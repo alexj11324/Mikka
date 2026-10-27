@@ -50,8 +50,9 @@ screen; it gets no other special UI (R-06).
   bot's name and a machine icon (cloud, laptop, server), never the machine
   as text. Only 等你回复 and 待审阅 add a word before the name; no 完成 or
   失败 word (the icon says it) and no failure reason. Never the bot's bloub avatar (glossary). Icons: grey
-  spinner 进行中, hollow circle 等你回复, PR icon 待审阅, red alert 失败, grey
-  check 完成. Rows waiting on the person carry a blue unread dot on the right.
+  spinner 进行中, hollow circle 等你回复, red alert 失败, green check 完成.
+  A thread whose output is a PR shows the PR icon in GitHub's colours: open
+  green (待审阅), draft grey, merged purple, closed red. Rows waiting on the person carry a blue unread dot on the right.
 - 设备 chips at the top (Mikka Cloud, Mac, …); an online machine has a green
   dot (R-24). Tapping one filters the list.
 - The filter button (top right) opens a menu: 全部 · 等你回复 · 待审阅 ·
@@ -66,8 +67,9 @@ in the blue one, as on the web (R-14). The
 thread card is a status icon and the thread name, with outputs as chips
 (R-66); no step line.
 
-Colour is restrained: grey spinners and checks; blue only for unread dots
-and send; red only for failure; green only for an online machine.
+Colour is restrained: grey spinners; blue only for unread dots and send;
+red only for failure; green for a finished thread and an online machine; PR
+states use GitHub's colours.
 
 Things waiting on the person have no screen of their own: proactive cards sit
 in the Coordinator chat (unread dot on its drawer row), and waiting threads
