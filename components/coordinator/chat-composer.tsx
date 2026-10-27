@@ -18,7 +18,7 @@ const MAX_LENGTH = 10_000
  * bar, attach on the left, send on the right. No model picker: the model is
  * ours unless the person picks their own in settings.
  */
-export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, onStop, quote }: {
+export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, onStop, quote }: {
   ref: Ref<HTMLTextAreaElement | null>
   value: string
   onChange: (value: string) => void
@@ -27,6 +27,8 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   placeholder?: string
   /** Waiting for a reply. With `onStop`, the send button turns into stop. */
   sending?: boolean
+  /** The other side keeps working and still takes messages. With `onStop`, the button is stop until something is typed. */
+  running?: boolean
   onStop?: () => void
   /** Something quoted into the message (an artifact quote chip): it sits on top, the buttons move to a row below. */
   quote?: ReactNode
@@ -36,6 +38,7 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   const fileRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const fileId = useId()
+  const stoppable = !!onStop && (sending || (running && !value.trim()))
   const setInput = (node: HTMLTextAreaElement | null) => {
     inputRef.current = node
     if (typeof ref === 'function') ref(node)
@@ -68,7 +71,7 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
       <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 py-3.5', quote ? 'min-h-10 pb-1' : 'min-h-12')} value={value} maxLength={MAX_LENGTH} rows={1} disabled={sending && !onStop} onChange={event => onChange(event.target.value)} onKeyDown={onKeyDown} />
       <InputGroupAddon align={quote ? 'block-end' : 'inline-end'} className={cn(quote ? 'justify-between px-2 pt-0 pb-2' : 'self-end pb-2')}>
         {quote && <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>}
-        {sending && onStop
+        {stoppable
           ? <InputGroupButton type="button" variant="default" size="icon-sm" className="rounded-full" aria-label={t('stop')} onClick={onStop}><Square className="fill-current" /></InputGroupButton>
           : <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" aria-label={t('send')} disabled={sending || !value.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>}
       </InputGroupAddon>

@@ -2306,8 +2306,9 @@
     "started": "started {time}",
     "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
     "composer": "Tell {agent} what to do next…",
-    "send": "Send",
-    "sendFailed": "Not sent. Your draft is still here"
+    "sendFailed": "Not sent. Your draft is still here",
+    "stopping": "Stopping…",
+    "stopFailed": "Couldn't stop it. Try again"
   },
   "Computer": {
     "status": {

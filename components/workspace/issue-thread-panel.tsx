@@ -1,17 +1,17 @@
 'use client'
 
 import { PersonAvatar } from '@/components/person-avatar'
-import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ArrowUp, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { getIssueThread, sendIssueThreadMessage } from '@/app/actions/agents'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
 import { runIsActive, threadItems } from '@/lib/issue-run-conversation'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
+import { ChatComposer } from '@/components/coordinator/chat-composer'
+import { Badge } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Spinner } from '@/components/ui/spinner'
 import { AgentMarkdown } from './agent-markdown'
 import { ThreadStatus, harnessLabel } from './issue-threads'
 import { cn } from '@/lib/utils'
@@ -32,11 +32,15 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [sendFailed, setSendFailed] = useState(false)
+  const [stopping, setStopping] = useState(false)
+  const [stopFailed, setStopFailed] = useState(false)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const detail = data?.thread.detail
   const active = !!data && runIsActive(data.thread.status)
+  // Stop was asked for; the run keeps its live status until the daemon ends it.
+  const stopRequested = active && (stopping || !!data?.thread.stopping)
   const items = data ? threadItems(data.chunks, data.messages) : []
-  async function send(event?: FormEvent) {
-    event?.preventDefault()
+  async function send() {
     const text = draft.trim()
     if (!text || sending) return
     setSending(true); setSendFailed(false)
@@ -44,9 +48,12 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
     catch { setSendFailed(true) }
     finally { setSending(false) }
   }
-  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
-    if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send() }
+  async function stop() {
+    if (stopRequested) return
+    setStopping(true); setStopFailed(false)
+    try { await stopRun(runId); await mutate() }
+    catch { setStopFailed(true) }
+    finally { setStopping(false) }
   }
   return <section aria-label={detail?.name ?? t('title')} className="flex h-full min-h-0 flex-col">
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4">
@@ -63,7 +70,7 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <ThreadStatus status={data.thread.status} />
+            {stopRequested ? <Badge variant="secondary" size="sm">{t('stopping')}</Badge> : <ThreadStatus status={data.thread.status} />}
             <span>{t('started', { time: format.dateTime(new Date(data.thread.createdAt), { hour: '2-digit', minute: '2-digit' }) })}</span>
           </div>
           {data.thread.prompt.trim() && <p className={cn(BUBBLE, data.thread.ownedByCurrentUser ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}>{data.thread.prompt.trim()}</p>}
@@ -84,14 +91,12 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
           </ol>
         </>}
     </div>
-    {active && detail && <form className={cn('flex shrink-0 flex-col gap-1 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')} onSubmit={event => { void send(event) }}>
-      <InputGroup className="min-h-12 rounded-3xl bg-background shadow-xs">
-        <InputGroupTextarea aria-label={t('composer', { agent: detail.agentName })} placeholder={t('composer', { agent: detail.agentName })} className="max-h-40 min-h-12 py-3.5" value={draft} maxLength={10_000} rows={1} disabled={sending} onChange={event => setDraft(event.target.value)} onKeyDown={onKeyDown} />
-        <InputGroupAddon align="inline-end" className="self-end pb-2">
-          <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" aria-label={t('send')} disabled={sending || !draft.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>
-        </InputGroupAddon>
-      </InputGroup>
+    {active && detail && <div className={cn('flex shrink-0 flex-col gap-1 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')}>
+      {/* Stop is the owner's; while it is on its way the button spins until the run ends. */}
+      <ChatComposer ref={inputRef} label={t('composer', { agent: detail.agentName })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
+        sending={sending || stopRequested} running onStop={data.thread.ownedByCurrentUser && !sending && !stopRequested ? () => { void stop() } : undefined} />
       {sendFailed && <p role="alert" className="px-3 text-xs text-destructive">{t('sendFailed')}</p>}
-    </form>}
+      {stopFailed && <p role="alert" className="px-3 text-xs text-destructive">{t('stopFailed')}</p>}
+    </div>}
   </section>
 }
