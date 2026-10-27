@@ -233,11 +233,16 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   row or a run. Built-in role names stay English (Coordinator).
 - **R-44** The home greeting stays 「早上好，Alex」 (time of day + name).
 
-- **R-45** A 建议 item, briefing item or follow-up item is written as an
-  action: it starts with a verb and names who or what it is about
-  (「回复 Jason：发布前要不要冻结 main」「核对 Stripe 10 月账单」), as Comma
-  ("Reply to Agenda", "Forward INV-2041") and ChatGPT do. Never a vague
-  report such as 「有人问…」 or 「#design 有人问…」.
+- **R-45** A 建议 item, briefing item or follow-up item makes clear what to
+  do and who or what it is about; never a bare report such as 「CI 挂了」 or
+  「有人问…」. A 建议 list row is short and starts with a verb
+  (「核对 Stripe 10 月账单」), as Comma ("Reply to Agenda") and ChatGPT do.
+- **R-46** The Coordinator talks like a warm, professional, well-organised
+  secretary, never like a command list. The briefing and follow-ups are
+  natural sentences: it says what it sorted and why, names the person, offers
+  to take the next step, and ends with one easy question
+  (「早上好，Alex。今天有 4 件事，我按轻重排了一下。最急的是 Kevin 的邮件…
+  先从 Kevin 那封开始？」).
 
 ## Tokens
 
