@@ -124,7 +124,7 @@ export function runBlockedEvent(run: WorkerRun, reason: string): CoordinatorEven
  * One item a briefing names, as the Coordinator reads it. `suggestionId`
  * links the item to its suggestion so a client can show it as a chip.
  * `title` is the source's own text until suggestions carry a verb-first
- * action title (R-41); then that title goes here, with the raw one as fallback.
+ * action title (R-45, `suggestions.actionTitle`); then that title goes here, with the raw one as fallback.
  */
 export interface BriefingEventItem { suggestionId: string; source: string; action: string; title: string; actor: string | null; url: string | null; required: boolean }
 
