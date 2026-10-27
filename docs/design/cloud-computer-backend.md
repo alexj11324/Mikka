@@ -69,8 +69,17 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
 - **Web sub-agents (R-72):** a bot runs each web task as a sub-agent with its
   own browser, several at once.
   - Each sub-agent gets a headless Chrome context, with no X display. Its live
-    view is a CDP screencast (`Page.startScreencast`), and takeover forwards
-    input over CDP (`Input.dispatchMouseEvent` / `dispatchKeyEvent`).
+    view is a CDP screencast (`Page.startScreencast`). There is no takeover of
+    a sub-agent's screen.
+  - **Login:** when a page needs credentials the sub-agent stops at
+    `needs_you` with `needs: { kind: "login", site, account? }`. The user
+    submits the password from the 登录 sheet to
+    `POST /api/bots/:botId/subagents/:id/credentials`; the bot machine focuses
+    the page's password field and types it with CDP `Input.insertText`. The
+    value goes straight from the request to the page: it is never written to
+    the database, logs, transcript or model context, and the screencast masks
+    it as the page does. One-time codes (2FA) use the same sheet with a code
+    field.
   - A sub-agent is not a run row in the thread list. It is owned by the bot
     and reported in the bot's chat.
   - Concurrency is capped per workspace (proposal: 6, Hark's figure). Further
@@ -185,8 +194,9 @@ Report findings in the issue before building on an assumption that failed.
   (`starting | running | paused | ended | error`), desktop (boolean),
   lastActiveAt.
 - `bot_subagents`: id, workspaceId, botId, task (one sentence, R-45), state
-  (`queued | running | needs_you | done | failed | stopped`), browser context
-  id, control (`agent | user | idle`), createdAt, endedAt. Not a run; never in
+  (`queued | running | needs_you | done | failed | stopped`), step (the
+  current step line), needs (`login` with site and account, or null), browser
+  context id, createdAt, endedAt. No credential column. Not a run; never in
   the thread list.
 - Approval rows: reuse the #161 ledger. Add `scope: once | run` so that
   本任务内都允许 auto-approves later operations of the same run on the same
@@ -271,10 +281,11 @@ that they land in the conversation:
 - `data-computer` with `{ botId, runId, task: string, state: "working" | "approval" | "done" | "failed", approvalId? }`.
   This is one card per computer task. `task` is the one-sentence task shown on
   the card.
-- `data-subagent` with `{ botId, subagentId, task: string, state: "queued" | "running" | "needs_you" | "done" | "failed" | "stopped", needs?: string }`
+- `data-subagent` with `{ botId, subagentId, task: string, state: "queued" | "running" | "needs_you" | "done" | "failed" | "stopped", step?: string, needs?: { kind: "login" | "code", site: string, account?: string } }`
   on the bot's chat (not a run). This is one card per web task, with a live
   view from `POST /api/bots/:botId/subagents/:id/viewer` (same shape as the
-  computer viewer). `POST /api/bots/:botId/subagents/:id/stop` stops it. The
+  computer viewer, view only). `POST /api/bots/:botId/subagents/:id/credentials`
+  fills a login (above) and `POST /api/bots/:botId/subagents/:id/stop` stops it. The
   bot then reports the outcome as an ordinary chat message.
 
 Workspace-level state changes also need to reach the details page outside a

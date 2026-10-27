@@ -95,8 +95,14 @@ source wins in a conflict is in [`README.md`](README.md).
   (no per-app cards). The daily briefing is not in 建议; it is the
   Coordinator's 08:00 message. A 任务 here is a thread started by the
   orchestrator or a bot; all of them stay listed. It is not a flat list of the
-  board's issues. 建议 items are standalone cards: a verb, the app's icon and
-  the concrete thing with its deadline or amount. The flow: the person says
+  board's issues. 建议 items are standalone cards, each one sentence: a verb
+  chip, the app's icon inline, the concrete thing and its reason, deadline or
+  amount (「取消你的 Verizon 套餐，赶在 11 月 1 日自动扣款 $52.13 之前」); no
+  separate meta line. Tapping posts the card in the bot's chat followed by the
+  full instruction handed to the orchestrator, written with its background
+  (account, source, what to check, and to stop for confirmation before an
+  irreversible step). While it runs, the card sits under 进行中 with a
+  progressive verb (正在取消). The flow: the person says
   yes to a Coordinator card, or taps a 建议 card, which starts the task at once
   (no composer step) → the orchestrator runs it as a bot sub-agent (web, R-72)
   or dispatches a thread (a real task such as coding) → the card shows it
@@ -192,8 +198,12 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   list. A web task is the bot's own: the bot runs it as a sub-agent (分身) with
   its own browser, and can run several at once. A sub-agent is never listed
   as a thread and has no name or avatar of its own; in the chat it shows as
-  one card per web task with its live screen and state (进行中, 等你处理,
-  完成), and the bot itself reports what it did, in its own voice.
+  one card per web task with its live screen and a step line (进行中, 需要你操作,
+  完成), and the bot itself reports what it did, in its own voice. The user
+  never drives a sub-agent's screen. When a site needs a login, the card shows
+  需要你操作 and the chat shows a 登录 <site> chip; tapping it opens a sheet
+  with the account and a password field, and the password is typed into that
+  site's login page only (not stored, not shown to the model).
 
 ## Look
 
