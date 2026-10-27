@@ -83,3 +83,9 @@ behaviour. Preserve owner-scoped historical reads, shared Bot rendering/images,
 and Claude Code/Codex/Cursor task execution harnesses. Harness names describe
 execution layers, not extra user-facing Bots. This is a behavioural retirement,
 not a shell/layout redesign; source correction: Alex 2026-10-25 23:40 UTC.
+
+## 2026-10-27: GitHub repository access and PR status
+
+GitHub repository access is individual: each person authorizes their own GitHub
+account and App installation. A linked PR's displayed state follows GitHub; Mikka
+does not close or reopen it. Existing manually shared task links remain shared.
