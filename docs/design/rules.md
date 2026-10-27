@@ -243,6 +243,10 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   to take the next step, and ends with one easy question
   (「早上好，Alex。今天有 4 件事，我按轻重排了一下。最急的是 Kevin 的邮件…
   先从 Kevin 那封开始？」).
+  The daily briefing follows Hark: a centred 「今日简报 · <date>」 label, then
+  one bubble per item, most urgent first. Each bubble says what came in and
+  why it matters to the person, then ends with one concrete offer
+  (「…要我按你的日历起草一封回复吗？」), so each can be answered on its own.
 
 ## Tokens
 
