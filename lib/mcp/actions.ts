@@ -1,7 +1,9 @@
+import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
-import { and, asc, desc, eq, gt, inArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { actAs } from '@/lib/acting-user'
+import type { ActivityActor } from '@/lib/activity-actor'
 import { addRunMessage, queueRun, requestRunStop } from '@/lib/agent-runs'
 import { forgetNotes, rememberNote } from '@/lib/coordinator/context'
 import { editMemory } from '@/lib/coordinator/store'
@@ -86,26 +88,26 @@ function issueResult(issue: { id: string; title: string; status: string; priorit
   }
 }
 
-export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }) {
+export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }, actor?: ActivityActor) {
   return attempt(() => actAs(userId, async () => {
     const created = unwrap(await saveIssue({ title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' })).issue
     return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeAgentId: input.assigneeAgentId }))
-  }))
+  }, actor))
 }
 
-export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }) {
+export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }, actor?: ActivityActor) {
   return attempt(() => actAs(userId, async () => {
     const { issueId, ...changes } = input
     return issueResult(await applyChanges(userId, issueId, changes))
-  }))
+  }, actor))
 }
 
-export async function linkIssues(userId: string, input: { issueId: string; kind: 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'; targetId: string | null; remove?: boolean }) {
+export async function linkIssues(userId: string, input: { issueId: string; kind: 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'; targetId: string | null; remove?: boolean }, actor?: ActivityActor) {
   return attempt(() => actAs(userId, async () => {
     const issue = await readIssue(input.issueId)
     const saved = unwrap(await updateIssueRelation({ id: issue.id, revision: issue.revision, kind: input.kind, targetId: input.targetId, remove: input.remove ?? false })).issue
     return issueResult(saved)
-  }))
+  }, actor))
 }
 
 /** Issues whose title or text contains `query`, most recently updated first. */
@@ -114,7 +116,7 @@ export async function searchIssues(userId: string, input: { query: string; statu
   const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(
-      or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)),
+      (await issueVisibility(userId)).predicate,
       or(sql`${issues.title} ilike ${pattern}`, sql`${issues.content}::text ilike ${pattern}`),
       input.status ? eq(issues.status, input.status) : undefined,
     ))
@@ -189,7 +191,7 @@ export async function listLabels(userId: string) {
 }
 
 export async function readMemory(userId: string) {
-  const [session] = await db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1)
+  const [session] = await db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNull(coordinatorSessions.botId))).limit(1)
   return { memory: session?.memory ?? '' }
 }
 

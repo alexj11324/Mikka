@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "private": true,
+  "license": "AGPL-3.0-only",
   "exports": {
     ".": "./src/index.ts",
     "./bridge": "./src/bridge.ts",
@@ -39,7 +40,8 @@
     "./label-colors": "./src/label-colors.ts",
     "./members": "./src/members.ts",
     "./collab": "./src/collab.ts",
-    "./artifact-frame": "./src/artifact-frame.ts"
+    "./artifact-frame": "./src/artifact-frame.ts",
+    "./coordinator": "./src/coordinator.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",

@@ -9,7 +9,9 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
-import { chatView, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatView, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { and, eq } from 'drizzle-orm'
+import { bots } from '@/lib/db/schema'
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { coordinatorWelcome } from '@/lib/agent-welcome'
@@ -22,11 +24,24 @@ async function getUserId(): Promise<string> {
 
 export type CoordinatorChat = ChatView & { enabled: boolean }
 
-/** The person's chat with their Coordinator. */
-export async function getCoordinatorChat(): Promise<CoordinatorChat> {
+const botIdSchema = z.uuid().nullable()
+
+/** The bot `botId` if it is one of the person's; null stays the Coordinator. */
+async function ownBot(userId: string, botId: string | null | undefined): Promise<{ id: string; name: string } | null> {
+  const parsed = botIdSchema.safeParse(botId ?? null)
+  if (!parsed.success) throw new ActionFailureError('validationGeneric')
+  if (!parsed.data) return null
+  const [bot] = await db.select({ id: bots.id, name: bots.name }).from(bots).where(and(eq(bots.id, parsed.data), eq(bots.userId, userId))).limit(1)
+  if (!bot) throw new ActionFailureError('validationGeneric')
+  return bot
+}
+
+/** The person's chat with their Coordinator, or with one of their bots: every bot runs on the same harness. */
+export async function getCoordinatorChat(botId: string | null = null): Promise<CoordinatorChat> {
   const userId = await getUserId()
+  const bot = await ownBot(userId, botId)
   const enabled = coordinatorEnabled()
-  const chat = await chatView(userId)
+  const chat = await chatView(userId, 200, bot?.id ?? null)
   // Without a Coordinator here nothing is coming, so do not show one working.
   return { ...chat, enabled, working: enabled && chat.working }
 }
@@ -36,34 +51,41 @@ const quoteSchema = z.object({
   text: z.string().trim().min(1).max(QUOTE_TEXT_MAX), label: z.string().max(200).optional(), selector: z.string().max(1000).optional(),
 })
 
-/** Sends a message to the Coordinator, with a quote from an artifact in front if given; its reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null): Promise<ActionResult<{ queued: true }>> {
+/** Each bot's latest line and whether it is answering, for the bot list. */
+export async function botChatSummaries(): Promise<Record<string, BotChatSummary>> {
+  return botChats(await getUserId())
+}
+
+/** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact in front if given; the reply shows up in the chat. */
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
     const userId = await getUserId()
+    const bot = await ownBot(userId, botId)
     const parsed = z.string().trim().min(1).max(10_000).safeParse(text)
     if (!parsed.success) throw new ActionFailureError('messageRequired')
     const quoted = quote ? quoteSchema.safeParse(quote) : null
     if (quoted && !quoted.success) throw new ActionFailureError('messageRequired')
-    await recordCoordinatorEvent(db, userMessageEvent(userId, withQuote(parsed.data, quoted?.data)))
+    await recordCoordinatorEvent(db, userMessageEvent(userId, withQuote(parsed.data, quoted?.data), { botId: bot?.id ?? null }))
     after(() => wakeCoordinator(userId))
     return { queued: true as const }
   })
 }
 
 /**
- * An empty Coordinator chat asks for its welcome, as every bot's does: a
+ * An empty chat asks its bot for a welcome, the Coordinator's included: a
  * greeting and one question about where to start. Once only: nothing happens
  * when the chat already has messages or anything waiting.
  */
-export async function welcomeCoordinator(): Promise<ActionResult<{ queued: boolean }>> {
+export async function welcomeCoordinator(botId: string | null = null): Promise<ActionResult<{ queued: boolean }>> {
   return runAction(async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
+    const bot = await ownBot(session.user.id, botId)
     if (!coordinatorEnabled()) return { queued: false }
-    const chat = await chatView(session.user.id, 1)
+    const chat = await chatView(session.user.id, 1, bot?.id ?? null)
     if (chat.items.length || chat.working) return { queued: false }
     const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
-    await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale)))
+    await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot?.name), { botId: bot?.id ?? null }))
     after(() => wakeCoordinator(session.user.id))
     return { queued: true }
   })

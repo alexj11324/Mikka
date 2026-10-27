@@ -13,9 +13,9 @@ import { withBasePath } from '@/lib/base-path'
 export interface SubmitInput { title: string; kind: ArtifactKind; content: string; artifactId?: string }
 
 /** The submitter for a run token: the run's agent. */
-export async function runSubmitter(run: { id: string; userId: string; issueId: string | null }): Promise<ArtifactSubmitter> {
+export async function runSubmitter(run: { id: string; userId: string; botId?: string | null; issueId: string | null }): Promise<ArtifactSubmitter> {
   const [row] = await db.select({ name: agents.name }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, run.id)).limit(1)
-  return { userId: run.userId, runId: run.id, issueId: run.issueId, authorName: row?.name ?? 'Agent' }
+  return { userId: run.userId, botId: run.botId ?? null, runId: run.id, issueId: run.issueId, authorName: row?.name ?? 'Agent' }
 }
 
 /** The submitter for an OAuth token: the person, by the client's registered name. */

@@ -1,19 +1,26 @@
+import { issueVisibility } from '@/lib/issue-visibility'
+import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
 import { generateText, type ModelMessage } from 'ai'
-import { and, asc, desc, eq, inArray, or } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
-import { addRunMessage, queueRun, readRun, requestRunStop, runViewColumns } from '@/lib/agent-runs'
+import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
+import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
-import { agentRuns, agents, deviceRepos, devices, issueMembers, issues } from '@/lib/db/schema'
+import { webSearch } from '@/lib/search'
+import { agents, deviceRepos, devices, issueMembers, issues, telegramLinks } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
-import { type ComposioActionName } from '@/lib/composio-actions'
+import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
+import { proposeAction } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
+import type { TelegramReplyTarget } from '@/lib/coordinator-events'
+import { postTelegramText } from '@/lib/telegram/client'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -30,24 +37,49 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   }
 }
 
-export async function takeInbox(userId: string, holder: string) {
+// `botId` picks the chat: null is the Coordinator, otherwise one of the person's bots.
+
+export async function takeInbox(userId: string, holder: string, botId: string | null = null) {
   'use step'
-  return store.takeInbox(userId, holder)
+  return store.takeInbox(userId, holder, botId)
 }
 
-export async function releaseLease(userId: string, holder: string) {
+export async function releaseLease(userId: string, holder: string, botId: string | null = null) {
   'use step'
-  return store.releaseLease(userId, holder)
+  return store.releaseLease(userId, holder, botId)
 }
 
-export async function failTurn(userId: string, holder: string, error: string) {
+export async function failTurn(userId: string, holder: string, error: string, botId: string | null = null) {
   'use step'
-  await store.failTurn(userId, holder, error)
+  await store.failTurn(userId, holder, error, botId)
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null) {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null) {
   'use step'
-  await store.appendMessages(userId, holder, messages, warning)
+  await store.appendMessages(userId, holder, messages, warning, botId)
+}
+
+/** Linked, de-duplicated Telegram threads that should get this reply. */
+export async function telegramReplyThreads(userId: string, targets: TelegramReplyTarget[]): Promise<string[]> {
+  'use step'
+  const destinations = [...new Map(targets.map(target => [JSON.stringify(target), target])).values()]
+  const threads: string[] = []
+  for (const target of destinations) {
+    const [link] = await db.select({ userId: telegramLinks.userId }).from(telegramLinks)
+      .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.telegramUserId, target.telegramUserId))).limit(1)
+    if (link && !threads.includes(target.threadId)) threads.push(target.threadId)
+  }
+  return threads
+}
+
+/**
+ * Sends one chunk to one thread. Each chunk is its own durable step, so a
+ * retry after a failed chunk resends only that chunk, never the ones already
+ * delivered (Telegram sends have no idempotency key).
+ */
+export async function sendTelegramChunk(threadId: string, chunk: string) {
+  'use step'
+  await postTelegramText(threadId, chunk)
 }
 
 /**
@@ -55,9 +87,9 @@ export async function appendMessages(userId: string, holder: string, messages: M
  * token budget, then returns the prompt for this turn: the instructions with
  * the person's memory, and the messages.
  */
-export async function preparePrompt(userId: string): Promise<{ instructions: string; messages: ModelMessage[] }> {
+export async function preparePrompt(userId: string, botId: string | null = null): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
-  let { summary, memory, messages } = await store.loadConversation(userId)
+  let { summary, memory, messages } = await store.loadConversation(userId, botId)
   const cut = compactionCut(summary, messages)
   if (cut !== null) {
     const folded = messages.filter(row => row.position <= cut)
@@ -66,51 +98,61 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
       instructions: SUMMARY_INSTRUCTIONS,
       messages: [...promptMessages(summary, folded), { role: 'user', content: 'Write the summary now.' }],
     })
-    await store.saveSummary(userId, text, cut)
+    await store.saveSummary(userId, text, cut, botId)
     summary = text
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(COORDINATOR_INSTRUCTIONS, memory), messages: promptMessages(summary, messages) }
+  return { instructions: instructionsWithMemory(await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages) }
 }
 
-export async function remember(userId: string, input: { note: string }) {
+export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope, botId: string | null = null) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
     const next = rememberNote(memory, input.note)
     return next === null ? { error: 'memoryFull: forget something first' } : { memory: next, result: { remembered: true } }
-  })
+  }, botId)
 }
 
-export async function forget(userId: string, input: { text: string }) {
+export async function forget(userId: string, input: { text: string }, scope?: NativeToolScope, botId: string | null = null) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
     const { memory: next, removed } = forgetNotes(memory, input.text)
     return { memory: next, result: { removed } }
-  })
+  }, botId)
 }
 
-export async function composioAction(userId: string, action: ComposioActionName, input: unknown) {
+export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return runComposioAction(userId, action, input)
 }
 
-export async function listIssues(userId: string, input: { status?: string }) {
+export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
+  return proposeAction(userId, action, input)
+}
+
+export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
   const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId)), input.status ? eq(issues.status, input.status) : undefined))
+    .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
     .orderBy(desc(issues.updatedAt)).limit(100)
   return rows.filter(row => !readIssueMetadata(row.content).deletedAt).slice(0, 50).map(({ content, updatedAt, ...row }) => ({
     ...row, number: readIssueMetadata(content).number ?? null, updatedAt: updatedAt.toISOString(),
   }))
 }
 
-export async function getIssue(userId: string, input: { issueId: string }) {
+export async function getIssue(userId: string, input: { issueId: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const issue = await issueForUser(userId, input.issueId)
   if (!issue) return { error: 'issueNotFound' }
-  const runs = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.issueId, issue.id), eq(agentRuns.userId, userId))).orderBy(desc(agentRuns.createdAt)).limit(5)
+  const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
   return {
     id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
@@ -118,8 +160,9 @@ export async function getIssue(userId: string, input: { issueId: string }) {
   }
 }
 
-export async function listAgents(userId: string) {
+export async function listAgents(userId: string, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const rows = await db.select({ id: agents.id, name: agents.name, description: agents.description, harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt })
     .from(agents).leftJoin(devices, eq(devices.id, agents.deviceId)).where(eq(agents.userId, userId)).orderBy(asc(agents.name))
   const deviceIds = [...new Set(rows.map(row => row.deviceId).filter((id): id is string => Boolean(id)))]
@@ -131,22 +174,23 @@ export async function listAgents(userId: string) {
   }))
 }
 
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }) {
+/** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope, botId: string | null = null) {
   'use step'
-  return asToolResult(async () => ({ ...(await queueRun(userId, input)), status: 'queued' }))
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId)), status: 'queued' }))
 }
 
-export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }) {
+export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope) {
   'use step'
-  const active = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
-  const rows = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.userId, userId), input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined, input.activeOnly ? inArray(agentRuns.status, [...active]) : undefined))
-    .orderBy(desc(agentRuns.createdAt)).limit(20)
+  await assertNativeToolScope(userId,scope)
+  const rows = await visibleRuns(userId, input)
   return rows.map(run => ({ id: run.id, issueId: run.issueId, agent: run.agentName, status: run.status, stopReason: run.stopReason, createdAt: run.createdAt.toISOString() }))
 }
 
-export async function getRun(userId: string, input: { runId: string }) {
+export async function getRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   const detail = await readRun(userId, input.runId)
   if (!detail) return { error: 'runNotFound' }
   const { run } = detail
@@ -159,12 +203,21 @@ export async function getRun(userId: string, input: { runId: string }) {
   }
 }
 
-export async function sendToRun(userId: string, input: { runId: string; text: string }) {
+export async function sendToRun(userId: string, input: { runId: string; text: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(async () => { await addRunMessage(userId, input); return { sent: true } })
 }
 
-export async function stopRun(userId: string, input: { runId: string }) {
+export async function stopRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
   'use step'
+  await assertNativeToolScope(userId,scope)
   return asToolResult(async () => { await requestRunStop(userId, input.runId); return { stopRequested: true } })
+}
+
+/** Web search through the shared SearchProvider (MIK-5); degrades to searchUnavailable on 429/5xx/timeout. */
+export async function webSearchStep(userId: string, input: { query: string; limit?: number }, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
 }

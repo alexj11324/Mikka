@@ -3,42 +3,11 @@
 Agents such as Claude Code and Codex can drive Mikka through its MCP server at
 `https://app.aspectlylabs.com/mikka/api/mcp` (Streamable HTTP).
 
-## Connecting
-
-Claude Code:
-
-```sh
-claude mcp add --transport http mikka https://app.aspectlylabs.com/mikka/api/mcp
-```
-
-Codex (`~/.codex/config.toml`):
-
-```toml
-[mcp_servers.mikka]
-url = "https://app.aspectlylabs.com/mikka/api/mcp"
-```
-
-then `codex mcp login mikka`.
-
-The first connection opens a browser: sign in to Mikka and allow the agent.
-The agent then acts as you.
+How to connect and the tool list for users are in the public docs:
+[aspectlylabs.com/mikka/docs/mcp](https://aspectlylabs.com/mikka/docs/mcp)
+(`mikka-web/content/docs/mcp.mdx`). This page covers the implementation.
 
 ## Tools
-
-| Tool | What it does |
-| --- | --- |
-| `send_to_coordinator` | Sends a message to your Coordinator, as if typed in the chat, and wakes it. Returns `after`. |
-| `read_coordinator_messages` | Reads the conversation after a position; `waitSeconds` waits for the Coordinator's reply. |
-| `list_issues`, `get_issue` | Your issues, and one issue with its text and latest runs. |
-| `list_runs`, `get_run` | Recent agent runs, and one run with its summary and latest events. |
-| `get_run_events` | A run's full event stream, a page at a time. |
-| `search_issues` | Issues whose title or text contains the words. |
-| `list_projects`, `list_labels`, `list_agents` | Your projects, the labels in use, and your agents with their devices and repositories. |
-| `create_issue`, `update_issue` | Create an issue, or change its title, status, priority, project, labels or assigned agent. |
-| `link_issues` | Add or remove a parent, child, related, blocked-by, blocks or duplicate link. |
-| `dispatch_run`, `send_to_run`, `stop_run` | Queue a run for an agent, message a running agent, ask a run to stop. |
-| `read_coordinator_memory`, `remember`, `forget` | Read and edit the notes your Coordinator keeps about you. |
-| `submit_artifact` | Hand over a document (Markdown) or a web page (one self-contained HTML file). Pass `artifactId` to add a version. See [Artifacts](#artifacts). |
 
 `get_issue` also returns the issue's project, labels, assignee and relations.
 Writes run the app's own server actions inside `actAs` (`lib/acting-user.ts`),

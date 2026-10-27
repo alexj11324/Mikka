@@ -26,7 +26,7 @@ export function AgentComputer({ botId, name }: { botId: string; name: string }) 
     <ComputerScreen botId={botId} name={name}>
       <Button size="sm" className="h-9 rounded-full bg-screen/80 px-3.5 text-screen-foreground backdrop-blur-sm hover:bg-screen/90" onClick={() => setViewing(true)}><Maximize2 data-icon="inline-start" />{t('open')}</Button>
     </ComputerScreen>
-    <p className="text-xs text-muted-foreground">{t('screenOf', { name })}</p>
+    <p className="max-w-full truncate text-xs text-muted-foreground">{t('screenOf', { name })}</p>
     {viewing && <ComputerViewer botId={botId} name={name} open={viewing} onOpenChange={setViewing} />}
   </div>
 }

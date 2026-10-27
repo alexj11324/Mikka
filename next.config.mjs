@@ -40,7 +40,9 @@ const nextConfig = {
     ]
   },
   transpilePackages: ['@mikka/protocol'],
-  serverExternalPackages: ['ai', 'better-auth', 'drizzle-orm'],
+  // better-auth/react must share Next's SSR React dispatcher with client components.
+  // Externalizing the whole package loads native React and crashes enabled analytics.
+  serverExternalPackages: ['ai', 'drizzle-orm'],
   async headers() {
     return [{ source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -48,7 +50,14 @@ const nextConfig = {
       { key: 'Strict-Transport-Security', value: 'max-age=63072000' },
       { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
       { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-    ] }]
+    ] }, // next-intl can land the reset link on a locale-prefixed page; it carries the token too.
+      ...['/api/auth/verify-email', '/verify-email', '/:locale(en|zh-CN)/verify-email', '/api/auth/reset-password/:path*', '/reset-password/:path*', '/:locale(en|zh-CN)/reset-password/:path*'].map(source => ({
+      source,
+      headers: [
+        { key: 'Referrer-Policy', value: 'no-referrer' },
+        { key: 'Cache-Control', value: 'no-store' },
+      ],
+    }))]
   },
   experimental: {
     globalNotFound: true,

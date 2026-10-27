@@ -1,0 +1,45 @@
+import { test, expect, register, conversationPill } from './fixtures'
+
+// The left column is a list of bots; the Coordinator is one of them. Every bot
+// chats on the Coordinator harness, in its own conversation. No model runs in
+// e2e, so a sent message stays pending in that bot's inbox, which is enough to
+// show where it went.
+test('新建 Bot 进入左侧列表，打开它自己的对话，消息不进 Coordinator', async ({ page }) => {
+  await register(page)
+  const bots = page.getByRole('list', { name: 'Bot', exact: true })
+  await expect(bots.getByRole('button', { name: 'Coordinator', exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click()
+  const dialog = page.getByRole('dialog', { name: '新建 Bot' })
+  await dialog.getByLabel('名字', { exact: true }).fill('写作助手')
+  await dialog.getByRole('button', { name: '爱心', exact: true }).click()
+  await dialog.getByRole('button', { name: '绿色', exact: true }).click()
+  await dialog.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(dialog).toBeHidden()
+
+  // The new bot's chat opens at once, under its own name, and survives a reload.
+  await expect(conversationPill(page)).toHaveText('写作助手')
+  await expect(page).toHaveURL(/[?&]bot=[0-9a-f-]{36}/)
+  const row = bots.getByRole('button', { name: '写作助手', exact: true })
+  await expect(row).toBeVisible()
+  // Its bloub wears the shape and colour picked in the dialog.
+  await expect(row.locator('[data-slot="bot-avatar"]')).toHaveAttribute('data-shape', 'coeur')
+  await expect(row.locator('[data-slot="bot-avatar"]')).toHaveAttribute('data-color', 'vert')
+
+  const composer = page.getByLabel('给 写作助手 发消息', { exact: true })
+  await composer.fill('帮我起草一份周报')
+  await composer.press('Enter')
+  await expect(page.getByText('帮我起草一份周报', { exact: true })).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('bot-chat.png'), fullPage: false })
+
+  await page.reload()
+  await expect(conversationPill(page)).toHaveText('写作助手')
+  await expect(page.getByText('帮我起草一份周报', { exact: true })).toBeVisible()
+
+  await bots.getByRole('button', { name: 'Coordinator', exact: true }).click()
+  await expect(conversationPill(page)).toHaveText('Coordinator')
+  await expect(page).not.toHaveURL(/[?&]bot=/)
+  await expect(page.getByLabel('给 Coordinator 发消息', { exact: true })).toBeVisible()
+  await expect(page.getByText('帮我起草一份周报', { exact: true })).toHaveCount(0)
+  await page.screenshot({ path: test.info().outputPath('coordinator-chat.png'), fullPage: false })
+})

@@ -1,6 +1,6 @@
 # Migration bootstrap
 
-`MIGRATE=1 pnpm migrate` applies the tracked SQL files to the configured application (`MIKKA_DATABASE_URL`, with the existing `ORVILO_DATABASE_URL` fallback) and workspace (`DATABASE_URL`) databases. Normal preview/local builds still skip migrations. Do not run this against a developer or production database as a test.
+`MIGRATE=1 pnpm migrate` applies the tracked SQL files to the configured application (`MIKKA_DATABASE_URL`) and workspace (`DATABASE_URL`) databases. Normal preview/local builds still skip migrations. Do not run this against a developer or production database as a test.
 
 ## The pre-history baseline
 

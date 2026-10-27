@@ -6,7 +6,8 @@ import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useComputer } from '@/hooks/use-computer'
-import { computerApi } from '@/lib/computer/client'
+import { computerApi, isMockedComputer } from '@/lib/computer/client'
+import { useCloudComputer } from '@/hooks/use-feature-availability'
 import type { ApprovalView, ComputerTask } from '@/lib/computer/types'
 import { cn } from '@/lib/utils'
 import { useComputerBotName, useRegisterComputerThread, useThreadName } from './computer-agents'
@@ -41,7 +42,15 @@ function ApprovalBar({ approval }: { approval: ApprovalView }) {
  * with the task sentence, the state and the live screen. Approval happens
  * here. While the computer is asleep or waking it shrinks to a chip.
  */
-export function ComputerCard({ botId, botName, runId, task, thread, state = 'working' }: Omit<ComputerTask, 'state'> & { state?: ComputerTask['state']; botName?: string; thread?: string }) {
+type ComputerCardProps = Omit<ComputerTask, 'state'> & { state?: ComputerTask['state']; botName?: string; thread?: string }
+
+/** Hidden behind the `cloud-computer` flag until the backend is live; the demo bots always show it. */
+export function ComputerCard(props: ComputerCardProps) {
+  const enabled = useCloudComputer()
+  return enabled || isMockedComputer(props.botId) ? <ComputerTaskCard {...props} /> : null
+}
+
+function ComputerTaskCard({ botId, botName, runId, task, thread, state = 'working' }: ComputerCardProps) {
   const t = useTranslations('Computer')
   const name = useComputerBotName(botId, botName)
   const threadName = useThreadName(botId, runId, thread, task)

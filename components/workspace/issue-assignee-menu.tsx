@@ -9,9 +9,12 @@ import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
 import type { IssueMetadata } from '@/lib/issue-metadata'
 import { Button } from '@/components/ui/button'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
+import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { avatarImageSrc } from '@/lib/default-avatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from '@/components/ui/command'
+import { ROW_VALUE } from './issue-property-row'
 
 
 /** An agent's mark: the bloub blob, still, in a colour taken from its name. Boards show many, so none of them move. */
@@ -23,7 +26,7 @@ export function AssigneeAvatar({ assignee, compact = false }: { assignee: IssueM
   if (!assignee) return <CircleUserRound data-icon="inline-start" />
   // Agents are blobs, people are photos or initials.
   if (assignee.kind === 'agent') return <AgentSphere name={assignee.name} compact={compact} />
-  return <Avatar size={compact ? 'xs' : 'sm'}><AvatarImage src={assignee.image ?? undefined} alt="" draggable={false} /><AvatarFallback>{assignee.name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+  return <Avatar size={compact ? 'xs' : 'sm'}><AvatarImage src={avatarImageSrc(assignee.image)} alt="" draggable={false} /><AvatarFallback>{assignee.name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
 }
 
 export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, onInvite, request }: {
@@ -40,8 +43,8 @@ export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, o
     if (await onChange(value)) { setOpen(false); setQuery('') }
   }
   return <Popover open={open} onOpenChange={value => { setOpen(value); setQuery('') }}>
-    <PopoverTrigger render={<Button data-assignee-trigger type="button" variant="ghost" size={compact ? 'icon-compact' : 'sm'} disabled={disabled} aria-label={t('aria', { name: assignee?.name ?? t('unassigned') })} title={t('ariaShortcut', { name: assignee?.name ?? t('unassigned') })} />}>
-      <AssigneeAvatar assignee={assignee} compact={compact} />{!compact && (assignee?.name ?? t('unassignedLabel'))}
+    <PopoverTrigger render={<Button data-assignee-trigger type="button" variant="ghost" size={compact ? 'icon-compact' : 'sm'} className={cn(!compact && ROW_VALUE)} disabled={disabled} aria-label={t('aria', { name: assignee?.name ?? t('unassigned') })} title={t('ariaShortcut', { name: assignee?.name ?? t('unassigned') })} />}>
+      <AssigneeAvatar assignee={assignee} compact={compact} />{!compact && <span className={cn('truncate', !assignee && 'text-muted-foreground')}>{assignee?.name ?? t('unassignedLabel')}</span>}
     </PopoverTrigger>
     <PopoverContent align="end" className="w-72 p-0">
       <Command onKeyDownCapture={event => {

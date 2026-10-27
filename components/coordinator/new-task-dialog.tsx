@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { DeviceIcon } from '@/components/devices/device-icon'
+import { useCloudComputer } from '@/hooks/use-feature-availability'
 import { useComputer } from '@/hooks/use-computer'
 
 const MAX_LENGTH = 8000
@@ -68,9 +69,11 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const own: Machine[] = devices.filter(item => (item as typeof item & { kind?: string }).kind !== 'cloud').map(item => ({ value: item.id, label: item.name, online: item.online, server: item.platform !== 'darwin' && item.platform !== 'win32' }))
   const local = own.filter(item => !item.server)
   const remote = own.filter(item => item.server)
-  const machines = [cloud, ...local, ...remote]
+  // Mikka Cloud is offered only once the cloud computer is live (the `cloud-computer` flag).
+  const cloudComputer = useCloudComputer()
+  const machines = cloudComputer ? [cloud, ...local, ...remote] : [...local, ...remote]
   const [picked, setPicked] = useState<string | null>(null)
-  const device = machines.find(item => item.value === picked) ?? cloud
+  const device = machines.find(item => item.value === picked) ?? machines[0]
   useEffect(() => { if (open && initialText) setDraft(current => current || initialText) }, [open, initialText])
 
   async function attach(files: File[]) {

@@ -4,6 +4,7 @@
   "description": "Local Mikka daemon: runs agents through the user's own CLIs",
   "type": "module",
   "private": true,
+  "license": "AGPL-3.0-only",
   "bin": {
     "mikka": "./bin/mikka.ts"
   },
@@ -16,7 +17,8 @@
     "./http-link": "./src/server-link-http.ts",
     "./login": "./src/login.ts",
     "./log": "./src/log.ts",
-    "./sandbox": "./src/agents/sandbox.ts"
+    "./sandbox": "./src/agents/sandbox.ts",
+    "./coordinator": "./src/coordinator/index.ts"
   },
   "scripts": {
     "daemon": "tsx bin/mikka.ts daemon",

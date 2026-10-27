@@ -20,6 +20,8 @@ export type { ArtifactDetail, ArtifactSummary, ArtifactVersionInfo } from '@/lib
 /** Who is handing an artifact over: the run's agent, or an agent signed in with OAuth. */
 export interface ArtifactSubmitter {
   userId: string
+  /** The bot whose run made it, so the card shows in that bot's chat; null for the Coordinator. */
+  botId?: string | null
   runId: string | null
   issueId: string | null
   authorName: string

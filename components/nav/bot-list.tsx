@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { PanelLeft, Plus } from 'lucide-react'
-import { getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
+import { botChatSummaries, getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
 import type { Thread } from '@/app/actions/task-runs'
 import { MikkaMark } from '@/components/brand/mikka-mark'
@@ -13,20 +13,19 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { cn } from '@/lib/utils'
-import { sessionPreview, type SavedAgentSession } from '@/lib/agent-history'
+import { sessionPreview } from '@/lib/agent-history'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
 
 /**
- * What the center column shows: the Coordinator, a bot's chat, or an older
- * chat that has no bot (reachable from ⌘K only; `sessionId: null` is a new one).
+ * What the center column shows: the Coordinator, a bot's chat (both on the
+ * Coordinator harness), or a read-only older chat (reachable from ⌘K only).
  */
 export type ChatTarget = { kind: 'coordinator' } | { kind: 'bot'; botId: string } | { kind: 'agent'; sessionId: string | null }
 
 type ListProps = {
   bots: BotView[]
   threads: Thread[]
-  sessions: SavedAgentSession[]
   active: ChatTarget | null
   onOpen: (target: ChatTarget) => void
   onNewBot: () => void
@@ -69,11 +68,11 @@ function useUnread(activeId: string | null, latest: Record<string, string>) {
   return (id: string) => !!seen && id !== activeId && !!latest[id] && latest[id] > (seen.at[id] ?? seen.since)
 }
 
-/** A bot's mood from its threads: waiting on you, then working, then a failed last run, else idle. */
-function botMood(threads: Thread[], botId: string): BotMood {
+/** A bot's mood from its chat and threads: waiting on you, then working, then a failed last run, else idle. */
+function botMood(threads: Thread[], botId: string, chatting: boolean): BotMood {
   const own = threads.filter(thread => thread.botId === botId)
   if (own.some(thread => thread.status === 'waiting_input')) return 'notify'
-  if (own.some(thread => ['queued', 'preparing', 'running', 'finishing'].includes(thread.status))) return 'thinking'
+  if (chatting || own.some(thread => ['queued', 'preparing', 'running', 'finishing'].includes(thread.status))) return 'thinking'
   // Threads arrive newest first: a failure stays on its face until the next run.
   return own[0]?.status === 'failed' ? 'exclaim' : 'idle'
 }
@@ -83,9 +82,15 @@ function coordinatorLine(text: string) {
   return sessionPreview(text.replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, '').replace(/\[([^\]\n]+)\]\([^)]+\)/g, '$1'), null)
 }
 
-function Row({ name, preview, avatar, current, unread, onClick }: { name: string; preview: ReactNode; avatar: ReactNode; current: boolean; unread: boolean; onClick: () => void }) {
-  return <SidebarMenuItem><SidebarMenuButton size="lg" isActive={current} aria-current={current ? 'page' : undefined} aria-label={name} onClick={onClick} className="h-13 gap-2.5 rounded-xl px-2.5">
-    {avatar}
+/** Green while the bot is working, orange while it waits on you; otherwise no dot. */
+type RowStatus = 'working' | 'waiting'
+
+function Row({ name, preview, avatar, status, current, unread, onClick, label }: { name: string; preview: ReactNode; avatar: ReactNode; status?: RowStatus; current: boolean; unread: boolean; onClick: () => void; label: string }) {
+  return <SidebarMenuItem><SidebarMenuButton size="lg" isActive={current} aria-current={current ? 'page' : undefined} aria-label={label} onClick={onClick} className="h-13 gap-2.5 rounded-xl px-2.5">
+    <span className="relative shrink-0">
+      {avatar}
+      {status && <span aria-hidden="true" className={cn('absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-sidebar', status === 'working' ? 'bg-success' : 'bg-attention')} />}
+    </span>
     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="truncate text-sm font-semibold">{name}</span>
       {preview && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">{preview}</span>}
@@ -100,21 +105,16 @@ function Row({ name, preview, avatar, current, unread, onClick }: { name: string
  * of its chat, most recent first. Threads (the work a bot does) live in the
  * right column, never here. It collapses off canvas; the rail stays.
  */
-export function BotList({ bots, threads, sessions, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: ListProps) {
+export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: ListProps) {
   const i18nText = useTranslations()
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
   const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat(), { revalidateOnFocus: false })
-  // Each bot's latest chat gives its row the preview line and its place in the list.
-  const latestChat = new Map<string, SavedAgentSession>()
-  for (const session of sessions) {
-    if (!session.botId) continue
-    const current = latestChat.get(session.botId)
-    if (!current || session.updatedAt > current.updatedAt) latestChat.set(session.botId, session)
-  }
-  const ordered = [...bots].sort((a, b) => (latestChat.get(b.id)?.updatedAt ?? '').localeCompare(latestChat.get(a.id)?.updatedAt ?? '') || a.name.localeCompare(b.name))
+  // Each bot's latest line gives its row the preview and its place in the list.
+  const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: 15000, revalidateOnFocus: false })
+  const ordered = [...bots].sort((a, b) => (chats[b.id]?.at ?? '').localeCompare(chats[a.id]?.at ?? '') || a.name.localeCompare(b.name))
   const lastReply = coordinator?.items.findLast(item => item.from !== 'event')
   const latest: Record<string, string> = {}
-  for (const [botId, session] of latestChat) latest[botId] = session.updatedAt
+  for (const [botId, chat] of Object.entries(chats)) if (chat.at) latest[botId] = chat.at
   if (lastReply?.from === 'coordinator') latest.coordinator = lastReply.createdAt
   const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'bot' ? active.botId : null
   const unread = useUnread(activeId, latest)
@@ -132,14 +132,17 @@ export function BotList({ bots, threads, sessions, active, onOpen, onNewBot, rai
     </SidebarHeader>
     <SidebarContent>
       <SidebarGroup className="px-2 pt-1"><SidebarMenu aria-label={i18nText('Nav.bots')} className="gap-0.5">
-        <Row name={i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
-          avatar={<CoordinatorAvatar />}
+        <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
+          avatar={<CoordinatorAvatar mood={coordinator?.working ? 'thinking' : 'idle'} />}
+          status={coordinator?.working ? 'working' : undefined}
           preview={lastReply ? <span className="truncate">{coordinatorLine(lastReply.text)}</span> : null} />
         {ordered.map(bot => {
-          const line = latestChat.get(bot.id)?.preview
-          return <Row key={bot.id} name={bot.name} current={active?.kind === 'bot' && active.botId === bot.id} unread={unread(bot.id)} onClick={() => choose({ kind: 'bot', botId: bot.id })}
-            avatar={<BotAvatar color={bot.color} shape={bot.shape} mood={botMood(threads, bot.id)} />}
-            preview={line ? <span className="truncate">{line}</span> : null} />
+          const chat = chats[bot.id]
+          const mood = botMood(threads, bot.id, chat?.working ?? false)
+          const status: RowStatus | undefined = mood === 'notify' ? 'waiting' : mood === 'thinking' ? 'working' : undefined
+          return <Row key={bot.id} name={bot.name} label={bot.name} current={active?.kind === 'bot' && active.botId === bot.id} unread={unread(bot.id)} onClick={() => choose({ kind: 'bot', botId: bot.id })}
+            avatar={<BotAvatar color={bot.color} shape={bot.shape} mood={mood} />} status={status}
+            preview={chat?.line ? <span className="truncate">{coordinatorLine(chat.line)}</span> : null} />
         })}
       </SidebarMenu></SidebarGroup>
     </SidebarContent>

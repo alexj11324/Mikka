@@ -1,3 +1,4 @@
+import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { after, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
@@ -10,8 +11,9 @@ import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 export const dynamic = 'force-dynamic'
 
 /** `GET /api/coordinator/messages`: the person's conversation with their Coordinator, oldest first. */
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
+  noteLogUser(session?.user?.id)
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
   return NextResponse.json({ enabled: coordinatorEnabled(), ...(await chatView(session.user.id)) }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
@@ -21,8 +23,9 @@ export async function GET(request: Request) {
  * Coordinator. It lands in the inbox and wakes a turn; the reply shows up in
  * the conversation.
  */
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
+  noteLogUser(session?.user?.id)
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
   const parsed = z.object({ text: z.string().trim().min(1).max(10_000) }).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'messageRequired' }, { status: 400 })
@@ -31,3 +34,6 @@ export async function POST(request: Request) {
   after(() => wakeCoordinator(userId))
   return NextResponse.json({ queued: true, enabled: coordinatorEnabled() }, { status: 202 })
 }
+
+export const GET = withRequestLog('/api/coordinator/messages', handleGET)
+export const POST = withRequestLog('/api/coordinator/messages', handlePOST)

@@ -1,11 +1,14 @@
 import 'server-only'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db } from '@/lib/db'
-import { agents, agentRuns, deviceRepos, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { agents, agentRuns, deviceRepos, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { issueVisibility } from '@/lib/issue-visibility'
+import { workspaceRunView } from '@/lib/run-visibility'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
+import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -44,7 +47,8 @@ export const runViewColumns = {
  * next poll, claims it, and reports back through `/v1/runs/:runId/complete`.
  * `note` is extra direction for this run only, after the issue.
  */
-export async function queueRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }): Promise<{ runId: string }> {
+/** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
+export async function queueRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, botId: string | null = null): Promise<{ runId: string }> {
   const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), deviceRepoId: z.uuid(), note: z.string().trim().max(10_000).optional() }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   const issue = await issueForUser(userId, parsed.data.issueId)
@@ -57,7 +61,7 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   if (!repo) throw new ActionFailureError('agentRepoMissing')
   const runId = crypto.randomUUID()
   await db.insert(agentRuns).values({
-    id: runId, userId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
+    id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
     deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
     prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note),
   })
@@ -69,17 +73,34 @@ function runPrompt(title: string, body: string, instructions: string, note?: str
   const parts = [`# ${title}`]
   if (body) parts.push(body)
   if (note) parts.push('## Notes for this run', note)
-  parts.push('---', 'Work in the repository checked out for this run. When you are done, hand in your work with a short summary of what changed.')
+  parts.push('---', 'Work in the repository checked out for this run. Mikka saves your changes as you go and handles commits and pushes, so you do not need to run git commit or git push. When you are done, hand in your work with a short summary of what changed.')
   if (instructions) parts.push('## Your standing instructions', instructions)
   return parts.join('\n\n').slice(0, 100_000)
 }
 
+/** Every surface uses this gate. Workspace membership never grants run control,
+ * personal agent/session access, or raw transcript access. */
+export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number } = {}): Promise<RunView[]> {
+  if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
+  if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
+  const visibility = await issueVisibility(userId)
+  const shared = visibility.allowedIds.length ? and(eq(issues.scope, 'workspace'), inArray(issues.id, visibility.allowedIds)) : sql`false`
+  const rows = await db.select({ ...runViewColumns, ownerId: agentRuns.userId }).from(agentRuns)
+    .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
+    .where(and(
+      or(eq(agentRuns.userId, userId), and(visibility.predicate, shared)),
+      input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined,
+      input.runIds ? inArray(agentRuns.id, input.runIds) : undefined,
+      input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined,
+    )).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(Math.max(1, Math.min(input.limit ?? 20, 100)))
+  return rows.map(({ ownerId, ...run }) => ownerId === userId ? run : workspaceRunView(run))
+}
+
 export async function readRun(userId: string, runId: string): Promise<RunDetail | null> {
-  const parsed = z.uuid().safeParse(runId)
-  if (!parsed.success) return null
-  const [run] = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.id, parsed.data), eq(agentRuns.userId, userId))).limit(1)
+  const [run] = await visibleRuns(userId, { runIds: [runId], limit: 1 })
   if (!run) return null
+  // Empty agentId is the deliberately restricted teammate projection.
+  if (!run.agentId) return { run, chunks: [], messages: [] }
   const chunks = await db.select({ chunk: runChunks.chunk }).from(runChunks)
     .where(eq(runChunks.runId, run.id)).orderBy(asc(runChunks.seq))
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt })

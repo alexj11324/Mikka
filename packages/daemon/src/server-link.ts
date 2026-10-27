@@ -1,3 +1,4 @@
+import type { NativeCoordinatorJob, NativeCoordinatorCommand, NativeCoordinatorToolResult } from "@mikka/protocol/coordinator"
 // The daemon's only view of the server. Everything the daemon needs from the
 // cloud goes through `ServerLink`, so tests use `MemoryServer` and the real
 // transport (`HttpServerLink`, apps/server routes) plugs in behind the same
@@ -27,6 +28,7 @@ import {
   type RunPatch,
   type RunState,
   type StopReason,
+  type RunCheckpoint,
 } from "@mikka/protocol"
 
 import type { RunChunk } from "./chunks"
@@ -56,6 +58,10 @@ export interface ChunkBatch {
  * the daemon keeps running and retries (offline tolerance, R13).
  */
 export interface ServerLink {
+  claimCoordinator?(deviceId: string, signal: AbortSignal): Promise<NativeCoordinatorJob | null>
+  coordinatorCommand?(deviceId: string, turnId: string, command: NativeCoordinatorCommand, signal: AbortSignal): Promise<void>
+  coordinatorToolResult?(deviceId: string, turnId: string, callId: string, signal: AbortSignal): Promise<NativeCoordinatorToolResult>
+
   /**
    * `credential` is the session from `mikka daemon login` (Better Auth
    * device authorization, RFC 8628) or one the signed-in desktop handed
@@ -79,6 +85,12 @@ export interface ServerLink {
   updateRun(runId: string, patch: RunPatch): Promise<void>
   /** Reports how the run ended, once, after its terminal `updateRun`. */
   completeRun(runId: string, completion: RunCompletion): Promise<void>
+  /**
+   * Saves the run's work in progress; the server keeps the latest one so
+   * another machine can take the run over. Optional: links without it
+   * keep work on this machine only.
+   */
+  checkpointRun?(runId: string, checkpoint: RunCheckpoint): Promise<void>
   /**
    * Messages people sent this device's runs and stops they asked for
    * (ADR 0018). Long-polls up to `waitSeconds` when nothing is pending;
@@ -126,6 +138,8 @@ interface MemoryRun {
   patches: RunPatch[]
   leaseExpiresAt?: number
   completion?: RunCompletion
+  /** The latest checkpoint the daemon saved. */
+  checkpoint?: RunCheckpoint
 }
 
 type QueueRunInput = Omit<RunAssignment, "deviceId" | "runId"> & {
@@ -372,6 +386,11 @@ export class MemoryServer {
         if (!run) return
         run.state = patch.state
         run.patches.push(patch)
+      },
+      checkpointRun: async (runId, checkpoint) => {
+        this.check()
+        const run = this.runs.get(runId)
+        if (run && !isTerminalRunState(run.state)) run.checkpoint = checkpoint
       },
       completeRun: async (runId, completion) => {
         this.check()

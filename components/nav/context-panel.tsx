@@ -9,7 +9,7 @@ import type { Thread } from '@/app/actions/task-runs'
 import { listBots, type BotView } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
+import { Empty, EmptyHeader, EmptyDescription } from '@/components/ui/empty'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { withBasePath } from '@/lib/base-path'
@@ -21,6 +21,7 @@ import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
 import { BotAvatar, colorFor, CoordinatorAvatar } from './bot-avatar'
 import { ThreadList, threadName } from './thread-list'
+import { useCloudComputer } from '@/hooks/use-feature-availability'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type PanelTab = 'details' | 'tasks' | 'browser' | 'knowledge' | 'schedules'
@@ -69,7 +70,7 @@ function greetingKey(now: Date) {
  * once sent, the Coordinator dispatches a thread and the item leaves 建议 for
  * 我的任务.
  */
-function Suggestions({ name, onArrange }: { name: string; onArrange: (prompt: string, suggestionId: string) => void }) {
+function Suggestions({ name, onArrange, onConnect }: { name: string; onArrange: (prompt: string, suggestionId: string) => void; onConnect: () => void }) {
   const t = useTranslations('Shell.suggestions')
   const pick = (item: SuggestionItem) => onArrange([`${t(`action.${item.action}`)}：${item.title}`, item.url].filter(Boolean).join('\n'), item.id)
   const timeZone = typeof Intl === 'undefined' ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -91,7 +92,7 @@ function Suggestions({ name, onArrange }: { name: string; onArrange: (prompt: st
         {group.items.map(item => <p key={item.id} className="flex min-w-0 items-center gap-2 text-sm"><span className="shrink-0">{t(`action.${item.action}`)}</span><SourceChip item={item} onPick={pick} /></p>)}
       </div>)}
     </>}
-    {empty && <Empty className="py-10"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle><EmptyDescription>{t('emptyDescription')}</EmptyDescription></EmptyHeader></Empty>}
+    {empty && <Empty className="py-10"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader><Button variant="secondary" className="rounded-full" onClick={onConnect}>{t('connect')}</Button></Empty>}
   </section>
 }
 
@@ -150,11 +151,10 @@ function MyTasks({ threads, issues, onOpenIssue }: { threads: Thread[]; issues: 
   </section>
 }
 
-function EmptyTab({ title, onArrange, arrangeLabel }: { title: string; onArrange?: () => void; arrangeLabel?: string }) {
-  const t = useTranslations('Shell.empty')
+function EmptyTab({ title, line, onArrange, arrangeLabel }: { title: string; line: string; onArrange?: () => void; arrangeLabel?: string }) {
   return <div className="flex flex-1 flex-col">
     <h2 className="text-lg font-semibold">{title}</h2>
-    <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('nothing')}</EmptyDescription></EmptyHeader>{onArrange && <Button variant="secondary" className="rounded-full" onClick={onArrange}>{arrangeLabel}</Button>}</Empty>
+    <Empty className="flex-1"><EmptyHeader><EmptyDescription>{line}</EmptyDescription></EmptyHeader>{onArrange && <Button variant="secondary" className="rounded-full" onClick={onArrange}>{arrangeLabel}</Button>}</Empty>
   </div>
 }
 
@@ -168,13 +168,14 @@ export type PanelConversation = { id?: string | null; name: string; color?: stri
  * becomes that bot's thread list and 详情 shows the picked thread (newest
  * first) on the bot's computer; picking another bot switches both.
  */
-export function ContextPanel({ userName, issues, threads, conversation, onOpenIssue, onArrange, onSearch, onClose }: {
+export function ContextPanel({ userName, issues, threads, conversation, onOpenIssue, onArrange, onConnect, onSearch, onClose }: {
   userName: string
   issues: Issue[]
   threads: Thread[]
   conversation: PanelConversation
   onOpenIssue: (id: string) => void
   onArrange: (prompt: string, suggestionId?: string) => void
+  onConnect: () => void
   onSearch: () => void
   onClose: () => void
 }) {
@@ -197,8 +198,9 @@ export function ContextPanel({ userName, issues, threads, conversation, onOpenIs
   // With a bot, the badge counts its threads waiting on you; otherwise every task's.
   const waiting = (botId ? botThreads : threads).filter(item => item.status === 'waiting_input' || item.status === 'failed').length
   // An older chat without a bot learns its thread from the 电脑 cards in it.
-  const registered = useConversationThread(conversation.kind === 'agent' ? conversation.id : null)
-  const computer = botId ?? registered?.botId
+  const cloudComputer = useCloudComputer()
+  const registered = useConversationThread(cloudComputer && conversation.kind === 'agent' ? conversation.id : null)
+  const computer = cloudComputer ? botId ?? registered?.botId : undefined
   // A conversation whose bot works on its computer opens on that thread's 详情, where the screen is (Figma 103:64).
   useEffect(() => { if (registered?.runId) setTab('details') }, [registered?.runId])
 
@@ -221,9 +223,10 @@ export function ContextPanel({ userName, issues, threads, conversation, onOpenIs
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
         </div>
       </div>
-      <TabsContent value="details" className={cn('min-h-0', computer || coordinator ? 'flex flex-col' : 'overflow-y-auto px-4 py-3')}>
-        {coordinator ? <div className="flex flex-col items-center gap-3 px-4 pt-9">
-          <CoordinatorAvatar size="profile" />
+      <TabsContent value="details" className={cn('min-h-0', computer || coordinator || botId ? 'flex flex-col' : 'overflow-y-auto px-4 py-3')}>
+        {/* A bot without a computer here (the Coordinator, or cloud computers off) shows just its avatar and name. */}
+        {coordinator || (botId && !computer) ? <div className="flex flex-col items-center gap-3 px-4 pt-9">
+          {coordinator ? <CoordinatorAvatar size="profile" /> : <BotAvatar color={conversation.color} shape={conversation.shape} size="profile" />}
           <h2 className="max-w-full truncate text-xl font-semibold">{conversation.name}</h2>
         </div> : computer ? <>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{botId
@@ -240,7 +243,7 @@ export function ContextPanel({ userName, issues, threads, conversation, onOpenIs
       </TabsContent>
       <TabsContent value="tasks" className="flex min-h-0 flex-col">
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-3">
-          <Suggestions name={userName} onArrange={onArrange} />
+          <Suggestions name={userName} onArrange={onArrange} onConnect={onConnect} />
           {/* With a bot, its threads sit between 建议 and 我的任务. */}
           {botId && <section aria-label={tThreads('title')} className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold">{tThreads('title')}</h2>
@@ -249,9 +252,9 @@ export function ContextPanel({ userName, issues, threads, conversation, onOpenIs
           <MyTasks threads={threads} issues={issues} onOpenIssue={onOpenIssue} />
         </div>
       </TabsContent>
-      <TabsContent value="browser" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('browser')} /></TabsContent>
-      <TabsContent value="knowledge" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('knowledge')} arrangeLabel={tEmpty('arrange')} onArrange={() => onArrange(tEmpty('knowledgePrompt'))} /></TabsContent>
-      <TabsContent value="schedules" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('schedules')} arrangeLabel={tEmpty('arrange')} onArrange={() => onArrange(tEmpty('schedulesPrompt'))} /></TabsContent>
+      <TabsContent value="browser" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('browser')} line={tEmpty('browser')} /></TabsContent>
+      <TabsContent value="knowledge" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('knowledge')} line={tEmpty('knowledge')} arrangeLabel={tEmpty('arrange')} onArrange={() => onArrange(tEmpty('knowledgePrompt'))} /></TabsContent>
+      <TabsContent value="schedules" className="flex min-h-0 flex-col px-4 py-3"><EmptyTab title={t('schedules')} line={tEmpty('schedules')} arrangeLabel={tEmpty('arrange')} onArrange={() => onArrange(tEmpty('schedulesPrompt'))} /></TabsContent>
     </Tabs>
   </aside>
 }
