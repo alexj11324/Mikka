@@ -1,0 +1,49 @@
+name: Agent kit
+
+on:
+  push:
+    branches: [chatgpt/327-agent-as-code]
+  pull_request:
+    paths:
+      - 'lib/agent-kit/**'
+      - 'agents/**'
+      - 'tests/agent-kit*'
+      - '.github/workflows/agent-kit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-kit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Record exact source
+        run: |
+          mkdir -p /tmp/agent-kit-evidence
+          git rev-parse HEAD > /tmp/agent-kit-evidence/source-sha.txt
+          git archive --format=tar.gz HEAD > /tmp/agent-kit-evidence/source.tar.gz
+      - name: Source-only agent kit tests
+        run: |
+          if test -f tests/agent-kit.test.mjs; then
+            node --experimental-strip-types --test tests/agent-kit.test.mjs
+          else
+            echo 'Bootstrap only; implementation tests not present yet.'
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-kit-source-${{ github.sha }}
+          path: /tmp/agent-kit-evidence/
+          retention-days: 3
