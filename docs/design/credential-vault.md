@@ -69,7 +69,7 @@
 - 代码里的 `CredentialVault` 接口（put/read/remove）保持不变。以后升级到云 KMS 时只换实现，
   上层不动。
 
-**以后升级到 KMS（不在第一版做）**：AWS KMS 或 GCP KMS 做信封加密，每条一个 DEK，
+**以后升级到 KMS（不在第一版做；用 AWS KMS，Alex 2026-10-27 定）**：AWS KMS 做信封加密，每条一个 DEK，
 encryption context 绑定 `{userId, credentialId, origin}`，主应用只能加密、只有 broker 能解密，
 每次解密都留 CloudTrail 记录，总钥匙永远不出 KMS。触发升级的时机：用户量大到碰上 Infisical
 的速率限制，或者需要「总钥匙不进任何进程」这一级的隔离时。Infisical 自带的 KMS 只在企业版，

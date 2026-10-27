@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | The saved-login vault starts on Infisical with per-user application encryption; its KMS upgrade uses AWS KMS (not GCP) (「用aws」) | `credential-vault.md` | AWS or GCP left open |
 | 2026-10-27 | Saved logins belong to the user's account and are kept (not one-time); every thread and every bot sub-agent of that user can use them. Browsers visit any site with no preset allowlist (「密码应该是绑在这个账户上边，每个线程都可以调用，密码不是一次性的，可以存进密码箱。浏览器可以就是说访问所有网站，不要预设白名单」) | R-72, `credential-vault.md` | Run-bound, one-time credentials; registered-service allowlist (#223) |
 | 2026-10-27 | A web sub-agent's login is a 登录 <site> pill in the bot's chat that expands in place into the login card, as Hark's Secured Login: the bot announces it, the card has 邮箱, 密码, Google, Apple and 登录 with 🔒 Secured by Mikka, and the login is saved to an encrypted vault for later runs (the user's Hark screenshots, 「你看看人家」「它是先从一个药丸转化为这个卡的」) | R-72, `cloud-computer-backend.md` § 2 | Login bottom sheet; password used once and not stored |
 | 2026-10-27 | No explanatory sentences on sheets: the login sheet is logo, title, account, password and button, with 🔒 Secured by Mikka as the only reassurance; R-40 now gives the delete test and applies to specs and agent briefs too (「你口水话怎么这么多呀？你下面写一个 secured by mikka 不就行了吗？」「能不能在文档或者什么地方写一下，避免这种口水话」) | R-40, `review-checklist.md` | Login-sheet subtitle and privacy sentence |
