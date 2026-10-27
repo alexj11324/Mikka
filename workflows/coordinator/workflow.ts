@@ -33,8 +33,8 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
       const selected = await native.runtime(userId)
       execution = await kit.beginAgentExecution(userId,botId,holder,round,selected)
       const result = selected.harness === 'ai_sdk'
-        ? await new WorkflowAgent({ model:COORDINATOR_MODEL,tools:coordinatorTools(userId,botId,undefined,execution,computerEnabled) }).generate({ ...(await steps.preparePrompt(userId,botId,execution?.snapshot)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep })
-        : await nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scope,execution,computerEnabled),botId,execution?.snapshot)
+        ? await new WorkflowAgent({ model:COORDINATOR_MODEL,tools:coordinatorTools(userId,botId,undefined,{ execution,computerEnabled }) }).generate({ ...(await steps.preparePrompt(userId,botId,execution?.snapshot)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep })
+        : await nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scope,{ execution,computerEnabled }),botId,execution?.snapshot)
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       await steps.appendMessages(userId,holder,result.responseMessages,quiet ? null : turnWarning(result.finishReason,result.text),botId)
       if (inbox.handoffMatterIds.length) await steps.settleAttention(userId,inbox.handoffMatterIds,inbox.handoffOnly && !quiet)

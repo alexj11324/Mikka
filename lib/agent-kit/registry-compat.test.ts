@@ -17,15 +17,16 @@ before(async()=>{registry=await import('../../workflows/coordinator/tools')})
 beforeEach(()=>{for(const fn of [dispatched,beforeCall,afterCall])fn.mock.resetCalls()})
 const context={toolCallId:'synthetic-call',messages:[]}
 const execution=():AgentExecution=>({id:randomUUID(),status:'running',snapshot:makeSnapshot(randomUUID(),1,{...DEFAULT_AGENT_DEFINITION,tools:['dispatch_bot_computer']},'HOST',{harness:'ai_sdk',model:'synthetic'})})
-test('feature-off catalog omits cloud tools; legacy boolean feature-on call remains compatible',()=>{
+test('feature-off catalog omits cloud tools; only named options can enable the computer',()=>{
  const off=registry.coordinatorTools(owner,botId)
  assert.equal(off.dispatch_bot_computer,undefined);assert.equal(off.load_skill,undefined);assert.ok(off.record_attention)
- assert.ok(registry.coordinatorTools(owner,botId,undefined,true).dispatch_bot_computer)
- assert.throws(()=>registry.coordinatorTools(owner,botId,undefined,execution(),false),/agentToolUnavailable/)
+ assert.ok(registry.coordinatorTools(owner,botId,undefined,{computerEnabled:true}).dispatch_bot_computer)
+ assert.throws(()=>registry.coordinatorTools(owner,botId,undefined,true as unknown as NonNullable<Parameters<typeof registry.coordinatorTools>[3]>),/agentToolOptionsInvalid/)
+ assert.throws(()=>registry.coordinatorTools(owner,botId,undefined,{execution:execution(),computerEnabled:false}),/agentToolUnavailable/)
 })
 test('versioned cloud tool keeps host owner, native scope and parent execution',async()=>{
  const run=execution(),scope={holder:'holder',turnId:'turn',callId:'call'}
- const tools=registry.coordinatorTools(owner,botId,scope,run,true)
+ const tools=registry.coordinatorTools(owner,botId,scope,{execution:run,computerEnabled:true})
  const execute=tools.dispatch_bot_computer.execute as unknown as (input:unknown,options:typeof context)=>Promise<unknown>
  await execute({issueId,harness:'codex'},context)
  const args=dispatched.mock.calls[0].arguments as unknown[]
@@ -33,7 +34,7 @@ test('versioned cloud tool keeps host owner, native scope and parent execution',
  assert.equal(beforeCall.mock.callCount(),1);assert.equal(afterCall.mock.callCount(),1)
 })
 test('a named Bot cannot redirect its cloud tool to another Bot',async()=>{
- const tools=registry.coordinatorTools(owner,botId,undefined,execution(),true)
+ const tools=registry.coordinatorTools(owner,botId,undefined,{execution:execution(),computerEnabled:true})
  const execute=tools.dispatch_bot_computer.execute as unknown as (input:unknown,options:typeof context)=>Promise<unknown>
  assert.deepEqual(await execute({botId:randomUUID(),issueId,harness:'codex'},context),{error:'botMismatch'});assert.equal(dispatched.mock.callCount(),0)
 })

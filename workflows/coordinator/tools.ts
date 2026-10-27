@@ -7,7 +7,11 @@ import * as steps from './steps'
 import * as kit from './agent-kit-steps'
 import type { NativeToolScope } from './tool-scope'
 
-export function createCoordinatorRegistry(userId: string, botId: string | null, scope?: NativeToolScope, execution?: AgentExecution | null, computerEnabled = false) {
+export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean }
+
+export function createCoordinatorRegistry(userId: string, botId: string | null, scope?: NativeToolScope, options: CoordinatorToolOptions = {}) {
+  if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
+  const { execution,computerEnabled = false } = options
   const id = z.uuid()
   // A named Bot always controls its own computer. The built-in Coordinator
   // may select any authorized Bot on the person's explicit instruction.
@@ -126,10 +130,9 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
     load_skill:tool({ description:'Load an assigned, version-pinned skill from this execution.',inputSchema:z.object({skillId:z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/)}),execute:input=>kit.loadAgentSkill(userId,botId,execution?.id,input.skillId,scope) }),
   }
 }
-export function coordinatorTools(userId: string, botId: string | null, scope?: NativeToolScope, executionOrComputerEnabled?: AgentExecution | null | boolean, computerEnabled = false): ToolSet {
-  const execution = typeof executionOrComputerEnabled === 'boolean' ? undefined : executionOrComputerEnabled
-  if (typeof executionOrComputerEnabled === 'boolean') computerEnabled = executionOrComputerEnabled
-  const registry = createCoordinatorRegistry(userId,botId,scope,execution,computerEnabled)
+export function coordinatorTools(userId: string, botId: string | null, scope?: NativeToolScope, options: CoordinatorToolOptions = {}): ToolSet {
+  const registry = createCoordinatorRegistry(userId,botId,scope,options)
+  const { execution } = options
   if (!execution) return Object.fromEntries(Object.entries(registry).filter(([name]) => name !== 'load_skill'))
   return instrumentTools(registry,execution.snapshot.effectiveTools,{
     before:(callId,name) => kit.beforeAgentTool(userId,botId,execution.id,callId,name,scope),
