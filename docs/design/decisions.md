@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | The briefing stays one bubble; only Hark's tone is adopted, not its one-bubble-per-item format, and no date label (「我只让你学他的口气…简报应该要写到一块儿…写到一个气泡里边」) | R-46 | Hark-style one bubble per item and date label (same day) |
 | 2026-10-27 | No visible times in the chat or on cards; swiping right-to-left reveals each message's time, as in iMessage and ChatGPT (「不要在左上角写这个时间…用手从右往左滑…跟 iMessage 是有点像的」) | | Time label above messages; time in card headers |
 | 2026-10-27 | The daily briefing takes Hark's form: a centred date label, then one bubble per item, each ending with a concrete offer (「你可以看看hark他怎么写的这个风格」) | R-46 | One long briefing bubble (same day) |
 | 2026-10-27 | The Coordinator's voice is a warm, professional, orderly secretary; the briefing is natural sentences, not commands. 建议 drops the 例行事项 heading (the page title already says 建议). Chats leave clear space above the composer (「每日简报写得太生硬了…像一个有条不紊的秘书」「例行事项写在那里…合适吗」「内容跟输入框靠得有点太近了」) | R-46, R-45 | Command-style briefing lines |
