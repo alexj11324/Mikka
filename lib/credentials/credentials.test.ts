@@ -5,6 +5,7 @@ import { canonicalOrigin, assertSameOrigin, submitSchema, CredentialError, type 
 import { seal, open, sealSession, type Kms } from './kms'
 import { checkCredentialRequest, credentialBody, credentialFailure } from './http'
 import { Cdp } from './browser'
+import { assertNoSecret, fingerprint } from './fingerprint'
 
 function fixtureKms(): Kms {
   const keys = new Map<string, { key: Buffer; context: string }>()
@@ -76,4 +77,12 @@ test('pushState/hash changes cannot resume screenshots while fields remain popul
   assert.equal(await cdp.safeToResume('https://example.com/login'), false)
   cdp.evaluate = async () => true
   assert.equal(await cdp.safeToResume('https://example.com/login'), true)
+})
+
+test('HMAC scanner rejects nested chat/tool secret copies without retaining values', () => {
+  const key = 'unit-test-auth-secret', entry = fingerprint('a', 'test-password', key)
+  assert(!JSON.stringify(entry).includes('test-password'))
+  assert.throws(() => assertNoSecret('a', { content: [{ text: 'prefix test-password suffix' }] }, [entry], key), CredentialError)
+  assertNoSecret('a', { text: 'safe status' }, [entry], key)
+  assertNoSecret('b', { text: 'test-password' }, [entry], key)
 })

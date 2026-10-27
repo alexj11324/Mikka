@@ -19,6 +19,7 @@ CREATE TABLE credentials (
 CREATE TABLE credential_secrets (
   credential_id uuid PRIMARY KEY REFERENCES credentials(id) ON DELETE CASCADE,
   wrapped_dek text NOT NULL, nonce text NOT NULL, ciphertext text NOT NULL,
+  leak_hmac text NOT NULL, leak_length integer NOT NULL CHECK (leak_length BETWEEN 1 AND 4096),
   aad_version integer NOT NULL DEFAULT 1 CHECK (aad_version=1),
   created_at timestamptz NOT NULL DEFAULT now()
 );

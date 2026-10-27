@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { canonicalOrigin, CredentialError, type Actor, type BrowserCaller, type Envelope } from './contracts'
 import { seal, type Kms } from './kms'
+import { fingerprint } from './fingerprint'
 
 export type BrowserTarget = { targetId: string; origin: string; endpoint: string; expiresAt: number }
 export const nonce = () => randomBytes(32).toString('base64url')
@@ -42,9 +43,10 @@ export class CredentialStore {
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${caller.userId}:${origin}`])
       const existing = (await client.query('SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND username=$3 FOR UPDATE', [caller.userId, origin, input.username])).rows[0]
       const id = existing?.id ?? randomUUID()
+      const leak = fingerprint(caller.userId, input.password)
       const envelope = await seal(this.kms, { userId: caller.userId, credentialId: id, origin }, Buffer.from(JSON.stringify({ username: input.username, password: input.password })))
       await client.query(`INSERT INTO credentials(id,user_id,origin,username) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,origin,username) DO UPDATE SET revoked_at=NULL`, [id, caller.userId, origin, input.username])
-      await client.query(`INSERT INTO credential_secrets(credential_id,wrapped_dek,nonce,ciphertext) VALUES($1,$2,$3,$4) ON CONFLICT(credential_id) DO UPDATE SET wrapped_dek=$2,nonce=$3,ciphertext=$4`, [id, envelope.wrappedDek, envelope.nonce, envelope.ciphertext])
+      await client.query(`INSERT INTO credential_secrets(credential_id,wrapped_dek,nonce,ciphertext,leak_hmac,leak_length) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(credential_id) DO UPDATE SET wrapped_dek=$2,nonce=$3,ciphertext=$4,leak_hmac=$5,leak_length=$6`, [id, envelope.wrappedDek, envelope.nonce, envelope.ciphertext, leak.digest, leak.length])
       await client.query('DELETE FROM browser_sessions WHERE credential_id=$1', [id])
       await client.query('COMMIT')
       return { status: 'saved' as const, origin }
