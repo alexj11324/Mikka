@@ -21,3 +21,8 @@ test('background events push nothing', () => {
 test('both reasons when a turn answers both', () => {
   assert.deepEqual(pushReasons([{ kind: 'run_finished', tier: 'result' }, { kind: 'run_question', tier: 'attention' }]).sort(), ['decide', 'finished'])
 })
+
+test('the morning briefing is a briefing push, a handed-over matter a decision', () => {
+  assert.deepEqual(pushReasons([{ kind: 'daily_briefing', tier: 'attention' }]), ['briefing'])
+  assert.deepEqual(pushReasons([{ kind: 'matter_handoff', tier: 'attention' }]), ['decide'])
+})

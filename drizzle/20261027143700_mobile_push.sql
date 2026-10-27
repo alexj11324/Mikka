@@ -1,7 +1,8 @@
 -- The iOS app (apps/mobile): where to push, and what the person wants pushed.
 -- mobile_push_tokens: one Expo push token per installed app; removed on sign-out.
--- user_preferences: the app's 通知 and 记忆 settings (docs/design/mobile.md,
--- "Settings"). A person without a row has the defaults.
+-- user_preferences: the app's push and 记忆 settings (docs/design/mobile.md,
+-- "Settings"); 主动消息 is attention_settings.enabled. A person without a row
+-- has the defaults.
 -- Additive and safe to re-run.
 begin;
 set local lock_timeout = '5s';
@@ -20,7 +21,6 @@ create index if not exists mobile_push_tokens_user_idx on mobile_push_tokens ("u
 
 create table if not exists user_preferences (
   "userId" text primary key references "user"(id) on delete cascade,
-  proactive boolean not null default true,
   "pushDecide" boolean not null default true,
   "pushReview" boolean not null default true,
   "pushFinished" boolean not null default false,

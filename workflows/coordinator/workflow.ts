@@ -6,6 +6,7 @@ import { COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinat
 import { AGENT_MAX_ROUNDS } from '@/lib/agent-rounds'
 import { createComposioAITools, createGoogleAITools } from '@/lib/composio-actions'
 import { splitTelegramText } from '@/lib/telegram/messages'
+import { QUIET_REPLY } from '@/lib/attention/handoff'
 import * as steps from './steps'
 import * as native from './native-steps'
 import { nativeCoordinatorTurn } from './native-turn'
@@ -40,9 +41,14 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
       const result = selected.harness === 'ai_sdk'
         ? await agent.generate({ ...(await steps.preparePrompt(userId, botId)), stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
         : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId, botId, scope), botId)
-      await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text), botId)
-      // A reply to Mikka's own events (not to the person) also goes to their phones; pushReply never throws.
-      if (inbox.pushReasons.length && result.text.trim()) await steps.pushToPhones(userId, botId, result.text, inbox.pushReasons)
+      // After a quiet decision on hidden evidence there is nothing to say, so a quiet or empty reply is not a warning.
+      const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
+      await steps.appendMessages(userId, holder, result.responseMessages, quiet ? null : turnWarning(result.finishReason, result.text), botId)
+      if (inbox.handoffMatterIds.length) await steps.settleAttention(userId, inbox.handoffMatterIds, inbox.handoffOnly && !quiet)
+      // A reply to Mikka's own events (not to the person) also goes to their phones, unless the Coordinator stayed quiet; pushReply never throws.
+      if (inbox.pushReasons.length && !quiet && result.text.trim() && result.text.trim() !== QUIET_REPLY) {
+        await steps.pushToPhones(userId, botId, inbox.pushHidesText ? null : result.text, inbox.pushReasons)
+      }
       if (inbox.telegramTargets.length && result.text.trim()) {
         // The reply is saved and shows on the web; a Telegram failure (a
         // blocked bot, an outage) must not fail the turn and stall the inbox.
@@ -114,6 +120,17 @@ export function coordinatorTools(userId: string, botId: string | null, scope?: N
       description: 'Send a message to a running agent. It reads it on its next poll.',
       inputSchema: z.object({ runId: id, text: z.string().min(1).max(10_000) }),
       execute: input => steps.sendToRun(userId, input, scope),
+    }),
+    record_attention: tool({
+      description: 'Record your decision on a matter handed to you as [Handoff] evidence, before you reply: notify (you are telling the person now; fails while the notification budget is closed and returns when it reopens), quiet (nothing reaches the person; give the reason), snooze (needs the person later; give runAt, and personAsked when the person asked to be reminded), or handled (the person answered it, did it, or said it is not needed).',
+      inputSchema: z.object({
+        matterId: id,
+        decision: z.enum(['notify', 'quiet', 'snooze', 'handled']),
+        reason: z.string().trim().max(500).optional().describe('Required for quiet and snooze: a short reason, e.g. "resolved: the rerun passed".'),
+        runAt: z.iso.datetime({ offset: true }).optional().describe('For snooze: when to hand the matter back, ISO 8601 with an offset.'),
+        personAsked: z.boolean().optional().describe('For snooze: the person asked for this reminder, so telling them then spends no budget.'),
+      }),
+      execute: input => steps.recordAttention(userId, input, scope),
     }),
     remember: tool({
       description: 'Save one short note to the person\'s memory, which you see in every conversation. Use it when the person asks you to remember something, or for a lasting preference or decision. Not for run status or anything that will soon change.',

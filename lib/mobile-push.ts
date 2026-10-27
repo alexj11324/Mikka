@@ -7,6 +7,7 @@ import type { PushReason } from '@/lib/push-reasons'
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 const BODY_MAX = 180
+const CODE_BODY = '收到一条验证码'
 
 const FLAG: Record<PushReason, keyof Preferences> = { decide: 'pushDecide', review: 'pushReview', finished: 'pushFinished', briefing: 'pushBriefing' }
 
@@ -28,17 +29,18 @@ export function pushBody(text: string): string {
 
 /**
  * Sends a Coordinator (or bot) reply to every phone the person signed in on,
- * when their settings allow it. Tapping the push opens that chat. Tokens
- * Expo reports as gone are removed. Never throws.
+ * when their settings allow it. Tapping the push opens that chat. `text` null
+ * is a reply about a verification code: the push only says one came, the code
+ * stays in the app chat. Tokens Expo reports as gone are removed. Never throws.
  */
-export async function pushReply(userId: string, botId: string | null, text: string, reasons: readonly PushReason[]): Promise<void> {
+export async function pushReply(userId: string, botId: string | null, text: string | null, reasons: readonly PushReason[]): Promise<void> {
   try {
-    if (!reasons.length || !text.trim()) return
+    if (!reasons.length || text?.trim() === '') return
     if (!pushAllowed(await readPreferences(userId), reasons)) return
     const tokens = await db.select({ token: mobilePushTokens.token }).from(mobilePushTokens).where(eq(mobilePushTokens.userId, userId))
     if (!tokens.length) return
     const [bot] = botId ? await db.select({ name: bots.name }).from(bots).where(eq(bots.id, botId)).limit(1) : []
-    const body = pushBody(text)
+    const body = text === null ? CODE_BODY : pushBody(text)
     const response = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
       headers: {

@@ -17,7 +17,9 @@ export function pushReasons(events: readonly InboxEvent[]): PushReason[] {
   if (events.some(event => event.kind === 'user_message')) return []
   const reasons = new Set<PushReason>()
   for (const event of events) {
-    if (event.tier === 'attention') reasons.add('decide')
+    // The 08:00 briefing is its own setting (每日简报), though it wakes the Coordinator like an attention event.
+    if (event.kind === 'daily_briefing') reasons.add('briefing')
+    else if (event.tier === 'attention') reasons.add('decide')
     else if (event.tier === 'result' && (event.kind === 'run_finished' || event.kind === 'artifact_submitted')) reasons.add('finished')
   }
   return [...reasons]

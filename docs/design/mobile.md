@@ -170,16 +170,18 @@ mobile drawer.
   workspace travels as the web's `mikka-workspace` cookie.
 - **Push:** Expo Push Service. `mobile_push_tokens` holds one token per
   installed app, removed on sign-out. A Coordinator or bot reply to Mikka's own
-  events (never to the person's message) is pushed when `user_preferences`
-  allow it: 需要你决策 for events that need the person, 线程完成 for finished
-  runs (`lib/push-reasons.ts`, `lib/mobile-push.ts`). Registering needs the
+  events (never to the person's message, never a quiet reply) is pushed when
+  the settings allow it: 需要你决策 for events that need the person (handed-over
+  matters included), 线程完成 for finished runs, 每日简报 for the 08:00
+  briefing (`lib/push-reasons.ts`, `lib/mobile-push.ts`). A verification code
+  stays in the app chat; its push only says one came. Registering needs the
   EAS project id in `app.json` (`extra.eas.projectId`) and a real device.
-- **Settings stored:** `user_preferences` (主动消息, the push switches,
-  使用记忆; off leaves the memory out of the prompt).
+- **Settings stored:** 主动消息 is lib/attention's switch
+  (`attention_settings.enabled`); the push switches and 使用记忆 (off leaves
+  the memory out of the prompt) are in `user_preferences`.
 - **Not on the server yet**, so the app leaves them out: proactive cards with
-  buttons and the 08:00 briefing (`claude/coordinator-attention`,
-  `claude/suggestions-cloudflare-cron`), 待审阅 and 已归档 threads, pinned
-  bots, 电脑不在用时 (needs the web to report presence), photo upload, dark mode.
+  buttons, 待审阅 and 已归档 threads, pinned bots, 电脑不在用时 (needs the web
+  to report presence), photo upload, dark mode.
 - **Updates:** EAS Update for JavaScript changes; store releases for native
   changes.
 
