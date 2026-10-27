@@ -2,7 +2,7 @@ import type { Pool } from 'pg'
 
 /** A dedicated thread uses its own device while retaining the Bot's agent
  * and subscription. Verify the complete binding before accepting that device. */
-export async function findNativeRun(pool: Pool, ownerId: string, deviceId: string, runId: string) {
+export async function findNativeRun(pool: Pick<Pool, 'query'>, ownerId: string, deviceId: string, runId: string) {
   const { rows } = await pool.query(`SELECT b.id,b."workspaceId",b."consumerId",b.route
     FROM byos_native_runs n JOIN agent_runs r ON r.id=n."runId"
     JOIN agents a ON a.id=r."agentId" JOIN byos_bindings b ON b.id=n."bindingId"
