@@ -42,3 +42,37 @@ export function safeTimeZone(value: string | null | undefined): string {
 export function localDate(timeZone: string, now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: safeTimeZone(timeZone), year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
 }
+
+/** The daily briefing is written at this local hour (R-21). */
+export const BRIEFING_HOUR = 8
+
+/** The local calendar date and hour at `now` in `timeZone`. */
+export function localClock(timeZone: string, now: Date = new Date()): { date: string; hour: number } {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: safeTimeZone(timeZone), year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(now)
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
+  return { date: `${part('year')}-${part('month')}-${part('day')}`, hour: Number(part('hour')) }
+}
+
+function offsetMs(timeZone: string, at: number) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(at))
+  const part = (type: string) => Number(parts.find(item => item.type === type)?.value)
+  return Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second')) - Math.floor(at / 1000) * 1000
+}
+
+/** The instant `hour`:00 falls on `date` (YYYY-MM-DD) in `timeZone`. */
+export function localInstant(timeZone: string, date: string, hour: number): Date {
+  const zone = safeTimeZone(timeZone)
+  const [year, month, day] = date.split('-').map(Number)
+  const wall = Date.UTC(year, month - 1, day, hour)
+  // Correct twice so a DST change between the guess and the answer is taken into account.
+  const first = wall - offsetMs(zone, wall)
+  return new Date(wall - offsetMs(zone, first))
+}
+
+/** For each time zone already past BRIEFING_HOUR today: its local date and when that day's briefing came due. */
+export function dueBriefingZones(timeZones: readonly string[], now: Date = new Date()) {
+  return timeZones.flatMap(timeZone => {
+    const { date, hour } = localClock(timeZone, now)
+    return hour >= BRIEFING_HOUR ? [{ timeZone, localDate: date, dueAt: localInstant(timeZone, date, BRIEFING_HOUR) }] : []
+  })
+}

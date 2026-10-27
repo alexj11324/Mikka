@@ -261,7 +261,7 @@ export const runTokens = pgTable('run_tokens', {
  * run, through the worker tools of the MCP server (lib/mcp/worker.ts).
  * `artifact_submitted` comes from `submit_artifact`, from a run or an OAuth agent.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
@@ -343,8 +343,10 @@ export const suggestions = pgTable('suggestions', {
 
 /**
  * The "早上好" briefing, one per person per local day. `first` is written
- * right after the person connects an app; `daily` the first time the list is
- * read on a new day. `highlights` are suggestion ids the briefing names.
+ * right after the person connects an app; `daily` at 08:00 the person's time
+ * by the briefings cron, or by the first read after 08:00 if the cron has not
+ * run (an empty `daily` only marks the day as done). `highlights` are
+ * suggestion ids the briefing names.
  */
 export const briefings = pgTable('briefings', {
   userId: text('userId').notNull(), localDate: text('localDate').notNull(),
@@ -360,6 +362,18 @@ export const suggestionTriggerChecks = pgTable('suggestion_trigger_checks', {
   userId: text('userId').primaryKey(),
   checkedAt: timestamp('checkedAt', { withTimezone: true }).notNull(),
 })
+
+/**
+ * Each person's IANA time zone, so the daily briefing is written at 08:00
+ * their time (app/api/cron/briefings). The browser's zone, sent when the
+ * suggestions list loads, replaces any earlier value; the connect callbacks'
+ * IP-derived zone only fills a gap.
+ */
+export const userTimeZones = pgTable('user_time_zones', {
+  userId: text('userId').primaryKey(),
+  timeZone: text('timeZone').notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('user_time_zones_zone_idx').on(table.timeZone)])
 
 /** The Coordinator's conversation, one AI SDK model message per row, in `position` order. */
 export const coordinatorMessages = pgTable('coordinator_messages', {

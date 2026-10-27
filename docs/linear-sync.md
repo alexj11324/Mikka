@@ -36,6 +36,8 @@ Set these server-only environment variables in the Mikka app and the Linear sync
 
 Generate an encryption key with `openssl rand -hex 32`. Never commit the generated value. Environments sharing the same Neon branch must share the same `LINEAR_TOKEN_ENCRYPTION_KEY`; production can use its own key because it uses a separate Neon branch.
 
+The suggestions schedules (daily briefings and the webhook backfill) run on a separate Worker; see [suggestions schedules](suggestions-cron.md).
+
 `cloudflare/linear-sync/wrangler.jsonc` binds the Worker to `linear-sync.aspectlylabs.com` and runs its recovery sweep daily at 04:00 UTC. Before deployment, create a Hyperdrive configuration for the target Neon branch, add its ID as the `HYPERDRIVE` binding, and set the Worker secrets above. For local development, the Worker uses its own request-scoped PostgreSQL pool and closes it after each webhook, batch, or scheduled run. Issue writes on Vercel and webhook receipts on Cloudflare still dispatch durable work immediately; the scheduled sweep recovers work interrupted by deployments, timeouts, or provider errors.
 
 ## Synced data
