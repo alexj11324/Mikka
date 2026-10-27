@@ -1,7 +1,6 @@
 -- Each person's IANA time zone, so the daily briefing is written at 08:00
 -- their time by the briefings cron (app/api/cron/briefings). Mirrors
--- userTimeZones in lib/db/schema.ts. Applied by scripts/migrate.mjs on
--- production builds.
+-- userTimeZones in lib/db/schema.ts. Apply with scripts/migrate.mjs.
 
 create table if not exists user_time_zones (
   "userId" text primary key,

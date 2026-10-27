@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { chatItems, eventPrompt } from './context'
+import { chatItems, eventPrompt, promptMessages, type StoredMessage } from './context'
 import { ATTENTION_THRESHOLD, eventsForInbox, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
 import { briefingEvent } from '@/lib/coordinator-events'
 
@@ -84,8 +84,20 @@ test('the morning briefing is pushed to the person once a day', () => {
   assert.doesNotMatch(prompt, /The person's name/)
   assert.match(eventPrompt({ ...briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'daily', total: 1, counts: {} }, [], 'Alex Jiang'), tier }), /The person's name: Alex Jiang\./)
   assert.deepEqual((event.payload.items as { suggestionId: string }[]).map(item => item.suggestionId), ['s1', 's2'])
-  // The person sees it as an event, without the triage line.
-  const [item] = chatItems([{ position: 1, createdAt: new Date(0), message: { role: 'user', content: prompt } }])
-  assert.equal(item.from, 'event')
-  assert.doesNotMatch(item.text, /Triage:/)
+  for (const kind of ['daily', 'first'] as const) {
+    const content = eventPrompt({ ...briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind, total: 4, counts: { gmail: 3, linear: 1 } }, event.payload.items as Parameters<typeof briefingEvent>[1]), tier })
+    const rows: (StoredMessage & { createdAt: Date; pending?: true })[] = [
+      { position: 1, createdAt: new Date(0), message: { role: 'assistant', content: 'Yesterday’s reply.' } },
+      { position: 2, createdAt: new Date(1), pending: true, message: { role: 'user', content } },
+    ]
+    assert.equal(chatItems(rows).length, 1, 'pending briefing instructions stay hidden')
+    delete rows[1].pending
+    rows.push({ position: 3, createdAt: new Date(2), message: { role: 'assistant', content: 'Good morning. Four things need your attention.' } })
+    assert.deepEqual(chatItems(rows).map(item => [item.from, item.text]), [
+      ['coordinator', 'Yesterday’s reply.'],
+      ['coordinator', 'Good morning. Four things need your attention.'],
+    ])
+    assert.doesNotMatch(JSON.stringify(chatItems(rows)), /Kevin|secretary|Triage:|Write the briefing/)
+    assert.ok(promptMessages(null, rows).some(message => message.content === content), 'the model still receives briefing instructions')
+  }
 })

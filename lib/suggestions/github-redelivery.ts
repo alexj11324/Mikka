@@ -13,7 +13,6 @@ export const REDELIVERY_WINDOW_MS = 3 * 60 * 60 * 1000
 export const REDELIVERY_LIMIT = 25
 /** The events app/api/webhooks/github turns into suggestions; others are not worth redelivering. */
 const SUGGESTION_EVENTS = new Set(['pull_request', 'issues', 'issue_comment', 'pull_request_review', 'pull_request_review_comment'])
-const MAX_PAGES = 10
 
 /** One row of GET /app/hook/deliveries. */
 export interface GitHubDelivery { id: string; guid: string; delivered_at: string; redelivery: boolean; status_code: number; event: string }
@@ -78,7 +77,7 @@ export async function redeliverFailedGitHubWebhooks({ now = new Date(), fetcher 
   const deliveries: GitHubDelivery[] = []
   let cursor: string | null = null
   // Newest first; stop once a page reaches past the window.
-  for (let page = 0; page < MAX_PAGES; page++) {
+  while (true) {
     const url = new URL(`${API}/app/hook/deliveries`)
     url.searchParams.set('per_page', '100')
     if (cursor) url.searchParams.set('cursor', cursor)
@@ -93,9 +92,9 @@ export async function redeliverFailedGitHubWebhooks({ now = new Date(), fetcher 
     if (!cursor || !rows.length || rows.some(row => new Date(row.delivered_at) < since)) break
   }
   result.scanned = deliveries.length
-  const failed = failedDeliveries(deliveries, since)
+  const failed = failedDeliveries(deliveries, since, Infinity)
   result.failed = failed.length
-  for (const delivery of failed) {
+  for (const delivery of failed.slice(0, REDELIVERY_LIMIT)) {
     const response = await fetcher(`${API}/app/hook/deliveries/${delivery.id}/attempts`, { method: 'POST', headers })
     if (response.ok) result.redelivered++
     else result.errors++

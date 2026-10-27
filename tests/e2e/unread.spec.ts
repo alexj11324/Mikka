@@ -5,8 +5,8 @@ import { test, expect, register, app } from './fixtures'
 // (same approach as working-status.spec.ts), so their positions aren't real rows. The read API
 // is answered here with the server's rules (lib/conversation-reads-store.ts): forward-only,
 // 422 for a message the chat doesn't have. One store per browser context, so two pages share it.
-type Item = { position: number; from: 'person' | 'coordinator'; text: string; tools: string[]; threads: string[]; createdAt: string; pending?: true }
-const message = (position: number, from: Item['from'] = 'coordinator'): Item => ({ position, from, text: `消息 ${position} ${'内容 '.repeat(40)}`, tools: [], threads: [], createdAt: '2026-10-22T00:00:00.000Z' })
+type Item = { position: number; from: 'person' | 'coordinator'; text: string; tools: string[]; threads: string[]; artifacts: string[]; createdAt: string; pending?: true }
+const message = (position: number, from: Item['from'] = 'coordinator'): Item => ({ position, from, text: `消息 ${position} ${'内容 '.repeat(40)}`, tools: [], threads: [], artifacts: [], createdAt: '2026-10-22T00:00:00.000Z' })
 const range = (from: number, to: number, who: Item['from'] = 'coordinator') => Array.from({ length: to - from + 1 }, (_, index) => message(from + index, who))
 
 const chats = new WeakMap<BrowserContext, { items: Item[] }>()

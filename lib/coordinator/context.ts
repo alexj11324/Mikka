@@ -1,5 +1,7 @@
 import { pruneMessages, type ModelMessage } from 'ai'
+import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
+import { splitQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 
 // What the Coordinator's model sees. Everything here depends only on the
 // stored conversation, never on time or on how long the person was away, so
@@ -112,6 +114,13 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         'The run keeps going. Ask the person, then pass their answer on with send_to_run.',
         note,
       ].filter(Boolean).join('\n')
+    case 'artifact_submitted':
+      return [
+        `[Event] ${payload.authorName}${event.runId ? ` (run ${event.runId})` : ''} handed over ${payload.artifactKind === 'html' ? 'a web page' : 'a document'} "${payload.title}", version ${payload.version}: [[artifact:${payload.artifactId}]]`,
+        event.issueId ? `Issue: ${event.issueId}.` : null,
+        'The person sees it as a card under your next reply. Say in a sentence what it is; do not repeat its content.',
+        note,
+      ].filter(Boolean).join('\n')
     case 'action_decided': {
       const what = `${payload.action} (proposal ${payload.actionId})`
       const outcome = payload.outcome && typeof payload.outcome === 'object' && Object.keys(payload.outcome).length ? ` Result: ${JSON.stringify(payload.outcome)}.` : ''
@@ -186,6 +195,10 @@ export interface ChatItem {
   createdAt: string
   /** Still in the inbox: its position is inferred, not a coordinator_messages row, so it can't be marked read. */
   pending?: true
+  /** What the person quoted from an artifact, shown above their text. */
+  quote?: ArtifactQuote
+  /** Artifacts shown as cards under this entry, in order. */
+  artifacts: string[]
 }
 
 /** The run id a dispatch_run result carries, if it succeeded. */
@@ -197,29 +210,72 @@ function dispatchedRun(part: { type: string; toolName?: string; output?: unknown
   return typeof runId === 'string' ? runId : null
 }
 
+const ARTIFACT_CITATION = /\[\[artifact:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]\]/gi
+
+/** The artifact ids cited in `text`, and the text without those citations. */
+function takeArtifacts(text: string): { ids: string[]; text: string } {
+  const ids = [...text.matchAll(ARTIFACT_CITATION)].map(match => match[1].toLowerCase())
+  return { ids, text: ids.length ? text.replace(ARTIFACT_CITATION, '').replace(/[ \t]+\n/g, '\n').trim() : text }
+}
+
 /**
  * The conversation as the person sees it: their messages, Mikka's events, and
- * one entry per Coordinator reply, with the tools it called folded in.
+ * one entry per Coordinator reply, with the tools it called folded in. An
+ * artifact the Coordinator was told about shows as a card under its next
+ * reply (or on its own when no reply came yet) instead of as an event line;
+ * one the reply cites goes there too, once.
  */
 export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pending?: true })[]): ChatItem[] {
   const items: ChatItem[] = []
+  let briefingBoundary = false
+  // Artifacts handed over since the last reply, waiting for one to sit under.
+  const waiting = { ids: [] as string[], position: 0, createdAt: new Date(0) }
+  const flush = () => {
+    if (!waiting.ids.length) return
+    items.push({ position: waiting.position, from: 'coordinator', text: '', tools: [], threads: [], createdAt: waiting.createdAt.toISOString(), artifacts: [...new Set(waiting.ids)] })
+    waiting.ids = []
+  }
   for (const { id, position, message, createdAt, pending } of rows) {
     if (message.role === 'user') {
-      const text = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
-      const event = text.startsWith('[Event]')
+      const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+      // The request for its welcome is for the Coordinator only.
+      if (raw.startsWith(COORDINATOR_WELCOME_MARK)) continue
+      // Briefing instructions belong only in model context; its reply starts a new chat message.
+      if (raw.startsWith('[Event] It is 08:00 for the person: their morning briefing') || raw.startsWith('[Event] The person just connected an app. Their first briefing:')) {
+        briefingBoundary = true
+        continue
+      }
+      const event = raw.startsWith('[Event]')
+      if (event) {
+        const cited = takeArtifacts(raw.split('\n')[0])
+        if (cited.ids.length) {
+          Object.assign(waiting, { ids: [...waiting.ids, ...cited.ids], position, createdAt })
+          continue
+        }
+      }
+      flush()
+      const base = { ...(id ? { id } : {}), position, tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], ...(pending ? { pending } : {}) }
       // The triage line is for the Coordinator, not the person.
-      items.push({ ...(id ? { id } : {}), position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], threads: [], createdAt: createdAt.toISOString(), ...(pending ? { pending } : {}) })
+      if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') })
+      else {
+        const { quote, text } = splitQuote(raw)
+        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}) })
+      }
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
-      const text = parts.flatMap(part => part.type === 'text' && part.text.trim() ? [part.text.trim()] : []).join('\n\n')
+      const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() ? [part.text.trim()] : []).join('\n\n'))
       const tools = parts.flatMap(part => part.type === 'tool-call' ? [part.toolName] : [])
       const last = items.at(-1)
-      if (last?.from === 'coordinator') {
-        last.text = [last.text, text].filter(Boolean).join('\n\n')
+      const shown = [...waiting.ids, ...cited.ids]
+      if (last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary) {
+        last.text = [last.text, cited.text].filter(Boolean).join('\n\n')
         last.tools.push(...tools)
-      } else if (text || tools.length) {
-        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text, tools, threads: [], createdAt: createdAt.toISOString() })
+        last.artifacts = [...new Set([...last.artifacts, ...cited.ids])]
+      } else if (cited.text || tools.length || shown.length) {
+        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)] })
+        waiting.ids = []
       }
+      briefingBoundary = false
     } else if (message.role === 'tool') {
       const last = items.at(-1)
       if (last?.from !== 'coordinator') continue
@@ -229,5 +285,6 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       }
     }
   }
+  flush()
   return items
 }

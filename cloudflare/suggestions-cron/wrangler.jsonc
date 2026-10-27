@@ -1,11 +1,11 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "mikka-suggestions-cron",
-  "main": "src/index.ts",
+  "main": "src/index.mjs",
   "compatibility_date": "2026-10-22",
-  // No public routes: the Worker only runs on its schedules and calls Mikka.
+  // Scheduled calls only; no public Worker or version preview URL.
   "workers_dev": false,
-  // Every 15 minutes: daily briefings at 08:00 local time. Hourly: the suggestions backfill.
+  "preview_urls": false,
   "triggers": { "crons": ["*/15 * * * *", "0 * * * *"] },
   "vars": { "MIKKA_URL": "https://app.aspectlylabs.com/mikka" },
   "observability": { "enabled": true }

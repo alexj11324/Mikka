@@ -13,7 +13,11 @@ async function handleGET(request: Request) {
   const secret = process.env.CRON_SECRET
   if (!secret) return Response.json({ error: 'Cron is not configured' }, { status: 503 })
   if (!await verifyBearer(request.headers.get('authorization'), secret)) return new Response(null, { status: 401 })
-  return Response.json(await reconcileSuggestions({ deadline: Date.now() + BUDGET_MS }), { headers: { 'Cache-Control': 'no-store' } })
+  const result = await reconcileSuggestions({ deadline: Date.now() + BUDGET_MS })
+  return Response.json(result, {
+    status: Object.values(result.failed).some(Boolean) || result.github?.errors ? 502 : !result.github?.configured ? 503 : 200,
+    headers: { 'Cache-Control': 'no-store' },
+  })
 }
 
 export const GET = withRequestLog('/api/cron/suggestions-reconcile', handleGET)
