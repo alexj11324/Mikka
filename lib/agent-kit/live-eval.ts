@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { createCoordinatorRegistry } from '@/workflows/coordinator/tools'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { personalCoordinatorInstructions } from '@/lib/coordinator/native-prompt'
-import { definitionInstructions } from './definition'
+import { definitionInstructions, type AgentDefinition } from './definition'
 import { CORE_EVAL_CASES, runEvalSuite, compareReports, type EvalCase, type EvalTrace, type ToolObservation } from './evals'
 import { caseFromFailure } from './improvement'
 import { selectRegisteredTools } from './registry'
@@ -13,10 +13,16 @@ import { AgentKitError, type AgentKitStore, type AgentScope } from './store'
 const finalReply = z.strictObject({ text:z.string().max(16_000),outcome:z.enum(['answered','blocked','approval_required']) })
 
 /** Every tool is replaced before execution. This runner never dispatches a run, writes memory or contacts an account provider. */
-export function evaluationTools(registry: ToolSet, testCase: EvalCase, observations: ToolObservation[]): ToolSet {
+export function evaluationTools(registry: ToolSet, testCase: EvalCase, observations: ToolObservation[], agent?: AgentDefinition): ToolSet {
   return Object.fromEntries(Object.entries(registry).map(([name,definition]) => [name,{
     ...definition,
-    execute:async () => {
+    execute:async (input: unknown) => {
+      if (name === 'load_skill') {
+        const skillId = input && typeof input === 'object' && 'skillId' in input ? input.skillId : null
+        const skill = agent?.skills.find(item => item.id === skillId)
+        observations.push({ name,outcome:skill ? 'ok' : 'error',authorized:false,effectPerformed:false })
+        return skill ? { id:skill.id,body:skill.body } : { error:'skillNotAssigned' }
+      }
       const pending = ['send_email','create_calendar_event','update_calendar_event'].includes(name)
       const failed = testCase.id === 'search-failure' || (!pending && name !== 'web_search')
       observations.push({ name,outcome:pending ? 'approval_pending' : failed ? 'error' : 'ok',authorized:false,effectPerformed:false })
@@ -33,16 +39,16 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
   const model = mode === 'live' ? COORDINATOR_MODEL : null
   const job = await store.beginEvaluation(scope,proposalId,requestId,mode,model)
   if (job.replayed) return { ...job.evaluation,replayed:true }
-  const cases = [...CORE_EVAL_CASES,...job.evidence.slice(0,10).map(caseFromFailure)]
+  const cases = [...CORE_EVAL_CASES,...job.evidence.slice(0,3).map(caseFromFailure)]
   try {
     const run = async (testCase: EvalCase, definition: typeof job.baseline.definition, signal: AbortSignal): Promise<EvalTrace> => {
       if (mode === 'fixture') {
         // Plumbing smoke test only; the activation gate always rejects fixture reports.
-        return { text:'Fixture response: 2026-01-15',outcome:testCase.expectedOutcome,tools:testCase.requiredTools.map(name => ({ name,outcome:testCase.expectedOutcome === 'blocked' ? 'error' : testCase.expectedOutcome === 'approval_required' ? 'approval_pending' : 'ok',authorized:false,effectPerformed:false })) }
+        return { text:testCase.expectedOutcome === 'answered' ? 'Fixture response: 2026-01-15' : testCase.expectedOutcome === 'blocked' ? 'Search unavailable.' : 'Awaiting approval.',outcome:testCase.expectedOutcome,tools:testCase.requiredTools.map(name => ({ name,outcome:testCase.expectedOutcome === 'blocked' ? 'error' : testCase.expectedOutcome === 'approval_required' ? 'approval_pending' : 'ok',authorized:false,effectPerformed:false })) }
       }
       const observations: ToolObservation[] = []
       const registry = selectRegisteredTools(createCoordinatorRegistry(scope.ownerId,scope.botId),definition.tools)
-      const tools = evaluationTools(registry,testCase,observations)
+      const tools = evaluationTools(registry,testCase,observations,definition)
       const result = await generateText({
         model:COORDINATOR_MODEL,
         instructions:definitionInstructions(personalCoordinatorInstructions(),definition) + '\n\nEvaluation response format: end with only JSON {"text":"your grounded answer","outcome":"answered|blocked|approval_required"}. Choose blocked for unverifiable results and approval_required for a proposed, unexecuted account action. All tools are inert evaluation fixtures.',

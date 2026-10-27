@@ -1,3 +1,4 @@
+import { definitionInstructions, type DefinitionSnapshot } from '@/lib/agent-kit/definition'
 import type { CoordinatorRuntime, NativeCoordinatorJob } from '@mikka/protocol/coordinator'
 import { nativeCoordinatorEnabled, nativeCoordinatorStore } from '@/lib/coordinator/native'
 import { loadConversation } from '@/lib/coordinator/store'
@@ -9,11 +10,11 @@ export async function runtime(userId: string): Promise<CoordinatorRuntime> {
   'use step'
   return nativeCoordinatorEnabled() ? nativeCoordinatorStore.runtime(userId) : { harness: 'ai_sdk' }
 }
-export async function enqueue(userId: string, holder: string, round: number, selected: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, tools: NativeCoordinatorJob['tools'], botId: string | null = null) {
+export async function enqueue(userId: string, holder: string, round: number, selected: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, tools: NativeCoordinatorJob['tools'], botId: string | null = null, snapshot?: DefinitionSnapshot) {
   'use step'
   const { summary, memory, messages } = await loadConversation(userId, botId)
   return nativeCoordinatorStore.enqueue(userId,holder,round,selected,{
-    instructions: instructionsWithMemory(await botInstructions(userId, botId, personalCoordinatorInstructions()), memory),
+    instructions: instructionsWithMemory(snapshot ? definitionInstructions(snapshot.hostInstructions, snapshot.definition) : await botInstructions(userId, botId, personalCoordinatorInstructions()), memory),
     context: nativeCoordinatorContext(promptMessages(summary,messages)), tools,
   })
 }
@@ -29,3 +30,4 @@ export async function close(userId: string, holder: string, turnId: string) {
   'use step'
   await nativeCoordinatorStore.close(userId,holder,turnId)
 }
+

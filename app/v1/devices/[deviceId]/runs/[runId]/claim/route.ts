@@ -45,6 +45,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     .set({ status: 'preparing', startedAt: new Date(), leaseExpiresAt: new Date(leaseExpiresAt), updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
     .returning({ id: agentRuns.id })
+  if (!claimed.length) return NextResponse.json({ error: 'Run was already claimed.' }, { status: 409 })
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
   const mcp = claimed.length
@@ -69,10 +70,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     : {}
   return NextResponse.json({
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
-    baseBranch: repo.baseBranch, harness: agent.harness, prompt: run.prompt,
+    baseBranch: repo.baseBranch, harness: run.agentDefinition?.harness ?? agent.harness, prompt: run.prompt,
     kind: run.kind, leaseExpiresAt,
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
     ...retry,
   })
 }
+

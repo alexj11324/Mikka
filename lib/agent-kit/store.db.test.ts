@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
 import { DEFAULT_AGENT_DEFINITION } from './builtin'
@@ -22,7 +22,7 @@ if(!loopback || (!dedicated && !actions)) throw new Error('Refusing non-isolated
 const pool=new Pool({connectionString,max:12})
 const store=new AgentKitStore(pool)
 const defaults=DEFAULT_AGENT_DEFINITION
-const migration=await readFile(new URL('../../drizzle/20261027040500_agent_kit.sql',import.meta.url),'utf8')
+const migration=readFileSync(new URL('../../drizzle/20261027040500_agent_kit.sql',import.meta.url),'utf8')
 
 before(async()=>{
   // Dedicated tests can start with only the real migration's parent contracts.
@@ -158,7 +158,9 @@ test('approval and rollback bind exact candidate, baseline and scoped evidence (
   assert.equal(job.replayed,false);if(job.replayed) return
   // These synthetic report rows validate the gate, not real model quality or provider acceptance.
   await store.finishEvaluation(scope,job.evaluation.id,{baseline:report(job.baseline.digest,false,'live'),candidate:report(job.candidate.digest,true,'live')})
-  const candidate=await store.approve(scope,proposal.id,job.evaluation.id,1,randomUUID(),defaults)
+  const approvalRequest=randomUUID()
+  const candidate=await store.approve(scope,proposal.id,job.evaluation.id,1,approvalRequest,defaults)
+  assert.equal((await store.approve(scope,proposal.id,job.evaluation.id,1,approvalRequest,defaults)).id,candidate.id)
   assert.equal(candidate.id,proposal.candidate_id)
   assert.equal((await store.active(scope,defaults)).id,candidate.id)
   const request=randomUUID()

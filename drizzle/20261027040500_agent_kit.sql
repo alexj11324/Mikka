@@ -105,10 +105,13 @@ create table if not exists agent_kit_activations (
   to_version uuid not null,
   request_key text not null,
   reason text not null check (reason in ('edit', 'rollback', 'approved_improvement')),
+  evaluation_id uuid,
+  check ((reason = 'approved_improvement') = (evaluation_id is not null)),
   created_at timestamptz not null default now(),
   unique (owner_id, bot_key, request_key),
   foreign key (owner_id, bot_key, from_version) references agent_kit_versions(owner_id, bot_key, id) on delete cascade,
-  foreign key (owner_id, bot_key, to_version) references agent_kit_versions(owner_id, bot_key, id) on delete cascade
+  foreign key (owner_id, bot_key, to_version) references agent_kit_versions(owner_id, bot_key, id) on delete cascade,
+  foreign key (owner_id, bot_key, evaluation_id) references agent_kit_evaluations(owner_id, bot_key, id)
 );
 
 create or replace function agent_kit_immutable_row() returns trigger language plpgsql as $$

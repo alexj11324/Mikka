@@ -75,11 +75,12 @@ export interface DefinitionSnapshot {
   revision: number
   definitionDigest: string
   definition: AgentDefinition
+  hostInstructions: string
   hostInstructionsDigest: string
   effectiveTools: string[]
   runtime: { harness: string; model: string | null }
 }
 export function makeSnapshot(revisionId: string, revision: number, input: unknown, hostInstructions: string, runtime: DefinitionSnapshot['runtime']): DefinitionSnapshot {
   const definition = parseDefinition(input)
-  return { formatVersion: 1, revisionId, revision, definitionDigest: digest(definition), definition, hostInstructionsDigest: digest(hostInstructions), effectiveTools: [...definition.tools], runtime }
+  return { formatVersion: 1, revisionId, revision, definitionDigest: digest(definition), definition, hostInstructions, hostInstructionsDigest: digest(hostInstructions), effectiveTools: [...definition.tools], runtime }
 }

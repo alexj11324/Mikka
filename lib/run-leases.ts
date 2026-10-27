@@ -1,4 +1,5 @@
 import 'server-only'
+import { retryWorkerDefinition } from '@/lib/agent-kit/worker'
 import { after } from 'next/server'
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm'
 import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
@@ -77,7 +78,7 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
  * Another online machine of the owner with the run's repository and its
  * agent's harness, or null when only the run's own device fits.
  */
-async function takeoverTarget(run: { userId: string; agentId: string; deviceId: string | null; deviceRepoId: string | null }, now: Date): Promise<TakeoverCandidate | null> {
+async function takeoverTarget(run: { userId: string; agentId: string; deviceId: string | null; deviceRepoId: string | null; agentDefinition?: Run['agentDefinition'] }, now: Date): Promise<TakeoverCandidate | null> {
   if (!run.deviceRepoId) return null
   const [repo] = await db.select({ remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
   const [agent] = await db.select({ harness: agents.harness }).from(agents).where(eq(agents.id, run.agentId)).limit(1)
@@ -86,7 +87,7 @@ async function takeoverTarget(run: { userId: string; agentId: string; deviceId: 
     .from(deviceRepos).innerJoin(devices, eq(devices.id, deviceRepos.deviceId))
     .where(and(eq(devices.ownerId, run.userId), eq(devices.enabled, true), gt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS))))
     .orderBy(desc(devices.lastSeenAt))
-  return pickTakeover(candidates, { remoteUrl: repo.remoteUrl, harness: agent.harness, lostDeviceId: run.deviceId })
+  return pickTakeover(candidates, { remoteUrl: repo.remoteUrl, harness: run.agentDefinition?.harness ?? agent.harness, lostDeviceId: run.deviceId })
 }
 
 /**
@@ -125,7 +126,8 @@ async function reclaimLostRun(run: Run, now: Date) {
       .returning({ id: agentRuns.id })
     if (!ended) return false
     await tx.insert(agentRuns).values({
-      id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId,
+      id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId,
+      agentDefinition: retryWorkerDefinition(run.agentDefinition, retryPrompt(run.prompt, outcome.attempt)),
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
       prompt: retryPrompt(run.prompt, outcome.attempt), attempt: outcome.attempt, retryOf: run.id,
     })
@@ -150,3 +152,4 @@ async function announceEnd(run: Run & { status: 'failed' | 'stopped' }) {
   await recordCoordinatorEvent(db, runFinishedEvent({ ...run, stopReason: 'device_lost', report: null }))
   after(() => wakeCoordinator(run.userId))
 }
+

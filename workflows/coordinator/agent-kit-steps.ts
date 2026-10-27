@@ -1,7 +1,7 @@
 import type { CoordinatorRuntime } from '@mikka/protocol/coordinator'
 import { agentKitEnabled, agentKitStore, agentScope } from '@/lib/agent-kit/service'
 import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
-import type { AgentExecution } from '@/lib/agent-kit/store'
+import { AgentKitError, type AgentExecution } from '@/lib/agent-kit/store'
 import type { ToolOutcome } from '@/lib/agent-kit/instrument'
 import type { FailureCode } from '@/lib/agent-kit/improvement'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
@@ -38,5 +38,16 @@ export async function loadAgentSkill(userId: string, botId: string | null, execu
 }
 export async function finishAgentExecution(userId: string, botId: string | null, executionId: string | undefined, failure?: FailureCode) {
   'use step'
-  if (executionId) await agentKitStore.finishExecution(await agentScope(userId,botId),executionId,failure ? 'failed' : 'completed',failure)
+  if (!executionId) return
+  const scope = await agentScope(userId,botId)
+  await agentKitStore.finishExecution(scope,executionId,failure ? 'failed' : 'completed',failure)
+  const execution = await agentKitStore.readExecution(scope,executionId)
+  if (!execution.snapshot.definition.hooks.includes('failure_cases')) return
+  // A stable revision key yields at most one automatic guidance candidate, never activation.
+  try {
+    await agentKitStore.propose(scope,execution.snapshot.revision,execution.snapshot.revisionId,DEFAULT_AGENT_DEFINITION)
+  } catch (error) {
+    if (error instanceof AgentKitError && ['agentImprovementInsufficientEvidence','agentImprovementNoChange','agentVersionConflict'].includes(error.code)) return
+    console.error('Agent improvement proposal unavailable; existing definition remains active')
+  }
 }

@@ -1,3 +1,5 @@
+import { definitionInstructions, type DefinitionSnapshot } from '@/lib/agent-kit/definition'
+import type { AgentExecution } from '@/lib/agent-kit/store'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
 import { generateText, type ModelMessage } from 'ai'
@@ -87,7 +89,7 @@ export async function sendTelegramChunk(threadId: string, chunk: string) {
  * token budget, then returns the prompt for this turn: the instructions with
  * the person's memory, and the messages.
  */
-export async function preparePrompt(userId: string, botId: string | null = null): Promise<{ instructions: string; messages: ModelMessage[] }> {
+export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
   let { summary, memory, messages } = await store.loadConversation(userId, botId)
   const cut = compactionCut(summary, messages)
@@ -102,7 +104,7 @@ export async function preparePrompt(userId: string, botId: string | null = null)
     summary = text
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages) }
+  return { instructions: instructionsWithMemory(snapshot ? definitionInstructions(snapshot.hostInstructions, snapshot.definition) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages) }
 }
 
 export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope, botId: string | null = null) {
@@ -175,10 +177,10 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
 }
 
 /** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope, botId: string | null = null) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId)), status: 'queued' }))
+  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId, execution)), status: 'queued' }))
 }
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope) {
@@ -221,3 +223,4 @@ export async function webSearchStep(userId: string, input: { query: string; limi
   await assertNativeToolScope(userId,scope)
   return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
 }
+

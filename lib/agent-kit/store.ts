@@ -70,9 +70,9 @@ export class AgentKitStore {
       return rows
     })
   }
-  private async activate(client: PoolClient, scope: AgentScope, from: string, to: string, requestKey: string, reason: 'edit' | 'rollback' | 'approved_improvement') {
+  private async activate(client: PoolClient, scope: AgentScope, from: string, to: string, requestKey: string, reason: 'edit' | 'rollback' | 'approved_improvement', evaluationId: string | null = null) {
     await client.query('update agent_kit_heads set active_version=$3 where owner_id=$1 and bot_key=$2',[...params(scope),to])
-    await client.query('insert into agent_kit_activations(id,owner_id,bot_key,from_version,to_version,request_key,reason) values($1,$2,$3,$4,$5,$6,$7)',[randomUUID(),...params(scope),from,to,requestKey,reason])
+    await client.query('insert into agent_kit_activations(id,owner_id,bot_key,from_version,to_version,request_key,reason,evaluation_id) values($1,$2,$3,$4,$5,$6,$7,$8)',[randomUUID(),...params(scope),from,to,requestKey,reason,evaluationId])
   }
   async save(scope: AgentScope, input: unknown, expectedVersion: number, requestId: string, defaults: AgentDefinition) {
     const definition = parseDefinition(input); uuid(requestId)
@@ -241,13 +241,20 @@ export class AgentKitStore {
       const { rows }=await client.query<ImprovementProposal>('select * from agent_kit_proposals where owner_id=$1 and bot_key=$2 and id=$3 for update',[...params(scope),proposalId])
       const proposal=rows[0]
       if (!proposal) throw new AgentKitError('agentProposalNotFound',404)
+      if (proposal.status === 'approved') {
+        const replay = (await client.query<{ from_version: string; to_version: string; reason: string; evaluation_id: string | null }>('select from_version,to_version,reason,evaluation_id from agent_kit_activations where owner_id=$1 and bot_key=$2 and request_key=$3',[...params(scope),requestId])).rows[0]
+        const base = await this.version(client,scope,proposal.baseline_id)
+        const evidence = (await client.query<EvaluationRecord>('select * from agent_kit_evaluations where owner_id=$1 and bot_key=$2 and proposal_id=$3 and id=$4',[...params(scope),proposalId,evaluationId])).rows[0]
+        if (replay?.evaluation_id === evaluationId && replay.reason === 'approved_improvement' && replay.to_version === proposal.candidate_id && replay.from_version === proposal.baseline_id && base.version === expectedVersion && evidence?.status === 'completed') return this.version(client,scope,proposal.candidate_id)
+        throw new AgentKitError('agentRequestConflict')
+      }
       if (proposal.status !== 'proposed') throw new AgentKitError('agentProposalClosed')
       if (active.version !== expectedVersion || active.id !== proposal.baseline_id) throw new AgentKitError('agentVersionConflict')
       const evaluation=(await client.query<EvaluationRecord>('select * from agent_kit_evaluations where owner_id=$1 and bot_key=$2 and proposal_id=$3 and id=$4',[...params(scope),proposalId,evaluationId])).rows[0]
       const candidate=await this.version(client,scope,proposal.candidate_id)
       if (!evaluation?.reports || evaluation.status !== 'completed' || evaluation.mode !== 'live' || evaluation.reports.baseline.definitionDigest !== active.digest || evaluation.reports.candidate.definitionDigest !== candidate.digest || !compareReports(evaluation.reports.baseline,evaluation.reports.candidate).activationEligible) throw new AgentKitError('agentEvaluationNotEligible')
       assertSafeImprovement(active.definition,candidate.definition)
-      await this.activate(client,scope,active.id,candidate.id,requestId,'approved_improvement')
+      await this.activate(client,scope,active.id,candidate.id,requestId,'approved_improvement',evaluationId)
       await client.query('update agent_kit_proposals set status=$2,decided_at=now() where id=$1',[proposalId,'approved'])
       return candidate
     })

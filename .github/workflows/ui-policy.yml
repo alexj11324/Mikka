@@ -84,6 +84,8 @@ jobs:
       - run: pnpm i18n:check
       - run: pnpm test:ssh-target
       - run: pnpm test:linear-sync
+      - run: pnpm check:agent-definitions
+      - run: pnpm test:agent-kit
       - run: pnpm test:coordinator-events
       - run: pnpm test:coordinator-native-relay
       - run: pnpm test:coordinator-native-scope
@@ -188,5 +190,5 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:bot-chats-db,test:conversation-reads,test:coordinator-native,test:groups,test:issue-search-db,test:relation-cycle,test:visibility-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:agent-kit-db,test:active-agents,test:activity-actor-db,test:bot-chats-db,test:conversation-reads,test:coordinator-native,test:groups,test:issue-search-db,test:relation-cycle,test:visibility-db,test:workspace-migration-db
       - run: pnpm build

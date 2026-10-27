@@ -17,7 +17,7 @@ import { freezeWorkerDefinition, retryWorkerDefinition } from './worker'
 
 const base = () => structuredClone(DEFAULT_AGENT_DEFINITION)
 const context = { toolCallId:'call-1',messages:[] }
-const runTool = (tools: ToolSet,name:string,input:unknown = {}) => (tools[name].execute as (input: unknown, context: typeof context) => Promise<unknown>)(input,context)
+const runTool = (tools: ToolSet,name:string,input:unknown = {}) => (tools[name].execute as unknown as (input: unknown, options: typeof context) => Promise<unknown>)(input,context)
 
 test('strict declarative schema rejects code, unknown capabilities and global memory', () => {
   for (const patch of [{ execute:'return process.env' },{ tools:['shell'] },{ hooks:['eval'] },{ memory:{ scope:'global' } },{ tools:['web_search','web_search'] },{ hooks:[] },{ instructions:'x'.repeat(24_001) }]) {
