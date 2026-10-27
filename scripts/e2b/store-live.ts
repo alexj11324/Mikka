@@ -32,6 +32,7 @@ async function main() {
     await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL)')
     await pool.query(await readFile(new URL('../../drizzle/20261027000000_computer_run_bindings.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000200_local_computer_reviews.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261027000500_computer_run_approvals.sql', import.meta.url), 'utf8'))
     const store = new ComputerStore(pool)
     const actor = { userId: 'acceptance-owner', workspaceId: randomUUID() }
     const bot = await store.createBot(actor, 'E2B acceptance')

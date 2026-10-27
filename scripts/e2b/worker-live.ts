@@ -33,6 +33,7 @@ async function main() {
     await pool.query(await readFile(new URL('../../drizzle/20261027000200_local_computer_reviews.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000300_cloud_device_scope.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000400_cloud_worker_leases.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261027000500_computer_run_approvals.sql', import.meta.url), 'utf8'))
     const actor = { userId: 'synthetic-owner', workspaceId: randomUUID() }
     const store = new ComputerStore(pool)
     const bot = await store.createBot(actor, 'Synthetic Bot')

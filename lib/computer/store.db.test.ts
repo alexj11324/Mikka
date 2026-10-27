@@ -48,6 +48,8 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(workerLeaseMigration); await pool.query(workerLeaseMigration)
     const reviewMigration = await readFile(new URL('../../drizzle/20261027000200_local_computer_reviews.sql', import.meta.url), 'utf8')
     await pool.query(reviewMigration); await pool.query(reviewMigration)
+    const runApprovalMigration = await readFile(new URL('../../drizzle/20261027000500_computer_run_approvals.sql', import.meta.url), 'utf8')
+    await pool.query(runApprovalMigration); await pool.query(runApprovalMigration)
     await pool.query('CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id))')
     const store = new ComputerStore(pool, runtime)
     const bot = await store.createBot(actor, 'Desktop')
@@ -150,7 +152,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('INSERT INTO byos_bindings(id) VALUES ($1)', [bindingId])
     assert.equal(await claimLocalRun(pool, subscriptionRun, deviceId, new Date(Date.now() + 30000), bindingId), 'claimed')
     assert.equal((await pool.query('SELECT "bindingId" FROM byos_native_runs WHERE "runId"=$1', [subscriptionRun])).rows[0].bindingId, bindingId)
-    await pool.query('UPDATE agent_runs SET status=$2 WHERE id=$1', [runId, 'running'])
+    await pool.query('UPDATE agent_runs SET status=$2,"leaseExpiresAt"=now()+interval \'5 minutes\' WHERE id=$1', [runId, 'running'])
     const reviewValue = { id: randomUUID(), runId, target: 'f'.repeat(64), display: ':1', call: { name: 'click' as const, arguments: { x: 3, y: 4 } }, expiresAt: Date.now() + 120000 }
     const review = { ...reviewValue, digest: createHash('sha256').update(JSON.stringify(reviewValue)).digest('hex') }
     await assert.rejects(syncComputerReviews(pool, deviceId, bob.userId, [review]))
@@ -186,6 +188,23 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
       await applyWebComputerDecisions(broker, await syncComputerReviews(pool, deviceId, actor.userId, snapshots))
       assert.equal(executions, 1, 'replayed decisions cannot execute again')
     } finally { await broker.close() }
+    const makeReview = (currentRun: string, x: number) => {
+      const value = { id: randomUUID(), runId: currentRun, target: 'f'.repeat(64), display: ':1', call: { name: 'click' as const, arguments: { x, y: 4 } }, expiresAt: Date.now() + 120000 }
+      return { ...value, digest: createHash('sha256').update(JSON.stringify(value)).digest('hex') }
+    }
+    const grantReview = makeReview(runId, 10)
+    assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [grantReview]), [])
+    assert.equal(await decideComputerReview(pool, otherWorkspace, grantReview.id, grantReview.digest, true, 'run'), false)
+    assert.equal(await decideComputerReview(pool, actor, grantReview.id, grantReview.digest, false, 'run'), false)
+    assert.equal(await decideComputerReview(pool, actor, grantReview.id, grantReview.digest, true, 'run'), true)
+    const laterReview = makeReview(runId, 11)
+    assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [laterReview]), [{ id: laterReview.id, digest: laterReview.digest, approve: true }])
+    await pool.query('UPDATE agent_runs SET status=$2,"deviceId"=$3,"leaseExpiresAt"=now()+interval \'5 minutes\' WHERE id=$1', [secondRunId, 'running', deviceId])
+    const otherRunReview = makeReview(secondRunId, 12)
+    assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [otherRunReview]), [], 'a different run on the same Bot needs its own approval')
+    await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=now()-interval \'1 second\' WHERE id=$1', [runId])
+    await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [makeReview(runId, 13)]), /Run or desktop unavailable/)
+    await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=now()+interval \'5 minutes\' WHERE id=$1', [runId])
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [runId])
     await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [review]))
     const startedId = randomUUID()
