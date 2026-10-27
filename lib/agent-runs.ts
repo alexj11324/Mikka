@@ -10,6 +10,7 @@ import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { runPrompt } from '@/lib/run-prompt'
+import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -103,16 +104,12 @@ export async function readRun(userId: string, runId: string): Promise<RunDetail 
 export async function addRunMessage(userId: string, input: { runId: string; text: string }): Promise<void> {
   const parsed = z.object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('messageRequired')
-  const [run] = await db.select({ id: agentRuns.id }).from(agentRuns)
-    .where(and(eq(agentRuns.id, parsed.data.runId), eq(agentRuns.userId, userId))).limit(1)
-  if (!run) throw new ActionFailureError('runNotFound')
-  await db.insert(runMessages).values({ id: crypto.randomUUID(), runId: run.id, userId, text: parsed.data.text })
+  await sendOwnedRunMessage(db, userId, parsed.data)
 }
 
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
 export async function requestRunStop(userId: string, runId: string): Promise<void> {
   const parsed = z.uuid().safeParse(runId)
   if (!parsed.success) throw new ActionFailureError('runNotFound')
-  await db.update(agentRuns).set({ stopRequestedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(agentRuns.id, parsed.data), eq(agentRuns.userId, userId)))
+  await stopOwnedRun(db, userId, parsed.data)
 }
