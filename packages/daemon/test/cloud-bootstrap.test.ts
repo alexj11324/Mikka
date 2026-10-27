@@ -18,6 +18,18 @@ it('accepts and consumes a private scoped handoff', () => {
   expect(() => consumeCloudBootstrap(file)).toThrow()
 })
 
+it('keeps preview access in the private handoff and never persists it with device credentials', async () => {
+  const directory = tempDir(), file = join(directory, 'handoff')
+  const input = { ...config(), server: 'https://fixture.vercel.app/mikka', protectionBypass: 'fixture-preview-secret-1234567890' }
+  writeFileSync(file, JSON.stringify(input), { mode: 0o600 })
+  const consumed = consumeCloudBootstrap(file)
+  expect(consumed).toEqual(input)
+  expect(await installCloudCredential(directory, consumed)).toBe('start')
+  expect(readFileSync(join(directory, 'device.json'), 'utf8')).not.toContain(input.protectionBypass)
+  writeFileSync(file, JSON.stringify({ ...input, server: 'https://attacker.example/mikka' }), { mode: 0o600 })
+  expect(() => consumeCloudBootstrap(file)).toThrow('Invalid cloud worker server')
+})
+
 it('seeds the bound device and rotates a running daemon through its private socket', async () => {
   const dataDir = tempDir(), input = config()
   expect(await installCloudCredential(dataDir, input)).toBe('start')
