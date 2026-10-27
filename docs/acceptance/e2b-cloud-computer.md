@@ -17,8 +17,25 @@ development database and the existing production database. The application
 changes remain on the development branch and the production feature flags
 remain off. Current preview work builds the actual CPA worker and sets up
 private connectivity for the E2B worker; isolated preview vault identities,
-real provider consent, real inference, the complete Bot chat experience and
-workspace computer-use policy enforcement still require validation or work.
+real provider consent, real inference and the complete Bot chat experience
+still require validation or work.
+
+On 2026-10-27, the additive `workspace_computer_policies` migration was also
+applied to both databases. Workspace admins can deny Bot computer use; denial
+stops queued and active cloud threads, clears their run-wide approvals and
+publishes a versioned display lease. A later re-enable cannot revive an old
+thread's approval. PostgreSQL and authorization-route tests passed. A real,
+disposable E2B sandbox using worker source `32732c8e10b782674a66a7f9ec193f9b3f6bca9d`
+and template `8u64kaq0wdlspihjinl7` verified that denial waits for an active
+driver lock, blocks the actual driver even after wake, rejects the old policy
+version after re-enable, and allows a new version. The subsequent simulated
+Bot task again performed screenshot, click, key and scroll. The sandbox was
+deleted; this is still not real-provider OAuth or model inference.
+
+Two dedicated preview Infisical projects were created for custody and access
+projections. The account's machine-identity limit prevents creating the two
+separate identities needed to configure them, so no broad existing identity
+was repurposed for the execution worker. The production feature remains off.
 
 ## Implemented
 
