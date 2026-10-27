@@ -1,7 +1,5 @@
 'use server'
 
-import { visibleRuns } from '@/lib/agent-runs'
-
 import { headers } from 'next/headers'
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
@@ -16,7 +14,7 @@ import {
 import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/device-link'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
-import { addRunMessage, queueRun, readRun, requestRunStop, type RunDetail, type RunView } from '@/lib/agent-runs'
+import { requestRunStop } from '@/lib/agent-runs'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
@@ -61,8 +59,6 @@ export interface AgentView {
   deviceId: string | null
   deviceName: string | null
 }
-
-export type { RunDetail, RunView } from '@/lib/agent-runs'
 
 /** Every device this person owns, with the repos agents may work in. */
 export async function listDevices(): Promise<DeviceView[]> {
@@ -225,16 +221,6 @@ async function ownedDeviceWithHarness(deviceId: string, harness: SupportedHarnes
   return device.harnesses.some(info => info.harness === harness && info.installed) ? device : null
 }
 
-/** Queues one run of one agent against one issue. */
-export async function startRun(input: { issueId: string; agentId: string; deviceRepoId: string }): Promise<{ runId: string }> {
-  return queueRun(await getUserId(), input)
-}
-
-export async function listRuns(issueId: string): Promise<RunView[]> {
-  const userId = await getUserId()
-  return visibleRuns(userId, { issueId })
-}
-
 /** Who currently collaborates on the issue (R-26): they see that its threads exist. */
 async function issueThreadAccess(issueId: string) {
   const { issue, user } = await requireIssueAccess(issueId)
@@ -310,10 +296,6 @@ export async function sendIssueThreadMessage(input: { issueId: string; runId: st
   await db.insert(runMessages).values({ id: crypto.randomUUID(), runId: row.id, userId: user.id, text: text.data })
 }
 
-export async function getRun(runId: string): Promise<RunDetail | null> {
-  return readRun(await getUserId(), runId)
-}
-
 /**
  * A thread's name: the task it works on, as "MIK-11 群聊建表" (glossary:
  * a thread is one run, named for its work, never for its bot). Null when the
@@ -327,11 +309,6 @@ export async function getThreadName(runId: string): Promise<string | null> {
   if (source?.kind !== 'run' || !source.issue) return null
   const key = source.issue.identifier ?? (source.issue.number === null ? null : `#${source.issue.number}`)
   return key ? `${key} ${source.issue.title}` : source.issue.title
-}
-
-/** A message a person sends the running agent; the daemon delivers it. */
-export async function sendRunMessage(input: { runId: string; text: string }): Promise<void> {
-  await addRunMessage(await getUserId(), input)
 }
 
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
