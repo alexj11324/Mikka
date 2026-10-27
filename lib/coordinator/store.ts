@@ -5,7 +5,8 @@ import 'server-only'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { subagentEventSchema, type SubagentEvent } from '@mikka/protocol/computer'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
@@ -200,6 +201,8 @@ export async function editMemory<T>(userId: string, edit: (memory: string) => { 
 
 export interface ChatView {
   items: ChatItem[]
+  /** Latest web-task cards for this Bot, separate from thread runs. */
+  subagents: SubagentEvent[]
   /** A turn holds the lease or messages wait in the inbox: a reply is coming. */
   working: boolean
   /** Why the last turn failed, when no turn has answered since. */
@@ -263,8 +266,11 @@ export async function chatView(userId: string, limit = 200, botId: string | null
   }))
   const leased = coordinatorLeaseActive(session)
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
+  const subagents = botId ? (await pool.query<{ id: string; task: string; state: string; needs: string | null }>(`SELECT id,task,state,needs FROM bot_subagents
+    WHERE "botId"=$1 AND "ownerId"=$2 ORDER BY "createdAt" DESC,id DESC LIMIT $3`, [botId, userId, limit])).rows.map(row =>
+    subagentEventSchema.parse({ type: 'data-subagent', data: { botId, subagentId: row.id, task: row.task, state: row.state, ...(row.needs ? { needs: row.needs } : {}) } })) : []
   return {
-    items,
+    items, subagents,
     // A handoff waiting in the inbox is not shown as a reply coming: the Coordinator may decide to stay quiet.
     working: leased || waiting.some(event => event.tier !== 'background' && !isHandoff(event.kind)),
     error: session?.lastError ?? null,

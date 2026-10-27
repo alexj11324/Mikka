@@ -15,6 +15,7 @@ import { authorizedAccessName } from '../subscription-access-snapshot'
 import { ensureBotRuntime } from './bot-runtime'
 import { bindBotSubscription } from './bot-subscription'
 import { ComputerBroker } from '../../packages/daemon/src/computer/broker.mjs'
+import { localComputerRequest } from '@mikka/protocol/computer'
 import { applyWebComputerDecisions, webComputerSnapshots } from '../../packages/daemon/src/computer/web-review'
 import type * as provider from './e2b-provider'
 
@@ -226,7 +227,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     try {
       const grant = threadBroker.spec(threadRun, 'ask', { display: ':1' })!
       const pending = threadBroker.request(grant.token, { name: 'click', arguments: { x: 1, y: 2 } })
-      const review = threadBroker.list()[0]
+      const review = localComputerRequest.parse(threadBroker.list()[0])
       await syncComputerReviews(pool, threadDevice, actor.userId, [review])
       assert.equal(await decideComputerReview(pool, actor, review.id, review.digest, true), true)
       const decisions = await syncComputerReviews(pool, threadDevice, actor.userId, [review])

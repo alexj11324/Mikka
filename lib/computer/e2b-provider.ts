@@ -21,6 +21,11 @@ export async function computerState(id: string) {
   return info.state === 'paused' ? 'sleeping' : 'running'
 }
 
+/** Keep a machine with an active daemon alive; inactivity still expires it. */
+export async function renewComputerLifetime(id: string) {
+  await Sandbox.setTimeout(id, lifetime, options())
+}
+
 /** Template is built from scripts/e2b/bootstrap.sh, never a third-party CUA image. */
 export async function createComputer(workspaceId: string, operationId: string) {
   const template = process.env.E2B_COMPUTER_TEMPLATE

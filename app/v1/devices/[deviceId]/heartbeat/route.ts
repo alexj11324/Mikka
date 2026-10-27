@@ -6,6 +6,7 @@ import { devices } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 import { reclaimLostRuns, renewRunLeases } from '@/lib/run-leases'
 import { renewCloudDeviceToken } from '@/lib/computer/cloud-device'
+import { renewThreadLifetime } from '@/lib/computer/thread-heartbeat'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
   await db.update(devices).set({ harnesses: parsed.data.harnesses, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
   const result = await renewRunLeases(deviceId, parsed.data.runs.map(run => run.runId))
+  if (caller.scopeDeviceId === deviceId && caller.scopeWorkspaceId) {
+    await renewThreadLifetime(pool, deviceId, caller.userId, Object.keys(result.leases)).catch(() => console.error('Could not renew cloud thread lifetime'))
+  }
   const cloudCredential = caller.scopeDeviceId === deviceId && caller.scopeWorkspaceId
     ? await renewCloudDeviceToken(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId, deviceId, tokenId: caller.tokenId }).catch(() => null)
     : null

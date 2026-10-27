@@ -2,7 +2,7 @@ import 'server-only'
 import { after } from 'next/server'
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm'
 import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos, devices, runCheckpoints } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent, runRetriedEvent } from '@/lib/coordinator-events'
@@ -108,6 +108,21 @@ export async function latestCheckpoint(retryOf: string): Promise<RunCheckpoint |
 type Run = typeof agentRuns.$inferSelect
 
 async function reclaimLostRun(run: Run, now: Date) {
+  // A dedicated cloud machine owns a private, per-run worktree. The generic
+  // retry path can assign its run to an unrelated device and cannot carry
+  // the computer binding. End it safely instead; thread cleanup preserves its
+  // result before destroying the machine. Do not silently move private work.
+  const thread = await pool.query('SELECT 1 FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2', [run.id, run.userId])
+  if (thread.rowCount) {
+    const stopped = !!run.stopRequestedAt
+    const status = stopped ? 'stopped' : 'failed'
+    const ended = await endRun(run.id, LEASED_RUN_STATUSES, { status, error: stopped ? null : 'The cloud thread lost its connection. Its work is being preserved.' }, now, now)
+    if (ended) {
+      await (await import('@/lib/suggestions/execution')).finishSuggestionRun(pool, run.userId, run.id, status)
+      await announceEnd({ ...run, status })
+    }
+    return
+  }
   const outcome = lostRunOutcome(run)
   if (outcome.kind !== 'retry') {
     const status = outcome.kind === 'stopped' ? 'stopped' : 'failed'
@@ -136,10 +151,10 @@ async function reclaimLostRun(run: Run, now: Date) {
 }
 
 /** Ends a run that is still in one of `from`; false when something else ended it first. */
-async function endRun(runId: string, from: readonly Run['status'][], end: { status: 'failed' | 'stopped'; error: string | null }, now: Date): Promise<boolean> {
+async function endRun(runId: string, from: readonly Run['status'][], end: { status: 'failed' | 'stopped'; error: string | null }, now: Date, leaseExpiredBefore?: Date): Promise<boolean> {
   const ended = await db.update(agentRuns)
     .set({ status: end.status, stopReason: 'device_lost', error: end.error, finishedAt: now, updatedAt: now })
-    .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...from])))
+    .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...from]), leaseExpiredBefore ? lt(agentRuns.leaseExpiresAt, leaseExpiredBefore) : undefined))
     .returning({ id: agentRuns.id })
   return ended.length > 0
 }

@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { Sandbox } from 'e2b'
 import { installComputerRuntime, installSubagentRuntime, startSubagentBrowser, subagentBrowserAction, subagentViewerGrant, syncSubagentLease, stopSubagentBrowser, type SubagentLease } from '../../lib/computer/e2b-provider'
 
+async function main() {
+
 const template = process.env.E2B_COMPUTER_TEMPLATE
 if (!template || !process.env.E2B_API_KEY) throw new Error('Disposable E2B template and key are required')
 const sandbox = await Sandbox.create(template, { apiKey: process.env.E2B_API_KEY, proxy: process.env.HTTPS_PROXY, timeoutMs: 240_000 })
@@ -27,3 +29,6 @@ try {
   await stopSubagentBrowser(sandbox, held.subagentId)
   console.log('live subagent browser: startup, access grant, wait, handback and stop passed')
 } finally { await sandbox.kill() }
+
+}
+void main().catch(error => { console.error(error instanceof Error ? error.message : "Live test failed"); process.exitCode = 1 })

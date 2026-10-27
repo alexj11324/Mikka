@@ -6,6 +6,8 @@ import { prepareWorkspaceSnapshot,collectRetiredSnapshots } from '../../lib/comp
 import { ThreadMachines } from '../../lib/computer/thread-machine'
 import { threadMachineProvider } from '../../lib/computer/e2b-provider'
 import { preserveThreadResult } from '../../lib/computer/thread-result'
+
+async function main() {
 const url=process.env.COMPUTER_TEST_DATABASE_URL!;if(!['localhost','127.0.0.1'].includes(new URL(url).hostname))throw Error('Loopback database required')
 const opts={apiKey:process.env.E2B_API_KEY!,proxy:process.env.HTTPS_PROXY,timeoutMs:240000}
 const schema='snapshotlive_'+randomUUID().replaceAll('-',''),admin=new Pool({connectionString:url});await admin.query(`CREATE SCHEMA ${schema}`)
@@ -44,3 +46,6 @@ try{
  const snaps=await pool.query('SELECT "snapshotId" FROM workspace_snapshot_versions').catch(()=>({rows:[]}));for(const s of snaps.rows)await Sandbox.deleteSnapshot(s.snapshotId,opts).catch(()=>console.log('snapshot_cleanup_failed'))
  await pool.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end()
 }
+
+}
+void main().catch(error => { console.error(error instanceof Error ? error.message : "Live test failed"); process.exitCode = 1 })

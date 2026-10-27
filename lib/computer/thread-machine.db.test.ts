@@ -11,6 +11,7 @@ import { renewCloudDeviceToken } from './cloud-device'
 import { startThreadWorker } from './thread-worker'
 import { cloudDeviceIsActive } from './device-scope'
 import { ThreadDesktopStore } from './thread-desktop'
+import { renewThreadLifetime } from './thread-heartbeat'
 import type * as e2bProvider from './e2b-provider'
 
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL
@@ -95,6 +96,15 @@ test('thread lifecycle serializes creation and respects owner, idle and terminal
     const worker = await startThreadWorker(pool, actor, runId, sandbox, 'https://mikka.example', sha, workerRuntime)
     assert.equal(worker.deviceId, credential.deviceId)
     assert.equal((await startThreadWorker(pool, actor, runId, sandbox, 'https://mikka.example', sha, workerRuntime)).deviceId, credential.deviceId)
+    await pool.query(`UPDATE agent_runs SET status='running',"deviceId"=$2,"leaseExpiresAt"=now()+interval '1 minute' WHERE id=$1`, [runId, credential.deviceId])
+    await pool.query(`UPDATE thread_machines SET "lastActiveAt"=now()-interval '3 minutes' WHERE "runId"=$1`, [runId])
+    const renewed: string[] = []
+    const renew = async (id: string) => { renewed.push(id) }
+    await renewThreadLifetime(pool, credential.deviceId, 'bob', [runId], renew)
+    await renewThreadLifetime(pool, credential.deviceId, actor.userId, [randomUUID()], renew)
+    await renewThreadLifetime(pool, credential.deviceId, actor.userId, [runId], renew)
+    await renewThreadLifetime(pool, credential.deviceId, actor.userId, [runId], renew)
+    assert.deepEqual(renewed, ['sandbox-fixture'])
     await assert.rejects(machines.pause(actor, runId), /not idle/)
     await assert.rejects(machines.end(actor, runId), /still active/)
     await pool.query('UPDATE agent_runs SET status=$2 WHERE id=$1', [runId, 'waiting_input'])

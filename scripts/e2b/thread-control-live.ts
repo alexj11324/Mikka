@@ -6,6 +6,8 @@ import { randomUUID } from 'node:crypto'
 import { Sandbox } from 'e2b'
 import { installComputerRuntime, startDesktop, syncDesktopLease, type DesktopLease } from '../../lib/computer/e2b-provider'
 
+async function main() {
+
 const template = process.env.E2B_COMPUTER_TEMPLATE
 if (!template || !process.env.E2B_API_KEY) throw new Error('Disposable E2B template and key are required')
 async function bounded<T>(promise: Promise<T>) {
@@ -42,3 +44,6 @@ catch(error) { await writeFile('/tmp/mikka-wait-'+mode,mode==='cancel'&&String(e
   assert.equal(await sandbox.files.read('/tmp/mikka-wait-cancel', { user: 'mikka-runner' }), 'cancelled')
   console.log('live thread control: wait, handback and cancellation passed')
 } finally { await sandbox.kill() }
+
+}
+void main().catch(error => { console.error(error instanceof Error ? error.message : "Live test failed"); process.exitCode = 1 })
