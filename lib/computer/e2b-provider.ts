@@ -72,9 +72,13 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const validSubagent = (id: string) => { if (!uuid.test(id)) throw new Error('Invalid subagent') }
 
 export async function installSubagentRuntime(sandbox: Sandbox) {
-  for (const name of ['subagent-browser.mjs', 'subagent-rpc.mjs', 'subagent-viewer.py', 'subagent-command.py', 'start-subagent.sh']) {
+  for (const name of ['subagent-browser.mjs', 'subagent-egress.mjs', 'subagent-rpc.mjs', 'subagent-viewer.py', 'subagent-command.py', 'start-subagent.sh']) {
     await sandbox.files.write(`/opt/mikka/computer/${name}`, await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8'), { user: 'root' })
   }
+  // E2B exposes loopback ports. The root-owned proxy permits only TCP sockets
+  // attributed by the kernel to Chromium's unprivileged account.
+  await sandbox.commands.run('install -d -o root -g root -m 0711 /run/mikka-subagent; flock -n /run/mikka-subagent/egress.lock env MIKKA_BROWSER_UID=$(id -u user) /usr/local/bin/node /opt/mikka/computer/subagent-egress.mjs', { user: 'root', background: true, timeoutMs: 0 })
+  await sandbox.commands.run('for i in $(seq 1 50); do [ "$(curl -s -o /dev/null -w "%{http_code}" --proxy http://127.0.0.1:6082 http://127.0.0.1:6080/ --noproxy "")" = 403 ] && exit 0; sleep .2; done; exit 1', { user: 'user', timeoutMs: 15_000 })
   await sandbox.commands.run('install -d -o root -g root -m 0711 /run/mikka-subagent; flock -n /run/mikka-subagent/gateway.lock /usr/bin/python3 /opt/mikka/computer/subagent-viewer.py', { user: 'root', background: true, timeoutMs: 0 })
   await sandbox.commands.run(`for i in $(seq 1 50); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6081/subagents/00000000-0000-4000-8000-000000000000)" = 401 ] && exit 0; sleep .2; done; exit 1`, { user: 'root', timeoutMs: 15_000 })
 }

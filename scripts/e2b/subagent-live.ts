@@ -11,7 +11,17 @@ if (!template || !process.env.E2B_API_KEY) throw new Error('Disposable E2B templ
 const sandbox = await Sandbox.create(template, { apiKey: process.env.E2B_API_KEY, proxy: process.env.HTTPS_PROXY, timeoutMs: 240_000 })
 try {
   await installComputerRuntime(sandbox)
+  console.log('live subagent: base runtime ready')
   await installSubagentRuntime(sandbox)
+  console.log('live subagent: isolated egress ready')
+  await sandbox.commands.run('if curl --connect-timeout 2 -s http://127.0.0.1:6082/ >/dev/null; then exit 1; fi', { user: 'root', timeoutMs: 5000 })
+  await sandbox.commands.run('[ "$(curl -s -o /dev/null -w "%{http_code}" --proxy http://127.0.0.1:6082 --noproxy "" http://127.0.0.1.nip.io/)" = 403 ]', { user: 'user', timeoutMs: 15_000 })
+  const outsider = await Sandbox.create(template, { apiKey: process.env.E2B_API_KEY, proxy: process.env.HTTPS_PROXY, timeoutMs: 60_000 })
+  try {
+    const host = sandbox.getHost(6082)
+    if (!/^[a-z0-9.-]+$/i.test(host)) throw new Error('Invalid sandbox host')
+    await outsider.commands.run(`status=$(curl -s --max-time 8 -o /dev/null -w '%{http_code}' https://${host}/ || true); [ "$status" != 200 ] && [ "$status" != 403 ]`, { user: 'root', timeoutMs: 12_000 })
+  } finally { await outsider.kill() }
   const held: SubagentLease = { subagentId: randomUUID(), botId: randomUUID(), workspaceId: randomUUID(), ownerId: 'synthetic-owner', epoch: 1, controlledBy: 'synthetic-owner', controlUntil: Date.now() / 1000 + 120, computerAllowed: true, policyVersion: 1, stopRequested: false }
   await startSubagentBrowser(sandbox, held.subagentId)
   await syncSubagentLease(sandbox, held)
@@ -26,6 +36,13 @@ try {
   const result = await waiting
   assert.equal(typeof result.title, 'string')
   await subagentBrowserAction(sandbox, released, { action: 'navigate', url: 'https://example.com' })
+  let loaded = false
+  for (let i = 0; i < 20; i++) {
+    await new Promise(resolve => setTimeout(resolve, 500))
+    const page = await subagentBrowserAction(sandbox, released, { action: 'snapshot' })
+    if (page.title === 'Example Domain') { loaded = true; break }
+  }
+  assert.equal(loaded, true, 'the isolated browser must still reach a public HTTPS page')
   await stopSubagentBrowser(sandbox, held.subagentId)
   console.log('live subagent browser: startup, access grant, wait, handback and stop passed')
 } finally { await sandbox.kill() }

@@ -11,7 +11,7 @@ const root = `/home/user/.mikka/subagents/${id}`
 mkdirSync(root, { recursive: true, mode: 0o700 }); chmodSync(root, 0o700)
 const socketPath = `${root}/browser.sock`
 try { unlinkSync(socketPath) } catch (error) { if (error.code !== 'ENOENT') throw error }
-const chrome = spawn('/usr/bin/chromium', ['--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--password-store=basic', `--user-data-dir=${root}/profile`, '--window-size=1280,800', '--remote-debugging-pipe', 'about:blank'], { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] })
+const chrome = spawn('/usr/bin/chromium', ['--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-quic', '--no-first-run', '--no-default-browser-check', '--password-store=basic', '--proxy-server=http://127.0.0.1:6082', '--proxy-bypass-list=<-loopback>', `--user-data-dir=${root}/profile`, '--window-size=1280,800', '--remote-debugging-pipe', 'about:blank'], { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] })
 let seq = 0, buffer = '', session, frameSubscribers = new Set()
 const pending = new Map()
 function call(method, params = {}, sessionId = session) {
@@ -32,7 +32,8 @@ chrome.stdio[4].on('data', data => {
     buffer = buffer.slice(end + 1)
     if (message.id && pending.has(message.id)) {
       const item = pending.get(message.id); pending.delete(message.id); clearTimeout(item.timer)
-      message.error ? item.reject(new Error('Browser rejected request')) : item.resolve(message.result)
+      if (message.error) item.reject(new Error('Browser rejected request'))
+      else item.resolve(message.result)
     } else if (message.method === 'Page.screencastFrame') {
       const frame = JSON.stringify({ type: 'frame', data: message.params.data, metadata: message.params.metadata }) + '\n'
       for (const client of frameSubscribers) if (!client.destroyed && client.writableLength < 8 * 1024 * 1024) client.write(frame)
