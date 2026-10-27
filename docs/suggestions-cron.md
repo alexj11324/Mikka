@@ -29,6 +29,13 @@ Each stored notification is read once for facts about the person after it is rat
 - fades facts not seen for 30 days (confidence × 0.95 a night, expired below 0.2);
 - keeps one answer per slot (for example `home_city`): the person's correction, else the newest.
 
+Proactive work is behind four switches (`docs/design/proactive.md` § 3), and any one of them off stops it:
+
+1. `PROACTIVE_PROFILE_ENABLED` (deployment, off unless `1` or `true`) gates extraction and this merge. Off, the endpoint answers 200 with `{"skipped":"disabled"}`. `PROACTIVE_RESEARCH_ENABLED` is reserved for the phase 2 research run and nothing reads it yet. Set both in Infisical, never in source.
+2. `proactive_entitlements.profile` must be true for the person; no row means not entitled.
+3. The person's 记忆 switch (`memory_settings.enabled`).
+4. `proactive_entitlements.dailyCalls` (default 200) caps extraction calls per UTC day. Each call is counted before it is made, and its tokens are added after, in `proactive_usage` (person, UTC day, kind), so cost per person can be computed.
+
 Facts the person corrected in 记忆 are never faded or overwritten. A person is due from 04:00 their time (the zone in `user_time_zones`, UTC without one); `memory_settings.consolidatedOn` holds the local date of the last merge and is claimed before merging, so overlapping runs merge a person once a day. A person with 记忆 off is not merged and nothing is extracted for them. The run starts no new people after about 40 seconds; the next hourly run picks up whoever is left.
 
 ## Backfill

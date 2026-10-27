@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | Proactive work sits behind flags because of its cost: a deployment switch each for the profile and for background research (both off by default for self-hosters), per-user entitlement (internal first, research can become paid), the person's own 记忆 / 主动推荐 toggles, and a daily budget per person (「要做个开关吧，做一个 flag 是不是？毕竟这成本挺高的」) | R-73, `proactive.md` § 3 | |
 | 2026-10-27 | Add Hark's proactive half: a per-person fact profile, a nightly research run (deadlines, tool advisories, interests × what is new nearby), ranked and capped cards, routine and location triggers, and feedback from dismissals (「我觉得我们可以把hark这一套补齐到我们的产品」) | R-73, `proactive.md` | Reactive-only attention model (Comma) |
 | 2026-10-27 | The saved-login vault starts on Infisical with per-user application encryption; its KMS upgrade uses AWS KMS (not GCP) (「用aws」) | `credential-vault.md` | AWS or GCP left open |
 | 2026-10-27 | Saved logins belong to the user's account and are kept (not one-time); every thread and every bot sub-agent of that user can use them. Browsers visit any site with no preset allowlist (「密码应该是绑在这个账户上边，每个线程都可以调用，密码不是一次性的，可以存进密码箱。浏览器可以就是说访问所有网站，不要预设白名单」) | R-72, `credential-vault.md` | Run-bound, one-time credentials; registered-service allowlist (#223) |

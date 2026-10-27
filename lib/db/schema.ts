@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -456,6 +456,32 @@ export const memorySettings = pgTable('memory_settings', {
   consolidatedOn: text('consolidatedOn'),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/**
+ * Who may use proactive work (docs/design/proactive.md § 3); no row means no.
+ * `research` is reserved for the nightly research run (phase 2). `dailyCalls`
+ * caps the person's profile model calls per UTC day.
+ */
+export const proactiveEntitlements = pgTable('proactive_entitlements', {
+  userId: text('userId').primaryKey(),
+  profile: boolean('profile').notNull().default(false),
+  research: boolean('research').notNull().default(false),
+  dailyCalls: integer('dailyCalls').notNull().default(200),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type ProactiveUsageKind = 'extraction'
+
+/** Proactive model calls and tokens per person, UTC day and kind, for the daily cap and cost per person. */
+export const proactiveUsage = pgTable('proactive_usage', {
+  userId: text('userId').notNull(),
+  day: date('day').notNull(),
+  kind: text('kind').$type<ProactiveUsageKind>().notNull(),
+  calls: integer('calls').notNull().default(0),
+  inputTokens: integer('inputTokens').notNull().default(0),
+  outputTokens: integer('outputTokens').notNull().default(0),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.day, table.kind] })])
 
 /** Every handoff and decision on a matter; the budgets count `handoff` and `notify` rows (lib/attention/budget.ts). */
 export const attentionLog = pgTable('attention_log', {

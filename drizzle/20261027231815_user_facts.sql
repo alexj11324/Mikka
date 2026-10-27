@@ -1,8 +1,10 @@
--- R-73 phase 1 (docs/design/proactive.md § 2.2): each person's profile of
--- facts drawn from what reaches them, shown and editable in 记忆, and the
--- person's 记忆 switch with the date their facts were last consolidated.
--- Facts belong to one person, never to a workspace. Mirrors user_facts and
--- memory_settings in lib/db/schema.ts. Additive only; safe to run again.
+-- R-73 phase 1 (docs/design/proactive.md § 2.2, § 3): each person's profile
+-- of facts drawn from what reaches them, shown and editable in 记忆; the
+-- person's 记忆 switch with the date their facts were last consolidated; who
+-- is entitled to proactive work; and its daily usage. Facts belong to one
+-- person, never to a workspace. Mirrors user_facts, memory_settings,
+-- proactive_entitlements and proactive_usage in lib/db/schema.ts. Additive
+-- only; safe to run again.
 
 create table if not exists user_facts (
   id uuid primary key,
@@ -34,4 +36,26 @@ create table if not exists memory_settings (
   -- The person's local date (YYYY-MM-DD) of the last nightly consolidation.
   "consolidatedOn" text,
   "updatedAt" timestamptz not null default now()
+);
+
+-- Who may use proactive work (proactive.md § 3). No row: not entitled.
+-- `research` is reserved for phase 2. `dailyCalls` caps profile model calls a day.
+create table if not exists proactive_entitlements (
+  "userId" text primary key,
+  profile boolean not null default false,
+  research boolean not null default false,
+  "dailyCalls" integer not null default 200 check ("dailyCalls" >= 0),
+  "updatedAt" timestamptz not null default now()
+);
+
+-- Model calls and tokens per person, UTC day and kind, so cost per person can be computed.
+create table if not exists proactive_usage (
+  "userId" text not null,
+  day date not null,
+  kind text not null check (kind in ('extraction')),
+  calls integer not null default 0,
+  "inputTokens" integer not null default 0,
+  "outputTokens" integer not null default 0,
+  "updatedAt" timestamptz not null default now(),
+  primary key ("userId", day, kind)
 );

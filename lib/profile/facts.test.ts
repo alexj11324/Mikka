@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
+import { profileEnabled, researchEnabled } from './flags'
 import { extractionPrompt, factInput, FIRST_SIGHT_MAX, mergedEvidence, mergedValue, parseFacts, planConsolidation, purchaseMerchant, raisedConfidence, subjectKey, type StoredFact } from './facts'
 
 const mail = (fields: Partial<ExternalNotification> = {}): ExternalNotification => ({ userId: 'u', source: 'gmail', externalId: 'm1', matterKey: 'gmail:t1', action: 'read', title: 'Your Weee! order has been delivered', url: null, actor: 'Weee! <orders@sayweee.com>', occurredAt: new Date('2026-10-20T19:05:00Z'), required: false, direct: false, fromSelf: false, automated: true, excerpt: 'Pixian bean paste x2, Sichuan peppercorn. Total $23.47', ...fields })
@@ -108,4 +109,27 @@ test('the nightly merge expires dated facts, fades stale ones and keeps the newe
   assert.equal(updates.has(facts[6].id), false)
   assert.equal(updates.has(facts[7].id), false, 'the correction wins its slot')
   assert.equal(updates.get(facts[8].id)?.state, 'expired')
+})
+
+test('proactive deployment switches are off unless set to 1 or true', t => {
+  const saved = { profile: process.env.PROACTIVE_PROFILE_ENABLED, research: process.env.PROACTIVE_RESEARCH_ENABLED }
+  t.after(() => {
+    for (const [name, value] of [['PROACTIVE_PROFILE_ENABLED', saved.profile], ['PROACTIVE_RESEARCH_ENABLED', saved.research]] as const) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+  })
+  delete process.env.PROACTIVE_PROFILE_ENABLED
+  delete process.env.PROACTIVE_RESEARCH_ENABLED
+  assert.equal(profileEnabled(), false)
+  assert.equal(researchEnabled(), false)
+  for (const value of ['0', 'false', 'yes', '']) {
+    process.env.PROACTIVE_PROFILE_ENABLED = value
+    assert.equal(profileEnabled(), false, value)
+  }
+  for (const value of ['1', 'true', 'TRUE']) {
+    process.env.PROACTIVE_PROFILE_ENABLED = value
+    assert.equal(profileEnabled(), true, value)
+  }
+  assert.equal(researchEnabled(), false, 'the two switches are separate')
 })

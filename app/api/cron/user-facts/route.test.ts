@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
 
 const originalSecret = process.env.CRON_SECRET
+const originalFlag = process.env.PROACTIVE_PROFILE_ENABLED
 const secret = 'source-only-cron-test-secret'
 const verifyBearer = mock.fn(async (_value: string | null, _secret: string) => false)
 const result = () => ({ people: 3, due: 2, written: 2, skipped: 0, failed: 0, deferred: 0 })
@@ -11,6 +12,7 @@ mock.module(new URL('../../../../lib/profile/store.ts', import.meta.url).href, {
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
 beforeEach(() => {
+  process.env.PROACTIVE_PROFILE_ENABLED = '1'
   verifyBearer.mock.resetCalls()
   verifyBearer.mock.mockImplementation(async () => false)
   consolidate.mock.resetCalls()
@@ -18,6 +20,8 @@ beforeEach(() => {
 after(() => {
   if (originalSecret === undefined) delete process.env.CRON_SECRET
   else process.env.CRON_SECRET = originalSecret
+  if (originalFlag === undefined) delete process.env.PROACTIVE_PROFILE_ENABLED
+  else process.env.PROACTIVE_PROFILE_ENABLED = originalFlag
 })
 
 const url = 'https://preview.example.test/mikka/api/cron/user-facts'
@@ -48,4 +52,17 @@ test('an authorized call returns only counts and gives the merge a 40-second bud
   assert.deepEqual(await response.json(), result())
   const deadline = consolidate.mock.calls[0].arguments[0].deadline
   assert.ok(deadline >= started + 40_000 && deadline <= Date.now() + 40_000)
+})
+
+test('with PROACTIVE_PROFILE_ENABLED off an authorized call answers 200 and merges nothing', async () => {
+  process.env.CRON_SECRET = secret
+  verifyBearer.mock.mockImplementation(async () => true)
+  for (const value of [undefined, '0', 'false', 'yes']) {
+    if (value === undefined) delete process.env.PROACTIVE_PROFILE_ENABLED
+    else process.env.PROACTIVE_PROFILE_ENABLED = value
+    const response = await GET(new Request(url, { headers: { authorization: `Bearer ${secret}` } }))
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), { skipped: 'disabled' })
+  }
+  assert.equal(consolidate.mock.callCount(), 0)
 })

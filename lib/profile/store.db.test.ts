@@ -24,7 +24,7 @@ const seen = (at: string, suggestionId: string, fields: Record<string, unknown> 
 })
 
 dbTest('facts stay with their person, merge on repeat, and keep the person\'s corrections', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, { workspaces, workspaceMembers }, store, { eq, inArray, sql }] = await Promise.all([
+  const [{ createRequestDatabaseScope, db }, schema, { workspaces, workspaceMembers }, store, { and, eq, inArray, sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('../db/workspace-schema'), import('./store'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
@@ -35,6 +35,8 @@ dbTest('facts stay with their person, merge on repeat, and keep the person\'s co
     await scope.run(async () => {
       await db.delete(schema.userFacts).where(inArray(schema.userFacts.userId, [alex, dana]))
       await db.delete(schema.memorySettings).where(inArray(schema.memorySettings.userId, [alex, dana]))
+      await db.delete(schema.proactiveEntitlements).where(inArray(schema.proactiveEntitlements.userId, [alex, dana]))
+      await db.delete(schema.proactiveUsage).where(inArray(schema.proactiveUsage.userId, [alex, dana]))
       await db.delete(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId))
       await db.delete(workspaces).where(eq(workspaces.id, workspaceId))
       await db.delete(schema.users).where(inArray(schema.users.id, [alex, dana]))
@@ -80,9 +82,24 @@ dbTest('facts stay with their person, merge on repeat, and keep the person\'s co
     const [tombstone] = await db.select().from(schema.userFacts).where(eq(schema.userFacts.id, fact.id))
     assert.deepEqual([tombstone.state, tombstone.value, tombstone.evidence], ['deleted', {}, []])
 
+    // Entitlement, 记忆 and the daily cap (proactive.md § 3).
+    assert.equal(await store.profileAllowance(alex), null, 'no entitlement row: not entitled')
+    await db.insert(schema.proactiveEntitlements).values([{ userId: alex, profile: true, dailyCalls: 2 }, { userId: dana, profile: true }])
+    assert.deepEqual(await store.profileAllowance(alex), { dailyCalls: 2 })
+    const day = store.usageDay(new Date('2026-10-28T12:00:00Z'))
+    const claims = await Promise.all([1, 2, 3].map(() => store.claimExtractionCall(alex, 2, day)))
+    assert.equal(claims.filter(Boolean).length, 2, 'the cap holds under concurrent calls')
+    assert.equal(await store.claimExtractionCall(alex, 2, store.usageDay(new Date('2026-10-29T00:00:00Z'))), true, 'a new day has a new budget')
+    await store.recordExtractionTokens(alex, day, 120, 30)
+    await store.recordExtractionTokens(alex, day, 80, 20)
+    const [usage] = await db.select().from(schema.proactiveUsage).where(and(eq(schema.proactiveUsage.userId, alex), eq(schema.proactiveUsage.day, day)))
+    assert.deepEqual([usage.calls, usage.inputTokens, usage.outputTokens], [2, 200, 50])
+    assert.equal(await store.claimExtractionCall(dana, 0, day), false)
+
     // Nightly merge: due once per local day from 04:00, never for someone with 记忆 off.
     await store.recordFacts(alex, ['2026-10-01', '2026-10-08', '2026-10-15'].map((day, index) => seen(`${day}T01:00:00Z`, `p${index}`, { subject: `调料 ${index}` })))
     await store.setMemoryEnabled(dana, false)
+    assert.equal(await store.profileAllowance(dana), null, '记忆 off stops extraction')
     const morning = new Date('2026-10-28T04:30:00Z')
     const first = await store.consolidateDueFacts({ now: morning })
     assert.equal(first.written, 1, 'only Alex: Dana has 记忆 off')
