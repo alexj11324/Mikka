@@ -1,6 +1,5 @@
 import 'server-only'
 import { eq, inArray } from 'drizzle-orm'
-import { createTranslator } from 'next-intl'
 import { db } from '@/lib/db'
 import { bots, mobilePushTokens } from '@/lib/db/schema'
 import { readPreferences, type Preferences } from '@/lib/preferences'
@@ -17,10 +16,14 @@ const MESSAGES = {
 
 const FLAG: Record<PushReason, keyof Preferences> = { decide: 'pushDecide', review: 'pushReview', finished: 'pushFinished', briefing: 'pushBriefing' }
 
-/** The push for a verification code, in the person's language: it only says one came; the code stays in the app chat. */
+/**
+ * The push for a verification code, in the person's language: it only says
+ * one came; the code stays in the app chat. Read straight from the messages:
+ * next-intl's entry loads React hooks, which the react-server condition
+ * (workflow steps, tests) does not have.
+ */
 export async function codePushBody(locale: ActionLocale): Promise<string> {
-  const messages = (await MESSAGES[locale]()).default
-  return createTranslator({ locale, messages, namespace: 'MobilePush' })('verificationCode')
+  return (await MESSAGES[locale]()).default.MobilePush.verificationCode
 }
 
 /** Whether the person's 通知 settings let a reply with these reasons reach the phone. */
