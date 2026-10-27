@@ -77,8 +77,11 @@ test('the morning briefing is pushed to the person once a day', () => {
   assert.match(prompt, /^\[Event\] It is 08:00 for the person: their morning briefing for 2026-10-27\. 4 item\(s\)/)
   assert.match(prompt, /gmail 3, linear 1/)
   assert.match(prompt, /- linear · handle · assigned to them: "Fix login" from Dana \(https:\/\/linear\.app\/x\/issue\/MIK-9\)/)
-  assert.match(prompt, /do not act until they say so/)
-  assert.match(prompt, /starts with a verb/)
+  assert.match(prompt, /Do not act until they say so/)
+  assert.match(prompt, /secretary/)
+  assert.match(prompt, /早上好，Alex/)
+  assert.doesNotMatch(prompt, /The person's name/)
+  assert.match(eventPrompt({ ...briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'daily', total: 1, counts: {} }, [], 'Alex Jiang'), tier }), /The person's name: Alex Jiang\./)
   assert.deepEqual((event.payload.items as { suggestionId: string }[]).map(item => item.suggestionId), ['s1', 's2'])
   // The person sees it as an event, without the triage line.
   const [item] = chatItems([{ position: 1, createdAt: new Date(0), message: { role: 'user', content: prompt } }])

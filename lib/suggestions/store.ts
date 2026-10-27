@@ -6,7 +6,7 @@ import { decisionInput } from '@/lib/coordinator/decision'
 import { briefingEvent } from '@/lib/coordinator-events'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { db } from '@/lib/db'
-import { briefings, suggestions, userTimeZones } from '@/lib/db/schema'
+import { briefings, suggestions, users, userTimeZones } from '@/lib/db/schema'
 import { BRIEFING_HOUR, BRIEFING_WINDOW_MS, briefingContent, dueBriefingZones, localClock, localDate, localInstant, safeTimeZone } from './briefing'
 import type { ExternalNotification } from './notification'
 import { fallbackVerdict, modelVerdict, ruleVerdict, suggestionQuestions, suggestionState, type Verdict } from './rules'
@@ -74,7 +74,8 @@ const pending = (row: Briefing | undefined, dueAt: Date) => !row || (row.kind ==
 async function pushBriefing(row: Briefing): Promise<boolean> {
   if (!row.total) return false
   const items = (await briefingHighlights(row.userId, row.highlights)).map(item => ({ suggestionId: item.id, source: item.source, action: item.action, title: item.title, actor: item.actor, url: item.url, required: item.required }))
-  await recordCoordinatorEvent(db, briefingEvent({ ...row, counts: row.counts as Record<string, number> }, items))
+  const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, row.userId)).limit(1)
+  await recordCoordinatorEvent(db, briefingEvent({ ...row, counts: row.counts as Record<string, number> }, items, person?.name?.trim() || null))
   return true
 }
 

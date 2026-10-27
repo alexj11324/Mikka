@@ -133,10 +133,10 @@ export interface BriefingEventItem { suggestionId: string; source: string; actio
  * first one after they connect an app. One event per briefing kind and local
  * date, so a rerun of the cron does not push it twice.
  */
-export function briefingEvent(briefing: { userId: string; localDate: string; kind: 'first' | 'daily'; total: number; counts: Record<string, number> }, items: readonly BriefingEventItem[]): CoordinatorEventInput {
+export function briefingEvent(briefing: { userId: string; localDate: string; kind: 'first' | 'daily'; total: number; counts: Record<string, number> }, items: readonly BriefingEventItem[], personName: string | null = null): CoordinatorEventInput {
   return {
     userId: briefing.userId, kind: 'daily_briefing', dedupeKey: `daily_briefing:${briefing.userId}:${briefing.localDate}:${briefing.kind}`, issueId: null, runId: null,
-    payload: { localDate: briefing.localDate, briefingKind: briefing.kind, total: briefing.total, counts: briefing.counts, items },
+    payload: { localDate: briefing.localDate, briefingKind: briefing.kind, total: briefing.total, counts: briefing.counts, items, ...(personName ? { personName } : {}) },
   }
 }
 
