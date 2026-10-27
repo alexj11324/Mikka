@@ -46,8 +46,10 @@ screen; it gets no other special UI (R-06).
 
 **线程 screen** (like the Claude app's Code screen):
 
-- A thread row is a status icon, the thread name, and one grey line (状态 ·
-  bot · machine or PR). Never the bot's bloub avatar (glossary). Icons: grey
+- A thread row is a status icon, the thread name, and one grey line: the
+  bot's name and a machine icon (cloud, laptop, server), never the machine
+  as text. Only 等你回复 and 待审阅 add a word before the name; no 完成 or
+  失败 word (the icon says it) and no failure reason. Never the bot's bloub avatar (glossary). Icons: grey
   spinner 进行中, hollow circle 等你回复, PR icon 待审阅, red alert 失败, grey
   check 完成. Rows waiting on the person carry a blue unread dot on the right.
 - 设备 chips at the top (Mikka Cloud, Mac, …); an online machine has a green
