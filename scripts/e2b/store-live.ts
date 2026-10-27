@@ -28,8 +28,8 @@ async function main() {
   try {
     await pool.query('CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES (\'acceptance-owner\')')
     await pool.query(await readFile(new URL('../../drizzle/20261026235901_cloud_computers.sql', import.meta.url), 'utf8'))
-    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, status text NOT NULL, "deviceId" uuid, "stopRequestedAt" timestamptz)')
-    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL)')
+    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, status text NOT NULL, "deviceId" uuid, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz)')
+    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, enabled boolean NOT NULL DEFAULT true)')
     await pool.query(await readFile(new URL('../../drizzle/20261027000000_computer_run_bindings.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000200_local_computer_reviews.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000500_computer_run_approvals.sql', import.meta.url), 'utf8'))
@@ -77,7 +77,7 @@ async function main() {
     await pool.query('INSERT INTO devices (id,"ownerId") VALUES ($1,$2)', [deviceId, actor.userId])
     await pool.query('INSERT INTO agent_runs (id,"userId",status,"deviceId") VALUES ($1,$2,$3,$4)', [runId, actor.userId, 'queued', deviceId])
     await bindComputerRun(pool, actor, runId, bot.id)
-    await pool.query('UPDATE agent_runs SET status=$2 WHERE id=$1', [runId, 'running'])
+    await pool.query('UPDATE agent_runs SET status=$2,"leaseExpiresAt"=now()+interval \'5 minutes\' WHERE id=$1', [runId, 'running'])
     await sandbox.files.write('/tmp/mikka-cua-driver.mjs', await readFile(new URL('../../packages/daemon/src/computer/driver.mjs', import.meta.url), 'utf8'), { user: 'user' })
     await sandbox.files.write('/tmp/mikka-cua-live.mjs', `import { detectComputerDriver, executeDriver } from './mikka-cua-driver.mjs';\nconst driver = await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif (!driver) throw new Error('driver unavailable');\nawait executeDriver(driver, { name: 'click', arguments: { x: 500, y: 500 } }, ':1');\n`, { user: 'user' })
     const activeSandbox = sandbox

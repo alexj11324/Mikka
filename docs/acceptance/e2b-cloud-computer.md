@@ -227,7 +227,8 @@ another Bot is rejected, the task account cannot read or alter the desktop lease
 person-controlled desktops deny agent input, and handback permits it again.
 A shared process lock held across exec also makes takeover wait for an active
 operation before granting the person control. The E2B sandbox was deleted. The
-guard is infrastructure-tested but is not yet injected into a real model run.
+guard is infrastructure-tested and is injected into the hosted fixture runs
+described below; no real model inference has been tested.
 
 The request-only computer MCP has also been injected into hosted Codex and
 Claude Code fixture sessions in real E2B containers. Both synthetic CLIs held
@@ -242,12 +243,15 @@ database approval before the guarded driver executed it; the fixture then
 submitted the task. The service and model were synthetic, and the database
 observer simulated approval; this is not a signed-in product, real provider, or
 production deployment acceptance. The sandbox and local schema were deleted.
+The test was repeated with a run-wide grant: the first screenshot was approved
+for that run, and its later click was automatically approved on the same Bot
+desktop. A different run on the same desktop still needs its own decision.
 
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
 expiry validation, rotation and the Bot's pending-review state. The worker
-credential provisioning and review polling still need to be connected to an
-actual Bot task before product acceptance.
+credential provisioning and review polling are wired to hosted fixture runs;
+they still require an actual user-initiated Bot task before product acceptance.
 
 The production-scoped infrastructure test was extended to create a disposable
 Bot/run binding in local PostgreSQL, approve the broker's exact request, and

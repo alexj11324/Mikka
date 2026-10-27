@@ -70,7 +70,8 @@ lines.on("line", async (line) => {
     const turnId = `fixture-turn-${++turn}`
     send({ id, result: { turn: { id: turnId } } })
     const prompt = params.input[0].text
-    if (prompt === 'COMPUTER' || prompt === 'FULL_COMPUTER') {
+    const fullComputer = prompt === 'FULL_COMPUTER' || prompt.startsWith('# FULL_COMPUTER\n')
+    if (prompt === 'COMPUTER' || fullComputer) {
       async function call(server, name, args) {
         const prefix = `mcp_servers.${server}.args=`
         const configured = process.argv.find(value => value.startsWith(prefix))
@@ -87,9 +88,9 @@ lines.on("line", async (line) => {
       proxy.kill()
       if (answer.result?.isError) process.exit(2)
       }
-      if (prompt === 'FULL_COMPUTER') await call('mikka_computer', 'get_desktop_state', {})
+      if (fullComputer) await call('mikka_computer', 'get_desktop_state', {})
       await call('mikka_computer', 'click', { x: 3, y: 4 })
-      if (prompt === 'FULL_COMPUTER') await call('mikka', 'submit', { summary: 'Synthetic computer task completed' })
+      if (fullComputer) await call('mikka', 'submit', { summary: 'Synthetic computer task completed' })
     }
     if(prompt==='PROBE_GIT') {
       const target=lstatSync('.git').isFile()?'.git':'.git/guard'

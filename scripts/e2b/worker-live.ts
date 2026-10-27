@@ -7,7 +7,7 @@ import { Pool } from 'pg'
 import { Sandbox } from 'e2b'
 import { ComputerStore } from '../../lib/computer/store'
 import { startCloudWorker } from '../../lib/computer/cloud-worker'
-import { bindComputerRun } from '../../lib/computer/run-binding'
+import { queueCloudRun } from '../../lib/computer/queue-run'
 import { claimCloudRun } from '../../lib/computer/claim'
 import { decideComputerReview, syncComputerReviews } from '../../lib/computer/reviews'
 import { computerSyncBody } from '@mikka/protocol/computer'
@@ -26,9 +26,9 @@ async function main() {
   try {
     await pool.query('CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES (\'synthetic-owner\')')
     await pool.query(await readFile(new URL('../../drizzle/20261026235901_cloud_computers.sql', import.meta.url), 'utf8'))
-    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "agentId" uuid, status text NOT NULL, "deviceId" uuid, "startedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
+    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
     await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL, enabled boolean NOT NULL DEFAULT true, "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz)')
-    await pool.query('CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id))')
+    await pool.query('CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, route text); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, instructions text); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "baseBranch" text)')
     await pool.query(await readFile(new URL('../../drizzle/20261027000000_computer_run_bindings.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000200_local_computer_reviews.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000300_cloud_device_scope.sql', import.meta.url), 'utf8'))
@@ -63,9 +63,10 @@ async function main() {
           const review = await active.files.read('/tmp/mikka-worker-review.json', { user: 'root' }).catch(() => null)
           if (review) {
             const snapshots = computerSyncBody.parse({ requests: JSON.parse(review) }).requests
-            await syncComputerReviews(pool, observedDevice, actor.userId, snapshots)
+            const existing = await syncComputerReviews(pool, observedDevice, actor.userId, snapshots)
             for (const request of snapshots) if (!approved.has(request.id)) {
-              assert.equal(await decideComputerReview(pool, actor, request.id, request.digest, true), true)
+              if (approved.size === 0) assert.equal(await decideComputerReview(pool, actor, request.id, request.digest, true, 'run'), true)
+              else assert.ok(existing.some(decision => decision.id === request.id && decision.digest === request.digest && decision.approve), 'later operation receives this run’s approval')
               approved.add(request.id); operations.push(request.call.name)
             }
             const decisions = await syncComputerReviews(pool, observedDevice, actor.userId, snapshots)
@@ -111,10 +112,12 @@ async function main() {
       assert.ok(Date.now() - began >= 800, 'takeover waits for the operation lock')
       await store.operate(actor, bot.id, 'handback')
       stage = 'prepare synthetic Bot task'
-      const runId = randomUUID(), agentId = randomUUID(), bindingId = randomUUID(), repoId = randomUUID(), issueId = randomUUID()
-      await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"deviceId") VALUES ($1,$2,$3,$4,$5)', [runId, actor.userId, agentId, 'queued', worker.deviceId])
-      await bindComputerRun(pool, actor, runId, bot.id)
-      await pool.query('INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId") VALUES ($1,$2,$3,$4)', [bindingId, actor.userId, actor.workspaceId, agentId])
+      const agentId = randomUUID(), bindingId = randomUUID(), repoId = randomUUID(), issueId = randomUUID()
+      await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,instructions) VALUES ($1,$2,$3,$4,$5)', [agentId, actor.userId, worker.deviceId, 'codex', ''])
+      await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch") VALUES ($1,$2,$3,$4)', [repoId, actor.userId, worker.deviceId, 'main'])
+      await pool.query('INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId",route) VALUES ($1,$2,$3,$4,$5)', [bindingId, actor.userId, actor.workspaceId, agentId, 'codex_cli'])
+      const { runId } = await queueCloudRun(pool, actor, { botId: bot.id, issueId, agentId, deviceRepoId: repoId, title: 'FULL_COMPUTER', body: '' })
+      const prompt = (await pool.query('SELECT prompt FROM agent_runs WHERE id=$1', [runId])).rows[0].prompt as string
       const leaseExpiresAt = new Date(Date.now() + 180_000).toISOString()
       const computer = await claimCloudRun(pool, actor, runId, worker.deviceId, new Date(leaseExpiresAt), bindingId)
       assert.ok(computer)
@@ -122,7 +125,7 @@ async function main() {
       await sandbox.commands.run('install -m 0755 /tmp/mikka-fake-codex.mjs /usr/local/bin/codex', { user: 'root' })
       const repoPath = '/home/mikka-runner/.mikka/synthetic-repo'
       await sandbox.commands.run(`mkdir -p ${repoPath} && git -C ${repoPath} init -q -b main && git -C ${repoPath} -c user.name=Fixture -c user.email=fixture@example.invalid commit --allow-empty -qm init`, { user: 'mikka-runner', timeoutMs: 20_000 })
-      const assignment = { runId, issueId, deviceId: worker.deviceId, repoId, baseBranch: 'main', harness: 'codex', prompt: 'FULL_COMPUTER', model: 'fixture-model', verifyCommand: 'true', leaseExpiresAt, computer,
+      const assignment = { runId, issueId, deviceId: worker.deviceId, repoId, baseBranch: 'main', harness: 'codex', prompt, model: 'fixture-model', verifyCommand: 'true', leaseExpiresAt, computer,
         subscriptionBinding: { bindingId, ownerId: actor.userId, workspaceId: actor.workspaceId, consumerId: agentId, route: 'codex_cli' } }
       const context = { route: 'codex_cli', modelId: 'fixture-model', revision: 2, accountId: 'fixture-account', expiresAt: new Date(Date.now() + 180_000).toISOString() }
       await sandbox.files.write('/tmp/mikka-worker-run.next', JSON.stringify({ runId, repoId, repoPath, leaseExpiresAt, assignment, context }), { user: 'user' })

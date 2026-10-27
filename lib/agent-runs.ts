@@ -9,6 +9,7 @@ import { workspaceRunView } from '@/lib/run-visibility'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
+import { runPrompt } from '@/lib/run-prompt'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -65,16 +66,6 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
     prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note),
   })
   return { runId }
-}
-
-/** The brief the agent starts from: the issue, any note for this run, then the agent's own role. */
-function runPrompt(title: string, body: string, instructions: string, note?: string): string {
-  const parts = [`# ${title}`]
-  if (body) parts.push(body)
-  if (note) parts.push('## Notes for this run', note)
-  parts.push('---', 'Work in the repository checked out for this run. Mikka saves your changes as you go and handles commits and pushes, so you do not need to run git commit or git push. When you are done, hand in your work with a short summary of what changed.')
-  if (instructions) parts.push('## Your standing instructions', instructions)
-  return parts.join('\n\n').slice(0, 100_000)
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,
