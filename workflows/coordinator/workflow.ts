@@ -63,7 +63,7 @@ export async function coordinatorTurn(userId: string) {
 }
 
 /** The Coordinator's tools. Each one runs as a step scoped to the person. */
-function coordinatorTools(userId: string, scope?: NativeToolScope) {
+export function coordinatorTools(userId: string, scope?: NativeToolScope) {
   const id = z.uuid()
   return {
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input, scope)),
