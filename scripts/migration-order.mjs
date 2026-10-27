@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { SCOPE_MIGRATION_EQUIVALENTS, scopeMigrationApplied } from './scope-migration-history.mjs'
 
 // This baseline fills tables that predate the tracked SQL history. Its timestamp
 // remains a normal migration ID, but it must run BEFORE 0001's issues FK.
@@ -23,6 +24,7 @@ export function orderMigrations(names) {
 
 // Earlier branch and deployment names are aliases only for identical SQL.
 export const MIGRATION_EQUIVALENTS = {
+  ...SCOPE_MIGRATION_EQUIVALENTS,
   '20261027164500_artifact_legacy_compat.sql': ['20261027040459_artifact_legacy_compat.sql'],
   '20261027164501_cloud_computers.sql': ['20261027040500_cloud_computers.sql', '20261026235901_cloud_computers.sql'],
   '20261027164502_computer_run_bindings.sql': ['20261027040501_computer_run_bindings.sql', '20261027000000_computer_run_bindings.sql'],
@@ -59,6 +61,8 @@ const EQUIVALENT_SQL_SHA256 = {
   '20261027164515_workspace_computer_policy.sql': 'b776298be218ee6f741347df61c99ada1565d92d813aa7da396725a3a967c76e',
 }
 export function alreadyApplied(name, applied, sql) {
+  const scope = scopeMigrationApplied(name, applied, sql)
+  if (scope !== undefined) return scope
   if (applied.has(name)) return true
   if (!(MIGRATION_EQUIVALENTS[name] ?? []).some(alias => applied.has(alias))) return false
   // An alias is safe only for the exact SQL historically recorded under it.
