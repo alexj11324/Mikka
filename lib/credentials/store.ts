@@ -1,8 +1,8 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { canonicalOrigin, CredentialError, type Actor, type BrowserCaller, type Envelope } from './contracts.js'
-import { seal, type Kms } from './kms.js'
-import { fingerprint } from './fingerprint.js'
+import { canonicalOrigin, CredentialError, type Actor, type BrowserCaller, type Envelope } from './contracts'
+import { seal, type Kms } from './kms'
+import { fingerprint } from './fingerprint'
 
 export type BrowserTarget = { targetId: string; origin: string; endpoint: string; expiresAt: number }
 export const nonce = () => randomBytes(32).toString('base64url')

@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { verifyAppOidc } from '../../../lib/credentials/oidc.js'
-import { assumeVercelRole, awsKms, open } from '../../../lib/credentials/kms.js'
+import { verifyAppOidc } from '../../../lib/credentials/oidc'
+import { assumeVercelRole, awsKms, open } from '../../../lib/credentials/kms'
 import { z } from 'zod'
-import { credentialFailure, privateHeaders } from '../../../lib/credentials/http.js'
-import { CredentialError } from '../../../lib/credentials/contracts.js'
+import { credentialFailure, privateHeaders } from '../../../lib/credentials/http'
+import { CredentialError } from '../../../lib/credentials/contracts'
 
 /** Protected Preview-only identity acceptance. Never returns JWTs or STS keys. */
 export default async function handler(request: IncomingMessage, response: ServerResponse) {

@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Pool } from 'pg'
-import { fillCredential } from '../../../lib/credentials/broker.js'
-import { verifyAppOidc } from '../../../lib/credentials/oidc.js'
-import { credentialBody, credentialFailure, privateHeaders } from '../../../lib/credentials/http.js'
-import { CredentialError } from '../../../lib/credentials/contracts.js'
+import { fillCredential } from '../../../lib/credentials/broker'
+import { verifyAppOidc } from '../../../lib/credentials/oidc'
+import { credentialBody, credentialFailure, privateHeaders } from '../../../lib/credentials/http'
+import { CredentialError } from '../../../lib/credentials/contracts'
 
 const pool = new Pool({ connectionString: process.env.MIKKA_DATABASE_URL, max: 3, connectionTimeoutMillis: 10_000 })
 export default async function handler(request: IncomingMessage, response: ServerResponse) {

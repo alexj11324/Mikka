@@ -1,4 +1,4 @@
-import { CredentialError } from './contracts.js'
+import { CredentialError } from './contracts'
 
 export const privateHeaders = { 'Cache-Control': 'private, no-store', Pragma: 'no-cache', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' }
 export function checkCredentialRequest(request: Request) {
