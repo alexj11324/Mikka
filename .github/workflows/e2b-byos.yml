@@ -1,7 +1,19 @@
 name: E2B subscription custody
 on:
   push:
-    branches: ['codex/e2b-cloud-computer-172']
+    branches: [main, 'codex/e2b-cloud-computer-172']
+  pull_request:
+    paths:
+      - 'lib/subscription*'
+      - 'lib/infisical-workload*'
+      - 'packages/subscription-worker/**'
+      - 'packages/daemon/**'
+      - 'packages/protocol/**'
+      - 'scripts/test-subscription*'
+      - 'tests/byos-*'
+      - '.github/workflows/e2b-byos.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
   workflow_dispatch:
 permissions:
   contents: read
