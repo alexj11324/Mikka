@@ -44,7 +44,11 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (!run || !run.botSandboxId || !['queued', 'preparing', 'running', 'waiting_input'].includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
     let machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
     if (machine?.state === 'ended') throw new ComputerError(409, 'Thread ended')
-    if (machine?.state === 'running') { await client.query('COMMIT'); return { runId, state: 'running' } }
+    if (machine?.state === 'running' && machine.sandboxId) {
+      const state = await Sandbox.getInfo(machine.sandboxId, options())
+      if (state.state !== 'paused') { await client.query('COMMIT'); return { runId, state: 'running' } }
+      machine.state = 'paused'
+    }
     if (machine?.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now() && machine.state !== 'paused') throw new ComputerError(409, 'Thread provisioning in progress')
     if (!machine || machine.snapshotId === 'pending') {
       const source = await connectComputer(run.botSandboxId)
@@ -101,7 +105,10 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
   if (!machine?.sandboxId || machine.state === 'ended') throw new ComputerError(404, 'Thread unavailable')
   if (action === 'resume') return ensureThreadMachine(pool, actor, runId)
   const sandbox = await connectComputer(machine.sandboxId)
-  if (action === 'pause') { await sandbox.pause(); await pool.query('UPDATE thread_machines SET state=\'paused\' WHERE "runId"=$1', [runId]) }
+  if (action === 'pause') {
+    const run = (await pool.query('SELECT status FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId, actor.userId])).rows[0]
+    if (run?.status !== 'queued') throw new ComputerError(409, 'Only an idle unclaimed thread can pause; an active run keeps its lease')
+    await sandbox.pause(); await pool.query('UPDATE thread_machines SET state=\'paused\' WHERE "runId"=$1', [runId]) }
   if (action === 'end') { await sandbox.kill(); await pool.query('UPDATE thread_machines SET state=\'ended\',"endedAt"=now() WHERE "runId"=$1', [runId]); await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE "boundDeviceId"=$1', [machine.deviceId]) }
   if (action === 'desktop') {
     await startDesktop(sandbox, 1)
