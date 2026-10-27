@@ -23,6 +23,17 @@ test('the owner reads their own thread in full', () => {
   assert.deepEqual(mine.detail, { name: 'Route group replies', agentName: 'Mikka Backend', harness: 'codex', summary: 'Done' })
 })
 
+test('a Bot display name or Bot identifier cannot replace the thread owner', () => {
+  const row = { ...make('bot-run', 'owner'), agentName: 'My Bot', botId: 'viewer' }
+  const members = new Set(['owner', 'viewer'])
+  const [mine] = projectIssueThreads([row], 'issue', 'owner', members)
+  assert.equal(mine.detail?.agentName, 'My Bot')
+  const [foreign] = projectIssueThreads([row], 'issue', 'viewer', members)
+  assert.equal(foreign.ownedByCurrentUser, false)
+  assert.equal(foreign.detail, null)
+  assert.equal(canReadThread(row.userId, row.botId, members), false)
+})
+
 test('other issues, removed owners and removed viewers see nothing', () => {
   assert.deepEqual(projectIssueThreads([make('other', 'teammate', 'other-issue'), make('removed', 'removed')], 'issue', 'viewer', new Set(['viewer', 'teammate'])), [])
   assert.deepEqual(projectIssueThreads([make('team')], 'issue', 'removed-viewer', new Set(['teammate'])), [])
