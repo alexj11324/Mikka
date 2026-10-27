@@ -244,19 +244,17 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
     await expect(children.getByRole('button', { name: '子任务 0 / 1', exact: true })).toBeVisible()
     await children.getByRole('button', { name: `移除子任务关系：${childTitle}`, exact: true }).click()
     await expect(children.getByRole('button', { name: '子任务 0 / 0', exact: true })).toBeVisible()
-    // Hold server actions: the picker (keyed by the viewer) must show loading or fresh data, never the stale snapshot.
+    // Hold the picker's search: it must show loading or fresh data, never results from before the unlink.
     let release!: () => void
     const held = new Promise<void>(resolve => { release = resolve })
     let heldActions = 0
-    await member.route('**/*', async route => {
-      if (route.request().method() === 'POST' && route.request().headers()['next-action']) { heldActions++; await held }
-      await route.fallback()
-    })
+    const search = /\/api\/issues\/search\?/
+    await member.route(search, async route => { heldActions++; await held; await route.fallback() })
     picker = await addExisting()
     await expect.poll(() => heldActions).toBeGreaterThan(0)
     await expect(picker.getByText('正在读取任务…', { exact: true }).or(picker.getByRole('option').filter({ hasText: childTitle }))).toBeVisible()
     release()
-    await member.unroute('**/*')
+    await member.unroute(search)
     await expect(picker.getByRole('option').filter({ hasText: childTitle })).toBeVisible()
     await picker.getByRole('button', { name: '关闭', exact: true }).click()
   } finally {
