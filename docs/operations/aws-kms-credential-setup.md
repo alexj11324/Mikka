@@ -125,7 +125,7 @@ Issuer mode 选 **Team**（issuer 就是 `https://oidc.vercel.com/mikka-dev`）�
 
 ## 7. 写进 Infisical（Mikka 项目）
 
-Production 写进 `prod:/aws`，Preview 写进 `preview:/aws`，每个环境各写这 5 个：
+Production 写进 `prod:/aws`，Preview 写进 `staging:/aws`（Infisical 里 Preview 对应的环境叫 `staging`），每个环境各写这 5 个：
 
 | 名称 | 值 |
 |---|---|
@@ -153,7 +153,7 @@ Production 写进 `prod:/aws`，Preview 写进 `preview:/aws`，每个环境各�
    - 用同样的 context `decrypt`，应该成功；
    - 换成 `userId=u2` 再 decrypt，**必须失败**。
 4. 确认 CloudTrail 里能看到这几次 Encrypt 和 Decrypt 事件，事件里带 encryption context。
-5. 确认 Vercel 项目已开 OIDC；Infisical 的 `prod:/aws` 和 `preview:/aws` 各有 5 个值，
+5. 确认 Vercel 项目已开 OIDC；Infisical 的 `prod:/aws` 和 `staging:/aws` 各有 5 个值，
    并且已同步到 Vercel 对应环境。
 
 「Vercel 部署里用 OIDC 真的换到角色」这一项，留到密码箱 PR 的 Preview 验收时再测，
@@ -165,3 +165,12 @@ Production 写进 `prod:/aws`，Preview 写进 `preview:/aws`，每个环境各�
 - 每一步的结果，分成「完成」「失败」「需要 Alex」三类。
 - 验证第 3 步换 userId 解密失败的原始错误码（例如 `InvalidCiphertextException`）。
 - 明确说明：没有创建任何长期 access key；没有把管理身份的凭据写进任何地方。
+
+## 10. 现状（2026-10-27 回报）
+
+- `prod:/aws` 和 `staging:/aws` 各 5 项已写入，并同步到 Vercel 项目 `mikka` 和
+  `mikka-credential-broker`（`prj_3ggcZrCQJmba0F8Ue1WEwb5hx0Pm`）的对应环境。
+- broker 跑在单独的 Vercel 项目 `mikka-credential-broker` 里。所以 broker 角色的信任策略里，
+  `sub` 必须是 `owner:mikka-dev:project:mikka-credential-broker:environment:<production|preview>`；
+  app 角色的 `sub` 仍是 `project:mikka`。两个项目都要开 OIDC（Team issuer）。
+- 「用 OIDC 换到角色」的实测留到密码箱 PR 的 Preview 验收。
