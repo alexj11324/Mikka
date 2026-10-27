@@ -271,6 +271,13 @@ Bot's real E2B working tree and internal executor records before queuing the
 task. The service, subscription binding and model remained synthetic. The
 `bot_cloud_runtimes` migration is recorded in development and production.
 
+The integrations settings now expose a user-driven subscription ceremony when
+the backend is enabled: Codex uses the provider's device page, and Claude uses
+the existing state-checked callback handoff. The page keeps ceremony data in
+memory and validates provider URLs; disconnect reports the limitation of
+provider-side revocation. This UI has source-level checks only. Actual provider
+consent, browser flow, and both subscription execution paths remain unverified.
+
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
 expiry validation, rotation and the Bot's pending-review state. The worker
