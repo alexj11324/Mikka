@@ -1,6 +1,7 @@
 import { pool } from '@/lib/db'
 import { verifyBearer } from '@/lib/linear-sync/webhook'
 import { reconcileFinishedThreads } from '@/lib/computer/thread-result'
+import { reconcileSubagents } from '@/lib/computer/reconcile-subagents'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -12,5 +13,6 @@ export async function GET(request: Request) {
   if (!secret) return Response.json({ error: 'Cron is not configured' }, { status: 503 })
   if (!await verifyBearer(request.headers.get('authorization'), secret)) return new Response(null, { status: 401 })
   const result = await reconcileFinishedThreads(pool)
-  return Response.json(result, { status: result.failed ? 503 : 200, headers: { 'Cache-Control': 'no-store' } })
+  const subagents = await reconcileSubagents(pool)
+  return Response.json({ ...result, subagents }, { status: result.failed || subagents.failed ? 503 : 200, headers: { 'Cache-Control': 'no-store' } })
 }

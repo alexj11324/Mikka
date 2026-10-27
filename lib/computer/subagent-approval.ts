@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 
 type Actor = { userId: string; workspaceId: string }
-export type BrowserAction = { action: 'navigate'; url: string } | { action: 'snapshot' } | { action: 'click'; ref: number } | { action: 'type'; text: string }
+export type BrowserAction = { action: 'navigate'; url: string } | { action: 'snapshot' } | { action: 'click'; ref: number; targetDigest: string } | { action: 'type'; text: string }
 
 /** One approval covers exactly one immutable browser action. A consumed or
  * uncertain action cannot be retried, including after a workflow replay. */

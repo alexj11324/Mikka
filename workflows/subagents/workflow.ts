@@ -36,7 +36,7 @@ export async function botWebWorker(actor: Actor) {
       tools: {
         navigate: tool({ description: 'Open an HTTP or HTTPS page after approval.', inputSchema: z.object({ url: z.url().max(4000) }), execute: (input, options) => approvedAction(actor, task, options.toolCallId, { action: 'navigate', url: input.url }) }),
         snapshot: tool({ description: 'Read the current page text and numbered visible elements after approval.', inputSchema: z.object({}), execute: (_, options) => approvedAction(actor, task, options.toolCallId, { action: 'snapshot' }) }),
-        click: tool({ description: 'Click one numbered element from the latest page snapshot after approval.', inputSchema: z.object({ ref: z.number().int().min(0).max(99) }), execute: (input, options) => approvedAction(actor, task, options.toolCallId, { action: 'click', ref: input.ref }) }),
+        click: tool({ description: 'Click one numbered element from the latest page snapshot after approval. Supply that element’s targetDigest so a changed page cannot redirect the approved click.', inputSchema: z.object({ ref: z.number().int().min(0).max(99), targetDigest: z.string().regex(/^[0-9a-f]{64}$/) }), execute: (input, options) => approvedAction(actor, task, options.toolCallId, { action: 'click', ref: input.ref, targetDigest: input.targetDigest }) }),
         type: tool({ description: 'Type ordinary text into the focused element after approval. Never use for passwords or codes.', inputSchema: z.object({ text: z.string().min(1).max(8000) }), execute: (input, options) => approvedAction(actor, task, options.toolCallId, { action: 'type', text: input.text }) }),
       },
     })

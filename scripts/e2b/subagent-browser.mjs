@@ -4,6 +4,7 @@
 import { spawn } from 'node:child_process'
 import { chmodSync, mkdirSync, unlinkSync } from 'node:fs'
 import { createServer, isIP } from 'node:net'
+import { createHash } from 'node:crypto'
 import { cookieSynchronizer } from './cookie-sync.mjs'
 
 const id = process.argv[2]
@@ -14,6 +15,7 @@ const socketPath = `${root}/browser.sock`
 try { unlinkSync(socketPath) } catch (error) { if (error.code !== 'ENOENT') throw error }
 const chrome = spawn('/usr/bin/chromium', ['--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-quic', '--no-first-run', '--no-default-browser-check', '--password-store=basic', '--proxy-server=http://127.0.0.1:6082', '--proxy-bypass-list=<-loopback>', `--user-data-dir=${root}/profile`, '--window-size=1280,800', '--remote-debugging-pipe', 'about:blank'], { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] })
 let seq = 0, buffer = '', session, frameSubscribers = new Set()
+const navigationWaiters = new Set()
 const pending = new Map()
 function call(method, params = {}, sessionId = session) {
   const id = ++seq
@@ -35,6 +37,8 @@ chrome.stdio[4].on('data', data => {
       const item = pending.get(message.id); pending.delete(message.id); clearTimeout(item.timer)
       if (message.error) item.reject(new Error('Browser rejected request'))
       else item.resolve(message.result)
+    } else if (message.method === 'Page.loadEventFired' || message.method === 'Page.navigatedWithinDocument') {
+      for (const finish of navigationWaiters) finish()
     } else if (message.method === 'Page.screencastFrame') {
       const frame = JSON.stringify({ type: 'frame', data: message.params.data, metadata: message.params.metadata }) + '\n'
       for (const client of frameSubscribers) if (!client.destroyed && client.writableLength < 8 * 1024 * 1024) client.write(frame)
@@ -45,6 +49,8 @@ chrome.stdio[4].on('data', data => {
 chrome.on('exit', () => { for (const item of pending.values()) { clearTimeout(item.timer); item.reject(new Error('Browser stopped')) }; pending.clear(); process.exit(1) })
 
 const visibleElements = `Array.from(document.querySelectorAll('a,button,input,textarea,select,[role="button"],[role="link"]')).filter(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'})`
+const elementDetails = `e=>{const r=e.getBoundingClientRect();return {tag:e.tagName.toLowerCase(),role:e.getAttribute('role'),label:String(e.getAttribute('aria-label')||e.innerText||e.getAttribute('placeholder')||'').trim().slice(0,160),type:e.getAttribute('type'),binding:{href:e.getAttribute('href'),id:e.id,name:e.getAttribute('name'),x:r.x,y:r.y,width:r.width,height:r.height}}}`
+function elementDigest(url, ref, element) { return createHash('sha256').update(JSON.stringify([url, ref, element])).digest('hex') }
 async function evaluate(expression) {
   const value = await call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })
   if (value.exceptionDetails || value.result?.subtype === 'error') throw new Error('Page inspection failed')
@@ -59,12 +65,29 @@ function publicUrl(input) {
 async function dispatch(request, client) {
   if (!request || typeof request !== 'object' || Array.isArray(request)) throw new Error('Invalid request')
   switch (request.action) {
-    case 'navigate': return call('Page.navigate', { url: publicUrl(request.url) })
-    case 'snapshot': return evaluate(`(()=>({title:String(document.title).slice(0,300),url:location.href,text:String(document.body?.innerText||'').slice(0,12000),elements:${visibleElements}.slice(0,100).map((e,i)=>({ref:i,tag:e.tagName.toLowerCase(),role:e.getAttribute('role'),label:String(e.getAttribute('aria-label')||e.innerText||e.getAttribute('placeholder')||'').trim().slice(0,160),type:e.getAttribute('type')}))}))()`)
+    case 'navigate': {
+      // Register before navigation: CDP's response arrives before the load
+      // event, and a fast page can finish before Page.navigate returns.
+      let finish
+      const loaded = new Promise(resolve => { finish = resolve; navigationWaiters.add(finish) })
+      const timer = setTimeout(finish, 10_000)
+      try {
+        const navigation = await call('Page.navigate', { url: publicUrl(request.url) })
+        if (navigation.errorText) throw new Error('Navigation unavailable')
+        await loaded
+        return navigation
+      } finally { clearTimeout(timer); navigationWaiters.delete(finish) }
+    }
+    case 'snapshot': {
+      const page = await evaluate(`(()=>({title:String(document.title).slice(0,300),url:location.href,text:String(document.body?.innerText||'').slice(0,12000),elements:${visibleElements}.slice(0,100).map(${elementDetails})}))()`)
+      return { ...page, elements: page.elements.map((element, ref) => ({ ref, tag: element.tag, role: element.role, label: element.label, type: element.type, targetDigest: elementDigest(page.url, ref, element) })) }
+    }
     case 'click': {
-      if (!Number.isInteger(request.ref) || request.ref < 0 || request.ref >= 100) throw new Error('Invalid element')
-      const point = await evaluate(`(()=>{const e=${visibleElements}[${request.ref}];if(!e)return null;const r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`)
-      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new Error('Element unavailable')
+      if (!Number.isInteger(request.ref) || request.ref < 0 || request.ref >= 100 || !/^[0-9a-f]{64}$/.test(request.targetDigest ?? '')) throw new Error('Invalid element')
+      const selected = await evaluate(`(()=>{const e=${visibleElements}[${request.ref}];return e?{url:location.href,element:(${elementDetails})(e)}:null})()`)
+      if (!selected || elementDigest(selected.url, request.ref, selected.element) !== request.targetDigest) throw new Error('Element changed')
+      const r = selected.element.binding, point = { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+      if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new Error('Element unavailable')
       await call('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 })
       return call('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 })
     }

@@ -8,6 +8,7 @@ import { SubagentQueue } from './subagent-queue'
 import { SubagentStore } from './subagent-store'
 import { coordinatorWebBot } from './coordinator-bot'
 import { SubagentApprovals } from './subagent-approval'
+import { failOrphanedSubagent } from './reconcile-subagents'
 import { startSuggestion, attachSuggestionRun, attachSuggestionSubagent, failUnattachedSuggestions } from '@/lib/suggestions/execution'
 import { claimThreadWorkerLease, provisionThreadDevice, releaseThreadWorkerLease } from './thread-device'
 import { renewCloudDeviceToken } from './cloud-device'
@@ -180,6 +181,7 @@ test('thread lifecycle serializes creation and respects owner, idle and terminal
     assert.equal(await queue.stop(actor, botId, remaining.id), true)
     assert.equal((await pool.query('SELECT state FROM bot_subagents WHERE id=$1', [remaining.id])).rows[0].state, 'stopped')
     const browser = claims.filter(Boolean).find(task => task!.id !== running.id)!
+    await pool.query('UPDATE bot_subagents SET "browserContextId"=$2 WHERE id=$1', [browser.id, browser.id])
     const approvals = new SubagentApprovals(pool)
     const action = { action: 'navigate', url: 'https://example.com/' } as const
     const requested = await approvals.request(actor, botId, browser.id, 'fixture-tool-call', action)
@@ -212,6 +214,21 @@ test('thread lifecycle serializes creation and respects owner, idle and terminal
     assert.equal(browserClosed, 1)
     assert.deepEqual(browserLeases.map(lease => [lease.controlledBy, lease.stopRequested]), [[null, false], ['alice', false], [null, false], [null, true]])
     assert.equal((await pool.query('SELECT state FROM bot_subagents WHERE id=$1', [browser.id])).rows[0].state, 'stopped')
+    const starting = claims.filter(Boolean).find(task => task!.id !== running.id && task!.id !== browser.id)!
+    assert.deepEqual(await browserStore.operate(actor, botId, starting.id, 'stop'), { stopped: true })
+    assert.equal((await pool.query('SELECT state FROM bot_subagents WHERE id=$1', [starting.id])).rows[0].state, 'stopped', 'a task can stop while its browser is still starting')
+    const lost = claims.filter(Boolean).find(task => task!.id !== running.id && task!.id !== browser.id && task!.id !== starting.id)!
+    const workerKey = (await pool.query('SELECT "workerKey" FROM bot_subagents WHERE id=$1', [lost.id])).rows[0].workerKey
+    await pool.query('UPDATE bot_subagents SET "browserContextId"=$2 WHERE id=$1', [lost.id, lost.id])
+    let failClose = true
+    const orphanRuntime = { ...browserRuntime, async stopSubagentBrowser() { if (failClose) throw new Error('browser still running') } } as unknown as typeof e2bProvider
+    const orphan = { id: lost.id, ownerId: actor.userId, workspaceId: actor.workspaceId, workerKey }
+    assert.equal(await failOrphanedSubagent(pool, { ...orphan, ownerId: 'bob' }, orphanRuntime), false)
+    await assert.rejects(failOrphanedSubagent(pool, orphan, orphanRuntime), /browser still running/)
+    assert.equal((await pool.query('SELECT state FROM bot_subagents WHERE id=$1', [lost.id])).rows[0].state, 'running', 'failed cleanup must retain the occupied slot')
+    failClose = false
+    assert.equal(await failOrphanedSubagent(pool, orphan, orphanRuntime), true)
+    assert.equal((await pool.query('SELECT state FROM bot_subagents WHERE id=$1', [lost.id])).rows[0].state, 'failed')
     await assert.rejects(pool.query('DELETE FROM bots WHERE id=$1', [botId]), { code: '23503' }, 'browser records cannot disappear through a Bot cascade')
 
     const suggestionId = randomUUID()

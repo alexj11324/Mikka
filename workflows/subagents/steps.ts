@@ -27,10 +27,10 @@ export async function boot(actor: Actor, task: Subagent) {
       WHERE s.id=$1 AND s."botId"=$2 AND s."ownerId"=$3 AND s."workspaceId"=$4 FOR UPDATE OF s`, [task.id, task.botId, actor.userId, actor.workspaceId])).rows[0]
     if (!row || row.stopRequestedAt || row.haltedAt || !['running','needs_you'].includes(row.state) || row.permission === 'deny') throw new Error('Web task unavailable')
     await provider.installSubagentRuntime(sandbox)
-    await provider.startSubagentBrowser(sandbox, task.id)
     await provider.syncSubagentLease(sandbox, { subagentId: task.id, botId: task.botId, ownerId: actor.userId, workspaceId: actor.workspaceId,
       epoch: row.epoch, controlledBy: row.controlledBy, controlUntil: row.controlUntil ? new Date(row.controlUntil).getTime() / 1000 : 0,
       computerAllowed: true, policyVersion: row.version ?? 0, stopRequested: false })
+    await provider.startSubagentBrowser(sandbox, task.id)
     await client.query('UPDATE bot_subagents SET "browserContextId"=$2 WHERE id=$1', [task.id, task.id])
     await client.query('COMMIT')
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
@@ -95,7 +95,7 @@ export async function finish(actor: Actor, task: Subagent, outcome: 'done' | 'fa
       count(*) FILTER (WHERE state IN ('denied','uncertain','executing') OR (state IN ('pending','approved') AND "expiresAt"<=now()))::int AS failed
       FROM bot_subagent_approvals WHERE "subagentId"=$1 AND "ownerId"=$2`, [task.id, actor.userId])).rows[0]
     if (!reviews.completed || reviews.failed) outcome = 'failed'
-    if (row.browserContextId && row.sandboxId) await provider.stopSubagentBrowser(await provider.connectComputer(row.sandboxId), task.id)
+    if (row.sandboxId) await provider.stopSubagentBrowser(await provider.connectComputer(row.sandboxId), task.id)
     await pool.query('UPDATE bot_subagents SET result=$2 WHERE id=$1 AND "ownerId"=$3', [task.id, result.slice(0, 10_000), actor.userId])
     await new SubagentQueue(pool).finish(actor, task.botId, task.id, outcome)
   }

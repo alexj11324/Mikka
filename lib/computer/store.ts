@@ -32,6 +32,7 @@ export class ComputerStore {
   async setPolicy(workspaceId: string, permission: 'ask' | 'deny') {
     const client = await this.pool.connect()
     const key = `computer-policy:${workspaceId}`
+    let stoppedQueued: { id: string; botId: string; ownerId: string }[] = []
     try {
       await client.query('BEGIN')
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [key])
@@ -60,10 +61,11 @@ export class ComputerStore {
           status=CASE WHEN r.status='queued' THEN 'stopped' ELSE r.status END
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."workspaceId"=$1
             AND r.status=ANY($2::text[])`, [workspaceId, ['queued', 'preparing', 'running', 'waiting_input', 'finishing']])
-        await client.query(`UPDATE bot_subagents SET "stopRequestedAt"=coalesce("stopRequestedAt",now()),
+        const stopped = await client.query<{ id: string; botId: string; ownerId: string; state: string }>(`UPDATE bot_subagents SET "stopRequestedAt"=coalesce("stopRequestedAt",now()),
           state=CASE WHEN state='queued' THEN 'stopped' ELSE state END,
           "endedAt"=CASE WHEN state='queued' THEN now() ELSE "endedAt" END
-          WHERE "workspaceId"=$1 AND state IN ('queued','running','needs_you')`, [workspaceId])
+          WHERE "workspaceId"=$1 AND state IN ('queued','running','needs_you') RETURNING id,"botId","ownerId",state`, [workspaceId])
+        stoppedQueued = stopped.rows.filter(row => row.state === 'stopped')
         await client.query(`UPDATE bot_subagent_approvals SET state='denied',"decidedAt"=now()
           WHERE "workspaceId"=$1 AND state IN ('pending','approved')`, [workspaceId])
       }
@@ -92,6 +94,12 @@ export class ComputerStore {
       // fences old approvals even if the subsequent database commit fails.
       await sync()
       await client.query('COMMIT')
+      for (const task of stoppedQueued) {
+        try {
+          await (await import('@/lib/suggestions/execution')).finishSuggestionSubagent(this.pool, task.ownerId, task.id, 'stopped')
+          await (await import('./subagent-notice')).subagentNotice(this.pool, { userId: task.ownerId, workspaceId }, task.botId, task.id, 'finished', { state: 'stopped' })
+        } catch { console.error('Could not report stopped web task') }
+      }
       return { permission }
     } catch (error) {
       await client.query('ROLLBACK')

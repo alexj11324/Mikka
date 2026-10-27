@@ -119,7 +119,7 @@ export async function subagentViewerGrant(sandbox: Sandbox, lease: SubagentLease
 
 /** Only reviewed, fixed actions reach the private browser RPC. No request
  * content enters argv, shell source, access logs or the model's environment. */
-export async function subagentBrowserAction(sandbox: Sandbox, lease: SubagentLease, request: { action: 'navigate' | 'snapshot' | 'click' | 'type'; url?: string; ref?: number; text?: string }) {
+export async function subagentBrowserAction(sandbox: Sandbox, lease: SubagentLease, request: { action: 'navigate' | 'snapshot' | 'click' | 'type'; url?: string; ref?: number; targetDigest?: string; text?: string }) {
   validSubagent(lease.subagentId); validSubagent(lease.botId); validSubagent(lease.workspaceId)
   if (!/^[A-Za-z0-9._:@-]{1,128}$/.test(lease.ownerId) || !Number.isSafeInteger(lease.policyVersion) || lease.policyVersion < 0) throw new Error('Invalid browser lease')
   const requestId = randomUUID(), dir = `/home/user/.mikka/subagents/${lease.subagentId}`
@@ -133,6 +133,11 @@ export async function subagentBrowserAction(sandbox: Sandbox, lease: SubagentLea
 export async function stopSubagentBrowser(sandbox: Sandbox, id: string) {
   validSubagent(id)
   const requestId = randomUUID(), dir = `/home/user/.mikka/subagents/${id}`
+  // A worker may fail before creating a browser, or lose the response after
+  // closing one. Both cases are already stopped and are safe to retry.
+  const status = (await sandbox.commands.run(`if [ ! -d ${dir} ]; then printf stopped; elif flock -n ${dir}/launch.lock true; then printf stopped; else printf running; fi`, { user: 'user', timeoutMs: 10_000 })).stdout.trim()
+  if (status === 'stopped') return
+  if (status !== 'running') throw new Error('Browser state unavailable')
   await sandbox.files.write(`${dir}/request-${requestId}.json`, JSON.stringify({ action: 'close' }), { user: 'user' })
   try {
     await sandbox.commands.run(`if [ -S ${dir}/browser.sock ]; then flock -x /run/mikka-subagent/${id}.lock /usr/local/bin/node /opt/mikka/computer/subagent-rpc.mjs ${id} ${requestId} || flock -n ${dir}/launch.lock true; fi; flock -w 30 ${dir}/launch.lock true`, { user: 'user', timeoutMs: 45_000 })

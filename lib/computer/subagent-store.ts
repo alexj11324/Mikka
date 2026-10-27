@@ -5,7 +5,7 @@ import { ComputerError } from './store'
 import { SubagentQueue } from './subagent-queue'
 
 type Actor = { userId: string; workspaceId: string }
-type BrowserRow = { id: string; botId: string; workspaceId: string; ownerId: string; state: string; controlledBy: string | null; controlUntil: Date | null; epoch: number; stopRequestedAt: Date | null; sandboxId: string | null; permission: string | null; version: number | null }
+type BrowserRow = { id: string; botId: string; workspaceId: string; ownerId: string; state: string; browserContextId: string | null; controlledBy: string | null; controlUntil: Date | null; epoch: number; stopRequestedAt: Date | null; sandboxId: string | null; permission: string | null; version: number | null }
 
 /** Changes to a browser lease are serialized with workspace policy changes. */
 export class SubagentStore {
@@ -29,7 +29,19 @@ export class SubagentStore {
         await (await import('./subagent-notice')).subagentNotice(this.pool, actor, botId, id, 'finished', { state: 'stopped' })
         return { stopped: true }
       }
-      if (!['running', 'needs_you'].includes(row.state) || !row.sandboxId || row.permission === 'deny') throw new ComputerError(409, 'Web task is unavailable')
+      if (action === 'stop' && ['running', 'needs_you'].includes(row.state) && !row.browserContextId) {
+        // Boot can be interrupted before it publishes the browser marker. The
+        // per-workspace lock prevents a new boot from racing this cleanup.
+        if (row.sandboxId) await this.runtime.stopSubagentBrowser(await this.runtime.connectComputer(row.sandboxId), id)
+        await client.query(`UPDATE bot_subagents SET state='stopped',control='idle',"stopRequestedAt"=now(),"endedAt"=now() WHERE id=$1`, [id])
+        await client.query(`UPDATE bot_subagent_approvals SET state='denied',"decidedAt"=now() WHERE "subagentId"=$1 AND "ownerId"=$2 AND state IN ('pending','approved')`, [id, actor.userId])
+        await client.query('COMMIT')
+        await (await import('@/lib/suggestions/execution')).finishSuggestionSubagent(this.pool, actor.userId, id, 'stopped')
+        await (await import('./subagent-notice')).subagentNotice(this.pool, actor, botId, id, 'finished', { state: 'stopped' })
+        return { stopped: true }
+      }
+      if (!['running', 'needs_you'].includes(row.state) || !row.sandboxId || (row.permission === 'deny' && action !== 'stop')) throw new ComputerError(409, 'Web task is unavailable')
+      if (!row.browserContextId) throw new ComputerError(409, 'Web task is starting')
       const held = !!row.controlledBy && !!row.controlUntil && new Date(row.controlUntil).getTime() > Date.now()
       if (action === 'takeover') {
         if (held && row.controlledBy !== actor.userId) throw new ComputerError(409, 'Control is held by another user')
@@ -39,7 +51,7 @@ export class SubagentStore {
         row.controlledBy = null; row.controlUntil = null; row.epoch++
       } else if (mode === 'control' && (!held || row.controlledBy !== actor.userId)) throw new ComputerError(403, 'Take control first')
       if (action === 'stop') { row.stopRequestedAt = new Date(); row.controlledBy = null; row.controlUntil = null; row.epoch++ }
-      const lease: provider.SubagentLease = { subagentId: id, botId, workspaceId: actor.workspaceId, ownerId: actor.userId, epoch: row.epoch, controlledBy: row.controlledBy, controlUntil: row.controlUntil ? new Date(row.controlUntil).getTime() / 1000 : 0, computerAllowed: true, policyVersion: row.version ?? 0, stopRequested: !!row.stopRequestedAt }
+      const lease: provider.SubagentLease = { subagentId: id, botId, workspaceId: actor.workspaceId, ownerId: actor.userId, epoch: row.epoch, controlledBy: row.controlledBy, controlUntil: row.controlUntil ? new Date(row.controlUntil).getTime() / 1000 : 0, computerAllowed: row.permission !== 'deny', policyVersion: row.version ?? 0, stopRequested: !!row.stopRequestedAt }
       const sandbox = await this.runtime.connectComputer(row.sandboxId)
       await this.runtime.syncSubagentLease(sandbox, lease)
       await client.query(`UPDATE bot_subagents SET "controlledBy"=$2,"controlUntil"=$3,epoch=$4,control=$5,"stopRequestedAt"=$6 WHERE id=$1`, [id, row.controlledBy, row.controlUntil, row.epoch, row.controlledBy ? 'user' : 'agent', row.stopRequestedAt])

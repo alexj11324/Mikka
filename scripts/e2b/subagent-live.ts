@@ -53,13 +53,17 @@ try {
   const result = await waiting
   assert.equal(typeof result.title, 'string')
   await subagentBrowserAction(sandbox, released, { action: 'navigate', url: 'https://example.com' })
-  let loaded = false
+  let loaded = false, page: { title: string; elements: { ref: number; targetDigest: string }[] } | undefined
   for (let i = 0; i < 20; i++) {
     await new Promise(resolve => setTimeout(resolve, 500))
-    const page = await subagentBrowserAction(sandbox, released, { action: 'snapshot' })
-    if (page.title === 'Example Domain') { loaded = true; break }
+    page = await subagentBrowserAction(sandbox, released, { action: 'snapshot' })
+    if (page?.title === 'Example Domain') { loaded = true; break }
   }
   assert.equal(loaded, true, 'the isolated browser must still reach a public HTTPS page')
+  const element = page?.elements[0]
+  assert.ok(element, 'the public fixture contains a link')
+  await assert.rejects(subagentBrowserAction(sandbox, released, { action: 'click', ref: element.ref, targetDigest: '0'.repeat(64) }))
+  await subagentBrowserAction(sandbox, released, { action: 'click', ref: element.ref, targetDigest: element.targetDigest })
   await stopSubagentBrowser(sandbox, peer.subagentId)
   await stopSubagentBrowser(sandbox, held.subagentId)
   console.log('live subagent browser: cookie sharing, access grant, wait, handback and stop passed')
