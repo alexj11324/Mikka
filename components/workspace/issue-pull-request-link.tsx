@@ -49,7 +49,7 @@ function ViewerPullRequestLink({ issueId, pr, compact = false, userId, isPending
       : !userId || error === 'githubNotConnected' || error === 'githubReconnectRequired' ? tSync('disconnected') : tSync('unavailable')
   const title = `${statusLabel} · ${tSync('manual', { state: tState(pr.state) })} · ${pr.url}`
   const Icon = state === 'merged' ? GitMerge : state === 'closed' ? X : GitPullRequest
-  const content = <><Icon data-icon="inline-start" className={cn(!state && 'text-muted-foreground', state === 'open' && 'text-success-foreground', state === 'merged' && 'text-info-foreground', state === 'closed' && 'text-destructive')} />#{pr.url.split('/').filter(Boolean).at(-1)}{!state && !compact && <span className="text-muted-foreground">{statusLabel}</span>}</>
+  const content = <><Icon data-icon="inline-start" className={cn(!state && 'text-muted-foreground', state === 'open' && 'text-success-foreground', state === 'merged' && 'text-info-foreground', state === 'closed' && 'text-destructive')} />#{pr.url.split('/').filter(Boolean).at(-1)}{!compact && <span className="text-muted-foreground">{state ? tState(state) : statusLabel}</span>}</>
   const link = <a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" title={title} aria-label={title} />
   return compact
     ? <BoardBadge variant="outline" size="lg" className="border-transparent px-1 tabular-nums" render={link}>{content}</BoardBadge>

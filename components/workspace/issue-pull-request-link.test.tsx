@@ -46,6 +46,7 @@ test('detail and board show GitHub state separately from the shared manual value
     assert.ok(markup.includes('Manual: open'))
     assert.ok(markup.includes('text-info-foreground'))
     assert.ok(markup.includes('target="_blank"'))
+    if (!compact) assert.ok(markup.includes('>merged</span>'))
   }
 })
 
