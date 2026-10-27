@@ -56,6 +56,12 @@ Worker bindings.
 
 ## Acceptance boundary
 
+The ordinary `pnpm build` does not run migrations. Review the pending SQL
+manifest, then configure the authorized production deployment's Build Command
+as `pnpm migrate && pnpm build`. This invokes `scripts/migrate.mjs` in the
+production build; do not apply the Production SQL manually. Initialize a
+Preview only against its dedicated cloud database with `MIGRATE=1`.
+
 GitHub's redelivery API returns 202 when it accepts the request. The receiving
 Mikka webhook also returns 202 before asynchronous suggestion ingestion
 finishes. Neither status proves a suggestion was saved. Verify the actual
