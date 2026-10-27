@@ -132,8 +132,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   line before the properties column or an open thread. Nothing else gets a
   line; sections are separated by space. The content column is centred in
   the main area, up to 680px wide.
-- **R-62** 线程 lists the threads working on the issue: bot avatar, thread
-  name, one line on what it is doing, status, time. Clicking one opens it on
+- **R-62** 线程 lists the threads working on the issue: status icon (never
+  the bot's avatar, `glossary.md`), thread name, one line on what it is doing, status, time. Clicking one opens it on
   the right as a conversation that ends in the composer (R-10); people and
   the agent talk there. A thread's content is its owner's alone: teammates
   (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
@@ -160,10 +160,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   back. The home page is already that conversation and has no button.
   Figma: page 「AI 侧栏 · 全局」.
 - **R-66** When the Coordinator dispatches a thread, the chat shows one
-  thread card under its reply: bot avatar, thread name and status badge,
-  then one line (运行中: 「交给 Codex · 第 N 步」; 完成: the result, then the
-  outputs such as a PR, folding extras into +N). The coding agent appears only
-  in that step line (R-62). The card updates in place, so a thread has one
+  thread card under its reply: status icon (never the bot's avatar), thread
+  name, then its outputs as chips such as a PR, folding extras into +N. No
+  step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
   card in a chat; a later change of state is a sentence from the Coordinator,
   not a second card. The card has no log, input box or buttons. Clicking it
   opens the thread conversation: on desktop the centre column switches to it

@@ -15,8 +15,10 @@ Decided by Alex, 2026-10-24.
 | **Thread** | 线程 | Does the work a bot dispatched: one run (`agent_runs`), usually tied to a task. A bot can have many threads at once. | **Thread list** (right column), plus the thread view and its computer. | Its own name, about the work, e.g. "#66 群聊前端骨架" or "MIK-11 群聊建表". Never the bot's name. |
 
 How they connect: a person chats with a bot (center). The bot dispatches
-tasks to threads, which do the work (right). Every thread belongs to exactly one bot and shows that
-bot's avatar. The computer a thread uses is its bot's computer.
+tasks to threads, which do the work (right). Every thread belongs to exactly one bot (the one that
+dispatched it), but a thread is never drawn with that bot's bloub avatar: the
+bloub stands for a bot, and bots do not do the work. A thread is shown by its
+status icon (Alex, 2026-10-27). The computer a thread uses is its bot's computer.
 
 ## Rules for designs
 
