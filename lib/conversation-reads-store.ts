@@ -30,15 +30,22 @@ export interface ConversationRead {
 export type ReadResult = { status: 200; body: ConversationRead } | { status: 401 | 403 | 404 | 422; body: { error: string } }
 
 export const COORDINATOR_CONVERSATION = 'coordinator'
+/** A bot's chat: `bot:<bots.id>`. Every bot chats on the Coordinator harness, in its own rows (`botId`). */
+const BOT_CONVERSATION = /^bot:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const POSITION = /^[1-9]\d{0,9}$/
 
 /** The owner whose coordinator_messages back `conversationId`, or null when `userId` is not a member. */
 export function conversationOwner(conversationId: string, userId: string): string | null {
-  // Today the only conversation is the person's own Coordinator chat. Group
-  // chats (MIK-11) will add a membership lookup here.
-  return conversationId === COORDINATOR_CONVERSATION ? userId : null
+  // The person's own Coordinator chat or one of their bots' (checked in
+  // handleRead). Group chats (MIK-11) will add a membership lookup here.
+  return conversationId === COORDINATOR_CONVERSATION || BOT_CONVERSATION.test(conversationId) ? userId : null
+}
+
+/** The bot a conversation id names; null for the Coordinator. */
+export function conversationBot(conversationId: string): string | null {
+  return BOT_CONVERSATION.exec(conversationId)?.[1].toLowerCase() ?? null
 }
 
 /** The host the browser addressed: the first x-forwarded-host value when a proxy set one, else Host. */
@@ -58,22 +65,22 @@ export function originAllowed(origin: string | null, host: string | null): boole
 }
 
 /** Resolves a messageId (uuid or position string) to a persisted message in the owner's conversation. */
-export async function resolveMessage(q: Queryable, ownerId: string, messageId: unknown): Promise<{ id: string; position: number } | null> {
+export async function resolveMessage(q: Queryable, ownerId: string, messageId: unknown, botId: string | null = null): Promise<{ id: string; position: number } | null> {
   if (typeof messageId !== 'string') return null
   const where = UUID.test(messageId) ? 'id = $2::uuid' : POSITION.test(messageId) && Number(messageId) <= 2_147_483_647 ? 'position = $2::int' : null
   if (!where) return null
-  const { rows } = await q.query<{ id: string; position: number }>(`select id::text as id, position from coordinator_messages where "userId" = $1 and ${where} limit 1`, [ownerId, messageId])
+  const { rows } = await q.query<{ id: string; position: number }>(`select id::text as id, position from coordinator_messages where "userId" = $1 and "botId" is not distinct from $3::uuid and ${where} limit 1`, [ownerId, messageId, botId])
   return rows[0] ? { id: rows[0].id, position: Number(rows[0].position) } : null
 }
 
-async function unreadCount(q: Queryable, ownerId: string, after: number): Promise<number> {
+async function unreadCount(q: Queryable, ownerId: string, after: number, botId: string | null): Promise<number> {
   const { rows } = await q.query<{ n: string }>(`
     select count(*)::text as n from (
       select position, role, lag(role) over (order by position) as prev
       from (select position, message->>'role' as role from coordinator_messages
-            where "userId" = $1 and message->>'role' in ('user', 'assistant')) m
+            where "userId" = $1 and "botId" is not distinct from $3::uuid and message->>'role' in ('user', 'assistant')) m
     ) t
-    where role = 'assistant' and prev is distinct from 'assistant' and position > $2`, [ownerId, after])
+    where role = 'assistant' and prev is distinct from 'assistant' and position > $2`, [ownerId, after, botId])
   return Number(rows[0]?.n ?? 0)
 }
 
@@ -82,7 +89,7 @@ async function current(q: Queryable, userId: string, conversationId: string, own
     'select "lastReadPosition", "lastReadMessageId" from conversation_reads where "userId" = $1 and "conversationId" = $2', [userId, conversationId])
   const row = rows[0]
   const position = row ? Number(row.lastReadPosition) : null
-  return { lastReadMessageId: row?.lastReadMessageId ?? null, lastReadPosition: position, unreadCount: await unreadCount(q, ownerId, position ?? 0) }
+  return { lastReadMessageId: row?.lastReadMessageId ?? null, lastReadPosition: position, unreadCount: await unreadCount(q, ownerId, position ?? 0, conversationBot(conversationId)) }
 }
 
 /**
@@ -99,7 +106,7 @@ export async function markRead(q: Queryable, userId: string, conversationId: str
       "updatedAt" = case when excluded."lastReadPosition" > r."lastReadPosition" then excluded."updatedAt" else r."updatedAt" end
     returning "lastReadPosition", "lastReadMessageId"`, [userId, conversationId, position, messageId])
   const row = rows[0]
-  return { lastReadMessageId: row.lastReadMessageId, lastReadPosition: Number(row.lastReadPosition), unreadCount: await unreadCount(q, ownerId, Number(row.lastReadPosition)) }
+  return { lastReadMessageId: row.lastReadMessageId, lastReadPosition: Number(row.lastReadPosition), unreadCount: await unreadCount(q, ownerId, Number(row.lastReadPosition), conversationBot(conversationId)) }
 }
 
 export interface ReadRequest {
@@ -119,6 +126,8 @@ export async function handleRead(q: Queryable, request: ReadRequest): Promise<Re
   if (!originAllowed(request.origin, request.host)) return { status: 403, body: { error: 'originNotAllowed' } }
   const ownerId = conversationOwner(request.conversationId, request.userId)
   if (!ownerId) return { status: 404, body: { error: 'conversationNotFound' } }
+  const botId = conversationBot(request.conversationId)
+  if (botId && !(await q.query('select 1 from bots where id = $1::uuid and "ownerId" = $2', [botId, ownerId])).rows.length) return { status: 404, body: { error: 'conversationNotFound' } }
   if (request.method === 'GET') return { status: 200, body: await current(q, request.userId, request.conversationId, ownerId) }
   let messageId: unknown
   try {
@@ -126,7 +135,7 @@ export async function handleRead(q: Queryable, request: ReadRequest): Promise<Re
   } catch {
     messageId = undefined
   }
-  const message = await resolveMessage(q, ownerId, messageId)
+  const message = await resolveMessage(q, ownerId, messageId, botId)
   if (!message) return { status: 422, body: { error: 'messageNotFound' } }
   return { status: 200, body: await markRead(q, request.userId, request.conversationId, ownerId, message.id, message.position) }
 }

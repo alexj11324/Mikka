@@ -88,6 +88,19 @@
 --color-avatar-3: var(--avatar-3);
 --color-avatar-4: var(--avatar-4);
 --color-avatar-5: var(--avatar-5);
+/* bloub's palette (components/nav/bot-avatar.tsx), for the 新建 Bot colour swatches. */
+--color-bot-encre: var(--bot-encre);
+--color-bot-brun: var(--bot-brun);
+--color-bot-rouge: var(--bot-rouge);
+--color-bot-orange: var(--bot-orange);
+--color-bot-ambre: var(--bot-ambre);
+--color-bot-vert: var(--bot-vert);
+--color-bot-turquoise: var(--bot-turquoise);
+--color-bot-bleu: var(--bot-bleu);
+--color-bot-violet: var(--bot-violet);
+--color-bot-rose: var(--bot-rose);
+--color-bot-gris: var(--bot-gris);
+--color-bot-creme: var(--bot-creme);
 --color-avatar-foreground: var(--avatar-foreground);
 /* Source chips and lists (components/ui/streaming-text), on the shadcn palette so both themes follow. */
 --color-page: var(--page);
@@ -107,6 +120,19 @@
 }
 
 :root {
+--bot-encre: #0a0a0c;
+--bot-brun: #8b5e3c;
+--bot-rouge: #e8483f;
+--bot-orange: #f08a24;
+--bot-ambre: #f0b429;
+--bot-vert: #3ecf8e;
+--bot-turquoise: #2fbfa0;
+--bot-bleu: #3b93f0;
+--bot-violet: #8b5cf6;
+--bot-rose: #e152b0;
+--bot-gris: #a3a3a3;
+--bot-creme: #f1efe9;
+/* The Coordinator's star (Figma 202:4518). */
 --settings-background: oklch(0.98 0.002 286);
 --settings-foreground: oklch(0.145 0 0);
 --settings-card: var(--card);
@@ -234,9 +260,9 @@
 --accent: oklch(0.269 0 0);
 --accent-foreground: oklch(0.985 0 0);
 --destructive: oklch(0.704 0.191 22.216);
---border: oklch(1 0 0 / 10%);
+--border: oklch(1 0 0 / 6%);
 --rule: oklch(0.269 0 0);
---input: oklch(1 0 0 / 15%);
+--input: oklch(1 0 0 / 6%);
 --ring: oklch(0.556 0 0);
 --chart-1: oklch(0.87 0 0);
 --chart-2: oklch(0.556 0 0);

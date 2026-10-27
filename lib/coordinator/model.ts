@@ -4,7 +4,7 @@ import { roundStep } from '@/lib/agent-rounds'
  * The Coordinator's model, through Vercel AI Gateway. On Vercel the gateway
  * signs in with the deployment's OIDC token; elsewhere set AI_GATEWAY_API_KEY.
  */
-export const COORDINATOR_MODEL = 'deepseek/deepseek-v4.1-flash-1017'
+export const COORDINATOR_MODEL = 'nvidia/nemotron-3.5-lightning-free'
 
 /**
  * Settings for the Coordinator's next step under the shared round cap
