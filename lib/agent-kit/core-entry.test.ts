@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mock, test } from 'node:test'
+import { before, mock, test } from 'node:test'
 import { makeSnapshot } from './definition'
 import { DEFAULT_AGENT_DEFINITION } from './builtin'
 import type { AgentExecution } from './store'
@@ -32,7 +32,8 @@ stub('../../workflows/coordinator/steps.ts',{
   sendTelegramChunk:async()=>{throw new Error('unexpected external message')},
   failTurn:async(...args:unknown[])=>{record('failed')(...args)},
 })
-const {coordinatorTurn}=await import('../../workflows/coordinator/workflow')
+let coordinatorTurn:typeof import('../../workflows/coordinator/workflow').coordinatorTurn
+before(async()=>{({coordinatorTurn}=await import('../../workflows/coordinator/workflow'))})
 function reset(harness?:string){
   calls.length=0;inboxTaken=false
   execution=harness?{id:'10000000-0000-4000-8000-000000000002',status:'running',snapshot:makeSnapshot('10000000-0000-4000-8000-000000000003',1,DEFAULT_AGENT_DEFINITION,'saved host',{harness,model:'saved-model'})}:null
