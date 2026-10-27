@@ -180,6 +180,10 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   opens its own page; rows are never laid out flat on one page. A row never
   states what the person already knows (for example which provider they
   signed in with).
+- **R-71** Icons follow precedent too: each icon is the one mainstream
+  products use for the same function (memory = book as in ChatGPT,
+  notifications = bell, connectors = blocks as in Claude…). The spec or review
+  page names the product for each.
 
 ## Look
 
