@@ -36,6 +36,23 @@ export const issuePrefixes = pgTable('issue_prefixes', {
   prefix: varchar('prefix', { length: 4 }).notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+/**
+ * A bot: what a person chats with in the left column. It runs only on Mikka's
+ * own harness (AI SDK), never on a coding agent, so it is not a row in `agents`.
+ */
+export const bots = pgTable('bots', {
+  id: uuid('id').primaryKey(),
+  /** Who made it, in which workspace: the identity the cloud computer (bot_desktops, #317) keys on too. */
+  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId').notNull(),
+  name: text('name').notNull(),
+  /** A bloub colour id, see components/nav/bot-avatar.tsx. */
+  color: text('color').notNull().default('encre'),
+  shape: text('shape').notNull().default('cercle'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
+
 export const agentSessions = pgTable('agent_sessions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(), title: varchar('title', { length: 200 }).notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
@@ -171,6 +188,8 @@ export const agentRuns = pgTable('agent_runs', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
   agentId: uuid('agentId').notNull().references(() => agents.id, { onDelete: 'cascade' }),
+  /** The bot that started this thread; null for runs started from a task directly. */
+  botId: uuid('botId').references(() => bots.id, { onDelete: 'set null' }),
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
@@ -190,7 +209,7 @@ export const agentRuns = pgTable('agent_runs', {
   finishedAt: timestamp('finishedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt)])
+}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`)])
 
 /** The run's event stream, one row per chunk; `seq` dedupes re-sent batches. */
 export const runChunks = pgTable('run_chunks', {
@@ -237,13 +256,14 @@ export const runTokens = pgTable('run_tokens', {
  * `action_decided` follows the person approving or declining a pending action.
  * `run_report`, `run_question` and `run_blocked` come from the agent inside a
  * run, through the worker tools of the MCP server (lib/mcp/worker.ts).
+ * `artifact_submitted` comes from `submit_artifact`, from a run or an OAuth agent.
  */
 /**
  * `matter_handoff` carries hidden evidence from connected apps
  * (lib/attention): the person has not seen it, and the Coordinator alone
  * decides whether to tell them.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'matter_handoff'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
@@ -254,6 +274,8 @@ export type CoordinatorEventTier = (typeof COORDINATOR_EVENT_TIERS)[number]
 
 export const coordinatorEvents = pgTable('coordinator_events', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** The bot whose chat this is for; null for the Coordinator's. */
+  botId: uuid('botId').references(() => bots.id, { onDelete: 'cascade' }),
   kind: text('kind').$type<CoordinatorEventKind>().notNull(),
   dedupeKey: text('dedupeKey').notNull().unique('coordinator_events_dedupe_key'),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
@@ -266,14 +288,17 @@ export const coordinatorEvents = pgTable('coordinator_events', {
 }, table => [index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt)])
 
 /**
- * One person's Coordinator. A turn holds the lease (`leaseHolder` until
+ * One person's Coordinator, or one of their bots (`botId`), which runs on the
+ * same harness with its own conversation and memory. A turn holds the lease (`leaseHolder` until
  * `leaseUntil`) while it works, so two wakes never run the same conversation
  * at once. `summary` replaces every message at or before `summaryThrough`
  * when the history is sent to the model. `memory` is what the person asked it to remember, as Markdown lines; it
  * goes into every prompt.
  */
 export const coordinatorSessions = pgTable('coordinator_sessions', {
-  userId: text('userId').primaryKey(),
+  userId: text('userId').notNull(),
+  /** A bot's own conversation on the same harness; null for the Coordinator. */
+  botId: uuid('botId').references(() => bots.id, { onDelete: 'cascade' }),
   leaseHolder: text('leaseHolder'),
   leaseUntil: timestamp('leaseUntil', { withTimezone: true }),
   summary: text('summary'),
@@ -282,12 +307,8 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   /** Why the last turn failed; cleared when a turn answers. */
   lastError: text('lastError'),
   lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
-  /** The person's switch for matters from connected apps (lib/attention). Off: nothing is handed over; 建议 still fills. */
-  attentionEnabled: boolean('attentionEnabled').notNull().default(true),
-  /** The language the person reads 建议 in (zh-CN or en), for the action lines of lib/suggestions/action-title.ts. */
-  locale: text('locale'),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-})
+}, table => [unique('coordinator_sessions_chat_key').on(table.userId, table.botId).nullsNotDistinct()])
 
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //
@@ -331,8 +352,10 @@ export const suggestions = pgTable('suggestions', {
 
 /**
  * The "早上好" briefing, one per person per local day. `first` is written
- * right after the person connects an app; `daily` the first time the list is
- * read on a new day. `highlights` are suggestion ids the briefing names.
+ * right after the person connects an app; `daily` at 08:00 the person's time
+ * by the briefings cron, or by the first read after 08:00 if the cron has not
+ * run (an empty `daily` only marks the day as done). `highlights` are
+ * suggestion ids the briefing names.
  */
 export const briefings = pgTable('briefings', {
   userId: text('userId').notNull(), localDate: text('localDate').notNull(),
@@ -381,6 +404,16 @@ export const attentionMatters = pgTable('attention_matters', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('attention_matters_key').on(table.userId, table.matterKey), index('attention_matters_state_idx').on(table.userId, table.state, table.updatedAt)])
 
+/** One person's settings for matters from connected apps; no row means the defaults. */
+export const attentionSettings = pgTable('attention_settings', {
+  userId: text('userId').primaryKey(),
+  /** The person's switch (lib/attention). Off: nothing is handed to the Coordinator; 建议 still fills. */
+  enabled: boolean('enabled').notNull().default(true),
+  /** The language the person reads 建议 in (zh-CN or en), for the action lines of lib/suggestions/action-title.ts. */
+  locale: text('locale'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
 /** Every handoff and decision on a matter; the budgets count `handoff` and `notify` rows (lib/attention/budget.ts). */
 export const attentionLog = pgTable('attention_log', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
@@ -399,13 +432,26 @@ export const suggestionTriggerChecks = pgTable('suggestion_trigger_checks', {
   checkedAt: timestamp('checkedAt', { withTimezone: true }).notNull(),
 })
 
+/**
+ * Each person's IANA time zone, so the daily briefing is written at 08:00
+ * their time (app/api/cron/briefings). The browser's zone, sent when the
+ * suggestions list loads, replaces any earlier value; the connect callbacks'
+ * IP-derived zone only fills a gap.
+ */
+export const userTimeZones = pgTable('user_time_zones', {
+  userId: text('userId').primaryKey(),
+  timeZone: text('timeZone').notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('user_time_zones_zone_idx').on(table.timeZone)])
+
 /** The Coordinator's conversation, one AI SDK model message per row, in `position` order. */
 export const coordinatorMessages = pgTable('coordinator_messages', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  botId: uuid('botId').references(() => bots.id, { onDelete: 'cascade' }),
   position: integer('position').notNull(),
   message: jsonb('message').$type<Record<string, unknown>>().notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [unique('coordinator_messages_position_key').on(table.userId, table.position)])
+}, table => [unique('coordinator_messages_position_key').on(table.userId, table.botId, table.position).nullsNotDistinct()])
 
 /** A message a person sent a running agent, delivered on its next poll. */
 export const runMessages = pgTable('run_messages', {
@@ -481,6 +527,49 @@ export const conversationLinks = pgTable('conversation_links', {
   lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull(), messageCount: bigint('messageCount', { mode: 'bigint' }).notNull(),
 }, t => [index('conversation_links_source_idx').on(t.sourceConversationId, t.anchorPosition)])
 
+// --- Artifacts ---------------------------------------------------------------
+//
+// A document (Markdown) or web page (HTML) an agent hands over through the MCP
+// tool `submit_artifact` (lib/artifacts). Each version's file sits in R2 under
+// `storageKey`, immutable; this table keeps who, when and which version.
+
+export const ARTIFACT_KINDS = ['markdown', 'html'] as const
+export type ArtifactKind = (typeof ARTIFACT_KINDS)[number]
+
+export const artifacts = pgTable('artifacts', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  kind: text('kind').$type<ArtifactKind>().notNull(),
+  title: varchar('title', { length: 200 }).notNull(),
+  /** The run that made it; null when an agent outside a run (OAuth) sent it. */
+  runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'set null' }),
+  issueId: uuid('issueId').references(() => issues.id, { onDelete: 'set null' }),
+  latestVersion: integer('latestVersion').notNull().default(1),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('artifacts_user_idx').on(table.userId, table.updatedAt), index('artifacts_run_idx').on(table.runId)])
+
+export const artifactVersions = pgTable('artifact_versions', {
+  id: uuid('id').primaryKey(),
+  artifactId: uuid('artifactId').notNull().references(() => artifacts.id, { onDelete: 'cascade' }),
+  version: integer('version').notNull(),
+  /** Object key in the artifacts bucket. */
+  storageKey: text('storageKey').notNull(),
+  /** The file itself, only where no bucket is configured (previews, tests); production always uses R2. */
+  inlineContent: text('inlineContent'),
+  sha256: text('sha256').notNull(), size: integer('size').notNull(),
+  /** Who made this version: the agent's name or the OAuth client's. */
+  authorName: text('authorName').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('artifact_versions_version_key').on(table.artifactId, table.version)])
+
+/** A link anyone can open at /a/<token>. Only the token's hash is stored; revoking ends it. */
+export const artifactShares = pgTable('artifact_shares', {
+  id: uuid('id').primaryKey(),
+  artifactId: uuid('artifactId').notNull().references(() => artifacts.id, { onDelete: 'cascade' }),
+  tokenHash: text('tokenHash').notNull(), createdBy: text('createdBy').notNull(),
+  revokedAt: timestamp('revokedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('artifact_shares_token_key').on(table.tokenHash), index('artifact_shares_artifact_idx').on(table.artifactId)])
 /**
  * Something an agent wants to do in the person's own accounts (send an email,
  * create or change a calendar event). It stays `pending` until the person

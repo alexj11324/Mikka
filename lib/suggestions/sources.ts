@@ -7,7 +7,7 @@ import { listComposioPages } from '@/lib/composio-pagination'
 import { linearGraphQL } from '@/lib/linear-sync/graphql'
 import { linearAccessToken } from '@/lib/linear-sync/tokens'
 import { githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, type ExternalNotification } from './notification'
-import { ingestNotifications, writeFirstBriefing } from './store'
+import { ingestNotifications, recordTimeZone, writeFirstBriefing } from './store'
 import { missingTriggers, TRIGGER_CHECK_INTERVAL_MS, TRIGGER_PATTERNS, triggerSlugs } from './triggers'
 
 // Where notifications come from. Linear and GitHub webhooks carry full
@@ -107,7 +107,8 @@ async function currentLinear(userId: string): Promise<ExternalNotification[]> {
 /**
  * Runs right after the person connects an app: subscribes its triggers, reads
  * what is there now, rates it like any webhook (without handing it to the
- * Coordinator), and writes the first briefing. Never throws; a source that fails just adds nothing.
+ * Coordinator one by one), and writes the first briefing, which the
+ * Coordinator then delivers in its chat. Never throws; a source that fails just adds nothing.
  */
 export async function bootstrapSuggestions(userId: string, app: 'composio' | 'linear', timeZone: string | null) {
   const read = async <T,>(label: string, load: () => Promise<T[]>): Promise<T[]> => {
@@ -117,12 +118,15 @@ export async function bootstrapSuggestions(userId: string, app: 'composio' | 'li
     }
   }
   try {
+    // The callbacks only know the IP-derived zone; it fills a gap until the browser reports one.
+    await recordTimeZone(userId, timeZone, { replace: false }).catch((error: unknown) => console.error('Time zone could not be saved', error instanceof Error ? error.message : error))
     const notifications = app === 'linear'
       ? await read('Linear', () => currentLinear(userId))
       : (await read('Composio', () => ensureComposioTriggers(userId, { force: true }))).includes('gmail') ? await read('Gmail', () => currentGmail(userId)) : []
     // What was already there goes into the first briefing, not to the Coordinator one by one.
     await ingestNotifications(notifications, { route: false })
-    await writeFirstBriefing(userId, timeZone)
+    // Loaded here so the webhook routes that import this module do not pull in the Coordinator workflow.
+    if (await writeFirstBriefing(userId, timeZone)) await (await import('@/lib/coordinator/wake')).wakeCoordinator(userId)
   } catch (error) {
     console.error('First briefing failed', error instanceof Error ? error.message : error)
   }

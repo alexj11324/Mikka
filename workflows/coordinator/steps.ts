@@ -6,6 +6,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
+import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
@@ -37,9 +38,11 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   }
 }
 
-export async function takeInbox(userId: string, holder: string) {
+// `botId` picks the chat: null is the Coordinator, otherwise one of the person's bots.
+
+export async function takeInbox(userId: string, holder: string, botId: string | null = null) {
   'use step'
-  return store.takeInbox(userId, holder)
+  return store.takeInbox(userId, holder, botId)
 }
 
 /** Settles the matters a turn was handed but did not decide on, and hands over the next one. */
@@ -64,19 +67,19 @@ export async function recordAttention(userId: string, input: { matterId: string;
   }
 }
 
-export async function releaseLease(userId: string, holder: string) {
+export async function releaseLease(userId: string, holder: string, botId: string | null = null) {
   'use step'
-  return store.releaseLease(userId, holder)
+  return store.releaseLease(userId, holder, botId)
 }
 
-export async function failTurn(userId: string, holder: string, error: string) {
+export async function failTurn(userId: string, holder: string, error: string, botId: string | null = null) {
   'use step'
-  await store.failTurn(userId, holder, error)
+  await store.failTurn(userId, holder, error, botId)
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null) {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null) {
   'use step'
-  await store.appendMessages(userId, holder, messages, warning)
+  await store.appendMessages(userId, holder, messages, warning, botId)
 }
 
 /** Linked, de-duplicated Telegram threads that should get this reply. */
@@ -107,9 +110,9 @@ export async function sendTelegramChunk(threadId: string, chunk: string) {
  * token budget, then returns the prompt for this turn: the instructions with
  * the person's memory, and the messages.
  */
-export async function preparePrompt(userId: string): Promise<{ instructions: string; messages: ModelMessage[] }> {
+export async function preparePrompt(userId: string, botId: string | null = null): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
-  let { summary, memory, messages } = await store.loadConversation(userId)
+  let { summary, memory, messages } = await store.loadConversation(userId, botId)
   const cut = compactionCut(summary, messages)
   if (cut !== null) {
     const folded = messages.filter(row => row.position <= cut)
@@ -118,29 +121,29 @@ export async function preparePrompt(userId: string): Promise<{ instructions: str
       instructions: SUMMARY_INSTRUCTIONS,
       messages: [...promptMessages(summary, folded), { role: 'user', content: 'Write the summary now.' }],
     })
-    await store.saveSummary(userId, text, cut)
+    await store.saveSummary(userId, text, cut, botId)
     summary = text
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(COORDINATOR_INSTRUCTIONS, memory), messages: promptMessages(summary, messages) }
+  return { instructions: instructionsWithMemory(await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages) }
 }
 
-export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope) {
+export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope, botId: string | null = null) {
   'use step'
   await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
     const next = rememberNote(memory, input.note)
     return next === null ? { error: 'memoryFull: forget something first' } : { memory: next, result: { remembered: true } }
-  })
+  }, botId)
 }
 
-export async function forget(userId: string, input: { text: string }, scope?: NativeToolScope) {
+export async function forget(userId: string, input: { text: string }, scope?: NativeToolScope, botId: string | null = null) {
   'use step'
   await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
     const { memory: next, removed } = forgetNotes(memory, input.text)
     return { memory: next, result: { removed } }
-  })
+  }, botId)
 }
 
 export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope) {
@@ -194,10 +197,11 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
   }))
 }
 
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope) {
+/** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope, botId: string | null = null) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => ({ ...(await queueRun(userId, input)), status: 'queued' }))
+  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId)), status: 'queued' }))
 }
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope) {

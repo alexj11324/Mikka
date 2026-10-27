@@ -3,7 +3,7 @@ import { createGateway, generateText } from 'ai'
 import { and, eq, sql } from 'drizzle-orm'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { db } from '@/lib/db'
-import { coordinatorSessions, suggestions } from '@/lib/db/schema'
+import { attentionSettings, suggestions } from '@/lib/db/schema'
 import { ACTION_BATCH, actionLocale, actionTitlePrompt, parseActionTitles, type ActionLocale, type ActionTitleInput } from './action-title'
 
 /** The small text model that writes action lines; the Coordinator's flash model. */
@@ -12,13 +12,13 @@ const ACTION_TITLE_TIMEOUT_MS = 15_000
 
 /** The language the person last used 建议 in (zh-CN until known). */
 export async function personLocale(userId: string): Promise<ActionLocale> {
-  const [row] = await db.select({ locale: coordinatorSessions.locale }).from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1)
+  const [row] = await db.select({ locale: attentionSettings.locale }).from(attentionSettings).where(eq(attentionSettings.userId, userId)).limit(1)
   return actionLocale(row?.locale)
 }
 
 /** Remembers the language the person reads 建议 in, so new action lines are written in it. */
 export async function rememberLocale(userId: string, locale: ActionLocale): Promise<void> {
-  await db.insert(coordinatorSessions).values({ userId, locale }).onConflictDoUpdate({ target: coordinatorSessions.userId, set: { locale }, setWhere: sql`${coordinatorSessions.locale} is distinct from ${locale}` })
+  await db.insert(attentionSettings).values({ userId, locale }).onConflictDoUpdate({ target: attentionSettings.userId, set: { locale, updatedAt: new Date() }, setWhere: sql`${attentionSettings.locale} is distinct from ${locale}` })
 }
 
 /**

@@ -1,3 +1,4 @@
+// i18n-ignore-file: model prompt text and its examples, not UI copy.
 // R-45: every item the person sees reads as an action. It starts with a verb,
 // names the person or thing, and says what to do, e.g. 「回复 Kevin：周四的会改到
 // 周三，明天中午前要定」, never a bare report like 「CI 挂了」. The Decisions API

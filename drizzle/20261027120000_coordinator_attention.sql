@@ -1,16 +1,20 @@
 -- The attention model (R-20, lib/attention): suggestions get Comma's levels
 -- and the matter they belong to; matters at a routed level are handed to the
 -- Coordinator, which records each decision; the person can turn it off.
--- Mirrors suggestions, attention_matters, attention_log and
--- coordinator_sessions in lib/db/schema.ts.
+-- Mirrors suggestions, attention_settings, attention_matters and
+-- attention_log in lib/db/schema.ts.
 
 alter table suggestions add column if not exists level text;
 alter table suggestions add column if not exists "matterKey" text;
 -- R-41: the item as a verb-first action line; null falls back to title.
 alter table suggestions add column if not exists "actionTitle" text;
 
-alter table coordinator_sessions add column if not exists "attentionEnabled" boolean not null default true;
-alter table coordinator_sessions add column if not exists locale text;
+create table if not exists attention_settings (
+  "userId" text primary key,
+  enabled boolean not null default true,
+  locale text,
+  "updatedAt" timestamptz not null default now()
+);
 
 create table if not exists attention_matters (
   id uuid primary key,

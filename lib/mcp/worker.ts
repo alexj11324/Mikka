@@ -47,7 +47,7 @@ export async function revokeRunTokens(runId: string): Promise<void> {
 export async function verifyRunToken(_request: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
   if (!bearerToken?.startsWith(RUN_TOKEN_PREFIX)) return undefined
   const [row] = await db
-    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId, agentId: agentRuns.agentId })
+    .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId, agentId: agentRuns.agentId, botId: agentRuns.botId })
     .from(runTokens)
     .innerJoin(agentRuns, eq(agentRuns.id, runTokens.runId))
     .where(and(
@@ -59,15 +59,15 @@ export async function verifyRunToken(_request: Request, bearerToken?: string): P
   return {
     token: bearerToken, clientId: `run:${row.runId}`, scopes: [],
     expiresAt: Math.floor(row.expiresAt.getTime() / 1000),
-    extra: { userId: row.userId, runId: row.runId, issueId: row.issueId, agentId: row.agentId },
+    extra: { userId: row.userId, runId: row.runId, issueId: row.issueId, agentId: row.agentId, botId: row.botId },
   }
 }
 
 /** The run a worker request comes from. */
-export function workerRun(authInfo: AuthInfo | undefined): { id: string; userId: string; issueId: string | null } {
+export function workerRun(authInfo: AuthInfo | undefined): { id: string; userId: string; botId: string | null; issueId: string | null } {
   const extra = authInfo?.extra
   if (typeof extra?.runId !== 'string' || typeof extra.userId !== 'string') throw new Error('MCP request is not a run')
-  return { id: extra.runId, userId: extra.userId, issueId: typeof extra.issueId === 'string' ? extra.issueId : null }
+  return { id: extra.runId, userId: extra.userId, botId: typeof extra.botId === 'string' ? extra.botId : null, issueId: typeof extra.issueId === 'string' ? extra.issueId : null }
 }
 
 async function deliver(event: CoordinatorEventInput): Promise<void> {

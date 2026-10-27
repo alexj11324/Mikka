@@ -35,6 +35,17 @@ export const COMPOSIO_ACTIONS = {
     slug: 'NOTION_SEARCH_NOTION_PAGE',
     inputSchema: z.object({ query: z.string().trim().min(1).max(200), page_size: z.number().int().min(1).max(100).optional(), start_cursor: z.string().max(500).optional() }),
   },
+  // Read by the hourly suggestions backfill (lib/suggestions/reconcile.ts); not offered to agents.
+  list_recent_notion_pages: {
+    title: 'List recently edited Notion pages',
+    description: 'List the pages in the connected Notion workspace, most recently edited first.',
+    toolkit: 'notion',
+    slug: 'NOTION_SEARCH_NOTION_PAGE',
+    inputSchema: z.object({ page_size: z.number().int().min(1).max(100).optional() }),
+    toArguments: (input: { page_size?: number }) => ({
+      query: '', page_size: input.page_size ?? 25, filter_property: 'object', filter_value: 'page', timestamp: 'last_edited_time', direction: 'descending',
+    }),
+  },
   read_notion_page_blocks: {
     title: 'Read Notion page blocks',
     description: 'Read the immediate child blocks of a Notion page or block. Use returned block IDs to read nested content.',

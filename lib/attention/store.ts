@@ -2,7 +2,7 @@ import 'server-only'
 import { and, desc, eq, gte, inArray, lte, ne, or, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { db } from '@/lib/db'
-import { attentionLog, attentionMatters, coordinatorEvents, coordinatorSessions, type AttentionMatterState } from '@/lib/db/schema'
+import { attentionLog, attentionMatters, attentionSettings, coordinatorEvents, type AttentionMatterState } from '@/lib/db/schema'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { BUDGET_WINDOW_MS, budgetState, type BudgetKind } from './budget'
 import { mergeEvidence, notice, stateAfterNotice, type BudgetView, type HandoffPayload, type ItemEvidence } from './handoff'
@@ -33,7 +33,7 @@ async function lock(tx: Tx, userId: string) {
 
 /** The person's switch; on unless they turned it off. */
 export async function attentionEnabled(userId: string, executor: Pick<typeof db, 'select'> = db): Promise<boolean> {
-  const [row] = await executor.select({ enabled: coordinatorSessions.attentionEnabled }).from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1)
+  const [row] = await executor.select({ enabled: attentionSettings.enabled }).from(attentionSettings).where(eq(attentionSettings.userId, userId)).limit(1)
   return row?.enabled ?? true
 }
 
@@ -41,7 +41,7 @@ export async function attentionEnabled(userId: string, executor: Pick<typeof db,
 export async function setAttentionEnabled(userId: string, enabled: boolean): Promise<void> {
   await db.transaction(async tx => {
     await lock(tx, userId)
-    await tx.insert(coordinatorSessions).values({ userId, attentionEnabled: enabled }).onConflictDoUpdate({ target: coordinatorSessions.userId, set: { attentionEnabled: enabled, updatedAt: new Date() } })
+    await tx.insert(attentionSettings).values({ userId, enabled }).onConflictDoUpdate({ target: attentionSettings.userId, set: { enabled, updatedAt: new Date() } })
     if (enabled) return
     const settled = await tx.update(attentionMatters).set({ state: 'quiet', reason: 'the person turned matters off', updatedAt: new Date() })
       .where(and(eq(attentionMatters.userId, userId), inArray(attentionMatters.state, ['waiting', 'snoozed']))).returning({ id: attentionMatters.id })
