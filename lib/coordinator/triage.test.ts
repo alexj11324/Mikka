@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { chatItems, eventPrompt } from './context'
+import { chatItems, eventPrompt, promptMessages, type StoredMessage } from './context'
 import { ATTENTION_THRESHOLD, eventsForInbox, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
+import { briefingEvent } from '@/lib/coordinator-events'
 
 const run = (payload: Record<string, unknown>) => ({ kind: 'run_finished' as const, payload: { stopReason: 'submitted', ...payload } })
 
@@ -61,4 +62,42 @@ test('worker events: questions and blocks need the person, reports go to the mod
 test('a worker question tells the Coordinator to relay the answer', () => {
   const text = eventPrompt({ kind: 'run_question', issueId: null, runId: 'r2', payload: { question: 'Keep v1?', options: ['Yes', 'No'] }, tier: 'attention' })
   assert.match(text, /asks the person: Keep v1\?\nOptions: Yes \/ No\n.*send_to_run/)
+})
+
+test('the morning briefing is pushed to the person once a day', () => {
+  const event = briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'daily', total: 4, counts: { gmail: 3, linear: 1 } }, [
+    { suggestionId: 's1', source: 'linear', action: 'handle', title: 'Fix login', actor: 'Dana', url: 'https://linear.app/x/issue/MIK-9', required: true },
+    { suggestionId: 's2', source: 'gmail', action: 'reply', title: 'Thursday agenda', actor: null, url: null, required: false },
+  ])
+  assert.equal(event.dedupeKey, 'daily_briefing:u1:2026-10-27:daily')
+  assert.notEqual(briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'first', total: 1, counts: {} }, []).dedupeKey, event.dedupeKey)
+  const tier = ruleTier(event)
+  assert.equal(tier, 'attention')
+  const prompt = eventPrompt({ ...event, tier })
+  assert.match(prompt, /^\[Event\] It is 08:00 for the person: their morning briefing for 2026-10-27\. 4 item\(s\)/)
+  assert.match(prompt, /gmail 3, linear 1/)
+  assert.match(prompt, /- linear · handle · assigned to them: "Fix login" from Dana \(https:\/\/linear\.app\/x\/issue\/MIK-9\)/)
+  assert.match(prompt, /Do not act until they say so/)
+  assert.match(prompt, /secretary/)
+  assert.match(prompt, /早上好，Alex。今天有 4 件事/)
+  assert.match(prompt, /one message/)
+  assert.doesNotMatch(prompt, /The person's name/)
+  assert.match(eventPrompt({ ...briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'daily', total: 1, counts: {} }, [], 'Alex Jiang'), tier }), /The person's name: Alex Jiang\./)
+  assert.deepEqual((event.payload.items as { suggestionId: string }[]).map(item => item.suggestionId), ['s1', 's2'])
+  for (const kind of ['daily', 'first'] as const) {
+    const content = eventPrompt({ ...briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind, total: 4, counts: { gmail: 3, linear: 1 } }, event.payload.items as Parameters<typeof briefingEvent>[1]), tier })
+    const rows: (StoredMessage & { createdAt: Date; pending?: true })[] = [
+      { position: 1, createdAt: new Date(0), message: { role: 'assistant', content: 'Yesterday’s reply.' } },
+      { position: 2, createdAt: new Date(1), pending: true, message: { role: 'user', content } },
+    ]
+    assert.equal(chatItems(rows).length, 1, 'pending briefing instructions stay hidden')
+    delete rows[1].pending
+    rows.push({ position: 3, createdAt: new Date(2), message: { role: 'assistant', content: 'Good morning. Four things need your attention.' } })
+    assert.deepEqual(chatItems(rows).map(item => [item.from, item.text]), [
+      ['coordinator', 'Yesterday’s reply.'],
+      ['coordinator', 'Good morning. Four things need your attention.'],
+    ])
+    assert.doesNotMatch(JSON.stringify(chatItems(rows)), /Kevin|secretary|Triage:|Write the briefing/)
+    assert.ok(promptMessages(null, rows).some(message => message.content === content), 'the model still receives briefing instructions')
+  }
 })

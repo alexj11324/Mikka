@@ -1,6 +1,8 @@
-// GitHub's hourly backfill runs in Mikka; this Worker only authenticates the call.
-export const SCHEDULE = '0 * * * *'
-export const ENDPOINT = '/api/cron/suggestions-reconcile'
+// Scheduling only: each endpoint handles its own work in Mikka.
+export const SCHEDULES = {
+  '*/15 * * * *': '/api/cron/briefings',
+  '0 * * * *': '/api/cron/suggestions-reconcile',
+}
 
 /** @typedef {{ MIKKA_URL?: string, CRON_SECRET?: string }} Env */
 
@@ -10,20 +12,29 @@ export const ENDPOINT = '/api/cron/suggestions-reconcile'
  * @param {typeof fetch} [fetcher]
  */
 export async function runSchedule(cron, env, fetcher = fetch) {
-  if (cron !== SCHEDULE) throw new Error('Unknown GitHub backfill schedule')
+  const endpoint = SCHEDULES[cron]
+  if (!endpoint) throw new Error('Unknown suggestions schedule')
   if (!env.MIKKA_URL || !env.CRON_SECRET) throw new Error('MIKKA_URL and CRON_SECRET must be set')
   let response
   try {
-    response = await fetcher(`${env.MIKKA_URL.replace(/\/+$/, '')}${ENDPOINT}`, {
+    response = await fetcher(`${env.MIKKA_URL.replace(/\/+$/, '')}${endpoint}`, {
       headers: { authorization: `Bearer ${env.CRON_SECRET}` },
       redirect: 'error',
       signal: AbortSignal.timeout(90_000),
     })
   } catch {
-    throw new Error(`${ENDPOINT} request failed`)
+    throw new Error(`${endpoint} request failed`)
   }
-  if (!response.ok) throw new Error(`${ENDPOINT} answered ${response.status}`)
-  console.log(`${ENDPOINT} ${response.status}`)
+  if (!response.ok) throw new Error(`${endpoint} answered ${response.status}`)
+  let summary
+  try { summary = await response.json() }
+  catch { throw new Error(`${endpoint} returned invalid JSON`) }
+  const counts = {}
+  for (const key of ['zones', 'due', 'written', 'empty', 'skipped', 'failed', 'deferred', 'pushed', 'people']) {
+    const value = summary?.[key]
+    if (Number.isSafeInteger(value) && value >= 0) counts[key] = value
+  }
+  console.log(`${endpoint} ${response.status} ${JSON.stringify(counts)}`)
   return response.status
 }
 

@@ -2451,8 +2451,6 @@
       "morning": "早上好，{name}。",
       "afternoon": "下午好，{name}。",
       "evening": "晚上好，{name}。",
-      "briefing": "有 {count} 条新消息值得看，先看",
-      "noneToday": "今天还没有新的建议。",
       "routine": "例行事项",
       "empty": "暂时没有要看的消息",
       "connect": "连接应用",
