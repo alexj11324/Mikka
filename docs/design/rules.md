@@ -184,6 +184,13 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   products use for the same function (memory = book as in ChatGPT,
   notifications = bell, connectors = blocks as in Claude…). The spec or review
   page names the product for each.
+- **R-72** Two kinds of work. A real task, such as coding, is a thread: a full
+  coding agent (Claude Code, Codex) does it, and it is listed in the thread
+  list. A web task is the bot's own: the bot runs it as a sub-agent (分身) with
+  its own browser, and can run several at once. A sub-agent is never listed
+  as a thread and has no name or avatar of its own; in the chat it shows as
+  one card per web task with its live screen and state (进行中, 等你处理,
+  完成), and the bot itself reports what it did, in its own voice.
 
 ## Look
 
