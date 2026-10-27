@@ -9,7 +9,7 @@ export interface WorkerDefinitionSnapshot {
   instructions: string
   definitionDigest: string
   promptDigest: string
-  /** The CLI chooses its current default; this is not a claimed model execution receipt. */
+  /** Pinned subscription provenance, or CLI default selection; neither is a model execution receipt. */
   modelSource: 'native-default' | 'subscription'
   subscription?: { bindingId: string; modelId: string; route: string }
   parent: { executionId: string; revisionId: string; revision: number; definitionDigest: string } | null

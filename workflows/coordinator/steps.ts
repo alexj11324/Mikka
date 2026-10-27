@@ -311,7 +311,7 @@ export async function bindComputerSubscription(userId: string, input: { botId: s
   if (!bot) return { error: 'cloudComputerUnavailable' }
   try {
     await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId)
-    await bindBotSubscription(pool, { userId, workspaceId: bot.workspaceId }, { ...input, idempotencyKey: `coordinator:${toolCallId}`,execution })
+    await bindBotSubscription(pool, { userId, workspaceId: bot.workspaceId }, { ...input, idempotencyKey: `coordinator:${toolCallId}` })
     return { botId: input.botId, bound: true }
   } catch { return { error: 'subscriptionUnavailable' } }
 }

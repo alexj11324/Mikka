@@ -86,6 +86,7 @@ jobs:
       - run: pnpm test:linear-sync
       - run: pnpm check:agent-definitions
       - run: pnpm test:agent-kit
+      - run: pnpm test:agent-kit-compat
       - run: pnpm test:coordinator-events
       - run: pnpm test:coordinator-native-relay
       - run: pnpm test:coordinator-native-scope

@@ -4,7 +4,6 @@ import {before, beforeEach, mock, test} from 'node:test'
 import {freezeWorkerDefinition, retryWorkerDefinition} from './worker'
 import {DEFAULT_AGENT_DEFINITION} from './builtin'
 import {makeSnapshot} from './definition'
-import type {Pool} from 'pg'
 
 const owner=randomUUID(),workspace=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID(),botId=randomUUID(),issueId=randomUUID()
 const binding={id:randomUUID(),ownerId:owner,workspaceId:workspace,consumerId:agentId,connectionId:randomUUID(),connectionRevision:1,route:'codex_cli',modelId:'frozen-model'}
@@ -55,6 +54,6 @@ test('cloud queue captures exact worker and parent snapshot in the same transact
  const calls:{sql:string,args:unknown[]}[]=[]
  const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Cloud review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
- await queue({connect:async()=>client} as unknown as Pool,{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'synthetic',execution:parent})
+ await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'synthetic',execution:parent})
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string);assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(snapshot.parent.executionId,parent.id);assert.equal(calls.at(-1)!.sql,'COMMIT');assert.ok(calls.some(c=>c.sql.startsWith('INSERT INTO computer_run_bindings')))
 })

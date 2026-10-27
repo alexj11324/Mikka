@@ -62,3 +62,11 @@ Skill artifact publication and Factory review/verification in #316 remain separa
 Run the pure definition/loader/tool/eval/HTTP suite with `pnpm test:agent-kit`. `pnpm test:agent-kit-db` uses only the existing Actions loopback service or an explicitly named isolated cloud-sandbox database; it refuses application/cloud URLs. The actual migration is applied repeatedly, and concurrency, immutable snapshots, tenant isolation, idempotency, proposal gates and HTTP-to-Postgres paths are exercised. Existing native relay and scope tests remain mandatory.
 
 Passing these suites establishes implementation contracts, not model quality. Real model comparisons and authenticated frozen-Preview acceptance must be reported separately, with their exact version and any missing authorization or configuration.
+
+## Current main compatibility
+
+The shared registry retains main's attention decisions and optional Bot-computer tools. The cloud catalog is advertised only when the existing computer/BYOS feature gate is enabled; a definition selecting an unavailable capability fails closed. Existing saved definitions retain their explicit tool list. The fresh built-in definition includes `record_attention`; adding it or cloud capabilities to an existing definition is an explicit versioned edit, not an automatic permission expansion.
+
+Both local and cloud dispatch capture the standing worker instructions and, when selected, the exact subscription binding/model/route as non-secret snapshot metadata. Claim and retries preserve that selection and refuse a missing, changed or disabled pinned subscription instead of choosing a later binding. Cloud retries retain their Bot desktop binding and stay on its cloud device. These source contracts do not establish real CC/Codex or provider execution.
+
+The Agent Kit migration now follows current main as `20261027181000_agent_kit.sql`. Its SQL bytes are unchanged; the migrator recognizes the former filename only with the approved exact SQL hash. The combined tree has 62 migrations, versus main's 61. No combined schema has been applied by this review.
