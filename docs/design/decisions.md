@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | Layer-1 scoring stays on the Decisions API: one call per item asks has_cost and irreversible (yes/no) and due (48h / week / later / none) and level (critical…low / unclear) as choices; code applies the floors; the Coordinator writes the message (「可以」) | R-20 | Single show/hide probability |
 | 2026-10-27 | The Coordinator's bar follows Comma's proactive skill: tell the person only when they must act before the next 08:00 briefing, or an irreversible cost lands within a week; when unsure, stay quiet; snooze instead of dropping when the cap is spent (「可以，这套打分逻辑可以」) | R-20 | |
 | 2026-10-27 | Events go to the Coordinator and only the Coordinator tells the person; every push comes from it, including the morning briefing (「信息应该发到 coordinator，就由 coordinator 发给我」) | R-20 | |
 | 2026-10-27 | The daily 建议 briefing is generated at 08:00 local time; connecting an app still writes one at once (「每日简报应该是在当地早晨…八点钟」「立即生成一次，这个是没有错的」) | R-21 | "Once a day at the person's chosen time" (same day) |
