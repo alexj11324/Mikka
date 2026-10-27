@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
+import { checkSummary, parseSummary } from './run-db-tests.mjs'
 
 if (process.platform !== 'linux') throw new Error('Authentication acceptance requires cloud Linux')
 const suffix = randomUUID()
@@ -26,10 +27,15 @@ try {
   }
   if (!ready) throw new Error('Isolated authentication Postgres did not start')
   await pool.end(); pool = undefined
-  run([process.execPath, '--import', 'tsx', '--test', 'lib/auth-email.test.ts'], {
-    stdio: 'inherit', env: { PATH: process.env.PATH, AUTH_EMAIL_TEST_DATABASE_URL: url },
+  const result = spawnSync(process.execPath, ['--import', 'tsx', '--test', '--test-reporter=tap', 'lib/auth-email.test.ts'], {
+    encoding: 'utf8', timeout: 180_000, env: { PATH: process.env.PATH, AUTH_EMAIL_TEST_DATABASE_URL: url },
   })
+  process.stdout.write(result.stdout ?? '')
+  process.stderr.write(result.stderr ?? '')
+  const error = checkSummary('auth-email', result.status, parseSummary(`${result.stdout}\n${result.stderr}`))
+  if (result.error || error) throw new Error(error ?? `Authentication test subprocess failed: ${result.error.message}`)
 } finally {
-  await pool?.end()
-  spawnSync('docker', ['rm', '-f', name], { stdio: 'ignore', timeout: 10_000 })
+  try { await pool?.end() } finally {
+    spawnSync('docker', ['rm', '-f', name], { stdio: 'ignore', timeout: 10_000 })
+  }
 }

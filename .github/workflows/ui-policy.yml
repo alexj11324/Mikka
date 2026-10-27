@@ -95,6 +95,8 @@ jobs:
           # Database regressions run against ephemeral Postgres in browser-tests below.
           MIKKA_DATABASE_URL: ""
       - run: pnpm test:auth-composio
+      - name: Authentication email integration tests (isolated Postgres)
+        run: node scripts/test-auth-email.mjs
       - run: pnpm test:groups
       - run: pnpm test:integrations
       - run: pnpm test:request-log
