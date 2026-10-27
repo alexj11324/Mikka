@@ -11,14 +11,17 @@ type Stored = { id: string; userId: string; botId: string | null; kind: string; 
 function fixture() {
   const rows = new Map<string, Stored>()
   const botRows = new Map<string, { id: string; name: string; ownerId: string }>()
-  const state: { insertError?: Error; selectError?: Error } = {}
+  const trace: string[] = []
+  const state: { insertError?: Error; selectError?: Error; arbitrate?: (event: Stored) => Promise<void>; missingRead?: boolean } = {}
   const executor = {
     insert(table: unknown) {
       assert.equal(table, coordinatorEvents)
       return { values(event: Stored) { return { onConflictDoNothing(options: { target: unknown }) {
         assert.equal(options.target, coordinatorEvents.dedupeKey)
         return { async returning() {
+          trace.push('insert')
           if (state.insertError) throw state.insertError
+          await state.arbitrate?.(event)
           if (rows.has(event.dedupeKey)) return []
           rows.set(event.dedupeKey, structuredClone(event))
           return [{ id: event.id }]
@@ -33,7 +36,9 @@ function fixture() {
         else { assert.match(query.sql, /"bots"\."id"/); assert.match(query.sql, /"bots"\."ownerId"/) }
         return { async limit(count: number) {
           assert.equal(count, 1)
+          if (table === coordinatorEvents) trace.push('read')
           if (state.selectError) throw state.selectError
+          if (state.missingRead) return []
           const row = table === coordinatorEvents ? rows.get(query.params[0] as string)
             : [...botRows.values()].find(bot => query.params.includes(bot.id) && query.params.includes(bot.ownerId))
           return row ? [structuredClone(row)] : []
@@ -41,7 +46,13 @@ function fixture() {
       } }
     } } },
   } as unknown as Parameters<typeof recordPersonalSubmission>[0]
-  return { rows, botRows, state, executor }
+  return { rows, botRows, state, trace, executor }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(accept => { resolve = accept })
+  return { promise, resolve }
 }
 
 test('personal input normalizes text and UUID and rejects question/authority fields', () => {
@@ -59,6 +70,48 @@ test('concurrent identical submissions use the existing unique target and one im
   const before = structuredClone([...f.rows.values()])
   await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'different', { submissionId }), SubmissionConflictError)
   assert.deepEqual([...f.rows.values()], before)
+})
+
+test('an uncommitted winner blocks retry completion and reading until commit', async () => {
+  for (const changed of [false, true]) {
+    const f = fixture(), entered = deferred<void>(), outcome = deferred<void>()
+    f.state.arbitrate = async event => {
+      entered.resolve()
+      await outcome.promise
+      f.rows.set(event.dedupeKey, { ...event, id: 'committed-winner', payload: { text: 'winner' } })
+    }
+    let settled = false
+    const request = recordPersonalSubmission(f.executor, 'owner', changed ? 'different' : 'winner', { submissionId })
+      .then(value => { settled = true; return { value, error: undefined } }, error => { settled = true; return { value: undefined, error } })
+    await entered.promise
+    assert.equal(settled, false); assert.deepEqual(f.trace, ['insert']); assert.equal(f.rows.size, 0)
+    outcome.resolve()
+    const result = await request
+    if (changed) assert.ok(result.error instanceof SubmissionConflictError)
+    else { assert.equal(result.error, undefined); assert.deepEqual(result.value, { duplicate: true }) }
+    assert.deepEqual(f.trace, ['insert', 'read'])
+    assert.equal([...f.rows.values()][0].payload.text, 'winner')
+  }
+})
+
+test('a rolled-back winner allows the waiting insertion without a duplicate read', async () => {
+  const f = fixture(), entered = deferred<void>(), rollback = deferred<void>()
+  f.state.arbitrate = async () => { entered.resolve(); await rollback.promise }
+  let settled = false
+  const request = recordPersonalSubmission(f.executor, 'owner', 'waiting message', { submissionId }).then(value => { settled = true; return value })
+  await entered.promise
+  assert.equal(settled, false); assert.deepEqual(f.trace, ['insert']); assert.equal(f.rows.size, 0)
+  rollback.resolve()
+  assert.deepEqual(await request, { duplicate: false })
+  assert.deepEqual(f.trace, ['insert']); assert.equal(f.rows.size, 1)
+})
+
+test('an unresolved conflict read never becomes an accepted retry', async () => {
+  const f = fixture()
+  await recordPersonalSubmission(f.executor, 'owner', 'hello', { submissionId })
+  f.state.missingRead = true
+  await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'hello', { submissionId }), /personalSubmissionUnavailable/)
+  assert.equal(f.rows.size, 1)
 })
 
 test('same submission UUID is isolated by authenticated owner and actual chat identity', async () => {
@@ -133,6 +186,23 @@ test('HTTP handler rejects anonymous and unsupported question submissions withou
   userId = 'owner'
   assert.equal((await POST(request({ text: 'hello', submissionId, questionId: submissionId }))).status, 400)
   assert.equal(current.rows.size, 0); assert.equal(callbacks.length, 0)
+})
+
+test('HTTP and action propagate unknown SQL errors without an accepted response or wake', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  const failure = new Error('synthetic unknown database failure')
+  current.state.insertError = failure
+  await assert.rejects(POST(request({ text: 'hello', submissionId })), error => error === failure)
+  await assert.rejects(sendCoordinatorMessage('hello', null, null, submissionId), error => error === failure)
+  assert.equal(current.rows.size, 0); assert.equal(callbacks.length, 0)
+})
+
+test('legacy HTTP and action calls without IDs remain valid separate submissions', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  assert.equal((await POST(request({ text: 'historical client' }))).status, 202)
+  assert.deepEqual(await sendCoordinatorMessage('historical client'), { queued: true })
+  assert.equal(current.rows.size, 2); assert.equal(callbacks.length, 2)
+  assert.ok([...current.rows.keys()].every(key => key.startsWith('user_message:')))
 })
 
 test('action checks actual Bot ownership before new submissions and duplicate retries', async () => {
