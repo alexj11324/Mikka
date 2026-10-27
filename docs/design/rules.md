@@ -82,8 +82,8 @@ source wins in a conflict is in [`README.md`](README.md).
   acts on an event before the person says yes. Its own ideas also go in its
   chat.
 - **R-21** The right panel has two parts: 建议 on top, then 任务. 建议 keeps
-  its name (not "Routines"): a daily briefing generated once a day at the
-  person's chosen time, then the normal-level items by source app. A 任务 here
+  its name (not "Routines"): a daily briefing generated at 08:00 in the
+  person's time zone, and again right after they connect an app, then the normal-level items by source app. A 任务 here
   is a thread started by the orchestrator or a bot; all of them stay listed.
   It is not a flat list of the board's issues. The flow: the person says yes
   to a Coordinator card, or clicks a 建议 item (which fills the centre

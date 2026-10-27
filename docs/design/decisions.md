@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | The daily 建议 briefing is generated at 08:00 local time; connecting an app still writes one at once (「每日简报应该是在当地早晨…八点钟」「立即生成一次，这个是没有错的」) | R-21 | "Once a day at the person's chosen time" (same day) |
 | 2026-10-27 | Rate events with Comma's attention model (cost, due, reversible → critical/high/ask/normal/low, with code floors); critical/high/ask go to the Coordinator, normal stays in 建议; telling the person is capped at 5 a day, 30 minutes apart (「可以」). The panel keeps the name 建议, not Routines (「我不建议把Suggestion改为routine」); its briefing is generated once a day at the person's chosen time | R-20, R-21 | |
 | 2026-10-27 | Follow Comma: important events are pushed into the Coordinator's chat, and 建议 keeps the briefing and 例行事项 for routine items (「它是在 coordinator…里，会把事件推上去，同时还会保留一个 routine。其实我觉得它这个设计挺好的」). The Coordinator always asks before acting on an event (「一是前者」) | R-20, R-21 | 建议 list as the only place events show (2026-10-23) |
 | 2026-10-27 | The Coordinator is each person's proactive personal agent: it brings important connected-app events (mail, CI, reviews, assignments, finished runs) to the person in its own chat and asks whether to act (「coordinator 应该做得比较 proactive 一点」; references: Hark, Wabi). The mobile client is built with Expo (React Native) and centres on this chat. Autonomy and the 建议 list: see the next row up | R-20 | |
