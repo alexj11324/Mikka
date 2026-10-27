@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
-import { computerAcceptancePreview, featureAvailability, gatedFeatureEnabled, gatedFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
+import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
 
 test('pageviews strip query strings, hashes, document identifiers and unapproved properties', () => {
   const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: {
@@ -61,6 +61,9 @@ test('gated features are on only when the remote flag is exactly true', () => {
   assert.equal(computerAcceptancePreview('preview', '1'), true)
   for (const environment of [undefined, 'development', 'production']) assert.equal(computerAcceptancePreview(environment, '1'), false)
   for (const flag of [undefined, '0', 'true']) assert.equal(computerAcceptancePreview('preview', flag), false)
+  assert.equal(computerProductionEnabled('production', '1'), true)
+  for (const environment of [undefined, 'development', 'preview']) assert.equal(computerProductionEnabled(environment, '1'), false)
+  for (const flag of [undefined, '0', 'true']) assert.equal(computerProductionEnabled('production', flag), false)
 })
 
 test('the locale layout mounts the pageview tracker whenever PostHog is configured', () => {
