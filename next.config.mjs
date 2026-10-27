@@ -10,6 +10,9 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingIncludes: {
+    // Workflow steps and thread/subagent routes load these reviewed scripts
+    // by name at runtime; dynamic names are not discovered by file tracing.
+    '/*': ['./scripts/e2b/*.mjs', './scripts/e2b/*.py', './scripts/e2b/*.sh'],
     '/api/bots/*/computer/*': ['./scripts/e2b/start-desktop.sh', './scripts/e2b/viewer-gateway.py', './scripts/e2b/lease-driver.py', './scripts/e2b/start-container-runtime.sh'],
     '/api/workspaces/**': ['./scripts/e2b/lease-driver.py'],
     '/api/subscriptions/**': ['./packages/subscription-worker/bin/mikka-subscription-worker', './packages/subscription-worker/bin/mikka-subscription-enrollment'],

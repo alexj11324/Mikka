@@ -35,7 +35,7 @@ def authorize(token, subagent, now=None):
     if grant.get('kind') != 'subagent' or grant.get('subagentId') != subagent or grant.get('mode') not in ('view', 'control') or not now < grant['exp'] <= now + 305:
         raise ValueError('invalid grant')
     state = json.loads((STATE / f'{subagent}.json').read_text())
-    if any(grant.get(key) != state.get(key) for key in ('subagentId', 'botId', 'ownerId', 'workspaceId', 'epoch')) or state.get('computerAllowed') is not True or state.get('stopRequested'):
+    if any(grant.get(key) != state.get(key) for key in ('subagentId', 'botId', 'ownerId', 'workspaceId', 'epoch', 'policyVersion')) or state.get('computerAllowed') is not True or state.get('stopRequested'):
         raise ValueError('revoked grant')
     if grant['mode'] == 'control' and (state.get('controlledBy') != grant.get('userId') or state.get('controlUntil', 0) <= now):
         raise ValueError('control not held')

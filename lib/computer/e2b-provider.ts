@@ -71,7 +71,16 @@ export type SubagentLease = { subagentId: string; botId: string; workspaceId: st
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const validSubagent = (id: string) => { if (!uuid.test(id)) throw new Error('Invalid subagent') }
 
+async function ensureCookieRuntime(sandbox: Sandbox) {
+  for (const name of ['cookie-manager.mjs', 'cookie-sync.mjs', 'desktop-chrome.mjs']) {
+    await sandbox.files.write(`/opt/mikka/computer/${name}`, await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8'), { user: 'root' })
+  }
+  await sandbox.commands.run('mkdir -p /home/user/.mikka; flock -n /home/user/.mikka/cookie-manager.lock /usr/local/bin/node /opt/mikka/computer/cookie-manager.mjs', { user: 'user', background: true, timeoutMs: 0 })
+  await sandbox.commands.run('for i in $(seq 1 50); do test -S /home/user/.mikka/shared-cookies/manager.sock && exit 0; sleep .2; done; exit 1', { user: 'user', timeoutMs: 15_000 })
+}
+
 export async function installSubagentRuntime(sandbox: Sandbox) {
+  await ensureCookieRuntime(sandbox)
   for (const name of ['subagent-browser.mjs', 'subagent-egress.mjs', 'subagent-rpc.mjs', 'subagent-viewer.py', 'subagent-command.py', 'start-subagent.sh']) {
     await sandbox.files.write(`/opt/mikka/computer/${name}`, await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8'), { user: 'root' })
   }
@@ -137,6 +146,7 @@ export async function installComputerRuntime(sandbox: Sandbox) {
     const content = await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8')
     await sandbox.files.write(`/opt/mikka/computer/${name}`, content, { user: 'root' })
   }
+  await ensureCookieRuntime(sandbox)
   await sandbox.commands.run('chmod 0755 /opt/mikka/computer/lease-driver.py', { user: 'root', timeoutMs: 10_000 })
   await sandbox.commands.run('flock -n /run/mikka-viewer/gateway.lock /usr/bin/python3 /opt/mikka/computer/viewer-gateway.py', { user: 'root', background: true, timeoutMs: 0 })
   await sandbox.commands.run('for i in $(seq 1 30); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 ] && exit 0; sleep .2; done; exit 1', { user: 'root', timeoutMs: 10_000 })
@@ -160,8 +170,10 @@ export async function ensureHostedRunnerImage(sandbox: Sandbox) {
 
 export async function startDesktop(sandbox: Sandbox, display: number) {
   if (!Number.isInteger(display) || display < 1 || display > 999) throw new Error('Invalid display')
+  await ensureCookieRuntime(sandbox)
+  await sandbox.files.write('/opt/mikka/computer/start-desktop.sh', await readFile(join(process.cwd(), 'scripts/e2b/start-desktop.sh'), 'utf8'), { user: 'root' })
   await sandbox.commands.run(`bash /opt/mikka/computer/start-desktop.sh ${display}`, { user: 'user', background: true, timeoutMs: 0 })
-  await sandbox.commands.run(`for i in $(seq 1 60); do DISPLAY=:${display} xdpyinfo >/dev/null 2>&1 && test -S /home/user/.mikka/vnc/${display}-view.sock && test -S /home/user/.mikka/vnc/${display}-control.sock && exit 0; sleep .25; done; exit 1`, { user: 'user', timeoutMs: 20_000 })
+  await sandbox.commands.run(`for i in $(seq 1 120); do DISPLAY=:${display} xdpyinfo >/dev/null 2>&1 && test -S /home/user/.mikka/vnc/${display}-view.sock && test -S /home/user/.mikka/vnc/${display}-control.sock && DISPLAY=:${display} xdotool search --onlyvisible --class chromium >/dev/null 2>&1 && exit 0; sleep .25; done; exit 1`, { user: 'user', timeoutMs: 35_000 })
 }
 
 export async function syncDesktopLease(sandbox: Sandbox, lease: DesktopLease) {

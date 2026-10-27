@@ -4,6 +4,7 @@
 import { spawn } from 'node:child_process'
 import { chmodSync, mkdirSync, unlinkSync } from 'node:fs'
 import { createServer, isIP } from 'node:net'
+import { cookieSynchronizer } from './cookie-sync.mjs'
 
 const id = process.argv[2]
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id ?? '')) throw new Error('Invalid subagent')
@@ -87,7 +88,7 @@ async function dispatch(request, client) {
     case 'setCookies':
       if (!Array.isArray(request.cookies) || request.cookies.length > 5000) throw new Error('Invalid cookies')
       return call('Storage.setCookies', { cookies: request.cookies }, null)
-    case 'close': setTimeout(() => { chrome.kill(); process.exit(0) }, 20); return { closed: true }
+    case 'close': setTimeout(() => { chrome.kill(); process.exit(0) }, 1000); return { closed: true }
     default: throw new Error('Unsupported request')
   }
 }
@@ -98,7 +99,10 @@ const target = targets.targetInfos.find(item => item.type === 'page')
 if (!target) throw new Error('Browser page unavailable')
 session = (await call('Target.attachToTarget', { targetId: target.targetId, flatten: true }, null)).sessionId
 await call('Page.enable'); await call('Runtime.enable')
+const synchronize = cookieSynchronizer(call)
+await synchronize()
 let actions = Promise.resolve()
+setInterval(() => { actions = actions.then(synchronize, synchronize).catch(() => undefined) }, 3000)
 const server = createServer(client => {
   let input = ''
   client.on('data', chunk => {
@@ -109,7 +113,7 @@ const server = createServer(client => {
       const line = input.slice(0, end); input = input.slice(end + 1)
       const execute = async () => {
         let request
-        try { request = JSON.parse(line); const result = await dispatch(request, client); client.write(JSON.stringify({ id: request.id, result }) + '\n') }
+        try { request = JSON.parse(line); await synchronize(); const result = await dispatch(request, client); await synchronize(); client.write(JSON.stringify({ id: request.id, result }) + '\n') }
         catch { client.write(JSON.stringify({ id: request?.id ?? null, error: 'Browser request unavailable' }) + '\n') }
       }
       actions = actions.then(execute, execute)

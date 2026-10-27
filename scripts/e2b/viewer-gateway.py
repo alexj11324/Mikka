@@ -33,7 +33,8 @@ def authorize(token, now=None):
     if type(display) is not int or not 1 <= display <= 999:
         raise ValueError('invalid display')
     state = json.loads((STATE / f'{display}.json').read_text())
-    if grant['botId'] != state['botId'] or grant['ownerId'] != state['ownerId'] or grant['epoch'] != state['epoch']:
+    if (grant['botId'] != state['botId'] or grant['ownerId'] != state['ownerId'] or grant['epoch'] != state['epoch']
+            or grant.get('policyVersion') != state.get('policyVersion')):
         raise ValueError('revoked grant')
     if grant['mode'] == 'control' and (state.get('controlledBy') != grant['userId'] or state.get('controlUntil', 0) <= now):
         raise ValueError('control not held')

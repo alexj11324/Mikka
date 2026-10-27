@@ -62,6 +62,7 @@ test('thread lifecycle serializes creation and respects owner, idle and terminal
     const approvalSql = await readFile(new URL('../../drizzle/20261027180008_subagent_approvals.sql', import.meta.url), 'utf8')
     await pool.query(approvalSql); await pool.query(approvalSql)
     await pool.query(await readFile(new URL('../../drizzle/20261027180009_subagent_worker.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261027180010_subagent_halt.sql', import.meta.url), 'utf8'))
     const suggestionSql = await readFile(new URL('../../drizzle/20261027180001_suggestion_execution.sql', import.meta.url), 'utf8')
     await pool.query(suggestionSql); await pool.query(suggestionSql)
     await pool.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)', [botId, actor.workspaceId, actor.userId, 'Test Bot'])

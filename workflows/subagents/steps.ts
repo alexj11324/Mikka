@@ -25,7 +25,7 @@ export async function boot(actor: Actor, task: Subagent) {
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     const row = (await client.query(`SELECT s.*,p.permission,p.version FROM bot_subagents s LEFT JOIN workspace_computer_policies p ON p."workspaceId"=s."workspaceId"
       WHERE s.id=$1 AND s."botId"=$2 AND s."ownerId"=$3 AND s."workspaceId"=$4 FOR UPDATE OF s`, [task.id, task.botId, actor.userId, actor.workspaceId])).rows[0]
-    if (!row || row.stopRequestedAt || !['running','needs_you'].includes(row.state) || row.permission === 'deny') throw new Error('Web task unavailable')
+    if (!row || row.stopRequestedAt || row.haltedAt || !['running','needs_you'].includes(row.state) || row.permission === 'deny') throw new Error('Web task unavailable')
     await provider.installSubagentRuntime(sandbox)
     await provider.startSubagentBrowser(sandbox, task.id)
     await provider.syncSubagentLease(sandbox, { subagentId: task.id, botId: task.botId, ownerId: actor.userId, workspaceId: actor.workspaceId,
@@ -56,7 +56,13 @@ export async function performApproved(actor: Actor, task: Subagent, id: string, 
   const action = await approvals.consume(actor, task.botId, task.id, id, digest)
   if (!action) {
     const status = await approvals.status(actor, task.botId, task.id, id, digest)
-    return status?.state === 'completed' ? { result: status.result } : { error: 'actionOutcomeUnknown' }
+    if (status?.state === 'completed') return { result: status.result }
+    if (status?.state === 'executing') {
+      await approvals.complete(actor, task.botId, task.id, id, digest, null, true)
+      await pool.query(`UPDATE bot_subagents SET "haltedAt"=coalesce("haltedAt",now()),needs=$2 WHERE id=$1 AND "ownerId"=$3`, [task.id, 'The action outcome is unknown; check the page before trying again.', actor.userId])
+      return { error: 'actionOutcomeUnknown' }
+    }
+    return { error: 'actionUnavailable' }
   }
   try {
     const row = (await pool.query(`SELECT s.*,m."sandboxId",p.permission,p.version FROM bot_subagents s
@@ -73,7 +79,7 @@ export async function performApproved(actor: Actor, task: Subagent, id: string, 
     return { result }
   } catch {
     await approvals.complete(actor, task.botId, task.id, id, digest, null, true)
-    await pool.query(`UPDATE bot_subagents SET "stopRequestedAt"=coalesce("stopRequestedAt",now()),needs=$2 WHERE id=$1 AND "ownerId"=$3`, [task.id, 'The action outcome is unknown; check the page before trying again.', actor.userId])
+    await pool.query(`UPDATE bot_subagents SET "haltedAt"=coalesce("haltedAt",now()),needs=$2 WHERE id=$1 AND "ownerId"=$3`, [task.id, 'The action outcome is unknown; check the page before trying again.', actor.userId])
     return { error: 'actionOutcomeUnknown' }
   }
 }

@@ -25,6 +25,23 @@ try {
   const held: SubagentLease = { subagentId: randomUUID(), botId: randomUUID(), workspaceId: randomUUID(), ownerId: 'synthetic-owner', epoch: 1, controlledBy: 'synthetic-owner', controlUntil: Date.now() / 1000 + 120, computerAllowed: true, policyVersion: 1, stopRequested: false }
   await startSubagentBrowser(sandbox, held.subagentId)
   await syncSubagentLease(sandbox, held)
+  const peer = { ...held, subagentId: randomUUID(), botId: randomUUID(), controlledBy: null, controlUntil: 0 }
+  await startSubagentBrowser(sandbox, peer.subagentId)
+  await syncSubagentLease(sandbox, peer)
+  const firstRequest = randomUUID(), secondRequest = randomUUID()
+  await sandbox.files.write(`/home/user/.mikka/subagents/${held.subagentId}/request-${firstRequest}.json`, JSON.stringify({ action: 'setCookies', cookies: [{ name: 'mikka_fixture_342', value: 'synthetic', url: 'https://example.com/' }] }), { user: 'user' })
+  await sandbox.files.write(`/home/user/.mikka/subagents/${peer.subagentId}/request-${secondRequest}.json`, JSON.stringify({ action: 'cookies' }), { user: 'user' })
+  await sandbox.commands.run(`/usr/local/bin/node /opt/mikka/computer/subagent-rpc.mjs ${held.subagentId} ${firstRequest} >/dev/null; /usr/local/bin/node /opt/mikka/computer/subagent-rpc.mjs ${peer.subagentId} ${secondRequest} > /tmp/mikka-cookie-fixture.json; node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync("/tmp/mikka-cookie-fixture.json"));if(!r.cookies.some(c=>c.name==="mikka_fixture_342"&&c.value==="synthetic"))process.exit(1)'`, { user: 'user', timeoutMs: 30_000 })
+  const extra: SubagentLease[] = []
+  for (let i = 0; i < 4; i++) {
+    const lease = { ...peer, subagentId: randomUUID(), botId: randomUUID() }
+    await startSubagentBrowser(sandbox, lease.subagentId)
+    await syncSubagentLease(sandbox, lease)
+    extra.push(lease)
+  }
+  for (const lease of extra) assert.equal(typeof (await subagentBrowserAction(sandbox, lease, { action: 'snapshot' })).title, 'string')
+  for (const lease of extra) await stopSubagentBrowser(sandbox, lease.subagentId)
+  console.log('live subagent: six concurrent browsers passed')
   const grant = await subagentViewerGrant(sandbox, held, held.ownerId, 'view')
   assert.match(grant.url, /^wss:\/\//)
   let finished = false
@@ -43,8 +60,9 @@ try {
     if (page.title === 'Example Domain') { loaded = true; break }
   }
   assert.equal(loaded, true, 'the isolated browser must still reach a public HTTPS page')
+  await stopSubagentBrowser(sandbox, peer.subagentId)
   await stopSubagentBrowser(sandbox, held.subagentId)
-  console.log('live subagent browser: startup, access grant, wait, handback and stop passed')
+  console.log('live subagent browser: cookie sharing, access grant, wait, handback and stop passed')
 } finally { await sandbox.kill() }
 
 }
