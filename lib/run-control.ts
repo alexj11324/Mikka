@@ -1,3 +1,4 @@
+import { personalRunMessageText } from './personal-run-message'
 import { and, eq } from 'drizzle-orm'
 import { ActionFailureError } from './action-error'
 import { agentRuns, runMessages } from './db/schema'
@@ -7,12 +8,13 @@ import type { db } from './db'
 export type RunControlDatabase = Pick<typeof db, 'transaction'>
 
 /** Lock the owned run before checking its state so completion and messages serialize. */
-export async function sendOwnedRunMessage(database: RunControlDatabase, userId: string, input: { runId: string; text: string }) {
+export async function sendOwnedRunMessage(database: RunControlDatabase, userId: string, input: { runId: string; text: string }, origin: 'user' | 'peer' = 'user') {
   await database.transaction(async tx => {
     const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt })
       .from(agentRuns).where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId))).limit(1).for('update')
     if (!run || run.stopRequestedAt || !UNFINISHED_RUN_STATUSES.some(status => status === run.status)) throw new ActionFailureError('runNotFound')
-    await tx.insert(runMessages).values({ id: crypto.randomUUID(), runId: run.id, userId, text: input.text })
+    const id = crypto.randomUUID()
+    await tx.insert(runMessages).values({ id, runId: run.id, userId, text: personalRunMessageText(id, input.text, origin) })
   })
 }
 

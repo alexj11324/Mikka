@@ -98,6 +98,6 @@ test('the morning briefing is pushed to the person once a day', () => {
       ['coordinator', 'Good morning. Four things need your attention.'],
     ])
     assert.doesNotMatch(JSON.stringify(chatItems(rows)), /Kevin|secretary|Triage:|Write the briefing/)
-    assert.ok(promptMessages(null, rows).some(message => message.content === content), 'the model still receives briefing instructions')
+    assert.ok(promptMessages(null, rows).some(message => message.role === 'user' && typeof message.content === 'string' && JSON.parse(message.content).untrustedData?.content === content), 'the model still receives briefing instructions')
   }
 })
