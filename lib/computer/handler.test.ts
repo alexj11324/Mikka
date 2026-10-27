@@ -60,3 +60,20 @@ test('keeps ownership errors but never serializes provider credentials', async (
   assert.equal(response.status, 503)
   assert.deepEqual(await response.json(), { error: 'Cloud computer is unavailable' })
 })
+test('waking starts the trusted worker after desktop provisioning and fails closed on worker errors', async () => {
+  const f = fixture()
+  let attempts = 0
+  const handle = createComputerHandler(f.store, async () => actor, async (owner, bot) => {
+    assert.deepEqual(f.calls.at(-1), [actor, botId, 'wake', 'view'])
+    assert.deepEqual(owner, actor)
+    assert.equal(bot, botId)
+    attempts++
+    if (attempts === 2) throw new Error('private provider details')
+  })
+  assert.equal((await handle(request(), botId, 'wake')).status, 202)
+  const failure = await handle(request(), botId, 'wake')
+  assert.equal(failure.status, 503)
+  assert.deepEqual(await failure.json(), { error: 'Cloud computer is unavailable' })
+  assert.equal((await handle(request('POST', { mode: 'view' }), botId, 'viewer')).status, 200)
+  assert.equal(attempts, 2)
+})

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { createBotSchema, viewerRequestSchema } from '@mikka/protocol/computer'
 import { ComputerError, type ComputerStore } from './store'
 
-export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'createBot' | 'state' | 'operate'>, authenticate: (request: Request) => Promise<{ userId: string; workspaceId: string } | null>) {
+export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'createBot' | 'state' | 'operate'>, authenticate: (request: Request) => Promise<{ userId: string; workspaceId: string } | null>, wakeWorker?: (actor: { userId: string; workspaceId: string }, botId: string) => Promise<void>) {
   return async function computerRoute(request: Request, botId?: string, action?: 'wake' | 'viewer' | 'takeover' | 'handback') {
     const response = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
     try {
@@ -19,6 +19,9 @@ export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'c
       if (!action) return response(await store.state(actor, botId))
       const mode = action === 'viewer' ? viewerRequestSchema.parse(await request.json()).mode : 'view'
       const result = await store.operate(actor, botId, action, mode)
+      // Provision after operate commits: worker provisioning takes its own
+      // machine lease and must not wait on the desktop transaction's row lock.
+      if (action === 'wake' && wakeWorker) await wakeWorker(actor, botId)
       return response(result, action === 'wake' ? 202 : 200)
     } catch (error) {
       if (error instanceof ComputerError) return response({ error: error.message }, error.status)
