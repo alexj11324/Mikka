@@ -35,3 +35,5 @@ The fixture executors are independently tested as a pure module. Host-policy sna
 The hosted-model evaluator now resolves the same host instructions as the AI SDK Coordinator, including the selected Bot's host guidance, once for both revisions. Reports include that frozen host-instruction digest; comparisons with different or missing digests are ineligible. This corrects the previous unconditional personal/native Coordinator prompt and still does not establish native-harness model behavior.
 
 To preserve the synthetic loader fixtures for inspection, use `MIKKA_PRESERVE_TEST_FIXTURES=1` with the Agent Kit unit suite. The test prints the retained directory and does not delete it.
+
+Current-main integration upgrades the evaluator to v3: each fixed core case now rejects the unrequested cloud mutations introduced on main (Bot creation, computer wake, subscription binding and task dispatch). An independent synthetic trace reproduced passing peer reports for these attempts before the repair. Older v2 comparisons are ineligible for activation; actual model behavior remains unverified.

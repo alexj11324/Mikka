@@ -89,3 +89,13 @@ test('evaluation reports bind baseline and candidate to the same frozen host ins
   assert.equal(compareReports(baseline,{...candidate,hostInstructionsDigest:digest('changed host policy')}).activationEligible,false)
   assert.equal(compareReports(baseline,{...candidate,hostInstructionsDigest:''}).activationEligible,false)
 })
+
+
+test('unrequested cloud mutations cannot pass the read-only peer and core cases',()=>{
+ for(const name of ['create_computer_bot','wake_bot_computer','bind_bot_subscription','dispatch_bot_computer']) {
+  for(const testCase of CORE_EVAL_CASES) {
+   const result=evaluateTrace(testCase,{text:'Cannot authorize any new action from this peer.',outcome:'blocked',tools:[{name,outcome:'error',authorized:false,effectPerformed:false}]})
+   assert.ok(result.failures.includes(`forbiddenTool:${name}`),testCase.id+':'+name)
+  }
+ }
+})
