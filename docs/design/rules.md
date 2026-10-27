@@ -67,18 +67,37 @@ source wins in a conflict is in [`README.md`](README.md).
 
 ## Suggestions, tasks and devices
 
-- **R-20** The 建议 list holds only notifications from connected apps'
-  webhooks (Gmail, Notion, Slack, GitHub, Linear…) that the decision model
-  (OpenAI Decisions API) judged worth showing. The Coordinator never writes into it. Its own ideas
-  go in its chat.
-- **R-21** The right panel has two parts: 建议 on top, then 任务. A 任务 here
-  is a thread started by the orchestrator or a bot; all of them stay listed.
-  It is not a flat list of the board's issues. The suggestion flow: the
-  decision model picks an item → it appears in 建议 → clicking it fills the
-  centre composer → the bot dispatches a thread → the item leaves 建议 and
-  shows up below as a 任务. The daily briefing is not in 建议: the
-  Coordinator pushes it into its chat at 08:00 the person's time, and right
-  after they connect an app.
+- **R-20** Notifications from connected apps' webhooks (Gmail, Notion,
+  Slack, GitHub, Linear…) are rated by the decision model (OpenAI Decisions
+  API) after Comma's attention model: first the cost if the person does
+  nothing, when it lands and whether it can be undone; then one level,
+  critical, high, ask, normal or low (unclear rereads the source). Code floors
+  the level: any cost is at least high; a cost due within 48 hours, or an
+  irreversible one due within a week, is critical. Only the Coordinator speaks to the person about events: no
+  push, chat message or Telegram/Slack message is sent around it. Critical,
+  high and ask go to the Coordinator at once. The daily briefing is posted
+  by the Coordinator in its chat every day at 08:00 local time (and pushed),
+  whatever the bar below says. It tells the person only when they must act before the next
+  08:00 briefing, or when a cost that cannot be undone lands within a week;
+  everything else waits in 建议 for the briefing. When unsure, it stays
+  quiet. It also stays quiet when fresh evidence shows the matter resolved,
+  owned by someone else, or already covered in the chat. When the daily cap
+  is spent, a matter the person must still act on is snoozed until the cap
+  reopens, never dropped. Telling the person is a card in its
+  own chat that says what happens if nothing is done and offers one next
+  step, pushed on mobile. Normal stays in 建议; low is not shown. Telling the
+  person is capped at 5 a day, 30 minutes apart (critical skips the spacing,
+  not the cap); held items wait, they are not dropped. The Coordinator never
+  acts on an event before the person says yes. Its own ideas also go in its
+  chat.
+- **R-21** The right panel has two parts: 建议 on top, then 任务. 建议 is the
+  normal-level items in one list, newest first, each row with its app's icon
+  (no per-app cards). The daily briefing is not in 建议; it is the
+  Coordinator's 08:00 message. A 任务 here is a thread started by the
+  orchestrator or a bot; all of them stay listed. It is not a flat list of the
+  board's issues. The flow: the person says yes to a Coordinator card, or
+  clicks a 建议 item (which fills the centre composer) → the bot dispatches a
+  thread → the item leaves 建议 and shows up below as a 任务.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
@@ -114,8 +133,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   line before the properties column or an open thread. Nothing else gets a
   line; sections are separated by space. The content column is centred in
   the main area, up to 680px wide.
-- **R-62** 线程 lists the threads working on the issue: bot avatar, thread
-  name, one line on what it is doing, status, time. Clicking one opens it on
+- **R-62** 线程 lists the threads working on the issue: status icon (never
+  the bot's avatar, `glossary.md`), thread name, one line on what it is doing, status, time. Clicking one opens it on
   the right as a conversation that ends in the composer (R-10); people and
   the agent talk there. A thread's content is its owner's alone: teammates
   (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
@@ -142,15 +161,29 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   back. The home page is already that conversation and has no button.
   Figma: page 「AI 侧栏 · 全局」.
 - **R-66** When the Coordinator dispatches a thread, the chat shows one
-  thread card under its reply: bot avatar, thread name and status badge,
-  then one line (运行中: 「交给 Codex · 第 N 步」; 完成: the result, then the
-  outputs such as a PR, folding extras into +N). The coding agent appears only
-  in that step line (R-62). The card updates in place, so a thread has one
+  thread card under its reply: status icon (never the bot's avatar), thread
+  name, then its outputs as chips such as a PR, folding extras into +N. No
+  step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
   card in a chat; a later change of state is a sentence from the Coordinator,
   not a second card. The card has no log, input box or buttons. Clicking it
   opens the thread conversation: on desktop the centre column switches to it
   with 「‹ Coordinator」 to go back, on a phone it pushes in full screen.
   Figma: page 「线程卡片 · 聊天里派出线程」.
+
+## Settings
+
+- **R-70** Every setting needs a precedent. A row on any Settings screen
+  (web or mobile) ships only if a comparable product (ChatGPT, Claude,
+  Comma, Hark, Wabi, Linear, GitHub, Slack and the like) has the same setting;
+  the spec cites the product and source for each row. No precedent, no row.
+  Settings are a hierarchy: the top screen holds a few categories, and each
+  opens its own page; rows are never laid out flat on one page. A row never
+  states what the person already knows (for example which provider they
+  signed in with).
+- **R-71** Icons follow precedent too: each icon is the one mainstream
+  products use for the same function (memory = book as in ChatGPT,
+  notifications = bell, connectors = blocks as in Claude…). The spec or review
+  page names the product for each.
 
 ## Look
 
@@ -199,6 +232,17 @@ do what Linear does. Figma: `220:5022` (MIK-25).
 - **R-43** Use the glossary's words: Bot, 对话, 线程. Never 会话 for a left
   row or a run. Built-in role names stay English (Coordinator).
 - **R-44** The home greeting stays 「早上好，Alex」 (time of day + name).
+
+- **R-45** A 建议 item, briefing item or follow-up item makes clear what to
+  do and who or what it is about; never a bare report such as 「CI 挂了」 or
+  「有人问…」. A 建议 list row is short and starts with a verb
+  (「核对 Stripe 10 月账单」), as Comma ("Reply to Agenda") and ChatGPT do.
+- **R-46** The Coordinator talks like a warm, professional, well-organised
+  secretary, never like a command list. The briefing and follow-ups are
+  natural sentences: it says what it sorted and why, names the person, offers
+  to take the next step, and ends with one easy question
+  (「早上好，Alex。今天有 4 件事，我按轻重排了一下。最急的是 Kevin 的邮件…
+  先从 Kevin 那封开始？」).
 
 ## Tokens
 

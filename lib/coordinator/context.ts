@@ -1,4 +1,5 @@
 import { pruneMessages, type ModelMessage } from 'ai'
+import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from '@/lib/attention/handoff'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
 import { splitQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
@@ -154,8 +155,13 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         'Tell the person what it needs. Pass their answer on with send_to_run, or stop_run if they say so.',
         note,
       ].filter(Boolean).join('\n')
+    case 'matter_handoff':
+      return handoffPrompt(payload as unknown as HandoffPayload)
   }
 }
+
+/** Bookkeeping the chat leaves out: the Coordinator records its attention decisions with it. */
+const HIDDEN_TOOLS = new Set(['record_attention'])
 
 /** Longest the memory may grow; past this the Coordinator must forget something first. */
 export const MEMORY_MAX_CHARS = 8000
@@ -240,6 +246,11 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
       // The request for its welcome is for the Coordinator only.
       if (raw.startsWith(COORDINATOR_WELCOME_MARK)) continue
+      // Evidence the person has not seen (lib/attention): only what the Coordinator decides to tell them shows, as its own message.
+      if (raw.startsWith(HANDOFF_PREFIX)) {
+        briefingBoundary = true
+        continue
+      }
       // Briefing instructions belong only in model context; its reply starts a new chat message.
       if (raw.startsWith('[Event] It is 08:00 for the person: their morning briefing') || raw.startsWith('[Event] The person just connected an app. Their first briefing:')) {
         briefingBoundary = true
@@ -263,8 +274,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       }
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
-      const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() ? [part.text.trim()] : []).join('\n\n'))
-      const tools = parts.flatMap(part => part.type === 'tool-call' ? [part.toolName] : [])
+      const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n'))
+      const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) ? [part.toolName] : [])
       const last = items.at(-1)
       const shown = [...waiting.ids, ...cited.ids]
       if (last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary) {
@@ -274,8 +285,9 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       } else if (cited.text || tools.length || shown.length) {
         items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)] })
         waiting.ids = []
+        // Only a reply that shows ends the boundary: a tool-only step (record_attention) before the text does not.
+        briefingBoundary = false
       }
-      briefingBoundary = false
     } else if (message.role === 'tool') {
       const last = items.at(-1)
       if (last?.from !== 'coordinator') continue

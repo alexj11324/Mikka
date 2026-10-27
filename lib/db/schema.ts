@@ -2,6 +2,7 @@ import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, timestamp, 
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
+import type { AttentionLevel } from '@/lib/attention/judgment'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
@@ -257,7 +258,12 @@ export const runTokens = pgTable('run_tokens', {
  * run, through the worker tools of the MCP server (lib/mcp/worker.ts).
  * `artifact_submitted` comes from `submit_artifact`, from a run or an OAuth agent.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing'] as const
+/**
+ * `matter_handoff` carries hidden evidence from connected apps
+ * (lib/attention): the person has not seen it, and the Coordinator alone
+ * decides whether to tell them.
+ */
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
@@ -306,10 +312,10 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
 
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //
-// External notifications from connected apps, judged by fixed rules or the
-// decision model (lib/suggestions). Only `shown` rows reach the person; hidden
-// rows stay so a repeat delivery is not judged again. The Coordinator never
-// writes here.
+// External notifications from connected apps, rated by fixed rules or the
+// decision model with the attention levels of lib/attention (R-20). Every
+// level but `low` is `shown`; hidden rows stay so a repeat delivery is not
+// judged again. The Coordinator never writes here.
 
 /** The connected apps a suggestion can come from. */
 export const SUGGESTION_SOURCES = ['gmail', 'slack', 'notion', 'github', 'linear'] as const
@@ -329,7 +335,14 @@ export const suggestions = pgTable('suggestions', {
   title: text('title').notNull(), url: text('url'), actor: text('actor'),
   shown: boolean('shown').notNull(),
   decidedBy: text('decidedBy').$type<SuggestionDecider>().notNull(),
+  /** Rows from before the attention levels; new rows leave it null. */
   probability: real('probability'),
+  /** critical, high, ask, normal or low (lib/attention/judgment.ts); null on rows from before it. */
+  level: text('level').$type<AttentionLevel>(),
+  /** The matter it belongs to (ExternalNotification.matterKey). */
+  matterKey: text('matterKey'),
+  /** The item as an action for the person (R-45), e.g. 「回复 Kevin：…」; the UI falls back to `title` without it. */
+  actionTitle: text('actionTitle'),
   /** Assigned to the person or their review is requested. */
   required: boolean('required').notNull().default(false),
   occurredAt: timestamp('occurredAt', { withTimezone: true }).notNull(),
@@ -352,6 +365,66 @@ export const briefings = pgTable('briefings', {
   total: integer('total').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.userId, table.localDate] })])
+
+/**
+ * A matter from the person's connected apps that reached a routed level
+ * (critical, high or ask), and what the Coordinator
+ * decided about it (lib/attention/store.ts). Repeated notices about one
+ * matter share the row. `state`: `waiting` for a budget or for the matter in
+ * hand, `handed` to the Coordinator, then `notified`, `quiet`, `snoozed`
+ * (until `runAt`) or `handled` once the person answered.
+ */
+export const ATTENTION_MATTER_STATES = ['waiting', 'handed', 'notified', 'quiet', 'snoozed', 'handled'] as const
+export type AttentionMatterState = (typeof ATTENTION_MATTER_STATES)[number]
+
+export const attentionMatters = pgTable('attention_matters', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  matterKey: text('matterKey').notNull(),
+  source: text('source').$type<SuggestionSource>().notNull(),
+  /** The latest notice's suggestion row. */
+  suggestionId: uuid('suggestionId').references(() => suggestions.id, { onDelete: 'set null' }),
+  title: text('title').notNull(), url: text('url'),
+  level: text('level').$type<AttentionLevel>().notNull(),
+  /** The cost, due window, reversibility and code flag the judgment gave (lib/attention/judgment.ts Assessment). */
+  assessment: jsonb('assessment').$type<Record<string, unknown>>().notNull(),
+  /** The evidence handed over: the latest notice and its earlier ones. */
+  evidence: jsonb('evidence').$type<Record<string, unknown>>().notNull(),
+  state: text('state').$type<AttentionMatterState>().notNull(),
+  /** The Coordinator's reason for its latest decision. */
+  reason: text('reason'),
+  /** When a snoozed matter is handed over again. */
+  runAt: timestamp('runAt', { withTimezone: true }),
+  /** The next handoff is a recheck of a snooze: it spends no handoff budget. */
+  recheck: boolean('recheck').notNull().default(false),
+  /** The person asked for the reminder: telling them spends no budget. */
+  personAsked: boolean('personAsked').notNull().default(false),
+  handoffs: integer('handoffs').notNull().default(0),
+  handedAt: timestamp('handedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('attention_matters_key').on(table.userId, table.matterKey), index('attention_matters_state_idx').on(table.userId, table.state, table.updatedAt)])
+
+/** One person's settings for matters from connected apps; no row means the defaults. */
+export const attentionSettings = pgTable('attention_settings', {
+  userId: text('userId').primaryKey(),
+  /** The person's switch (lib/attention). Off: nothing is handed to the Coordinator; 建议 still fills. */
+  enabled: boolean('enabled').notNull().default(true),
+  /** The language the person reads 建议 in (zh-CN or en), for the action lines of lib/suggestions/action-title.ts. */
+  locale: text('locale'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Every handoff and decision on a matter; the budgets count `handoff` and `notify` rows (lib/attention/budget.ts). */
+export const attentionLog = pgTable('attention_log', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  matterId: uuid('matterId').notNull().references(() => attentionMatters.id, { onDelete: 'cascade' }),
+  action: text('action').$type<'handoff' | 'recheck' | 'notify' | 'quiet' | 'snooze' | 'handled'>().notNull(),
+  /** Whether it counts against a budget. */
+  spends: boolean('spends').notNull(),
+  reason: text('reason'),
+  runAt: timestamp('runAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('attention_log_budget_idx').on(table.userId, table.action, table.createdAt)])
 
 /** When the person's Composio trigger subscriptions were last checked (lib/suggestions/sources.ts). */
 export const suggestionTriggerChecks = pgTable('suggestion_trigger_checks', {

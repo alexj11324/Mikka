@@ -21,6 +21,7 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
 import type { TelegramReplyTarget } from '@/lib/coordinator-events'
 import { postTelegramText } from '@/lib/telegram/client'
+import { recordDecision, settleTurn } from '@/lib/attention/store'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -42,6 +43,28 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
 export async function takeInbox(userId: string, holder: string, botId: string | null = null) {
   'use step'
   return store.takeInbox(userId, holder, botId)
+}
+
+/** Settles the matters a turn was handed but did not decide on, and hands over the next one. */
+export async function settleAttention(userId: string, matterIds: string[], toldPerson: boolean) {
+  'use step'
+  await settleTurn(userId, matterIds, toldPerson)
+}
+
+export async function recordAttention(userId: string, input: { matterId: string; decision: 'notify' | 'quiet' | 'snooze' | 'handled'; reason?: string; runAt?: string; personAsked?: boolean }, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  const reason = input.reason?.trim()
+  switch (input.decision) {
+    case 'quiet':
+      return reason ? recordDecision(userId, { matterId: input.matterId, decision: 'quiet', reason }) : { error: 'reasonRequired' }
+    case 'snooze':
+      if (!reason) return { error: 'reasonRequired' }
+      if (!input.runAt) return { error: 'runAtRequired' }
+      return recordDecision(userId, { matterId: input.matterId, decision: 'snooze', reason, runAt: new Date(input.runAt), personAsked: input.personAsked })
+    default:
+      return recordDecision(userId, { matterId: input.matterId, decision: input.decision, reason })
+  }
 }
 
 export async function releaseLease(userId: string, holder: string, botId: string | null = null) {

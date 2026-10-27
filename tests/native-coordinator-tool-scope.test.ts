@@ -18,6 +18,7 @@ stub('../lib/composio.ts',{runComposioAction:effect})
 stub('../lib/pending-action-store.ts',{proposeAction:effect})
 stub('../lib/issue-access.ts',{issueForUser:effect})
 stub('../lib/telegram/client.ts',{postTelegramText:effect})
+stub('../lib/attention/store.ts',{recordDecision:effect,settleTurn:effect})
 let steps: typeof import('../workflows/coordinator/steps')
 before(async()=>{steps=await import('../workflows/coordinator/steps')})
 const scope={holder:'holder',turnId:'turn',callId:'call'}
@@ -39,6 +40,7 @@ const calls = {
   sendToRun:()=>steps.sendToRun(user,{runId:'run',text:'message'},scope),
   stopRun:()=>steps.stopRun(user,{runId:'run'},scope),
   webSearchStep:()=>steps.webSearchStep(user,{query:'query'},scope),
+  recordAttention:()=>steps.recordAttention(user,{matterId:'matter',decision:'notify'},scope),
 }
 for (const [name,call] of Object.entries(calls)) {
   test(`${name} checks current native authorization inside the business step`,async()=>{
