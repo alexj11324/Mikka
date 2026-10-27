@@ -92,13 +92,60 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
     }
     return existingTransaction ? work(existingTransaction) : transaction(work)
   }
+  // Match dispatch -> selection and scope -> run ordering before Factory locks the origin.
+  async function lockQuestion(userId: string, issueId: string, runId: string, tx: PoolClient) {
+    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+      [JSON.stringify(['dispatch-issue', userId, issueId])])
+    const run = await owned(tx, userId, runId)
+    if (run.issueId !== issueId) throw new ImprovementError('sourceMismatch')
+  }
+  // The question answer owns this transaction, so selection commits before the run can be claimed.
+  async function continueQuestion(userId: string, runId: string, tx: PoolClient) {
+    const run = await owned(tx, userId, runId)
+    if (run.status !== 'queued' || run.startedAt) throw new ImprovementError('runUnavailable')
+    let child = run
+    let taskId: string | undefined
+    const visited = new Set<string>([runId])
+    for (let depth = 0; depth < 10; depth++) {
+      const link = child.questionContinuation
+      if (!link || link.requireSessionResume !== true || !z.uuid().safeParse(link.originRunId).success ||
+        visited.has(link.originRunId)) throw new ImprovementError('sourceMismatch')
+      const { rows: [question] } = await tx.query(`SELECT "taskId" FROM factory_questions
+        WHERE id=$1 AND "userId"=$2 AND "issueId"=$3 AND "originRunId"=$4
+        AND "originSessionId"=$5 AND "continuationRunId"=$6`,
+        [link.questionId, userId, run.issueId, link.originRunId, link.originSessionId, child.id])
+      if (!question || (taskId && taskId !== question.taskId)) throw new ImprovementError('sourceMismatch')
+      taskId = question.taskId
+      const origin = await owned(tx, userId, link.originRunId)
+      if (origin.status !== 'stopped' || !origin.sessionId || origin.sessionId !== link.originSessionId ||
+        (child.sessionId && child.sessionId !== origin.sessionId) || origin.issueId !== run.issueId ||
+        origin.agentId !== run.agentId || origin.deviceRepoId !== run.deviceRepoId || origin.deviceId !== run.deviceId)
+        throw new ImprovementError('sourceMismatch')
+      const { rows: [selection] } = await tx.query('SELECT * FROM improvement_skill_selections WHERE "runId"=$1', [origin.id])
+      if (selection) {
+        await selected(tx, userId, origin, selection)
+        const { rows: [purpose] } = await tx.query('SELECT * FROM improvement_skill_run_purposes WHERE "runId"=$1', [origin.id])
+        // Benchmark arms bind a fixed run; an answer cannot authorize a replacement arm.
+        if (purpose && (purpose.purpose !== 'active' || purpose.evaluationId !== null || purpose.userId !== userId ||
+          purpose.versionId !== selection.versionId)) throw new ImprovementError('sourceRequired')
+        await select(tx, userId, run, selection.versionId, purpose ? { purpose: 'active', evaluationId: null } : undefined)
+        return
+      }
+      if (!origin.questionContinuation) return
+      visited.add(origin.id)
+      child = origin
+    }
+    throw new ImprovementError('sourceRequired')
+  }
   async function preflight(userId: string, runId: string, supportsArtifacts: boolean) {
     const { rows: [selection] } = await pool.query('SELECT * FROM improvement_skill_selections WHERE "runId"=$1', [runId])
     if (!selection) {
       const { rows:[ancestor] }=await pool.query(`WITH RECURSIVE lineage AS (
-        SELECT id,"retryOf","userId",0 AS depth FROM agent_runs WHERE id=$1 AND "userId"=$2
-        UNION ALL SELECT r.id,r."retryOf",r."userId",l.depth+1 FROM agent_runs r JOIN lineage l ON r.id=l."retryOf" WHERE r."userId"=$2 AND l.depth<10
-      ) SELECT 1 FROM lineage l JOIN improvement_skill_selections s ON s."runId"=l.id AND s."userId"=$2 LIMIT 1`,[runId,userId])
+        SELECT id,"retryOf","questionContinuation","userId",0 AS depth FROM agent_runs WHERE id=$1 AND "userId"=$2
+        UNION ALL SELECT r.id,r."retryOf",r."questionContinuation",r."userId",l.depth+1 FROM agent_runs r JOIN lineage l
+          ON r.id::text IN (l."retryOf"::text,l."questionContinuation"->>'originRunId') WHERE r."userId"=$2 AND l.depth<10
+      ) SELECT 1 FROM lineage l LEFT JOIN improvement_skill_selections s ON s."runId"=l.id AND s."userId"=$2
+        WHERE s."runId" IS NOT NULL OR l.depth=10 LIMIT 1`,[runId,userId])
       if (ancestor) throw new ImprovementError('sourceRequired')
       return
     }
@@ -173,7 +220,7 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
     const protectedIds=new Set(rows.map(row=>row.runId))
     return {legacy:runIds.filter(id=>!protectedIds.has(id)),leases,revoked}
   }
-  return { selectBaseline, selectVersion, selectActive, preflight, recordClaim, revalidate, renewHeartbeat }
+  return { selectBaseline, selectVersion, selectActive, lockQuestion, continueQuestion, preflight, recordClaim, revalidate, renewHeartbeat }
 }
 
 /** Historical provenance stays readable after source withdrawal or task revocation. */

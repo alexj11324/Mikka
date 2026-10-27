@@ -1,5 +1,7 @@
 import "server-only";
 import { createSkillActivationAdapters } from "../self-improvement/activation";
+import { ImprovementError } from "../self-improvement/contract";
+import { FactoryError } from "./contract";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pool } from "@/lib/db";
 import { issueForUser } from "@/lib/issue-access";
@@ -87,11 +89,32 @@ export const dispatchFactoryRun = createFactoryDispatch(
   (tx, userId, input) => queueRun(userId, input, factoryDispatchDatabase(tx)),
 );
 import { createFactoryQuestions } from "./questions/store";
+const questionSkillAssignments: NonNullable<Parameters<typeof createFactoryQuestions>[4]> = {
+  lockOrigin: async (...args) => {
+    try {
+      await (await import("../self-improvement/server")).skillAssignments.lockQuestion(...args);
+    } catch (error) {
+      if (error instanceof ImprovementError)
+        throw new FactoryError("factoryQuestionContinuationUnavailable");
+      throw error;
+    }
+  },
+  continueQuestion: async (...args) => {
+    try {
+      await (await import("../self-improvement/server")).skillAssignments.continueQuestion(...args);
+    } catch (error) {
+      if (error instanceof ImprovementError)
+        throw new FactoryError("factoryQuestionContinuationUnavailable");
+      throw error;
+    }
+  },
+};
 export const factoryQuestions = createFactoryQuestions(
   pool,
   authorize,
   factoryStore,
   dispatchFactoryRun,
+  questionSkillAssignments,
 );
 import { createFactoryReconciler } from "./reconcile";
 export const reconcileFactoryRuns = createFactoryReconciler(

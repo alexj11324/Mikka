@@ -1,11 +1,12 @@
 import { isolatedPostgresURL } from "../../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../../scripts/migration-order.mjs";
 import { FactoryError } from "../contract";
+import { ActionFailureError } from "../../action-error";
 import { createFactoryStore } from "../store";
 import { createFactoryDispatch } from "../dispatch";
 import { factoryDispatchDatabase } from "../transaction";
@@ -14,6 +15,11 @@ import { createFactoryQuestions, questionReference } from "./store";
 import { createFactoryReconciler } from "../reconcile";
 import { lostRunOutcome } from "../../run-retry";
 import { blockQuestionRetry } from "./retry";
+import { createSkillAssignments } from "../../self-improvement/assignments";
+import {
+  BASELINE_ARTIFACT,
+  BASELINE_MARKDOWN,
+} from "../../self-improvement/builtin-skill";
 
 const local = process.env.FACTORY_QUESTION_TEST_URL;
 const dbURL =
@@ -57,7 +63,14 @@ test(
           [issue, owner],
         )
       ).rowCount === 1;
-    const make = (p: Pool) => {
+    const evaluationRuns = new Map<string, string>();
+    const make = (p: Pool, withSkills = true) => {
+      const assignments = createSkillAssignments(
+        p,
+        authorize,
+        async (_tx, owner, run, evaluationId) =>
+          owner === userId && evaluationRuns.get(run.id) === evaluationId,
+      );
       const store = createFactoryStore(p, authorize);
       const dispatch = createFactoryDispatch(p, store, (tx, owner, input) =>
         insertRunOnce(factoryDispatchDatabase(tx), owner, input, {
@@ -68,10 +81,23 @@ test(
       );
       return {
         store,
-        questions: createFactoryQuestions(p, authorize, store, dispatch),
+        dispatch,
+        assignments,
+        questions: createFactoryQuestions(
+          p,
+          authorize,
+          store,
+          dispatch,
+          withSkills
+            ? {
+                lockOrigin: assignments.lockQuestion,
+                continueQuestion: assignments.continueQuestion,
+              }
+            : undefined,
+        ),
       };
     };
-    const { store, questions } = make(pool);
+    const { store, questions, assignments } = make(pool);
     try {
       const dir = new URL("../../../drizzle/", import.meta.url);
       for (const name of orderMigrations(
@@ -106,6 +132,9 @@ test(
       const fixture = async (
         kind: "context" | "decision" | "permission" | "external" = "context",
         record = true,
+        selectSkill: (runId: string, issueId: string) => Promise<unknown> = (
+          runId,
+        ) => assignments.selectBaseline(userId, runId),
       ) => {
         const issueId = randomUUID(),
           eventId = randomUUID(),
@@ -126,8 +155,21 @@ test(
           rationale: "Explicit fixture",
         });
         await pool.query(
-          `INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"sessionId") VALUES ($1,'owner',$2,$3,$4,$5,'running',$6)`,
+          `INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"sessionId") VALUES ($1,'owner',$2,$3,$4,$5,'queued',$6)`,
           [runId, issueId, agentId, deviceId, repoId, `session:${runId}`],
+        );
+        await selectSkill(runId, issueId);
+        const lease = new Date(Date.now() + 60000).toISOString();
+        await pool.query(
+          `UPDATE agent_runs SET status='preparing',"startedAt"=now(),"leaseExpiresAt"=$2 WHERE id=$1`,
+          [runId, lease],
+        );
+        const { skillReceipt } = await assignments.recordClaim(
+          userId,
+          deviceId,
+          runId,
+          lease,
+          true,
         );
         const b = {
           taskId: state.task.id,
@@ -158,7 +200,15 @@ test(
           ],
         );
         const q = record ? await questions.record(userId, runId) : null;
-        return { task: state.task, issueId, eventId, runId, questionId, q: q! };
+        return {
+          task: state.task,
+          issueId,
+          eventId,
+          runId,
+          questionId,
+          q: q!,
+          skillReceipt,
+        };
       };
       const facts = (f: Awaited<ReturnType<typeof fixture>>) => ({
         reference: questionReference(f.q),
@@ -243,11 +293,52 @@ test(
           assert.equal(row.questionContinuation.requireSessionResume, true);
           assert.equal(result.task.id, f.task.id);
           assert.equal(result.task.status, "running");
+          const originalSelection = (
+            await pool.query(
+              'SELECT * FROM improvement_skill_selections WHERE "runId"=$1',
+              [f.runId],
+            )
+          ).rows[0];
+          const selection = (
+            await pool.query(
+              'SELECT * FROM improvement_skill_selections WHERE "runId"=$1',
+              [row.id],
+            )
+          ).rows[0];
+          assert.deepEqual(selection, {
+            ...originalSelection,
+            runId: row.id,
+            selectedAt: selection.selectedAt,
+          });
+          assert.equal(
+            (
+              await pool.query(
+                'SELECT * FROM improvement_skill_receipts WHERE "runId"=$1',
+                [row.id],
+              )
+            ).rowCount,
+            0,
+          );
+          const lease = new Date(Date.now() + 60000).toISOString();
           const claim = await questions.claimContinuation(
             userId,
             deviceId,
-            result.continuationRunId,
-            new Date(Date.now() + 60000).toISOString(),
+            row.id,
+            lease,
+          );
+          const prepared = await assignments.recordClaim(
+            userId,
+            deviceId,
+            row.id,
+            lease,
+            true,
+          );
+          assert.ok(prepared.skillReceipt);
+          assert.notEqual(prepared.skillReceipt.id, f.skillReceipt!.id);
+          assert.equal(prepared.skillReceipt.runId, row.id);
+          assert.deepEqual(
+            prepared.skillReceipt.artifact,
+            f.skillReceipt!.artifact,
           );
           assert.equal(claim.resumeSessionId, `session:${f.runId}`);
           assert.equal(claim.requireSessionResume, true);
@@ -274,6 +365,418 @@ test(
                 answerId: randomUUID(),
               }),
             "factoryQuestionAnswerConflict",
+          );
+        },
+      );
+      await t.test(
+        "answer and heartbeat share scope-before-run lock order",
+        { timeout: 15000 },
+        async () => {
+          const f = await fixture();
+          const [answer, heartbeat] = await Promise.all([
+            questions.answer(orchestrator, facts(f)),
+            assignments.renewHeartbeat(userId, deviceId, [f.runId], true),
+          ]);
+          assert.equal(await queued(f.issueId), 1);
+          assert.deepEqual(heartbeat.revoked, [f.runId]);
+          const selection = (
+            await pool.query(
+              'SELECT * FROM improvement_skill_selections WHERE "runId"=$1',
+              [answer.continuationRunId],
+            )
+          ).rows[0];
+          assert.equal(selection.versionId, BASELINE_ARTIFACT.versionId);
+        },
+      );
+      await t.test(
+        "answer waits for dispatch issue before taking Skill scope",
+        { timeout: 15000 },
+        async () => {
+          const f = await fixture(),
+            eventId = randomUUID();
+          await pool.query(
+            `INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey","issueId",payload)
+          VALUES($1::uuid,$2,'user_message',$1::text,$3,'{"text":"Independent rehearsal"}')`,
+            [eventId, userId, f.issueId],
+          );
+          const second = await store.route(userId, {
+            issueId: f.issueId,
+            eventId: randomUUID(),
+            sourceEventId: eventId,
+            rationale: "Independent rehearsal sharing the issue and repository",
+          });
+          assert.notEqual(second.task.id, f.task.id);
+          assert.equal(second.task.stage, "execute");
+          const tx = await pool.connect();
+          const answerPool = new Pool({
+            connectionString: fixtureURL,
+            max: 1,
+            options: `-c search_path=${schema} -c statement_timeout=10000`,
+          });
+          let signal!: () => void;
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const enteredDispatch = new Promise<void>((resolve, reject) => {
+            signal = resolve;
+            timer = setTimeout(
+              () =>
+                reject(new Error("Answer did not reach dispatch issue gate")),
+              5000,
+            );
+          });
+          const issueGate = JSON.stringify([
+            "dispatch-issue",
+            userId,
+            f.issueId,
+          ]);
+          answerPool.on("connect", (client) => {
+            client.query = new Proxy(client.query, {
+              apply(target, receiver, args) {
+                const text =
+                  typeof args[0] === "string" ? args[0] : args[0]?.text;
+                const values =
+                  typeof args[0] === "string" ? args[1] : args[0]?.values;
+                if (
+                  text?.includes("pg_advisory_xact_lock") &&
+                  values?.includes(issueGate)
+                )
+                  signal();
+                return Reflect.apply(target, receiver, args);
+              },
+            });
+          });
+          let answer: Promise<unknown> | undefined;
+          try {
+            await tx.query("BEGIN");
+            await tx.query("SET LOCAL lock_timeout='5s'");
+            const rehearsal = await make(pool).dispatch(
+              userId,
+              {
+                binding: {
+                  taskId: second.task.id,
+                  issueId: f.issueId,
+                  attemptId: second.task.attemptId,
+                  revision: second.task.revision,
+                  candidateId: second.task.candidateId,
+                },
+                agentId,
+                deviceRepoId: repoId,
+              },
+              tx,
+            );
+            answer = make(answerPool)
+              .questions.answer(orchestrator, facts(f))
+              .then(
+                (result) => result,
+                (error) => error,
+              );
+            await enteredDispatch;
+            clearTimeout(timer);
+            // The answer is now waiting on our dispatch gate; it must not own the Skill scope.
+            await assignments.selectBaseline(userId, rehearsal.runId, tx);
+            await tx.query("COMMIT");
+            const failure = await answer;
+            assert.ok(failure instanceof ActionFailureError);
+            assert.equal(failure.code, "runAlreadyActive");
+            const q = await questions.read(userId, f.questionId);
+            assert.equal(q.status, "open");
+            assert.equal(q.answerId, null);
+            assert.equal(q.continuationRunId, null);
+            assert.equal(
+              (await store.read(userId, f.task.id)).attempts.length,
+              1,
+            );
+            assert.equal(await queued(f.issueId), 1);
+            const selections = await pool.query(
+              'SELECT "runId","versionId" FROM improvement_skill_selections WHERE "issueId"=$1 ORDER BY "runId"',
+              [f.issueId],
+            );
+            assert.deepEqual(
+              new Set(selections.rows.map((row) => row.runId)),
+              new Set([f.runId, rehearsal.runId]),
+            );
+            assert.ok(
+              selections.rows.every(
+                (row) => row.versionId === BASELINE_ARTIFACT.versionId,
+              ),
+            );
+          } finally {
+            clearTimeout(timer);
+            await tx.query("ROLLBACK");
+            tx.release();
+            await answer;
+            await answerPool.end();
+          }
+        },
+      );
+      await t.test(
+        "withdrawn active candidates and fixed evaluation arms cannot continue",
+        async () => {
+          for (const purpose of ["active", "evaluation"] as const) {
+            const versionId = randomUUID(),
+              proposalId = randomUUID(),
+              evaluationId = randomUUID();
+            const markdown = `${BASELINE_MARKDOWN}\nSynthetic question continuation candidate.\n`;
+            const artifact = {
+              ...BASELINE_ARTIFACT,
+              versionId,
+              sha256: createHash("sha256").update(markdown).digest("hex"),
+            };
+            const f = await fixture("context", true, async (runId, issueId) => {
+              await pool.query(
+                `INSERT INTO improvement_scorers(digest,id,version,definition) VALUES($1,$1,1,'{}')`,
+                [proposalId],
+              );
+              await pool.query(
+                `INSERT INTO improvement_proposals(id,"userId",bucket,fingerprint,"issueId","scorerDigest",candidate,result,status)
+              VALUES($1::uuid,$2,'synthetic',$1::text,$3,$1::text,'{}','{}','awaiting_independent_review')`,
+                [proposalId, userId, issueId],
+              );
+              await pool.query(
+                "INSERT INTO improvement_skill_versions(id,artifact,markdown) VALUES($1,$2,$3)",
+                [versionId, JSON.stringify(artifact), markdown],
+              );
+              await pool.query(
+                `INSERT INTO improvement_skill_candidates("versionId","userId","issueId","agentId","repoId","proposalId","factoryTaskId","candidateId",repository,"commitSha",path,"baselineVersionId")
+              VALUES($1,$2,$3,$4,$5,$6,$7,$8,'https://github.com/example/public',$9,'lib/self-improvement/skills/run-report/SKILL.md',$10)`,
+                [
+                  versionId,
+                  userId,
+                  issueId,
+                  agentId,
+                  repoId,
+                  proposalId,
+                  randomUUID(),
+                  randomUUID(),
+                  "a".repeat(40),
+                  BASELINE_ARTIFACT.versionId,
+                ],
+              );
+              if (purpose === "active") {
+                await pool.query(
+                  `INSERT INTO improvement_skill_lifecycle(id,"userId","issueId","repoId","versionId",operation,"publicationId","approvalId")
+                VALUES($1,$2,$3,$4,$5,'activate',$6,$7)`,
+                  [
+                    randomUUID(),
+                    userId,
+                    issueId,
+                    repoId,
+                    versionId,
+                    randomUUID(),
+                    randomUUID(),
+                  ],
+                );
+                await assignments.selectActive(userId, runId);
+              } else {
+                evaluationRuns.set(runId, evaluationId);
+                const tx = await pool.connect();
+                try {
+                  await tx.query("BEGIN");
+                  await assignments.selectVersion(
+                    userId,
+                    runId,
+                    versionId,
+                    { purpose: "evaluation", evaluationId },
+                    tx,
+                  );
+                  await tx.query("COMMIT");
+                } catch (error) {
+                  await tx.query("ROLLBACK");
+                  throw error;
+                } finally {
+                  tx.release();
+                }
+              }
+            });
+            if (purpose === "active") {
+              await pool.query(
+                `INSERT INTO improvement_skill_lifecycle(id,"userId","issueId","repoId","versionId",operation,"publicationId","approvalId")
+              VALUES($1,$2,$3,$4,$5,'withdraw',$6,$7)`,
+                [
+                  randomUUID(),
+                  userId,
+                  f.issueId,
+                  repoId,
+                  versionId,
+                  randomUUID(),
+                  randomUUID(),
+                ],
+              );
+            }
+            await assert.rejects(
+              questions.answer(orchestrator, facts(f)),
+              purpose === "active" ? /runUnavailable/ : /sourceRequired/,
+            );
+            assert.equal(await queued(f.issueId), 0);
+            const q = await questions.read(userId, f.questionId);
+            assert.equal(q.status, "open");
+            assert.equal(q.answerId, null);
+            assert.equal(q.continuationRunId, null);
+            assert.equal(
+              (await store.read(userId, f.task.id)).attempts.length,
+              1,
+            );
+          }
+        },
+      );
+      await t.test(
+        "Skill authorization and device revocation roll back the answer and queue",
+        async () => {
+          for (const boundary of ["device", "authorization"] as const) {
+            const f = await fixture();
+            if (boundary === "device")
+              await pool.query("UPDATE devices SET enabled=false WHERE id=$1", [
+                deviceId,
+              ]);
+            else
+              await pool.query(
+                `UPDATE issues SET "userId"='other' WHERE id=$1`,
+                [f.issueId],
+              );
+            try {
+              await assert.rejects(
+                questions.answer(orchestrator, facts(f)),
+                /notFound|factoryNotFound|factoryQuestionContinuationUnavailable/,
+              );
+              assert.equal(await queued(f.issueId), 0);
+              const q = (
+                await pool.query(
+                  "SELECT * FROM factory_questions WHERE id=$1",
+                  [f.questionId],
+                )
+              ).rows[0];
+              assert.equal(q.status, "open");
+              assert.equal(q.answerId, null);
+              assert.equal(q.continuationRunId, null);
+              assert.equal(
+                (
+                  await pool.query(
+                    'SELECT count(*)::int AS n FROM factory_attempts WHERE "taskId"=$1',
+                    [f.task.id],
+                  )
+                ).rows[0].n,
+                1,
+              );
+            } finally {
+              await pool.query("UPDATE devices SET enabled=true WHERE id=$1", [
+                deviceId,
+              ]);
+              await pool.query('UPDATE issues SET "userId"=$2 WHERE id=$1', [
+                f.issueId,
+                userId,
+              ]);
+            }
+          }
+        },
+      );
+      await t.test(
+        "changed origin agent cannot transfer an earlier Skill selection",
+        async () => {
+          const f = await fixture(),
+            otherAgentId = randomUUID();
+          await pool.query(
+            `INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,'Other fixture agent','codex',$3)`,
+            [otherAgentId, userId, deviceId],
+          );
+          await pool.query('UPDATE agent_runs SET "agentId"=$2 WHERE id=$1', [
+            f.runId,
+            otherAgentId,
+          ]);
+          await assert.rejects(
+            questions.answer(orchestrator, facts(f)),
+            /sourceMismatch/,
+          );
+          assert.equal(await queued(f.issueId), 0);
+          const q = await questions.read(userId, f.questionId);
+          assert.equal(q.status, "open");
+          assert.equal(q.answerId, null);
+          assert.equal(q.continuationRunId, null);
+          assert.equal(
+            (await store.read(userId, f.task.id)).attempts.length,
+            1,
+          );
+        },
+      );
+      await t.test(
+        "legacy missing-selection continuation recovers only into a new run without historical backfill",
+        async () => {
+          const f = await fixture();
+          const legacy = await make(pool, false).questions.answer(
+            orchestrator,
+            facts(f),
+          );
+          await assert.rejects(
+            assignments.preflight(userId, legacy.continuationRunId, true),
+            /sourceRequired/,
+          );
+          const nextQuestionId = randomUUID();
+          await pool.query(
+            `UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"=$2,report=$3,"finishedAt"=now() WHERE id=$1`,
+            [
+              legacy.continuationRunId,
+              `session:${f.runId}`,
+              JSON.stringify({
+                summary: "Legacy continuation hand-in",
+                question: {
+                  questionId: nextQuestionId,
+                  kind: "context",
+                  question: "Which API?",
+                  options: [],
+                },
+              }),
+            ],
+          );
+          const q = await questions.record(userId, legacy.continuationRunId);
+          const answer = await questions.answer(orchestrator, {
+            reference: questionReference(q),
+            answerId: randomUUID(),
+            facts: [{ kind: "issue", quote: "Keep the existing public API" }],
+          });
+          const selected = (
+            await pool.query(
+              'SELECT * FROM improvement_skill_selections WHERE "runId"=$1',
+              [answer.continuationRunId],
+            )
+          ).rows[0];
+          assert.equal(selected.versionId, BASELINE_ARTIFACT.versionId);
+          assert.equal(selected.issueId, f.issueId);
+          assert.equal(
+            (
+              await pool.query(
+                'SELECT * FROM improvement_skill_selections WHERE "runId"=$1',
+                [legacy.continuationRunId],
+              )
+            ).rowCount,
+            0,
+          );
+          assert.equal(
+            (
+              await pool.query(
+                'SELECT * FROM improvement_skill_receipts WHERE "runId"=ANY($1::uuid[])',
+                [[legacy.continuationRunId, answer.continuationRunId]],
+              )
+            ).rowCount,
+            0,
+          );
+          const lease = new Date(Date.now() + 60000).toISOString();
+          const claim = await questions.claimContinuation(
+            userId,
+            deviceId,
+            answer.continuationRunId,
+            lease,
+          );
+          assert.equal(claim.resumeSessionId, `session:${f.runId}`);
+          const prepared = await assignments.recordClaim(
+            userId,
+            deviceId,
+            answer.continuationRunId,
+            lease,
+            true,
+          );
+          assert.ok(prepared.skillReceipt);
+          assert.notEqual(prepared.skillReceipt.id, f.skillReceipt!.id);
+          assert.deepEqual(
+            prepared.skillReceipt.artifact,
+            f.skillReceipt!.artifact,
           );
         },
       );

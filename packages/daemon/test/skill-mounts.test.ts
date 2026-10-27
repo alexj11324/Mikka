@@ -6,7 +6,7 @@ import { afterEach, expect, it } from 'vitest'
 import { skillMarkdown, type SkillAssignmentReceipt } from '@mikka/protocol/skill'
 import { defaultRunPolicy, runPolicyDigestInput } from '@mikka/protocol/agent-policy'
 import type { RunCompletion } from '@mikka/protocol/run'
-import type { AgentAdapter, AgentReport, SessionOptions } from '../src/adapters/types'
+import type { AgentAdapter, AgentReport, SessionOptions, StartOptions } from '../src/adapters/types'
 import { endedSession } from '../src/agents/child'
 import { RunContext, runPaths } from '../src/agents/run-context'
 import { createLogger } from '../src/log'
@@ -17,7 +17,7 @@ import { cleanupTempDirs, makeRepo, tempDir, waitFor } from './helpers'
 
 afterEach(cleanupTempDirs)
 
-async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' | 'wrong-receipt' | 'cached-handoff' | 'wrong-fixture' | 'delayed-handoff' = 'valid', resumed = false, benchmark = false, observedModel: string | null = 'observed-model') {
+async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' | 'wrong-receipt' | 'cached-handoff' | 'wrong-fixture' | 'delayed-handoff' = 'valid', resumed = false, benchmark = false, observedModel: string | null = 'observed-model', questionContinuation?: 'valid' | 'expired' | 'wrong-device') {
   const root = tempDir(), repo = await makeRepo(), runId = randomUUID(), worktree = join(root, 'worktree')
   execFileSync('git', ['worktree', 'add', '--detach', worktree, 'HEAD'], { cwd: repo, stdio: 'ignore' })
   const receipt: SkillAssignmentReceipt = { id: randomUUID(), runId, issueId: randomUUID(), agentId: randomUUID(), repoId: randomUUID(),
@@ -40,6 +40,19 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
     sessionId: 'actual-session', mountedAt: receipt.assignedAt }
   const priorExecution = assignment.benchmark ? { ...assignment.benchmark, harness: 'codex' as const,
     requestedModel: assignment.model!, observedModel: 'durably-observed-model', verifyCommand: assignment.verifyCommand! } : undefined
+  const parentRunId = randomUUID(), parentReceipt = { ...receipt, id: randomUUID(), runId: parentRunId }
+  if (questionContinuation) {
+    journal.put({ assignment: { ...assignment, runId: parentRunId, skillReceipt: parentReceipt }, state: 'stopped',
+      worktree, baseCommit: sourceCommit, sessionId: 'actual-session', skillMount: { ...priorMount, receiptId: parentReceipt.id },
+      lastSeq: 0, error: null, stopReason: 'asked_human', waitingQuestionId: randomUUID(), updatedAt: new Date().toISOString() })
+    Object.assign(assignment, { continuesRunId: parentRunId, resumeSessionId: 'actual-session', requireSessionResume: true,
+      followUp: 'Answer: use the baseline Skill.' })
+    if (questionContinuation === 'expired') {
+      receipt.leaseExpiresAt = new Date(Date.now() - 1000).toISOString()
+      assignment.leaseExpiresAt = receipt.leaseExpiresAt
+    }
+    if (questionContinuation === 'wrong-device') receipt.deviceId = randomUUID()
+  }
   if (mode === 'wrong-receipt') priorMount.receiptId = randomUUID()
   if (resumed) {
     journal.put({ assignment, state: 'running', worktree, baseCommit: assignment.benchmark?.sourceCommit ?? 'b'.repeat(40), execution: priorExecution, sessionId: 'actual-session', skillMount: priorMount,
@@ -72,11 +85,13 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
         yield { type: 'exit' as const, outcome: 'succeeded' as const, stopReason: 'turn_ended' as const,
         report: { summary: 'test', execution: { observedModel: 'model-fake' }, sourceCommit: 'f'.repeat(40), skillMount: { ...priorMount, sessionId: 'model-lie' } } as AgentReport } } }
   }
-  const adapter: AgentAdapter = { harness: 'codex', capabilities: { supportsResume: true, supportsInterject: false }, envAllow: [], start: open, resume: (_id, options) => open(options) }
+  let startOptions: StartOptions | undefined
+  const adapter: AgentAdapter = { harness: 'codex', capabilities: { supportsResume: true, supportsInterject: false }, envAllow: [],
+    start: options => { startOptions = options; return open(options) }, resume: (_id, options) => open(options) }
   const completions: RunCompletion[] = []
   const deps = { journal, adapterStateDir, adapters: new Map([['codex', adapter]]), log: createLogger(),
     repos: () => [{ repoId: receipt.repoId, name: 'test', path: repo }],
-    worktrees: { create: async () => worktree, bootstrap: async () => 'test', pathFor: () => worktree, changedFiles: async () => [] },
+    worktrees: { create: async () => worktree, continueFrom: async () => worktree, bootstrap: async () => 'test', pathFor: () => worktree, changedFiles: async () => [] },
     outbox: { push: (_id: string, item: { kind: string; completion: RunCompletion }) => { if (item.kind === 'complete') completions.push(item.completion) },
       compact: async () => {}, lastChunkSeq: () => 0 },
     revalidateSkillAssignment: async () => ({ skillReceipt: receipt, leaseExpiresAt: receipt.leaseExpiresAt }),
@@ -96,8 +111,39 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
     await restarted.resumeAll()
     await restarted.idle()
   } else await supervisor.idle()
-  return { report: completions.at(-1)!.report, journal, cancelled, priorMount, priorExecution, runId, receipt, stopReason: completions.at(-1)!.stopReason }
+  return { report: completions.at(-1)!.report, journal, cancelled, priorMount, priorExecution, runId, receipt, parentRunId, parentReceipt, startOptions, worktree, stopReason: completions.at(-1)!.stopReason }
 }
+
+it('revalidates question continuation bytes and journals a fresh receipt in the original session', async () => {
+  const result = await fixture('valid', false, false, 'resumed-model', 'valid')
+  expect(result.stopReason).toBe('turn_ended')
+  expect(result.startOptions).toMatchObject({ requireSessionResume: true, skillReceipt: result.receipt, skills: [BASELINE_SKILL],
+    continueSession: { sessionId: 'actual-session', runId: result.parentRunId, message: 'Answer: use the baseline Skill.' } })
+  expect(result.receipt.id).not.toBe(result.parentReceipt.id)
+  expect(result.report.skillMount).toMatchObject({ receiptId: result.receipt.id, sessionId: 'actual-session', sha256: BASELINE_ARTIFACT.sha256 })
+  expect(result.report.runtime).toMatchObject({ harness: 'codex', observedModel: 'resumed-model', sourceCommit: result.report.sourceCommit })
+  const saved = new RunJournal(join(result.worktree, '..', 'journal.json')).get(result.runId)
+  expect(saved).toMatchObject({ assignment: { skillReceipt: result.receipt }, questionResumeState: 'accepted',
+    sessionId: 'actual-session', worktree: result.worktree, skillMount: result.report.skillMount, runtime: result.report.runtime })
+  expect(result.journal.get(result.parentRunId)?.skillMount?.receiptId).toBe(result.parentReceipt.id)
+})
+
+it.each(['missing', 'tampered', 'wrong-session'] as const)('rejects question continuation with %s mount evidence', async mode => {
+  const result = await fixture(mode, false, false, 'resumed-model', 'valid')
+  expect(result.stopReason).toBe('error')
+  expect(result.cancelled).toBe(true)
+  expect(result.report.skillMount).toBeUndefined()
+  expect(result.report.runtime).toBeUndefined()
+  expect(result.journal.get(result.runId)?.questionResumeState).not.toBe('accepted')
+})
+
+it.each(['expired', 'wrong-device'] as const)('rejects question continuation with %s authorization before opening the adapter', async authorization => {
+  const result = await fixture('valid', false, false, 'resumed-model', authorization)
+  expect(result.stopReason).toBe('error')
+  expect(result.startOptions).toBeUndefined()
+  expect(result.report.skillMount).toBeUndefined()
+  expect(result.report.runtime).toBeUndefined()
+})
 
 it('rereads real RunContext bytes and ignores model-supplied evidence', async () => {
   const result = await fixture()

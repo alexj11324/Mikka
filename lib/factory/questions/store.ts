@@ -102,6 +102,10 @@ export function createFactoryQuestions(
   authorize: FactoryAuthorize,
   store: ReturnType<typeof createFactoryStore>,
   dispatch: Dispatch,
+  skills?: {
+    lockOrigin: (userId: string, issueId: string, runId: string, tx: PoolClient) => Promise<void>;
+    continueQuestion: (userId: string, runId: string, tx: PoolClient) => Promise<void>;
+  },
 ) {
   async function transaction<T>(
     fn: (tx: PoolClient) => Promise<T>,
@@ -551,6 +555,7 @@ export function createFactoryQuestions(
           return { ...q.result, replayed: true };
         }
         fence(task, q, input.reference);
+        await skills?.lockOrigin(actor.userId, q.issueId, q.originRunId, tx);
         const {
           rows: [origin],
         } = await tx.query(
@@ -639,6 +644,7 @@ export function createFactoryQuestions(
           `UPDATE factory_questions SET status='resuming',"continuationRunId"=$2,result=$3,"updatedAt"=now() WHERE id=$1`,
           [q.id, run.runId, JSON.stringify(result)],
         );
+        await skills?.continueQuestion(actor.userId, run.runId, tx);
         // A task-thread answer is retained in the addressed run, not stranded in its old inbox.
         await tx.query(
           `INSERT INTO run_messages (id,"runId","userId",text,"deliveredAt") VALUES ($1,$2,$3,$4,now()) ON CONFLICT (id) DO NOTHING`,
