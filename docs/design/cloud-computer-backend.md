@@ -45,13 +45,13 @@ on one shared machine, as in Grok Bot.
 ```
 workspace ──1:1── bot machine (E2B sandbox, Linux)          light, shared
                     ├─ mikka daemon (device, kind = "cloud")
-                    ├─ $HOME: shared CLI and browser logins
+                    ├─ owner-scoped authentication (never shared across users)
                     ├─ bot A: Xvfb :1 + WM + x11vnc + websockify → noVNC
                     │         Chrome profile ~/.mikka/profiles/<botId>
                     ├─ bot A, web sub-agents: one headless Chrome each,
                     │         live view by CDP screencast
                     ├─ bot B: Xvfb :2 + …
-                    └─ cookie sync between all profiles
+                    └─ cookie sync between one owner's profiles only
 
 cloud thread ──1:1── thread machine (E2B sandbox from the workspace snapshot)
                     ├─ mikka daemon running the coding harness (Claude Code, Codex)
@@ -97,12 +97,17 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
     and reported in the bot's chat.
   - Concurrency is capped per workspace (proposal: 6, Hark's figure). Further
     tasks queue.
-- **Browser logins are shared:** Chrome locks a profile directory to one
-  process, so each bot and each sub-agent gets its own profile or context. A
-  background job syncs cookies between them, for example with CDP
-  `Network.getAllCookies` / `Network.setCookies`. Logging in once then logs in
-  everywhere. Sites that pin a session to one device may still ask again; that
-  is accepted.
+- **Browser logins stay with their owner (#172):** Chrome locks a profile
+  directory to one process, so each bot and each sub-agent gets its own
+  profile or context. A background job syncs cookies only between profiles of
+  the same account owner, for example with CDP `Network.getAllCookies` /
+  `Network.setCookies`; there is never cross-user authentication-cookie sync.
+  Saved logins come from the owner's vault (`credential-vault.md`). Project
+  files may be shared in `/workspace`; a shared `$HOME` is not an
+  authentication or security boundary. Until a stronger process or sandbox
+  boundary exists, the runtime rejects a second account owner on the
+  workspace's bot machine. Sites that pin a session to one device may still
+  ask again; that is accepted.
 
 ### Thread machine (one per cloud thread)
 
@@ -192,8 +197,8 @@ New on top of #161:
 3. **Viewer auth.** The noVNC endpoint is reachable through the sandbox's public
    host. It must require a short-lived signed token, with separate view and
    control grants, and must never be open by URL alone.
-4. **Cookie sync.** Check that the CDP sync is reliable while two Chromes run.
-   Measure how long a change takes to propagate.
+4. **Session reuse.** Check authorized same-owner reuse while two Chromes run,
+   and prove that sessions cannot cross account-owner boundaries.
 
 Report findings in the issue before building on an assumption that failed.
 

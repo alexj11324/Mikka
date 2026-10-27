@@ -1537,6 +1537,16 @@
       "previewNote": "表单预览：尚未连接工作区存储，修改不会保存。",
       "previewLabel": "工作区表单预览"
     },
+    "computerPolicy": {
+      "heading": "云电脑",
+      "description": "控制工作区内的 Bot 是否可以操作电脑。",
+      "label": "Bot 操作电脑",
+      "help": "禁止后，电脑任务会停止，已有授权也会失效。你仍然可以接管电脑。",
+      "adminOnly": "只有工作区管理员可以修改此设置。",
+      "ask": "操作前审批",
+      "deny": "禁止",
+      "error": "无法读取或更新电脑设置。"
+    },
     "issuePrefix": {
       "title": "个人任务编号",
       "description": "个人任务只留在 Mikka，不写进 Linear，编号用你自己的 4 个字母前缀。工作区任务用 Linear 的编号。",
@@ -1573,6 +1583,32 @@
       "loadError": "无法加载 Linear 设置。",
       "operationError": "Linear 同步操作失败，请重试。",
       "teamAlreadyLinked": "此 Linear 团队已连接到另一个 Mikka 账号。"
+    },
+    "subscriptions": {
+      "heading": "订阅",
+      "description": "连接你自己的订阅，供此工作区中获授权的 Bot 任务使用。",
+      "codex": "ChatGPT / Codex",
+      "claude": "Claude",
+      "providerDescription": "在服务商的网站登录并同意授权。",
+      "unavailable": "此连接暂不可用。",
+      "connected": "已连接",
+      "notConnected": "未连接",
+      "connect": "连接",
+      "connectAnother": "连接另一个",
+      "reconnect": "重新连接",
+      "disconnect": "断开连接",
+      "deviceInstructions": "打开服务商页面并输入以下代码。请保持此页面打开，Mikka 会检查连接状态。",
+      "callbackInstructions": "打开服务商页面并同意授权。如果浏览器最后停在 localhost 回调页面，请将地址栏中的完整地址粘贴到下方。",
+      "callbackLabel": "回调页面地址",
+      "openProvider": "打开服务商页面",
+      "finish": "完成连接",
+      "close": "关闭",
+      "expired": "连接已过期，请重新开始。",
+      "loadFailed": "无法加载订阅设置。",
+      "connectionFailed": "无法完成连接，请重新开始。",
+      "disconnectFailed": "无法断开订阅连接。",
+      "connectedNotice": "订阅已连接。",
+      "disconnectedNotice": "已从 Mikka 断开。你可能还需要在服务商网站撤销授权。"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",
@@ -2347,6 +2383,7 @@
       "handbackFailed": "没能交还，请重试。"
     },
     "approval": {
+      "action": { "click": "点击屏幕", "type": "输入文字", "key": "按键", "scroll": "滚动", "screenshot": "查看屏幕" },
       "allowRun": "本任务内都允许",
       "deny": "拒绝",
       "allow": "允许",

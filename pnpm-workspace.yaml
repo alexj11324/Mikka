@@ -16,3 +16,6 @@ allowBuilds:
   '@swc/core': true
   esbuild: true
   sharp: true
+
+patchedDependencies:
+  '@novnc/novnc@1.6.0': patches/@novnc__novnc@1.6.0.patch

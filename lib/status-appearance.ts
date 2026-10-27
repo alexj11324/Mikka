@@ -38,4 +38,3 @@ export const statusIconTints: Record<StatusTone, string> = {
   destructive: 'text-destructive',
   focus: 'text-info-foreground',
 }
-

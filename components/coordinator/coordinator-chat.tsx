@@ -42,7 +42,7 @@ export function coordinatorChatKey(botId?: string | null) {
 
 /** The tools a reply used, less a dispatch that already shows as its thread card. */
 function footerTools(item: Chat['items'][number]) {
-  return [...new Set(item.tools.filter(tool => !(tool === 'dispatch_run' && item.threads.length)))]
+  return [...new Set(item.tools.filter(tool => !((tool === 'dispatch_run' || tool === 'dispatch_bot_computer') && item.threads.length)))]
 }
 
 /**

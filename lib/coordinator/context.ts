@@ -207,9 +207,9 @@ export interface ChatItem {
   artifacts: string[]
 }
 
-/** The run id a dispatch_run result carries, if it succeeded. */
+/** The run id a successful local or Bot-computer dispatch carries. */
 function dispatchedRun(part: { type: string; toolName?: string; output?: unknown }): string | null {
-  if (part.type !== 'tool-result' || part.toolName !== 'dispatch_run') return null
+  if (part.type !== 'tool-result' || (part.toolName !== 'dispatch_run' && part.toolName !== 'dispatch_bot_computer')) return null
   const output = part.output as { type?: string; value?: unknown } | undefined
   const value = output?.type === 'json' ? output.value : null
   const runId = value && typeof value === 'object' ? (value as { runId?: unknown }).runId : null

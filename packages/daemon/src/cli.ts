@@ -15,7 +15,7 @@ import { MemoryServer, type DeviceRepo, type ServerLink } from "./server-link"
 import { HttpServerLink } from "./server-link-http"
 
 const USAGE = `Usage:
-  mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>]
+  mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>] [--hosted-subscriptions]
   mikka daemon login [--server <url>] [--workspace <id>] [--token <session>] [--dev] [--data-dir <dir>]
   mikka daemon status [--dev] [--data-dir <dir>]`
 
@@ -39,7 +39,8 @@ const defaultIO: CliIO = {
 /** Returns an exit code, or `null` while the daemon keeps running. */
 export async function runCli(
   argv: string[],
-  io: CliIO = defaultIO
+  io: CliIO = defaultIO,
+  privateConfig?: { protectionBypass?: string }
 ): Promise<number | null> {
   const { values, positionals } = parseArgs({
     args: argv,
@@ -51,6 +52,9 @@ export async function runCli(
       "mock-speed": { type: "string" },
       "fixtures-dir": { type: "string" },
       "stall-minutes": { type: "string" },
+      "hosted-subscriptions": { type: "boolean", default: false },
+      "e2b-container-runtime": { type: "boolean", default: false },
+      "e2b-computer": { type: "boolean", default: false },
       token: { type: "string" },
       workspace: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
@@ -142,14 +146,13 @@ export async function runCli(
     }
     memoryServer = new MemoryServer("dev-device")
     const seed = readJson(daemonPaths(dataDir).devRepos) as
-      | { repos?: DeviceRepo[] }
-      | undefined
+      { repos?: DeviceRepo[] } | undefined
     for (const repo of seed?.repos ?? [])
       memoryServer.addRepo("dev-device", repo)
     link = memoryServer.link()
     credential = "dev"
   } else {
-    link = new HttpServerLink(serverArg)
+    link = new HttpServerLink(serverArg, fetch, DAEMON_VERSION, privateConfig?.protectionBypass)
   }
 
   const log = createLogger({
@@ -167,6 +170,9 @@ export async function runCli(
       log,
       mockSpeed: speed,
       fixturesDir: values["fixtures-dir"],
+      hostedSubscriptions: values["hosted-subscriptions"],
+      e2bContainerRuntime: values["e2b-container-runtime"],
+      cloudComputer: values["e2b-computer"],
       stallMs: values["stall-minutes"]
         ? Number(values["stall-minutes"]) * 60_000
         : undefined,
