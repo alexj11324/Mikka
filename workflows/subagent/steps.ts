@@ -5,13 +5,21 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
   const { SubagentStore } = await import('@/lib/cloud-computer/subagents')
   const store = new SubagentStore(pool)
   const row = await store.start(actor, botId, id)
-  if (['done', 'failed', 'stopped'].includes(row.status)) return 'terminal'
+  if (['done', 'failed', 'stopped'].includes(row.status)) {
+    await store.cleanup(actor, botId, id)
+    await report(actor.userId, botId, id, `Web task ${row.task}: ${row.status}. ${row.step}`, row.status)
+    return 'terminal'
+  }
   if (row.status === 'queued' || row.status === 'needs_you') return 'waiting'
   try {
     const observation = await store.action(actor, botId, id, { action: 'observe' })
     const page = observation.observation as { needsLogin?: boolean; url?: string }
     if (page.needsLogin && page.url) {
       const site = new URL(page.url).origin
+      const { requestBrowserLogin } = await import('@/lib/cloud-computer/login-provider')
+      const login = await requestBrowserLogin({ ...actor, botId, subagentId: id }, site)
+      if (login.status === 'submitted') return 'running'
+      if (login.status === 'needs_code') return 'waiting'
       await store.update(actor, botId, id, 'needs_you', 'needs_you', { kind: 'login', site })
       await report(actor.userId, botId, id, `The web task needs a login at ${site}. Ask for the saved-login card; never request credentials in chat.`, 'login')
       return 'waiting'
@@ -53,10 +61,11 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
   }
 }
 async function report(userId: string, botId: string, id: string, text: string, state: string) {
-  const { db } = await import('@/lib/db')
+  const { db, pool } = await import('@/lib/db')
   const { recordCoordinatorEvent } = await import('@/lib/coordinator-event-store')
   const { wakeCoordinator } = await import('@/lib/coordinator/wake')
-  await recordCoordinatorEvent(db, { userId, botId, kind: 'user_message', dedupeKey: `subagent:${id}:${state}`, issueId: null, runId: null, payload: { text: `Web task result (${state}): ${text}. Reply as the Bot in ordinary chat.`, subagentId: id } })
+  const fromSuggestion = Boolean((await pool.query('SELECT 1 FROM suggestion_executions WHERE "subagentId"=$1 AND "ownerId"=$2', [id, userId])).rowCount)
+  await recordCoordinatorEvent(db, { userId, botId: fromSuggestion ? null : botId, kind: 'user_message', dedupeKey: `subagent:${id}:${state}`, issueId: null, runId: null, payload: { text: `Web task result (${state}): ${text}. Reply as the Bot in ordinary chat.`, subagentId: id } })
   await wakeCoordinator(userId)
 }
 export async function expire(actor: Actor, botId: string, id: string) {

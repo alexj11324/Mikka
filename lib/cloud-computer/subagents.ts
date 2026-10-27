@@ -18,7 +18,9 @@ export class SubagentStore {
     const bot = (await this.pool.query('SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [botId, actor.userId, actor.workspaceId])).rows[0]
     if (!bot) throw new ComputerError(404, 'Bot unavailable')
     await this.pool.query(`INSERT INTO bot_subagents (id,"ownerId","workspaceId","botId",task) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(id) DO NOTHING`, [id, actor.userId, actor.workspaceId, botId, task])
-    return this.get(actor, botId, id)
+    const row = await this.get(actor, botId, id)
+    if (row.task !== task) throw new ComputerError(409, 'Web task request changed')
+    return row
   }
   private async publish(client: Pool | PoolClient, row: Subagent) {
     const event = subagentEventSchema.parse({ type: 'data-subagent', data: { botId: row.botId, subagentId: row.id, task: row.task, state: row.status, step: row.step, needs: row.needs } })
@@ -55,6 +57,7 @@ export class SubagentStore {
   }
   async update(actor: Actor, botId: string, id: string, status: Subagent['status'], step: string, needs: Subagent['needs'] = null) {
     const client = await this.pool.connect()
+    let changed: Subagent | undefined
     try {
       await client.query('BEGIN')
       const row = (await client.query<Subagent>(`UPDATE bot_subagents SET status=$5,step=$6,needs=$7,"endedAt"=CASE WHEN $5 IN ('done','failed','stopped') THEN now() ELSE NULL END
@@ -64,8 +67,15 @@ export class SubagentStore {
         if (['done', 'failed', 'stopped'].includes(status)) await client.query(`UPDATE suggestion_executions SET status=$2,"endedAt"=now() WHERE "subagentId"=$1`, [id, status])
       }
       await client.query('COMMIT')
-      return row ?? await this.get(actor, botId, id)
+      changed = row
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+    if (['done', 'failed', 'stopped'].includes(status)) await this.cleanup(actor, botId, id)
+    return changed ?? await this.get(actor, botId, id)
+  }
+  async cleanup(actor: Actor, botId: string, id: string) {
+    const row = await this.get(actor, botId, id)
+    const machine = (await this.pool.query('SELECT "sandboxId" FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
+    if (machine?.sandboxId) await runtimeRequest(machine.sandboxId, row, '/stop', {})
   }
   async machine(actor: Actor, botId: string, id: string) {
     const row = await this.get(actor, botId, id)

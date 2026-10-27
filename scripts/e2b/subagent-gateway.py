@@ -108,7 +108,11 @@ async def state(request):
     return web.json_response({'targetId':b.target,'url':None if b.guard else await b.url(),'guarded':bool(b.guard)})
 
 async def stop(request):
-    _,grant=authorize(request,'runtime');b=browser(grant);await b.stop();return web.json_response({'stopped':True})
+    _,grant=authorize(request,'runtime')
+    b=AGENTS.get(grant['subagentId'])
+    if b and not b.stopped:
+        b=browser(grant);await b.stop()
+    return web.json_response({'stopped':True})
 
 async def viewer(request):
     raw,grant=authorize(request,'view');b=browser(grant)
