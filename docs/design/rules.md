@@ -68,18 +68,27 @@ source wins in a conflict is in [`README.md`](README.md).
 ## Suggestions, tasks and devices
 
 - **R-20** Notifications from connected apps' webhooks (Gmail, Notion,
-  Slack, GitHub, Linear…) are sorted by the decision model (OpenAI Decisions
-  API). An important one (it needs the person, or the Coordinator can act on
-  it) is posted by the Coordinator in its own chat as a card asking whether
-  to act, and is pushed on mobile. Routine ones go to 例行事项 in the 建议
-  panel. The rest are not shown. The Coordinator never acts on an event
-  before the person says yes. Its own ideas also go in its chat.
-- **R-21** The right panel has two parts: 建议 (today's briefing and
-  例行事项) on top, then 任务. A 任务 here is a thread started by the
-  orchestrator or a bot; all of them stay listed. It is not a flat list of
-  the board's issues. The flow: the person says yes to a Coordinator card, or
-  clicks a 例行事项 item (which fills the centre composer) → the bot
-  dispatches a thread → the item leaves 建议 and shows up below as a 任务.
+  Slack, GitHub, Linear…) are rated by the decision model (OpenAI Decisions
+  API) after Comma's attention model: first the cost if the person does
+  nothing, when it lands and whether it can be undone; then one level,
+  critical, high, ask, normal or low (unclear rereads the source). Code floors
+  the level: any cost is at least high; a cost due within 48 hours, or an
+  irreversible one due within a week, is critical. Critical, high and ask go
+  to the Coordinator, which decides whether to tell the person: a card in its
+  own chat that says what happens if nothing is done and offers one next
+  step, pushed on mobile. Normal stays in 建议; low is not shown. Telling the
+  person is capped at 5 a day, 30 minutes apart (critical skips the spacing,
+  not the cap); held items wait, they are not dropped. The Coordinator never
+  acts on an event before the person says yes. Its own ideas also go in its
+  chat.
+- **R-21** The right panel has two parts: 建议 on top, then 任务. 建议 keeps
+  its name (not "Routines"): a daily briefing generated once a day at the
+  person's chosen time, then the normal-level items by source app. A 任务 here
+  is a thread started by the orchestrator or a bot; all of them stay listed.
+  It is not a flat list of the board's issues. The flow: the person says yes
+  to a Coordinator card, or clicks a 建议 item (which fills the centre
+  composer) → the bot dispatches a thread → the item leaves 建议 and shows up
+  below as a 任务.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
