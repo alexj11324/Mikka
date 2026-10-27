@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'
@@ -157,9 +158,11 @@ function ViewerIntegrationsSettings({ showWebhookDetails, userId, isPending }: {
             </Button>)}
             <Button type="button" variant="outline" size="sm" disabled={!userId || githubLoading || githubLinking} onClick={() => void refreshGitHub()}>{t('githubRefresh')}</Button>
           </div>
-          {githubState?.configured && githubState.connected && githubState.installed && githubState.repositories.length > 0 && <ul aria-label={t('githubRepositoryList')} className="flex max-w-64 flex-col gap-1 text-xs text-muted-foreground">
-            {githubState.repositories.map(repository => <li key={repository.id} className="break-all">{repository.fullName}</li>)}
-          </ul>}
+          {githubState?.configured && githubState.connected && githubState.installed && githubState.repositories.length > 0 && <ScrollArea className="h-32 w-64 max-w-full">
+            <ul aria-label={t('githubRepositoryList')} className="flex flex-col gap-1 pr-3 text-xs text-muted-foreground">
+              {githubState.repositories.map(repository => <li key={repository.id} className="break-all">{repository.fullName}</li>)}
+            </ul>
+          </ScrollArea>}
           {githubError && <p role="alert" className="text-sm text-destructive">{githubError}</p>}
           {githubLinkError && <p role="alert" className="text-sm text-destructive">{githubLinkError}</p>}
         </div>

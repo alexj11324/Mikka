@@ -32,7 +32,7 @@ before(async () => {
 
 beforeEach(() => {
   userId = 'viewer-a'; pending = false; requests.length = 0
-  browser.history.replaceState(null, '', '?settings=integrations')
+  browser.history.replaceState({}, '', '?settings=integrations')
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
@@ -120,7 +120,7 @@ test('mismatched and unauthenticated 401 errors cannot offer another viewer a re
 })
 
 test('OAuth callback errors survive initial session confirmation and the keyed remount', async () => {
-  browser.history.replaceState(null, '', '?settings=integrations&github=link-failed&composio=callback-failed')
+  browser.history.replaceState({}, '', '?settings=integrations&github=link-failed&composio=callback-failed')
   pending = true
   await render()
   assert.equal(new URL(browser.location.href).searchParams.get('github'), 'link-failed')

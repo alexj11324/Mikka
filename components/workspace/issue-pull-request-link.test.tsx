@@ -119,7 +119,7 @@ test('a cookie switch from A to B cannot write B state into the still-visible A 
     respond(Response.json({ viewerId: 'viewer-b', state: 'merged' }))
     const result = await pendingRequest
     assert.deepEqual(result, { error: 'authRequired' })
-    data = result as typeof data
+    data = result as { error: string }
     const markup = render()
     assert.ok(markup.includes('unavailable'))
     assert.ok(!markup.includes('GitHub: open'))
