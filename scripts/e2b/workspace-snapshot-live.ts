@@ -33,6 +33,10 @@ try{
  const refreshed=await prepareWorkspaceSnapshot(pool,actor,run2,botId,sha);if(snap===refreshed)throw Error('snapshot not refreshed')
  await collectRetiredSnapshots(pool,actor);const retained=await pool.query('SELECT 1 FROM workspace_snapshot_versions WHERE "snapshotId"=$1',[snap]);if(!retained.rowCount)throw Error('live snapshot deleted')
  await pool.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"worktreePath"=$3 WHERE id=$1',[runId,'succeeded',worktree])
+ if(process.env.E2B_NEXT_TEMPLATE || process.env.E2B_NEXT_SHA){
+  if(!process.env.E2B_NEXT_TEMPLATE || !/^[a-f0-9]{40}$/.test(process.env.E2B_NEXT_SHA??''))throw Error('Invalid upgraded template configuration')
+  process.env.E2B_COMPUTER_TEMPLATE=process.env.E2B_NEXT_TEMPLATE;process.env.MIKKA_CLOUD_WORKER_SHA=process.env.E2B_NEXT_SHA
+ }
  resultSnapshot=await preserveThreadResult(pool,actor,runId);if(!resultSnapshot)throw Error('result snapshot missing')
  restored=await Sandbox.create(resultSnapshot,opts)
  if((await restored.files.read(`${worktree}/uncommitted.txt`,{user:'mikka-runner'})).trim()!=='uncommitted fixture')throw Error('uncommitted work missing')
