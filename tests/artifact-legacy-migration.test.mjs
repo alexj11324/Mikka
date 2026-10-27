@@ -19,7 +19,7 @@ test('the legacy artifact migration preserves data and foreign keys alongside ma
     await client.query('INSERT INTO artifacts VALUES ($1,$2)', [id, randomUUID()])
     await client.query('INSERT INTO artifact_versions (id,"artifactId") VALUES ($1,$2)', [randomUUID(), id])
     await client.query('INSERT INTO artifact_threads (id,"artifactId") VALUES ($1,$2)', [randomUUID(), id])
-    const compatibility = await readFile(new URL('../drizzle/20261027040459_artifact_legacy_compat.sql', import.meta.url), 'utf8')
+    const compatibility = await readFile(new URL('../drizzle/20261027164500_artifact_legacy_compat.sql', import.meta.url), 'utf8')
     await client.query(compatibility)
     await client.query(await readFile(new URL('../drizzle/20261027010100_artifacts.sql', import.meta.url), 'utf8'))
     await client.query(compatibility)

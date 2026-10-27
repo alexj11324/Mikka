@@ -12,8 +12,8 @@ test('missing baseline fails before connecting to any database', () => {
 })
 
 test('known legacy artifact compatibility runs before mainline artifact creation', () => {
-  const names = [APPLICATION_BASELINE, '0001_a.sql', '20261027010100_artifacts.sql', ARTIFACT_COMPATIBILITY, '20261027040500_cloud_computers.sql']
-  assert.deepEqual(orderMigrations(names), [APPLICATION_BASELINE, '0001_a.sql', ARTIFACT_COMPATIBILITY, '20261027010100_artifacts.sql', '20261027040500_cloud_computers.sql'])
+  const names = [APPLICATION_BASELINE, '0001_a.sql', '20261027010100_artifacts.sql', ARTIFACT_COMPATIBILITY, '20261027164501_cloud_computers.sql']
+  assert.deepEqual(orderMigrations(names), [APPLICATION_BASELINE, '0001_a.sql', ARTIFACT_COMPATIBILITY, '20261027010100_artifacts.sql', '20261027164501_cloud_computers.sql'])
 })
 
 test('BYOS migration aliases recognize both recorded branch histories without replay', async () => {
