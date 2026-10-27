@@ -17,7 +17,7 @@ Do not include private memories, unrelated issues, or other integration content 
 
 export async function slackTurn(userId: string, threadId: string, text: string) {
   'use workflow'
-  const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, tools: coordinatorTools(userId) })
+  const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, tools: coordinatorTools(userId, null) })
   try {
     const result = await agent.generate({
       instructions: SLACK_INSTRUCTIONS,
