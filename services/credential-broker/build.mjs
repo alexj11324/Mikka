@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs'
 import { build } from 'esbuild'
 import { fileURLToPath } from 'node:url'
 
@@ -11,3 +12,6 @@ await build({
   external: ['pg-native'],
   banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
 })
+
+// Vercel expects the static output directory even for this API-only service.
+mkdirSync(path('public'), { recursive: true })
