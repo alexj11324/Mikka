@@ -9,6 +9,7 @@ import { ComputerStore } from '../../lib/computer/store'
 import { startCloudWorker } from '../../lib/computer/cloud-worker'
 import { queueCloudRun } from '../../lib/computer/queue-run'
 import { ensureBotRuntime } from '../../lib/computer/bot-runtime'
+import { bindBotSubscription } from '../../lib/computer/bot-subscription'
 import { claimCloudRun } from '../../lib/computer/claim'
 import { decideComputerReview, syncComputerReviews } from '../../lib/computer/reviews'
 import { computerSyncBody } from '@mikka/protocol/computer'
@@ -29,7 +30,7 @@ async function main() {
     await pool.query(await readFile(new URL('../../drizzle/20261026235901_cloud_computers.sql', import.meta.url), 'utf8'))
     await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
     await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL, enabled boolean NOT NULL DEFAULT true, harnesses jsonb NOT NULL DEFAULT \'[]\', "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz)')
-    await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
+    await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
     await pool.query(await readFile(new URL('../../drizzle/20261027000000_computer_run_bindings.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000200_local_computer_reviews.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027000300_cloud_device_scope.sql', import.meta.url), 'utf8'))
@@ -135,9 +136,11 @@ async function main() {
       assert.ok(Date.now() - began >= 800, 'takeover waits for the operation lock')
       await store.operate(actor, bot.id, 'handback')
       stage = 'prepare synthetic Bot task'
-      const agentId = codex.agentId, repoId = codex.repoId, bindingId = randomUUID(), issueId = randomUUID(), connectionId = randomUUID()
-      await pool.query('INSERT INTO byos_connections (id,"ownerId","workspaceId",state,epoch) VALUES ($1,$2,$3,$4,$5)', [connectionId, actor.userId, actor.workspaceId, 'connected', 1])
-      await pool.query('INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId",route,"connectionId","connectionRevision") VALUES ($1,$2,$3,$4,$5,$6,$7)', [bindingId, actor.userId, actor.workspaceId, agentId, 'codex_cli', connectionId, 1])
+      const agentId = codex.agentId, repoId = codex.repoId, issueId = randomUUID(), connectionId = randomUUID()
+      await pool.query('INSERT INTO byos_connections (id,"ownerId","workspaceId",state,epoch,provider) VALUES ($1,$2,$3,$4,$5,$6)', [connectionId, actor.userId, actor.workspaceId, 'connected', 1, 'codex'])
+      const bindingInput = { botId: bot.id, connectionId, revision: 1, harness: 'codex' as const, modelId: 'fixture-model', idempotencyKey: 'synthetic-bind' }
+      const { bindingId } = await bindBotSubscription(pool, actor, bindingInput)
+      assert.equal((await bindBotSubscription(pool, actor, bindingInput)).bindingId, bindingId)
       const { runId } = await queueCloudRun(pool, actor, { botId: bot.id, issueId, agentId, deviceRepoId: repoId, title: 'FULL_COMPUTER', body: '' })
       const prompt = (await pool.query('SELECT prompt FROM agent_runs WHERE id=$1', [runId])).rows[0].prompt as string
       const leaseExpiresAt = new Date(Date.now() + 180_000).toISOString()

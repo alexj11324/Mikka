@@ -23,6 +23,7 @@ import type { TelegramReplyTarget } from '@/lib/coordinator-events'
 import { postTelegramText } from '@/lib/telegram/client'
 import { queueCloudRun } from '@/lib/computer/queue-run'
 import { ComputerStore } from '@/lib/computer/store'
+import { bindBotSubscription } from '@/lib/computer/bot-subscription'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -258,6 +259,30 @@ export async function wakeComputerBot(userId: string, input: { botId: string }, 
     const runtimes = await (await import('@/lib/computer/wake-worker')).ensureCloudBotWorker(pool, actor, input.botId)
     return { botId: input.botId, awake: true, harnesses: runtimes.map(runtime => runtime.harness) }
   } catch { return { error: 'cloudComputerUnavailable' } }
+}
+
+export async function listBotSubscriptions(userId: string, input: { botId: string }, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
+  if (!bot) return { error: 'cloudComputerUnavailable' }
+  try { await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId) } catch { return { error: 'cloudComputerUnavailable' } }
+  const rows = (await pool.query(`SELECT id,provider,epoch FROM byos_connections WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='connected' ORDER BY "createdAt",id LIMIT 50`, [userId, bot.workspaceId])).rows
+  return rows.map(row => ({ connectionId: row.id, provider: row.provider, revision: Number(row.epoch) }))
+}
+
+export async function bindComputerSubscription(userId: string, input: { botId: string; connectionId: string; revision: number; harness: 'codex' | 'claude_code'; modelId: string }, toolCallId: string, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
+  const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
+  if (!bot) return { error: 'cloudComputerUnavailable' }
+  try {
+    await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId)
+    await bindBotSubscription(pool, { userId, workspaceId: bot.workspaceId }, { ...input, idempotencyKey: `coordinator:${toolCallId}` })
+    return { botId: input.botId, bound: true }
+  } catch { return { error: 'subscriptionUnavailable' } }
 }
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope) {

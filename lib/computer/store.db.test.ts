@@ -12,6 +12,7 @@ import { claimWorkerLease, renewWorkerLease, releaseWorkerLease } from './worker
 import { startCloudWorker } from './cloud-worker'
 import { queueCloudRun } from './queue-run'
 import { ensureBotRuntime } from './bot-runtime'
+import { bindBotSubscription } from './bot-subscription'
 import { ComputerBroker } from '../../packages/daemon/src/computer/broker.mjs'
 import { applyWebComputerDecisions, webComputerSnapshots } from '../../packages/daemon/src/computer/web-review'
 import type * as provider from './e2b-provider'
@@ -52,7 +53,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(reviewMigration); await pool.query(reviewMigration)
     const runApprovalMigration = await readFile(new URL('../../drizzle/20261027000500_computer_run_approvals.sql', import.meta.url), 'utf8')
     await pool.query(runApprovalMigration); await pool.query(runApprovalMigration)
-    await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
+    await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
     const botRuntimeMigration = await readFile(new URL('../../drizzle/20261027000600_bot_cloud_runtimes.sql', import.meta.url), 'utf8')
     await pool.query(botRuntimeMigration); await pool.query(botRuntimeMigration)
     const store = new ComputerStore(pool, runtime)
@@ -136,8 +137,18 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await bindComputerRun(pool, actor, cloudRun, bot.id)
     await pool.query('INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId") VALUES ($1,$2,$3,$4),($5,$6,$3,$4)', [cloudSubscription, actor.userId, actor.workspaceId, consumer, wrongSubscription, bob.userId])
     const connectionId = randomUUID()
-    await pool.query('INSERT INTO byos_connections (id,"ownerId","workspaceId",state,epoch) VALUES ($1,$2,$3,$4,$5)', [connectionId, actor.userId, actor.workspaceId, 'connected', 1])
+    await pool.query('INSERT INTO byos_connections (id,"ownerId","workspaceId",state,epoch,provider) VALUES ($1,$2,$3,$4,$5,$6)', [connectionId, actor.userId, actor.workspaceId, 'connected', 1, 'codex'])
     await pool.query('UPDATE byos_bindings SET route=$2,"connectionId"=$3,"connectionRevision"=1 WHERE id=$1', [cloudSubscription, 'codex_cli', connectionId])
+    const botBinding = { botId: bot.id, connectionId, revision: 1, harness: 'codex' as const, modelId: 'fixture-model', idempotencyKey: 'bind-once' }
+    await assert.rejects(bindBotSubscription(pool, bob, botBinding), /unavailable/)
+    await assert.rejects(bindBotSubscription(pool, otherWorkspace, botBinding), /unavailable/)
+    await assert.rejects(bindBotSubscription(pool, actor, { ...botBinding, revision: 2 }), /unavailable/)
+    const linked = await Promise.all([bindBotSubscription(pool, actor, botBinding), bindBotSubscription(pool, actor, botBinding)])
+    assert.deepEqual(linked[0], linked[1], 'a retried bind selects the same subscription binding')
+    await assert.rejects(bindBotSubscription(pool, actor, { ...botBinding, modelId: 'changed-model' }), /unavailable/)
+    const managedCodex = setups[0].find(row => row.harness === 'codex')!
+    const managedRun = await queueCloudRun(pool, actor, { botId: bot.id, issueId: randomUUID(), agentId: managedCodex.agentId, deviceRepoId: managedCodex.repoId, title: 'Computer task', body: '' })
+    assert.equal((await pool.query('SELECT "botId" FROM computer_run_bindings WHERE "runId"=$1', [managedRun.runId])).rows[0].botId, bot.id)
     const cloudRepo = randomUUID()
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,instructions,name) VALUES ($1,$2,$3,$4,$5,$6)', [consumer, actor.userId, worker.deviceId, 'codex', 'Follow the task', 'Fixture'])
     await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch","repoPath") VALUES ($1,$2,$3,$4,$5)', [cloudRepo, actor.userId, worker.deviceId, 'main', '/tmp/cloud-repo'])

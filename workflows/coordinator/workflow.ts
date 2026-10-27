@@ -110,6 +110,16 @@ function coordinatorTools(userId: string, scope?: NativeToolScope, computerEnabl
         inputSchema: z.object({ botId: id }),
         execute: input => steps.wakeComputerBot(userId, input, scope),
       }),
+      list_bot_subscriptions: tool({
+        description: 'List the person’s connected subscriptions available in this Bot’s workspace. Never returns credentials.',
+        inputSchema: z.object({ botId: id }),
+        execute: input => steps.listBotSubscriptions(userId, input, scope),
+      }),
+      bind_bot_subscription: tool({
+        description: 'Only when the person has selected a connected subscription and model, bind it to the Bot’s hosted executor. The Bot must first be awake.',
+        inputSchema: z.object({ botId: id, connectionId: id, revision: z.number().int().positive(), harness: z.enum(['codex', 'claude_code']), modelId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/) }),
+        execute: (input, options) => steps.bindComputerSubscription(userId, input, options.toolCallId, scope),
+      }),
       dispatch_bot_computer: tool({
         description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Computer operations still require their approval.',
         inputSchema: z.object({ botId: id, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional() }),
