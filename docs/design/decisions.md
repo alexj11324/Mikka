@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | Mobile composer: the 「+」 sits inside the input field at its left end, not as a separate circle beside it (as in ChatGPT iOS). Alex: 「加号改在里边」 | — | — |
 | 2026-10-27 | The briefing stays one bubble; only Hark's tone is adopted, not its one-bubble-per-item format, and no date label (「我只让你学他的口气…简报应该要写到一块儿…写到一个气泡里边」) | R-46 | Hark-style one bubble per item and date label (same day) |
 | 2026-10-27 | No visible times in the chat or on cards; swiping right-to-left reveals each message's time, as in iMessage and ChatGPT (「不要在左上角写这个时间…用手从右往左滑…跟 iMessage 是有点像的」) | | Time label above messages; time in card headers |
 | 2026-10-27 | The daily briefing takes Hark's form: a centred date label, then one bubble per item, each ending with a concrete offer (「你可以看看hark他怎么写的这个风格」) | R-46 | One long briefing bubble (same day) |
