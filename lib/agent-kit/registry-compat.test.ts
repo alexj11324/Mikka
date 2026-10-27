@@ -26,7 +26,7 @@ test('feature-off catalog omits cloud tools; legacy boolean feature-on call rema
 test('versioned cloud tool keeps host owner, native scope and parent execution',async()=>{
  const run=execution(),scope={holder:'holder',turnId:'turn',callId:'call'}
  const tools=registry.coordinatorTools(owner,botId,scope,run,true)
- const execute=tools.dispatch_bot_computer.execute as (input:unknown,options:typeof context)=>Promise<unknown>
+ const execute=tools.dispatch_bot_computer.execute as unknown as (input:unknown,options:typeof context)=>Promise<unknown>
  await execute({issueId,harness:'codex'},context)
  const args=dispatched.mock.calls[0].arguments as unknown[]
  assert.equal(args[0],owner);assert.deepEqual(args[1],{issueId,harness:'codex',botId});assert.equal(args[2],context.toolCallId);assert.deepEqual(args[3],scope);assert.equal(args[4],run)
@@ -34,6 +34,6 @@ test('versioned cloud tool keeps host owner, native scope and parent execution',
 })
 test('a named Bot cannot redirect its cloud tool to another Bot',async()=>{
  const tools=registry.coordinatorTools(owner,botId,undefined,execution(),true)
- const execute=tools.dispatch_bot_computer.execute as (input:unknown,options:typeof context)=>Promise<unknown>
+ const execute=tools.dispatch_bot_computer.execute as unknown as (input:unknown,options:typeof context)=>Promise<unknown>
  assert.deepEqual(await execute({botId:randomUUID(),issueId,harness:'codex'},context),{error:'botMismatch'});assert.equal(dispatched.mock.callCount(),0)
 })

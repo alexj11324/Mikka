@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {randomUUID} from 'node:crypto'
 import {before, beforeEach, mock, test} from 'node:test'
 import {freezeWorkerDefinition, retryWorkerDefinition} from './worker'
+import {runPrompt} from '../run-prompt'
 import {DEFAULT_AGENT_DEFINITION} from './builtin'
 import {makeSnapshot} from './definition'
 
@@ -56,4 +57,18 @@ test('cloud queue captures exact worker and parent snapshot in the same transact
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
  await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'synthetic',execution:parent})
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string);assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(snapshot.parent.executionId,parent.id);assert.equal(calls.at(-1)!.sql,'COMMIT');assert.ok(calls.some(c=>c.sql.startsWith('INSERT INTO computer_run_bindings')))
+})
+
+
+test('feature-off cloud queue keeps the existing main SQL path without snapshot or binding lookup',async()=>{
+ process.env.MIKKA_AGENT_KIT='0'
+ const calls:{sql:string,args:unknown[]}[]=[]
+ const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});return {rows:sql.startsWith('SELECT m.')?[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]:[]}}}
+ await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:''})
+ assert.ok(!calls.some(c=>c.sql.includes('agentDefinition')||c.sql.startsWith('select id from byos_bindings')));assert.equal(calls.at(-1)!.sql,'COMMIT')
+})
+test('cloud request replay cannot substitute another parent execution',async()=>{
+ const client={release(){},async query(sql:string){if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT r.'))return {rows:[{userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,runBotId:botId,botId,workspaceId:workspace,prompt:runPrompt('Review','','Review'),agentDefinition:{harness:'codex',parent:{executionId:randomUUID()}}}]};return {rows:[]}}}
+ const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
+ await assert.rejects(queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',execution:parent,idempotencyKey:'same-call'}),/Task request changed/)
 })
