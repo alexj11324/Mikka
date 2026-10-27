@@ -59,8 +59,8 @@ screen; it gets no other special UI (R-06).
 
 **Chat** (like the Claude app): the header is the bot's name in a pill; the
 right button opens that bot's threads and carries a blue dot when one waits
-on the person. The bot's replies are plain text without a bubble (this
-differs from the web's grey bubble, R-14; Alex to confirm for mobile). The
+on the person. The bot's replies sit in the grey bubble and the person's
+in the blue one, as on the web (R-14). The
 thread card is a status icon and the thread name, with outputs as chips
 (R-66); no step line.
 
