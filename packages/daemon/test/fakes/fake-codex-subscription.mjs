@@ -70,21 +70,26 @@ lines.on("line", async (line) => {
     const turnId = `fixture-turn-${++turn}`
     send({ id, result: { turn: { id: turnId } } })
     const prompt = params.input[0].text
-    if (prompt === 'COMPUTER') {
-      const prefix = 'mcp_servers.mikka_computer.args='
-      const configured = process.argv.find(value => value.startsWith(prefix))
-      if (!configured) process.exit(2)
-      const proxy = spawn('node', JSON.parse(configured.slice(prefix.length)), { stdio: ['pipe', 'pipe', 'ignore'] })
+    if (prompt === 'COMPUTER' || prompt === 'FULL_COMPUTER') {
+      async function call(server, name, args) {
+        const prefix = `mcp_servers.${server}.args=`
+        const configured = process.argv.find(value => value.startsWith(prefix))
+        if (!configured) process.exit(2)
+        const proxy = spawn('node', JSON.parse(configured.slice(prefix.length)), { stdio: ['pipe', 'pipe', 'ignore'] })
       const reply = new Promise((resolve, reject) => {
         const reader = createInterface({ input: proxy.stdout })
         reader.once('line', line => { reader.close(); resolve(JSON.parse(line)) })
         proxy.once('error', reject)
         proxy.once('exit', code => { if (code) reject(new Error('computer proxy failed')) })
       })
-      proxy.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'click', arguments: { x: 3, y: 4 } } }) + '\n')
+      proxy.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n')
       const answer = await reply
       proxy.kill()
       if (answer.result?.isError) process.exit(2)
+      }
+      if (prompt === 'FULL_COMPUTER') await call('mikka_computer', 'get_desktop_state', {})
+      await call('mikka_computer', 'click', { x: 3, y: 4 })
+      if (prompt === 'FULL_COMPUTER') await call('mikka', 'submit', { summary: 'Synthetic computer task completed' })
     }
     if(prompt==='PROBE_GIT') {
       const target=lstatSync('.git').isFile()?'.git':'.git/guard'

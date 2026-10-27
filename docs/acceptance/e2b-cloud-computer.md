@@ -234,6 +234,15 @@ Claude Code fixture sessions in real E2B containers. Both synthetic CLIs held
 their click until the matching Bot/display review was approved, then continued.
 No real model inference or deployed product session was involved.
 
+The `e54444d` worker template (`gsn1ued0tiywwmwwkjxi`) also completed a full
+synthetic Bot task in E2B: a scoped worker registered with a simulated HTTPS
+device service, the claim helper bound a synthetic task, and the hosted fixture CLI
+requested a screenshot and a click. Each operation waited for its matching
+database approval before the guarded driver executed it; the fixture then
+submitted the task. The service and model were synthetic, and the database
+observer simulated approval; this is not a signed-in product, real provider, or
+production deployment acceptance. The sandbox and local schema were deleted.
+
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
 expiry validation, rotation and the Bot's pending-review state. The worker
