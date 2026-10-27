@@ -67,16 +67,19 @@ source wins in a conflict is in [`README.md`](README.md).
 
 ## Suggestions, tasks and devices
 
-- **R-20** The 建议 list holds only notifications from connected apps'
-  webhooks (Gmail, Notion, Slack, GitHub, Linear…) that the decision model
-  (OpenAI Decisions API) judged worth showing. The Coordinator never writes into it. Its own ideas
-  go in its chat.
-- **R-21** The right panel has two parts: 建议 on top, then 任务. A 任务 here
-  is a thread started by the orchestrator or a bot; all of them stay listed.
-  It is not a flat list of the board's issues. The suggestion flow: the
-  decision model picks an item → it appears in 建议 → clicking it fills the
-  centre composer → the bot dispatches a thread → the item leaves 建议 and
-  shows up below as a 任务.
+- **R-20** Notifications from connected apps' webhooks (Gmail, Notion,
+  Slack, GitHub, Linear…) are sorted by the decision model (OpenAI Decisions
+  API). An important one (it needs the person, or the Coordinator can act on
+  it) is posted by the Coordinator in its own chat as a card asking whether
+  to act, and is pushed on mobile. Routine ones go to 例行事项 in the 建议
+  panel. The rest are not shown. The Coordinator never acts on an event
+  before the person says yes. Its own ideas also go in its chat.
+- **R-21** The right panel has two parts: 建议 (today's briefing and
+  例行事项) on top, then 任务. A 任务 here is a thread started by the
+  orchestrator or a bot; all of them stay listed. It is not a flat list of
+  the board's issues. The flow: the person says yes to a Coordinator card, or
+  clicks a 例行事项 item (which fills the centre composer) → the bot
+  dispatches a thread → the item leaves 建议 and shows up below as a 任务.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog

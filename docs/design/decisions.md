@@ -12,7 +12,8 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
-| 2026-10-27 | The Coordinator is each person's proactive personal agent: it brings important connected-app events (mail, CI, reviews, assignments, finished runs) to the person in its own chat and asks whether to act (「coordinator 应该做得比较 proactive 一点」; references: Hark, Wabi). The mobile client is built with Expo (React Native) and centres on this chat. How far the Coordinator may act without asking, and whether the web 建议 list stays, are open | R-20 | |
+| 2026-10-27 | Follow Comma: important events are pushed into the Coordinator's chat, and 建议 keeps the briefing and 例行事项 for routine items (「它是在 coordinator…里，会把事件推上去，同时还会保留一个 routine。其实我觉得它这个设计挺好的」). The Coordinator always asks before acting on an event (「一是前者」) | R-20, R-21 | 建议 list as the only place events show (2026-10-23) |
+| 2026-10-27 | The Coordinator is each person's proactive personal agent: it brings important connected-app events (mail, CI, reviews, assignments, finished runs) to the person in its own chat and asks whether to act (「coordinator 应该做得比较 proactive 一点」; references: Hark, Wabi). The mobile client is built with Expo (React Native) and centres on this chat. Autonomy and the 建议 list: see the next row up | R-20 | |
 | 2026-10-25 | Keep the shell layout as it is: 72px icon rail with labels, conversation list, centre, full-height right panel, top search bar, white card on grey. Narrower rail, search in the list header, grouped list, floating right card and dropping the outer card were all proposed (after a look at ChatGPT's two-layer layout) and declined (「不用，我就要现在这个样子」). Conversation rows carry a status dot on the avatar (green working, orange needs you) instead of status text, and no 「置顶 ·」 prefix | R-13 | |
 | 2026-10-25 | Layout pass (「10条可以全修」, pending Alex's review of the artifact): board cards lose chip borders, no 「看板」 pill, 已完成 collapses beside the open sidebar; issue content centred up to 680px; same-minute events join; group 详情 lists members, recent threads and files, with no cloud computer (Alex: 「群聊用人不看电脑…没有加电脑之前的那种做法」); the avatar stays beside the bubbles at the bottom of a run (「icon 应该是跟我们的这些泡泡放在左边」) | R-13, R-25, R-61, R-63 | Bordered chips; left-aligned 560px issue column; a near-empty group 详情 |
 | 2026-10-25 | One-to-one chats keep the grey bubble for a bot's text; an artifact, interactive chart or other rich card has no bubble (「一对一的聊天里，BOT回复应该是会说气泡…可以显示交互式图表的，是不需要气泡的」). The board's Coordinator sidebar was drawn without bubbles and with a different composer; fixed to match | R-14, R-10 | Board sidebar with bare text and a boxed composer |
@@ -70,8 +71,6 @@ Questions waiting on Alex. Move a row to "Decided" when he answers.
 
 | Since | Question | Default until answered |
 | --- | --- | --- |
-| 2026-10-27 | How far may the proactive Coordinator act without asking (always ask, or act-then-report on low-risk work)? | Always ask |
-| 2026-10-27 | Does the web right panel keep the 建议 list (R-21), or do suggestions move into the Coordinator's chat everywhere? | Keep the list on web; mobile uses the chat |
 | 2026-10-24 | Remove white hairlines app-wide (dialog and popover rings, column borders), not only inputs? | Inputs only |
 | 2026-10-24 | Token drift between Figma and code (`rules.md` § Tokens): which side moves? | Code value ships, Figma follows |
 
