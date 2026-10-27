@@ -78,9 +78,9 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
     密码; Google and Apple buttons and 登录; 🔒 Secured by Mikka). The person can ask the bot to send the card
     again.
     - 登录 submits to `POST /api/bots/:botId/subagents/:id/credentials`,
-      which stores the login in the credential vault of #180 (secure form →
-      server-side vault → short-lived lease → controlled browser); there is no
-      second vault. The bot machine then focuses the page's fields and types
+      which stores the login in the credential vault of #180; the design (envelope
+      encryption, broker-only decrypt, fill path, threat model) is in
+      `credential-vault.md`. There is no second vault. The bot machine then focuses the page's fields and types
       them with CDP `Input.insertText`.
     - The model only ever sees a reference (`credential:<site>`), never the
       value. The value never reaches logs, the transcript or the model
