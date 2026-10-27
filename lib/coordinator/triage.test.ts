@@ -74,25 +74,18 @@ test('the morning briefing is pushed to the person once a day', () => {
   const tier = ruleTier(event)
   assert.equal(tier, 'attention')
   const prompt = eventPrompt({ ...event, tier })
-  assert.match(prompt, /^\[Event\] Daily briefing for 2026-10-27\.\nIt is 08:00 for the person\. 4 item\(s\)/)
+  assert.match(prompt, /^\[Event\] It is 08:00 for the person: their morning briefing for 2026-10-27\. 4 item\(s\)/)
   assert.match(prompt, /gmail 3, linear 1/)
   assert.match(prompt, /- linear · handle · assigned to them: "Fix login" from Dana \(https:\/\/linear\.app\/x\/issue\/MIK-9\)/)
-  assert.match(prompt, /one short paragraph per item/)
-  assert.match(prompt, /secretary/)
   assert.match(prompt, /Do not act until they say so/)
+  assert.match(prompt, /secretary/)
+  assert.match(prompt, /早上好，Alex。今天有 4 件事/)
+  assert.match(prompt, /one message/)
   assert.doesNotMatch(prompt, /The person's name/)
   assert.match(eventPrompt({ ...briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'daily', total: 1, counts: {} }, [], 'Alex Jiang'), tier }), /The person's name: Alex Jiang\./)
   assert.deepEqual((event.payload.items as { suggestionId: string }[]).map(item => item.suggestionId), ['s1', 's2'])
-  // The chat shows the event as a dated label and the reply as one message per item.
-  const items = chatItems([
-    { id: 'm1', position: 1, createdAt: new Date(0), message: { role: 'user', content: prompt } },
-    { id: 'm2', position: 2, createdAt: new Date(0), message: { role: 'assistant', content: 'Kevin 来信……要我起草回复吗？\n\nPR #212 的类型检查没过。要我开个线程修好吗？' } },
-    { id: 'm3', position: 3, createdAt: new Date(0), message: { role: 'user', content: 'ok\n\nthanks' } },
-  ])
-  assert.deepEqual(items.map(item => [item.from, item.briefingDate ?? null, item.part ?? null, item.text]), [
-    ['event', '2026-10-27', null, ''],
-    ['coordinator', null, 0, 'Kevin 来信……要我起草回复吗？'],
-    ['coordinator', null, 1, 'PR #212 的类型检查没过。要我开个线程修好吗？'],
-    ['person', null, null, 'ok\n\nthanks'],
-  ])
+  // The person sees it as an event, without the triage line.
+  const [item] = chatItems([{ position: 1, createdAt: new Date(0), message: { role: 'user', content: prompt } }])
+  assert.equal(item.from, 'event')
+  assert.doesNotMatch(item.text, /Triage:/)
 })

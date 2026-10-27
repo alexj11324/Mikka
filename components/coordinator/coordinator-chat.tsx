@@ -109,11 +109,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={t('conversation')}>
           <MessageScrollerContent className={cn('mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 pb-6', compact ? 'pt-4' : 'pt-18')}>
-            {items.map(item => <Fragment key={item.pending ? `pending-${item.position}` : `${item.position}-${item.part ?? 0}`}>
+            {items.map(item => <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
               {unread.divider === item.position && <UnreadDivider />}
               <MessageScrollerItem messageId={String(item.position)} scrollAnchor={item.from === 'person'} {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
               {item.from === 'event'
-                ? <p className="text-center text-xs text-muted-foreground">{item.briefingDate ? t('briefingLabel', { date: item.briefingDate }) : item.text.replace(/^\[Event\]\s*/, '')}</p>
+                ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
                     {item.text && (item.from === 'coordinator'
                       ? <Bubble variant="muted" align="start" className={cn('min-w-0', compact ? 'max-w-full' : 'max-w-[min(35rem,85%)]')}><BubbleContent className="flex w-full min-w-0 flex-col gap-1 rounded-2xl bg-muted/60 px-4 py-3"><span className="text-xs font-medium text-muted-foreground">{t('label')}</span><CoordinatorReply text={item.text} citations={citations} /></BubbleContent></Bubble>

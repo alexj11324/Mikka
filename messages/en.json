@@ -1991,7 +1991,6 @@
   "Coordinator": {
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
-    "briefingLabel": "Today's briefing · {date}",
     "usedTools": "Used {tools}",
     "pendingActions": {
       "label": "Waiting for your approval",
