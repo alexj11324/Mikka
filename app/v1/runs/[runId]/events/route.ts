@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { and, eq, sql } from 'drizzle-orm'
 import { runEventBatchSchema } from '@mikka/protocol/device'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { agentRuns, devices, runChunks } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
+import { computerEventsMatch } from '@/lib/computer/events'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   if (!await ownedRun(runId, caller.userId)) return NextResponse.json({ error: 'Unknown run.' }, { status: 404 })
   const parsed = runEventBatchSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid event batch.' }, { status: 400 })
+  if (parsed.data.chunks.some(chunk => chunk.type === 'data-computer')) {
+    const binding = caller.scopeDeviceId && caller.scopeWorkspaceId
+      ? (await pool.query(`SELECT b."botId" FROM computer_run_bindings b JOIN agent_runs r ON r.id=b."runId" AND r."userId"=b."ownerId"
+        WHERE b."runId"=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3 AND r."deviceId"=$4`, [runId, caller.userId, caller.scopeWorkspaceId, caller.scopeDeviceId])).rows[0]
+      : undefined
+    if (!computerEventsMatch(parsed.data.chunks, runId, binding?.botId ?? null)) return NextResponse.json({ error: 'Invalid computer event.' }, { status: 400 })
+  }
   await db.insert(runChunks)
     .values(parsed.data.chunks.map((chunk, index) => ({
       id: crypto.randomUUID(), runId, seq: parsed.data.fromSeq + index,

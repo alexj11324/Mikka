@@ -48,7 +48,7 @@ export function useConversationThread(conversation: string | null | undefined): 
 
 /** A bot's display name: the one the card was given, else the bot list. */
 export function useComputerBotName(botId: string, given?: string) {
-  const { data } = useSWR(given ? null : 'bots', listBots, { revalidateOnFocus: false })
+  const { data } = useSWR(given || isMockedComputer(botId) ? null : 'bots', listBots, { revalidateOnFocus: false })
   return given ?? data?.find(bot => bot.id === botId)?.name ?? 'Bot'
 }
 

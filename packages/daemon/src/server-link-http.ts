@@ -14,6 +14,8 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // `RunNotPinnedHereError`; any other 4xx is a refusal (`DaemonError`) that
 // retrying cannot fix.
 import type { z } from "zod"
+import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
+import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
 
 import {
   CLIENT_VERSION_HEADER,
@@ -116,8 +118,14 @@ export class HttpServerLink implements ServerLink {
   constructor(
     private readonly baseUrl: string,
     private readonly fetchImpl: typeof fetch = fetch,
-    private readonly clientVersion: string = DAEMON_VERSION
-  ) {}
+    private readonly clientVersion: string = DAEMON_VERSION,
+    private readonly protectionBypass?: string
+  ) {
+    if (protectionBypass) {
+      const url = new URL(baseUrl)
+      if (url.protocol !== 'https:' || !url.hostname.endsWith('.vercel.app') || url.username || url.password || url.search || url.hash || !/^[A-Za-z0-9_-]{20,256}$/.test(protectionBypass)) throw new Error('Invalid preview transport')
+    }
+  }
 
   private async send(
     method: string,
@@ -136,7 +144,9 @@ export class HttpServerLink implements ServerLink {
           "content-type": "application/json",
           [CLIENT_VERSION_HEADER]: this.clientVersion,
           ...(token ? { authorization: `Bearer ${token}` } : {}),
+          ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
         },
+        ...(this.protectionBypass ? { redirect: 'error' as const } : {}),
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: signal
           ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
@@ -238,6 +248,22 @@ export class HttpServerLink implements ServerLink {
       devicePaths.claim(checkId(deviceId), checkId(runId)),
       { schema: runAssignmentSchema, claimOf: runId }
     )
+  }
+  async syncComputerReviews(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal) {
+    const result = await this.call("POST", computerSyncPath(checkId(deviceId)), { body: { requests }, schema: computerSyncResponse, signal })
+    return result.decisions
+  }
+  async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
+    return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
+  }
+  async nativeRequest(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal) {
+    const response=await this.send('POST',`${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`,{action:'request',payload},this.credential,{signal,timeoutMs:275_000})
+    const contentType=response.headers.get('content-type')?.split(';')[0]
+    if(!response.ok || !response.body || (contentType!=='text/event-stream' && contentType!=='application/json')) {
+      await response.body?.cancel()
+      throw new Error('subscription_native_unavailable')
+    }
+    return {contentType,body:response.body}
   }
 
   async appendRunChunks(runId: string, batch: ChunkBatch) {
