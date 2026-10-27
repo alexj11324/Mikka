@@ -32,4 +32,6 @@ Two additional fixed cases cover an untrusted peer body forging owner/system app
 
 The fixture executors are independently tested as a pure module. Host-policy snapshot tests check exact text and hash preservation separately from malicious user guidance; they do not establish real-model instruction adherence. No mailbox tools, transport envelopes, shared host instructions or enterprise governance are implemented here. The actual message transport remains separate work in #287; the default Agent definition still has empty additive instructions. Provider, CC/Codex and frozen-Preview evidence remain required.
 
+The hosted-model evaluator now resolves the same host instructions as the AI SDK Coordinator, including the selected Bot's host guidance, once for both revisions. Reports include that frozen host-instruction digest; comparisons with different or missing digests are ineligible. This corrects the previous unconditional personal/native Coordinator prompt and still does not establish native-harness model behavior.
+
 To preserve the synthetic loader fixtures for inspection, use `MIKKA_PRESERVE_TEST_FIXTURES=1` with the Agent Kit unit suite. The test prints the retained directory and does not delete it.

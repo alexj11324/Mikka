@@ -79,3 +79,13 @@ test('snapshots retain exact host policy independently of user guidance that cla
   assert.match(prompt,/User-owned guidance \(subordinate to platform permissions and approval policy\)/)
   assert.doesNotMatch(prompt,/edited later/)
 })
+test('evaluation reports bind baseline and candidate to the same frozen host instructions', async () => {
+  const hostInstructions='Synthetic frozen Bot host policy'
+  const options={definition:DEFAULT_AGENT_DEFINITION,cases:[CORE_EVAL_CASES[0]],mode:'live' as const,model:'synthetic-unit-contract',hostInstructions}
+  const baseline=await runEvalSuite({...options,run:async () => ({text:'Unknown',outcome:'blocked',tools:[]})})
+  const candidate=await runEvalSuite({...options,run:async () => ({text:'2026-01-15',outcome:'answered',tools:[{name:'web_search',outcome:'ok',authorized:false,effectPerformed:false}]})})
+  assert.equal(candidate.hostInstructionsDigest,digest(hostInstructions))
+  assert.equal(compareReports(baseline,candidate).activationEligible,true)
+  assert.equal(compareReports(baseline,{...candidate,hostInstructionsDigest:digest('changed host policy')}).activationEligible,false)
+  assert.equal(compareReports(baseline,{...candidate,hostInstructionsDigest:''}).activationEligible,false)
+})

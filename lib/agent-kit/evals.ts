@@ -19,6 +19,7 @@ export interface EvalReport {
   runnerVersion: typeof EVAL_RUNNER_VERSION
   suiteDigest: string
   definitionDigest: string
+  hostInstructionsDigest: string
   mode: 'fixture' | 'live'
   model: string | null
   results: EvalResult[]
@@ -81,6 +82,7 @@ export function evaluateTrace(testCase: EvalCase, trace: EvalTrace): EvalResult 
 
 export async function runEvalSuite(options: {
   definition: AgentDefinition; cases: readonly EvalCase[]; mode: EvalReport['mode']; model?: string
+  hostInstructions?: string
   run: (testCase: EvalCase, definition: AgentDefinition, signal: AbortSignal) => Promise<EvalTrace>
   signal?: AbortSignal; caseTimeoutMs?: number
 }): Promise<EvalReport> {
@@ -108,13 +110,13 @@ export async function runEvalSuite(options: {
       options.signal?.removeEventListener('abort', relay)
     }
   }
-  return { runnerVersion: EVAL_RUNNER_VERSION, suiteDigest: digest(cases), definitionDigest: digest(options.definition), mode: options.mode, model: options.model ?? null, results, passed: results.filter(result => result.passed).length, total: results.length, errors }
+  return { runnerVersion: EVAL_RUNNER_VERSION, suiteDigest: digest(cases), definitionDigest: digest(options.definition), hostInstructionsDigest:digest(options.hostInstructions ?? ''), mode: options.mode, model: options.model ?? null, results, passed: results.filter(result => result.passed).length, total: results.length, errors }
 }
 
 export function compareReports(baseline: EvalReport, candidate: EvalReport) {
   const sameCases = baseline.results.length === candidate.results.length && baseline.results.every((item, index) => item.caseId === candidate.results[index]?.caseId)
   const valid = (report: EvalReport) => report.total === report.results.length && report.passed === report.results.filter(item => item.passed).length && new Set(report.results.map(item => item.caseId)).size === report.total && report.results.every(item => item.passed === (item.failures.length === 0))
-  const comparable = valid(baseline) && valid(candidate) && sameCases && baseline.total > 0 && baseline.suiteDigest === candidate.suiteDigest && baseline.runnerVersion === EVAL_RUNNER_VERSION && candidate.runnerVersion === EVAL_RUNNER_VERSION && baseline.mode === candidate.mode && baseline.model === candidate.model && !baseline.errors && !candidate.errors
+  const comparable = valid(baseline) && valid(candidate) && sameCases && baseline.total > 0 && baseline.suiteDigest === candidate.suiteDigest && /^[a-f0-9]{64}$/.test(baseline.hostInstructionsDigest) && baseline.hostInstructionsDigest === candidate.hostInstructionsDigest && baseline.runnerVersion === EVAL_RUNNER_VERSION && candidate.runnerVersion === EVAL_RUNNER_VERSION && baseline.mode === candidate.mode && baseline.model === candidate.model && !baseline.errors && !candidate.errors
   const regressions = candidate.results.filter((item, index) => !item.passed && baseline.results[index]?.passed).map(item => item.caseId)
   return { comparable, regressions, improved: comparable && !regressions.length && candidate.passed > baseline.passed, activationEligible: comparable && baseline.mode === 'live' && !regressions.length && candidate.passed === candidate.total && candidate.passed > baseline.passed }
 }

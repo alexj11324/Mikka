@@ -55,7 +55,7 @@ async function failures(scope:AgentScope){
   return store.propose(scope,current.version,randomUUID(),defaults)
 }
 function report(definitionDigest:string,passed:boolean,mode:'fixture'|'live'):EvalReport{
-  return {runnerVersion:EVAL_RUNNER_VERSION,suiteDigest:digest(CORE_EVAL_CASES),definitionDigest,mode,model:mode==='live'?'synthetic-test-model':null,results:CORE_EVAL_CASES.map(item=>({caseId:item.id,passed,failures:passed?[]:['testFailure']})),passed:passed?CORE_EVAL_CASES.length:0,total:CORE_EVAL_CASES.length,errors:0}
+  return {runnerVersion:EVAL_RUNNER_VERSION,suiteDigest:digest(CORE_EVAL_CASES),definitionDigest,hostInstructionsDigest:digest('synthetic test host policy'),mode,model:mode==='live'?'synthetic-test-model':null,results:CORE_EVAL_CASES.map(item=>({caseId:item.id,passed,failures:passed?[]:['testFailure']})),passed:passed?CORE_EVAL_CASES.length:0,total:CORE_EVAL_CASES.length,errors:0}
 }
 
 test('real PostgreSQL migration is rerunnable and historical runs stay unrecorded',async()=>{
