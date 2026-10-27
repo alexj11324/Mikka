@@ -4,6 +4,9 @@
 - **Linear / GitHub:** none yet
 - **Figma:** page `268:4750` 「手机端 · iOS 初稿（Claude · 2026-10-27）」 in `zPe5LKycb2XuT1ivCLRw07`, frames 01–07 (in review)
 - **Owner thread:** `claude/mikka-mobile-tech-choice-jrtbd3`
+- **Code:** `apps/mobile` (Expo SDK 58). Every screen in the frames runs on
+  sample data and is checked with Expo web screenshots; sign-in, push and the
+  live chat are not wired yet.
 
 Decisions behind this spec are the 2026-10-27 rows in `decisions.md` and
 R-20 / R-21 in `rules.md`.

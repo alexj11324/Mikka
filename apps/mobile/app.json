@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Mikka",
+    "slug": "mikka",
+    "scheme": "mikka",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.aspectlylabs.mikka",
+      "supportsTablet": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
