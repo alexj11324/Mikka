@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { pushAllowed, pushBody } from './mobile-push'
+import { codePushBody, pushAllowed, pushBody } from './mobile-push'
 import { DEFAULT_PREFERENCES } from './preferences'
 
 test('defaults push decisions but not finished threads', () => {
@@ -20,4 +20,9 @@ test('long text is cut with an ellipsis', () => {
   const body = pushBody('字'.repeat(400))
   assert.equal(body.length, 180)
   assert.ok(body.endsWith('…'))
+})
+
+test('a verification code push comes from the messages, in the person\'s language, without the code', async () => {
+  assert.equal(await codePushBody('zh-CN'), '收到一条验证码')
+  assert.equal(await codePushBody('en'), 'A verification code arrived')
 })

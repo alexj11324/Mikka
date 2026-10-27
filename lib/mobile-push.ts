@@ -1,15 +1,27 @@
 import 'server-only'
 import { eq, inArray } from 'drizzle-orm'
+import { createTranslator } from 'next-intl'
 import { db } from '@/lib/db'
 import { bots, mobilePushTokens } from '@/lib/db/schema'
 import { readPreferences, type Preferences } from '@/lib/preferences'
 import type { PushReason } from '@/lib/push-reasons'
+import type { ActionLocale } from '@/lib/suggestions/action-title'
+import { personLocale } from '@/lib/suggestions/action-title-server'
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 const BODY_MAX = 180
-const CODE_BODY = '收到一条验证码'
+const MESSAGES = {
+  'zh-CN': () => import('@/messages/zh-CN.json'),
+  en: () => import('@/messages/en.json'),
+} as const
 
 const FLAG: Record<PushReason, keyof Preferences> = { decide: 'pushDecide', review: 'pushReview', finished: 'pushFinished', briefing: 'pushBriefing' }
+
+/** The push for a verification code, in the person's language: it only says one came; the code stays in the app chat. */
+export async function codePushBody(locale: ActionLocale): Promise<string> {
+  const messages = (await MESSAGES[locale]()).default
+  return createTranslator({ locale, messages, namespace: 'MobilePush' })('verificationCode')
+}
 
 /** Whether the person's 通知 settings let a reply with these reasons reach the phone. */
 export function pushAllowed(preferences: Preferences, reasons: readonly PushReason[]): boolean {
@@ -40,7 +52,7 @@ export async function pushReply(userId: string, botId: string | null, text: stri
     const tokens = await db.select({ token: mobilePushTokens.token }).from(mobilePushTokens).where(eq(mobilePushTokens.userId, userId))
     if (!tokens.length) return
     const [bot] = botId ? await db.select({ name: bots.name }).from(bots).where(eq(bots.id, botId)).limit(1) : []
-    const body = text === null ? CODE_BODY : pushBody(text)
+    const body = text === null ? await codePushBody(await personLocale(userId)) : pushBody(text)
     const response = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
       headers: {
