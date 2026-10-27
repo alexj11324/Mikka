@@ -36,7 +36,7 @@ Drawer, top to bottom:
 
 | Part | 中文 | What it holds |
 | --- | --- | --- |
-| Fixed rows | Coordinator · 建议 · 线程 · 任务 | Coordinator chat (first row, unread dot); 建议 (08:00 briefing and normal items, R-21); 线程 (every thread); 任务 (list only, no board) |
+| Fixed rows | Coordinator · 建议 · 线程 · 任务 | Coordinator chat (first row, unread dot; the 08:00 briefing arrives here); 建议 (normal items, R-21); 线程 (every thread); 任务 (list only, no board) |
 | 置顶 | 置顶 | Pinned bots and group chats |
 | 最近 | 最近 | The other bots and group chats, newest first (the web bot list, R-01) |
 | Bottom | 新建 · avatar | New bot or chat; the avatar opens Settings |
@@ -93,8 +93,9 @@ What reaches the person and when is R-20. On mobile:
   notification**. The push has **no buttons**: tapping it opens the card.
 - Verification codes (R-20): in the app chat and its push only; never to
   Telegram or Slack.
-- The 08:00 briefing: a short message and push only when an item needs the
-  person today; otherwise it sits in 建议.
+- The 08:00 briefing: every day the Coordinator posts it in its chat and
+  pushes it: one verb-first line per item, each with a mention chip that
+  opens the item (R-41).
 - Follow-up: when a thread finishes an item, the Coordinator says what was
   done in one bubble, then lists what is left from today's briefing as
   mention chips and asks whether to go on, with one button per item and

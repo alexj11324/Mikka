@@ -75,8 +75,9 @@ source wins in a conflict is in [`README.md`](README.md).
   the level: any cost is at least high; a cost due within 48 hours, or an
   irreversible one due within a week, is critical. Only the Coordinator speaks to the person about events: no
   push, chat message or Telegram/Slack message is sent around it. Critical,
-  high and ask go to the Coordinator at once; the 08:00 briefing is handed to
-  it too. It tells the person only when they must act before the next
+  high and ask go to the Coordinator at once. The daily briefing is posted
+  by the Coordinator in its chat every day at 08:00 local time (and pushed),
+  whatever the bar below says. It tells the person only when they must act before the next
   08:00 briefing, or when a cost that cannot be undone lands within a week;
   everything else waits in 建议 for the briefing. When unsure, it stays
   quiet. It also stays quiet when fresh evidence shows the matter resolved,
@@ -89,15 +90,14 @@ source wins in a conflict is in [`README.md`](README.md).
   not the cap); held items wait, they are not dropped. The Coordinator never
   acts on an event before the person says yes. Its own ideas also go in its
   chat.
-- **R-21** The right panel has two parts: 建议 on top, then 任务. 建议 keeps
-  its name (not "Routines"): a daily briefing generated at 08:00 in the
-  person's time zone, and again right after they connect an app, then the normal-level items in one list, newest first, each row with
-  its app's icon (no per-app cards). A 任务 here
-  is a thread started by the orchestrator or a bot; all of them stay listed.
-  It is not a flat list of the board's issues. The flow: the person says yes
-  to a Coordinator card, or clicks a 建议 item (which fills the centre
-  composer) → the bot dispatches a thread → the item leaves 建议 and shows up
-  below as a 任务.
+- **R-21** The right panel has two parts: 建议 on top, then 任务. 建议 is the
+  normal-level items in one list, newest first, each row with its app's icon
+  (no per-app cards). The daily briefing is not in 建议; it is the
+  Coordinator's 08:00 message. A 任务 here is a thread started by the
+  orchestrator or a bot; all of them stay listed. It is not a flat list of the
+  board's issues. The flow: the person says yes to a Coordinator card, or
+  clicks a 建议 item (which fills the centre composer) → the bot dispatches a
+  thread → the item leaves 建议 and shows up below as a 任务.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
