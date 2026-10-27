@@ -296,6 +296,21 @@ export async function routeFactoryTask(userId: string, input: Omit<FactoryRoute,
   return asToolResult(() => factoryStore.route(userId,{...input,eventId:input.sourceEventId}))
 }
 
+type CoordinatorQuestionReference = Pick<QuestionReference, 'questionId' | 'questionRevision'>
+
+function coordinatorQuestion(question: Awaited<ReturnType<typeof factoryQuestions.read>>) {
+  return {
+    ...question,
+    reference: { questionId: question.reference.questionId, questionRevision: question.reference.questionRevision },
+  }
+}
+
+async function resolveQuestionReference(userId: string, reference: CoordinatorQuestionReference): Promise<QuestionReference> {
+  const question = await factoryQuestions.read(userId, reference.questionId)
+  // Keep the caller's revision so the store can fence first writes and recognize original replays.
+  return { ...question.reference, questionRevision: reference.questionRevision }
+}
+
 export async function getFactoryTask(
   userId: string,
   input: { taskId: string }, scope?: NativeToolScope) {
@@ -303,7 +318,7 @@ export async function getFactoryTask(
   await assertNativeToolScope(userId,scope)
   return asToolResult(async () => ({
     ...(await factoryStore.read(userId, input.taskId)),
-    questions: await factoryQuestions.list(userId, input.taskId),
+    questions: (await factoryQuestions.list(userId, input.taskId)).map(coordinatorQuestion),
   }))
 }
 
@@ -312,11 +327,11 @@ export async function listFactoryQuestions(
   input: { taskId?: string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(() =>
-    input.taskId
+  return asToolResult(async () => (
+    await (input.taskId
       ? factoryQuestions.list(userId, input.taskId)
-      : factoryQuestions.pending(userId),
-  )
+      : factoryQuestions.pending(userId))
+  ).map(coordinatorQuestion))
 }
 
 export async function getFactoryQuestion(
@@ -324,31 +339,37 @@ export async function getFactoryQuestion(
   input: { questionId: string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(() => factoryQuestions.read(userId, input.questionId))
+  return asToolResult(async () => coordinatorQuestion(await factoryQuestions.read(userId, input.questionId)))
 }
 
 export async function answerFactoryContext(
   userId: string,
-  input: ContextQuestionAnswer, scope?: NativeToolScope) {
+  input: Omit<ContextQuestionAnswer, 'reference'> & { reference: CoordinatorQuestionReference }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(() =>
-    factoryQuestions.answer({ source: 'orchestrator', userId }, input),
-  )
+  return asToolResult(async () => {
+    const reference = await resolveQuestionReference(userId, input.reference)
+    await assertNativeToolScope(userId,scope)
+    return factoryQuestions.answer({ source: 'orchestrator', userId }, { ...input, reference })
+  })
 }
 
 export async function escalateFactoryQuestion(
   userId: string,
-  input: { reference: QuestionReference; eventId: string; reason: string }, scope?: NativeToolScope) {
+  input: { reference: CoordinatorQuestionReference; eventId: string; reason: string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(() => factoryQuestions.escalate(userId, input))
+  return asToolResult(async () => {
+    const reference = await resolveQuestionReference(userId, input.reference)
+    await assertNativeToolScope(userId,scope)
+    return coordinatorQuestion(await factoryQuestions.escalate(userId, { ...input, reference }))
+  })
 }
 
 export async function answerFactoryQuestionFromUser(
   userId: string,
   input: {
-    reference: QuestionReference
+    reference: CoordinatorQuestionReference
     answerId: string
     sourceEventId: string
   }, scope?: NativeToolScope) {
@@ -368,9 +389,11 @@ export async function answerFactoryQuestionFromUser(
       .limit(1)
     if (!event || typeof event.payload.text !== 'string')
       throw new FactoryError('factoryHumanRequired')
+    const reference = await resolveQuestionReference(userId, input.reference)
+    await assertNativeToolScope(userId,scope)
     return factoryQuestions.answer(
       { source: 'human_event', userId },
-      { ...input, text: event.payload.text },
+      { ...input, reference, text: event.payload.text },
     )
   })
 }

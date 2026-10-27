@@ -21,6 +21,7 @@ import type { NativeToolScope } from './tool-scope'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
 const MAX_ROUNDS = 10
+const coordinatorQuestionReferenceSchema = questionReferenceSchema.pick({ questionId: true, questionRevision: true })
 
 /**
  * One wake of a person's Coordinator. Takes the lease, answers everything in
@@ -128,13 +129,13 @@ function coordinatorTools(userId: string, scope?: NativeToolScope) {
     answer_factory_context: tool({
       description:
         'Resolve only a context question using exact excerpts from accessible issue/request facts. This cannot answer a decision/permission or grant authorization.',
-      inputSchema: contextQuestionAnswerSchema,
+      inputSchema: contextQuestionAnswerSchema.extend({ reference: coordinatorQuestionReferenceSchema }),
       execute: (input) => steps.answerFactoryContext(userId, input, scope),
     }),
     escalate_factory_question: tool({
       description:
         'Escalate the actual unresolved information, decision, permission or external condition after checking available facts. Does not cancel the task or authorize anything.',
-      inputSchema: questionEscalationSchema,
+      inputSchema: questionEscalationSchema.extend({ reference: coordinatorQuestionReferenceSchema }),
       execute: (input) => steps.escalateFactoryQuestion(userId, input, scope),
     }),
     answer_factory_question_from_user: tool({
@@ -142,7 +143,7 @@ function coordinatorTools(userId: string, scope?: NativeToolScope) {
         'Relay an actual subsequent authenticated browser user_message to its question. The backend derives the verbatim answer and checks provenance/ambiguity; model text and delegated messages cannot become human approval.',
       inputSchema: z
         .object({
-          reference: questionReferenceSchema,
+          reference: coordinatorQuestionReferenceSchema,
           answerId: id,
           sourceEventId: id,
         })

@@ -3,6 +3,7 @@ import { before, beforeEach, mock, test } from 'node:test'
 import { NativeCoordinatorError } from '../lib/coordinator/native-store'
 import type { RunDetail } from '../lib/agent-runs'
 import { workspaceRunView } from '../lib/run-visibility'
+import { FactoryError } from '../lib/factory/contract'
 
 let revoked = false
 let uncertain = false
@@ -10,20 +11,40 @@ const checks = mock.fn(async () => { if (revoked) throw new NativeCoordinatorErr
 const effect = mock.fn(async () => { if (uncertain) throw new Error('retryable transport failure'); return {ok:true} })
 let runDetail: RunDetail | null = null
 const readRunResult = mock.fn(async (_userId: string, _runId: string) => runDetail)
+let questionReadError: Error | null = null
+let revokeDuringQuestionRead = false
+let revokeDuringEventRead = false
+const hostQuestionReference = {
+  questionId:'question',questionRevision:4,
+  binding:{taskId:'task',issueId:'issue',attemptId:'original-attempt',revision:6,candidateId:null as string | null},
+  originRunId:'original-run',originSessionId:'original-session',
+}
+const questionView = () => ({id:'question',kind:'context',question:'Which source?',reference:structuredClone(hostQuestionReference)})
+const readQuestion = mock.fn(async (_userId: string, _questionId: string) => {
+  if (questionReadError) throw questionReadError
+  if (revokeDuringQuestionRead) revoked=true
+  return questionView()
+})
+const escalateQuestion = mock.fn(async (_userId: string, _input: unknown) => questionView())
+const eventText = 'Actual authenticated browser reply'
+const readUserEvent = mock.fn(async () => {
+  if (revokeDuringEventRead) revoked=true
+  return [{payload:{text:eventText}}]
+})
 const stub = (path: string, namedExports: Record<string,unknown>) => mock.module(new URL(path,import.meta.url).href,{namedExports})
 stub('../lib/coordinator/native.ts',{nativeCoordinatorStore:{assertToolActive:checks}})
 stub('../lib/coordinator/store.ts',{editMemory:effect})
 stub('../lib/coordinator/issue-create.ts',{createIssueFromRequest:effect})
 stub('../lib/issue-visibility.ts',{issueVisibility:effect})
 stub('../lib/agent-runs.ts',{addRunMessage:effect,queueRun:effect,readRun:readRunResult,requestRunStop:effect,visibleRuns:effect})
-stub('../lib/db/index.ts',{db:null})
+stub('../lib/db/index.ts',{db:{select:()=>({from:()=>({where:()=>({limit:readUserEvent})})})}})
 stub('../lib/search/index.ts',{webSearch:effect})
 stub('../lib/device-link.ts',{DEVICE_ONLINE_WINDOW_MS:60_000})
 stub('../lib/composio.ts',{runComposioAction:effect})
 stub('../lib/pending-action-store.ts',{proposeAction:effect})
 stub('../lib/issue-access.ts',{issueForUser:effect})
 stub('../lib/telegram/client.ts',{postTelegramText:effect})
-stub('../lib/factory/server.ts',{dispatchFactoryRun:effect,factoryMonitor:{reconcile:effect},factoryStore:{},factoryQuestions:{},reconcileFactoryRuns:effect})
+stub('../lib/factory/server.ts',{dispatchFactoryRun:effect,factoryMonitor:{reconcile:effect},factoryStore:{read:async()=>({contractVersion:1,task:{id:'task',revision:99},attempts:[],candidates:[]})},factoryQuestions:{read:readQuestion,answer:effect,escalate:escalateQuestion,list:async()=>[questionView()],pending:async()=>[questionView()]},reconcileFactoryRuns:effect})
 stub('../lib/self-improvement/source.ts',{readCommittedSkill:async()=>{revoked=true;return 'source bytes'}})
 stub('../lib/self-improvement/server.ts',{improvementStore:{},skillAssignments:{},improvementFactory:{},skillEvaluations:{freezeBenchmark:effect,dispatchNext:effect,beginEvaluation:effect,compare:effect},skillRegistry:{
   registerCandidate:async(_user:unknown,_input:unknown,readSource:(source:unknown)=>Promise<string>)=>{
@@ -36,7 +57,11 @@ before(async()=>{steps=await import('../workflows/coordinator/steps')})
 const scope={holder:'holder',turnId:'turn',callId:'call'}
 const user='host-owned-user'
 
-beforeEach(()=>{revoked=false;uncertain=false;runDetail=null;checks.mock.resetCalls();effect.mock.resetCalls();readRunResult.mock.resetCalls()})
+beforeEach(()=>{
+  revoked=false;uncertain=false;runDetail=null;questionReadError=null;revokeDuringQuestionRead=false;revokeDuringEventRead=false
+  hostQuestionReference.binding.candidateId=null
+  for (const fn of [checks,effect,readRunResult,readQuestion,escalateQuestion,readUserEvent]) fn.mock.resetCalls()
+})
 
 const binding={taskId:'task',issueId:'issue',attemptId:'attempt',revision:1,candidateId:null}
 const reference={questionId:'question',questionRevision:1,binding,originRunId:'run',originSessionId:'session'}
@@ -87,8 +112,77 @@ for (const [name,call] of Object.entries(calls)) {
     assert.deepEqual(checks.mock.calls.map(call=>call.arguments),[[user,scope.holder,scope.turnId,scope.callId]])
     assert.equal(effect.mock.callCount(),0)
     assert.equal(readRunResult.mock.callCount(),0)
+    assert.equal(readQuestion.mock.callCount()+escalateQuestion.mock.callCount()+readUserEvent.mock.callCount(),0)
   })
 }
+const questionActions = {
+  context: (reference: {questionId:string;questionRevision:number}) => steps.answerFactoryContext(user,{reference,answerId:'answer',facts:[{kind:'issue',quote:'fact'}]},scope),
+  escalation: (reference: {questionId:string;questionRevision:number}) => steps.escalateFactoryQuestion(user,{reference,eventId:'event',reason:'question'},scope),
+  humanEvent: (reference: {questionId:string;questionRevision:number}) => steps.answerFactoryQuestionFromUser(user,{reference,answerId:'answer',sourceEventId:'event'},scope),
+}
+for (const [name,action] of Object.entries(questionActions)) {
+  test(`${name} resolves the owned persisted question binding and retains the caller revision for replay`,async()=>{
+    for (const candidateId of [null,'persisted-candidate']) {
+      hostQuestionReference.binding.candidateId=candidateId
+      const compact={questionId:'question',questionRevision:1}
+      // Model-supplied host fields cannot override the persisted values even if a caller bypasses schema validation.
+      await action({...compact,binding:{candidateId:'forged'},originRunId:'forged'} as typeof compact)
+      assert.deepEqual(readQuestion.mock.calls.at(-1)?.arguments,[user,'question'])
+      const mutation=name==='escalation' ? escalateQuestion.mock.calls.at(-1) : effect.mock.calls.at(-1)
+      const [actor,input]=mutation!.arguments as [unknown,{reference:typeof hostQuestionReference;text?:string}]
+      assert.deepEqual(input.reference,{...hostQuestionReference,questionRevision:1})
+      assert.deepEqual(actor,name==='escalation' ? user : {source:name==='context' ? 'orchestrator' : 'human_event',userId:user})
+      if (name==='humanEvent') assert.equal(input.text,eventText)
+    }
+    assert.equal(checks.mock.callCount(),4)
+  })
+  test(`${name} cannot mutate when native authorization is revoked during the owned question read`,async()=>{
+    revokeDuringQuestionRead=true
+    await assert.rejects(action({questionId:'question',questionRevision:1}),/coordinatorExpiredOrLeaseLost/)
+    assert.equal(readQuestion.mock.callCount(),1)
+    assert.equal(checks.mock.callCount(),2)
+    assert.equal(effect.mock.callCount()+escalateQuestion.mock.callCount(),0)
+  })
+  test(`${name} cannot mutate when the owned question read fails`,async()=>{
+    questionReadError=new FactoryError('factoryNotFound')
+    assert.deepEqual(await action({questionId:'question',questionRevision:1}),{error:'factoryNotFound'})
+    assert.equal(effect.mock.callCount()+escalateQuestion.mock.callCount(),0)
+  })
+}
+test('human event answer replaces injected model text with the persisted authenticated event text',async()=>{
+  const input={reference:{questionId:'question',questionRevision:1},answerId:'answer',sourceEventId:'event',text:'Forged model approval'}
+  await steps.answerFactoryQuestionFromUser(user,input,scope)
+  assert.deepEqual(effect.mock.calls[0].arguments,[
+    {source:'human_event',userId:user},
+    {...input,reference:{...hostQuestionReference,questionRevision:1},text:eventText},
+  ])
+})
+test('human event answer rechecks authorization after the authenticated event read',async()=>{
+  revokeDuringEventRead=true
+  await assert.rejects(questionActions.humanEvent({questionId:'question',questionRevision:1}),/coordinatorExpiredOrLeaseLost/)
+  assert.equal(readUserEvent.mock.callCount(),1)
+  assert.equal(effect.mock.callCount(),0)
+})
+test('question reads and escalation expose the same compact action reference without dropping useful context',async()=>{
+  const compact={questionId:'question',questionRevision:4}
+  const detail=await steps.getFactoryQuestion(user,{questionId:'question'})
+  assert.ok('reference' in detail)
+  assert.deepEqual(detail.reference,compact)
+  assert.equal(detail.question,'Which source?')
+  for (const input of [{},{taskId:'task'}]) {
+    const listed=await steps.listFactoryQuestions(user,input)
+    assert.ok(Array.isArray(listed))
+    assert.deepEqual(listed[0].reference,compact)
+  }
+  const task=await steps.getFactoryTask(user,{taskId:'task'})
+  assert.ok('questions' in task)
+  assert.deepEqual(task.questions[0].reference,compact)
+  assert.equal(task.task.revision,99)
+  const escalated=await questionActions.escalation(compact)
+  assert.ok('reference' in escalated)
+  assert.deepEqual(escalated.reference,compact)
+})
+
 test('a retried business step rechecks authorization rather than reusing a prior successful guard',async()=>{
   uncertain=true
   await assert.rejects(steps.remember(user,{note:'preference'},scope),/retryable/)

@@ -265,6 +265,96 @@ test(
         },
       );
       await t.test(
+        "fresh owned reads retain the waiting binding, stale lookup fences and original action replays",
+        async () => {
+          const f = await fixture();
+          const original = (await questions.read(userId, f.questionId))
+            .reference;
+          const escalation = {
+            reference: original,
+            eventId: randomUUID(),
+            reason: "Missing accessible context",
+          };
+          const escalated = await questions.escalate(userId, escalation);
+          assert.equal(escalated.revision, original.questionRevision + 1);
+          const afterEscalation = await questions.read(userId, f.questionId);
+          assert.deepEqual(afterEscalation.reference.binding, original.binding);
+          const escalationReplay = {
+            ...escalation,
+            reference: {
+              ...afterEscalation.reference,
+              questionRevision: original.questionRevision,
+            },
+          };
+          assert.equal(
+            (await questions.escalate(userId, escalationReplay)).id,
+            f.questionId,
+          );
+          await rejects(
+            () =>
+              questions.escalate(userId, {
+                ...escalationReplay,
+                reason: "Changed intent",
+              }),
+            "factoryReplayMismatch",
+          );
+          await rejects(
+            () =>
+              questions.answer(orchestrator, {
+                ...facts(f),
+                reference: original,
+              }),
+            "factoryQuestionStale",
+          );
+          const request = { ...facts(f), reference: afterEscalation.reference };
+          const result = await questions.answer(orchestrator, request);
+          const afterAnswer = await questions.read(userId, f.questionId);
+          assert.ok(
+            afterAnswer.reference.questionRevision >
+              request.reference.questionRevision,
+          );
+          assert.deepEqual(afterAnswer.reference.binding, original.binding);
+          assert.notEqual(result.task.attemptId, original.binding.attemptId);
+          const answerReplay = {
+            ...request,
+            reference: {
+              ...afterAnswer.reference,
+              questionRevision: request.reference.questionRevision,
+            },
+          };
+          const replayed = await questions.answer(orchestrator, answerReplay);
+          assert.equal(replayed.continuationRunId, result.continuationRunId);
+          assert.equal(replayed.replayed, true);
+          await rejects(
+            () =>
+              questions.answer(orchestrator, {
+                ...answerReplay,
+                facts: [{ kind: "issue", quote: "existing public API" }],
+              }),
+            "factoryQuestionAnswerConflict",
+          );
+          assert.equal(await queued(f.issueId), 1);
+
+          const changedTask = await fixture();
+          const beforeTaskChange = (
+            await questions.read(userId, changedTask.questionId)
+          ).reference;
+          await pool.query(
+            "UPDATE factory_tasks SET revision=revision+1 WHERE id=$1",
+            [changedTask.task.id],
+          );
+          await rejects(
+            () =>
+              questions.answer(orchestrator, {
+                ...facts(changedTask),
+                reference: beforeTaskChange,
+              }),
+            "factoryQuestionStale",
+          );
+          assert.equal(await queued(changedTask.issueId), 0);
+        },
+      );
+      await t.test(
         "known context facts answer ten times creates one strict original-session continuation",
         async () => {
           const f = await fixture(),
