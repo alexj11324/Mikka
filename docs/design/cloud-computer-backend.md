@@ -78,10 +78,10 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
     密码; Google and Apple buttons and 登录; 🔒 Secured by Mikka). The person can ask the bot to send the card
     again.
     - 登录 submits to `POST /api/bots/:botId/subagents/:id/credentials`,
-      which saves the email and password to the workspace's credential vault
-      (`site_credentials`, encrypted with a per-workspace key; open question:
-      Vercel KMS or Infisical). The bot machine then focuses the page's fields
-      and types them with CDP `Input.insertText`.
+      which stores the login in the credential vault of #180 (secure form →
+      server-side vault → short-lived lease → controlled browser); there is no
+      second vault. The bot machine then focuses the page's fields and types
+      them with CDP `Input.insertText`.
     - The model only ever sees a reference (`credential:<site>`), never the
       value. The value never reaches logs, the transcript or the model
       context, and the screencast masks it as the page does.
@@ -208,10 +208,8 @@ Report findings in the issue before building on an assumption that failed.
   (`queued | running | needs_you | done | failed | stopped`), step (the
   current step line), needs (`login` with site and account, or null), browser
   context id, createdAt, endedAt. No credential column.
-- `site_credentials`: workspaceId, site (registrable domain), email,
-  encrypted secret, key id, createdBy, createdAt, lastUsedAt. Read only by the
-  bot machine's fill step; never returned by an API. Not a run; never in
-  the thread list.
+- Saved logins: the #180 vault, keyed by workspace and site; no Mikka table
+  holds a secret.
 - Approval rows: reuse the #161 ledger. Add `scope: once | run` so that
   本任务内都允许 auto-approves later operations of the same run on the same
   desktop. A workspace `deny` still wins.
