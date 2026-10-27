@@ -89,6 +89,12 @@ jobs:
       - run: pnpm test:coordinator-native-relay
       - run: pnpm test:coordinator-native-scope
       - run: pnpm --filter @mikka/daemon test
+      - name: Install sandbox runtime dependencies without changing host namespace policy
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
+      - name: Require real sandbox probe and daemon lifecycle acceptance (no skips)
+        run: pnpm --filter @mikka/daemon test
+        env:
+          MIKKA_SANDBOX_ACCEPTANCE: '1'
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm --filter @mikka/mobile typecheck
@@ -97,6 +103,8 @@ jobs:
           # Database regressions run against ephemeral Postgres in browser-tests below.
           MIKKA_DATABASE_URL: ""
       - run: pnpm test:auth-composio
+      - name: Authentication email integration tests (isolated Postgres)
+        run: node scripts/test-auth-email.mjs
       - run: pnpm test:groups
       - run: pnpm test:integrations
       - run: pnpm test:request-log

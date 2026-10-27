@@ -93,7 +93,7 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-21** The right panel has two parts: 建议 on top, then 任务. 建议 is the
   normal-level items in one list, newest first, each row with its app's icon
   (no per-app cards). The daily briefing is not in 建议; it is the
-  Coordinator's 08:00 message. A 任务 here is a thread started by the
+  Coordinator's 08:00 message, also sent right after the person connects an app. A 任务 here is a thread started by the
   orchestrator or a bot; all of them stay listed. It is not a flat list of the
   board's issues. The flow: the person says yes to a Coordinator card, or
   clicks a 建议 item (which fills the centre composer) → the bot dispatches a

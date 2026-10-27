@@ -133,6 +133,25 @@ export function notionNotification(userId: string, event: Json): ExternalNotific
   })
 }
 
+/** The plain text of a Notion page's title property. */
+function notionTitle(page: Json): string {
+  for (const property of Object.values(record(page.properties))) {
+    const value = record(property)
+    if (value.type !== 'title' || !Array.isArray(value.title)) continue
+    return value.title.map(part => { const text = record(part).plain_text; return typeof text === 'string' ? text : '' }).join('')
+  }
+  return ''
+}
+
+/** One page from Notion's search (NOTION_SEARCH_NOTION_PAGE), read like the trigger event. */
+export function notionSearchNotification(userId: string, page: Json): ExternalNotification | null {
+  if (page.object !== 'page' || page.archived === true || page.in_trash === true) return null
+  return notionNotification(userId, {
+    id: page.id, title: notionTitle(page), url: page.url,
+    last_edited_time: page.last_edited_time, last_edited_by: page.last_edited_by,
+  })
+}
+
 /** A verified Composio trigger event, or null for a toolkit or shape we do not read. */
 export function composioNotification(event: { userId: string; toolkitSlug: string; payload?: Json }): ExternalNotification | null {
   const payload = record(event.payload)

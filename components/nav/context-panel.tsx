@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { BookOpen, ChevronRight, CircleCheck, Clock, Globe, Info, Maximize2, Minimize2, RotateCw, Search, X, type LucideIcon } from 'lucide-react'
@@ -36,7 +36,6 @@ const TABS: { id: PanelTab; icon: LucideIcon }[] = [
 
 type SuggestionItem = { id: string; source: SuggestionSource; action: SuggestionAction; title: string; url: string | null }
 type SuggestionsView = {
-  briefing: { total: number; highlights: SuggestionItem[] } | null
   groups: { source: SuggestionSource; items: SuggestionItem[] }[]
 }
 
@@ -65,7 +64,7 @@ function greetingKey(now: Date) {
 }
 
 /**
- * 建议: today's briefing and the routine items by source app, from GET
+ * 建议: routine items by source app; the daily briefing goes to chat (R-21). GET
  * /api/suggestions (MIK-28). Clicking one fills the Coordinator's composer;
  * once sent, the Coordinator dispatches a thread and the item leaves 建议 for
  * 我的任务.
@@ -75,7 +74,7 @@ function Suggestions({ name, onArrange, onConnect }: { name: string; onArrange: 
   const pick = (item: SuggestionItem) => onArrange([`${t(`action.${item.action}`)}：${item.title}`, item.url].filter(Boolean).join('\n'), item.id)
   const timeZone = typeof Intl === 'undefined' ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone
   const { data, error, isValidating, mutate } = useSWR(withBasePath(`/api/suggestions?tz=${encodeURIComponent(timeZone)}`), fetchSuggestions, { revalidateOnFocus: false })
-  const empty = data && !data.briefing && !data.groups.length
+  const empty = data && !data.groups.length
   return <section aria-label={t('title')} className="flex flex-col gap-2">
     <div className="flex items-center justify-between">
       <h2 className="text-xs font-medium text-muted-foreground">{t('title')}</h2>
@@ -83,8 +82,6 @@ function Suggestions({ name, onArrange, onConnect }: { name: string; onArrange: 
     </div>
     <p className="text-lg font-semibold">{t(greetingKey(new Date()), { name })}</p>
     {error && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
-    {data?.briefing?.highlights.length ? <p className="text-sm leading-relaxed text-muted-foreground">{t('briefing', { count: data.briefing.total })} {data.briefing.highlights.map(item => <SourceChip key={item.id} item={item} onPick={pick} />).reduce<ReactNode[]>((all, chip, index) => index ? [...all, ' ', chip] : [chip], [])}</p>
-      : data && !empty && <p className="text-sm text-muted-foreground">{t('noneToday')}</p>}
     {data && !!data.groups.length && <>
       <h3 className="pt-2 text-xs font-medium text-muted-foreground">{t('routine')}</h3>
       {data.groups.map(group => <div key={group.source} className="flex flex-col gap-2 rounded-xl bg-muted/50 p-3">

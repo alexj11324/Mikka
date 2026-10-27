@@ -31,6 +31,9 @@ export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
     case 'run_question':
     case 'run_blocked':
       return 'attention'
+    // The morning briefing is the Coordinator's to deliver (R-21).
+    case 'daily_briefing':
+      return 'attention'
     // A handed-over document or page is a result: the card shows under the next reply.
     case 'artifact_submitted':
       return 'result'

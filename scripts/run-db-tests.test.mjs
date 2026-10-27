@@ -70,6 +70,7 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(plan.files.includes('lib/coordinator/native-relay.db.test.ts'))
   assert.ok(plan.selfManaged.includes('lib/auth-email.test.ts'))
   const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
+  for (const { runner } of SELF_MANAGED) assert.ok(workflow.includes(`run: node ${runner}`), `${runner} runs in CI`)
   const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
   // Pure gates also run without a database in the fast job; their DB run is still only through pnpm test:db.
   const pureGates = ['test:groups', 'test:active-agents', 'test:group-turns', 'test:issue-search']
