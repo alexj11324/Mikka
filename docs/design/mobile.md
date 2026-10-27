@@ -96,13 +96,27 @@ What reaches the person and when is R-20. On mobile:
 
 ## Settings
 
-| Setting | 中文 | Behaviour |
-| --- | --- | --- |
-| Proactive messages | 主动消息 | On / off. Off stops proactive cards and pushes; replies and reminders the person asked for still work. The Coordinator may turn it on or off when asked, only after the person confirms. |
-| Phone pushes while the computer is open | 电脑在用时不推送到手机 | Off by default (push everywhere at once). On: no phone push while a Mikka web tab is open and active. |
-| About you | 关于你 | The profile Mikka keeps about the person (accounts, what they own, what they work on now, where their work is reported, preferences, what is not theirs), each line with its evidence. Edit or delete any line. |
+Opened from the avatar at the bottom of the drawer. Only light, frequent
+settings; administration (members, teams, devices) stays on the web
+(`docs/settings.md`). Top to bottom:
 
-There is no budget setting; the caps in R-20 are fixed.
+| Group | 中文 | Rows |
+| --- | --- | --- |
+| Profile | — | Avatar and name; opens editing |
+| Workspace | 工作区 | 当前工作区 (switch) |
+| Notifications | 通知 | 主动消息 (on/off); 电脑在用时不推送到手机 (off by default). When iOS notification permission is off, one extra row says so and opens iOS Settings; it is absent otherwise |
+| Connected apps | 已连接的 App | Gmail, GitHub, Slack, Notion, Linear: 已连接 or 连接 |
+| Account | 账户 | 登录方式 |
+| General | 通用 | 语言; 外观 (跟随系统 / 浅色 / 深色) |
+| — | — | 退出登录; version |
+
+The Coordinator may turn 主动消息 on or off when asked, only after the person
+confirms. There is no budget setting; the caps in R-20 are fixed.
+
+What the Coordinator knows about the person (accounts, what they own, what is
+not theirs) is not in Settings. The person manages it in the chat: telling
+the Coordinator 「Dependabot 的事别找我」 records it, and asking what it knows
+gets the list as a reply.
 
 ## Layout and states
 
