@@ -90,10 +90,25 @@ function coordinatorTools(userId: string, scope?: NativeToolScope, computerEnabl
       execute: () => steps.listAgents(userId, scope),
     }),
     ...(computerEnabled ? {
+      list_computer_workspaces: tool({
+        description: 'List workspaces the person belongs to, so a requested new Bot is created in the right workspace.',
+        inputSchema: z.object({}),
+        execute: () => steps.listComputerWorkspaces(userId, scope),
+      }),
+      create_computer_bot: tool({
+        description: 'Create a Bot only when the person asks to create one. Use an authorized workspace from list_computer_workspaces; if the workspace is ambiguous, ask the person.',
+        inputSchema: z.object({ workspaceId: id, name: z.string().trim().min(1).max(120) }),
+        execute: (input, options) => steps.createComputerBot(userId, input, options.toolCallId, scope),
+      }),
       list_computer_bots: tool({
         description: 'List the person’s Bots and the available hosted execution harnesses for their computers.',
         inputSchema: z.object({}),
         execute: () => steps.listComputerBots(userId, scope),
+      }),
+      wake_bot_computer: tool({
+        description: 'Wake an owned Bot computer when the person asks to use it. This starts cloud compute and prepares its hosted workers.',
+        inputSchema: z.object({ botId: id }),
+        execute: input => steps.wakeComputerBot(userId, input, scope),
       }),
       dispatch_bot_computer: tool({
         description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Computer operations still require their approval.',
