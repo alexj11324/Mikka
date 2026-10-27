@@ -7,7 +7,7 @@ def cap(role,owner='probe-owner'):
  return p+'.'+base64.urlsafe_b64encode(hmac.new(KEY,p.encode(),hashlib.sha256).digest()).decode().rstrip('=')
 def url(path,role='runtime'):return f'http://127.0.0.1:6082/agents/{ID}{path}?token={cap(role)}'
 async def main():
- fixture=web.Application();fixture.router.add_get('/login',lambda _:web.Response(text='<input type=password id=password><button>Login</button>',content_type='text/html'))
+ fixture=web.Application();fixture.router.add_get('/login',lambda _:web.Response(text='<input type=password id=password><button type=button id=delete>Delete account</button><a id=link href=/login>Read</a>',content_type='text/html'))
  runner=web.AppRunner(fixture);await runner.setup();await web.TCPSite(runner,'127.0.0.1',6083).start()
  async with aiohttp.ClientSession() as s:
   for _ in range(30):
@@ -18,7 +18,11 @@ async def main():
   async with s.post(url('/action'),json={'action':'navigate','url':'http://127.0.0.1:6083/login'}) as r:assert r.status==200
   await asyncio.sleep(1)
   async with s.post(url('/action'),json={'action':'observe'}) as r:o=await r.json();assert o['observation']['needsLogin']
-  print('PASS: independent Chrome pipe, navigation, redacted observation',flush=True)
+  async with s.post(url('/action'),json={'action':'inspectMutation','mutation':{'action':'click','selector':'#delete'}}) as r:assert (await r.json())['requiresApproval'] is True
+  async with s.post(url('/action'),json={'action':'inspectMutation','mutation':{'action':'click','selector':'#link'}}) as r:assert (await r.json())['requiresApproval'] is False
+  async with s.post(url('/action'),json={'action':'type','selector':'#password','text':'must-not-enter'}) as r:assert r.status==403
+  async with s.post(url('/action'),json={'action':'click','selector':'#link','expectedLoaderId':'other-document','expectedOrigin':'http://127.0.0.1:6083'}) as r:assert r.status==409
+  print('PASS: independent Chrome pipe, redacted observation, ordinary/risky distinction, password typing denial, approval document fencing',flush=True)
   async with s.ws_connect(url('/viewer','view')) as v:
    frame=await v.receive(timeout=10);assert frame.json()['type']=='frame'
    await v.send_json({'id':1,'method':'Input.insertText','params':{'text':'forbidden'}})

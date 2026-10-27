@@ -70,7 +70,8 @@
     "test:byos-worker": "node scripts/test-subscription-worker.mjs",
     "test:slack": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/slack/webhook.test.ts lib/slack/owner.test.ts tests/slack-bot.test.mjs",
     "test:credentials": "node --import tsx --test lib/credentials/credentials.test.ts",
-    "test:credentials-db": "node --import tsx --test lib/credentials/store.db.test.ts"
+    "test:credentials-db": "node --import tsx --test lib/credentials/store.db.test.ts",
+    "test:cloud-backend-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/backend.db.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

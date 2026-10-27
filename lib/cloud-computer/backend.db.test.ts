@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { SubagentStore } from './subagents'
 import { claimCloudRun } from '@/lib/computer/claim'
-const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL
+const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
 test('real DB: additive migration, subagent owner isolation and separate thread claims', { skip: !databaseURL }, async () => {
   assert.ok(['localhost', '127.0.0.1'].includes(new URL(databaseURL!).hostname))

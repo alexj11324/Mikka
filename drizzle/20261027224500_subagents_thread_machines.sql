@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS thread_machines (
 );
 CREATE TABLE IF NOT EXISTS suggestion_executions (
  "suggestionId" uuid PRIMARY KEY REFERENCES suggestions(id) ON DELETE CASCADE,
- "ownerId" text NOT NULL,"workspaceId" uuid NOT NULL,"botId" uuid NOT NULL,
+ "ownerId" text NOT NULL,"workspaceId" uuid NOT NULL,"botId" uuid,
  instruction text NOT NULL,status text NOT NULL DEFAULT 'starting' CHECK(status IN ('starting','running','done','failed','stopped')),
  "subagentId" uuid REFERENCES bot_subagents(id),"runId" uuid REFERENCES agent_runs(id),
  "createdAt" timestamptz NOT NULL DEFAULT now(),"endedAt" timestamptz

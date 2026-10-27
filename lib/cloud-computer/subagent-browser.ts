@@ -26,7 +26,7 @@ export async function resolveThreadBrowserTarget(input: { userId: string; worksp
     WHERE m."runId"=$1 AND m."ownerId"=$2 AND m."workspaceId"=$3 AND m.state='running'
       AND r.status IN ('running','waiting_input','preparing') AND r."stopRequestedAt" IS NULL`, [input.runId, input.userId, input.workspaceId])).rows[0]
   if (!row?.targetId || !row.sandboxId) throw new Error('Thread browser unavailable')
-  const binding = { id: input.runId, ownerId: input.userId, workspaceId: input.workspaceId, botId: row.botId, epoch: row.epoch }
+  const binding = { id: input.runId, ownerId: input.userId, workspaceId: input.workspaceId, botId: row.botId, epoch: row.epoch, display: 1 }
   const state = await runtimeRequest(row.sandboxId, binding, '/state')
   if (state.guarded || state.targetId !== row.targetId || typeof state.url !== 'string') throw new Error('Thread browser unavailable')
   const url = new URL(state.url)

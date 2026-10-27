@@ -30,6 +30,7 @@ export async function browserAction(pool: Pool, actor: Actor, botId: string, id:
 /** Called only after the existing ledger has atomically consumed pending ->
  * running. It cannot replay, alter the operation, or act on a navigated page. */
 export async function executeApprovedBrowserAction(pool: Pool, userId: string, raw: unknown, approved: boolean): Promise<{ data: Record<string, unknown> } | { error: string }> {
+  let active: { store: SubagentStore; actor: Actor; botId: string; id: string } | undefined
   try {
     const input = approvedSchema.parse(raw)
     const { digest, ...signed } = input
@@ -41,8 +42,12 @@ export async function executeApprovedBrowserAction(pool: Pool, userId: string, r
     const row = await store.get(actor, input.botId, input.subagentId)
     if (row.status !== 'needs_you' || row.epoch !== input.epoch) return { error: 'browserActionExpired' }
     if (!approved) { await store.stop(actor, input.botId, input.subagentId); return { data: {} } }
+    active = { store, actor, botId: input.botId, id: input.subagentId }
     await store.update(actor, input.botId, input.subagentId, 'running', input.summary)
     await store.action(actor, input.botId, input.subagentId, { ...input.mutation, expectedLoaderId: input.loaderId, expectedOrigin: input.origin })
     return { data: { subagentId: input.subagentId } }
-  } catch { return { error: 'browserActionOutcomeUnknown' } }
+  } catch {
+    if (active) await active.store.update(active.actor, active.botId, active.id, 'failed', 'Action outcome unknown').catch(() => undefined)
+    return { error: 'browserActionOutcomeUnknown' }
+  }
 }
