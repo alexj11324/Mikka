@@ -3,10 +3,10 @@ import { test } from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { CredentialStore } from './store'
-import { CredentialError } from './contracts'
-import { fillCredential } from './broker'
-import type { Kms } from './kms'
+import { CredentialStore } from './store.js'
+import { CredentialError } from './contracts.js'
+import { fillCredential } from './broker.js'
+import type { Kms } from './kms.js'
 
 const databaseURL = process.env.CREDENTIAL_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Credential test database is required')

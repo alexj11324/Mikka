@@ -1,5 +1,5 @@
 import { verifyVercelOidcToken } from '@vercel/oidc'
-import { CredentialError } from './contracts'
+import { CredentialError } from './contracts.js'
 
 /** Verify the exact app project, team, issuer, audience and environment. */
 export async function verifyAppOidc(token: string, environment = process.env.VERCEL_ENV) {
