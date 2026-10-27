@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -64,14 +65,15 @@ function improvedPair() {
 }
 
 test("definition is deeply frozen, versioned and reproducible before generation", () => {
-  assert.equal(REPORT_BENCHMARK.version, "run-report-behavior-v1");
+  assert.equal(REPORT_BENCHMARK.version, "run-report-behavior-v2");
+  assert.equal(REPORT_BENCHMARK.evaluatorVersion, "exact-semantic-fields-v1");
   assert.equal(
     REPORT_BENCHMARK.digest,
-    "0e4ac1786df6d3565c63715a8919b5cdc7bfba899e42f7dcafce2ab4b9b0c92b",
+    "df7584b75e426b1534bd87f048b57a53335a6ebc2491bcd0ffba50f71a54f0eb",
   );
   assert.equal(
     instance.digest,
-    "19737d352cd35cf921038766b0163ba59451a98d90c3f6cf2b04546fe2cfed9e",
+    "75a341bad7f3bca76bb98d8f9d77dc84a6d75a77650ded7d089ac2084ceeca31",
   );
   assert.ok(Object.isFrozen(REPORT_BENCHMARK.cases[0].expected));
   for (const item of REPORT_BENCHMARK.cases) {
@@ -90,6 +92,39 @@ test("definition is deeply frozen, versioned and reproducible before generation"
   );
   assert.throws(() => task("invented"));
   assert.throws(() => evaluate("invented", "{}"));
+});
+
+test("trusted task binds the persisted submit.summary boundary into the definition digest", () => {
+  const { digest, trainingCaseIds, evaluationCaseIds, ...definition } =
+    REPORT_BENCHMARK;
+  assert.ok(Object.isFrozen(definition.taskInstructions));
+  for (const id of [...trainingCaseIds, ...evaluationCaseIds]) {
+    const builtTask = task(id);
+    assert.equal(
+      builtTask.prompt,
+      [
+        ...definition.taskInstructions,
+        JSON.stringify(definition.contract),
+        JSON.stringify(builtTask.input),
+      ].join("\n"),
+    );
+    assert.match(builtTask.prompt, /submit tool of the mikka MCP server/);
+    assert.match(
+      builtTask.prompt,
+      /JSON object serialized as the string value of its summary argument/,
+    );
+    assert.match(builtTask.prompt, /Final chat text is not graded/);
+  }
+  const hash = (value: unknown) =>
+    createHash("sha256").update(JSON.stringify(value)).digest("hex");
+  assert.equal(hash(definition), digest);
+  assert.notEqual(
+    hash({
+      ...definition,
+      taskInstructions: definition.taskInstructions.slice(0, -1),
+    }),
+    digest,
+  );
 });
 
 test("scores observed semantic fields, allows JSON whitespace/order and explicit unknowns", () => {

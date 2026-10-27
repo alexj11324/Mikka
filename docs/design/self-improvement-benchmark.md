@@ -9,12 +9,20 @@ a deployment succeeded. Real daemon sessions must produce the reports.
 ## Freeze before candidate generation
 
 `REPORT_BENCHMARK` is the deeply frozen definition, version
-`run-report-behavior-v1`, evaluator `exact-semantic-fields-v1`. Its SHA-256 digest
-covers the ordered case templates, expected facts, schema, evaluator version,
-instance derivation version, fixed verification command and thresholds. Definition
-digest: `0e4ac1786df6d3565c63715a8919b5cdc7bfba899e42f7dcafce2ab4b9b0c92b`.
+`run-report-behavior-v2`, evaluator `exact-semantic-fields-v1`. Its SHA-256 digest
+covers the ordered case templates, expected facts, schema, actual task instructions
+(including the submitted output boundary), evaluator version, instance derivation
+version, fixed verification command and thresholds. Definition digest:
+`df7584b75e426b1534bd87f048b57a53335a6ebc2491bcd0ffba50f71a54f0eb`.
 Changes to scoring code require a new evaluator/benchmark version and reviewed
 source; the digest is a definition identity, not a source signature.
+
+Version 2 resolves an observed version 1 ambiguity: a real session submitted a
+prose summary while putting correct JSON in final chat. Preserve that instance and
+its run as historical evidence; do not rescore it or count it as a genuine Skill
+failure. After deploying version 2, freeze a fresh instance before generating any
+candidate. The evaluator, cases, six-field schema, thresholds, 25 distinct failures,
+seven-day trigger and verification command are unchanged.
 
 The server generates 32 random bytes, encodes them as lowercase hex and calls
 `freezeBenchmarkInstance(seed)` **before** candidate generation. Persist this
@@ -77,9 +85,12 @@ The prompt defines the schema and authority without revealing expected answers.
 
 ## Report contract and scoring
 
-The actual submitted Harness output must be a JSON object with exactly these
-properties. Whitespace, property order, valid JSON escaping and unknown-field
-list order do not affect scoring.
+Call the `submit` tool of the `mikka` MCP server with the JSON object below
+serialized as the **string value of its `summary` argument**. The server persists
+that string as `report.summary`, and only that string is graded. Final chat text
+is not graded and cannot substitute for `submit.summary`. The summary must contain
+exactly this JSON object, with no prose or Markdown fences. Whitespace, property
+order, valid JSON escaping and unknown-field list order do not affect scoring.
 
 ```json
 {
