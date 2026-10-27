@@ -15,7 +15,7 @@ test('聊天历史未返回时壳子已可导航，恢复后显示真实会话',
     await expect.poll(() => requested).toBe(true)
     await expect(page).not.toHaveURL(/section=agent/)
     await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeVisible()
-    await page.getByRole('button', { name: '打开 Bot 对话', exact: true }).click()
+    await page.getByRole('list', { name: 'Bot', exact: true }).getByRole('button', { name: 'Coordinator', exact: true }).click()
     await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
     await rail(page, '看板').click()
     await expect(page).not.toHaveURL(/section=agent/)

@@ -62,7 +62,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const [viewing, setViewing] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
-  const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), () => getCoordinatorChat(botId), {
+  const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), () => botId ? getCoordinatorChat(botId) : getCoordinatorChat(), {
     refreshInterval: latest => latest?.working ? 2000 : 10000,
   })
   const [draft, setDraft] = useState('')
@@ -87,7 +87,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   useEffect(() => {
     if (!data?.enabled || items.length || data.working || welcomed.current) return
     welcomed.current = true
-    void welcomeCoordinator(botId).then(() => mutate())
+    void (botId ? welcomeCoordinator(botId) : welcomeCoordinator()).then(() => mutate())
   })
   const rootRef = useRef<HTMLElement>(null)
   // Events are system lines, not messages; the person's own messages never count as unread.
@@ -107,7 +107,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     setSending(true)
     setSendError(null)
     try {
-      const result = await sendCoordinatorMessage(text, embedded?.quote, botId)
+      const result = botId ? await sendCoordinatorMessage(text, embedded?.quote, botId) : await sendCoordinatorMessage(text, embedded?.quote)
       if (result.error) { setSendError(actionError(result.error)); return false }
       embedded?.clearQuote()
       await mutate()
