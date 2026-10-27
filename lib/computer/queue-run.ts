@@ -19,8 +19,11 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       JOIN agents a ON a.id=$4 AND a."userId"=b."ownerId" AND a."deviceId"=dev.id
       JOIN device_repos repo ON repo.id=$5 AND repo."deviceId"=dev.id AND repo."userId"=b."ownerId"
       WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3
-        AND EXISTS (SELECT 1 FROM byos_bindings s WHERE s."ownerId"=b."ownerId" AND s."workspaceId"=b."workspaceId"::text
-          AND s."consumerId"=a.id::text AND s.route=CASE a.harness WHEN 'codex' THEN 'codex_cli' WHEN 'claude_code' THEN 'claude_code_cli' ELSE '' END)`,
+        AND EXISTS (SELECT 1 FROM byos_bindings s JOIN byos_connections c ON c.id=s."connectionId" AND c."ownerId"=s."ownerId"
+          AND c."workspaceId"=s."workspaceId" AND c.state='connected' AND c.epoch=s."connectionRevision"
+          WHERE s.id=(SELECT latest.id FROM byos_bindings latest WHERE latest."ownerId"=b."ownerId" AND latest."consumerId"=a.id::text
+            AND latest.route=CASE a.harness WHEN 'codex' THEN 'codex_cli' WHEN 'claude_code' THEN 'claude_code_cli' ELSE '' END
+            ORDER BY latest."createdAt" DESC,latest.id DESC LIMIT 1) AND s."workspaceId"=b."workspaceId"::text)`,
     [input.botId, actor.userId, actor.workspaceId, input.agentId, input.deviceRepoId])).rows[0]
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
     const runId = randomUUID()

@@ -266,6 +266,10 @@ renewal. Approved screenshot, click, Tab and scroll operations ran through the
 guarded driver; an X11 event listener confirmed that Tab and the scroll reached
 the desktop window. This remains a synthetic service/model test, not signed-in
 product or provider acceptance. The sandbox was deleted.
+The test was then repeated using `ensureBotRuntime` to create and reuse the
+Bot's real E2B working tree and internal executor records before queuing the
+task. The service, subscription binding and model remained synthetic. The
+`bot_cloud_runtimes` migration is recorded in development and production.
 
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
