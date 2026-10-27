@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | Mobile navigation is a side drawer like the ChatGPT iOS app: opens on the Coordinator chat; drawer = Coordinator, 建议, 线程, 任务, then 置顶 and 最近 bots/chats; the 线程 screen follows ChatGPT's Codex screen (machine filter chips, sections, floating composer) (「对，就按抽屉结构改」) | | Three bottom tabs (proposed same day) |
 | 2026-10-27 | Mobile: Expo builds both platforms, iOS ships first; the mobile visual design is native and drawn fresh, not the web look (「我们肯定先做 iOS」「原生肯定是要重新做呀」). Spec: `mobile.md` | | |
 | 2026-10-27 | A push notification has no buttons; the Coordinator's proactive message in its chat is a card with buttons. Pushes go to every device at once; a setting can turn off phone pushes while the computer is open (「手机推送不带按钮，在消息里面带按钮…同时推，但是在开关里面保留选项」) | R-20 | Plain-text reminders (Comma) |
 | 2026-10-27 | Proactive messages are an on/off switch in Settings (no user-facing budget setting). The Coordinator may switch it on or off when the person asks, only after their explicit confirmation. The person's profile (what Mikka knows about them) lives in Settings (「主动消息只是开关，不是额度」「要明确需要用户的明确授权」) | | |

@@ -28,18 +28,34 @@ briefing in the morning and see what is waiting on me.
 
 ## Where it lives
 
-Three tabs (proposed, not yet confirmed by Alex):
+A side drawer, like the ChatGPT iOS app; no bottom tabs. The app opens on the
+Coordinator chat. The menu button (top left) slides the drawer in from the
+left and pushes the current screen right.
 
-| Tab | 中文 | What it shows |
+Drawer, top to bottom:
+
+| Part | 中文 | What it holds |
 | --- | --- | --- |
-| Coordinator | Coordinator | The person's chat with the Coordinator. Home screen. |
-| 建议 | 建议 | Today's 08:00 briefing, then normal-level items by source app (R-21). |
-| 待你决策 | 待你决策 | Every matter or thread waiting on the person: Coordinator cards not yet answered, threads in `waiting_input`. |
+| Fixed rows | Coordinator · 建议 · 线程 · 任务 | Coordinator chat (first row, unread dot); 建议 (08:00 briefing and normal items, R-21); 线程 (every thread); 任务 (list only, no board) |
+| 置顶 | 置顶 | Pinned bots and group chats |
+| 最近 | 最近 | The other bots and group chats, newest first (the web bot list, R-01) |
+| Bottom | 新建 · avatar | New bot or chat; the avatar opens Settings |
 
-Other bots and group chats are reached from the Coordinator tab's header (a
-bot list sheet), not a tab of their own. Open question: R-06 says the
-Coordinator has no special UI; making its chat the mobile home gives it a
-special place. Alex to confirm.
+The Coordinator is the first ordinary row in the drawer and the default
+screen; it gets no other special UI (R-06).
+
+**线程 screen** (like ChatGPT's Codex screen):
+
+- Filter chips: 全部 · Mikka Cloud · 本机 · Remote (R-23 order); an online
+  machine has a green dot (R-24).
+- Sections 置顶 and 今天, then older. A running thread shows a spinner; one
+  waiting on the person shows the orange dot (R-13) and sorts first.
+- A floating composer at the bottom dispatches work through the Coordinator
+  (R-10: one composer).
+
+Things waiting on the person have no screen of their own: proactive cards sit
+in the Coordinator chat (unread dot on its drawer row), and waiting threads
+sort first on 线程.
 
 A thread card in any chat (R-15) opens the thread conversation full screen;
 back returns to the chat.
@@ -74,13 +90,15 @@ There is no budget setting; the caps in R-20 are fixed.
 
 ## Layout and states
 
-To draw for each tab: empty, loading, normal, error, offline, dark mode,
+To draw for each screen: empty, loading, normal, error, offline, dark mode,
 large Dynamic Type. Plus:
 
 - Coordinator chat: streaming reply, proactive card (unanswered / answered /
   snoozed), thread card (running / waiting / failed / done).
 - Push: lock screen and banner, one per kind (mail, CI, run finished,
   briefing, verification code).
+- Drawer: open over the Coordinator chat, with unread dots.
+- 线程: each filter, running / waiting / failed / done rows.
 - 建议: no apps connected (connect CTA), nothing today, briefing generating.
 - Sign in: Google, GitHub (R-40 copy rules).
 
@@ -88,7 +106,7 @@ large Dynamic Type. Plus:
 
 R-06, R-14, R-15, R-20, R-21, R-36, R-40. New rules this spec needs once Alex
 accepts the frames: proactive card with buttons, push without buttons,
-mobile tabs.
+mobile drawer.
 
 ## Engineering prerequisites
 
