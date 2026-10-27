@@ -29,7 +29,7 @@ Everything read is ingested through `ingestNotifications`, which skips an extern
 | Slack | Not reconciled | Slack is moving off Composio to Mikka's own Slack app; its backfill belongs there |
 | Notion | `NOTION_SEARCH_NOTION_PAGE`, most recently edited pages | A page already on file under any edit time is skipped, because the trigger's edit time may be written differently |
 | Linear | Replays the window's Issue and Comment deliveries from `linear_sync_inbox` | The inbox stores every signed delivery before it is acknowledged, whichever host received it |
-| GitHub | Not reconciled | Sign-in grants no token that can list a person's review requests or notifications, and the repository webhook has no store to replay from |
+| GitHub | Mikka's GitHub App (`mikka-github`) reads its own webhook delivery log (`GET /app/hook/deliveries`, last 3 hours) and asks GitHub to send again (`POST /app/hook/deliveries/{id}/attempts`) every delivery of a suggestion event (`pull_request`, `issues`, `issue_comment`, `pull_request_review`, `pull_request_review_comment`) that has no 2xx attempt, at most 25 a run | The redelivery reaches `app/api/webhooks/github`, so ingestion and the external-id dedupe are unchanged. It is a no-op without `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY`, and it cannot help while that route answers 503 for want of `GITHUB_WEBHOOK_SECRET` |
 
 People are those in `suggestion_trigger_checks` (opened the list or connected an app through Composio), least recently checked first. The backfill also re-creates missing Composio trigger subscriptions, at most hourly per person.
 
@@ -50,6 +50,11 @@ The Worker needs one secret, `CRON_SECRET`, and it must equal the app's `CRON_SE
 | --- | --- | --- |
 | Vercel (Production) | `CRON_SECRET` | Already stored in Infisical `prod:/vercel` and synced to Vercel |
 | Worker `mikka-suggestions-cron` | `CRON_SECRET` | New Infisical folder `prod:/cloudflare/suggestions-cron` holding only a reference to `prod:/vercel` `CRON_SECRET`, delivered by a new native Cloudflare Workers sync to `mikka-suggestions-cron` |
+
+| Vercel (Production; Preview for acceptance) | `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` | Stored in Infisical `prod:/github` and `staging:/github`. Not yet synced to Vercel: add references to them in `prod:/vercel` (and `staging:/vercel`), or add `/github` to the Vercel sync |
+| Vercel (Production; Preview for acceptance) | `GITHUB_WEBHOOK_SECRET` | Stored in Infisical `prod:/github` and `staging:/github`, but missing from both `/vercel` folders. Without it `app/api/webhooks/github` answers 503 to every delivery, so suggestions get nothing from GitHub and redelivery cannot help. It must equal the webhook secret set on the GitHub App |
+
+`/github` also holds `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_SLUG`; the backfill does not use them.
 
 Use a folder of its own instead of the existing `/cloudflare` folder, which also holds the Linear OAuth and webhook secrets this Worker does not need. Deploy the Worker once before creating the sync, so the sync has a destination.
 

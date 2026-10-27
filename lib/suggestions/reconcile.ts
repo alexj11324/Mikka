@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { linearSyncInbox, suggestions, suggestionTriggerChecks } from '@/lib/db/schema'
 import { getComposio, runComposioAction } from '@/lib/composio'
 import { listComposioPages } from '@/lib/composio-pagination'
+import { redeliverFailedGitHubWebhooks, type RedeliveryResult } from './github-redelivery'
 import { gmailNotification, notionSearchNotification, type ExternalNotification } from './notification'
 import { ensureComposioTriggers, linearWebhookNotifications } from './sources'
 import { ingestNotifications } from './store'
@@ -12,8 +13,8 @@ import { ingestNotifications } from './store'
 // It reads what each source holds now and ingests it like a webhook delivery;
 // ingestNotifications skips anything already stored under the same external
 // id, so only what a lost delivery missed is judged and added. GitHub is not
-// read: sign-in grants no token that can list the person's review requests,
-// and the repository webhook has no store to replay from.
+// re-read: Mikka's GitHub App asks GitHub to send its failed webhook
+// deliveries again (./github-redelivery).
 
 /** How far back the backfill looks. Longer than its interval, so one missed run is still covered. */
 export const RECONCILE_WINDOW_MS = 26 * 60 * 60 * 1000
@@ -50,7 +51,7 @@ async function recentNotion(userId: string, since: Date): Promise<ExternalNotifi
   return pages.filter(page => !knownPages.has(pageId(page.externalId)))
 }
 
-export interface ReconcileResult { people: number; read: Record<string, number>; failed: Record<string, number>; deferred: number; linear: { deliveries: number; notifications: number } }
+export interface ReconcileResult { people: number; read: Record<string, number>; failed: Record<string, number>; deferred: number; linear: { deliveries: number; notifications: number }; github: RedeliveryResult | null }
 
 async function reconcilePerson(userId: string, toolkits: readonly string[], since: Date, result: ReconcileResult) {
   // A lost subscription is the likeliest reason deliveries stopped; re-create it (at most hourly).
@@ -95,7 +96,12 @@ async function reconcileLinear(since: Date, result: ReconcileResult) {
  */
 export async function reconcileSuggestions({ now = new Date(), deadline = Infinity }: { now?: Date; deadline?: number } = {}): Promise<ReconcileResult> {
   const since = new Date(now.getTime() - RECONCILE_WINDOW_MS)
-  const result: ReconcileResult = { people: 0, read: {}, failed: {}, deferred: 0, linear: { deliveries: 0, notifications: 0 } }
+  const result: ReconcileResult = { people: 0, read: {}, failed: {}, deferred: 0, linear: { deliveries: 0, notifications: 0 }, github: null }
+  try { result.github = await redeliverFailedGitHubWebhooks({ now }) }
+  catch (error) {
+    result.failed.github = 1
+    console.error('Suggestions backfill could not redeliver GitHub webhooks', error instanceof Error ? error.message : error)
+  }
   try { await reconcileLinear(since, result) }
   catch (error) {
     result.failed.linear = 1
