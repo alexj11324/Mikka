@@ -76,7 +76,13 @@ source wins in a conflict is in [`README.md`](README.md).
   irreversible one due within a week, is critical. Only the Coordinator speaks to the person about events: no
   push, chat message or Telegram/Slack message is sent around it. Critical,
   high and ask go to the Coordinator at once; the 08:00 briefing is handed to
-  it too. It decides whether to tell the person: a card in its
+  it too. It tells the person only when they must act before the next
+  08:00 briefing, or when a cost that cannot be undone lands within a week;
+  everything else waits in 建议 for the briefing. When unsure, it stays
+  quiet. It also stays quiet when fresh evidence shows the matter resolved,
+  owned by someone else, or already covered in the chat. When the daily cap
+  is spent, a matter the person must still act on is snoozed until the cap
+  reopens, never dropped. Telling the person is a card in its
   own chat that says what happens if nothing is done and offers one next
   step, pushed on mobile. Normal stays in 建议; low is not shown. Telling the
   person is capped at 5 a day, 30 minutes apart (critical skips the spacing,
