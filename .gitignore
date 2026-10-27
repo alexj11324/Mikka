@@ -47,3 +47,4 @@ next-env.d.ts
 /packages/subscription-worker/bin/
 # Generated standalone credential broker bundles.
 /services/credential-broker/dist/
+/services/credential-broker/public/
