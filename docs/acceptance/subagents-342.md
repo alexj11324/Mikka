@@ -34,16 +34,46 @@ Actual new gateway on an E2B disposable machine passed:
 - Stop makes state unavailable; another owner's signed capability is rejected.
 
 The test fixture is `scripts/e2b/subagent-live-acceptance.py`, executed inside the
-isolated machine after infrastructure installs the gateway and key. All test
-machines and snapshots were deleted. Synthetic test passwords never appear in
+isolated machine after infrastructure installs the gateway and key. Preflight test
+machines and snapshots were deleted; controlled joint acceptance fixtures have
+short expiry and are cleaned up after the HTTP acceptance. Synthetic test passwords never appear in
 reported output. Runtime secrets are obtained from Infisical in process memory.
 
-## Remaining acceptance
+## Dedicated thread Preview acceptance
 
-- Fixed application Preview and actual authenticated session/API tests.
-- Dedicated thread worker registration/claim/end and snapshot refresh on real repo changes.
-- Pausing a thread at a safe checkpoint without losing its run lease.
-- Actual #180 broker deployment -> this gateway integration, including thread browser binding.
-- Complete web-task actions (current durable worker supports navigation and observation).
-- Browser-login cookie synchronization restricted to one owner.
-- Frontend pill/card/settings acceptance remains outside this backend PR.
+Fixed worker API Preview: `https://mikka-l6ajy50po-mikka-dev.vercel.app`,
+source `9fb6b12fca8115eede222246b4f4f6b10fdd6ea0`. This is an isolated empty
+Neon acceptance database with controlled users, sessions and repository fixtures;
+no production rows or subscription credentials were copied.
+
+Authenticated HTTP resume created two independent sandbox/device pairs in
+39.248s and 38.145s, including filesystem clone, runtime installation, pinned
+container image readiness and actual daemon registration/heartbeat. These are
+full startup timings, distinct from the 12.575s bare snapshot cold-ready probe.
+Both threads reused their owner's cached snapshot. Pause/resume returned 200
+in 2.474/2.631s and 2.029/2.056s. Changing only the repository lockfile generated
+a different snapshot and another independent device (37.574s).
+
+A real issued device credential claimed its own run over HTTPS (200), with the
+expected owner/workspace/route. Another thread's run or device token was refused
+(401). Controlled connected subscription *metadata* enabled this infrastructure
+claim; its secret reference deliberately does not identify a real credential.
+The native subscription endpoint still returned application empty-body 401,
+not Vercel protection HTML. Its existing hosted-device authorization and custody
+configuration remain prerequisites for actual provider login or coding inference.
+No new subscription credentials or permanent hosted-device exemptions were made.
+The worker bootstrap privately carries the branch's Preview protection bypass;
+actual registration and heartbeat use the same transport as daemon polling.
+
+Ordinary browser navigate/click/type/key actions are implemented. Password and
+OTP typing is broker-only; sensitive observations and display access remain
+blocked until cleared. Irreversible actions use the existing pending_actions
+approval ledger, while normal navigation does not request per-action approval.
+Joint acceptance must keep #180's actual login provider and #342's actual browser
+resolver; standalone seams intentionally fail closed without the other PR.
+
+The linked issue and PR hold final fixed-SHA deployment, worker self-claim,
+end/cleanup and joint broker HTTP results. Active native runs retain their
+90-second lease; only idle unclaimed threads pause. Safely pausing an active
+native run at a checkpoint, real provider consent/inference and frontend
+pill/card/settings acceptance remain outside the demonstrated acceptance.
