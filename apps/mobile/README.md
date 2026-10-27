@@ -3,9 +3,9 @@
 The iOS app (Expo SDK 58, Expo Router). Spec: `docs/design/mobile.md`; frames:
 Figma page `268:4750`.
 
-The screens run on sample data in `lib/mock.ts` until the mobile API exists
-(mobile.md, "Engineering prerequisites"). Sign-in, push and the chat stream
-are not wired yet.
+The screens read the server's `app/api/mobile/*` routes (mobile.md,
+"Engineering"). `EXPO_PUBLIC_API_URL` points the app at a preview deployment,
+with the base path (e.g. `https://<preview>/mikka`); the default is production.
 
 ```sh
 pnpm install                       # from the repository root
@@ -23,4 +23,5 @@ Layout:
   page; `settings/` is a modal stack.
 - `components/`: the drawer, chat pieces (bubbles, mention chips, proactive
   and thread cards, swipe-for-times), the composer, settings rows, icons.
-- `lib/`: theme colours and sample data.
+- `lib/`: the auth client, `api()` and `useApi()`, response types, push
+  registration, theme colours.

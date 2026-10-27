@@ -43,9 +43,9 @@ export function Header({ left, title, right, subtitle, style }: { left?: ReactNo
  * The composer: one rounded field holding 「+」, the text, the mic and send
  * (Alex 2026-10-27: 「加号改在里边」).
  */
-export function Composer({ placeholder, onSend }: { placeholder: string; onSend?: (text: string) => void }) {
+export function Composer({ placeholder, onSend, initial = '', disabled = false }: { placeholder: string; onSend?: (text: string) => void; initial?: string; disabled?: boolean }) {
   const insets = useSafeAreaInsets()
-  const [text, setText] = useState('')
+  const [text, setText] = useState(initial)
   const send = () => {
     const value = text.trim()
     if (!value) return
@@ -58,12 +58,12 @@ export function Composer({ placeholder, onSend }: { placeholder: string; onSend?
         <Pressable accessibilityRole="button" accessibilityLabel="添加附件" hitSlop={8} style={styles.fieldIcon}>
           <Plus size={22} color={colors.ink} strokeWidth={2} />
         </Pressable>
-        <TextInput value={text} onChangeText={setText} onSubmitEditing={send} placeholder={placeholder}
+        <TextInput value={text} onChangeText={setText} onSubmitEditing={send} placeholder={placeholder} editable={!disabled}
           placeholderTextColor={colors.tertiary} style={styles.input} returnKeyType="send" />
         <Pressable accessibilityRole="button" accessibilityLabel="语音输入" hitSlop={8} style={styles.fieldIcon}>
           <Mic size={21} color={colors.secondary} strokeWidth={2} />
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="发送" onPress={send} style={styles.send}>
+        <Pressable accessibilityRole="button" accessibilityLabel="发送" onPress={send} disabled={disabled} style={[styles.send, disabled && { backgroundColor: colors.tertiary }]}>
           <ArrowUp size={20} color="#fff" strokeWidth={2.4} />
         </Pressable>
       </View>

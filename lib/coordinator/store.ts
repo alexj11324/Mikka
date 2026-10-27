@@ -17,6 +17,8 @@ import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
 import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
+import { readPreferences } from '@/lib/preferences'
+import { pushReasons, type PushReason } from '@/lib/push-reasons'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -67,7 +69,7 @@ export async function wakingChats(userId: string): Promise<(string | null)[]> {
  * but do not count: with nothing else waiting, nothing moves. `held` is false
  * when another turn holds the lease; that turn will pick the events up.
  */
-export async function takeInbox(userId: string, holder: string, botId: string | null = null): Promise<{ held: boolean; added: number; telegramTargets: TelegramReplyTarget[] }> {
+export async function takeInbox(userId: string, holder: string, botId: string | null = null): Promise<{ held: boolean; added: number; telegramTargets: TelegramReplyTarget[]; pushReasons: PushReason[] }> {
   return db.transaction(async tx => {
     const now = new Date()
     await tx.insert(coordinatorSessions).values({ userId, botId }).onConflictDoNothing()
@@ -75,23 +77,23 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
       .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
       .where(and(sessionOf(userId, botId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
-    if (!taken) return { held: false, added: 0, telegramTargets: [] }
+    if (!taken) return { held: false, added: 0, telegramTargets: [], pushReasons: [] }
     const due = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
-    if (!due.length) return { held: true, added: 0, telegramTargets: [] }
+    if (!due.length) return { held: true, added: 0, telegramTargets: [], pushReasons: [] }
     const backgroundLimit = INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
-    if (!events.length) return { held: true, added: 0, telegramTargets: [] }
+    if (!events.length) return { held: true, added: 0, telegramTargets: [], pushReasons: [] }
     const first = await nextPosition(tx, userId, botId)
     await tx.insert(coordinatorMessages).values(events.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
       message: { role: 'user', content: eventPrompt(event) } satisfies ModelMessage,
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
-    return { held: true, added: events.length, telegramTargets: telegramReplyTargets(events) }
+    return { held: true, added: events.length, telegramTargets: telegramReplyTargets(events), pushReasons: pushReasons(events) }
   })
 }
 
@@ -145,7 +147,9 @@ export async function loadConversation(userId: string, botId: string | null = nu
     .from(coordinatorMessages)
     .where(and(messagesOf(userId, botId), gt(coordinatorMessages.position, through)))
     .orderBy(asc(coordinatorMessages.position))
-  return { summary: session?.summary ?? null, memory: session?.memory ?? '', messages: rows.map(row => ({ position: row.position, message: row.message as unknown as ModelMessage })) }
+  // 使用记忆 off (the app's 记忆 setting): the prompt leaves the memory out; it stays saved.
+  const memory = (await readPreferences(userId)).memoryEnabled ? session?.memory ?? '' : ''
+  return { summary: session?.summary ?? null, memory, messages: rows.map(row => ({ position: row.position, message: row.message as unknown as ModelMessage })) }
 }
 
 /** Replaces every message at or before `through` with `summary`. The messages stay stored. */

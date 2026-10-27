@@ -1,26 +1,26 @@
-import { useState } from 'react'
-import { ChoiceRow, SettingsPage, ToggleRow } from '@/components/settings'
+import { View } from 'react-native'
+import { SettingsPage, ToggleRow } from '@/components/settings'
 import { Group } from '@/components/ui'
+import { useSettings } from '@/lib/settings'
 
-/** 通知 (07c): 主动消息, per-event pushes, and when to push to the phone (Slack "Notify me on mobile"). */
+/**
+ * 通知 (07c): 主动消息 and which of the Coordinator's own messages reach the
+ * phone. 待审阅, 每日简报 and 电脑不在用时 come back when the server sends
+ * those (the attention and briefing work).
+ */
 export default function NotificationsScreen() {
-  const [proactive, setProactive] = useState(true)
-  const [events, setEvents] = useState({ decide: true, review: true, finished: false, briefing: true })
-  const [when, setWhen] = useState<'always' | 'away'>('always')
-  const toggle = (key: keyof typeof events) => (next: boolean) => setEvents(e => ({ ...e, [key]: next }))
+  const { data, savePreferences } = useSettings()
+  const p = data?.preferences
+  if (!p) return <SettingsPage title="通知"><View /></SettingsPage>
   return (
     <SettingsPage title="通知">
-      <Group><ToggleRow label="主动消息" value={proactive} onChange={setProactive} /></Group>
-      <Group label="推送这些事">
-        <ToggleRow label="需要你决策" value={events.decide} onChange={toggle('decide')} />
-        <ToggleRow label="待审阅" value={events.review} onChange={toggle('review')} />
-        <ToggleRow label="线程完成" value={events.finished} onChange={toggle('finished')} />
-        <ToggleRow label="每日简报" value={events.briefing} onChange={toggle('briefing')} />
-      </Group>
-      <Group label="推送到手机">
-        <ChoiceRow label="立即，即使电脑在用" selected={when === 'always'} onPress={() => setWhen('always')} />
-        <ChoiceRow label="电脑不在用时" selected={when === 'away'} onPress={() => setWhen('away')} />
-      </Group>
+      <Group><ToggleRow label="主动消息" value={p.proactive} onChange={proactive => void savePreferences({ proactive })} /></Group>
+      {p.proactive ? (
+        <Group label="推送这些事">
+          <ToggleRow label="需要你决策" value={p.pushDecide} onChange={pushDecide => void savePreferences({ pushDecide })} />
+          <ToggleRow label="线程完成" value={p.pushFinished} onChange={pushFinished => void savePreferences({ pushFinished })} />
+        </Group>
+      ) : null}
     </SettingsPage>
   )
 }

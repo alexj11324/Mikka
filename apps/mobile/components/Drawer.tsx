@@ -3,10 +3,10 @@ import { Animated, Easing, Pressable, ScrollView, StyleSheet, useWindowDimension
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { usePathname, useRouter, type Href } from 'expo-router'
 import { CodeXml, Inbox, ListChecks, PenLine, Search } from 'lucide-react-native'
-import { BotAvatar } from '@/components/icons'
+import { BotAvatar, Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { Dot, RoundButton } from '@/components/ui'
-import { bots, coordinator, me, suggestions, threads } from '@/lib/mock'
+import { useHome } from '@/lib/home'
 import { colors } from '@/lib/theme'
 
 type DrawerState = { open: () => void; close: () => void; isOpen: boolean }
@@ -51,9 +51,10 @@ function DrawerPanel({ onNavigate }: { onNavigate: () => void }) {
   const router = useRouter()
   const path = usePathname()
   const go = (href: Href) => { onNavigate(); router.replace(href) }
-  const running = threads.filter(t => t.status === 'running').length
-  const pinned = bots.filter(b => b.pinned)
-  const recent = bots.filter(b => !b.pinned)
+  const { data } = useHome()
+  // 最近: newest chat first (mobile.md). Pinning is not on the server yet, so there is no 置顶 group.
+  const bots = [...data?.bots ?? []].sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''))
+  const initials = (data?.user.name || data?.user.email || '').trim().slice(0, 2).toUpperCase()
 
   return (
     <View style={{ flex: 1, paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 12) }}>
@@ -62,26 +63,25 @@ function DrawerPanel({ onNavigate }: { onNavigate: () => void }) {
         <RoundButton label="搜索"><Search size={20} color={colors.ink} strokeWidth={2} /></RoundButton>
       </View>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 16 }}>
-        <Row active={path === '/'} onPress={() => go('/')} icon={<BotAvatar look={coordinator.look} size={24} />} label="Coordinator" trailing={<Dot />} />
-        <Row active={path === '/suggestions'} onPress={() => go('/suggestions')} icon={<Inbox size={22} color={colors.ink} strokeWidth={1.8} />} label="建议" trailing={<Text style={styles.count}>{suggestions.length}</Text>} />
-        <Row active={path.startsWith('/threads')} onPress={() => go('/threads')} icon={<CodeXml size={22} color={colors.ink} strokeWidth={1.8} />} label="线程" trailing={<Text style={styles.count}>{running} 运行中</Text>} />
+        <Row active={path === '/'} onPress={() => go('/')} icon={<BotAvatar size={24} />} label="Coordinator" />
+        <Row active={path === '/suggestions'} onPress={() => go('/suggestions')} icon={<Inbox size={22} color={colors.ink} strokeWidth={1.8} />} label="建议"
+          trailing={data?.suggestions ? <Text style={styles.count}>{data.suggestions}</Text> : null} />
+        <Row active={path.startsWith('/threads')} onPress={() => go('/threads')} icon={<CodeXml size={22} color={colors.ink} strokeWidth={1.8} />} label="线程"
+          trailing={data?.threads.waiting ? <Dot /> : data?.threads.running ? <Text style={styles.count}>{data.threads.running} 运行中</Text> : null} />
         <Row active={path === '/tasks'} onPress={() => go('/tasks')} icon={<ListChecks size={22} color={colors.ink} strokeWidth={1.8} />} label="任务" />
-        <Text style={styles.section}>置顶</Text>
-        {pinned.map(bot => (
-          <Row key={bot.id} active={path === `/bots/${bot.id}`} onPress={() => go(`/bots/${bot.id}`)} icon={<BotAvatar look={bot.look} size={24} />} label={bot.name} trailing={bot.unread ? <Dot color={colors.orange} /> : null} />
-        ))}
-        <Text style={styles.section}>最近</Text>
-        {recent.map(bot => (
-          <Row key={bot.id} active={path === `/bots/${bot.id}`} onPress={() => go(`/bots/${bot.id}`)} icon={<BotAvatar look={bot.look} size={24} />} label={bot.name} />
+        {bots.length ? <Text style={styles.section}>最近</Text> : null}
+        {bots.map(bot => (
+          <Row key={bot.id} active={path === `/bots/${bot.id}`} onPress={() => go(`/bots/${bot.id}`)} icon={<BotAvatar color={bot.color} shape={bot.shape} size={24} />} label={bot.name}
+            trailing={bot.working ? <Spinner size={14} /> : null} />
         ))}
       </ScrollView>
       <View style={styles.bottom}>
-        <Pressable accessibilityRole="button" style={styles.newButton}>
+        <Pressable accessibilityRole="button" onPress={() => go('/')} style={styles.newButton}>
           <PenLine size={18} color="#fff" strokeWidth={2} />
           <Text style={styles.newLabel}>新建</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="设置" onPress={() => { onNavigate(); router.push('/settings') }} style={styles.me}>
-          <Text style={styles.meText}>{me.initials}</Text>
+          <Text style={styles.meText}>{initials}</Text>
         </Pressable>
       </View>
     </View>

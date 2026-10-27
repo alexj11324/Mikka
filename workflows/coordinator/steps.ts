@@ -21,6 +21,8 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
 import type { TelegramReplyTarget } from '@/lib/coordinator-events'
 import { postTelegramText } from '@/lib/telegram/client'
+import { pushReply } from '@/lib/mobile-push'
+import type { PushReason } from '@/lib/push-reasons'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -80,6 +82,12 @@ export async function telegramReplyThreads(userId: string, targets: TelegramRepl
 export async function sendTelegramChunk(threadId: string, chunk: string) {
   'use step'
   await postTelegramText(threadId, chunk)
+}
+
+/** Pushes a reply the Coordinator raised on its own to the person's phones, as their 通知 settings allow (lib/mobile-push.ts). */
+export async function pushToPhones(userId: string, botId: string | null, text: string, reasons: PushReason[]) {
+  'use step'
+  await pushReply(userId, botId, text, reasons)
 }
 
 /**

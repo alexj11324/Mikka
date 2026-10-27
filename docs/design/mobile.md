@@ -4,9 +4,8 @@
 - **Linear / GitHub:** none yet
 - **Figma:** page `268:4750` 「手机端 · iOS 初稿（Claude · 2026-10-27）」 in `zPe5LKycb2XuT1ivCLRw07`, frames 01–07 (in review)
 - **Owner thread:** `claude/mikka-mobile-tech-choice-jrtbd3`
-- **Code:** `apps/mobile` (Expo SDK 58). Every screen in the frames runs on
-  sample data and is checked with Expo web screenshots; sign-in, push and the
-  live chat are not wired yet.
+- **Code:** `apps/mobile` (Expo SDK 58) on the server's `app/api/mobile/*`
+  routes; checked end to end with Expo web against a local server.
 
 Decisions behind this spec are the 2026-10-27 rows in `decisions.md` and
 R-20 / R-21 in `rules.md`.
@@ -157,23 +156,32 @@ R-06, R-14, R-15, R-20, R-21, R-36, R-40. New rules this spec needs once Alex
 accepts the frames: proactive card with buttons, push without buttons,
 mobile drawer.
 
-## Engineering prerequisites
+## Engineering
 
-- **Push:** Expo Push Service (APNs on iOS). Store device push tokens per
-  person and device; remove them on sign-out. One "tell the person" decision
-  (R-20) fans out to the app chat, every registered device, and, when
-  configured, Telegram / Slack.
-- **Presence:** the web app reports when a tab is open and active, for the
-  「电脑在用时不推送到手机」 setting.
-- **Sign-in:** better-auth's Expo plugin. Check that the OAuth proxy hub
-  (`BETTER_AUTH_OAUTH_PROXY_URL`) returns to the app's deep link.
-- **Chat:** AI SDK `useChat` with `expo/fetch` for streaming; card actions
-  call the same server endpoints the web uses.
+- **Sign-in:** better-auth's Expo plugin (`expo()` in `lib/auth.ts`, the app's
+  scheme `mikka://` is a trusted origin). Google and GitHub open the system
+  browser; email and password work too. The session cookie lives in the
+  keychain and goes with every request. Still to check on a device: that the
+  OAuth proxy hub (`BETTER_AUTH_OAUTH_PROXY_URL`) returns to `mikka://`.
+- **API:** `app/api/mobile/*`, one route per screen: `home` (drawer),
+  `chat` (Coordinator or a bot; `?bot=`), `threads`, `threads/:id`, `tasks`,
+  `settings`, `preferences`, `push-tokens`. 建议 uses `/api/suggestions`.
+  Writes refuse a browser Origin other than the site's own. The chosen
+  workspace travels as the web's `mikka-workspace` cookie.
+- **Push:** Expo Push Service. `mobile_push_tokens` holds one token per
+  installed app, removed on sign-out. A Coordinator or bot reply to Mikka's own
+  events (never to the person's message) is pushed when `user_preferences`
+  allow it: 需要你决策 for events that need the person, 线程完成 for finished
+  runs (`lib/push-reasons.ts`, `lib/mobile-push.ts`). Registering needs the
+  EAS project id in `app.json` (`extra.eas.projectId`) and a real device.
+- **Settings stored:** `user_preferences` (主动消息, the push switches,
+  使用记忆; off leaves the memory out of the prompt).
+- **Not on the server yet**, so the app leaves them out: proactive cards with
+  buttons and the 08:00 briefing (`claude/coordinator-attention`,
+  `claude/suggestions-cloudflare-cron`), 待审阅 and 已归档 threads, pinned
+  bots, 电脑不在用时 (needs the web to report presence), photo upload, dark mode.
 - **Updates:** EAS Update for JavaScript changes; store releases for native
   changes.
-- **Backend this depends on:** the 08:00 briefing schedule
-  (`claude/suggestions-cloudflare-cron`) and attention scoring and routing
-  (`claude/coordinator-attention`).
 
 ## Out of scope (first version)
 

@@ -41,6 +41,8 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
         ? await agent.generate({ ...(await steps.preparePrompt(userId, botId)), stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
         : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId, botId, scope), botId)
       await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text), botId)
+      // A reply to Mikka's own events (not to the person) also goes to their phones; pushReply never throws.
+      if (inbox.pushReasons.length && result.text.trim()) await steps.pushToPhones(userId, botId, result.text, inbox.pushReasons)
       if (inbox.telegramTargets.length && result.text.trim()) {
         // The reply is saved and shows on the web; a Telegram failure (a
         // blocked bot, an outage) must not fail the turn and stall the inbox.

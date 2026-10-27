@@ -1,34 +1,48 @@
 import { FlatList, Pressable, StyleSheet, View } from 'react-native'
+import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Search } from 'lucide-react-native'
 import { useDrawer } from '@/components/Drawer'
-import { MenuIcon, SourceIcon } from '@/components/icons'
+import { MenuIcon, SourceIcon, Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { Header, RoundButton } from '@/components/ui'
-import { suggestions } from '@/lib/mock'
+import { shortWhen } from '@/lib/clock'
+import type { Suggestion, Suggestions } from '@/lib/types'
+import { useApi } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
 
-/** 建议: today's normal items in one list, each led by its app's icon and a verb (R-21, R-45). The briefing is not here. */
+const VERB: Record<string, string> = { reply: '回复', review: '审阅', handle: '处理', read: '查看' }
+const APP: Record<string, string> = { gmail: 'Gmail', slack: 'Slack', notion: 'Notion', github: 'GitHub', linear: 'Linear' }
+const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+/**
+ * 建议: today's items in one list, each led by its app's icon and a verb
+ * (R-21, R-45). Tapping one hands it to the Coordinator, as on the web.
+ */
 export default function SuggestionsScreen() {
   const drawer = useDrawer()
+  const router = useRouter()
   const insets = useSafeAreaInsets()
+  const { data, error, loading } = useApi<Suggestions>(`/api/suggestions?tz=${encodeURIComponent(timeZone)}`)
+  const items = (data?.groups ?? []).flatMap(group => group.items).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+  const arrange = (item: Suggestion) => router.replace({ pathname: '/', params: { draft: [`${VERB[item.action] ?? ''}：${item.title}`, item.url].filter(Boolean).join('\n') } })
+
   return (
     <View style={styles.screen}>
-      <Header
-        left={<RoundButton label="菜单" onPress={drawer.open}><MenuIcon /></RoundButton>}
-        title="建议"
-        right={<RoundButton label="搜索"><Search size={20} color={colors.ink} strokeWidth={2} /></RoundButton>}
-      />
+      <Header left={<RoundButton label="菜单" onPress={drawer.open}><MenuIcon /></RoundButton>} title="建议" />
+      {loading ? <View style={styles.center}><Spinner /></View> : null}
+      {!loading && error ? <Text style={styles.note}>建议加载失败。</Text> : null}
+      {!loading && data && !items.length ? <Text style={styles.note}>今天还没有新的建议。</Text> : null}
       <FlatList
-        data={suggestions}
+        data={items}
         keyExtractor={item => item.id}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
         renderItem={({ item, index }) => (
-          <Pressable accessibilityRole="button" style={({ pressed }) => [styles.row, index === 0 && styles.first, index === suggestions.length - 1 && styles.last, pressed && { backgroundColor: colors.pressed }]}>
+          <Pressable accessibilityRole="button" onPress={() => arrange(item)}
+            style={({ pressed }) => [styles.row, index === 0 && styles.first, index === items.length - 1 && styles.last, pressed && { backgroundColor: colors.pressed }]}>
             <SourceIcon source={item.source} size={20} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-              <Text style={styles.meta} numberOfLines={1}>{item.meta}</Text>
+              <Text style={styles.title} numberOfLines={1}>{VERB[item.action] ? `${VERB[item.action]}：` : ''}{item.title}</Text>
+              <Text style={styles.meta} numberOfLines={1}>{[APP[item.source] ?? item.source, item.actor, shortWhen(item.occurredAt)].filter(Boolean).join(' · ')}</Text>
             </View>
           </Pressable>
         )}
@@ -39,6 +53,8 @@ export default function SuggestionsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.grouped },
+  center: { paddingTop: 40, alignItems: 'center' },
+  note: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
   list: { paddingHorizontal: 16, paddingTop: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 10 },
   first: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 14 },

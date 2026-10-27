@@ -1,29 +1,41 @@
-import { Pressable, StyleSheet, View } from 'react-native'
-import { Row, SettingsPage } from '@/components/settings'
+import { useState } from 'react'
+import { StyleSheet, TextInput, View } from 'react-native'
+import { Avatar, Row, SettingsPage } from '@/components/settings'
 import { Text } from '@/components/Text'
 import { Group } from '@/components/ui'
-import { me } from '@/lib/mock'
-import { colors } from '@/lib/theme'
+import { authClient } from '@/lib/auth'
+import { useSettings } from '@/lib/settings'
+import { colors, font } from '@/lib/theme'
 
-/** 个人资料: photo and name; email read-only (Comma iOS Profile, Claude). */
+/** 个人资料: photo and name; email read-only (Comma iOS Profile, Claude). The name saves when the field is left. */
 export default function ProfileScreen() {
+  const { data, setData } = useSettings()
+  const [name, setName] = useState(data?.user.name ?? '')
+  if (!data) return <SettingsPage title="个人资料"><View /></SettingsPage>
+  const save = async () => {
+    const next = name.trim()
+    if (!next || next === data.user.name) return setName(data.user.name)
+    const result = await authClient.updateUser({ name: next })
+    if (result.error) return setName(data.user.name)
+    setData(current => current && { ...current, user: { ...current.user, name: next } })
+  }
   return (
     <SettingsPage title="个人资料">
-      <View style={styles.hero}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{me.initials}</Text></View>
-        <Pressable accessibilityRole="button"><Text style={styles.edit}>编辑</Text></Pressable>
-      </View>
+      <View style={styles.hero}><Avatar name={data.user.name || data.user.email} image={data.user.image} size={88} /></View>
       <Group>
-        <Row label="名字" value={me.name} trailing={null} />
-        <Row label="邮箱" value={me.email} trailing={null} />
+        <View style={styles.row}>
+          <Text style={styles.label}>名字</Text>
+          <TextInput value={name} onChangeText={setName} onBlur={() => void save()} onSubmitEditing={() => void save()} returnKeyType="done" style={styles.input} />
+        </View>
+        <Row label="邮箱" value={data.user.email} trailing={null} />
       </Group>
     </SettingsPage>
   )
 }
 
 const styles = StyleSheet.create({
-  hero: { alignItems: 'center', gap: 10, marginBottom: 20 },
-  avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#55705F', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontSize: 30, fontWeight: '600' },
-  edit: { color: colors.accent, fontSize: 15 },
+  hero: { alignItems: 'center', marginBottom: 20 },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 16, gap: 12, backgroundColor: '#fff' },
+  label: { fontSize: 16 },
+  input: { flex: 1, minWidth: 0, textAlign: 'right', fontSize: 15, color: colors.secondary, fontFamily: font, outlineStyle: 'none' } as never,
 })

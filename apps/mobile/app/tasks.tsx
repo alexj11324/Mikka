@@ -1,24 +1,29 @@
 import { SectionList, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Circle, CircleCheck, CircleDashed, CircleDot } from 'lucide-react-native'
+import { Circle, CircleCheck, CircleDashed, CircleDot, CircleX } from 'lucide-react-native'
 import { useDrawer } from '@/components/Drawer'
-import { MenuIcon } from '@/components/icons'
+import { MenuIcon, Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { Header, RoundButton } from '@/components/ui'
-import { tasks, type Task } from '@/lib/mock'
+import type { Task } from '@/lib/types'
+import { useApi } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
 
-const SECTIONS: { status: Task['status']; title: string }[] = [
-  { status: 'doing', title: '进行中' },
-  { status: 'review', title: '待审阅' },
-  { status: 'todo', title: '待办' },
-  { status: 'done', title: '已完成' },
+/** The web's task statuses (lib/issue-meta.ts) in board order, with their names. */
+const SECTIONS: { status: string[]; title: string }[] = [
+  { status: ['doing'], title: '进行中' },
+  { status: ['review'], title: '评审中' },
+  { status: ['todo'], title: '待办' },
+  { status: ['backlog'], title: '待整理' },
+  { status: ['done'], title: '已完成' },
+  { status: ['canceled', 'duplicate'], title: '已取消' },
 ]
 
-function TaskIcon({ status }: { status: Task['status'] }) {
+function TaskIcon({ status }: { status: string }) {
   if (status === 'done') return <CircleCheck size={18} color={colors.success} strokeWidth={2} />
   if (status === 'doing') return <CircleDot size={18} color={colors.orange} strokeWidth={2} />
-  if (status === 'review') return <CircleDashed size={18} color={colors.prOpen} strokeWidth={2} />
+  if (status === 'review') return <CircleDashed size={18} color={colors.success} strokeWidth={2} />
+  if (status === 'canceled' || status === 'duplicate') return <CircleX size={18} color={colors.tertiary} strokeWidth={2} />
   return <Circle size={18} color={colors.secondary} strokeWidth={2} />
 }
 
@@ -26,7 +31,8 @@ function TaskIcon({ status }: { status: Task['status'] }) {
 export default function TasksScreen() {
   const drawer = useDrawer()
   const insets = useSafeAreaInsets()
-  const sections = SECTIONS.map(s => ({ title: s.title, data: tasks.filter(t => t.status === s.status) })).filter(s => s.data.length)
+  const { data, error, loading } = useApi<{ tasks: Task[] }>('/api/mobile/tasks', 30_000)
+  const sections = SECTIONS.map(s => ({ title: s.title, data: (data?.tasks ?? []).filter(t => s.status.includes(t.status)) })).filter(s => s.data.length)
   return (
     <View style={styles.screen}>
       <Header left={<RoundButton label="菜单" onPress={drawer.open}><MenuIcon /></RoundButton>} title="任务" />
@@ -35,13 +41,13 @@ export default function TasksScreen() {
         keyExtractor={t => t.id}
         stickySectionHeadersEnabled={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : <Text style={styles.empty}>{error ? '任务加载失败。' : '还没有任务。'}</Text>}
         renderSectionHeader={({ section }) => <Text style={styles.section}>{section.title}</Text>}
         renderItem={({ item }) => (
           <View style={styles.row}>
             <TaskIcon status={item.status} />
-            <Text style={styles.key}>{item.key}</Text>
+            {item.identifier ? <Text style={styles.key}>{item.identifier}</Text> : null}
             <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-            <Text style={styles.assignee} numberOfLines={1}>{item.assignee}</Text>
           </View>
         )}
       />
@@ -53,7 +59,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
   section: { fontSize: 13, color: colors.secondary, marginLeft: 20, marginTop: 16, marginBottom: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, height: 48 },
-  key: { fontSize: 13, color: colors.secondary, width: 56 },
+  key: { fontSize: 13, color: colors.secondary, minWidth: 56 },
   title: { flex: 1, fontSize: 16 },
-  assignee: { fontSize: 13, color: colors.secondary, maxWidth: 110 },
+  empty: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
 })

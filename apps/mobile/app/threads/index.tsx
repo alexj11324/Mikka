@@ -2,47 +2,46 @@ import { type ComponentType, useMemo, useState } from 'react'
 import { FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Archive, Check, CircleCheck, Eye, Hand, List, LoaderCircle, Plus, Search, SlidersHorizontal } from 'lucide-react-native'
+import { Check, CircleCheck, Hand, List, LoaderCircle, Plus, SlidersHorizontal } from 'lucide-react-native'
 import { useDrawer } from '@/components/Drawer'
-import { MachineIcon, MenuIcon, StatusIcon } from '@/components/icons'
+import { MachineIcon, MenuIcon, Spinner, StatusIcon } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { Dot, Header, RoundButton } from '@/components/ui'
-import { machines, threads, type Machine, type Thread } from '@/lib/mock'
+import type { Thread, Threads } from '@/lib/types'
+import { useApi } from '@/lib/useApi'
 import { colors, lift } from '@/lib/theme'
 
-type Filter = 'all' | 'waiting' | 'review' | 'running' | 'done' | 'archived'
+// 待审阅 and 已归档 (Figma 03b) wait for the server to track reviews and archiving.
+type Filter = 'all' | 'waiting' | 'running' | 'done'
 const filters: { id: Filter; label: string; icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }> }[] = [
   { id: 'all', label: '全部', icon: List },
   { id: 'waiting', label: '等你回复', icon: Hand },
-  { id: 'review', label: '待审阅', icon: Eye },
   { id: 'running', label: '进行中', icon: LoaderCircle },
   { id: 'done', label: '已完成', icon: CircleCheck },
-  { id: 'archived', label: '已归档', icon: Archive },
 ]
 
 const matches = (thread: Thread, filter: Filter) => {
-  if (filter === 'archived') return !!thread.archived
-  if (thread.archived) return false
   if (filter === 'all') return true
-  if (filter === 'done') return ['done', 'merged', 'closed'].includes(thread.status)
+  if (filter === 'done') return thread.status === 'done' || thread.status === 'stopped'
   return thread.status === filter
 }
 
 /** Threads waiting on the person sort first (mobile.md). */
-const rank = (thread: Thread) => (thread.status === 'waiting' || thread.status === 'review' ? 0 : thread.status === 'running' ? 1 : 2)
+const rank = (thread: Thread) => (thread.status === 'waiting' ? 0 : thread.status === 'running' ? 1 : 2)
 
 /** 线程, like the Claude app's Code screen: 设备 chips, filter menu, 新线程 pill (mobile.md). */
 export default function ThreadsScreen() {
   const drawer = useDrawer()
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const [machine, setMachine] = useState<Machine | null>(null)
+  const { data, loading, error } = useApi<Threads>('/api/mobile/threads', 10_000)
+  const [machine, setMachine] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [menu, setMenu] = useState(false)
 
-  const list = useMemo(() => threads
-    .filter(t => matches(t, filter) && (!machine || t.machine === machine))
-    .sort((a, b) => rank(a) - rank(b)), [filter, machine])
+  const list = useMemo(() => (data?.threads ?? [])
+    .filter(t => matches(t, filter) && (!machine || t.device?.id === machine))
+    .sort((a, b) => rank(a) - rank(b)), [data, filter, machine])
 
   return (
     <View style={styles.screen}>
@@ -57,15 +56,15 @@ export default function ThreadsScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
         ListHeaderComponent={
           <View>
-            <Text style={styles.section}>设备</Text>
+            {data?.devices.length ? <Text style={styles.section}>设备</Text> : null}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              {machines.map(m => {
+              {(data?.devices ?? []).map(m => {
                 const active = machine === m.id
                 return (
                   <Pressable key={m.id} accessibilityRole="button" onPress={() => setMachine(active ? null : m.id)} style={[styles.chip, active && styles.chipActive]}>
-                    <MachineIcon machine={m.id} size={16} color={active ? '#fff' : colors.ink} />
+                    <MachineIcon machine={m.kind} size={16} color={active ? '#fff' : colors.ink} />
                     <Text style={[styles.chipText, active && { color: '#fff' }]}>{m.name}</Text>
-                    {m.id !== 'server' ? <View style={styles.online} /> : null}
+                    {m.online ? <View style={styles.online} /> : null}
                   </Pressable>
                 )
               })}
@@ -73,11 +72,11 @@ export default function ThreadsScreen() {
             <Text style={styles.section}>{filter === 'all' ? '线程' : filters.find(f => f.id === filter)?.label}</Text>
           </View>
         }
-        ListEmptyComponent={<Text style={styles.empty}>没有线程</Text>}
+        ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : <Text style={styles.empty}>{error ? '线程加载失败。' : '没有线程'}</Text>}
         renderItem={({ item }) => <ThreadRow thread={item} onPress={() => router.push(`/threads/${item.id}`)} />}
       />
       <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 12) }]} pointerEvents="box-none">
-        <RoundButton label="搜索"><Search size={20} color={colors.ink} strokeWidth={2} /></RoundButton>
+        <View />
         <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={styles.newThread}>
           <Plus size={18} color="#fff" strokeWidth={2.4} />
           <Text style={styles.newThreadText}>新线程</Text>
@@ -100,20 +99,19 @@ export default function ThreadsScreen() {
   )
 }
 
-/** Status icon, name, one grey line: bot and machine icon. Only 等你回复 and 待审阅 add a word (mobile.md). */
+/** Status icon, name, one grey line: bot and machine icon. Only 等你回复 adds a word (mobile.md). */
 function ThreadRow({ thread, onPress }: { thread: Thread; onPress: () => void }) {
-  const word = thread.status === 'waiting' ? '等你回复' : thread.status === 'review' ? '待审阅' : null
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       <View style={styles.rowIcon}><StatusIcon status={thread.status} size={20} /></View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.rowTitle} numberOfLines={1}>{thread.title}</Text>
+        <Text style={styles.rowTitle} numberOfLines={1}>{thread.name}</Text>
         <View style={styles.rowMeta}>
-          <Text style={styles.rowMetaText}>{word ? `${word} · ` : ''}{thread.bot}</Text>
-          <MachineIcon machine={thread.machine} size={13} />
+          <Text style={styles.rowMetaText}>{thread.status === 'waiting' ? '等你回复 · ' : ''}{thread.by}</Text>
+          {thread.device ? <MachineIcon machine={thread.device.kind} size={13} /> : null}
         </View>
       </View>
-      {thread.unread ? <Dot /> : null}
+      {thread.status === 'waiting' ? <Dot /> : null}
     </Pressable>
   )
 }

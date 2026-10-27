@@ -1,11 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { Animated, Easing, View } from 'react-native'
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg'
-import {
-  Circle as CircleIcon, CircleAlert, CircleCheck, Cloud, GitMerge, GitPullRequest, GitPullRequestClosed,
-  GitPullRequestDraft, LoaderCircle, Laptop, Server,
-} from 'lucide-react-native'
-import type { BotLook, Machine, Source, ThreadStatus } from '@/lib/mock'
+import { Circle as CircleIcon, CircleAlert, CircleCheck, CircleSlash, Cloud, LoaderCircle, Laptop, Server } from 'lucide-react-native'
+import type { MachineKind, Source, ThreadStatus } from '@/lib/types'
 import { colors } from '@/lib/theme'
 
 /** The two-line menu mark from the frames (ChatGPT iOS). */
@@ -33,27 +30,35 @@ export function Spinner({ size = 18, color = colors.secondary }: { size?: number
   )
 }
 
-/** A thread's status icon; a thread is never drawn with its bot's avatar (glossary). PR states use GitHub's colours. */
+/** A thread's status icon; a thread is never drawn with its bot's avatar (glossary). */
 export function StatusIcon({ status, size = 18 }: { status: ThreadStatus; size?: number }) {
   switch (status) {
     case 'running': return <Spinner size={size} />
     case 'waiting': return <CircleIcon size={size} color={colors.secondary} strokeWidth={2} />
     case 'failed': return <CircleAlert size={size} color={colors.danger} strokeWidth={2} />
     case 'done': return <CircleCheck size={size} color={colors.success} strokeWidth={2} />
-    case 'review': return <GitPullRequest size={size} color={colors.prOpen} strokeWidth={2} />
-    case 'draft': return <GitPullRequestDraft size={size} color={colors.secondary} strokeWidth={2} />
-    case 'merged': return <GitMerge size={size} color={colors.merged} strokeWidth={2} />
-    case 'closed': return <GitPullRequestClosed size={size} color={colors.danger} strokeWidth={2} />
+    case 'stopped': return <CircleSlash size={size} color={colors.secondary} strokeWidth={2} />
   }
 }
 
-export function MachineIcon({ machine, size = 13, color = colors.secondary }: { machine: Machine; size?: number; color?: string }) {
+/** A run's stored status (agent_runs.status) as the app's thread state. */
+export function threadStatus(status: string): ThreadStatus {
+  switch (status) {
+    case 'waiting_input': return 'waiting'
+    case 'failed': return 'failed'
+    case 'succeeded': return 'done'
+    case 'stopped': case 'cancelled': return 'stopped'
+    default: return 'running'
+  }
+}
+
+export function MachineIcon({ machine, size = 13, color = colors.secondary }: { machine: MachineKind; size?: number; color?: string }) {
   const Icon = machine === 'cloud' ? Cloud : machine === 'laptop' ? Laptop : Server
   return <Icon size={size} color={color} strokeWidth={2} />
 }
 
 /** Each app's own coloured mark, not a tinted square (Alex 2026-10-27). */
-export function SourceIcon({ source, size = 20 }: { source: Source; size?: number }) {
+export function SourceIcon({ source, size = 20 }: { source: Source | 'google'; size?: number }) {
   const props = { width: size, height: size, viewBox: '0 0 24 24' }
   switch (source) {
     case 'gmail':
@@ -95,7 +100,16 @@ export function SourceIcon({ source, size = 20 }: { source: Source; size?: numbe
           <Path d="M6 13.5l4.5 4.5M5.2 10l8.8 8.8M7 7l10 10M10 5.2l8.8 8.8" stroke="#fff" strokeWidth={1.3} strokeLinecap="round" />
         </Svg>
       )
-    case 'calendar':
+    case 'google':
+      return (
+        <Svg {...props}>
+          <Path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.5-.2-2.2H12v4.3h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2.1-1.9 3.3-4.8 3.3-8.1z" />
+          <Path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.7c-1 .7-2.2 1.1-3.7 1.1-2.9 0-5.3-1.9-6.2-4.5H2.1v2.8A11 11 0 0 0 12 23z" />
+          <Path fill="#FBBC05" d="M5.8 14.2a6.6 6.6 0 0 1 0-4.3V7H2.1a11 11 0 0 0 0 9.9z" />
+          <Path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.2-3.2A11 11 0 0 0 2.1 7l3.7 2.9C6.7 7.3 9.1 5.4 12 5.4z" />
+        </Svg>
+      )
+    case 'googlecalendar':
       return (
         <Svg {...props}>
           <Rect x={3} y={3} width={18} height={18} rx={3} fill="#4285F4" />
@@ -106,11 +120,26 @@ export function SourceIcon({ source, size = 20 }: { source: Source; size?: numbe
   }
 }
 
-/** A bot's avatar: its blob in its colour, with one bright eye (a still bloub). */
-export function BotAvatar({ look, size = 24 }: { look: BotLook; size?: number }) {
-  const c = look.color
+/** Bot colours, as on the web (app/globals.css --bot-*). */
+const BOT_COLORS: Record<string, string> = {
+  encre: '#0a0a0c', brun: '#8b5e3c', rouge: '#e8483f', orange: '#f08a24', ambre: '#f0b429', vert: '#3ecf8e',
+  turquoise: '#2fbfa0', bleu: '#3b93f0', violet: '#8b5cf6', rose: '#e152b0', gris: '#a3a3a3', creme: '#d9d5ca',
+}
+
+type Shape = 'circle' | 'squircle' | 'flower' | 'cloud' | 'cat' | 'drop'
+
+/** The web's sixteen bloub shapes, drawn still with the nearest of six. */
+const SHAPES: Record<string, Shape> = {
+  cercle: 'circle', galet: 'circle', coeur: 'circle', champignon: 'circle', fantome: 'circle', feuille: 'drop',
+  squircle: 'squircle', capsule: 'squircle', triangle: 'squircle', hexagone: 'squircle', ecran: 'squircle',
+  nuage: 'cloud', goutte: 'drop', fleur: 'flower', etoile: 'flower', chat: 'cat',
+}
+
+/** A bot's avatar: its blob in its colour and shape, with one bright eye (a still bloub, R-36). The Coordinator is the ink circle. */
+export function BotAvatar({ color = 'encre', shape = 'cercle', size = 24 }: { color?: string; shape?: string; size?: number }) {
+  const c = BOT_COLORS[color] ?? BOT_COLORS.encre
   const body = (() => {
-    switch (look.shape) {
+    switch (SHAPES[shape] ?? 'circle') {
       case 'circle': return <Circle cx={12} cy={12} r={10} fill={c} />
       case 'squircle': return <Rect x={2.5} y={2.5} width={19} height={19} rx={6.5} fill={c} />
       case 'flower':

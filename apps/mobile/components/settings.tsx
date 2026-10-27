@@ -1,11 +1,23 @@
 import type { ReactNode } from 'react'
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
+import { Image, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, ChevronRight } from 'lucide-react-native'
 import { Text } from '@/components/Text'
+import { API_URL } from '@/lib/config'
 import { BackButton, Header } from '@/components/ui'
 import { colors } from '@/lib/theme'
+
+/** The person's photo, or their initials on green when they have none. */
+export function Avatar({ name, image, size }: { name: string; image: string | null; size: number }) {
+  // The server's default avatars are paths under its base path (lib/default-avatar.ts).
+  if (image) return <Image source={{ uri: image.startsWith('/') ? `${API_URL}${image}` : image }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+  return (
+    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
+      <Text style={[styles.avatarText, { fontSize: size * 0.38 }]}>{name.trim().slice(0, 2).toUpperCase()}</Text>
+    </View>
+  )
+}
 
 /** A settings sub-page: back button, centred title, grouped rows (R-70). */
 export function SettingsPage({ title, subtitle, right, children, footer }: { title: string; subtitle?: string; right?: ReactNode; children: ReactNode; footer?: ReactNode }) {
@@ -67,4 +79,6 @@ const styles = StyleSheet.create({
   label: { fontSize: 16 },
   detail: { fontSize: 12, color: colors.secondary, marginTop: 2 },
   value: { fontSize: 15, color: colors.secondary, maxWidth: 200 },
+  avatar: { backgroundColor: '#55705F', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontWeight: '600' },
 })
