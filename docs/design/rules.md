@@ -202,8 +202,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   完成), and the bot itself reports what it did, in its own voice. The user
   never drives a sub-agent's screen. When a site needs a login, the card shows
   需要你操作 and the chat shows a 登录 <site> chip; tapping it opens a sheet
-  with the account and a password field, and the password is typed into that
-  site's login page only (not stored, not shown to the model).
+  (title, account, password, 登录, 🔒 Secured by Mikka). The password is typed
+  into that site's login page only (not stored, not shown to the model).
 
 ## Look
 
@@ -244,7 +244,19 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   this on 2026-10-23 and 2026-10-24). If a sentence only explains the screen
   or narrates state, remove it. Examples that were removed: 「谁在工作 · 1 个
   agent 正在处理任务」 above the composer, 「和你的 Coordinator 聊聊」,
-  「有值得看的会第一时间放到这里」.
+  「有值得看的会第一时间放到这里」, and on a login sheet the subtitle
+  「Mikka 会把密码直接填进 Cloudflare 登录页，然后接着检查隧道。」 and the
+  small print 「密码只填进 Cloudflare 的登录页，Mikka 不保存，也不会给 AI
+  看」 (2026-10-27).
+  - A sheet or dialog is a title, its fields and its button. No subtitle that
+    says what will happen next.
+  - Reassurance (privacy, security) is a short mark, never a sentence: a lock
+    and 「Secured by Mikka」, as Stripe's 「Secured by Stripe」.
+  - A status line names the state only (「已登录 Cloudflare」), not the next
+    step (「…，继续检查」).
+  - Test: delete the string. If the screen still says the same thing, keep it
+    deleted. This applies to copy written in specs and agent briefs too: do not
+    hand a designer or subagent an explanatory sentence to draw.
 - **R-41** An empty state is one colloquial line plus one button (often
   "send to a bot"). Never "这里是空的" or "Check back later".
 - **R-42** Every visible string lives in `messages/zh-CN.json` and
