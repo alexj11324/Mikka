@@ -96,27 +96,29 @@ What reaches the person and when is R-20. On mobile:
 
 ## Settings
 
-Opened from the avatar at the bottom of the drawer. Only light, frequent
-settings; administration (members, teams, devices) stays on the web
-(`docs/settings.md`). Top to bottom:
+Opened from the avatar at the bottom of the drawer. A hierarchy (R-70): the
+top screen holds categories, each opens its own page. Every row cites its
+precedent. Figma frames 07, 07a–07e.
 
-| Group | 中文 | Rows |
+| Row | Where | Precedent |
 | --- | --- | --- |
-| Profile | — | Avatar and name; opens editing |
-| Workspace | 工作区 | 当前工作区 (switch) |
-| Notifications | 通知 | 主动消息 (on/off); 电脑在用时不推送到手机 (off by default). When iOS notification permission is off, one extra row says so and opens iOS Settings; it is absent otherwise |
-| Connected apps | 已连接的 App | Gmail, GitHub, Slack, Notion, Linear: 已连接 or 连接 |
-| Account | 账户 | 登录方式 |
-| General | 通用 | 语言; 外观 (跟随系统 / 浅色 / 深色) |
-| — | — | 退出登录; version |
+| Account: avatar, name, email → 个人资料 (photo, name; email read-only) | top → 07a | Comma iOS Account row → Profile; Claude (name + email); ChatGPT (avatar + name). None shows the sign-in provider |
+| 工作区 | top → 07b | Comma iOS workspace picker; ChatGPT 工作空间 |
+| 通知 (value 开/关) | top → 07c | ChatGPT, Claude, Comma (Comma shows On/Off on the row) |
+| 主动消息 | 07c | Claude Code "Push when Claude decides"; Comma "Proactive messages" |
+| 需要你决策 / 待审阅 / 线程完成 | 07c | Claude Code "Push when actions required"; Cursor (needs input, finished, ready for review); Replit; GitHub Mobile per-type toggles |
+| 每日简报 | 07c | ChatGPT notifications "Tasks" (scheduled-task results) |
+| 推送到手机: 立即 / 电脑不在用时 | 07c | Slack "Notify me on mobile" |
+| 记忆: 使用记忆 + list, swipe to delete | top → 07d | ChatGPT 记忆 (Reference saved memories, Manage); Claude (Memory from chats, Manage) |
+| 已连接的 App | top → 07e | Claude Connectors; ChatGPT 插件; Poke Integrations |
+| 外观 | top | Claude, ChatGPT, Comma Android |
+| 语言 (opens iOS Settings) | top | Comma iOS |
+| 版本 | top | Comma iOS Version; ChatGPT 关于 |
+| 退出登录 | top, last | ChatGPT, Claude, Comma |
+| Push not deliverable (only when it fails) | top, first | Comma iOS |
 
-The Coordinator may turn 主动消息 on or off when asked, only after the person
-confirms. There is no budget setting; the caps in R-20 are fixed.
-
-What the Coordinator knows about the person (accounts, what they own, what is
-not theirs) is not in Settings. The person manages it in the chat: telling
-the Coordinator 「Dependabot 的事别找我」 records it, and asking what it knows
-gets the list as a reply.
+Left out: sign-in provider, push-device list, explanatory footers, counts.
+Administration (members, teams, devices) stays on the web.
 
 ## Layout and states
 
