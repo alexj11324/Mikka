@@ -66,8 +66,8 @@ test('a worker question tells the Coordinator to relay the answer', () => {
 
 test('the morning briefing is pushed to the person once a day', () => {
   const event = briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'daily', total: 4, counts: { gmail: 3, linear: 1 } }, [
-    { source: 'linear', action: 'handle', title: 'Fix login', actor: 'Dana', url: 'https://linear.app/x/issue/MIK-9', required: true },
-    { source: 'gmail', action: 'reply', title: 'Thursday agenda', actor: null, url: null, required: false },
+    { suggestionId: 's1', source: 'linear', action: 'handle', title: 'Fix login', actor: 'Dana', url: 'https://linear.app/x/issue/MIK-9', required: true },
+    { suggestionId: 's2', source: 'gmail', action: 'reply', title: 'Thursday agenda', actor: null, url: null, required: false },
   ])
   assert.equal(event.dedupeKey, 'daily_briefing:u1:2026-10-27:daily')
   assert.notEqual(briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'first', total: 1, counts: {} }, []).dedupeKey, event.dedupeKey)
@@ -78,6 +78,8 @@ test('the morning briefing is pushed to the person once a day', () => {
   assert.match(prompt, /gmail 3, linear 1/)
   assert.match(prompt, /- linear · handle · assigned to them: "Fix login" from Dana \(https:\/\/linear\.app\/x\/issue\/MIK-9\)/)
   assert.match(prompt, /do not act until they say so/)
+  assert.match(prompt, /starts with a verb/)
+  assert.deepEqual((event.payload.items as { suggestionId: string }[]).map(item => item.suggestionId), ['s1', 's2'])
   // The person sees it as an event, without the triage line.
   const [item] = chatItems([{ position: 1, createdAt: new Date(0), message: { role: 'user', content: prompt } }])
   assert.equal(item.from, 'event')

@@ -73,7 +73,7 @@ const pending = (row: Briefing | undefined, dueAt: Date) => !row || (row.kind ==
  */
 async function pushBriefing(row: Briefing): Promise<boolean> {
   if (!row.total) return false
-  const items = (await briefingHighlights(row.userId, row.highlights)).map(item => ({ source: item.source, action: item.action, title: item.title, actor: item.actor, url: item.url, required: item.required }))
+  const items = (await briefingHighlights(row.userId, row.highlights)).map(item => ({ suggestionId: item.id, source: item.source, action: item.action, title: item.title, actor: item.actor, url: item.url, required: item.required }))
   await recordCoordinatorEvent(db, briefingEvent({ ...row, counts: row.counts as Record<string, number> }, items))
   return true
 }
