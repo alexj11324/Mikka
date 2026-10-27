@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | The 建议 briefing names each item as an inline mention chip (app icon + short label, as Comma's briefing does); tapping a chip opens that item. No 「去 Coordinator 处理」 link (「简报这一块，人家是加上了这个 mention block 的」) | R-21 | Plain briefing text with a link to the Coordinator |
 | 2026-10-27 | Every icon must match what mainstream products use for the same function; memory is a book (ChatGPT), 建议 an inbox, 线程 a code window, 任务 a checklist. Design reviews are sent as an Artifact page, with 3× images (「图标是不是用错了…你要去思考一下，目前主流产品都用什么图标」「要用 artifact」) | R-71 | Lightbulb, sparkles and other unsourced icons |
 | 2026-10-27 | A finished thread's check is green. PR states use GitHub's own colours: open green, draft grey, merged purple, closed red (「打勾可以用绿色」「PR 的颜色根据 GitHub 上来」) | R-62, R-66 | Grey check (same day) |
 | 2026-10-27 | Mobile Settings rebuilt as a hierarchy with a cited precedent per row (`mobile.md` § Settings, Figma 07–07e): account → 个人资料, 工作区, 通知, 记忆, 已连接的 App, 外观, 语言, 版本, 退出登录. 记忆 is a settings page after all (ChatGPT, Claude precedent) | R-70 | Flat settings page; 「关于你」 in chat only (same day) |
