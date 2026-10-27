@@ -7,7 +7,7 @@ import { listComposioPages } from '@/lib/composio-pagination'
 import { linearGraphQL } from '@/lib/linear-sync/graphql'
 import { linearAccessToken } from '@/lib/linear-sync/tokens'
 import { githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, type ExternalNotification } from './notification'
-import { ingestNotifications, writeFirstBriefing } from './store'
+import { ingestNotifications, recordTimeZone, writeFirstBriefing } from './store'
 import { missingTriggers, TRIGGER_CHECK_INTERVAL_MS, TRIGGER_PATTERNS, triggerSlugs } from './triggers'
 
 // Where notifications come from. Linear and GitHub webhooks carry full
@@ -117,6 +117,8 @@ export async function bootstrapSuggestions(userId: string, app: 'composio' | 'li
     }
   }
   try {
+    // The callbacks only know the IP-derived zone; it fills a gap until the browser reports one.
+    await recordTimeZone(userId, timeZone, { replace: false }).catch((error: unknown) => console.error('Time zone could not be saved', error instanceof Error ? error.message : error))
     const notifications = app === 'linear'
       ? await read('Linear', () => currentLinear(userId))
       : (await read('Composio', () => ensureComposioTriggers(userId, { force: true }))).includes('gmail') ? await read('Gmail', () => currentGmail(userId)) : []

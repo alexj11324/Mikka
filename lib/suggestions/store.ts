@@ -1,11 +1,11 @@
 import 'server-only'
-import { and, desc, eq, gte, inArray, isNull } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, isNull, lt, ne, or } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { decide } from '@/lib/coordinator/decide'
 import { decisionInput } from '@/lib/coordinator/decision'
 import { db } from '@/lib/db'
-import { briefings, suggestions } from '@/lib/db/schema'
-import { BRIEFING_WINDOW_MS, briefingContent, localDate, safeTimeZone } from './briefing'
+import { briefings, suggestions, userTimeZones } from '@/lib/db/schema'
+import { BRIEFING_HOUR, BRIEFING_WINDOW_MS, briefingContent, dueBriefingZones, localClock, localDate, localInstant, safeTimeZone } from './briefing'
 import type { ExternalNotification } from './notification'
 import { fallbackVerdict, modelVerdict, ruleVerdict, suggestionQuestions, suggestionState, type Verdict } from './rules'
 
@@ -55,21 +55,102 @@ async function briefingRow(userId: string, timeZone: string, kind: 'first' | 'da
   return { userId, localDate: localDate(timeZone, now), kind, timeZone, ...briefingContent(items) }
 }
 
+type Briefing = typeof briefings.$inferSelect
+
+/** A daily briefing with nothing in it only records that the day was checked; the person sees no briefing. */
+const shown = (row: Briefing | undefined) => row && !(row.kind === 'daily' && !row.total) ? row : null
+
+/** True when the row still has to give way to today's daily briefing: none yet, or one written on connecting before it came due. */
+const pending = (row: Briefing | undefined, dueAt: Date) => !row || (row.kind === 'first' && row.createdAt < dueAt)
+
 /**
- * Today's briefing in the person's time zone. The first read on a new day
- * writes the daily one from the last 24 hours; a day with nothing to say has
- * no briefing, so the UI shows its empty state.
+ * Writes the daily briefing from the last 24 hours, also when it is empty, so
+ * each local date gets at most one. It replaces only a `first` briefing
+ * written before `dueAt`. Null when another writer got there first.
+ */
+async function writeDailyBriefing(userId: string, timeZone: string, dueAt: Date, now: Date) {
+  const row = await briefingRow(userId, timeZone, 'daily', now)
+  const [saved] = await db.insert(briefings).values({ ...row, createdAt: now }).onConflictDoUpdate({
+    target: [briefings.userId, briefings.localDate],
+    set: { kind: row.kind, timeZone: row.timeZone, highlights: row.highlights, counts: row.counts, total: row.total, createdAt: now },
+    setWhere: and(eq(briefings.kind, 'first'), lt(briefings.createdAt, dueAt)),
+  }).returning()
+  return saved ?? null
+}
+
+/**
+ * The person's current briefing. The briefings cron writes the daily one at
+ * 08:00 their time; this is the fallback when it has not run yet. Before
+ * 08:00 it is the latest briefing from the last day (yesterday's, or one
+ * written on connecting an app), so nothing is written early.
  */
 export async function todaysBriefing(userId: string, timeZoneName: string | null) {
   const timeZone = safeTimeZone(timeZoneName)
   const now = new Date()
-  const today = localDate(timeZone, now)
-  const [existing] = await db.select().from(briefings).where(and(eq(briefings.userId, userId), eq(briefings.localDate, today))).limit(1)
-  if (existing) return existing
-  const row = await briefingRow(userId, timeZone, 'daily', now)
-  if (!row.total) return null
-  const [saved] = await db.insert(briefings).values(row).onConflictDoNothing().returning()
-  return saved ?? (await db.select().from(briefings).where(and(eq(briefings.userId, userId), eq(briefings.localDate, today))).limit(1))[0] ?? null
+  const { date: today, hour } = localClock(timeZone, now)
+  if (hour < BRIEFING_HOUR) {
+    const [latest] = await db.select().from(briefings).where(and(eq(briefings.userId, userId), gte(briefings.createdAt, new Date(now.getTime() - BRIEFING_WINDOW_MS)))).orderBy(desc(briefings.localDate)).limit(1)
+    return shown(latest)
+  }
+  const todays = async () => (await db.select().from(briefings).where(and(eq(briefings.userId, userId), eq(briefings.localDate, today))).limit(1))[0]
+  const existing = await todays()
+  const dueAt = localInstant(timeZone, today, BRIEFING_HOUR)
+  if (!pending(existing, dueAt)) return shown(existing)
+  return shown(await writeDailyBriefing(userId, timeZone, dueAt, now) ?? await todays())
+}
+
+/**
+ * Remembers the person's time zone for the briefings cron. An invalid name is
+ * ignored. With `replace: false` it only fills a gap, so an IP-derived guess
+ * never overrides the zone the person's browser reported.
+ */
+export async function recordTimeZone(userId: string, timeZoneName: string | null, { replace = true } = {}) {
+  if (!timeZoneName || safeTimeZone(timeZoneName) !== timeZoneName) return
+  const now = new Date()
+  const insert = db.insert(userTimeZones).values({ userId, timeZone: timeZoneName, updatedAt: now })
+  await (replace
+    ? insert.onConflictDoUpdate({ target: userTimeZones.userId, set: { timeZone: timeZoneName, updatedAt: now }, setWhere: ne(userTimeZones.timeZone, timeZoneName) })
+    : insert.onConflictDoNothing())
+}
+
+/** How many briefings the cron writes at once. */
+const BRIEFING_CONCURRENCY = 8
+
+/**
+ * Writes the daily briefing for everyone whose local time is past 08:00 and
+ * who has none for today yet. Running every 15 minutes, a person's briefing
+ * lands within 15 minutes of 08:00; a missed or cut-short run is caught up by
+ * the next one the same local day. Safe to run concurrently: the
+ * (userId, localDate) key keeps it to one per day.
+ */
+export async function writeDueBriefings({ now = new Date(), limit = 500, deadline = Infinity }: { now?: Date; limit?: number; deadline?: number } = {}) {
+  const zones = (await db.selectDistinct({ timeZone: userTimeZones.timeZone }).from(userTimeZones)).map(row => row.timeZone)
+  const people: { userId: string; timeZone: string; dueAt: Date }[] = []
+  for (const zone of dueBriefingZones(zones, now)) {
+    if (people.length > limit) break
+    const rows = await db.select({ userId: userTimeZones.userId }).from(userTimeZones)
+      .leftJoin(briefings, and(eq(briefings.userId, userTimeZones.userId), eq(briefings.localDate, zone.localDate)))
+      .where(and(eq(userTimeZones.timeZone, zone.timeZone), or(isNull(briefings.userId), and(eq(briefings.kind, 'first'), lt(briefings.createdAt, zone.dueAt)))))
+      .limit(limit + 1 - people.length)
+    people.push(...rows.map(row => ({ userId: row.userId, timeZone: zone.timeZone, dueAt: zone.dueAt })))
+  }
+  const result = { zones: zones.length, due: Math.min(people.length, limit), written: 0, empty: 0, skipped: 0, failed: 0, deferred: Math.max(0, people.length - limit) }
+  const batch = people.slice(0, limit)
+  for (let index = 0; index < batch.length; index += BRIEFING_CONCURRENCY) {
+    if (Date.now() > deadline) { result.deferred += batch.length - index; break }
+    await Promise.all(batch.slice(index, index + BRIEFING_CONCURRENCY).map(async person => {
+      try {
+        const saved = await writeDailyBriefing(person.userId, person.timeZone, person.dueAt, now)
+        if (!saved) result.skipped++
+        else if (saved.total) result.written++
+        else result.empty++
+      } catch (error) {
+        result.failed++
+        console.error('Daily briefing failed', error instanceof Error ? error.message : error)
+      }
+    }))
+  }
+  return result
 }
 
 /** Writes the briefing right after the person connects an app, replacing today's. */

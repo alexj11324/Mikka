@@ -2,7 +2,7 @@ import { after, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import type { SuggestionSource } from '@/lib/db/schema'
 import { ensureComposioTriggers } from '@/lib/suggestions/sources'
-import { briefingHighlights, listSuggestions, todaysBriefing } from '@/lib/suggestions/store'
+import { briefingHighlights, listSuggestions, recordTimeZone, todaysBriefing } from '@/lib/suggestions/store'
 
 export const runtime = 'nodejs'
 
@@ -11,7 +11,8 @@ const headers = { 'Cache-Control': 'private, no-store' }
 /**
  * The suggestions list: today's briefing (null on a day with nothing to say)
  * and the shown suggestions grouped by source app. `tz` is the person's IANA
- * time zone; without it the visitor's location decides.
+ * time zone, remembered so the briefings cron writes at 08:00 their time;
+ * without it the visitor's location decides.
  */
 export async function GET(request: Request) {
   const user = (await getSession())?.user
@@ -21,7 +22,14 @@ export async function GET(request: Request) {
     try { await ensureComposioTriggers(user.id) }
     catch (error) { console.error('Composio trigger check failed', error instanceof Error ? error.message : error) }
   })
-  const timeZone = new URL(request.url).searchParams.get('tz') ?? request.headers.get('x-vercel-ip-timezone')
+  const browserTimeZone = new URL(request.url).searchParams.get('tz')
+  if (browserTimeZone) {
+    after(async () => {
+      try { await recordTimeZone(user.id, browserTimeZone) }
+      catch (error) { console.error('Time zone could not be saved', error instanceof Error ? error.message : error) }
+    })
+  }
+  const timeZone = browserTimeZone ?? request.headers.get('x-vercel-ip-timezone')
   const [briefing, items] = await Promise.all([todaysBriefing(user.id, timeZone), listSuggestions(user.id)])
   const groups = new Map<SuggestionSource, typeof items>()
   for (const item of items) groups.set(item.source, [...groups.get(item.source) ?? [], item])

@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
-import { briefingContent, localDate, safeTimeZone } from './briefing'
+import { BRIEFING_HOUR, briefingContent, dueBriefingZones, localClock, localDate, localInstant, safeTimeZone } from './briefing'
 import { verifyGitHubSignature } from './github-webhook'
-import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, slackNotification, type ExternalNotification } from './notification'
+import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, notionNotification, notionSearchNotification, slackNotification, slackSearchNotification, type ExternalNotification } from './notification'
 import { missingTriggers, needsConfig, triggerSlugs } from './triggers'
 import { fallbackVerdict, modelVerdict, ruleVerdict, SHOW_THRESHOLD, suggestionState } from './rules'
 
@@ -121,4 +121,39 @@ test('only missing triggers are created, so a re-check is safe', () => {
   const wanted = [{ connectedAccountId: 'a1', slug: 'GMAIL_NEW_GMAIL_MESSAGE' }, { connectedAccountId: 'a2', slug: 'NOTION_PAGE_ADDED_TRIGGER' }]
   assert.deepEqual(missingTriggers(wanted, [{ connectedAccountId: 'a1', triggerName: 'GMAIL_NEW_GMAIL_MESSAGE', disabledAt: null }]), [wanted[1]])
   assert.deepEqual(missingTriggers(wanted, [{ connectedAccountId: 'a1', triggerName: 'GMAIL_NEW_GMAIL_MESSAGE', disabledAt: '2026-10-23T00:00:00Z' }]), wanted)
+})
+
+test('08:00 local is found across offsets and DST changes', () => {
+  assert.equal(localInstant('Asia/Shanghai', '2026-10-27', 8).toISOString(), '2026-10-27T00:00:00.000Z')
+  assert.equal(localInstant('America/Los_Angeles', '2026-10-27', 8).toISOString(), '2026-10-27T15:00:00.000Z')
+  // The day after US clocks go back: PST, not PDT.
+  assert.equal(localInstant('America/Los_Angeles', '2026-11-02', 8).toISOString(), '2026-11-02T16:00:00.000Z')
+  assert.equal(localInstant('Asia/Kolkata', '2026-10-27', 8).toISOString(), '2026-10-27T02:30:00.000Z')
+  assert.equal(localInstant('not/a zone', '2026-10-27', 8).toISOString(), '2026-10-27T08:00:00.000Z')
+  assert.deepEqual(localClock('Asia/Shanghai', new Date('2026-10-26T23:59:00Z')), { date: '2026-10-27', hour: 7 })
+  assert.deepEqual(localClock('UTC', new Date('2026-10-27T00:30:00Z')), { date: '2026-10-27', hour: 0 })
+})
+
+test('a time zone is due from 08:00 until its local midnight', () => {
+  const zones = ['Asia/Shanghai', 'Europe/Berlin', 'America/New_York']
+  // 00:10 UTC: 08:10 in Shanghai, 01:10 in Berlin, 20:10 the day before in New York.
+  const due = dueBriefingZones(zones, new Date('2026-10-27T00:10:00Z'))
+  assert.deepEqual(due.map(zone => [zone.timeZone, zone.localDate]), [['Asia/Shanghai', '2026-10-27'], ['America/New_York', '2026-10-26']])
+  assert.equal(due[0].dueAt.toISOString(), '2026-10-27T00:00:00.000Z')
+  // 07:59 in Shanghai is not due yet.
+  assert.deepEqual(dueBriefingZones(['Asia/Shanghai'], new Date('2026-10-26T23:59:00Z')), [])
+  assert.equal(BRIEFING_HOUR, 8)
+})
+
+test('search results keep the external id their trigger event has', () => {
+  const event = slackNotification(me, { channel: 'D123', ts: '1761200000.0001', text: 'are you around?', user: 'U9' })!
+  const match = slackSearchNotification(me, { channel: { id: 'D123', name: 'U9' }, ts: '1761200000.0001', text: 'are you around?', user: 'U9', permalink: 'https://x.slack.com/p1' })!
+  assert.equal(match.externalId, event.externalId)
+  assert.equal(match.direct, true)
+  const page = { object: 'page', id: 'p-1', url: 'https://notion.so/p-1', last_edited_time: '2026-10-27T08:00:00.000Z', last_edited_by: { object: 'user', id: 'u1' }, properties: { Name: { id: 'title', type: 'title', title: [{ plain_text: 'Q4 ' }, { plain_text: 'plan' }] } } }
+  const notion = notionSearchNotification(me, page)!
+  assert.equal(notion.title, 'Q4 plan')
+  assert.equal(notion.externalId, notionNotification(me, { page_id: 'p-1', title: 'Q4 plan', last_edited_time: '2026-10-27T08:00:00.000Z' })!.externalId)
+  assert.equal(notionSearchNotification(me, { ...page, in_trash: true }), null)
+  assert.equal(notionSearchNotification(me, { ...page, object: 'database' }), null)
 })

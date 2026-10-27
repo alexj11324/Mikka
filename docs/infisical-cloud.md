@@ -38,6 +38,7 @@ Neon integration-managed `DATABASE_URL` and `DATABASE_URL_UNPOOLED` are snapshot
 | Vercel Mikka team | Shared organization-level native App Connection `mikka-team-vercel-native-sync` created with explicit team-wide authorization. Four syncs for Development, default Preview, Production and the existing Linear branch have succeeded; automatic sync is enabled. The temporary OAuth hub branch sync was removed after the fixed production hub was deployed. |
 | Worker `mikka-linear-sync` | Native sync `mikka-workers-prod` succeeded and automatic sync is enabled. Deployed signature checks returned 401 for an invalid signature and 200 for a valid signature. |
 | Worker `mikka-linear-sync-preview` | Native sync `mikka-workers-staging` succeeded and automatic sync is enabled. Deployed signature checks returned 401 for an invalid signature and 200 for a valid signature. |
+| Worker `mikka-suggestions-cron` | Not configured yet. Needs folder `prod:/cloudflare/suggestions-cron` with only a `CRON_SECRET` reference to `prod:/vercel`, and a native Workers sync to it; see [suggestions schedules](suggestions-cron.md). |
 | Cloudflare Pages | No existing Mikka Pages project; no destination was invented. |
 | Cloud workload | GitHub OIDC identity `mikka-github-cloud` configured with 900-second tokens, no organization access and read-only Mikka project membership. Existing CI successfully verified one injected Composio credential against its issuer on a GitHub-hosted runner, without a Mac service. The old local MCP credential belongs to the deleted organization. |
 

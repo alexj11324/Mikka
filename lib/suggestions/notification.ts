@@ -133,6 +133,39 @@ export function notionNotification(userId: string, event: Json): ExternalNotific
   })
 }
 
+/**
+ * One match from Slack's message search (SLACK_SEARCH_MESSAGES), read like
+ * the trigger event so the external id is the same `${channel}:${ts}`.
+ */
+export function slackSearchNotification(userId: string, match: Json): ExternalNotification | null {
+  const channel = record(match.channel)
+  const id = str(channel.id)
+  return slackNotification(userId, {
+    ...match,
+    channel: id,
+    channel_type: id.startsWith('D') ? 'im' : channel.is_mpim ? 'mpim' : '',
+  })
+}
+
+/** The plain text of a Notion page's title property. */
+function notionTitle(page: Json): string {
+  for (const property of Object.values(record(page.properties))) {
+    const value = record(property)
+    if (value.type !== 'title' || !Array.isArray(value.title)) continue
+    return value.title.map(part => { const text = record(part).plain_text; return typeof text === 'string' ? text : '' }).join('')
+  }
+  return ''
+}
+
+/** One page from Notion's search (NOTION_SEARCH_NOTION_PAGE), read like the trigger event. */
+export function notionSearchNotification(userId: string, page: Json): ExternalNotification | null {
+  if (page.object !== 'page' || page.archived === true || page.in_trash === true) return null
+  return notionNotification(userId, {
+    id: page.id, title: notionTitle(page), url: page.url,
+    last_edited_time: page.last_edited_time, last_edited_by: page.last_edited_by,
+  })
+}
+
 /** A verified Composio trigger event, or null for a toolkit or shape we do not read. */
 export function composioNotification(event: { userId: string; toolkitSlug: string; payload?: Json }): ExternalNotification | null {
   const payload = record(event.payload)
