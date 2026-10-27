@@ -65,6 +65,7 @@ export const MCP_SERVER_SCRIPT = resolve(import.meta.dirname, "mikka-mcp.mjs")
 
 /** Name of the MCP server in every harness's config (`mcp__mikka__submit`). */
 export const MCP_SERVER_NAME = "mikka"
+export const COMPUTER_MCP_SERVER_NAME = "mikka_computer"
 
 export interface McpServerSpec {
   command: string

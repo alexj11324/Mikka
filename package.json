@@ -6,9 +6,10 @@
   "type": "module",
   "packageManager": "pnpm@10.34.3",
   "scripts": {
+    "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts",
     "generate:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs",
     "check:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
-    "build": "pnpm generate:agent-ui && pnpm lint && next build",
+    "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && pnpm lint && next build",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
     "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs",
@@ -61,10 +62,13 @@
     "test:db": "node scripts/run-db-tests.mjs",
     "test:db-runner": "node --test scripts/run-db-tests.test.mjs",
     "test:workspace-migration-db": "node --test tests/workspace-migration.test.mjs",
+    "test:artifact-migration-db": "node --test tests/artifact-legacy-migration.test.mjs",
     "test:activity-actor-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/activity-actor-db.test.ts",
     "test:coordinator-native": "node --experimental-test-module-mocks --import tsx --test lib/coordinator/native-store.test.ts lib/coordinator/native-prompt.test.ts lib/coordinator/native-relay.db.test.ts",
     "test:coordinator-native-scope": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/native-coordinator-tool-scope.test.ts",
     "test:coordinator-native-relay": "pnpm --filter @mikka/daemon exec vitest run --root ../.. tests/native-coordinator-relay.test.mjs",
+    "test:byos": "node --import ./scripts/server-test.mjs --import tsx --test lib/infisical-workload.test.ts lib/subscription-access-snapshot.test.ts lib/subscription-model.test.ts lib/subscription-enrollment.test.ts lib/subscription-enrollment-bind.test.ts lib/subscription-enrollment-binding-proof.test.ts lib/subscription-enrollment-handoff.test.ts lib/subscription-enrollment-policy.test.ts lib/subscription-ui.test.ts",
+    "test:byos-worker": "node scripts/test-subscription-worker.mjs",
     "test:slack": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/slack/webhook.test.ts lib/slack/owner.test.ts tests/slack-bot.test.mjs"
   },
   "dependencies": {
@@ -76,7 +80,6 @@
     "@better-auth/core": "1.7.12",
     "@better-auth/expo": "1.7.12",
     "@better-auth/oauth-provider": "1.7.12",
-    "@chat-adapter/slack": "4.43.0",
     "@chat-adapter/state-pg": "^4.43.0",
     "@chat-adapter/telegram": "^4.43.0",
     "@composio/core": "^0.26.0",
@@ -125,6 +128,7 @@
     "diff": "8.0.2",
     "dompurify": "^3.4.17",
     "drizzle-orm": "^0.45.4",
+    "e2b": "^2.61.0",
     "embla-carousel-react": "8.5.1",
     "input-otp": "1.4.1",
     "katex": "^0.16.47",
@@ -158,7 +162,8 @@
     "workflow": "5.2.3",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.33",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "@chat-adapter/slack": "4.43.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

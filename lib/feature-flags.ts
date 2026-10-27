@@ -30,3 +30,13 @@ export type GatedFeature = keyof typeof gatedFeatures
 export function gatedFeatureEnabled(remoteValue: boolean | string | undefined) {
   return remoteValue === true
 }
+
+/** An explicitly configured Preview can exercise the real cloud UI before rollout. */
+export function computerAcceptancePreview(environment: string | undefined, enabled: string | undefined) {
+  return environment === 'preview' && enabled === '1'
+}
+
+/** Production rollout can be enabled explicitly without changing Preview behavior. */
+export function computerProductionEnabled(environment: string | undefined, enabled: string | undefined) {
+  return environment === 'production' && enabled === '1'
+}

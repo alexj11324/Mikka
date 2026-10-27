@@ -634,6 +634,7 @@ describe("run stops", () => {
     await daemon.syncWithServer()
     await waitFor(() => daemon.supervisor.get(runId).state === "running")
     expect(daemon.supervisor.get(runId).leaseExpiresAt).toBeDefined()
+    expect(daemon.supervisor.computerRunAllowed(runId)).toBe(true)
     // The heartbeat renews the lease while the server is reachable.
     await new Promise((resolve) => setTimeout(resolve, 600))
     expect(daemon.supervisor.get(runId).state).toBe("running")
@@ -641,6 +642,7 @@ describe("run stops", () => {
     server.online = false
     await daemon.supervisor.idle()
     expect(daemon.supervisor.get(runId).stopReason).toBe("device_lost")
+    expect(daemon.supervisor.computerRunAllowed(runId)).toBe(false)
     // Meanwhile the server sees an active run without a fresh lease.
     expect(server.unownedRuns()).toEqual([runId])
 

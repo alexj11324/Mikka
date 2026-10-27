@@ -41,7 +41,9 @@
     "./members": "./src/members.ts",
     "./collab": "./src/collab.ts",
     "./artifact-frame": "./src/artifact-frame.ts",
-    "./coordinator": "./src/coordinator.ts"
+    "./coordinator": "./src/coordinator.ts",
+    "./computer": "./src/computer.ts",
+    "./subscription": "./src/subscription.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",

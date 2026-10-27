@@ -25,9 +25,10 @@ const MAX_ROUNDS = 10
 export async function coordinatorTurn(userId: string, botId: string | null = null) {
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
+  const computerEnabled = await steps.computerToolsEnabled()
   const agent = new WorkflowAgent({
     model: COORDINATOR_MODEL,
-    tools: coordinatorTools(userId, botId),
+    tools: coordinatorTools(userId, botId, undefined, computerEnabled),
   })
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const inbox = await steps.takeInbox(userId, holder, botId)
@@ -40,7 +41,7 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
       const selected = await native.runtime(userId)
       const result = selected.harness === 'ai_sdk'
         ? await agent.generate({ ...(await steps.preparePrompt(userId, botId)), stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
-        : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId, botId, scope), botId)
+        : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId, botId, scope, computerEnabled), botId)
       // After a quiet decision on hidden evidence there is nothing to say, so a quiet or empty reply is not a warning.
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       await steps.appendMessages(userId, holder, result.responseMessages, quiet ? null : turnWarning(result.finishReason, result.text), botId)
@@ -72,8 +73,12 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
 }
 
 /** Every bot's tools. Each one runs as a step scoped to the person; memory and dispatched runs belong to the bot (null: the Coordinator). */
-export function coordinatorTools(userId: string, botId: string | null, scope?: NativeToolScope) {
+export function coordinatorTools(userId: string, botId: string | null, scope?: NativeToolScope, computerEnabled = false) {
   const id = z.uuid()
+  // A named Bot always controls its own computer. The built-in Coordinator
+  // may select any authorized Bot on the person's explicit instruction.
+  const botInput = botId ? id.optional() : id
+  const targetBot = (requested?: string) => botId ? (!requested || requested === botId ? botId : null) : requested ?? null
   return {
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input, scope)),
     ...createGoogleAITools((action, input) => steps.composioAction(userId, action, input, scope), (action, input) => steps.proposeAccountAction(userId, action, input, scope)),
@@ -97,6 +102,43 @@ export function coordinatorTools(userId: string, botId: string | null, scope?: N
       inputSchema: z.object({}),
       execute: () => steps.listAgents(userId, scope),
     }),
+    ...(computerEnabled ? {
+      list_computer_workspaces: tool({
+        description: 'List workspaces the person belongs to, so a requested new Bot is created in the right workspace.',
+        inputSchema: z.object({}),
+        execute: () => steps.listComputerWorkspaces(userId, scope),
+      }),
+      create_computer_bot: tool({
+        description: 'Create a Bot only when the person asks to create one. Use an authorized workspace from list_computer_workspaces; if the workspace is ambiguous, ask the person.',
+        inputSchema: z.object({ workspaceId: id, name: z.string().trim().min(1).max(120) }),
+        execute: (input, options) => steps.createComputerBot(userId, input, options.toolCallId, scope),
+      }),
+      list_computer_bots: tool({
+        description: 'List the person’s Bots and the available hosted execution harnesses for their computers.',
+        inputSchema: z.object({}),
+        execute: () => steps.listComputerBots(userId, scope),
+      }),
+      wake_bot_computer: tool({
+        description: 'Wake the selected Bot computer when the person asks to use it. In a Bot chat, omit botId to use this Bot. This starts cloud compute and prepares its hosted workers.',
+        inputSchema: z.object({ botId: botInput }),
+        execute: input => { const target = targetBot(input.botId); return target ? steps.wakeComputerBot(userId, { botId: target }, scope) : { error: 'botMismatch' } },
+      }),
+      list_bot_subscriptions: tool({
+        description: 'List the person’s connected subscriptions available in this Bot’s workspace. In a Bot chat, omit botId to use this Bot. Never returns credentials.',
+        inputSchema: z.object({ botId: botInput }),
+        execute: input => { const target = targetBot(input.botId); return target ? steps.listBotSubscriptions(userId, { botId: target }, scope) : { error: 'botMismatch' } },
+      }),
+      bind_bot_subscription: tool({
+        description: 'Only when the person has selected a connected subscription and model, bind it to the Bot’s hosted executor. The Bot must first be awake.',
+        inputSchema: z.object({ botId: botInput, connectionId: id, revision: z.number().int().positive(), harness: z.enum(['codex', 'claude_code']), modelId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/) }),
+        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.bindComputerSubscription(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
+      }),
+      dispatch_bot_computer: tool({
+        description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Computer operations still require their approval.',
+        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional() }),
+        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerTask(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
+      }),
+    } : {}),
     dispatch_run: tool({
       description: 'Queue a run: one agent works one issue in one repository on its device. Returns the run id at once; an [Event] message arrives when the run ends.',
       inputSchema: z.object({
