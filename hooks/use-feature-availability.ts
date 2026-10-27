@@ -4,7 +4,7 @@ import { useCallback, useSyncExternalStore } from 'react'
 import { useTranslations } from 'next-intl'
 import posthog from 'posthog-js'
 import { computerMock } from '@/lib/computer/client'
-import { featureAvailability, gatedFeatureEnabled, gatedFeatures, upcomingFeatures, type GatedFeature, type UpcomingFeature } from '@/lib/feature-flags'
+import { computerAcceptancePreview, featureAvailability, gatedFeatureEnabled, gatedFeatures, upcomingFeatures, type GatedFeature, type UpcomingFeature } from '@/lib/feature-flags'
 
 const subscribe = (notify: () => void) => posthog.onFeatureFlags(() => notify())
 const serverSnapshot = () => undefined
@@ -24,7 +24,7 @@ export function useGatedFeature(feature: GatedFeature) {
   return gatedFeatureEnabled(useSyncExternalStore(subscribe, snapshot, serverSnapshot))
 }
 
-/** The cloud computer UI, behind its PostHog flag; the mock (NEXT_PUBLIC_COMPUTER_MOCK=1) plays the backend, so it shows without it. */
+/** The cloud computer UI uses the rollout flag or a deliberately enabled Preview. */
 export function useCloudComputer() {
-  return useGatedFeature('cloudComputer') || computerMock
+  return useGatedFeature('cloudComputer') || computerMock || computerAcceptancePreview(process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT, process.env.NEXT_PUBLIC_COMPUTER_ACCEPTANCE)
 }
