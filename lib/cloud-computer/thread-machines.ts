@@ -4,7 +4,7 @@ import type { Pool } from 'pg'
 import { Sandbox } from 'e2b'
 import { z } from 'zod'
 import { ComputerError } from '@/lib/computer/store'
-import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, ensureHostedRunnerImage } from '@/lib/computer/e2b-provider'
+import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant, ensureHostedRunnerImage } from '@/lib/computer/e2b-provider'
 import { installSubagentRuntime, runtimeRequest } from './runtime'
 import type { Actor } from './subagents'
 function options() {
@@ -106,16 +106,24 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
   if (action === 'resume') return ensureThreadMachine(pool, actor, runId)
   const sandbox = await connectComputer(machine.sandboxId)
   if (action === 'pause') {
-    const run = (await pool.query('SELECT status FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId, actor.userId])).rows[0]
-    if (run?.status !== 'queued') throw new ComputerError(409, 'Only an idle unclaimed thread can pause; an active run keeps its lease')
-    await sandbox.pause(); await pool.query('UPDATE thread_machines SET state=\'paused\' WHERE "runId"=$1', [runId]) }
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      const run = (await client.query('SELECT status FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
+      if (run?.status !== 'queued') throw new ComputerError(409, 'Only an idle unclaimed thread can pause; an active run keeps its lease')
+      await sandbox.pause()
+      await client.query('UPDATE thread_machines SET state=\'paused\' WHERE "runId"=$1', [runId])
+      await client.query('COMMIT')
+    } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  }
   if (action === 'end') { await sandbox.kill(); await pool.query('UPDATE thread_machines SET state=\'ended\',"endedAt"=now() WHERE "runId"=$1', [runId]); await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE "boundDeviceId"=$1', [machine.deviceId]) }
   if (action === 'desktop') {
-    await startDesktop(sandbox, 1)
+    await startDesktop(sandbox, 1, true)
     await syncDesktopLease(sandbox, { botId: machine.botId, ownerId: actor.userId, display: 1, epoch: machine.epoch, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion: 0 })
     await installSubagentRuntime(sandbox, actor.userId)
-    const browser = await runtimeRequest(machine.sandboxId, { id: runId, ownerId: actor.userId, workspaceId: actor.workspaceId, botId: machine.botId, epoch: machine.epoch }, '/start', {})
+    const browser = await runtimeRequest(machine.sandboxId, { id: runId, ownerId: actor.userId, workspaceId: actor.workspaceId, botId: machine.botId, epoch: machine.epoch, display: 1 }, '/start', {})
     await pool.query('UPDATE thread_machines SET "targetId"=$2 WHERE "runId"=$1', [runId, browser.targetId])
+    return { runId, state: machine.state, ...await viewerGrant(sandbox, { botId: machine.botId, ownerId: actor.userId, display: 1, epoch: machine.epoch, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion: 0 }, actor.userId, 'view') }
   }
   return { runId, state: action === 'end' ? 'ended' : action === 'pause' ? 'paused' : machine.state }
 }

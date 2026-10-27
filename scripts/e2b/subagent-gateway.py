@@ -2,7 +2,7 @@
 Viewer capabilities only receive JPEG frames. Broker capabilities are minted by
 the server for a specific owner/bot/subagent and may enter one guarded fill.
 """
-import asyncio, base64, hashlib, hmac, json, os, secrets, time
+import asyncio, base64, fcntl, hashlib, hmac, json, os, secrets, time
 from pathlib import Path
 from aiohttp import web, WSMsgType
 ROOT = Path('/run/mikka-subagents')
@@ -38,7 +38,7 @@ class Browser:
         self.guard_file=self.path/'guard'
         if self.guard_file.exists(): self.guard='locked'
     async def start(self):
-        self.process=await asyncio.create_subprocess_exec('node','/opt/mikka/computer/subagent-cdp.mjs',self.grant['subagentId'],stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL)
+        self.process=await asyncio.create_subprocess_exec('node','/opt/mikka/computer/subagent-cdp.mjs',self.grant['subagentId'],*([str(self.grant['display'])] if self.grant.get('display') else []),stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL)
         for _ in range(100):
             try: self.reader,self.writer=await asyncio.open_unix_connection(str(self.path/'cdp.sock'),limit=4*1024*1024);break
             except (FileNotFoundError,ConnectionRefusedError): await asyncio.sleep(.1)
@@ -85,7 +85,7 @@ class Browser:
 
 def browser(grant):
     b=AGENTS.get(grant['subagentId'])
-    if not b or b.stopped or any(grant.get(k)!=b.grant.get(k) for k in ('ownerId','workspaceId','botId','epoch')):raise web.HTTPNotFound()
+    if not b or b.stopped or any(grant.get(k)!=b.grant.get(k) for k in ('ownerId','workspaceId','botId','epoch','display')):raise web.HTTPNotFound()
     return b
 
 async def start(request):
@@ -127,8 +127,27 @@ async def begin(request):
     _,grant=authorize(request,'broker');b=browser(grant)
     async with b.lock:
         if b.guard:raise web.HTTPConflict()
-        # Persist before any operation; a failure stays locked through restart.
         b.guard=secrets.token_urlsafe(32);b.guard_file.write_text(b.guard);b.frame=None
+        display=b.grant.get('display')
+        if display:
+            state=Path('/run/mikka-viewer')
+            if (state/'guard-protocol').read_text()!='1':raise web.HTTPServiceUnavailable()
+            # Same lock used by #161's trusted CUA lease-driver. Wait for an
+            # in-flight operation, then exclude screenshots and input until end.
+            b.driver_lock=open(state/f'{display}.lock','a')
+            deadline=time.time()+20
+            while True:
+                try:fcntl.flock(b.driver_lock,fcntl.LOCK_EX|fcntl.LOCK_NB);break
+                except BlockingIOError:
+                    if time.time()>deadline:b.driver_lock.close();raise web.HTTPServiceUnavailable()
+                    await asyncio.sleep(.05)
+            (state/f'{display}.guard').write_text('credentials')
+            # VNC acknowledges every pre-existing viewer has closed. New ones
+            # are rejected by the marker before a frame can be sent.
+            while (state/f'{display}-viewers').exists() and int((state/f'{display}-viewers').read_text())>0:
+                if time.time()>deadline:raise web.HTTPServiceUnavailable()
+                await asyncio.sleep(.05)
+        # A failure keeps the persisted guard closed through restart.
         await b.rpc('Page.stopScreencast',session=b.session)
         tree=await b.rpc('Page.getFrameTree',session=b.session)
         b.guard_loader=tree['frameTree']['frame']['loaderId']
@@ -167,12 +186,15 @@ async def end(request):
     _,grant=authorize(request,'broker');b=browser(grant);data=await request.json()
     async with b.lock:
         if not b.guard or not hmac.compare_digest(data.get('guardToken',''),b.guard):raise web.HTTPForbidden()
-        check=await b.rpc('Runtime.evaluate',{'expression':"Array.from(document.querySelectorAll('input')).every(e => !e.value)",'returnByValue':True},b.session)
+        check=await b.rpc('Runtime.evaluate',{'expression':"!Array.from(document.querySelectorAll('input')).some(e => e.value && (e.type==='password'||e.autocomplete==='one-time-code'))",'returnByValue':True},b.session)
         tree=await b.rpc('Page.getFrameTree',session=b.session)
-        if (not getattr(b,'guard_loader',None) or tree['frameTree']['frame']['loaderId']==b.guard_loader) and check.get('result',{}).get('value') is not True:raise web.HTTPConflict()
+        if check.get('result',{}).get('value') is not True:raise web.HTTPConflict()
         # Clear the last frame so no buffered pre-fill frame races resumption.
         b.frame=None;await b.rpc('Page.startScreencast',{'format':'jpeg','quality':60,'maxWidth':1280,'maxHeight':800,'everyNthFrame':2},b.session)
         b.guard_file.unlink();b.guard=None
+        if b.grant.get('display'):
+            (Path('/run/mikka-viewer')/f"{b.grant['display']}.guard").unlink()
+            fcntl.flock(b.driver_lock,fcntl.LOCK_UN);b.driver_lock.close()
     return web.json_response({'resumed':True})
 
 async def action(request):
@@ -199,7 +221,7 @@ async def action(request):
             await b.rpc('Page.navigate',{'url':data['url']},b.session)
         elif name=='observe':
             # Exclude all form values, cookies, storage and raw HTML.
-            text=await b.rpc('Runtime.evaluate',{'expression':"JSON.stringify({url:location.href,title:document.title,links:Array.from(document.querySelectorAll('a')).slice(0,80).map(e=>({text:e.innerText.slice(0,160),href:e.href})),buttons:Array.from(document.querySelectorAll('button')).slice(0,80).map(e=>e.innerText.slice(0,160)),needsLogin:Array.from(document.querySelectorAll('input[type=password]')).some(e=>e.getClientRects().length>0)})",'returnByValue':True},b.session)
+            text=await b.rpc('Runtime.evaluate',{'expression':'(() => { const copy=document.body.cloneNode(true); copy.querySelectorAll(\'input,textarea,select,script,style,noscript\').forEach(e=>e.remove()); const elements=Array.from(document.querySelectorAll(\'a,button,input,textarea,select\')).slice(0,150).map((e,i)=>{e.setAttribute(\'data-mikka-ref\',String(i));return {selector:\'[data-mikka-ref=\\"\'+i+\'\\"]\',tag:e.tagName,type:e.type||null,text:[\'INPUT\',\'TEXTAREA\',\'SELECT\'].includes(e.tagName)?null:e.innerText.slice(0,200),label:e.getAttribute(\'aria-label\')||e.getAttribute(\'placeholder\'),href:e.tagName===\'A\'?e.href:null}});return JSON.stringify({url:location.origin+location.pathname,title:document.title,text:(copy.innerText||copy.textContent||\'\').slice(0,16000),elements,needsLogin:Array.from(document.querySelectorAll(\'input[type=password]\')).some(e=>e.getClientRects().length>0)})})()','returnByValue':True},b.session)
             return web.json_response({'observation':json.loads(text['result']['value'])})
         elif name=='type':
             selector=json.dumps(str(data.get('selector',''))[:500])
