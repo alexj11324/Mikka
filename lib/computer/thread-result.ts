@@ -33,8 +33,13 @@ export async function preserveThreadResult(pool: Pool, actor: Actor, runId: stri
     const expectedSha = process.env.MIKKA_CLOUD_WORKER_SHA
     if (!expectedSha || !/^[a-f0-9]{40}$/.test(expectedSha)) throw new Error('Cloud worker is not configured')
     source = await runtime.connectComputer(row.sandboxId)
+    // A thread can outlive a deployment. Its worker was pinned when its
+    // snapshot was created; requiring the *current* version here strands its
+    // work after an upgrade. The source is the owner-bound sandbox recorded
+    // for this run and its marker is root-owned. The clean destination below
+    // is still required to match the current trusted template exactly.
     const revision = await source.files.read('/opt/mikka/worker-source-sha', { user: 'root' })
-    if (revision.trim() !== expectedSha) throw new Error('Cloud worker version mismatch')
+    if (!/^[a-f0-9]{40}$/.test(revision.trim())) throw new Error('Cloud worker version unavailable')
     const hasWorktree = (await source.commands.run(`umask 077; tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -cf ${workspaceTar} -C /workspace .; if test -d ${worktree}; then tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -cf ${worktreeTar} -C ${worktree} .; printf yes; else printf no; fi`, { user: 'mikka-runner', timeoutMs: 180_000 })).stdout.trim()
     if (hasWorktree !== 'yes' && hasWorktree !== 'no') throw new Error('Thread worktree unavailable')
     if (row.worktreePath && hasWorktree !== 'yes') throw new Error('Thread worktree unavailable')
