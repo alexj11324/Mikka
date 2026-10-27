@@ -67,6 +67,31 @@ type rejectingStore struct {
 	reject bool
 }
 
+func TestProductionExecutionWorkerAcceptsOnlyItsAccessSnapshot(t *testing.T) {
+	w, inf, _ := fixtureWorker(t, "codex")
+	initial := mustAcquire(t, w)
+	bindNativeRunFixture(t, w, initial.Revision, "codex_cli")
+	record, err := w.Repo.Lookup(context.Background(), w.Scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inf.mu.Lock()
+	projection := string(inf.values[record.AccessName])
+	inf.mu.Unlock()
+	config := map[string]any{"scope": w.Scope, "use": w.Use, "executionOnly": true, "databaseUrl": os.Getenv("MIKKA_BYOS_TEST_DATABASE_URL"), "accessPath": "/byos-access", "accessSnapshot": AccessSnapshot{Name: record.AccessName, Value: projection}, "enableRuntime": true}
+	var input bytes.Buffer
+	enc := json.NewEncoder(&input)
+	_ = enc.Encode(config)
+	_ = enc.Encode(map[string]any{"id": "snapshot", "method": "nativeContext", "revision": initial.Revision})
+	command := osexec.Command(os.Getenv("MIKKA_BYOS_WORKER_BINARY"))
+	command.Env = []string{"PATH=" + os.Getenv("PATH"), "LANG=C.UTF-8"}
+	command.Stdin = &input
+	out, err := command.Output()
+	if err != nil || !bytes.Contains(out, []byte(`"result"`)) || bytes.Contains(out, []byte(`"error"`)) || bytes.Contains(out, []byte("fixture-codex-access")) {
+		t.Fatal("snapshot execution failed or exposed credentials", err)
+	}
+}
+
 func (s *rejectingStore) Create(ctx context.Context, name string, raw []byte) error {
 	if s.reject {
 		return ErrStore
