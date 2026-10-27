@@ -9,7 +9,7 @@
     "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts",
     "generate:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs",
     "check:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
-    "build": "pnpm generate:agent-ui && pnpm lint && next build",
+    "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && pnpm lint && next build",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
     "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs",
@@ -63,7 +63,7 @@
     "test:coordinator-native": "node --experimental-test-module-mocks --import tsx --test lib/coordinator/native-store.test.ts lib/coordinator/native-prompt.test.ts lib/coordinator/native-relay.db.test.ts",
     "test:coordinator-native-scope": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/native-coordinator-tool-scope.test.ts",
     "test:coordinator-native-relay": "pnpm --filter @mikka/daemon exec vitest run --root ../.. tests/native-coordinator-relay.test.mjs",
-    "test:byos": "node --import ./scripts/server-test.mjs --import tsx --test lib/subscription-model.test.ts lib/subscription-enrollment.test.ts lib/subscription-enrollment-bind.test.ts lib/subscription-enrollment-binding-proof.test.ts lib/subscription-enrollment-handoff.test.ts lib/subscription-enrollment-policy.test.ts lib/subscription-ui.test.ts",
+    "test:byos": "node --import ./scripts/server-test.mjs --import tsx --test lib/infisical-workload.test.ts lib/subscription-model.test.ts lib/subscription-enrollment.test.ts lib/subscription-enrollment-bind.test.ts lib/subscription-enrollment-binding-proof.test.ts lib/subscription-enrollment-handoff.test.ts lib/subscription-enrollment-policy.test.ts lib/subscription-ui.test.ts",
     "test:byos-worker": "node scripts/test-subscription-worker.mjs"
   },
   "dependencies": {

@@ -5,7 +5,7 @@ import { SubscriptionWorkerClient } from '../src/subscription-worker-client'
 import { cleanupTempDirs, tempDir } from './helpers'
 
 afterEach(cleanupTempDirs)
-function fixture(hold = false) {
+function fixture(hold = false, resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal) => Promise<{ workloadToken?: string; accessToken?: string }>) {
   const directory = tempDir('mikka-worker-boundary-')
   const journal = join(directory, 'calls')
   const binary = join(directory, 'worker.mjs')
@@ -22,7 +22,7 @@ if(request.method==='executeStream'){console.log(JSON.stringify({id:request.id,c
   const client = new SubscriptionWorkerClient({ binary }, {
     scope: { ownerId: 'fixture-owner', workspaceId: 'fixture-workspace', connectionId: '20000000-0000-4000-8000-000000000001', provider: 'codex' },
     databaseUrl: 'synthetic', infisicalOrigin: 'https://fixture.invalid', project: 'fixture', environment: 'test', path: '/grants', workloadToken: 'fixture-custody-identity', accessPath: '/access', accessToken: 'fixture-access-reader', enableRuntime: true, enrollmentAttemptPath: '/attempts', enrollmentClaimPath: '/claims', enrollmentGrantPath: '/pending'
-  }).forUse({ bindingId: '20000000-0000-4000-8000-000000000002', consumerId: 'fixture-task' })
+  }, resolveIdentity).forUse({ bindingId: '20000000-0000-4000-8000-000000000002', consumerId: 'fixture-task' })
   return { client, journal }
 }
 it('quota and inference children receive no full-bundle identity and retain the exact task binding', async () => {
@@ -51,4 +51,24 @@ it('native broker requests retain the task and access-reader boundary and preser
 it('custody retains source cleanup paths without exposing them to execution children', async () => {
   const { client } = fixture()
   expect(await client.call('status')).toMatchObject({ fullAuthority: true, sourceAuthority: true })
+})
+
+it('resolves only the identity required for each worker and strips custody from execution', async () => {
+  const calls: boolean[] = []
+  const { client } = fixture(false, async executionOnly => {
+    calls.push(executionOnly)
+    return executionOnly ? { workloadToken: 'must-not-cross-boundary', accessToken: 'fixture-access-reader' } : { workloadToken: 'fixture-custody-identity' }
+  })
+  expect(await client.call('status')).toMatchObject({ fullAuthority: true, sourceAuthority: true })
+  expect(await client.call('quota')).toMatchObject({ fullAuthority: false, sourceAuthority: false, accessAuthority: true })
+  expect(calls).toEqual([false, true])
+})
+
+it('does not start a worker request if identity resolution fails or is cancelled', async () => {
+  const { client, journal } = fixture(false, async () => { throw new Error('secret must not leak') })
+  await expect(client.call('status')).rejects.toThrow('subscription_worker_unavailable')
+  expect(readFileSync(journal, 'utf8')).toBe('')
+  const aborted = new AbortController()
+  aborted.abort()
+  await expect(client.call('status', {}, aborted.signal)).rejects.toThrow('subscription_cancelled')
 })

@@ -41,9 +41,9 @@ export class WorkerRefusal extends Error {
 const safeCode = (value: unknown) => typeof value === "string" && /^[a-z_]{1,64}$/.test(value) ? value : "subscription_worker_unavailable"
 
 export class SubscriptionWorkerClient {
-  constructor(private readonly launch: { binary: string; args?: string[]; env?: Record<string, string> }, private readonly config: WorkerConfiguration) {}
+  constructor(private readonly launch: { binary: string; args?: string[]; env?: Record<string, string> }, private readonly config: WorkerConfiguration, private readonly resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal) => Promise<{ workloadToken?: string; accessToken?: string }>) {}
   forUse(use: { bindingId: string; consumerId: string; runId?: string }): SubscriptionWorkerClient {
-    return new SubscriptionWorkerClient(this.launch, { ...this.config, use: { bindingId: use.bindingId, consumerId: use.consumerId, ...(use.runId ? {runId:use.runId} : {}) } })
+    return new SubscriptionWorkerClient(this.launch, { ...this.config, use: { bindingId: use.bindingId, consumerId: use.consumerId, ...(use.runId ? {runId:use.runId} : {}) } }, this.resolveIdentity)
   }
 
   private start(request: Record<string, unknown>, signal?: AbortSignal, chunk?: (value: string) => void, head?: (value: { contentType: string }) => void, binary?: (value: Uint8Array) => void) {
@@ -106,8 +106,13 @@ export class SubscriptionWorkerClient {
       const executionOnly = ['executeStream', 'execute', 'quota', 'nativeContext', 'nativeStream'].includes(String(request.method))
       // Execution children receive the access-store identity only. Refresh and
       // OAuth stay in custody children, with no token material in their results.
-      const config = executionOnly ? { ...this.config, executionOnly: true, path: '', workloadToken: '', enrollmentAttemptPath: '', enrollmentClaimPath: '', enrollmentGrantPath: '', enableCodexOAuth: false, enableClaudeOAuth: false } : this.config
-      child.stdin.write(`${JSON.stringify(config)}\n${JSON.stringify({ ...request, id })}\n`)
+      void (async () => {
+        const identity = this.resolveIdentity ? await this.resolveIdentity(executionOnly, signal) : {}
+        if (settled) return
+        const resolved = { ...this.config, ...identity }
+        const config = executionOnly ? { ...resolved, executionOnly: true, path: '', workloadToken: '', enrollmentAttemptPath: '', enrollmentClaimPath: '', enrollmentGrantPath: '', enableCodexOAuth: false, enableClaudeOAuth: false } : resolved
+        child.stdin.write(`${JSON.stringify(config)}\n${JSON.stringify({ ...request, id })}\n`)
+      })().catch(() => finish(new WorkerRefusal()))
     })
     return { result, stop: abort, pause: () => child.stdout.pause(), resume: () => child.stdout.resume() }
   }
