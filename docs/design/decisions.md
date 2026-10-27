@@ -12,6 +12,9 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | A push notification has no buttons; the Coordinator's proactive message in its chat is a card with buttons. Pushes go to every device at once; a setting can turn off phone pushes while the computer is open (「手机推送不带按钮，在消息里面带按钮…同时推，但是在开关里面保留选项」) | R-20 | Plain-text reminders (Comma) |
+| 2026-10-27 | Proactive messages are an on/off switch in Settings (no user-facing budget setting). The Coordinator may switch it on or off when the person asks, only after their explicit confirmation. The person's profile (what Mikka knows about them) lives in Settings (「主动消息只是开关，不是额度」「要明确需要用户的明确授权」) | | |
+| 2026-10-27 | The mobile app lives in the main repository under `apps/mobile` (「App 可以放到 Mobile，就是放到那个主仓库里面去」) | | |
 | 2026-10-27 | Layer-1 scoring stays on the Decisions API: one call per item asks has_cost and irreversible (yes/no) and due (48h / week / later / none) and level (critical…low / unclear) as choices; code applies the floors; the Coordinator writes the message (「可以」) | R-20 | Single show/hide probability |
 | 2026-10-27 | The Coordinator's bar follows Comma's proactive skill: tell the person only when they must act before the next 08:00 briefing, or an irreversible cost lands within a week; when unsure, stay quiet; snooze instead of dropping when the cap is spent (「可以，这套打分逻辑可以」) | R-20 | |
 | 2026-10-27 | Events go to the Coordinator and only the Coordinator tells the person; every push comes from it, including the morning briefing (「信息应该发到 coordinator，就由 coordinator 发给我」) | R-20 | |
