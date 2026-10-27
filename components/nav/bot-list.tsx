@@ -79,7 +79,7 @@ function botMood(threads: Thread[], botId: string, chatting: boolean): BotMood {
 
 /** A Coordinator reply as one plain line: citations become their labels. */
 function coordinatorLine(text: string) {
-  return sessionPreview(text.replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, '').replace(/\[([^\]\n]+)\]\([^)]+\)/g, '$1'), null)
+  return sessionPreview(text.replace(/\[\[(?:issue|run|suggestion):[0-9a-f-]{36}\]\]/gi, '').replace(/\[([^\]\n]+)\]\([^)]+\)/g, '$1'), null)
 }
 
 /** Green while the bot is working, orange while it waits on you; otherwise no dot. */

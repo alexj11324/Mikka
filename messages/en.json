@@ -2039,6 +2039,7 @@
       "openIssue": "Open issue: {title}",
       "openRunIssue": "{agent} run, open issue: {title}",
       "noIssue": "No linked issue",
+      "openSuggestion": "Open in {app}: {title}",
       "runStatus": {
         "queued": "Queued",
         "preparing": "Preparing",

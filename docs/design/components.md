@@ -15,6 +15,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Composer | the composer in `components/coordinator/coordinator-chat.tsx` (`InputGroup` + `InputGroupTextarea`) | Attachment button, no model picker. Reuse it for every chat |
 | Messages | `components/ui/message.tsx`, `components/ui/bubble.tsx`, `MessageScroller*` | R-13, R-14 |
 | Task, run and source chips in chat | OpenUI `TaskChip`, `RunChip`, `SourceChip` (`components/workspace/agent-ui-library.tsx`, data from `agent-citations.tsx`) | R-15 |
+| A 建议 item mentioned in chat (`[[suggestion:<id>]]`) | `SuggestionCitation` with `AppMark` (`components/workspace/agent-citations.tsx`); marks in `public/icons/<app>.svg` | R-15, decisions 2026-10-27 |
 | Thread card under a Coordinator reply | `components/coordinator/thread-card.tsx`; opens `IssueThreadPanel` in the centre | R-66 |
 | New task | `components/coordinator/new-task-dialog.tsx` | R-22, R-23 |
 | Search | reUI `CommandDialog` (⌘K), centred | |

@@ -1,9 +1,20 @@
-// Coordinator replies cite issues and runs as [[issue:<id>]] or [[run:<id>]].
-// Older replies name them by bare id. Web pages come as Markdown links or bare
-// URLs. The chat shows all of them as source chips: issues and runs looked up
-// for the person when the chat loads, web pages by their link preview.
+// Coordinator replies cite issues, runs and 建议 items with a token:
+//
+//   [[issue:<uuid>]]       an issue (task) on the board
+//   [[run:<uuid>]]         a thread (agent run)
+//   [[suggestion:<uuid>]]  a row of `suggestions`: an email, Slack message, PR,
+//                          Notion page… (the briefing's `suggestionId`)
+//
+// The id is the row's lowercase or uppercase UUID, no spaces, and the token is
+// written in place of the item's name in the sentence, e.g.
+// 「先回 [[suggestion:3f6c…]]，再看 [[suggestion:a1b2…]]。」 The chat draws a
+// suggestion as a mention chip (its app's mark and a short label) that opens
+// the item; a token the person may not see stays plain text. Older replies name
+// issues and runs by bare id (never suggestions). Web pages come as Markdown
+// links or bare URLs. Everything cited is looked up for the person when the
+// chat loads; web pages by their link preview.
 
-export type CitationKind = 'issue' | 'run'
+export type CitationKind = 'issue' | 'run' | 'suggestion'
 
 export type CitationPart =
   | { type: 'text'; text: string }
@@ -40,12 +51,27 @@ export interface RunSource {
   finishedAt: string | null
 }
 
-export type CitationSource = IssueSource | RunSource
+/** The apps a 建议 item can come from; matches `SUGGESTION_SOURCES` in the schema. */
+export type SuggestionApp = 'gmail' | 'slack' | 'notion' | 'github' | 'linear' | 'googlecalendar'
+
+export interface SuggestionCitationSource {
+  kind: 'suggestion'
+  id: string
+  app: SuggestionApp
+  /** What the chip says: a few words, e.g. 「会议改期」 or `PR #212`. */
+  label: string
+  /** The source's own text, in full, for the hover card. */
+  title: string
+  /** Where the item lives in its app; null when it has no http(s) link. */
+  url: string | null
+}
+
+export type CitationSource = IssueSource | RunSource | SuggestionCitationSource
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 /** ASCII only, so a URL followed by Chinese text with no space still ends at the URL. */
 const URL_CHARS = '[^\\s<>()\\[\\]"\'`\\u0080-\\uffff]+'
-const CITATION = new RegExp(`\\[([^\\]\\n]{1,200})\\]\\((https?://${URL_CHARS})\\)|(https?://${URL_CHARS})|\\[\\[(issue|run):(${UUID})\\]\\]|\\b(${UUID})\\b`, 'gi')
+const CITATION = new RegExp(`\\[([^\\]\\n]{1,200})\\]\\((https?://${URL_CHARS})\\)|(https?://${URL_CHARS})|\\[\\[(issue|run|suggestion):(${UUID})\\]\\]|\\b(${UUID})\\b`, 'gi')
 /** Punctuation that ends a sentence rather than a bare URL. */
 const TRAILING = /[.,;:!?。，；：！？、）]+$/
 
@@ -67,18 +93,65 @@ export function splitCitations(text: string): CitationPart[] {
   return parts
 }
 
-/** Every id cited in `texts`: the ones to look up as issues, and as runs. Bare ids go in both. */
-export function citedIds(texts: readonly string[]): { issueIds: string[]; runIds: string[] } {
+/** Every id cited in `texts`: the ones to look up as issues, as runs, and as suggestions. Bare ids go in issues and runs. */
+export function citedIds(texts: readonly string[]): { issueIds: string[]; runIds: string[]; suggestionIds: string[] } {
   const issueIds = new Set<string>()
   const runIds = new Set<string>()
+  const suggestionIds = new Set<string>()
   for (const text of texts) {
     for (const part of splitCitations(text)) {
       if (part.type !== 'citation') continue
+      if (part.kind === 'suggestion') { suggestionIds.add(part.id); continue }
       if (part.kind !== 'run') issueIds.add(part.id)
       if (part.kind !== 'issue') runIds.add(part.id)
     }
   }
-  return { issueIds: [...issueIds], runIds: [...runIds] }
+  return { issueIds: [...issueIds], runIds: [...runIds], suggestionIds: [...suggestionIds] }
+}
+
+/** Characters a suggestion chip shows before it cuts the title. */
+const LABEL_MAX = 16
+
+/**
+ * The chip's label for a 建议 item: its short action title when it has one,
+ * `PR #212` / `Issue #212` for a GitHub link, else the title cut to a few words.
+ */
+export function suggestionLabel({ app, title, actionTitle, url }: { app: SuggestionApp; title: string; actionTitle?: string | null; url: string | null }): string {
+  const short = actionTitle?.replace(/\s+/g, ' ').trim()
+  if (short) return clip(short)
+  if (app === 'github' && url) {
+    const match = /^https:\/\/github\.com\/[^/]+\/[^/]+\/(pull|issues)\/(\d+)/.exec(url)
+    if (match) return `${match[1] === 'pull' ? 'PR' : 'Issue'} #${match[2]}`
+  }
+  return clip(title.replace(/\s+/g, ' ').trim())
+}
+
+function clip(text: string): string {
+  const chars = Array.from(text)
+  return chars.length > LABEL_MAX ? `${chars.slice(0, LABEL_MAX - 1).join('').trimEnd()}…` : text
+}
+
+/**
+ * The suggestions `userId` may cite, by id, from rows already fetched: a row
+ * owned by anyone else is dropped, so a foreign id stays plain text.
+ */
+export function suggestionCitations(userId: string, rows: readonly { id: string; userId: string; source: SuggestionApp; title: string; url: string | null; actionTitle?: string | null }[]): Record<string, SuggestionCitationSource> {
+  const sources: Record<string, SuggestionCitationSource> = {}
+  for (const row of rows) {
+    if (row.userId !== userId) continue
+    const url = safeSourceUrl(row.url)
+    sources[row.id] = { kind: 'suggestion', id: row.id, app: row.source, label: suggestionLabel({ app: row.source, title: row.title, actionTitle: row.actionTitle, url }), title: row.title, url }
+  }
+  return sources
+}
+
+/** `url` if it is an http(s) link, else null: a row's link never becomes a `javascript:` href. */
+export function safeSourceUrl(url: string | null | undefined): string | null {
+  if (!url) return null
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.href : null
+  } catch { return null }
 }
 
 /** Where a citation link points, as `#cite/<kind|any>/<id>`; relative, so Markdown keeps it. */
@@ -87,7 +160,7 @@ export const CITATION_HREF = '#cite/'
 type MdastNode = { type: string; value?: string; url?: string; children?: MdastNode[] }
 
 /**
- * Remark plugin: turns [[issue:<id>]], [[run:<id>]] and bare ids in text into
+ * Remark plugin: turns [[issue:<id>]], [[run:<id>]], [[suggestion:<id>]] and bare ids in text into
  * links the citation anchor renders as chips, and keeps single line breaks,
  * since replies are written as plain text. Code is left alone.
  */

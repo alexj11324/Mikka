@@ -2039,6 +2039,7 @@
       "openIssue": "打开 issue：{title}",
       "openRunIssue": "{agent} 的运行，打开 issue：{title}",
       "noIssue": "没有关联的 issue",
+      "openSuggestion": "在 {app} 打开：{title}",
       "runStatus": {
         "queued": "排队中",
         "preparing": "准备中",

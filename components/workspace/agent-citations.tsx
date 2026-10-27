@@ -4,7 +4,8 @@ import { createContext, useContext, useState, type ComponentProps } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'
-import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource } from '@/lib/coordinator/citations'
+import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, type SuggestionApp, type SuggestionCitationSource } from '@/lib/coordinator/citations'
+import { withBasePath } from '@/lib/base-path'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { cn } from 'cn'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
@@ -24,6 +25,20 @@ export const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destru
 
 /** A task chip is wider than a source chip: it carries the title too. */
 const TASK_CHIP = 'max-w-72 pl-1.5'
+/** A 建议 item named in a sentence: a filled light grey pill, no outline, meta-sized text (R-32, R-33; decisions 2026-10-27). */
+const MENTION_CHIP = 'h-5 max-w-60 gap-1 rounded-full bg-foreground/[0.06] pl-1 pr-2 font-sans text-xs text-foreground shadow-none hover:bg-foreground/10 hover:text-foreground data-popup-open:bg-foreground/10'
+
+/** Each app's name; `mono` marks are black and invert in the dark theme. */
+const SUGGESTION_APPS: Record<SuggestionApp, { name: string; mono?: boolean }> = {
+  gmail: { name: 'Gmail' }, slack: { name: 'Slack' }, notion: { name: 'Notion', mono: true },
+  github: { name: 'GitHub', mono: true }, linear: { name: 'Linear' }, googlecalendar: { name: 'Google Calendar' },
+}
+
+/** The app's own mark, bare: no tinted square behind it (decisions 2026-10-27). */
+export function AppMark({ app }: { app: SuggestionApp }) {
+  // eslint-disable-next-line @next/next/no-img-element -- static brand marks from /public/icons
+  return <img src={withBasePath(`/icons/${app}.svg`)} alt="" aria-hidden="true" className={cn('size-3.5 shrink-0 object-contain', SUGGESTION_APPS[app].mono && 'dark:invert')} />
+}
 
 export type LinkPreviews = Record<string, LinkPreview | null>
 
@@ -81,6 +96,7 @@ export function CitationSources({ text }: { text: string }) {
       const source = sources[part.id]
       if (!source || (part.kind && part.kind !== source.kind)) continue
       if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
+      else if (source.kind === 'suggestion') listed.set(source.id, { name: source.title, domain: SUGGESTION_APPS[source.app].name, icon: <AppMark app={source.app} />, href: source.url ?? undefined })
       else {
         const issue = source.issue
         listed.set(source.id, { name: source.name, domain: source.agentName, icon: <BotAvatar color={colorFor(source.agentName)} size="row" still />, onSelect: issue ? () => onOpenIssue(issue.id) : undefined })
@@ -120,14 +136,37 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   </InlineCitation>
 }
 
-/** A cited issue or run by id, as a chip; the raw id when the conversation cannot show it. */
+/** A cited issue, run or suggestion by id, as a chip; the raw id when the conversation cannot show it. */
 export function CitationChip({ id, kind }: { id: string; kind: CitationKind }) {
   const citations = useAgentCitations()
   const source = citations?.sources[id]
   if (!citations || source?.kind !== kind) return <>{id}</>
+  if (source.kind === 'suggestion') return <SuggestionCitation suggestion={source} />
   return source.kind === 'issue'
     ? <IssueCitation issue={source} onOpen={citations.onOpenIssue} />
     : <RunCitation run={source} onOpen={citations.onOpenIssue} />
+}
+
+/** A 建议 item mentioned in a reply: its app's mark and a short label; opens the item in its app. */
+export function SuggestionCitation({ suggestion }: { suggestion: SuggestionCitationSource }) {
+  const t = useTranslations('Coordinator.citation')
+  const app = SUGGESTION_APPS[suggestion.app].name
+  return <InlineCitation>
+    <InlineCitationTrigger
+      aria-label={t('openSuggestion', { app, title: suggestion.title })}
+      render={suggestion.url ? <a href={suggestion.url} target="_blank" rel="noopener noreferrer" /> : undefined}
+      className={MENTION_CHIP}
+    >
+      <AppMark app={suggestion.app} />
+      <InlineCitationLabel>{suggestion.label}</InlineCitationLabel>
+    </InlineCitationTrigger>
+    <InlineCitationContent>
+      <InlineCitationBody>
+        <InlineCitationSource><AppMark app={suggestion.app} />{app}</InlineCitationSource>
+        <InlineCitationTitle>{suggestion.title}</InlineCitationTitle>
+      </InlineCitationBody>
+    </InlineCitationContent>
+  </InlineCitation>
 }
 
 /** A cited web page as a chip with its link preview; a plain link outside a conversation that cites. */

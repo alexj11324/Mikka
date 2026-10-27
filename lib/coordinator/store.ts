@@ -6,11 +6,11 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
-import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, suggestions, type CoordinatorEventTier } from '@/lib/db/schema'
 import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox } from '@/lib/coordinator/triage'
-import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
+import { citedIds, suggestionCitations, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
@@ -173,13 +173,13 @@ export interface ChatView {
   working: boolean
   /** Why the last turn failed, when no turn has answered since. */
   error: string | null
-  /** The issues and runs the replies cite, by id, that this person can see. */
+  /** The issues, runs and suggestions the replies cite, by id, that this person can see. */
   sources: Record<string, CitationSource>
   /** The artifacts shown as cards, by id. */
   artifacts: Record<string, ArtifactSummary>
 }
 
-/** Looks up the issues and runs cited in `texts`, and the `threads` dispatched, keeping only what `userId` may see. */
+/** Looks up the issues, runs and suggestions cited in `texts`, and the `threads` dispatched, keeping only what `userId` may see. */
 export async function citationSources(userId: string, texts: readonly string[], threads: readonly string[] = []): Promise<Record<string, CitationSource>> {
   const cited = citedIds(texts)
   const issueIds = cited.issueIds
@@ -212,6 +212,12 @@ export async function citationSources(userId: string, texts: readonly string[], 
         name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
         createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
     }
+  }
+  if (cited.suggestionIds.length) {
+    // Only the person's own, and only rows judged worth showing: a suggestion is their mail, messages and PRs, never a teammate's.
+    const rows = await db.select({ id: suggestions.id, userId: suggestions.userId, source: suggestions.source, title: suggestions.title, url: suggestions.url })
+      .from(suggestions).where(and(inArray(suggestions.id, cited.suggestionIds), eq(suggestions.userId, userId), eq(suggestions.shown, true)))
+    Object.assign(sources, suggestionCitations(userId, rows))
   }
   return sources
 }

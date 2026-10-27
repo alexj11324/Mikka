@@ -59,6 +59,9 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-15** A task or thread mentioned in chat is an inline chip, not a large
   card (a task chip carries the board's status icon). A thread the reply
   dispatches is different: it is a thread card under that reply (R-66).
+  A 建议 item mentioned in chat is a mention chip: the source app's own mark
+  (no tinted square behind it) and a short label on a filled light grey pill
+  with no outline; it opens the item in its app.
 - **R-16** The computer card in chat shows a title, a status, one sentence
   about the task and a big screen. Approval is part of that card. It never
   shows an operation log, a step checklist, or OS and spec lines.

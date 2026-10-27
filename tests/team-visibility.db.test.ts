@@ -23,6 +23,7 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
   const owner = `visibility-owner-${randomUUID()}`, member = `visibility-member-${randomUUID()}`, foreign = `visibility-foreign-${randomUUID()}`
   const workspace = randomUUID(), otherWorkspace = randomUUID(), team = randomUUID(), otherTeam = randomUUID()
   const shared = randomUUID(), personal = randomUUID(), foreignIssue = randomUUID(), unlinked = randomUUID()
+  const ownSuggestion = randomUUID(), foreignSuggestion = randomUUID()
   const agent = randomUUID(), ownAgent = randomUUID(), sharedRun = randomUUID(), privateRun = randomUUID(), orphanRun = randomUUID(), foreignRun = randomUUID()
   const doc = (label: string) => JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1, labels: [{ name: label, color: 'blue' }] } }, content: [] })
   try {
@@ -88,6 +89,12 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     assert.equal(JSON.stringify(citations).includes('private-agent'),false)
     assert.equal(citations[personal],undefined)
     assert.equal(citations[sharedRun]?.kind,'run')
+    // Suggestions are the person's own mail and messages: a teammate citing one gets plain text.
+    for (const [id,u,title] of [[ownSuggestion,member,'member-suggestion'],[foreignSuggestion,owner,'secret-suggestion']]) await pool.query('insert into suggestions (id,"userId",source,"externalId",action,title,url,shown,"decidedBy","occurredAt") values ($1,$2,\'github\',$1,\'review\',$3,\'https://github.com/alexj11324/Mikka/pull/212\',true,\'rule\',now())',[id,u,title])
+    const suggestionCitations = await citationSources(member,[`[[suggestion:${ownSuggestion}]] [[suggestion:${foreignSuggestion}]]`])
+    assert.deepEqual(suggestionCitations[ownSuggestion],{kind:'suggestion',id:ownSuggestion,app:'github',label:'PR #212',title:'member-suggestion',url:'https://github.com/alexj11324/Mikka/pull/212'})
+    assert.equal(suggestionCitations[foreignSuggestion],undefined)
+    assert.equal(JSON.stringify(suggestionCitations).includes('secret-suggestion'),false)
     // Revoke after a successful read: no per-request/global positive cache.
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2',[workspace,member])
     assert.equal(await issueForUser(member,shared),null)
@@ -99,6 +106,7 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     assert.equal(await readRun(member,sharedRun),null)
     assert.equal((await readRun(owner,sharedRun))?.run.id,sharedRun)
   } finally {
+    await pool.query('delete from suggestions where id=any($1::uuid[])',[[ownSuggestion,foreignSuggestion]])
     await pool.query('delete from run_messages where "runId"=any($1::uuid[])',[[sharedRun,privateRun,orphanRun,foreignRun]])
     await pool.query('delete from agent_runs where id=any($1::uuid[])',[[sharedRun,privateRun,orphanRun,foreignRun]])
     await pool.query('delete from agents where id=any($1::uuid[])',[[agent,ownAgent]])
