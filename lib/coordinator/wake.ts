@@ -10,7 +10,8 @@ import { coordinatorTurn } from '@/workflows/coordinator/workflow'
 /**
  * Whether the Coordinator runs here: on Vercel (the AI Gateway signs in with
  * the deployment's OIDC token) or wherever a gateway key is set. Elsewhere,
- * events still collect in the inbox and wait.
+ * events still collect in the inbox and wait. `MIKKA_NATIVE_COORDINATOR`
+ * (deprecated #312 runtime, keep unset) also enables it.
  */
 export function coordinatorEnabled(): boolean {
   return process.env.MIKKA_NATIVE_COORDINATOR === '1' || process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY)
