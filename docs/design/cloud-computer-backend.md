@@ -2,7 +2,8 @@
 
 Owner split (Alex, 2026-10-24): **Codex builds the backend described here; the
 frontend is built separately** against the API contract in section 5. When the
-design changes, this document is updated, not forked.
+design changes, this document is updated, not forked. Revised 2026-10-27:
+separate thread machines and bot web sub-agents (section 2, R-72).
 
 - Design review page: https://claude.ai/artifact/G8aEuFM4rwvGFeZbPYyVwU
 - Figma: file `zPe5LKycb2XuT1ivCLRw07`, section "云端电脑" (node `102:65`)
@@ -35,35 +36,93 @@ computer. The computer is keyed by `bots.id`, never `agents.id`:
 
 ## 2. Architecture
 
+Revised 2026-10-27 (Alex; `decisions.md`, R-72). The 2026-10-24 version put
+every bot and every cloud thread on one machine per workspace. Threads build,
+install and test, which is heavy, so they now get machines of their own, as in
+Cursor's cloud agents, Devin, Codex cloud and Copilot's coding agent. Bots stay
+on one shared machine, as in Grok Bot.
+
 ```
-workspace ──1:1── cloud machine (E2B sandbox, Linux)
-                    ├─ mikka daemon (registered as a device, kind = "cloud")
-                    ├─ shared:  /workspace (repos, files)   $HOME (CLI logins)
-                    ├─ bot A:   Xvfb :1 + WM + x11vnc + websockify  → noVNC
-                    │           Chrome profile ~/.mikka/profiles/<botId>
-                    ├─ bot B:   Xvfb :2 + …
-                    └─ cookie sync between the bot profiles
+workspace ──1:1── bot machine (E2B sandbox, Linux)          light, shared
+                    ├─ mikka daemon (device, kind = "cloud")
+                    ├─ $HOME: shared CLI and browser logins
+                    ├─ bot A: Xvfb :1 + WM + x11vnc + websockify → noVNC
+                    │         Chrome profile ~/.mikka/profiles/<botId>
+                    ├─ bot A, web sub-agents: one headless Chrome each,
+                    │         live view by CDP screencast
+                    ├─ bot B: Xvfb :2 + …
+                    └─ cookie sync between all profiles
+
+cloud thread ──1:1── thread machine (E2B sandbox from the workspace snapshot)
+                    ├─ mikka daemon running the coding harness (Claude Code, Codex)
+                    ├─ /workspace: the repo at the thread's branch
+                    └─ desktop (Xvfb + WM + VNC + Chrome) only when needed
 ```
 
-- **One machine per workspace**, not one per bot. The cost is one sandbox's
-  running time plus one disk.
-- **Shared files**: all bots work in the same `/workspace` and the same
-  `$HOME`. Claude Code / Codex CLI logins (stored under `$HOME`) are therefore
-  done once and work for every bot.
-- **Isolated desktops**: each bot gets its own X display (`Xvfb :N`), window
-  manager, apps and windows, and its own VNC stream. Displays are allocated
-  lazily on a bot's first computer use and kept across sleep.
-- **Browser logins are shared**: Chrome locks a profile directory to one
-  process, so each bot gets its own profile. A background job syncs cookies
-  between profiles, for example with CDP `Network.getAllCookies` and
-  `Network.setCookies`. Logging in on one bot's desktop then logs every bot in.
-  Sites that pin a session to one device may still ask again; that is accepted.
-- **Sleep**: use E2B pause/resume. Pause when no bot has a running computer
-  task and no viewer is open for N minutes (default 15). Resume on a computer
-  tool call, a 唤醒 press or a viewer open.
-- **The daemon is the only thing that talks to our server**, exactly like a
-  local device (ADR 0016 link, `packages/protocol/src/device.ts`). It registers
-  with `kind: "cloud"` so the devices UI can exclude it.
+### Bot machine (one per workspace)
+
+- **Shared:** all bots and their web sub-agents. The load is light: chat turns
+  and browsers, no builds.
+- **Bot desktops:** each bot keeps its own X display, window manager, apps,
+  windows and VNC stream (R-04). Displays are allocated lazily on a bot's first
+  computer use and kept across sleep.
+- **Web sub-agents (R-72):** a bot runs each web task as a sub-agent with its
+  own browser, several at once.
+  - Each sub-agent gets a headless Chrome context, with no X display. Its live
+    view is a CDP screencast (`Page.startScreencast`), and takeover forwards
+    input over CDP (`Input.dispatchMouseEvent` / `dispatchKeyEvent`).
+  - A sub-agent is not a run row in the thread list. It is owned by the bot
+    and reported in the bot's chat.
+  - Concurrency is capped per workspace (proposal: 6, Hark's figure). Further
+    tasks queue.
+- **Browser logins are shared:** Chrome locks a profile directory to one
+  process, so each bot and each sub-agent gets its own profile or context. A
+  background job syncs cookies between them, for example with CDP
+  `Network.getAllCookies` / `Network.setCookies`. Logging in once then logs in
+  everywhere. Sites that pin a session to one device may still ask again; that
+  is accepted.
+
+### Thread machine (one per cloud thread)
+
+- **One E2B sandbox per thread**, so threads never slow each other down or the
+  bots.
+- **Start:** from a workspace snapshot that holds the repo, dependencies and
+  the coding CLI logins, so it boots in seconds. The thread then checks out its
+  branch. Refresh the snapshot when dependencies change.
+- **Lifecycle:** pause while idle (no charge), resume on the next step, kill
+  when the thread ends. A thread's changes live on its branch; nothing is
+  copied back to the bot machine.
+- **Desktop on demand:** a thread that needs a screen, for example to accept a
+  web change, starts Xvfb, the WM, VNC and Chrome on its own machine. It never
+  moves to another machine, so no data is transferred.
+- **Threads on the person's own devices** (their Mac, SSH hosts) are
+  unchanged. They cannot see cloud screens; their acceptance runs on that
+  device.
+
+### Seeing and driving across machines
+
+- **On the same machine:** any process can use a display (`DISPLAY=:N`), and
+  any agent can drive a Chrome through its CDP port.
+- **Across machines:** a bot views a thread's screen, or drives its browser,
+  through a port the thread machine exposes (E2B public host). The thread
+  reaches the bot machine the same way. Every such port needs a short-lived
+  signed token, with separate view and control grants, as for the noVNC viewer.
+- **One driver per screen:** control is `agent | user | idle` plus the holder
+  (bot, sub-agent, thread or person). A second driver waits; it does not fail.
+
+### Sleep
+
+- **Bot machine:** E2B pause/resume. Pause when no bot has a running computer
+  task, no sub-agent is running and no viewer is open for N minutes (default
+  15). Resume on a computer tool call, a sub-agent start, a 唤醒 press or a
+  viewer open.
+- **Thread machines:** pause and resume on their own, as above.
+
+### The daemon
+
+The daemon is the only thing that talks to our server, exactly like a local
+device (ADR 0016 link, `packages/protocol/src/device.ts`). On each machine it
+registers with `kind: "cloud"`, so the devices UI can exclude it.
 
 ### Secrets
 
@@ -122,6 +181,13 @@ Report findings in the issue before building on an assumption that failed.
   (`sleeping | waking | running | error`), lastActiveAt.
 - `bot_desktops`: workspaceId, botId (references `bots.id`; unique pair), display number, control
   (`agent | user | idle`), controlledBy (userId, nullable), lastActiveAt.
+- `thread_machines`: runId (unique), sandboxId, snapshotId, state
+  (`starting | running | paused | ended | error`), desktop (boolean),
+  lastActiveAt.
+- `bot_subagents`: id, workspaceId, botId, task (one sentence, R-45), state
+  (`queued | running | needs_you | done | failed | stopped`), browser context
+  id, control (`agent | user | idle`), createdAt, endedAt. Not a run; never in
+  the thread list.
 - Approval rows: reuse the #161 ledger. Add `scope: once | run` so that
   本任务内都允许 auto-approves later operations of the same run on the same
   desktop. A workspace `deny` still wins.
@@ -205,6 +271,11 @@ that they land in the conversation:
 - `data-computer` with `{ botId, runId, task: string, state: "working" | "approval" | "done" | "failed", approvalId? }`.
   This is one card per computer task. `task` is the one-sentence task shown on
   the card.
+- `data-subagent` with `{ botId, subagentId, task: string, state: "queued" | "running" | "needs_you" | "done" | "failed" | "stopped", needs?: string }`
+  on the bot's chat (not a run). This is one card per web task, with a live
+  view from `POST /api/bots/:botId/subagents/:id/viewer` (same shape as the
+  computer viewer). `POST /api/bots/:botId/subagents/:id/stop` stops it. The
+  bot then reports the outcome as an ordinary chat message.
 
 Workspace-level state changes also need to reach the details page outside a
 run. The app has no realtime channel yet, so add one: an SSE stream at
@@ -249,3 +320,7 @@ section 5 is settled.
 - Whether Chrome should keep running across pause, or restart with the session
   restored.
 - Default idle timeout before pause (proposal: 15 minutes).
+- Thread machine size and snapshot refresh: what triggers a new workspace
+  snapshot (lockfile change, schedule), and how long a cold start takes.
+- Sub-agent cap per workspace (proposal: 6) and how many headless contexts one
+  bot machine size can hold.

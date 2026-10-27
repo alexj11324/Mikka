@@ -95,9 +95,12 @@ source wins in a conflict is in [`README.md`](README.md).
   (no per-app cards). The daily briefing is not in 建议; it is the
   Coordinator's 08:00 message. A 任务 here is a thread started by the
   orchestrator or a bot; all of them stay listed. It is not a flat list of the
-  board's issues. The flow: the person says yes to a Coordinator card, or
-  clicks a 建议 item (which fills the centre composer) → the bot dispatches a
-  thread → the item leaves 建议 and shows up below as a 任务.
+  board's issues. 建议 items are standalone cards: a verb, the app's icon and
+  the concrete thing with its deadline or amount. The flow: the person says
+  yes to a Coordinator card, or taps a 建议 card, which starts the task at once
+  (no composer step) → the orchestrator runs it as a bot sub-agent (web, R-72)
+  or dispatches a thread (a real task such as coding) → the card shows it
+  running and leaves 建议 when done; a thread also shows up below as a 任务.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
