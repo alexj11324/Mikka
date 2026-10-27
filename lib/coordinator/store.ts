@@ -50,7 +50,19 @@ export async function hasWakingEvents(userId: string): Promise<boolean> {
  * but do not count: with nothing else waiting, nothing moves. `held` is false
  * when another turn holds the lease; that turn will pick the events up.
  */
-export async function takeInbox(userId: string, holder: string): Promise<{ held: boolean; added: number; telegramTargets: TelegramReplyTarget[] }> {
+export interface InboxTake {
+  held: boolean
+  added: number
+  telegramTargets: TelegramReplyTarget[]
+  /** Matters from connected apps handed over in this take (lib/attention). */
+  handoffMatterIds: string[]
+  /** Every event in the take is a handoff: a reply can only be telling the person about one. */
+  handoffOnly: boolean
+}
+
+const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false }
+
+export async function takeInbox(userId: string, holder: string): Promise<InboxTake> {
   return db.transaction(async tx => {
     const now = new Date()
     await tx.insert(coordinatorSessions).values({ userId }).onConflictDoNothing()
@@ -58,24 +70,40 @@ export async function takeInbox(userId: string, holder: string): Promise<{ held:
       .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
       .where(and(eq(coordinatorSessions.userId, userId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
-    if (!taken) return { held: false, added: 0, telegramTargets: [] }
+    if (!taken) return { held: false, ...NO_TAKE }
     const due = await tx.select().from(coordinatorEvents).where(waking(userId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
-    if (!due.length) return { held: true, added: 0, telegramTargets: [] }
+    if (!due.length) return { held: true, ...NO_TAKE }
     const backgroundLimit = INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
-    if (!events.length) return { held: true, added: 0, telegramTargets: [] }
+    if (!events.length) return { held: true, ...NO_TAKE }
     const first = await nextPosition(tx, userId)
     await tx.insert(coordinatorMessages).values(events.map((event, index) => ({
       id: crypto.randomUUID(), userId, position: first + index,
       message: { role: 'user', content: eventPrompt(event) } satisfies ModelMessage,
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
-    return { held: true, added: events.length, telegramTargets: telegramReplyTargets(events) }
+    const handoffs = events.filter(event => isHandoff(event.kind))
+    return {
+      held: true, added: events.length,
+      // A verification code is told in the app chat only, never on Telegram.
+      telegramTargets: handoffs.some(carriesCode) ? [] : telegramReplyTargets(events),
+      handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
+      handoffOnly: handoffs.length === events.length,
+    }
   })
+}
+
+function isHandoff(kind: string): boolean {
+  return kind === 'matter_handoff' || kind === 'briefing_handoff'
+}
+
+function carriesCode(event: { payload: Record<string, unknown> }): boolean {
+  const assessment = event.payload.assessment
+  return Boolean(assessment && typeof assessment === 'object' && (assessment as { verificationCode?: unknown }).verificationCode)
 }
 
 /** Lets go of the lease. Returns whether events that need a turn arrived meanwhile, so the caller can take them. */
@@ -215,7 +243,8 @@ export async function chatView(userId: string, limit = 200): Promise<ChatView> {
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   return {
     items,
-    working: leased || waiting.some(event => event.tier !== 'background'),
+    // A handoff waiting in the inbox is not shown as a reply coming: the Coordinator may decide to stay quiet.
+    working: leased || waiting.some(event => event.tier !== 'background' && !isHandoff(event.kind)),
     error: session?.lastError ?? null,
     sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text), items.flatMap(item => item.threads)),
   }

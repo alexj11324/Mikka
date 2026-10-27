@@ -3,9 +3,8 @@ import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { briefingContent, localDate, safeTimeZone } from './briefing'
 import { verifyGitHubSignature } from './github-webhook'
-import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, slackNotification, type ExternalNotification } from './notification'
+import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, slackNotification } from './notification'
 import { missingTriggers, needsConfig, triggerSlugs } from './triggers'
-import { fallbackVerdict, modelVerdict, ruleVerdict, SHOW_THRESHOLD, suggestionState } from './rules'
 
 const me = 'user-1'
 
@@ -69,29 +68,28 @@ test('GitHub signatures are checked against the raw body', () => {
   assert.equal(verifyGitHubSignature(body, null, 's3cret'), false)
 })
 
-const notification = (fields: Partial<ExternalNotification>): ExternalNotification => ({ userId: me, source: 'gmail', externalId: 'x', action: 'reply', title: 't', url: null, actor: null, occurredAt: new Date(), required: false, direct: false, fromSelf: false, automated: false, excerpt: '', ...fields })
-
-test('rules decide the clear cases and leave the rest to the model', () => {
-  assert.deepEqual(ruleVerdict(notification({ fromSelf: true, required: true })), { shown: false, decidedBy: 'rule', probability: null })
-  assert.deepEqual(ruleVerdict(notification({ automated: true })), { shown: false, decidedBy: 'rule', probability: null })
-  assert.deepEqual(ruleVerdict(notification({ required: true })), { shown: true, decidedBy: 'rule', probability: null })
-  assert.equal(ruleVerdict(notification({ direct: true })), null)
-  assert.equal(modelVerdict(SHOW_THRESHOLD).shown, true)
-  assert.equal(modelVerdict(0.2).shown, false)
-  assert.equal(fallbackVerdict(notification({ direct: true })).shown, true)
-  assert.equal(fallbackVerdict(notification({})).shown, false)
-  assert.equal(suggestionState(notification({ excerpt: 'body' })).content, 'body')
+test('notices about one thread share a matter', () => {
+  const first = gmailNotification(me, { messageId: 'm1', threadId: 't1', subject: 'Invoice' })!
+  const second = gmailNotification(me, { messageId: 'm2', threadId: 't1', subject: 'Re: Invoice' })!
+  assert.equal(first.matterKey, 'gmail:t1')
+  assert.equal(second.matterKey, first.matterKey)
+  assert.equal(slackNotification(me, { channel: 'C1', ts: '2', thread_ts: '1', text: 'still failing' })!.matterKey, 'slack:C1:1')
+  const recipient = { userId: me, githubId: '42' }
+  const comment = githubNotification(recipient, 'issue_comment', { repository: { full_name: 'a/b' }, sender: { id: 7 }, action: 'created', issue: { number: 9, title: 'x', user: { id: 42 } }, comment: { id: 3, body: 'ping' } })!
+  assert.equal(comment.matterKey, 'github:a/b#9')
+  assert.equal(linearCommentNotification({ userId: me, linearUserId: 'lin-me' }, { type: 'Comment', action: 'create', data: { id: 'c1', body: 'hi', issueId: 'i1' } })!.matterKey, 'linear:i1')
 })
 
-test('the briefing names required items first and counts by source', () => {
+test('the briefing names the highest levels first and counts by source', () => {
   const at = (minutes: number) => new Date(Date.UTC(2026, 9, 23, 8, minutes))
   const content = briefingContent([
-    { id: 'a', source: 'gmail', action: 'reply', required: false, probability: 0.9, occurredAt: at(1) },
-    { id: 'b', source: 'github', action: 'review', required: true, probability: null, occurredAt: at(0) },
-    { id: 'c', source: 'gmail', action: 'reply', required: false, probability: 0.6, occurredAt: at(5) },
-    { id: 'd', source: 'slack', action: 'reply', required: false, probability: 0.6, occurredAt: at(2) },
+    { id: 'a', source: 'gmail', action: 'reply', required: false, level: 'high', probability: null, occurredAt: at(1) },
+    { id: 'b', source: 'github', action: 'review', required: true, level: 'normal', probability: null, occurredAt: at(0) },
+    { id: 'c', source: 'gmail', action: 'reply', required: false, level: 'critical', probability: null, occurredAt: at(5) },
+    // A row from before the levels ranks as normal by its old probability.
+    { id: 'd', source: 'slack', action: 'reply', required: false, level: null, probability: 0.9, occurredAt: at(2) },
   ])
-  assert.deepEqual(content.highlights, ['b', 'a', 'c'])
+  assert.deepEqual(content.highlights, ['c', 'a', 'd'])
   assert.deepEqual(content.counts, { gmail: 2, github: 1, slack: 1 })
   assert.equal(content.total, 4)
 })

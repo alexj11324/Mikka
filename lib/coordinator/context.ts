@@ -1,4 +1,5 @@
 import { pruneMessages, type ModelMessage } from 'ai'
+import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from '@/lib/attention/handoff'
 import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
 
 // What the Coordinator's model sees. Everything here depends only on the
@@ -129,8 +130,14 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         'Tell the person what it needs. Pass their answer on with send_to_run, or stop_run if they say so.',
         note,
       ].filter(Boolean).join('\n')
+    case 'matter_handoff':
+    case 'briefing_handoff':
+      return handoffPrompt(payload as unknown as HandoffPayload)
   }
 }
+
+/** Bookkeeping the chat leaves out: the Coordinator records its attention decisions with it. */
+const HIDDEN_TOOLS = new Set(['record_attention'])
 
 /** Longest the memory may grow; past this the Coordinator must forget something first. */
 export const MEMORY_MAX_CHARS = 8000
@@ -187,22 +194,28 @@ function dispatchedRun(part: { type: string; toolName?: string; output?: unknown
  */
 export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pending?: true })[]): ChatItem[] {
   const items: ChatItem[] = []
+  // A hidden handoff ends the reply before it, so what the Coordinator says about it starts its own entry.
+  let afterHandoff = false
   for (const { id, position, message, createdAt, pending } of rows) {
     if (message.role === 'user') {
       const text = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+      // Evidence the person has not seen: only what the Coordinator decides to tell them shows.
+      if (text.startsWith(HANDOFF_PREFIX)) { afterHandoff = true; continue }
+      afterHandoff = false
       const event = text.startsWith('[Event]')
       // The triage line is for the Coordinator, not the person.
       items.push({ ...(id ? { id } : {}), position, from: event ? 'event' : 'person', text: event ? text.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') : text, tools: [], threads: [], createdAt: createdAt.toISOString(), ...(pending ? { pending } : {}) })
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
-      const text = parts.flatMap(part => part.type === 'text' && part.text.trim() ? [part.text.trim()] : []).join('\n\n')
-      const tools = parts.flatMap(part => part.type === 'tool-call' ? [part.toolName] : [])
+      const text = parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n')
+      const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) ? [part.toolName] : [])
       const last = items.at(-1)
-      if (last?.from === 'coordinator') {
+      if (last?.from === 'coordinator' && !afterHandoff) {
         last.text = [last.text, text].filter(Boolean).join('\n\n')
         last.tools.push(...tools)
       } else if (text || tools.length) {
         items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text, tools, threads: [], createdAt: createdAt.toISOString() })
+        afterHandoff = false
       }
     } else if (message.role === 'tool') {
       const last = items.at(-1)

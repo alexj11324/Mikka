@@ -1,3 +1,4 @@
+import { levelRank, type AttentionLevel } from '@/lib/attention/judgment'
 import type { SuggestionAction, SuggestionSource } from '@/lib/db/schema'
 
 // The "早上好" briefing as data: which suggestions to name and how many each
@@ -9,15 +10,20 @@ export const HIGHLIGHT_LIMIT = 3
 /** A daily briefing covers what arrived in this window before it. */
 export const BRIEFING_WINDOW_MS = 24 * 60 * 60 * 1000
 
-export interface BriefingItem { id: string; source: SuggestionSource; action: SuggestionAction; required: boolean; probability: number | null; occurredAt: Date }
+export interface BriefingItem { id: string; source: SuggestionSource; action: SuggestionAction; required: boolean; level: AttentionLevel | null; probability: number | null; occurredAt: Date }
+
+/** Rows from before the attention levels rank by the old probability, as normal around it. */
+function rank(item: BriefingItem): number {
+  return item.level ? levelRank(item.level) : levelRank('normal') + ((item.probability ?? 0.5) - 0.5)
+}
 
 export interface BriefingContent { highlights: string[]; counts: Partial<Record<SuggestionSource, number>>; total: number }
 
-/** Required items first, then what the model was surest about, then newest. */
+/** The highest attention level first, then required items, then newest. */
 export function rankForBriefing<T extends BriefingItem>(items: readonly T[]): T[] {
   return [...items].sort((a, b) =>
-    Number(b.required) - Number(a.required)
-    || (b.probability ?? 0.5) - (a.probability ?? 0.5)
+    rank(b) - rank(a)
+    || Number(b.required) - Number(a.required)
     || b.occurredAt.getTime() - a.occurredAt.getTime())
 }
 
