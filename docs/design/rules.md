@@ -73,8 +73,10 @@ source wins in a conflict is in [`README.md`](README.md).
   nothing, when it lands and whether it can be undone; then one level,
   critical, high, ask, normal or low (unclear rereads the source). Code floors
   the level: any cost is at least high; a cost due within 48 hours, or an
-  irreversible one due within a week, is critical. Critical, high and ask go
-  to the Coordinator, which decides whether to tell the person: a card in its
+  irreversible one due within a week, is critical. Only the Coordinator speaks to the person about events: no
+  push, chat message or Telegram/Slack message is sent around it. Critical,
+  high and ask go to the Coordinator at once; the 08:00 briefing is handed to
+  it too. It decides whether to tell the person: a card in its
   own chat that says what happens if nothing is done and offers one next
   step, pushed on mobile. Normal stays in 建议; low is not shown. Telling the
   person is capped at 5 a day, 30 minutes apart (critical skips the spacing,
