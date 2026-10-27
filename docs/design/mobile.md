@@ -75,8 +75,9 @@ Things waiting on the person have no screen of their own: proactive cards sit
 in the Coordinator chat (unread dot on its drawer row), and waiting threads
 sort first on 线程.
 
-A thread card in any chat (R-15) opens the thread conversation full screen;
-back returns to the chat.
+A thread card in any chat (R-15) pushes the thread's own page (back button top
+left returns to the chat), as ChatGPT and Claude open a task. No bottom sheet,
+no minimised bar.
 
 ## The Coordinator's proactive messages
 
@@ -116,7 +117,8 @@ precedent. Figma frames 07, 07a–07e.
 | 需要你决策 / 待审阅 / 线程完成 | 07c | Claude Code "Push when actions required"; Cursor (needs input, finished, ready for review); Replit; GitHub Mobile per-type toggles |
 | 每日简报 | 07c | ChatGPT notifications "Tasks" (scheduled-task results) |
 | 推送到手机: 立即 / 电脑不在用时 | 07c | Slack "Notify me on mobile" |
-| 记忆: 使用记忆 + list, swipe to delete | top → 07d | ChatGPT 记忆 (Reference saved memories, Manage); Claude (Memory from chats, Manage) |
+| 记忆: 使用记忆 toggle + 记忆摘要 row | top → 07d | ChatGPT 记忆 (Reference saved memories, Manage); Claude (Memory from chats, Manage) |
+| 记忆摘要: one Markdown document (headings, prose, lists), updated time, 提问或更新 input at the bottom | 07d → 07f | ChatGPT 记忆摘要 |
 | 已连接的 App | top → 07e | Claude Connectors; ChatGPT 插件; Poke Integrations |
 | 外观 | top | Claude, ChatGPT, Comma Android |
 | 语言 (opens iOS Settings) | top | Comma iOS |

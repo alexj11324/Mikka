@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | Opening a thread pushes a new page with a back button, never a bottom sheet or minimised bar (ChatGPT and Claude open a task as a page). 记忆 is a Markdown summary page (headings, prose, lists) with an 提问或更新 input, as ChatGPT's 记忆摘要 (「不允许做成抽屉…都是进入一个新的页面」「记忆…应该做成 Markdown」) | R-15 | Thread bottom sheet and minimised bar; memory as a list of rows |
 | 2026-10-27 | The daily briefing moves out of 建议: the Coordinator posts it in its chat every day at 08:00 local time, as verb-first lines with mention chips (decided in the briefing thread: 「简报挪到 coordinate 里面，早上8点定时发送就行」) | R-20, R-21 | Briefing card at the top of 建议; briefing told only when an item needs the person today |
 | 2026-10-27 | Items are written as verb-first actions that name the person or object (Comma, ChatGPT precedent) (「是不是应该设计成以动词开头啊…你写的东西就是有头无尾」) | R-41 | 「有人问…」 style items |
 | 2026-10-27 | After an item is handled, the Coordinator reports the result and asks about the rest of today's briefing (chips, one button per item, 不用了) (「处理完之后应该还有跟进的过程…你可以问一下剩下两条你要不要处理」) | R-20 | |
