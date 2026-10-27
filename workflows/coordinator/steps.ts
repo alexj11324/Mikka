@@ -1,3 +1,5 @@
+import { definitionInstructions, type DefinitionSnapshot } from '@/lib/agent-kit/definition'
+import type { AgentExecution } from '@/lib/agent-kit/store'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { createHash } from 'node:crypto'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
@@ -119,7 +121,7 @@ export async function sendTelegramChunk(threadId: string, chunk: string) {
  * token budget, then returns the prompt for this turn: the instructions with
  * the person's memory, and the messages.
  */
-export async function preparePrompt(userId: string, botId: string | null = null): Promise<{ instructions: string; messages: ModelMessage[] }> {
+export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
   let { summary, memory, messages } = await store.loadConversation(userId, botId)
   const cut = compactionCut(summary, messages)
@@ -134,7 +136,7 @@ export async function preparePrompt(userId: string, botId: string | null = null)
     summary = text
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages) }
+  return { instructions: instructionsWithMemory(snapshot ? definitionInstructions(snapshot.hostInstructions, snapshot.definition) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages) }
 }
 
 export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope, botId: string | null = null) {
@@ -207,10 +209,10 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
 }
 
 /** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope, botId: string | null = null) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId)), status: 'queued' }))
+  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId, execution)), status: 'queued' }))
 }
 
 /** Only the person's own Bots in workspaces they still belong to are listed. */
@@ -255,7 +257,7 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
 }
 
 /** Queue and bind atomically, with a stable tool-call id for workflow retries. */
-export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string }, toolCallId: string, scope?: NativeToolScope) {
+export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
@@ -267,7 +269,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
   const issue = await issueForUser(userId, input.issueId)
   if (!issue) return { error: 'issueNotFound' }
   try {
-    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, idempotencyKey: `coordinator:${toolCallId}` })
+    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, idempotencyKey: `coordinator:${toolCallId}`,execution })
     return { ...result, botId: input.botId, task: issue.title, status: 'queued' as const }
   } catch { return { error: 'cloudComputerUnavailable' } }
 }
@@ -354,3 +356,4 @@ export async function webSearchStep(userId: string, input: { query: string; limi
   await assertNativeToolScope(userId,scope)
   return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
 }
+

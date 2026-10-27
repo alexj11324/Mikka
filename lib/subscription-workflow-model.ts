@@ -1,0 +1,29 @@
+import type { LanguageModel } from 'ai'
+import { WORKFLOW_SERIALIZE, WORKFLOW_DESERIALIZE } from '@workflow/serde'
+import { hostedSubscriptionSnapshotSchema, type HostedSubscriptionSnapshot } from './subscription-model-snapshot'
+
+type V4Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
+/** Only non-secret frozen references cross Workflow steps. Custody is resolved
+ * in the Node model step, never serialized or loaded by the Workflow VM. */
+export class SubscriptionWorkflowModel implements V4Model {
+  readonly specificationVersion = 'v4' as const
+  readonly provider = 'mikka.subscription'
+  readonly supportedUrls = {}
+  readonly modelId: string
+  private readonly selection: HostedSubscriptionSnapshot
+  constructor(selection: HostedSubscriptionSnapshot) {
+    this.selection = hostedSubscriptionSnapshotSchema.parse(selection)
+    this.modelId = this.selection.modelId
+  }
+  static [WORKFLOW_SERIALIZE](value: SubscriptionWorkflowModel) { return { ...value.selection } }
+  static [WORKFLOW_DESERIALIZE](value: unknown) { return new SubscriptionWorkflowModel(hostedSubscriptionSnapshotSchema.parse(value)) }
+  async doGenerate(_options: Parameters<V4Model['doGenerate']>[0]): Promise<Awaited<ReturnType<V4Model['doGenerate']>>> {
+    throw new Error('subscription_stream_required')
+  }
+  async doStream(options: Parameters<V4Model['doStream']>[0]) {
+    const { resolveSubscriptionWorkflowModel } = await import('./subscription-workflow-model-runtime')
+    const model = await resolveSubscriptionWorkflowModel(this.selection, options.abortSignal)
+    if (typeof model === 'string' || model.specificationVersion !== 'v4') throw new Error('subscription_model_unavailable')
+    return model.doStream(options)
+  }
+}

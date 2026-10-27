@@ -42,14 +42,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       .where(eq(agentRuns.id, runId))
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
-  const subscription = process.env.MIKKA_BYOS_ENABLED === '1'
-    ? await subscriptionRuntime().repository.nativeBinding(caller.userId, agent.id, agent.harness) : null
+  const harness = run.agentDefinition?.harness ?? agent.harness
+  const pinned = run.agentDefinition?.subscription
+  let subscription: Awaited<ReturnType<ReturnType<typeof subscriptionRuntime>['repository']['nativeBinding']>>
+  try { subscription = process.env.MIKKA_BYOS_ENABLED === '1'
+    ? pinned ? await subscriptionRuntime().repository.binding(caller.userId,pinned.bindingId) : run.agentDefinition ? null : await subscriptionRuntime().repository.nativeBinding(caller.userId, agent.id, harness) : null
+  } catch { return NextResponse.json({ error:'Subscription unavailable.' },{ status:409 }) }
+  if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id || subscription.ownerId !== caller.userId)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
   if (subscription && (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId)) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
-  if (subscription && !device.harnesses.some(harness => harness.harness === agent.harness && harness.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
+  if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let computer: Awaited<ReturnType<typeof claimCloudRun>> = null
   if (device.kind === 'cloud') {
-    if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(harness => harness.harness === agent.harness && harness.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
+    if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id)
     if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
   } else {
@@ -78,7 +83,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     : {}
   return NextResponse.json({
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
-    baseBranch: repo.baseBranch, harness: agent.harness, prompt: run.prompt,
+    baseBranch: repo.baseBranch, harness, prompt: run.prompt,
     kind: run.kind, leaseExpiresAt,
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
@@ -87,3 +92,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...retry,
   })
 }
+

@@ -2,6 +2,15 @@
 
 Verified on 2026-10-22. Organization: Aspectly Labs. Project: Mikka (`89850d6a-f020-4936-863e-df77380dfe40`). This inventory contains names and migration status only.
 
+## Required identity reuse
+
+**必须使用已有可用的 Infisical 身份；不限定 admin，也不限定非 admin。**
+
+- 在已经授权的项目、环境和操作范围内，只要已有身份能完成任务，就必须复用；不能因为它不是 admin，或因为偏好另一个身份，而停止工作或新建 identity。
+- 已有 admin 可用时可以直接使用；已有非 admin 身份可用时同样应直接使用。选择依据是能否完成当前任务，不是身份名称或类别。
+- 不为了选择身份而新建 identity、增加身份数量、触碰免费额度或升级套餐。某一个身份不可用时，先核对其他现有可用身份；只有确认现有身份都不能完成必要操作时，才报告具体缺项，请用户决定后续处理。
+- 不能把执行审核或规则保存失败写成用户禁止使用非 admin 身份；用户授权与执行限制必须分别记录。身份选择不改变当前任务的其他授权边界。
+
 ## Verified storage
 
 All 89 application/database records were read back and compared to their prepared source values or expanded references. Environment/path counts include repeated names. Seven platform records and ten Worker secret references are stored separately. These counts establish storage, not deployed acceptance.
