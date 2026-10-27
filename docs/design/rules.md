@@ -209,6 +209,17 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   thread and bot sub-agent of that user can use it; the model never sees it.
   Browsing is open to every site, with no allowlist. Once saved, the card collapses to 已登录 <site>.
 
+- **R-73** Mikka is proactive as well as reactive (`proactive.md`). Besides
+  rating incoming events (R-20), it keeps a per-person profile of facts drawn
+  from mail, purchases, calendar and chats (interests, routines, places,
+  subscriptions, deadlines, tools), shown and editable in 记忆, and once a day
+  before the briefing it researches new cards from them: deadlines, tools'
+  advisories, and interests matched with what is new nearby. New proactive
+  cards are capped at 5 a day and written as R-21 cards with their source;
+  interest cards are normal and stay in 建议; routine and location triggers
+  go through the Coordinator under R-20's cap. Dismissals lower the fact's
+  confidence. Profiles are per person, never shared in a workspace.
+
 ## Look
 
 - **R-30** Greys are pure neutral: `rgba(0,0,0,a)` and `#737373 / #A3A3A3 /
