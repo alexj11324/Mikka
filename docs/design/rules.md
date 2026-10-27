@@ -91,7 +91,8 @@ source wins in a conflict is in [`README.md`](README.md).
   chat.
 - **R-21** The right panel has two parts: 建议 on top, then 任务. 建议 keeps
   its name (not "Routines"): a daily briefing generated at 08:00 in the
-  person's time zone, and again right after they connect an app, then the normal-level items by source app. A 任务 here
+  person's time zone, and again right after they connect an app, then the normal-level items in one list, newest first, each row with
+  its app's icon (no per-app cards). A 任务 here
   is a thread started by the orchestrator or a bot; all of them stay listed.
   It is not a flat list of the board's issues. The flow: the person says yes
   to a Coordinator card, or clicks a 建议 item (which fills the centre
@@ -132,8 +133,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   line before the properties column or an open thread. Nothing else gets a
   line; sections are separated by space. The content column is centred in
   the main area, up to 680px wide.
-- **R-62** 线程 lists the threads working on the issue: bot avatar, thread
-  name, one line on what it is doing, status, time. Clicking one opens it on
+- **R-62** 线程 lists the threads working on the issue: status icon (never
+  the bot's avatar, `glossary.md`), thread name, one line on what it is doing, status, time. Clicking one opens it on
   the right as a conversation that ends in the composer (R-10); people and
   the agent talk there. A thread's content is its owner's alone: teammates
   (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
@@ -160,15 +161,29 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   back. The home page is already that conversation and has no button.
   Figma: page 「AI 侧栏 · 全局」.
 - **R-66** When the Coordinator dispatches a thread, the chat shows one
-  thread card under its reply: bot avatar, thread name and status badge,
-  then one line (运行中: 「交给 Codex · 第 N 步」; 完成: the result, then the
-  outputs such as a PR, folding extras into +N). The coding agent appears only
-  in that step line (R-62). The card updates in place, so a thread has one
+  thread card under its reply: status icon (never the bot's avatar), thread
+  name, then its outputs as chips such as a PR, folding extras into +N. No
+  step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
   card in a chat; a later change of state is a sentence from the Coordinator,
   not a second card. The card has no log, input box or buttons. Clicking it
   opens the thread conversation: on desktop the centre column switches to it
   with 「‹ Coordinator」 to go back, on a phone it pushes in full screen.
   Figma: page 「线程卡片 · 聊天里派出线程」.
+
+## Settings
+
+- **R-70** Every setting needs a precedent. A row on any Settings screen
+  (web or mobile) ships only if a comparable product (ChatGPT, Claude,
+  Comma, Hark, Wabi, Linear, GitHub, Slack and the like) has the same setting;
+  the spec cites the product and source for each row. No precedent, no row.
+  Settings are a hierarchy: the top screen holds a few categories, and each
+  opens its own page; rows are never laid out flat on one page. A row never
+  states what the person already knows (for example which provider they
+  signed in with).
+- **R-71** Icons follow precedent too: each icon is the one mainstream
+  products use for the same function (memory = book as in ChatGPT,
+  notifications = bell, connectors = blocks as in Claude…). The spec or review
+  page names the product for each.
 
 ## Look
 
@@ -217,6 +232,12 @@ do what Linear does. Figma: `220:5022` (MIK-25).
 - **R-43** Use the glossary's words: Bot, 对话, 线程. Never 会话 for a left
   row or a run. Built-in role names stay English (Coordinator).
 - **R-44** The home greeting stays 「早上好，Alex」 (time of day + name).
+
+- **R-41** A 建议 item, briefing item or follow-up item is written as an
+  action: it starts with a verb and names who or what it is about
+  (「回复 Jason：发布前要不要冻结 main」「核对 Stripe 10 月账单」), as Comma
+  ("Reply to Agenda", "Forward INV-2041") and ChatGPT do. Never a vague
+  report such as 「有人问…」 or 「#design 有人问…」.
 
 ## Tokens
 

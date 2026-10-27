@@ -1,5 +1,6 @@
 import 'server-only'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
+import { displayTitle } from '@/lib/suggestions/action-title'
 import { briefingHighlights, todaysBriefing } from '@/lib/suggestions/store'
 import { higherLevel, type AttentionLevel } from './judgment'
 import { queueBriefing } from './store'
@@ -19,7 +20,7 @@ export async function handBriefingToCoordinator(userId: string, timeZone: string
   const level = items.reduce<AttentionLevel>((top, item) => item.level ? higherLevel(top, item.level) : top, 'normal')
   const queued = await queueBriefing(userId, {
     localDate: briefing.localDate, total: briefing.total,
-    items: items.map(item => ({ title: item.title, source: item.source, level: item.level, url: item.url, actor: item.actor })),
+    items: items.map(item => ({ title: displayTitle(item), source: item.source, level: item.level, url: item.url, actor: item.actor })),
   }, level)
   if (!queued) return false
   await wakeCoordinator(userId)

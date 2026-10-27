@@ -6,8 +6,11 @@
 
 alter table suggestions add column if not exists level text;
 alter table suggestions add column if not exists "matterKey" text;
+-- R-41: the item as a verb-first action line; null falls back to title.
+alter table suggestions add column if not exists "actionTitle" text;
 
 alter table coordinator_sessions add column if not exists "attentionEnabled" boolean not null default true;
+alter table coordinator_sessions add column if not exists locale text;
 
 create table if not exists attention_matters (
   id uuid primary key,

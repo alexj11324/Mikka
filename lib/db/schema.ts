@@ -284,6 +284,8 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   /** The person's switch for matters from connected apps (lib/attention). Off: nothing is handed over; 建议 still fills. */
   attentionEnabled: boolean('attentionEnabled').notNull().default(true),
+  /** The language the person reads 建议 in (zh-CN or en), for the action lines of lib/suggestions/action-title.ts. */
+  locale: text('locale'),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -318,6 +320,8 @@ export const suggestions = pgTable('suggestions', {
   level: text('level').$type<AttentionLevel>(),
   /** The matter it belongs to (ExternalNotification.matterKey). */
   matterKey: text('matterKey'),
+  /** The item as an action for the person (R-41), e.g. 「回复 Kevin：…」; the UI falls back to `title` without it. */
+  actionTitle: text('actionTitle'),
   /** Assigned to the person or their review is requested. */
   required: boolean('required').notNull().default(false),
   occurredAt: timestamp('occurredAt', { withTimezone: true }).notNull(),

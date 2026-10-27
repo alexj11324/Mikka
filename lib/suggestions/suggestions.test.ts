@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
+import { actionLocale, actionTitlePrompt, clampTitle, displayTitle, parseActionTitles } from './action-title'
 import { briefingContent, localDate, safeTimeZone } from './briefing'
 import { verifyGitHubSignature } from './github-webhook'
 import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, slackNotification } from './notification'
@@ -119,4 +120,36 @@ test('only missing triggers are created, so a re-check is safe', () => {
   const wanted = [{ connectedAccountId: 'a1', slug: 'GMAIL_NEW_GMAIL_MESSAGE' }, { connectedAccountId: 'a2', slug: 'NOTION_PAGE_ADDED_TRIGGER' }]
   assert.deepEqual(missingTriggers(wanted, [{ connectedAccountId: 'a1', triggerName: 'GMAIL_NEW_GMAIL_MESSAGE', disabledAt: null }]), [wanted[1]])
   assert.deepEqual(missingTriggers(wanted, [{ connectedAccountId: 'a1', triggerName: 'GMAIL_NEW_GMAIL_MESSAGE', disabledAt: '2026-10-23T00:00:00Z' }]), wanted)
+})
+
+test('action lines (R-41): the prompt carries the rule and examples, the answer is checked, and the raw title is the fallback', () => {
+  const items = [
+    { id: 's1', source: 'gmail', action: 'reply', title: 'Re: Thursday', actor: 'Kevin', excerpt: 'Can we move Thursday to Wednesday? Need to know by noon tomorrow.' },
+    { id: 's2', source: 'github', action: 'review', title: 'Fix types', actor: 'dana', excerpt: 'Fix types' },
+  ]
+  const zh = actionTitlePrompt(items, 'zh-CN')
+  assert.match(zh.instructions, /Simplified Chinese, at most 30 characters/)
+  assert.match(zh.instructions, /Start with a verb/)
+  assert.match(zh.instructions, /「回复 Kevin：周四的会改到周三，明天中午前要定」/)
+  assert.match(zh.instructions, /Bad: 「CI 挂了」/)
+  assert.match(zh.instructions, /untrusted evidence/)
+  const sent = JSON.parse(zh.prompt).notifications
+  assert.equal(sent[0].text, items[0].excerpt)
+  assert.equal(sent[1].text, undefined, 'an excerpt that only repeats the title is not sent')
+  assert.match(actionTitlePrompt(items, 'en').instructions, /English, at most 60 characters/)
+
+  const answer = 'Sure: {"titles": [{"id": "s1", "title": "回复 Kevin：周四的会改到周三，明天中午前要定"}, {"id": "s9", "title": "x"}, {"id": "s2", "title": "  "}]}'
+  assert.deepEqual([...parseActionTitles(answer, ['s1', 's2'], 'zh-CN')], [['s1', '回复 Kevin：周四的会改到周三，明天中午前要定']])
+  assert.equal(parseActionTitles('not json', ['s1'], 'zh-CN').size, 0)
+  assert.equal(parseActionTitles('{"titles": "no"}', ['s1'], 'zh-CN').size, 0)
+  const long = parseActionTitles(JSON.stringify({ titles: [{ id: 's1', title: '回'.repeat(40) }] }), ['s1'], 'zh-CN').get('s1')!
+  assert.equal([...long].length, 30)
+  assert.ok(long.endsWith('…'))
+  assert.equal(clampTitle('a'.repeat(70), 'en').length, 60)
+
+  assert.equal(displayTitle({ title: 'Re: Thursday', actionTitle: '回复 Kevin：改到周三' }), '回复 Kevin：改到周三')
+  assert.equal(displayTitle({ title: 'Re: Thursday', actionTitle: null }), 'Re: Thursday')
+  assert.equal(displayTitle({ title: 'Re: Thursday', actionTitle: ' ' }), 'Re: Thursday')
+  assert.equal(actionLocale('en'), 'en')
+  assert.equal(actionLocale(null), 'zh-CN')
 })

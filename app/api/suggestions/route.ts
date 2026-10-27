@@ -1,6 +1,8 @@
 import { after, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import type { SuggestionSource } from '@/lib/db/schema'
+import { ACTION_LOCALES, type ActionLocale } from '@/lib/suggestions/action-title'
+import { rememberLocale } from '@/lib/suggestions/action-title-server'
 import { ensureComposioTriggers } from '@/lib/suggestions/sources'
 import { briefingHighlights, listSuggestions, todaysBriefing } from '@/lib/suggestions/store'
 
@@ -11,7 +13,8 @@ const headers = { 'Cache-Control': 'private, no-store' }
 /**
  * The suggestions list: today's briefing (null on a day with nothing to say)
  * and the shown suggestions grouped by source app. `tz` is the person's IANA
- * time zone; without it the visitor's location decides.
+ * time zone; without it the visitor's location decides. `locale` is the UI
+ * language, remembered so new items' action lines (R-41) are written in it.
  */
 export async function GET(request: Request) {
   const user = (await getSession())?.user
@@ -21,11 +24,19 @@ export async function GET(request: Request) {
     try { await ensureComposioTriggers(user.id) }
     catch (error) { console.error('Composio trigger check failed', error instanceof Error ? error.message : error) }
   })
-  const timeZone = new URL(request.url).searchParams.get('tz') ?? request.headers.get('x-vercel-ip-timezone')
+  const params = new URL(request.url).searchParams
+  const timeZone = params.get('tz') ?? request.headers.get('x-vercel-ip-timezone')
+  const locale = params.get('locale')
+  if (locale && (ACTION_LOCALES as readonly string[]).includes(locale)) {
+    after(async () => {
+      try { await rememberLocale(user.id, locale as ActionLocale) }
+      catch (error) { console.error('Remembering the locale failed', error instanceof Error ? error.message : error) }
+    })
+  }
   const [briefing, items] = await Promise.all([todaysBriefing(user.id, timeZone), listSuggestions(user.id)])
   const groups = new Map<SuggestionSource, typeof items>()
   for (const item of items) groups.set(item.source, [...groups.get(item.source) ?? [], item])
-  const view = (item: (typeof items)[number]) => ({ id: item.id, source: item.source, action: item.action, title: item.title, url: item.url, actor: item.actor, required: item.required, occurredAt: item.occurredAt })
+  const view = (item: (typeof items)[number]) => ({ id: item.id, source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle, url: item.url, actor: item.actor, required: item.required, occurredAt: item.occurredAt })
   return NextResponse.json({
     briefing: briefing && {
       kind: briefing.kind, localDate: briefing.localDate, counts: briefing.counts, total: briefing.total,

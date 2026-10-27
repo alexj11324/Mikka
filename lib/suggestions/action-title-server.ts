@@ -1,0 +1,47 @@
+import 'server-only'
+import { createGateway, generateText } from 'ai'
+import { and, eq, sql } from 'drizzle-orm'
+import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
+import { db } from '@/lib/db'
+import { coordinatorSessions, suggestions } from '@/lib/db/schema'
+import { ACTION_BATCH, actionLocale, actionTitlePrompt, parseActionTitles, type ActionLocale, type ActionTitleInput } from './action-title'
+
+/** The small text model that writes action lines; the Coordinator's flash model. */
+const ACTION_TITLE_MODEL = COORDINATOR_MODEL
+const ACTION_TITLE_TIMEOUT_MS = 15_000
+
+/** The language the person last used 建议 in (zh-CN until known). */
+export async function personLocale(userId: string): Promise<ActionLocale> {
+  const [row] = await db.select({ locale: coordinatorSessions.locale }).from(coordinatorSessions).where(eq(coordinatorSessions.userId, userId)).limit(1)
+  return actionLocale(row?.locale)
+}
+
+/** Remembers the language the person reads 建议 in, so new action lines are written in it. */
+export async function rememberLocale(userId: string, locale: ActionLocale): Promise<void> {
+  await db.insert(coordinatorSessions).values({ userId, locale }).onConflictDoUpdate({ target: coordinatorSessions.userId, set: { locale }, setWhere: sql`${coordinatorSessions.locale} is distinct from ${locale}` })
+}
+
+/**
+ * Writes action lines (R-41) for one person's newly shown items, in batches of
+ * ACTION_BATCH, one model call each. Like the decision model it signs in with
+ * DECISION_GATEWAY_API_KEY, whose budget caps the spend; without the key, or
+ * when a call fails, the items keep their raw title. Never throws.
+ */
+export async function writeActionTitles(userId: string, items: readonly ActionTitleInput[]): Promise<void> {
+  const key = process.env.DECISION_GATEWAY_API_KEY
+  if (!key || !items.length) return
+  try {
+    const locale = await personLocale(userId)
+    const gateway = createGateway({ apiKey: key })
+    for (let start = 0; start < items.length; start += ACTION_BATCH) {
+      const batch = items.slice(start, start + ACTION_BATCH)
+      const { instructions, prompt } = actionTitlePrompt(batch, locale)
+      const { text } = await generateText({ model: gateway(ACTION_TITLE_MODEL), instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(ACTION_TITLE_TIMEOUT_MS) })
+      for (const [id, actionTitle] of parseActionTitles(text, batch.map(item => item.id), locale)) {
+        await db.update(suggestions).set({ actionTitle }).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId)))
+      }
+    }
+  } catch (error) {
+    console.error('Action titles failed', error instanceof Error ? error.message : error)
+  }
+}
