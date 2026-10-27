@@ -63,8 +63,8 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
   await steps.releaseLease(userId, holder, botId)
 }
 
-/** Every bot's tools. Each one runs as a step scoped to the person; memory and dispatched runs belong to the bot. */
-function coordinatorTools(userId: string, botId: string | null, scope?: NativeToolScope) {
+/** Every bot's tools. Each one runs as a step scoped to the person; memory and dispatched runs belong to the bot (null: the Coordinator). */
+export function coordinatorTools(userId: string, botId: string | null, scope?: NativeToolScope) {
   const id = z.uuid()
   return {
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input, scope)),
