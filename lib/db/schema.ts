@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import type { AttentionLevel } from '@/lib/attention/judgment'
+import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
@@ -415,6 +416,44 @@ export const attentionSettings = pgTable('attention_settings', {
   enabled: boolean('enabled').notNull().default(true),
   /** The language the person reads 建议 in (zh-CN or en), for the action lines of lib/suggestions/action-title.ts. */
   locale: text('locale'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Where a fact was seen: references only, never the source text. */
+export interface UserFactEvidence { source: string; suggestionId?: string; externalId?: string; factIds?: string[]; at: string }
+
+/**
+ * One fact in one person's profile (lib/profile), drawn from what reaches them
+ * and merged nightly. Facts belong to the person, never to a workspace, and
+ * only they see them in 记忆. A fact the person corrected (`userEdited`) is
+ * never overwritten by the model. Same fact = same (userId, kind, subjectKey).
+ */
+export const userFacts = pgTable('user_facts', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  kind: text('kind').$type<UserFactKind>().notNull(),
+  /** One line, e.g. 川菜, or Verizon 套餐. */
+  subject: text('subject').notNull(),
+  /** The subject folded for dedupe (lib/profile/facts.ts subjectKey). */
+  subjectKey: text('subjectKey').notNull(),
+  /** Structured details: amount, date, time window, place, merchant, items. */
+  value: jsonb('value').$type<Record<string, unknown>>().notNull().default({}),
+  evidence: jsonb('evidence').$type<UserFactEvidence[]>().notNull().default([]),
+  confidence: real('confidence').notNull(),
+  firstSeenAt: timestamp('firstSeenAt', { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp('lastSeenAt', { withTimezone: true }).notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  state: text('state').$type<UserFactState>().notNull().default('active'),
+  userEdited: boolean('userEdited').notNull().default(false),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('user_facts_subject_key').on(table.userId, table.kind, table.subjectKey), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind)])
+
+/** The person's 记忆 switch; no row means on. Off: nothing is extracted or merged. */
+export const memorySettings = pgTable('memory_settings', {
+  userId: text('userId').primaryKey(),
+  enabled: boolean('enabled').notNull().default(true),
+  /** The local date (YYYY-MM-DD) the nightly consolidation last ran for the person. */
+  consolidatedOn: text('consolidatedOn'),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 

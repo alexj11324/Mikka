@@ -1485,6 +1485,9 @@
         "title": "Profile",
         "description": "See the account details used in your workspace."
       },
+      "memory": {
+        "title": "Memory"
+      },
       "account": {
         "title": "Account",
         "description": "Manage how you sign in to Mikka."
@@ -1527,6 +1530,24 @@
       "email": "Email",
       "notSet": "Not set",
       "readOnly": "Account details are read-only; this version does not support editing them here."
+    },
+    "memory": {
+      "enabled": "Use memory",
+      "learn": "Learn from connected apps",
+      "error": "Could not update memory",
+      "empty": "No memories yet",
+      "correct": "Correct",
+      "delete": "Delete",
+      "kinds": {
+        "interest": "Interests",
+        "routine": "Routines",
+        "place": "Places",
+        "subscription": "Subscriptions",
+        "deadline": "Deadlines",
+        "tool": "Tools",
+        "person": "People",
+        "preference": "Preferences"
+      }
     },
     "workspaceForm": {
       "id": "Workspace ID",

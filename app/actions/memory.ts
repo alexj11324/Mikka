@@ -1,0 +1,29 @@
+'use server'
+
+import { z } from 'zod'
+import { requireUser } from '@/lib/issue-access'
+import { correctFact, deleteFact, listFacts, memoryEnabled, setMemoryEnabled } from '@/lib/profile/store'
+
+// 记忆 (R-73): the signed-in person's own facts only; nothing here takes
+// another person or a workspace.
+
+export async function getMemory() {
+  const user = await requireUser()
+  const [enabled, facts] = await Promise.all([memoryEnabled(user.id), listFacts(user.id)])
+  return { enabled, facts: facts.map(fact => ({ id: fact.id, kind: fact.kind, subject: fact.subject, userEdited: fact.userEdited })) }
+}
+
+export async function setMemory(enabled: boolean) {
+  const user = await requireUser()
+  await setMemoryEnabled(user.id, z.boolean().parse(enabled))
+}
+
+export async function removeFact(id: string) {
+  const user = await requireUser()
+  return deleteFact(user.id, z.uuid().parse(id))
+}
+
+export async function updateFact(id: string, subject: string) {
+  const user = await requireUser()
+  return correctFact(user.id, z.uuid().parse(id), z.string().max(200).parse(subject))
+}
