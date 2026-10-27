@@ -160,6 +160,10 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.match(queuedBinding.prompt, /Use the desktop/)
     assert.equal(await claimLocalRun(pool, queued.runId, worker.deviceId, new Date(Date.now() + 30000)), 'cloud-required')
     assert.deepEqual(await claimCloudRun(pool, actor, queued.runId, worker.deviceId, new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1' })
+    const idempotent = { ...cloudInput, idempotencyKey: 'durable-tool-call-1' }
+    const [first, retry] = await Promise.all([queueCloudRun(pool, actor, idempotent), queueCloudRun(pool, actor, idempotent)])
+    assert.equal(first.runId, retry.runId, 'a retried tool call queues exactly one task')
+    await assert.rejects(queueCloudRun(pool, actor, { ...idempotent, note: 'changed' }), { status: 409 })
     const deadline = new Date(Date.now() + 30000)
     assert.equal(await claimCloudRun(pool, otherWorkspace, cloudRun, worker.deviceId, deadline, cloudSubscription), null)
     assert.equal(await claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, wrongSubscription), null)

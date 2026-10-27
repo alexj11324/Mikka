@@ -23,9 +23,10 @@ const MAX_ROUNDS = 10
 export async function coordinatorTurn(userId: string) {
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
+  const computerEnabled = await steps.computerToolsEnabled()
   const agent = new WorkflowAgent({
     model: COORDINATOR_MODEL,
-    tools: coordinatorTools(userId),
+    tools: coordinatorTools(userId, undefined, computerEnabled),
   })
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const inbox = await steps.takeInbox(userId, holder)
@@ -38,7 +39,7 @@ export async function coordinatorTurn(userId: string) {
       const selected = await native.runtime(userId)
       const result = selected.harness === 'ai_sdk'
         ? await agent.generate({ ...(await steps.preparePrompt(userId)), stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
-        : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId,scope))
+        : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId,scope,computerEnabled))
       await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text))
       if (inbox.telegramTargets.length && result.text.trim()) {
         // The reply is saved and shows on the web; a Telegram failure (a
@@ -63,7 +64,7 @@ export async function coordinatorTurn(userId: string) {
 }
 
 /** The Coordinator's tools. Each one runs as a step scoped to the person. */
-function coordinatorTools(userId: string, scope?: NativeToolScope) {
+function coordinatorTools(userId: string, scope?: NativeToolScope, computerEnabled = false) {
   const id = z.uuid()
   return {
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input, scope)),
@@ -88,6 +89,18 @@ function coordinatorTools(userId: string, scope?: NativeToolScope) {
       inputSchema: z.object({}),
       execute: () => steps.listAgents(userId, scope),
     }),
+    ...(computerEnabled ? {
+      list_computer_bots: tool({
+        description: 'List the person’s Bots and the available hosted execution harnesses for their computers.',
+        inputSchema: z.object({}),
+        execute: () => steps.listComputerBots(userId, scope),
+      }),
+      dispatch_bot_computer: tool({
+        description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Computer operations still require their approval.',
+        inputSchema: z.object({ botId: id, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional() }),
+        execute: (input, options) => steps.dispatchComputerTask(userId, input, options.toolCallId, scope),
+      }),
+    } : {}),
     dispatch_run: tool({
       description: 'Queue a run: one agent works one issue in one repository on its device. Returns the run id at once; an [Event] message arrives when the run ends.',
       inputSchema: z.object({

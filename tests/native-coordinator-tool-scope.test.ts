@@ -11,7 +11,7 @@ stub('../lib/coordinator/native.ts',{nativeCoordinatorStore:{assertToolActive:ch
 stub('../lib/coordinator/store.ts',{editMemory:effect})
 stub('../lib/issue-visibility.ts',{issueVisibility:effect})
 stub('../lib/agent-runs.ts',{addRunMessage:effect,queueRun:effect,readRun:effect,requestRunStop:effect,visibleRuns:effect})
-stub('../lib/db/index.ts',{db:null})
+stub('../lib/db/index.ts',{db:null,pool:null})
 stub('../lib/search/index.ts',{webSearch:effect})
 stub('../lib/device-link.ts',{DEVICE_ONLINE_WINDOW_MS:60_000})
 stub('../lib/composio.ts',{runComposioAction:effect})
@@ -34,6 +34,8 @@ const calls = {
   getIssue:()=>steps.getIssue(user,{issueId:'issue'},scope),
   listAgents:()=>steps.listAgents(user,scope),
   dispatchRun:()=>steps.dispatchRun(user,{issueId:'issue',agentId:'agent',deviceRepoId:'repo'},scope),
+  listComputerBots:()=>steps.listComputerBots(user,scope),
+  dispatchComputerTask:()=>steps.dispatchComputerTask(user,{botId:'bot',issueId:'issue',harness:'codex'},'tool-call',scope),
   listRuns:()=>steps.listRuns(user,{},scope),
   getRun:()=>steps.getRun(user,{runId:'run'},scope),
   sendToRun:()=>steps.sendToRun(user,{runId:'run',text:'message'},scope),

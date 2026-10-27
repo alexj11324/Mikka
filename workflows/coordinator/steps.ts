@@ -8,7 +8,7 @@ import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rem
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
 import { agents, deviceRepos, devices, issueMembers, issues, telegramLinks } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
@@ -20,12 +20,18 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
 import type { TelegramReplyTarget } from '@/lib/coordinator-events'
 import { postTelegramText } from '@/lib/telegram/client'
+import { queueCloudRun } from '@/lib/computer/queue-run'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
 // expected failures instead of throwing, so a bad id is not retried.
 
 type ToolResult<T> = T | { error: string }
+
+export async function computerToolsEnabled() {
+  'use step'
+  return process.env.MIKKA_CLOUD_COMPUTER_TASKS === '1' && process.env.MIKKA_BYOS_ENABLED === '1'
+}
 
 async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
@@ -175,6 +181,40 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   'use step'
   await assertNativeToolScope(userId,scope)
   return asToolResult(async () => ({ ...(await queueRun(userId, input)), status: 'queued' }))
+}
+
+/** Only the person's own Bots in workspaces they still belong to are listed. */
+export async function listComputerBots(userId: string, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  const { authorizeSubscriptionWorkspace } = await import('@/lib/subscription-runtime')
+  const { rows } = await pool.query(`SELECT b.id,b.name,b."workspaceId",coalesce(array_agg(r.harness) FILTER (WHERE r.harness IS NOT NULL),'{}') AS harnesses
+    FROM bots b LEFT JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
+    WHERE b."ownerId"=$1 GROUP BY b.id ORDER BY b."createdAt",b.id LIMIT 50`, [userId])
+  const visible = await Promise.all(rows.map(async row => {
+    try { await authorizeSubscriptionWorkspace(userId, row.workspaceId); return { id: row.id, name: row.name, harnesses: row.harnesses } }
+    catch { return null }
+  }))
+  return visible.filter(item => item !== null)
+}
+
+/** Queue and bind atomically, with a stable tool-call id for workflow retries. */
+export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string }, toolCallId: string, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
+  const target = (await pool.query(`SELECT b."workspaceId",r."agentId",r."repoId" FROM bots b
+    JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
+    WHERE b.id=$1 AND b."ownerId"=$2 AND r.harness=$3`, [input.botId, userId, input.harness])).rows[0]
+  if (!target) return { error: 'cloudComputerUnavailable' }
+  try { await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, target.workspaceId) } catch { return { error: 'cloudComputerUnavailable' } }
+  const issue = await issueForUser(userId, input.issueId)
+  if (!issue) return { error: 'issueNotFound' }
+  try {
+    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, idempotencyKey: `coordinator:${toolCallId}` })
+    return { ...result, botId: input.botId, task: issue.title, status: 'queued' as const }
+  } catch { return { error: 'cloudComputerUnavailable' } }
 }
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope) {
