@@ -85,8 +85,10 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
     - The model only ever sees a reference (`credential:<site>`), never the
       value. The value never reaches logs, the transcript or the model
       context, and the screencast masks it as the page does.
-    - Later logins to the same site use the vault without asking. The person
-      can remove a saved login in Settings.
+    - The login belongs to the user's account, not a run or workspace: any of
+      the user's threads and bot sub-agents uses it later without asking. The
+      person can remove a saved login in Settings. Browsers may visit any
+      site; the only check is that a site's password is filled on that site.
     - Google or Apple clicks the site's own 使用 Google/Apple 登录 and
       completes OAuth in the browser with the person's synced session; if
       that needs the person, the card asks again.
@@ -208,8 +210,8 @@ Report findings in the issue before building on an assumption that failed.
   (`queued | running | needs_you | done | failed | stopped`), step (the
   current step line), needs (`login` with site and account, or null), browser
   context id, createdAt, endedAt. No credential column.
-- Saved logins: the #180 vault, keyed by workspace and site; no Mikka table
-  holds a secret.
+- Saved logins: the #180 vault, keyed by user account and site
+  (`credential-vault.md`); only ciphertext is stored.
 - Approval rows: reuse the #161 ledger. Add `scope: once | run` so that
   本任务内都允许 auto-approves later operations of the same run on the same
   desktop. A workspace `deny` still wins.

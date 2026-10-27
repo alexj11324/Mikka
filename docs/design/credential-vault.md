@@ -16,8 +16,10 @@
 3. 点药丸 → 原地放大成登录卡：logo、登录 <站点>、✕；邮箱、密码；Google、Apple、登录；
    🔒 Secured by Mikka。卡里不写说明句子（R-40）。
 4. 提交后密码**保存**到密码箱，填进分身自己的浏览器，分身继续干活；卡片收成「已登录 Cloudflare ✓」。
-5. 以后同一工作区、同一网站自动登录，不再问；用户可在设置里删除。
-6. 模型永远拿不到密码；日志、聊天记录、截图、遥测里都不能出现。
+5. 密码**绑在用户账户上**，不是一次性的：这个用户的所有线程（coding agent）和所有 bot 的网页分身
+   都能调用，以后同一网站自动登录，不再问；用户可在设置里删除。
+6. 浏览器**可以访问所有网站，不设白名单**，不预先登记站点。
+7. 模型永远拿不到密码；日志、聊天记录、截图、遥测里都不能出现。
 
 ## 2. 行业怎么做（调研结论）
 
@@ -52,7 +54,7 @@
 - **KEK** 放在云 KMS 里，推荐 **AWS KMS**：每个 key $1/月，$0.03/万次。Vercel 用
   OIDC 联合到 IAM role，不放静态密钥。
 - **每条凭据一个 DEK**（`GenerateDataKey`），用 AES-256-GCM 在本地加密。AAD 和 KMS 的
-  encryption context 都是 `{workspaceId, userId, credentialId, origin, purpose}`；key
+  encryption context 都是 `{userId, credentialId, origin, purpose}`；key
   policy 用 `kms:EncryptionContext:*` 强制要求，CloudTrail 会记下 context。
 - **权限分开**：主应用 role 只有 `GenerateDataKey`（能加密，不能解密）；**只有 broker role
   有 `Decrypt`**。
@@ -77,19 +79,19 @@ Infisical 仍然用来放：broker 的配置（role ARN、日志指纹 pepper）
 
 ### 数据表（Neon，新迁移，不是 #313 的三张表照搬）
 
-- `credentials(id, workspace_id, created_by, origin, alt_origins[], username, auth_kind password|oauth|session, totp_mode ask|stored, unattended_allowed, created_at, last_used_at, revoked_at)`：唯一键 `(workspace_id, origin, username)`。
+- `credentials(id, user_id, origin, alt_origins[], username, auth_kind password|oauth|session, totp_mode ask|stored, unattended_allowed, created_at, last_used_at, revoked_at)`：唯一键 `(user_id, origin, username)`。属于用户账户，不属于工作区或某个 run。
 - `credential_secrets(credential_id, kms_key_arn, wrapped_dek, nonce, ciphertext, aad_version, created_at)`
 - `browser_sessions(credential_id, wrapped_dek, nonce, ciphertext_storage_state, expires_at)`：cookie 也是凭据，同样加密。
-- `credential_grants(credential_id, bot_id, scope, expires_at)`
-- `credential_access_events(credential_id, bot_id, subagent_id, origin_seen, decision, ts)`：只记事件，不记值。
+- （不设 per-bot grant 表：账户下的所有线程和分身都可调用，靠 access_events 审计。）
+- `credential_access_events(credential_id, user_id, bot_id, run_id, subagent_id, origin_seen, decision, ts)`：只记事件，不记值。
 
 ### 填写路径
 
-1. 模型调用 `login(site)`。它只拿到 `credential_id` 或 `needs_login`，拿不到值。
-2. 编排代码检查 grant，用 CDP 读顶层 frame 的 URL：协议加主机必须**精确等于**
+1. 线程里的 coding agent 或 bot 的网页分身调用 `login(site)`。它只拿到 `credential_id` 或 `needs_login`，拿不到值。
+2. 编排代码确认调用方属于凭据的主人（run 或分身的 owner = `user_id`），用 CDP 读顶层 frame 的 URL：协议加主机必须**精确等于**
    `credential.origin`。拒绝 userinfo URL，做 punycode 归一化，只认顶层，不认跨源 iframe。
-3. 编排代码向 broker 要一次性 lease（约 30 秒，签名，绑定 subagent、origin 和目标）。
-4. **broker 自己连分身浏览器的 CDP**，明文不经过 agent 进程。顺序如下：
+3. 编排代码向 broker 要一次填写用的短 lease（约 30 秒，签名，绑定调用方、origin 和目标）。这是单次填写的授权，密码本身长期保存。
+4. **broker 自己连调用方浏览器的 CDP**（分身在 bot 机器上，线程在自己的 thread 机器上），明文不经过 agent 进程。顺序如下：
    1. 暂停 screencast 和截图；
    2. 再核一次 origin；
    3. 按选择器聚焦输入框；
@@ -109,8 +111,9 @@ Infisical 仍然用来放：broker 的配置（role ARN、日志指纹 pepper）
   完成后保存登录态。Google 可能拦截自动化浏览器，要实测。
 - **2FA**：默认用同一张卡片的验证码形态问用户。存 TOTP 种子必须用户明确开启，并且单独加密，
   因为种子和密码放在一起就等于只剩一个因素。
-- **批准**：某个 bot 第一次在某个站点用某条凭据，要用户批准；之后只有用户开了「无人值守」
-  才自动用。每次自动填写都发通知，并在设置里留记录。
+- **浏览范围**：浏览器访问所有网站，不设白名单。唯一的站点检查是「某网站的密码只填进那个网站」
+  （密码管理器的标准做法，防钓鱼页骗走密码），它不限制浏览。
+- **调用**：保存后，账户下的线程和分身直接调用，不再逐次批准；每次填写在设置里留记录。
 - **设置**：设置里新增「已保存的登录」，可删除；删除即作废 DEK 和登录态。
   这一页属于 R-70 意义上的设置，先例是 1Password 和 Chrome 的密码管理器。
 
@@ -119,7 +122,7 @@ Infisical 仍然用来放：broker 的配置（role ARN、日志指纹 pepper）
 | 威胁 | 防护 |
 |---|---|
 | Neon 泄露或备份泄露 | 只有密文和 wrapped DEK，解密要 KMS 的 IAM 权限。**防得住** |
-| Next.js 应用服务器被攻破 | 应用 role 不能 Decrypt；只能为运行中的分身、在匹配的 origin 上申请 lease，有限速和审计。**部分防住** |
+| Next.js 应用服务器被攻破 | 应用 role 不能 Decrypt；只能为该用户运行中的线程或分身、在匹配的 origin 上申请 lease，有限速和审计。**部分防住** |
 | 对模型的提示注入 | 模型拿不到值；origin 校验挡住填到别的站。**防不住**：分身在已登录会话里被诱导乱操作（Comet 事故） |
 | 钓鱼或仿冒域名 | 精确 origin 绑定，broker 填写前再核一次 |
 | 内部人员 | role 分离，CloudTrail 记录 context，broker 部署和 KMS policy 双人审批。**防不住**：恶意的 broker 部署 |
@@ -153,14 +156,15 @@ Infisical 仍然用来放：broker 的配置（role ARN、日志指纹 pepper）
 
 **必须按新方向改**（这三处与 R-72 冲突）
 
-1. **不绑 run。** 现在每个请求都要 `workspaceId + runId + taskId`，还要设备在线；网页分身不是线程。
-   改成按 `workspaceId + origin + username` 存；使用时绑定 `botId + subagentId`。
-   线程（coding agent）需要 API token 时仍可按 run 申请，那条路径留着。
+1. **绑账户，不绑 run。** 现在每个请求都要 `workspaceId + runId + taskId`，还要设备在线。
+   改成按 `userId + origin + username` 存在用户账户下；这个用户的**每个线程和每个网页分身**
+   都能调用（调用时校验调用方的 owner 是该用户）。
 2. **默认保存、可复用。** 现在是 `retention: once | session`，到期就销毁。改成长期保存，
    支持撤销和删除，并加上 `browser_sessions` 复用。
-3. **填进分身自己的浏览器。** 现在是独占的 `owned-chromium`，网站要在部署里预先登记，
-   之后只能做固定的 navigate/read/click。改成 broker 连 bot 机器上该分身的 CDP 上下文，
-   填完把浏览器交还给分身自由使用。预登记的 `services` 列表去掉，改用 origin 绑定。
+3. **浏览器访问所有网站，不设白名单。** 现在是独占的 `owned-chromium`，网站要在部署里预先登记
+   （`services`），之后只能做固定的 navigate/read/click。去掉 `services` 白名单和固定动作；
+   broker 连调用方自己的浏览器（分身或线程）的 CDP 填写，填完浏览器照常自由使用。
+   只保留「某站点的密码只填进该站点」的检查。
 
 **怎么拆**：不要在 #313 这个 592 个文件的 PR 里做。从最新 main 开一个只做密码箱的 PR，
 从 `codex/issue-180-credential-backend` 或 #313 里拣上面「留用」的文件过来。#313 其余部分
@@ -170,9 +174,9 @@ Coordinator attention（#339）等，`lib/coordinator`、`workflows/coordinator`
 ## 6. 验收（沿用 #180 的完成门槛）
 
 - 在 Preview 上，用一个**测试站点和测试账号**走完：药丸 → 卡片 → 保存 → 填写 → 分身继续 →
-  第二次自动登录（先试登录态，再试密码）→ 设置里删除 → 再用就被拒。截真实界面图。
+  另一个线程或另一个 bot 的分身直接用同一条密码登录（先试登录态，再试密码）→ 设置里删除 → 再用就被拒。截真实界面图。
 - 检查数据库、日志、聊天记录、SSE、截图、遥测、模型输入，全部没有明文；故意走错误路径也要查。
-- 错误的 workspace、bot 或 origin，过期或重放的 lease，userinfo 或 punycode 仿冒的 URL，
+- 别的用户的线程或分身来调用、origin 不匹配、过期或重放的 lease，userinfo 或 punycode 仿冒的 URL，
   全部被拒。
 - KMS 不可用时不能谎报成功；清理失败要可重试。
 - 不碰生产数据和真实账号；生产迁移先走 manifest 检查。按 `AGENTS.md`，凭据只放在 Infisical。

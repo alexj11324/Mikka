@@ -205,8 +205,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   under it. Tapping the pill expands it in place into the login card (logo,
   登录 <site>, ✕; 邮箱, 密码; Google, Apple, 登录; 🔒 Secured by Mikka); ✕
   shrinks it back. No sheet and no sentence in the card. The login is saved
-  to the workspace's encrypted vault and typed into the site; the model never
-  sees it. Once saved, the card collapses to 已登录 <site>.
+  to the user's encrypted vault (bound to the account, not one-time) and every
+  thread and bot sub-agent of that user can use it; the model never sees it.
+  Browsing is open to every site, with no allowlist. Once saved, the card collapses to 已登录 <site>.
 
 ## Look
 
