@@ -85,11 +85,12 @@ export async function open(kms: Kms, context: EncryptionContext, envelope: Envel
 /** Session snapshots use the credential's wrapped DEK with a fresh GCM nonce and
  * distinct AAD purpose. The decrypt-only broker cannot call GenerateDataKey. */
 export async function sealSession(kms: Kms, context: EncryptionContext, wrappedDek: string, plaintext: Buffer): Promise<Envelope> {
-  const key = await kms.decrypt(wrappedDek, context)
+  let key: Buffer | undefined
   try {
+    key = await kms.decrypt(wrappedDek, context)
     const nonce = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key, nonce)
     cipher.setAAD(aad(context, 'session'))
     const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final(), cipher.getAuthTag()])
     return { v: 1, wrappedDek, nonce: nonce.toString('base64'), ciphertext: encrypted.toString('base64') }
-  } finally { key.fill(0); plaintext.fill(0) }
+  } finally { key?.fill(0); plaintext.fill(0) }
 }
