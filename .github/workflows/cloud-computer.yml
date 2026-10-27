@@ -30,7 +30,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm exec oxlint --deny-warnings lib/computer app/api/bots
       - run: pnpm --filter @mikka/protocol exec vitest run src/computer.test.ts
-      - run: node --import ./scripts/server-test.mjs --import tsx --test lib/computer/handler.test.ts lib/computer/policy-route.test.ts lib/computer/thread-handler.test.ts lib/computer/subagent-handler.test.ts
+      - run: node --import ./scripts/server-test.mjs --import tsx --test lib/computer/handler.test.ts lib/computer/policy-route.test.ts lib/computer/thread-handler.test.ts lib/computer/subagent-handler.test.ts lib/computer/thread-result-download.test.ts
       - run: node --import ./scripts/server-test.mjs --import tsx --test lib/cua/local-review.test.ts
       - run: node --test packages/daemon/src/computer/broker.test.mjs
       - run: node --import ./scripts/server-test.mjs --import tsx --test packages/daemon/src/computer/web-review.node.ts

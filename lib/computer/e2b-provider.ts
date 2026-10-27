@@ -63,6 +63,12 @@ export async function createWorkspaceSnapshot(stage: Sandbox) {
   return stage.createSnapshot({ mode: 'filesystem' })
 }
 
+/** A result download uses a disposable instance; it must not remain paused
+ * and billed if the client disconnects or the serving function stops. */
+export async function createResultReader(snapshotId: string, runId: string) {
+  return Sandbox.create(snapshotId, { ...options(), metadata: { application: 'mikka-thread-result', runId }, lifecycle: { onTimeout: 'kill' } })
+}
+
 export async function deleteWorkspaceSnapshot(snapshotId: string) {
   await Sandbox.deleteSnapshot(snapshotId, options())
 }
