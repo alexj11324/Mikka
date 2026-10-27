@@ -49,39 +49,62 @@
 
 ## 3. 推荐方案
 
-### 加密：信封加密（envelope encryption）
+### 加密与存储：第一版用 Infisical（Alex 2026-10-27 定）
 
-- **KEK** 放在云 KMS 里，推荐 **AWS KMS**：每个 key $1/月，$0.03/万次。Vercel 用
-  OIDC 联合到 IAM role，不放静态密钥。
-- **每条凭据一个 DEK**（`GenerateDataKey`），用 AES-256-GCM 在本地加密。AAD 和 KMS 的
-  encryption context 都是 `{userId, credentialId, origin, purpose}`；key
-  policy 用 `kms:EncryptionContext:*` 强制要求，CloudTrail 会记下 context。
-- **权限分开**：主应用 role 只有 `GenerateDataKey`（能加密，不能解密）；**只有 broker role
-  有 `Decrypt`**。
-- 密文和 wrapped DEK 存 Neon。**Mikka 库里不出现明文**，Neon 泄露也解不开。
-- 轮换用 KMS 自动轮换，无需重新包装。删除凭据就删行，DEK 随之作废。
+不需要新开 AWS。第一版沿用 #313 的 Infisical 存储，外面再加一层由 Mikka 自己做的加密：
 
-不选其它方案的原因：
+- **存储**：每条密码在 Infisical 里存成一个 secret。项目和环境单独划出，比如 `prod:/user-credentials`；
+  名字是随机 UUID（`MIKKA_CREDENTIAL_<uuid>`），不带用户、网站或账号名。这部分是 #313 的
+  `InfisicalCredentialVault`。
+- **包一层应用加密**：写进 Infisical 之前，先用 AES-256-GCM 加密。
+  - 总钥匙 `CREDENTIAL_MASTER_KEY` 是 32 字节，放在 Infisical，**只同步给 broker**。
+  - 每个用户的钥匙用 HKDF 派生：`HKDF(master, salt=user_id, info="mikka-credential-v1")`。
+  - AAD 是 `{userId, credentialId, origin, v}`。
+  - 存进 Infisical 的值是 `{v, nonce, ciphertext}`。
+  - 读出来时，只能用调用方自己的 `user_id` 派生钥匙并校验 AAD；拿错别人的那条，会解密失败并报错。
+- **只有 broker 能读**：Infisical 里只有 broker 的 machine identity 能读这个目录。主应用的身份
+  只能写，或者完全不能碰，由 broker 代为写入。其它服务和 Secret Sync 都不同步这个目录。
+- **删除**：删 Infisical secret，再删 Neon 里的行。Infisical 的版本和备份保留由 Infisical 管，
+  逻辑删除不等于从备份里物理擦除。
+- 代码里的 `CredentialVault` 接口（put/read/remove）保持不变。以后升级到云 KMS 时只换实现，
+  上层不动。
 
-- **Infisical KMS** 只在企业版，加密接口不收 AAD。
-- **#313 现有的「每条密码一个 Infisical secret」**：Infisical 是给应用配置用的，几百万条
-  用户密码会碰上路径和权限面积、速率限制的问题，而且 Mikka 侧任何持有该 machine identity
-  的进程都能读。
-- **Vault Transit** 要自己运维集群。
-- **Vercel KMS** 只能签名。
-- **GCP KMS** 与 AWS 等价，也可以用。
+**以后升级到 KMS（不在第一版做）**：AWS KMS 或 GCP KMS 做信封加密，每条一个 DEK，
+encryption context 绑定 `{userId, credentialId, origin}`，主应用只能加密、只有 broker 能解密，
+每次解密都留 CloudTrail 记录，总钥匙永远不出 KMS。触发升级的时机：用户量大到碰上 Infisical
+的速率限制，或者需要「总钥匙不进任何进程」这一级的隔离时。Infisical 自带的 KMS 只在企业版，
+而且加密接口不收 AAD，所以不考虑。
 
-Infisical 仍然用来放：broker 的配置（role ARN、日志指纹 pepper）、Secret Syncs、broker
-的 machine identity，以及 API token 类凭据（Infisical Agent Vault 在代理层注入那种）。
+### 用户之间的隔离（必须做到）
 
-> 需要 Alex 决定：新开 AWS 账号用 KMS（推荐），还是先沿用 #313 的 Infisical 存储作为第一版、
-> 接口保持不变、之后迁移。`CredentialVault` 接口两种都能接。
+Infisical 不知道 Mikka 的用户：所有用户的密码在同一个目录里，broker 能读全部。所以「A 拿不到 B 的
+密码」要靠 Mikka 自己保证，下面六条都是硬要求：
+
+1. **调用方身份由服务器认定。** 线程或分身发起登录时，服务器从「这个 run 或分身的 owner」
+   得出 `user_id`，再用 `user_id + origin` 查 `credentials`。模型和前端只能说要登录哪个网站，
+   不能指定凭据 id、代号或用户。不存在按 id 取凭据的工具或接口。
+2. **代号随机、不外露。** Infisical 名字和 `credential_id` 从不返回给前端、模型、日志或 SSE。
+3. **加密绑定主人**（见上一节）。代码哪怕拿错了别人的那条，也解不开。
+4. **按个人账户隔离，不按工作区。** 同一工作区的队友也不能用彼此的密码；B 的线程用不了 A 的密码。
+   这和「线程只有主人能读写」的权限一致。
+5. **Infisical 权限最小化。** 只有 broker 的 identity 能读这个目录。Infisical 的读取审计日志
+   要能和 `credential_access_events` 对账。
+6. **越权测试。** 下面每一种都必须被拒，并且不泄露「这条存不存在」：
+   - B 的线程或分身请求 A 的网站登录；
+   - 伪造或重放 `credential_id`、lease 或代号；
+   - 换一个工作区去请求；
+   - 已删除的凭据。
+
+   #223 已有的跨用户、跨 run 拒绝测试，要按「绑账户」的新模型重写。
+
+剩下防不住的情况：Mikka 服务器连同 `CREDENTIAL_MASTER_KEY` 一起被攻破，或者 broker 的
+Infisical 身份被盗用，这两种都能读到全部密码。所以 broker 的部署和权限要尽量收窄。
 
 ### 数据表（Neon，新迁移，不是 #313 的三张表照搬）
 
 - `credentials(id, user_id, origin, alt_origins[], username, auth_kind password|oauth|session, totp_mode ask|stored, unattended_allowed, created_at, last_used_at, revoked_at)`：唯一键 `(user_id, origin, username)`。属于用户账户，不属于工作区或某个 run。
-- `credential_secrets(credential_id, kms_key_arn, wrapped_dek, nonce, ciphertext, aad_version, created_at)`
-- `browser_sessions(credential_id, wrapped_dek, nonce, ciphertext_storage_state, expires_at)`：cookie 也是凭据，同样加密。
+- `credential_secrets(credential_id, vault_ref, aad_version, created_at)`：`vault_ref` 是 Infisical 里的随机名字；值（应用层密文）只在 Infisical。
+- `browser_sessions(credential_id, vault_ref, expires_at)`：登录态（cookie）也是凭据，同样加密后存在 Infisical。
 - （不设 per-bot grant 表：账户下的所有线程和分身都可调用，靠 access_events 审计。）
 - `credential_access_events(credential_id, user_id, bot_id, run_id, subagent_id, origin_seen, decision, ts)`：只记事件，不记值。
 
@@ -114,23 +137,25 @@ Infisical 仍然用来放：broker 的配置（role ARN、日志指纹 pepper）
 - **浏览范围**：浏览器访问所有网站，不设白名单。唯一的站点检查是「某网站的密码只填进那个网站」
   （密码管理器的标准做法，防钓鱼页骗走密码），它不限制浏览。
 - **调用**：保存后，账户下的线程和分身直接调用，不再逐次批准；每次填写在设置里留记录。
-- **设置**：设置里新增「已保存的登录」，可删除；删除即作废 DEK 和登录态。
+- **设置**：设置里新增「已保存的登录」，可以删除；删除时同时删掉密码和登录态。
   这一页属于 R-70 意义上的设置，先例是 1Password 和 Chrome 的密码管理器。
 
 ## 4. 威胁模型
 
 | 威胁 | 防护 |
 |---|---|
-| Neon 泄露或备份泄露 | 只有密文和 wrapped DEK，解密要 KMS 的 IAM 权限。**防得住** |
-| Next.js 应用服务器被攻破 | 应用 role 不能 Decrypt；只能为该用户运行中的线程或分身、在匹配的 origin 上申请 lease，有限速和审计。**部分防住** |
+| Neon 泄露或备份泄露 | Neon 里只有随机代号，没有密码。**防得住** |
+| Infisical 项目泄露 | 只有应用层密文，没有 `CREDENTIAL_MASTER_KEY` 解不开。**防得住** |
+| 用户 A 拿到用户 B 的密码 | 见「用户之间的隔离」六条。**防得住**，除非服务器和总钥匙一起被攻破 |
+| Next.js 应用服务器被攻破 | 主应用读不了 Infisical 那个目录，也没有总钥匙；只能为该用户运行中的线程或分身、在匹配的 origin 上申请 lease，有限速和审计。**部分防住** |
 | 对模型的提示注入 | 模型拿不到值；origin 校验挡住填到别的站。**防不住**：分身在已登录会话里被诱导乱操作（Comet 事故） |
 | 钓鱼或仿冒域名 | 精确 origin 绑定，broker 填写前再核一次 |
-| 内部人员 | role 分离，CloudTrail 记录 context，broker 部署和 KMS policy 双人审批。**防不住**：恶意的 broker 部署 |
+| 内部人员 | broker 身份单独管理，Infisical 有审计日志，broker 部署双人审批。**防不住**：恶意的 broker 部署 |
 | 日志、截图、遥测泄露 | 暂停 screencast、去掉 value、丢弃 CDP 参数、指纹扫描 |
 
 仍然不受保护的：
 
-- broker 和 KMS role 能解密全部数据，因此不是零知识；
+- broker（持有 Infisical 读取权限和总钥匙）能解密全部数据，因此不是零知识；
 - 真网站本身的 XSS，或者被攻破的 E2B 沙箱、Chrome，能读到输入框；
 - 被盗的 cookie 可以绕过密码和 2FA；
 - 被劫持的分身能以用户身份操作，只能靠关键操作逐项确认（付款、删除、取消订阅等）；
@@ -150,7 +175,7 @@ Infisical 仍然用来放：broker 的配置（role ARN、日志指纹 pepper）
 - 提交接口的防护：精确 Origin、`X-Mikka-Credential` 头、拒绝跨站、12 KB 上限、拒绝
   CR/LF/NUL、`no-store`、nonce 一次性。
 - 不存值、不记明文错误的纪律，「provider 错误不带 cause」的写法，以及清理和重放的测试。
-- `CredentialVault` 接口（put/read/remove）。把实现换成 KMS 信封加密：`read` 只在 broker 里可用。
+- `CredentialVault` 接口（put/read/remove）和 `InfisicalCredentialVault`：外面加上应用层加密（绑定 user_id），`read` 只在 broker 里可用。
 - 只有引用的 AI 工具：没有 `getSecret`。
 - Infisical universal-auth 的取 token 逻辑：broker 读配置时用。
 
@@ -178,7 +203,9 @@ Coordinator attention（#339）等，`lib/coordinator`、`workflows/coordinator`
 - 检查数据库、日志、聊天记录、SSE、截图、遥测、模型输入，全部没有明文；故意走错误路径也要查。
 - 别的用户的线程或分身来调用、origin 不匹配、过期或重放的 lease，userinfo 或 punycode 仿冒的 URL，
   全部被拒。
-- KMS 不可用时不能谎报成功；清理失败要可重试。
+- 用户 B 的线程或分身请求 A 的网站登录被拒；伪造、重放、换工作区、已删除凭据都被拒。
+  从 Infisical 里拿 A 的那条，用 B 的 user_id 解密必须失败。
+- Infisical 不可用时不能谎报成功；清理失败要可重试。
 - 不碰生产数据和真实账号；生产迁移先走 manifest 检查。按 `AGENTS.md`，凭据只放在 Infisical。
 - 交付时写明：分支、commit SHA、Preview URL；分别列出通过、失败、阻塞、未执行的项。
 
