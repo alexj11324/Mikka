@@ -10,7 +10,7 @@ The `mikka` Vercel project's Production environment needs these variables:
 - `TELEGRAM_BOT_USERNAME`: the bot username without `@`.
 - `TELEGRAM_WEBHOOK_SECRET_TOKEN`: a random value using only letters, numbers, `_`, or `-`.
 
-Keep the token and webhook secret in Vercel's encrypted Production environment variables. They do not belong in the repository. The Telegram schema is `drizzle/0004_telegram_chat.sql`. Migrations run only through `pnpm migrate` (`scripts/migrate.mjs`): in Vercel Production when the Build Command is `pnpm migrate && pnpm build`, or with `MIGRATE=1`; plain `pnpm build` never runs them.
+Keep the token and webhook secret in Vercel's encrypted Production environment variables. They do not belong in the repository. The Telegram schema is `drizzle/0004_telegram_chat.sql`. Migrations: additive (or idempotent), tested on a real Postgres; see `docs/migration-bootstrap.md` for when they run.
 
 After the production deployment is ready, register `https://app.aspectlylabs.com/mikka/api/webhooks/telegram` with Telegram's `setWebhook` method. Set its `secret_token` to the same value as `TELEGRAM_WEBHOOK_SECRET_TOKEN`. The bot uses webhook delivery; do not run `getUpdates` for the same bot while the webhook is configured.
 

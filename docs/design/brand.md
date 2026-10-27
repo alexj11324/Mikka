@@ -2,9 +2,7 @@
 
 Mikka has one mark: an M drawn on a 5×5 dot grid. The 13 dots that form the M
 are solid. The other 12 are ghosts at low opacity. This page says where the
-mark goes, how big it is, and what color it takes. Sizes are listed per
-placement below; the bot list header uses a 28px inline mark (`size-7`), the
-same height as its icon buttons.
+mark goes, how big it is, and what color it takes.
 
 ## Assets
 

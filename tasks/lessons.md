@@ -163,7 +163,7 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 **发生了什么**：反复 `TaskStop` 开发服务器后，`next dev` 进程 CPU 很高但端口不响应，
 日志出现 `inner_of_upper_lost_followers` 的 tokio panic。
 
-**规则**：（仅限允许起本地服务的环境；开发者的 Mac 上不起 dev server，见 `AGENTS.md`）遇到这种状态先 `rm -rf .next` 再启动，不要在「等它编译完」上浪费时间；
+**规则**：遇到这种状态先 `rm -rf .next` 再启动，不要在「等它编译完」上浪费时间；
 `pkill -f "next dev"` 后确认端口释放，避免新实例换端口导致 better-auth origin 校验失败。
 
 ## 2026-10-21 `[locale]/not-found.tsx` 需要 catch-all 才可达

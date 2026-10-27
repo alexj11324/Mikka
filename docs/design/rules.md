@@ -178,7 +178,7 @@ do what Linear does. Figma: `220:5022` (MIK-25).
 - **R-34** Status colours come only from the StatusBadge set (Figma
   `99:75`), shared by devices, threads and tasks.
 - **R-35** Shell (Comma): grey window background, 44px top bar (back,
-  forward, centred search pill that opens ⌘K), 72px icon rail with a text
+  forward, centred search pill that opens ⌘K), 56px icon rail with a text
   label under each icon (主页, 看板…), and one rounded content card. Build on
   `components/app-shell.tsx`; no reUI App Shell blocks.
 - **R-36** Bots use bloub avatars (`BotAvatar`, Figma `196:3571`, all 16

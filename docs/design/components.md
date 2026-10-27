@@ -28,10 +28,8 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 
 ## Do not use
 
-These are leftovers from the retired standalone Agent chat and the old sidebar
-shell; none has a caller left. Copying from
-them is how retired designs came back. Do not import them into new UI; delete
-them when their last caller goes.
+Files and patterns that brought retired designs back. The files have no
+callers left; do not import them, and delete them in a cleanup PR.
 
 | Component | Why not | What brought it back |
 | --- | --- | --- |

@@ -34,8 +34,8 @@ Thank you for helping improve Mikka.
 Slow checks run less often and later. Each layer catches what the one before
 cannot.
 
-1. **While writing** (seconds, in the agent's container; on the developer's
-   Mac only source-only tests, see `AGENTS.md`): `pnpm typecheck`, `pnpm lint` and the unit tests for what you changed. Run a
+1. **While writing** (seconds, on your machine or the agent's container):
+   `pnpm typecheck`, `pnpm lint` and the unit tests for what you changed. Run a
    browser test only for the flow you changed, and only if you can.
 2. **Every push and pull request** (minutes, CI): production build, every unit
    test, database migrations and integration tests such as thread privacy.

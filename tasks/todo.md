@@ -206,7 +206,7 @@ next/font 在构建期把字体自托管到本地，运行时同样不联网；�
 
 # Agents 界面 + 设备 harness 检测（daemon 移植）— 2026-10-20
 
-> 已过时：`/agents` 页面与手动 Agent 管理已移除；线程由 Bot 派发（见 `docs/design/decisions.md` 2026-10-25 23:40）。
+> 已过时：已无 `/agents` 页面，Agent 增删改没有 UI 入口；线程由 Coordinator/Bot 通过 `dispatch_run` 派发（#334）。
 
 ## 目标
 
