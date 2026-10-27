@@ -20,7 +20,8 @@ test('workspace snapshots serialize refresh, seed the right run and retain versi
   const sha = 'a'.repeat(40)
   let archiveHash = 'b'.repeat(64), builds = 0, threadCreates = 0
   const deleted: string[] = []
-  const source = { files: { read: async (path: string) => path.endsWith('worker-source-sha') ? sha : new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array([1])); controller.close() } }) },
+  let botRevision = 'd'.repeat(40)
+  const source = { files: { read: async (path: string) => path.endsWith('worker-source-sha') ? botRevision : new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array([1])); controller.close() } }) },
     commands: { run: async (command: string) => ({ stdout: command.startsWith('umask') ? archiveHash : '' }) } }
   const stage = { files: { read: async () => sha, write: async () => {} }, commands: { run: async () => ({ stdout: '' }) }, kill: async () => {} }
   let handoff: { deviceId: string } | undefined
@@ -68,6 +69,9 @@ test('workspace snapshots serialize refresh, seed the right run and retain versi
     await assert.rejects(prepareWorkspaceSnapshot(pool, actor, runs[0], botId, sha, runtime), /unavailable/)
     assert.equal(builds, 0)
     await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])
+    botRevision = 'invalid'
+    await assert.rejects(prepareWorkspaceSnapshot(pool, actor, runs[0], botId, sha, runtime), /version unavailable/)
+    botRevision = 'd'.repeat(40)
     assert.deepEqual(await Promise.all(runs.slice(0, 2).map(run => prepareWorkspaceSnapshot(pool, actor, run, botId, sha, runtime))), ['snapshot-1', 'snapshot-1'])
     assert.equal(builds, 1)
     archiveHash = 'c'.repeat(64)

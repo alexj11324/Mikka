@@ -36,7 +36,10 @@ export async function prepareWorkspaceSnapshot(pool: Pool, actor: Actor, runId: 
     if (prior) { await client.query('COMMIT'); committed = true; return prior.snapshotId as string }
     source = await runtime.connectComputer(run.sandboxId)
     const revision = await source.files.read('/opt/mikka/worker-source-sha', { user: 'root' })
-    if (revision.trim() !== sourceSha) throw new Error('Cloud worker version mismatch')
+    // An existing Bot may predate the current deployment. Its owner-bound
+    // machine can supply the workspace, while the clean staging image below
+    // must be pinned to the current trusted worker revision.
+    if (!/^[a-f0-9]{40}$/.test(revision.trim())) throw new Error('Cloud worker version unavailable')
     const result = await source.commands.run(`umask 077; git -C ${run.repoPath} rev-parse --verify HEAD >/dev/null; tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -cf ${archive} -C ${run.repoPath} .; sha256sum ${archive} | cut -d ' ' -f1`, { user: 'mikka-runner', timeoutMs: 180_000 })
     const fingerprint = result.stdout.trim()
     if (!/^[a-f0-9]{64}$/.test(fingerprint)) throw new Error('Workspace archive unavailable')

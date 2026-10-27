@@ -15,6 +15,8 @@ async function main() {
   assert.ok(['localhost', '127.0.0.1'].includes(url.hostname))
   const template = process.env.E2B_COMPUTER_TEMPLATE, sha = process.env.E2B_WORKER_SHA
   if (!template || !process.env.E2B_API_KEY || !sha || !/^[a-f0-9]{40}$/.test(sha)) throw new Error('Disposable template and worker revision required')
+  const sourceTemplate = process.env.E2B_SOURCE_TEMPLATE ?? template, sourceSha = process.env.E2B_SOURCE_SHA ?? sha
+  if (!/^[a-f0-9]{40}$/.test(sourceSha)) throw new Error('Invalid source worker revision')
   const options = { apiKey: process.env.E2B_API_KEY, proxy: process.env.HTTPS_PROXY, timeoutMs: 360_000 }
   const schema = `threadworker_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: url.toString() })
@@ -36,8 +38,8 @@ async function main() {
       await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
     }
     const actor = { userId: 'synthetic-owner', workspaceId: randomUUID() }, botId = randomUUID(), runId = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
-    source = await Sandbox.create(template, options)
-    assert.equal((await source.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim(), sha)
+    source = await Sandbox.create(sourceTemplate, options)
+    assert.equal((await source.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim(), sourceSha)
     const repo = `/home/mikka-runner/.mikka/bot-workspaces/${botId}`
     await source.commands.run(`install -d -o mikka-runner -g mikka-runner -m 0700 ${repo}`, { user: 'root' })
     await source.commands.run(`git -C ${repo} init -q -b main; printf 'thread fixture\n' > ${repo}/fixture.txt; git -C ${repo} add .; git -C ${repo} -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm fixture`, { user: 'mikka-runner', timeoutMs: 30_000 })
