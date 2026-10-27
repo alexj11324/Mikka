@@ -4,33 +4,57 @@ import { createHash } from 'node:crypto'
 // remains a normal migration ID, but it must run BEFORE 0001's issues FK.
 // Keep the exception explicit: future timestamped migrations stay chronological.
 export const APPLICATION_BASELINE = '20261023221259_application_baseline.sql'
+export const ARTIFACT_COMPATIBILITY = '20261027040459_artifact_legacy_compat.sql'
+const MAIN_ARTIFACTS = '20261027010100_artifacts.sql'
 
 export function orderMigrations(names) {
   const ordered = [...names].sort()
   if (!ordered.includes(APPLICATION_BASELINE)) throw new Error(`migrate: missing required baseline ${APPLICATION_BASELINE}`)
-  return [APPLICATION_BASELINE, ...ordered.filter(name => name !== APPLICATION_BASELINE)]
+  const remaining = ordered.filter(name => name !== APPLICATION_BASELINE && name !== ARTIFACT_COMPATIBILITY)
+  // A legacy production table predates main's artifact migration. The
+  // compatibility migration only renames that known legacy layout and must
+  // therefore run before the mainline create statements.
+  if (ordered.includes(ARTIFACT_COMPATIBILITY)) {
+    const artifactIndex = remaining.indexOf(MAIN_ARTIFACTS)
+    remaining.splice(artifactIndex < 0 ? remaining.length : artifactIndex, 0, ARTIFACT_COMPATIBILITY)
+  }
+  return [APPLICATION_BASELINE, ...remaining]
 }
 
-// The same reviewed BYOS migrations were previously applied from two unmerged
-// branches under different names. Preserve those historical ledger entries;
-// do not re-run their SQL when the canonical mainline names arrive.
+// Earlier branch and deployment names are aliases only for identical SQL.
 export const MIGRATION_EQUIVALENTS = {
-  '20261027000100_byos_credential_publications.sql': ['20261024064200_byos_credential_publications.sql', '20261025141650_byos_credential_publications.sql'],
-  '20261027000101_byos_bindings_oauth.sql': ['20261024080000_byos_bindings_oauth.sql', '20261025141651_byos_bindings_oauth.sql'],
-  '20261027000102_byos_device_authorization.sql': ['20261024160000_byos_device_authorization.sql', '20261025141652_byos_device_authorization.sql'],
-  '20261027000103_byos_access_and_cleanup.sql': ['20261024190000_byos_access_and_cleanup.sql', '20261025141653_byos_access_and_cleanup.sql'],
-  '20261027000104_byos_native_runs.sql': ['20261024201500_byos_native_runs.sql', '20261025141654_byos_native_runs.sql'],
-  '20261027000105_byos_enrollment_transfers.sql': ['20261024223000_byos_enrollment_transfers.sql', '20261025141655_byos_enrollment_transfers.sql'],
-  '20261027000106_byos_enrollment_cleanup.sql': ['20261024230000_byos_enrollment_cleanup.sql', '20261025141656_byos_enrollment_cleanup.sql'],
+  '20261027040500_cloud_computers.sql': ['20261026235901_cloud_computers.sql'],
+  '20261027040501_computer_run_bindings.sql': ['20261027000000_computer_run_bindings.sql'],
+  '20261027040502_byos_credential_publications.sql': ['20261027000100_byos_credential_publications.sql', '20261024064200_byos_credential_publications.sql', '20261025141650_byos_credential_publications.sql'],
+  '20261027040503_byos_bindings_oauth.sql': ['20261027000101_byos_bindings_oauth.sql', '20261024080000_byos_bindings_oauth.sql', '20261025141651_byos_bindings_oauth.sql'],
+  '20261027040504_byos_device_authorization.sql': ['20261027000102_byos_device_authorization.sql', '20261024160000_byos_device_authorization.sql', '20261025141652_byos_device_authorization.sql'],
+  '20261027040505_byos_access_and_cleanup.sql': ['20261027000103_byos_access_and_cleanup.sql', '20261024190000_byos_access_and_cleanup.sql', '20261025141653_byos_access_and_cleanup.sql'],
+  '20261027040506_byos_native_runs.sql': ['20261027000104_byos_native_runs.sql', '20261024201500_byos_native_runs.sql', '20261025141654_byos_native_runs.sql'],
+  '20261027040507_byos_enrollment_transfers.sql': ['20261027000105_byos_enrollment_transfers.sql', '20261024223000_byos_enrollment_transfers.sql', '20261025141655_byos_enrollment_transfers.sql'],
+  '20261027040508_byos_enrollment_cleanup.sql': ['20261027000106_byos_enrollment_cleanup.sql', '20261024230000_byos_enrollment_cleanup.sql', '20261025141656_byos_enrollment_cleanup.sql'],
+  '20261027040509_local_computer_reviews.sql': ['20261027000200_local_computer_reviews.sql'],
+  '20261027040510_cloud_device_scope.sql': ['20261027000300_cloud_device_scope.sql'],
+  '20261027040511_cloud_worker_leases.sql': ['20261027000400_cloud_worker_leases.sql'],
+  '20261027040512_computer_run_approvals.sql': ['20261027000500_computer_run_approvals.sql'],
+  '20261027040513_bot_cloud_runtimes.sql': ['20261027000600_bot_cloud_runtimes.sql'],
+  '20261027040514_workspace_computer_policy.sql': ['20261027000700_workspace_computer_policy.sql'],
 }
 const EQUIVALENT_SQL_SHA256 = {
-  '20261027000100_byos_credential_publications.sql': '1ec983216f55262ceaf1adbdafd191168a3e2ac552909f8c529eb04ad74865e3',
-  '20261027000101_byos_bindings_oauth.sql': 'daa6b4adc31536f66b9cc56bb2c4142c834efc4c540e3073340b023dcd3839d8',
-  '20261027000102_byos_device_authorization.sql': '6e4aa98f3efa36a48af3c0937b7eddd64bb1d03498c65cc92b48461dd7a0ce9f',
-  '20261027000103_byos_access_and_cleanup.sql': '5f08ca8b2814f5539af0013f7ef927ab264c895007d7cbc766fdbb0055aaca6d',
-  '20261027000104_byos_native_runs.sql': '8dd7726b41a89b602cf2b6e70217ab7a2374de4664a66b2ea4b7ea5c21bb3333',
-  '20261027000105_byos_enrollment_transfers.sql': '8e8887e88e39c74f9e240d7bf125029a511817038ef9e787d5a2c97d741daf43',
-  '20261027000106_byos_enrollment_cleanup.sql': '3c159f69bc6ed132b0289499e2ea71d240f0b7a0324caecca7a5b6b206cb6ea4',
+  '20261027040500_cloud_computers.sql': '018c0fbf7941f607b42e02c1d56bdeebef38ab9717ef9a84bce9df7f173ffe65',
+  '20261027040501_computer_run_bindings.sql': 'fbb9384171873aeb0762481e09d35051cd7adc09569332e8594ecfb459cffaf5',
+  '20261027040502_byos_credential_publications.sql': '1ec983216f55262ceaf1adbdafd191168a3e2ac552909f8c529eb04ad74865e3',
+  '20261027040503_byos_bindings_oauth.sql': 'daa6b4adc31536f66b9cc56bb2c4142c834efc4c540e3073340b023dcd3839d8',
+  '20261027040504_byos_device_authorization.sql': '6e4aa98f3efa36a48af3c0937b7eddd64bb1d03498c65cc92b48461dd7a0ce9f',
+  '20261027040505_byos_access_and_cleanup.sql': '5f08ca8b2814f5539af0013f7ef927ab264c895007d7cbc766fdbb0055aaca6d',
+  '20261027040506_byos_native_runs.sql': '8dd7726b41a89b602cf2b6e70217ab7a2374de4664a66b2ea4b7ea5c21bb3333',
+  '20261027040507_byos_enrollment_transfers.sql': '8e8887e88e39c74f9e240d7bf125029a511817038ef9e787d5a2c97d741daf43',
+  '20261027040508_byos_enrollment_cleanup.sql': '3c159f69bc6ed132b0289499e2ea71d240f0b7a0324caecca7a5b6b206cb6ea4',
+  '20261027040509_local_computer_reviews.sql': 'f213d360b2b130a9536b33bf1eb8646fd83824415f8839fb77513b4115abb85b',
+  '20261027040510_cloud_device_scope.sql': '889bb9ffabc776a3df8dc4caef13e6fdfcb615d8ec84f89d00672a9c3c40d3bd',
+  '20261027040511_cloud_worker_leases.sql': '24fc7695775eb37d350de4ab08c8e425c95161468c7e65e4ac823d84e638ceb3',
+  '20261027040512_computer_run_approvals.sql': 'c9164c3b066dff4c0d6fa0566bbca028e6b8df8974cd10f8982256721de58f80',
+  '20261027040513_bot_cloud_runtimes.sql': '2b752bada07de7569781d8f4f5bfd3200179c16c831f212cd81964c22259d4e7',
+  '20261027040514_workspace_computer_policy.sql': 'b776298be218ee6f741347df61c99ada1565d92d813aa7da396725a3a967c76e',
 }
 export function alreadyApplied(name, applied, sql) {
   if (applied.has(name)) return true

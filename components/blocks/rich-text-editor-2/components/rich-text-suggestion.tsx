@@ -130,7 +130,7 @@ export function RichTextSuggestionMenu<T>({
       shouldFilter={false}
       loop
       onMouseDown={keepEditorFocus}
-      className={cn("ring-foreground/10 w-72 ring-1", className)}
+      className={cn("ring-border w-72 ring-1", className)}
     >
       {/* The list ships its bar hidden; the fade marks the cut-off rows. A short
           reveal keeps it full when the list overflows by only a row or two. */}

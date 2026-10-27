@@ -100,6 +100,7 @@ jobs:
       - run: pnpm test:groups
       - run: pnpm test:integrations
       - run: pnpm test:request-log
+      - run: pnpm test:slack
       - run: pnpm test:telegram
       - run: pnpm test:agent
       - run: pnpm test:acceptance
@@ -189,5 +190,5 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:computer-db,test:conversation-reads,test:coordinator-native,test:groups,test:issue-search-db,test:relation-cycle,test:visibility-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-native,test:groups,test:issue-search-db,test:relation-cycle,test:visibility-db,test:workspace-migration-db
       - run: pnpm build

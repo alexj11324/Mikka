@@ -61,7 +61,7 @@ try {
   }
   // Computer infrastructure uses reviewed SQL migrations rather than Drizzle
   // table definitions. Apply the same additive DDL in the isolated E2E DB.
-  for (const name of ['20261026235901_cloud_computers.sql', '20261027000000_computer_run_bindings.sql', '20261027000200_local_computer_reviews.sql', '20261027000300_cloud_device_scope.sql', '20261027000400_cloud_worker_leases.sql', '20261027000500_computer_run_approvals.sql', '20261027000600_bot_cloud_runtimes.sql', '20261027000700_workspace_computer_policy.sql']) {
+  for (const name of ['20261027040500_cloud_computers.sql', '20261027040501_computer_run_bindings.sql', '20261027040509_local_computer_reviews.sql', '20261027040510_cloud_device_scope.sql', '20261027040511_cloud_worker_leases.sql', '20261027040512_computer_run_approvals.sql', '20261027040513_bot_cloud_runtimes.sql', '20261027040514_workspace_computer_policy.sql']) {
     await pool.query(await readFile(new URL(`../drizzle/${name}`, import.meta.url), 'utf8'))
   }
   for (const statement of postgresSchemaStatements) await pool.query(statement)

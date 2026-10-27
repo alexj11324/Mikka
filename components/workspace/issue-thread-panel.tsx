@@ -7,7 +7,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowUp, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage } from '@/app/actions/agents'
 import { runIsActive, threadItems } from '@/lib/issue-run-conversation'
-import { LetterAvatar } from '@/components/nav/letter-avatar'
+import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -55,7 +55,7 @@ export function IssueThreadPanel({ issueId, runId, onClose, back }: { issueId: s
         <Button variant="ghost" size="sm" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
         <span aria-hidden="true" className="text-muted-foreground">/</span>
       </>}
-      {detail && <LetterAvatar name={detail.agentName} size="pill" />}
+      {detail && <BotAvatar color={colorFor(detail.agentName)} size="pill" still />}
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{detail?.name ?? t('title')}</h2>
       {!back && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
     </header>

@@ -15,32 +15,33 @@ import type { NativeToolScope } from './tool-scope'
 const MAX_ROUNDS = 10
 
 /**
- * One wake of a person's Coordinator. Takes the lease, answers everything in
- * the inbox, and keeps going while new events arrive. A second wake that finds
- * the lease held exits at once, since the holder drains the inbox before it
- * lets go.
+ * One wake of one of a person's bots: the Coordinator (`botId` null) or a bot
+ * they made, all on this harness with the same tools. Takes the lease, answers
+ * everything in the inbox, and keeps going while new events arrive. A second
+ * wake that finds the lease held exits at once, since the holder drains the
+ * inbox before it lets go.
  */
-export async function coordinatorTurn(userId: string) {
+export async function coordinatorTurn(userId: string, botId: string | null = null) {
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
   const computerEnabled = await steps.computerToolsEnabled()
   const agent = new WorkflowAgent({
     model: COORDINATOR_MODEL,
-    tools: coordinatorTools(userId, undefined, computerEnabled),
+    tools: coordinatorTools(userId, botId, undefined, computerEnabled),
   })
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const inbox = await steps.takeInbox(userId, holder)
+    const inbox = await steps.takeInbox(userId, holder, botId)
     if (!inbox.held) return
     if (!inbox.added) {
-      if (await steps.releaseLease(userId, holder)) continue
+      if (await steps.releaseLease(userId, holder, botId)) continue
       return
     }
     try {
       const selected = await native.runtime(userId)
       const result = selected.harness === 'ai_sdk'
-        ? await agent.generate({ ...(await steps.preparePrompt(userId)), stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
-        : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId,scope,computerEnabled))
-      await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text))
+        ? await agent.generate({ ...(await steps.preparePrompt(userId, botId)), stopWhen: isStepCount(AGENT_MAX_ROUNDS), prepareStep: coordinatorStep })
+        : await nativeCoordinatorTurn(userId, holder, round, selected, scope => coordinatorTools(userId, botId, scope, computerEnabled), botId)
+      await steps.appendMessages(userId, holder, result.responseMessages, turnWarning(result.finishReason, result.text), botId)
       if (inbox.telegramTargets.length && result.text.trim()) {
         // The reply is saved and shows on the web; a Telegram failure (a
         // blocked bot, an outage) must not fail the turn and stall the inbox.
@@ -56,16 +57,20 @@ export async function coordinatorTurn(userId: string) {
       }
     } catch (error) {
       // The messages stay in the conversation; the next wake answers them.
-      await steps.failTurn(userId, holder, error instanceof Error ? error.message : String(error))
+      await steps.failTurn(userId, holder, error instanceof Error ? error.message : String(error), botId)
       throw error
     }
   }
-  await steps.releaseLease(userId, holder)
+  await steps.releaseLease(userId, holder, botId)
 }
 
-/** The Coordinator's tools. Each one runs as a step scoped to the person. */
-function coordinatorTools(userId: string, scope?: NativeToolScope, computerEnabled = false) {
+/** Every bot's tools. Each one runs as a step scoped to the person; memory and dispatched runs belong to the bot (null: the Coordinator). */
+export function coordinatorTools(userId: string, botId: string | null, scope?: NativeToolScope, computerEnabled = false) {
   const id = z.uuid()
+  // A named Bot always controls its own computer. The built-in Coordinator
+  // may select any authorized Bot on the person's explicit instruction.
+  const botInput = botId ? id.optional() : id
+  const targetBot = (requested?: string) => botId ? (!requested || requested === botId ? botId : null) : requested ?? null
   return {
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input, scope)),
     ...createGoogleAITools((action, input) => steps.composioAction(userId, action, input, scope), (action, input) => steps.proposeAccountAction(userId, action, input, scope)),
@@ -106,24 +111,24 @@ function coordinatorTools(userId: string, scope?: NativeToolScope, computerEnabl
         execute: () => steps.listComputerBots(userId, scope),
       }),
       wake_bot_computer: tool({
-        description: 'Wake an owned Bot computer when the person asks to use it. This starts cloud compute and prepares its hosted workers.',
-        inputSchema: z.object({ botId: id }),
-        execute: input => steps.wakeComputerBot(userId, input, scope),
+        description: 'Wake the selected Bot computer when the person asks to use it. In a Bot chat, omit botId to use this Bot. This starts cloud compute and prepares its hosted workers.',
+        inputSchema: z.object({ botId: botInput }),
+        execute: input => { const target = targetBot(input.botId); return target ? steps.wakeComputerBot(userId, { botId: target }, scope) : { error: 'botMismatch' } },
       }),
       list_bot_subscriptions: tool({
-        description: 'List the person’s connected subscriptions available in this Bot’s workspace. Never returns credentials.',
-        inputSchema: z.object({ botId: id }),
-        execute: input => steps.listBotSubscriptions(userId, input, scope),
+        description: 'List the person’s connected subscriptions available in this Bot’s workspace. In a Bot chat, omit botId to use this Bot. Never returns credentials.',
+        inputSchema: z.object({ botId: botInput }),
+        execute: input => { const target = targetBot(input.botId); return target ? steps.listBotSubscriptions(userId, { botId: target }, scope) : { error: 'botMismatch' } },
       }),
       bind_bot_subscription: tool({
         description: 'Only when the person has selected a connected subscription and model, bind it to the Bot’s hosted executor. The Bot must first be awake.',
-        inputSchema: z.object({ botId: id, connectionId: id, revision: z.number().int().positive(), harness: z.enum(['codex', 'claude_code']), modelId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/) }),
-        execute: (input, options) => steps.bindComputerSubscription(userId, input, options.toolCallId, scope),
+        inputSchema: z.object({ botId: botInput, connectionId: id, revision: z.number().int().positive(), harness: z.enum(['codex', 'claude_code']), modelId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/) }),
+        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.bindComputerSubscription(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
       }),
       dispatch_bot_computer: tool({
         description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Computer operations still require their approval.',
-        inputSchema: z.object({ botId: id, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional() }),
-        execute: (input, options) => steps.dispatchComputerTask(userId, input, options.toolCallId, scope),
+        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional() }),
+        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerTask(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
       }),
     } : {}),
     dispatch_run: tool({
@@ -133,7 +138,7 @@ function coordinatorTools(userId: string, scope?: NativeToolScope, computerEnabl
         deviceRepoId: id.describe('A repository id from list_agents, on the agent\'s own device.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
       }),
-      execute: input => steps.dispatchRun(userId, input, scope),
+      execute: input => steps.dispatchRun(userId, input, scope, botId),
     }),
     list_runs: tool({
       description: 'List recent runs, newest first, optionally for one issue or only those still going.',
@@ -153,12 +158,12 @@ function coordinatorTools(userId: string, scope?: NativeToolScope, computerEnabl
     remember: tool({
       description: 'Save one short note to the person\'s memory, which you see in every conversation. Use it when the person asks you to remember something, or for a lasting preference or decision. Not for run status or anything that will soon change.',
       inputSchema: z.object({ note: z.string().min(1).max(500) }),
-      execute: input => steps.remember(userId, input, scope),
+      execute: input => steps.remember(userId, input, scope, botId),
     }),
     forget: tool({
       description: 'Remove every memory line that contains this text. Use it when the person asks you to forget something or a note is no longer true.',
       inputSchema: z.object({ text: z.string().min(1).max(200) }),
-      execute: input => steps.forget(userId, input, scope),
+      execute: input => steps.forget(userId, input, scope, botId),
     }),
     stop_run: tool({
       description: 'Ask a run to stop.',

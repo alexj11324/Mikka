@@ -1,6 +1,7 @@
 'use client'
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
+import { AgentTextBubble } from './agent-text-bubble'
 import { useIsStreaming } from '@openuidev/react-lang'
 import { CircleCheck, CircleHelp, Code, ListTodo, LoaderCircle, MessageSquareText, Quote, Sparkles } from 'lucide-react'
 import { StreamingResponse } from '@/components/agents/streaming-response'
@@ -18,7 +19,7 @@ const icons = { assistant: Sparkles, reply: MessageSquareText, approve: CircleCh
 
 export const AgentTextContent: AgentComponentRenderers['TextContent'] = ({ props }) => {
   const isStreaming = useIsStreaming()
-  return <AgentMarkdown text={props.text ?? ''} size={props.size} isStreaming={isStreaming} />
+  return <AgentTextBubble><AgentMarkdown text={props.text ?? ''} size={props.size} isStreaming={isStreaming} /></AgentTextBubble>
 }
 
 export const AgentContent: AgentComponentRenderers['BeResponse'] = ({ props, renderNode }) => {
