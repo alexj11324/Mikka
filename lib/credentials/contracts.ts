@@ -8,6 +8,7 @@ export const submitSchema = z.object({
   nonce: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   origin: z.string().max(2048), username: secretText, password: secretText,
 }).strict()
+export const otpSchema = z.object({ nonce: z.string().regex(/^[A-Za-z0-9_-]{43}$/), origin: z.string().max(2048), code: z.string().regex(/^[A-Za-z0-9 -]{3,32}$/) }).strict()
 export type Actor = { userId: string; workspaceId: string }
 export type BrowserCaller = Actor & { botId: string; subagentId?: string; runId?: string }
 export type EncryptionContext = { userId: string; credentialId: string; origin: string }

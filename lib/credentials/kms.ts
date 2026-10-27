@@ -57,14 +57,14 @@ export function awsKms(role: 'app' | 'broker'): Kms {
   }
 }
 
-export async function seal(kms: Kms, context: EncryptionContext, plaintext: Buffer): Promise<Envelope> {
+export async function seal(kms: Kms, context: EncryptionContext, plaintext: Buffer, kind = 'password'): Promise<Envelope> {
   let key: Buffer | undefined
   try {
     const generated = await kms.generate(context)
     key = generated.plaintext
     const wrapped = generated.wrapped
     const nonce = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key, nonce)
-    cipher.setAAD(aad(context))
+    cipher.setAAD(aad(context, kind))
     const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final(), cipher.getAuthTag()])
     return { v: 1, wrappedDek: wrapped, nonce: nonce.toString('base64'), ciphertext: encrypted.toString('base64') }
   } finally { key?.fill(0); plaintext.fill(0) }

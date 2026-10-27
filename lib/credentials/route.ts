@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { canonicalOrigin, CredentialError, secretText, submitSchema } from './contracts'
+import { canonicalOrigin, CredentialError, secretText, submitSchema, otpSchema } from './contracts'
 import { checkCredentialRequest, credentialBody, credentialFailure, privateHeaders } from './http'
-import { credentialActor, credentialStore, login } from './runtime'
+import { credentialActor, credentialStore, login, executeCredentialLease } from './runtime'
 import { resolveSubagentBrowserTarget } from '@/lib/cloud-computer/subagent-browser'
 
 export async function subagentCredentialRoute(request: Request, botId: string, subagentId: string, action: 'challenge' | 'submit' | 'login') {
@@ -11,11 +11,16 @@ export async function subagentCredentialRoute(request: Request, botId: string, s
     const caller = { ...await credentialActor(request), botId, subagentId }
     await credentialStore.authorize(caller)
     if (action === 'submit') {
-      const parsed = submitSchema.safeParse(await credentialBody(request))
+      const parsed = z.union([submitSchema, otpSchema]).safeParse(await credentialBody(request))
       if (!parsed.success) throw new CredentialError('credential_submission_invalid', 400)
       // Resolve the actual browser before accepting an account/site binding.
       const target = await resolveSubagentBrowserTarget(caller)
       if (canonicalOrigin(target.origin) !== canonicalOrigin(parsed.data.origin)) throw new CredentialError('credential_denied', 404)
+      if ('code' in parsed.data) {
+        const lease = await credentialStore.otpLease(caller, parsed.data, target)
+        parsed.data.code = ''
+        return Response.json(await executeCredentialLease(lease, target.origin), { headers: privateHeaders })
+      }
       await credentialStore.save(caller, parsed.data)
       parsed.data.password = ''
       const result = await login(caller, target.origin)

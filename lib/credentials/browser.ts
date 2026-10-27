@@ -30,6 +30,7 @@ export const gatewayGuard: BrowserGuard = {
 /** Deliberately no CDP logger, remote exception, message body or console handler. */
 export class Cdp {
   private id = 0
+  private sessionId?: string
   private pending = new Map<number, { resolve: (value: Record<string, any>) => void; reject: () => void; timer: ReturnType<typeof setTimeout> }>()
   constructor(private socket: WebSocket) {
     socket.addEventListener('message', event => {
@@ -56,8 +57,13 @@ export class Cdp {
       const id = ++this.id
       const timer = setTimeout(() => { this.pending.delete(id); reject(new CredentialError()) }, 10_000)
       this.pending.set(id, { resolve, reject: () => reject(new CredentialError()), timer })
-      this.socket.send(JSON.stringify({ id, method, params }))
+      this.socket.send(JSON.stringify({ id, method, params, ...(this.sessionId && !method.startsWith('Target.') ? { sessionId: this.sessionId } : {}) }))
     })
+  }
+  async attach(targetId: string) {
+    const result = await this.call('Target.attachToTarget', { targetId, flatten: true })
+    if (typeof result.sessionId !== 'string') throw new CredentialError()
+    this.sessionId = result.sessionId
   }
   close() {
     for (const task of this.pending.values()) { clearTimeout(task.timer); task.reject() }
@@ -88,5 +94,13 @@ export class Cdp {
     // A URL change can be pushState/hash rather than navigation. Check every
     // time, including after redirects, before allowing any image or DOM read.
     return await this.evaluate(`![...document.querySelectorAll('input')].some(e=>e.value && (e.type==='password'||e.autocomplete==='one-time-code'))`) === true
+  }
+  async fillOtp(origin: string, code: string) {
+    await this.origin(origin)
+    const focused = await this.evaluate(`(()=>{const e=document.querySelector('input[autocomplete="one-time-code"],input[name="code"],input[name="otp"]');if(!e||e.disabled||e.readOnly)return false;e.focus();e.value='';return document.activeElement===e})()`)
+    if (!focused) throw new CredentialError()
+    await this.origin(origin); await this.call('Input.insertText', { text: code })
+    await this.origin(origin)
+    await this.evaluate(`(()=>{const e=document.querySelector('input[autocomplete="one-time-code"],input[name="code"],input[name="otp"]');if(!e?.form)return false;e.form.requestSubmit();return true})()`)
   }
 }

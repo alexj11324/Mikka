@@ -57,6 +57,8 @@ CREATE TABLE credential_fill_leases (
   workspace_id uuid NOT NULL, bot_id uuid NOT NULL,
   subagent_id uuid, run_id uuid,
   target jsonb NOT NULL,
+  input_kind text NOT NULL DEFAULT 'password' CHECK (input_kind IN ('password','otp')),
+  input_envelope jsonb,
   expires_at timestamptz NOT NULL, consumed_at timestamptz,
   FOREIGN KEY(credential_id,user_id,origin) REFERENCES credentials(id,user_id,origin) ON DELETE CASCADE
 );

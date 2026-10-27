@@ -7,3 +7,7 @@ import type { BrowserTarget } from '../credentials/store'
 export async function resolveSubagentBrowserTarget(_caller: BrowserCaller): Promise<BrowserTarget> {
   throw new Error('Subagent browser runtime is not installed (#342)')
 }
+
+export async function resolveThreadBrowserTarget(_caller: { userId: string; workspaceId: string; runId: string }): Promise<BrowserTarget> {
+  throw new Error('Thread browser runtime is not installed (#342)')
+}

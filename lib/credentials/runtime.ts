@@ -3,7 +3,7 @@ import { getVercelOidcToken } from '@vercel/oidc'
 import { auth } from '@/lib/auth'
 import { pool } from '@/lib/db'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
-import { resolveSubagentBrowserTarget } from '@/lib/cloud-computer/subagent-browser'
+import { resolveSubagentBrowserTarget, resolveThreadBrowserTarget } from '@/lib/cloud-computer/subagent-browser'
 import { canonicalOrigin, CredentialError, type BrowserCaller } from './contracts'
 import { awsKms } from './kms'
 import { CredentialStore } from './store'
@@ -21,16 +21,23 @@ export async function login(caller: BrowserCaller, site: string) {
   if (process.env.CREDENTIAL_VAULT_ENABLED !== '1') throw new CredentialError()
   const origin = canonicalOrigin(site)
   await credentialStore.authorize(caller)
-  const target = await resolveSubagentBrowserTarget(caller)
+  const target = caller.subagentId
+    ? await resolveSubagentBrowserTarget({ ...caller, subagentId: caller.subagentId })
+    : caller.runId ? await resolveThreadBrowserTarget({ ...caller, runId: caller.runId }) : null
+  if (!target) throw new CredentialError('credential_denied', 404)
   const lease = await credentialStore.lease(caller, origin, target)
   if (lease.status === 'needs_login') return lease
+  return executeCredentialLease(lease.lease, origin)
+}
+
+export async function executeCredentialLease(lease: string, origin: string) {
   const broker = new URL(process.env.CREDENTIAL_BROKER_URL ?? '')
   if (broker.protocol !== 'https:' || !broker.hostname.endsWith('.vercel.app') || broker.pathname !== '/' || broker.username || broker.password || broker.search || broker.hash) throw new CredentialError()
   try {
     const response = await fetch(new URL('/api/fill', broker), { method: 'POST', headers: {
       'Content-Type': 'application/json', Authorization: `Bearer ${await getVercelOidcToken()}`,
       ...(process.env.CREDENTIAL_BROKER_PREVIEW_BYPASS ? { 'x-vercel-protection-bypass': process.env.CREDENTIAL_BROKER_PREVIEW_BYPASS } : {}),
-    }, body: JSON.stringify({ lease: lease.lease }), redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(40_000) })
+    }, body: JSON.stringify({ lease }), redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(40_000) })
     if (!response.ok) { await response.body?.cancel(); throw new Error() }
     // Do not forward arbitrary responses from another process to the model.
     const result = await response.json()

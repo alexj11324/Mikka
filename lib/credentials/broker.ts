@@ -27,12 +27,13 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     const guarded = await guard.begin(target)
     guardToken = guarded.guardToken
     cdp = await (options.connect ?? Cdp.connect)(guarded.cdpUrl)
+    await cdp.attach(guarded.targetId)
     await cdp.origin(context.origin)
     const initialUrl = (await cdp.call('Page.getFrameTree')).frameTree.frame.url as string
     // Only this broker process ever receives cookie/password plaintext.
     const session = (await client.query('SELECT * FROM browser_sessions WHERE credential_id=$1 AND expires_at>now()', [context.credentialId])).rows[0]
     let restored = false
-    if (session) {
+    if (session && claimed.input_kind !== 'otp') {
       try {
         plaintext = await open(kms, context, rowEnvelope(session), 'session')
         const state = JSON.parse(plaintext.toString('utf8'))
@@ -50,7 +51,11 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
         } while (!restored && Date.now() < deadline)
       } catch { restored = false } finally { plaintext?.fill(0); plaintext = undefined }
     }
-    if (!restored) {
+    if (claimed.input_kind === 'otp') {
+      plaintext = await open(kms, context, claimed.input_envelope, 'otp')
+      await cdp.fillOtp(context.origin, plaintext.toString())
+      plaintext.fill(0); plaintext = undefined
+    } else if (!restored) {
       plaintext = await open(kms, context, rowEnvelope(credential))
       let value = JSON.parse(plaintext.toString('utf8'))
       plaintext.fill(0); plaintext = undefined
