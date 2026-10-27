@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { BRIEFING_HOUR, briefingContent, dueBriefingZones, localClock, localDate, localInstant, safeTimeZone } from './briefing'
 import { verifyGitHubSignature } from './github-webhook'
-import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, notionNotification, notionSearchNotification, slackNotification, slackSearchNotification, type ExternalNotification } from './notification'
+import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, notionNotification, notionSearchNotification, slackNotification, type ExternalNotification } from './notification'
 import { missingTriggers, needsConfig, triggerSlugs } from './triggers'
 import { fallbackVerdict, modelVerdict, ruleVerdict, SHOW_THRESHOLD, suggestionState } from './rules'
 
@@ -146,10 +146,6 @@ test('a time zone is due from 08:00 until its local midnight', () => {
 })
 
 test('search results keep the external id their trigger event has', () => {
-  const event = slackNotification(me, { channel: 'D123', ts: '1761200000.0001', text: 'are you around?', user: 'U9' })!
-  const match = slackSearchNotification(me, { channel: { id: 'D123', name: 'U9' }, ts: '1761200000.0001', text: 'are you around?', user: 'U9', permalink: 'https://x.slack.com/p1' })!
-  assert.equal(match.externalId, event.externalId)
-  assert.equal(match.direct, true)
   const page = { object: 'page', id: 'p-1', url: 'https://notion.so/p-1', last_edited_time: '2026-10-27T08:00:00.000Z', last_edited_by: { object: 'user', id: 'u1' }, properties: { Name: { id: 'title', type: 'title', title: [{ plain_text: 'Q4 ' }, { plain_text: 'plan' }] } } }
   const notion = notionSearchNotification(me, page)!
   assert.equal(notion.title, 'Q4 plan')

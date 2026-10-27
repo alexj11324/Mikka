@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { linearSyncInbox, suggestions, suggestionTriggerChecks } from '@/lib/db/schema'
 import { getComposio, runComposioAction } from '@/lib/composio'
 import { listComposioPages } from '@/lib/composio-pagination'
-import { gmailNotification, notionSearchNotification, slackSearchNotification, type ExternalNotification } from './notification'
+import { gmailNotification, notionSearchNotification, type ExternalNotification } from './notification'
 import { ensureComposioTriggers, linearWebhookNotifications } from './sources'
 import { ingestNotifications } from './store'
 
@@ -17,13 +17,13 @@ import { ingestNotifications } from './store'
 
 /** How far back the backfill looks. Longer than its interval, so one missed run is still covered. */
 export const RECONCILE_WINDOW_MS = 26 * 60 * 60 * 1000
-const COMPOSIO_TOOLKITS = ['gmail', 'slack', 'notion'] as const
+// Slack is left out: it is moving off Composio to Mikka's own Slack app.
+const COMPOSIO_TOOLKITS = ['gmail', 'notion'] as const
 const PEOPLE_CONCURRENCY = 4
 const LINEAR_INBOX_LIMIT = 500
 
 type Json = Record<string, unknown>
 const record = (value: unknown): Json => value && typeof value === 'object' && !Array.isArray(value) ? value as Json : {}
-const str = (value: unknown) => typeof value === 'string' ? value : ''
 const list = (value: unknown): Json[] => Array.isArray(value) ? value.map(record) : []
 
 /** The same mail the Gmail trigger delivers, minus what Gmail files as promotions or social. */
@@ -31,21 +31,6 @@ async function recentGmail(userId: string): Promise<ExternalNotification[]> {
   const result = await runComposioAction(userId, 'fetch_recent_gmail', { query: 'in:inbox newer_than:2d -category:promotions -category:social', max_results: 50 })
   if ('error' in result) throw new Error(result.error)
   return list(result.data.messages).flatMap(message => gmailNotification(userId, message) ?? [])
-}
-
-/**
- * Direct and group messages from the last two days. Channel messages are left
- * to the trigger: search reaches every channel the person can see, far more
- * than the trigger ever delivered.
- */
-async function recentSlack(userId: string, since: Date): Promise<ExternalNotification[]> {
-  const after = new Date(since.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const result = await runComposioAction(userId, 'search_slack_messages', { query: `after:${after}`, count: 100, sort: 'timestamp', sort_dir: 'desc' })
-  if ('error' in result) throw new Error(result.error)
-  return list(record(result.data.messages).matches)
-    .filter(match => str(record(match.channel).id).startsWith('D') || record(match.channel).is_mpim === true)
-    .flatMap(match => slackSearchNotification(userId, match) ?? [])
-    .filter(notification => notification.occurredAt >= since)
 }
 
 /**
@@ -72,7 +57,6 @@ async function reconcilePerson(userId: string, toolkits: readonly string[], sinc
   await ensureComposioTriggers(userId).catch((error: unknown) => console.error('Composio trigger check failed', error instanceof Error ? error.message : error))
   const readers: Record<string, () => Promise<ExternalNotification[]>> = {
     gmail: () => recentGmail(userId),
-    slack: () => recentSlack(userId, since),
     notion: () => recentNotion(userId, since),
   }
   for (const toolkit of toolkits) {

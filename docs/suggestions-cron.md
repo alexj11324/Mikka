@@ -24,7 +24,7 @@ Everything read is ingested through `ingestNotifications`, which skips an extern
 | Source | How | Notes |
 | --- | --- | --- |
 | Gmail | `GMAIL_FETCH_EMAILS`, `in:inbox newer_than:2d`, minus promotions and social | Same message id as the trigger |
-| Slack | `SLACK_SEARCH_MESSAGES` after yesterday, direct and group messages only | Channel messages are left out: search reaches every channel the person can see, far more than the trigger delivers |
+| Slack | Not reconciled | Slack is moving off Composio to Mikka's own Slack app; its backfill belongs there |
 | Notion | `NOTION_SEARCH_NOTION_PAGE`, most recently edited pages | A page already on file under any edit time is skipped, because the trigger's edit time may be written differently |
 | Linear | Replays the window's Issue and Comment deliveries from `linear_sync_inbox` | The inbox stores every signed delivery before it is acknowledged, whichever host received it |
 | GitHub | Not reconciled | Sign-in grants no token that can list a person's review requests or notifications, and the repository webhook has no store to replay from |

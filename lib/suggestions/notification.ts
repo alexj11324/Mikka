@@ -133,20 +133,6 @@ export function notionNotification(userId: string, event: Json): ExternalNotific
   })
 }
 
-/**
- * One match from Slack's message search (SLACK_SEARCH_MESSAGES), read like
- * the trigger event so the external id is the same `${channel}:${ts}`.
- */
-export function slackSearchNotification(userId: string, match: Json): ExternalNotification | null {
-  const channel = record(match.channel)
-  const id = str(channel.id)
-  return slackNotification(userId, {
-    ...match,
-    channel: id,
-    channel_type: id.startsWith('D') ? 'im' : channel.is_mpim ? 'mpim' : '',
-  })
-}
-
 /** The plain text of a Notion page's title property. */
 function notionTitle(page: Json): string {
   for (const property of Object.values(record(page.properties))) {
