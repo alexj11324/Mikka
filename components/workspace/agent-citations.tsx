@@ -7,7 +7,7 @@ import { getLinkPreview } from '@/app/actions/link-preview'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { cn } from 'cn'
-import { LetterAvatar } from '@/components/nav/letter-avatar'
+import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { Badge } from '@/components/reui/badge'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
 import { SourceAvatar, SourcesList, SourcesSummary, type StreamingSource } from '@/components/ui/streaming-text'
@@ -83,7 +83,7 @@ export function CitationSources({ text }: { text: string }) {
       if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
       else {
         const issue = source.issue
-        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <LetterAvatar name={source.agentName} size="row" />, onSelect: issue ? () => onOpenIssue(issue.id) : undefined })
+        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <BotAvatar color={colorFor(source.agentName)} size="row" still />, onSelect: issue ? () => onOpenIssue(issue.id) : undefined })
       }
     }
   }
@@ -150,7 +150,7 @@ export function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: stri
       aria-label={issue ? t('openRunIssue', { agent: run.agentName, title: issue.title }) : t('runOf', { agent: run.agentName })}
       onClick={issue ? () => onOpen(issue.id) : undefined}
     >
-      <SourceAvatar source={{ name: run.agentName, domain: run.agentName, icon: <LetterAvatar name={run.agentName} size="row" /> }} className="size-4 rounded-full" />
+      <SourceAvatar source={{ name: run.agentName, domain: run.agentName, icon: <BotAvatar color={colorFor(run.agentName)} size="row" still /> }} className="size-4 rounded-full" />
       <InlineCitationLabel>{run.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
