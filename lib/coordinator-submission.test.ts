@@ -220,3 +220,16 @@ test('action checks actual Bot ownership before new submissions and duplicate re
   assert.deepEqual(await sendCoordinatorMessage('hello', null, botId, submissionId), { error: 'validationGeneric', params: undefined })
   assert.equal(current.rows.size, 2); assert.equal(callbacks.length, 2)
 })
+
+test('actual action freezes serialized quotes across retries and rejects quote changes', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  const quote = { artifactId: 'b4000000-0000-4000-8000-000000000003', version: 1, kind: 'text' as const, text: 'Quoted selection', label: 'Synthetic artifact' }
+  assert.deepEqual(await sendCoordinatorMessage('hello', quote, null, submissionId), { queued: true })
+  const original = structuredClone([...current.rows.values()])
+  assert.match(original[0].payload.text, /Quoted selection/)
+  assert.notEqual(original[0].payload.text, 'hello')
+  assert.deepEqual(await sendCoordinatorMessage('hello', { ...quote }, null, submissionId), { queued: true })
+  assert.deepEqual(await sendCoordinatorMessage('hello', { ...quote, version: 2 }, null, submissionId), { error: 'submissionConflict', params: undefined })
+  assert.deepEqual([...current.rows.values()], original)
+  assert.equal(callbacks.length, 2)
+})
