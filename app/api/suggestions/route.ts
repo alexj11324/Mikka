@@ -14,7 +14,7 @@ const headers = { 'Cache-Control': 'private, no-store' }
  * The suggestions list: today's briefing (null on a day with nothing to say)
  * and the shown suggestions grouped by source app. `tz` is the person's IANA
  * time zone; without it the visitor's location decides. `locale` is the UI
- * language, remembered so new items' action lines (R-41) are written in it.
+ * language, remembered so new items' action lines (R-45) are written in it.
  */
 export async function GET(request: Request) {
   const user = (await getSession())?.user

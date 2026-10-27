@@ -47,7 +47,7 @@ export async function ingestNotifications(notifications: readonly ExternalNotifi
     if (stored && level !== 'low') shown.set(notification.userId, [...shown.get(notification.userId) ?? [], { id, source: notification.source, action: notification.action, title: notification.title, actor: notification.actor, excerpt: notification.excerpt }])
     if (stored && route && await recordNotice(notification, id, { ...score, level }, continuesId)) woken.add(notification.userId)
   }))
-  // One batched call per person writes the shown items as actions (R-41).
+  // One batched call per person writes the shown items as actions (R-45).
   await Promise.all([...shown].map(([userId, items]) => writeActionTitles(userId, items)))
   // The Coordinator's wake hands the next waiting matter over, one at a time.
   for (const userId of woken) await wakeCoordinator(userId)

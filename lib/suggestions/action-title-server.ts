@@ -22,7 +22,7 @@ export async function rememberLocale(userId: string, locale: ActionLocale): Prom
 }
 
 /**
- * Writes action lines (R-41) for one person's newly shown items, in batches of
+ * Writes action lines (R-45) for one person's newly shown items, in batches of
  * ACTION_BATCH, one model call each. Like the decision model it signs in with
  * DECISION_GATEWAY_API_KEY, whose budget caps the spend; without the key, or
  * when a call fails, the items keep their raw title. Never throws.

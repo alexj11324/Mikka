@@ -51,7 +51,7 @@ function SourceMark({ source }: { source: SuggestionSource }) {
     source === 'notion' && 'bg-foreground', source === 'slack' && 'bg-avatar-2')} />
 }
 
-/** An inline source chip: the app's mark and the item as an action (R-41), or its own title before one is written (MIK-28). */
+/** An inline source chip: the app's mark and the item as an action (R-45), or its own title before one is written (MIK-28). */
 function SourceChip({ item }: { item: SuggestionItem }) {
   const body = <><SourceMark source={item.source} /><span className="truncate">{displayTitle(item)}</span></>
   const className = 'inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-md bg-muted px-1.5 py-0.5 align-middle text-xs text-foreground'

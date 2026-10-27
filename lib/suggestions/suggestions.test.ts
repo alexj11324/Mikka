@@ -122,7 +122,7 @@ test('only missing triggers are created, so a re-check is safe', () => {
   assert.deepEqual(missingTriggers(wanted, [{ connectedAccountId: 'a1', triggerName: 'GMAIL_NEW_GMAIL_MESSAGE', disabledAt: '2026-10-23T00:00:00Z' }]), wanted)
 })
 
-test('action lines (R-41): the prompt carries the rule and examples, the answer is checked, and the raw title is the fallback', () => {
+test('action lines (R-45): the prompt carries the rule and examples, the answer is checked, and the raw title is the fallback', () => {
   const items = [
     { id: 's1', source: 'gmail', action: 'reply', title: 'Re: Thursday', actor: 'Kevin', excerpt: 'Can we move Thursday to Wednesday? Need to know by noon tomorrow.' },
     { id: 's2', source: 'github', action: 'review', title: 'Fix types', actor: 'dana', excerpt: 'Fix types' },

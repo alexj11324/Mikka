@@ -320,7 +320,7 @@ export const suggestions = pgTable('suggestions', {
   level: text('level').$type<AttentionLevel>(),
   /** The matter it belongs to (ExternalNotification.matterKey). */
   matterKey: text('matterKey'),
-  /** The item as an action for the person (R-41), e.g. 「回复 Kevin：…」; the UI falls back to `title` without it. */
+  /** The item as an action for the person (R-45), e.g. 「回复 Kevin：…」; the UI falls back to `title` without it. */
   actionTitle: text('actionTitle'),
   /** Assigned to the person or their review is requested. */
   required: boolean('required').notNull().default(false),
