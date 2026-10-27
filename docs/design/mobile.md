@@ -2,7 +2,7 @@
 
 - **Status:** draft (2026-10-27)
 - **Linear / GitHub:** none yet
-- **Figma:** not drawn yet; new page 「Mobile 2026-10-27」 in `zPe5LKycb2XuT1ivCLRw07`
+- **Figma:** page `268:4750` 「手机端 · iOS 初稿（Claude · 2026-10-27）」 in `zPe5LKycb2XuT1ivCLRw07`, frames 01–07 (in review)
 - **Owner thread:** `claude/mikka-mobile-tech-choice-jrtbd3`
 
 Decisions behind this spec are the 2026-10-27 rows in `decisions.md` and
