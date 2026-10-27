@@ -283,8 +283,10 @@ export async function wakeComputerBot(userId: string, input: { botId: string }, 
     await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId)
     const actor = { userId, workspaceId: bot.workspaceId as string }
     await new ComputerStore(pool).operate(actor, input.botId, 'wake')
-    const runtimes = await (await import('@/lib/computer/wake-worker')).ensureCloudBotWorker(pool, actor, input.botId)
-    return { botId: input.botId, awake: true, harnesses: runtimes.map(runtime => runtime.harness) }
+    await (await import('@/lib/computer/wake-worker')).ensureCloudBotWorker(pool, actor, input.botId)
+    // Worker installation is not evidence that any model credential is bound
+    // or that a hosted task can execute. Check that separately before claiming it.
+    return { botId: input.botId, awake: true, taskReadiness: 'not_checked', taskRequirement: 'A connected and bound subscription is required before running a hosted task.' }
   } catch { return { error: 'cloudComputerUnavailable' } }
 }
 
