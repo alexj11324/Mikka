@@ -14,7 +14,7 @@ import {
 import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/device-link'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
-import { requestRunStop } from '@/lib/agent-runs'
+import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
@@ -293,7 +293,7 @@ export async function sendIssueThreadMessage(input: { issueId: string; runId: st
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId)
   if (!runIsActive(row.status)) throw new ActionFailureError('runNotFound')
-  await db.insert(runMessages).values({ id: crypto.randomUUID(), runId: row.id, userId: user.id, text: text.data })
+  await addRunMessage(user.id, { runId: row.id, text: text.data })
 }
 
 /**
