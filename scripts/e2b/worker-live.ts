@@ -69,7 +69,8 @@ async function main() {
             let existing = await syncComputerReviews(pool, observedDevice, actor.userId, snapshots)
             if (snapshots.length && !renewed) {
               // Switch credentials while a real task is waiting for approval.
-              await active.files.write('/tmp/mikka-worker-renewal.json', JSON.stringify({ credential: replacement }), { user: 'user' })
+              await active.files.write('/tmp/mikka-worker-renewal.next', JSON.stringify({ credential: replacement }), { user: 'user' })
+              await active.commands.run('mv /tmp/mikka-worker-renewal.next /tmp/mikka-worker-renewal.json', { user: 'user' })
               const deadline = Date.now() + 50_000
               while (Date.now() < deadline && !renewed) {
                 const current = await active.files.read('/tmp/mikka-worker-registration.json', { user: 'root' }).catch(() => null)
@@ -156,7 +157,9 @@ async function main() {
       assert.equal(completion?.stopReason, 'submitted')
       assert.ok(renewed)
       assert.deepEqual(operations, ['get_desktop_state', 'click'])
-      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, credentialRenewed: true, pinnedSource: true, otherBotDenied: true, taskLeasePrivate: true, takeoverDeniesAgent: true, handbackAllowsAgent: true, takeoverWaitsForOperation: true, syntheticBotTaskSubmitted: true, screenshotAndClickApproved: true }))
+      const event = JSON.parse(await sandbox.files.read('/tmp/mikka-worker-computer-event.json', { user: 'root' }))
+      assert.deepEqual(event, { type: 'data-computer', data: { botId: bot.id, runId, task: 'FULL_COMPUTER', state: 'working' } })
+      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, credentialRenewed: true, pinnedSource: true, otherBotDenied: true, taskLeasePrivate: true, takeoverDeniesAgent: true, handbackAllowsAgent: true, takeoverWaitsForOperation: true, syntheticBotTaskSubmitted: true, screenshotAndClickApproved: true, computerEventMatchesBot: true }))
     } finally { done = true; await observe }
   } catch (error) {
     if (sandbox && stage === 'check mock service') {

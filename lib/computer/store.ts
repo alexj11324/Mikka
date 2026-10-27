@@ -42,10 +42,12 @@ export class ComputerStore {
         AND v."expiresAt">now() AND v."seenAt">now()-interval '10 seconds' AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now()
         AND r.status=ANY($4::text[]) ORDER BY v."seenAt",v.id LIMIT 1`, [botId, actor.workspaceId, actor.userId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]
     const call = review?.call
-    const pendingApproval: ComputerState['pendingApproval'] = call && (call.name === 'click' || call.name === 'type_text' || call.name === 'get_desktop_state')
+    const pendingApproval: ComputerState['pendingApproval'] = call && (call.name === 'click' || call.name === 'type_text' || call.name === 'get_desktop_state' || call.name === 'press_key' || call.name === 'scroll')
       ? { id: review.id, digest: review.digest, runId: review.runId, botId,
           action: call.name === 'click' ? { tool: 'click', x: call.arguments.x, y: call.arguments.y }
-            : call.name === 'type_text' ? { tool: 'type', text: call.arguments.text } : { tool: 'screenshot' },
+            : call.name === 'type_text' ? { tool: 'type', text: call.arguments.text }
+              : call.name === 'press_key' ? { tool: 'key', text: [...(call.arguments.modifiers ?? []), call.arguments.key].join('+') }
+                : call.name === 'scroll' ? { tool: 'scroll', text: `${call.arguments.direction} × ${call.arguments.amount}`, x: call.arguments.x, y: call.arguments.y } : { tool: 'screenshot' },
           summary: call.name,
           expiresAt: new Date(review.expiresAt).toISOString() } : undefined
     return { machine: row.machine, control: held ? 'user' : row.control === 'user' ? 'agent' : row.control,

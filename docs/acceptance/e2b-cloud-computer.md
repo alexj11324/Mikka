@@ -253,6 +253,13 @@ server checks it against the scoped device and stored Bot binding before the
 thread can render its computer card. PostgreSQL and source tests cover these
 bindings; the signed-in UI and deployed request path still need acceptance.
 
+Template `jqy5eq2ckjt1pw48uxfj` (worker source `43948df`) was tested with a
+synthetic credential replacement while a real E2B task was awaiting approval.
+The worker re-registered with the replacement, then continued through approval
+and submission. This does not exercise the deployed heartbeat endpoint or a
+real provider credential. PostgreSQL tests separately cover renewal isolation,
+concurrent requests and retry after a lost response. The sandbox was deleted.
+
 Development and production databases also have the additive cloud-device-scope
 migration recorded. Isolated PostgreSQL tests exercised scoped worker credentials,
 expiry validation, rotation and the Bot's pending-review state. The worker

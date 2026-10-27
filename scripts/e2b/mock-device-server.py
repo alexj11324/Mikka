@@ -13,6 +13,7 @@ review_file = '/tmp/mikka-worker-review.json'
 decision_file = '/tmp/mikka-worker-decisions.json'
 completion_file = '/tmp/mikka-worker-completion.json'
 renewal_file = '/tmp/mikka-worker-renewal.json'
+computer_event_file = '/tmp/mikka-worker-computer-event.json'
 
 def run_config():
     try:
@@ -78,6 +79,9 @@ async def request_handler(request):
         return web.json_response({'requests': []})
     if config and path.endswith('/runs/' + config['runId'] + '/events'):
         body = await request.json()
+        for chunk in body['chunks']:
+            if chunk.get('type') == 'data-computer':
+                publish(computer_event_file, chunk)
         return web.json_response({'offset': str(body['fromSeq'] + len(body['chunks']) - 1)})
     if config and path.endswith('/runs/' + config['runId'] + '/complete'):
         publish(completion_file, await request.json())

@@ -53,6 +53,11 @@ export const localComputerCall = z.discriminatedUnion('name', [
   z.object({ name: z.literal('get_desktop_state'), arguments: z.object({}).strict() }).strict(),
   z.object({ name: z.literal('click'), arguments: z.object({ x: z.number().int().min(0).max(100000), y: z.number().int().min(0).max(100000) }).strict() }).strict(),
   z.object({ name: z.literal('type_text'), arguments: z.object({ text: z.string().min(1).max(8000) }).strict() }).strict(),
+  z.object({ name: z.literal('press_key'), arguments: z.object({
+    key: z.string().regex(/^(?:[\x20-\x7e]|enter|return|tab|escape|space|backspace|delete|insert|home|end|pageup|pagedown|up|down|left|right|f(?:[1-9]|1[0-2]))$/),
+    modifiers: z.array(z.enum(['ctrl', 'shift', 'alt', 'super'])).max(4).refine(items => new Set(items).size === items.length).optional(),
+  }).strict() }).strict(),
+  z.object({ name: z.literal('scroll'), arguments: z.object({ direction: z.enum(['up', 'down', 'left', 'right']), amount: z.number().int().min(1).max(50), x: z.number().int().min(0).max(100000), y: z.number().int().min(0).max(100000) }).strict() }).strict(),
 ])
 export const localComputerRequest = z.object({
   id: z.uuid(), runId: z.uuid(), target: reviewDigestSchema,

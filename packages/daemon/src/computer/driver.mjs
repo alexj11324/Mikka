@@ -61,6 +61,24 @@ export const TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: "press_key",
+    description: "Press the approved key and modifiers on the focused desktop.",
+    inputSchema: {
+      type: "object",
+      properties: { key: { type: "string" }, modifiers: { type: "array", items: { type: "string", enum: ["ctrl", "shift", "alt", "super"] }, maxItems: 4, uniqueItems: true } },
+      required: ["key"], additionalProperties: false,
+    },
+  },
+  {
+    name: "scroll",
+    description: "Scroll the approved amount at a desktop coordinate.",
+    inputSchema: {
+      type: "object",
+      properties: { direction: { type: "string", enum: ["up", "down", "left", "right"] }, amount: { type: "integer", minimum: 1, maximum: 50 }, x: { type: "integer", minimum: 0, maximum: 100000 }, y: { type: "integer", minimum: 0, maximum: 100000 } },
+      required: ["direction", "amount", "x", "y"], additionalProperties: false,
+    },
+  },
 ];
 export function normalizeCall(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -86,6 +104,10 @@ export function normalizeCall(value) {
     args.text.length <= 8000
   )
     return { name, arguments: { text: args.text } };
+  if (name === "press_key" && ["key", "key,modifiers"].includes(keys) && typeof args.key === "string" && /^(?:[\x20-\x7e]|enter|return|tab|escape|space|backspace|delete|insert|home|end|pageup|pagedown|up|down|left|right|f(?:[1-9]|1[0-2]))$/.test(args.key) && (args.modifiers === undefined || (Array.isArray(args.modifiers) && args.modifiers.length <= 4 && new Set(args.modifiers).size === args.modifiers.length && args.modifiers.every(v => ["ctrl", "shift", "alt", "super"].includes(v)))))
+    return { name, arguments: { key: args.key, ...(args.modifiers === undefined ? {} : { modifiers: args.modifiers }) } };
+  if (name === "scroll" && keys === "amount,direction,x,y" && ["up", "down", "left", "right"].includes(args.direction) && Number.isInteger(args.amount) && args.amount >= 1 && args.amount <= 50 && [args.x, args.y].every(v => Number.isInteger(v) && v >= 0 && v <= 100000))
+    return { name, arguments: { direction: args.direction, amount: args.amount, x: args.x, y: args.y } };
   throw new Error("Unsupported tool or arguments");
 }
 // The pinned release exposes different strict click schemas by platform.
@@ -96,7 +118,9 @@ export function driverArguments(input, platform = process.platform) {
     ? { ...call.arguments, scope: "desktop",
         ...(platform === "darwin" ? {} : { coordinate_frame: "desktop" }),
         delivery_mode: "foreground" }
-    : call.arguments;
+    : call.name === "press_key" ? { ...call.arguments, scope: "desktop", delivery_mode: "foreground" }
+      : call.name === "scroll" ? { ...call.arguments, scope: "desktop", ...(platform === "darwin" ? {} : { coordinate_frame: "desktop" }), delivery_mode: "foreground" }
+        : call.arguments;
 }
 // Owned by the daemon, never by a harness. No shell, auto-update, host
 // credentials, arbitrary tool names, output paths or browser attachment tools.

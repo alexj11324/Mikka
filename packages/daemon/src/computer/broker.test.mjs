@@ -60,8 +60,29 @@ test("strict allowlist rejects arbitrary tools, output paths and argument smuggl
     { name: "click", arguments: { x: 1, y: 2, scope: "browser" } },
     { name: "click", arguments: { x: NaN, y: 2 } },
     { name: "type_text", arguments: { text: "" } },
+    { name: "press_key", arguments: { key: "enter", modifiers: ["ctrl", "ctrl"] } },
+    { name: "press_key", arguments: { key: "enter", modifiers: ["other"] } },
+    { name: "scroll", arguments: { direction: "down", amount: 51, x: 1, y: 2 } },
+    { name: "scroll", arguments: { direction: "down", amount: 1, x: 1, y: 2, scope: "window" } },
   ])
     assert.throws(() => normalizeCall(value));
+});
+test("keys and scrolling require the exact approval and use the selected desktop", async (t) => {
+  const b = await fixture(t);
+  const grant = b.spec("r", "ask", { display: ":1" });
+  for (const call of [
+    { name: "press_key", arguments: { key: "tab", modifiers: ["shift"] } },
+    { name: "scroll", arguments: { direction: "down", amount: 2, x: 10, y: 20 } },
+  ]) {
+    const pending = b.request(grant.token, call);
+    const row = b.list()[0];
+    assert.deepEqual(row.call, call);
+    assert.equal(row.display, ":1");
+    await b.decide(row.id, row.digest, true);
+    await pending;
+  }
+  assert.deepEqual(driverArguments({ name: "press_key", arguments: { key: "tab" } }, "linux"), { key: "tab", scope: "desktop", delivery_mode: "foreground" });
+  assert.deepEqual(driverArguments({ name: "scroll", arguments: { direction: "down", amount: 2, x: 10, y: 20 } }, "linux"), { direction: "down", amount: 2, x: 10, y: 20, scope: "desktop", coordinate_frame: "desktop", delivery_mode: "foreground" });
 });
 test("ask and allow both suspend; one exact review delivers result, replay denied", async (t) => {
   for (const permission of ["ask", "allow"]) {
