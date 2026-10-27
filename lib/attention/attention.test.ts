@@ -5,7 +5,7 @@ import { chatItems } from '@/lib/coordinator/context'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { BUDGET_WINDOW_MS, budgetState } from './budget'
 import { handoffPrompt, HANDOFF_PREFIX, mergeEvidence, QUIET_REPLY, stateAfterNotice, type HandoffPayload, type Notice } from './handoff'
-import { attentionQuestions, attentionState, codeLevel, continuedLevel, fallbackLevel, readJudgment, ruleLevel, withFloor, type Assessment } from './judgment'
+import { attentionQuestions, attentionState, codeLevel, continuedLevel, fallbackLevel, readJudgment, ROUTED_LEVEL_CONFIDENCE, ruleLevel, withFloor, type Assessment } from './judgment'
 
 const none: Assessment = { cost: false, due: 'unknown', reversible: true, verificationCode: false }
 const cost = (fields: Partial<Assessment> = {}): Assessment => ({ ...none, cost: true, ...fields })
@@ -79,6 +79,21 @@ test('the judgment reads cost, due and reversibility before the level', () => {
   assert.equal(quiet.continues, null)
   assert.equal(readJudgment(answers([{ type: 'choice', name: 'level', choice: 'unclear' }]), 0, [])!.level, 'unclear')
   assert.equal(readJudgment(answers([{ type: 'predicate', name: 'cost', probability: 1 }]), 0, []), null)
+})
+
+test('a routed level the model is unsure of stays in 建议 unless a cost lifts it', () => {
+  const level = (choice: string, probability: number, costProbability = 0.1) => readJudgment(answers([
+    { type: 'predicate', name: 'cost', probability: costProbability },
+    { type: 'choice', name: 'due', choice: 'later' },
+    { type: 'choice', name: 'level', choice, probabilities: [{ value: choice, probability }, { value: 'normal', probability: 1 - probability }] },
+  ]), 0, [])!.level
+  assert.equal(level('high', ROUTED_LEVEL_CONFIDENCE), 'high')
+  assert.equal(level('ask', 0.4), 'normal')
+  assert.equal(level('critical', 0.3), 'normal')
+  assert.equal(level('critical', 0.3, 0.8), 'high')
+  assert.equal(level('low', 0.2), 'low')
+  // An answer without probabilities is taken as given.
+  assert.equal(readJudgment(answers([{ type: 'choice', name: 'level', choice: 'ask' }]), 0, [])!.level, 'ask')
 })
 
 test('the continues question is asked only with earlier matters, and the state carries the time', () => {

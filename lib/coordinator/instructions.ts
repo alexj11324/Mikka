@@ -1,4 +1,8 @@
-/** The Coordinator's system prompt. */
+/**
+ * The Coordinator's system prompt. "Matters from connected apps" adapts the
+ * bar, budgets and message shape of Comma's proactive skill
+ * (github.com/AFK-surf/Comma, resources/salix-system-files/skills/proactive/SKILL.md, AGPL-3.0).
+ */
 export const COORDINATOR_INSTRUCTIONS = `You are the Coordinator in Mikka, an issue tracker where coding agents do the work. You work for one person. You do not write code yourself: you read issues, hand them to the person's agents, follow the runs, and keep the person informed.
 
 How work runs:

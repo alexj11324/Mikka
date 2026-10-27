@@ -1,6 +1,7 @@
 import type { AttentionLevel } from './judgment'
 
-// Two budgets per person, after Comma. Handoffs wake the Coordinator with
+// Two budgets per person, after Comma (github.com/AFK-surf/Comma,
+// systems/apps/salix_im/lib/salix_im/mail_interaction.ex, AGPL-3.0). Handoffs wake the Coordinator with
 // evidence; their daily cap bounds its cost. Telling the person is the
 // Coordinator's decision to interrupt them about a matter it was handed; that
 // cap bounds a Coordinator that is wrong about what must be known now. A

@@ -1,7 +1,10 @@
 import type { DecisionAnswer, DecisionQuestion } from '@/lib/coordinator/decision'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 
-// Layer 1 of the attention model (R-20), after Comma's attention judgment:
+// Layer 1 of the attention model (R-20). The questions, levels and floors are
+// adapted from Comma's attention judgment (github.com/AFK-surf/Comma,
+// systems/apps/comma_web: recommendation_renderer.ex and proactive_check.ex,
+// AGPL-3.0), rewritten for the Decisions API:
 // the decision model first answers what happens if the person does nothing
 // (cost, when it lands, whether it can be undone), then picks one level. Code
 // then floors the level, so a model that is unsure of the level cannot hide a
@@ -34,6 +37,12 @@ export interface Assessment {
 export const CODE_FRESH_MS = 10 * 60_000
 /** At or above this probability a predicate counts as yes. */
 export const YES = 0.5
+/**
+ * A routed level (critical, high, ask) the model is less sure of than this
+ * reads as normal: when unsure, stay quiet, so it waits in 建议. A cost the
+ * model did name still lifts it through the floors.
+ */
+export const ROUTED_LEVEL_CONFIDENCE = 0.5
 
 export function levelRank(level: AttentionLevel): number {
   return ATTENTION_LEVELS.indexOf(level)
@@ -178,12 +187,21 @@ function choice<T extends string>(answers: Answers, name: string, values: readon
   return answer?.type === 'choice' && (values as readonly string[]).includes(answer.choice) ? answer.choice as T : null
 }
 
+/** How sure the model is of `value` for the level question; 1 when the answer carries no probabilities. */
+function levelConfidence(answers: Answers, value: string): number {
+  const answer = answers.get('level')
+  if (answer?.type !== 'choice') return 0
+  const listed = answer.probabilities?.find(entry => entry.value === value)?.probability
+  return listed ?? answer.confidence ?? 1
+}
+
 export interface Judgment { level: JudgedLevel; assessment: Assessment; continues: string | null }
 
 /** The model's answers, floored by code; null when the answers are unusable (no level). */
 export function readJudgment(answers: Answers, ageMs: number, matterIds: readonly string[]): Judgment | null {
-  const level = choice(answers, 'level', LEVEL_CHOICES.map(item => item.value))
-  if (!level) return null
+  const picked = choice(answers, 'level', LEVEL_CHOICES.map(item => item.value))
+  if (!picked) return null
+  const level: JudgedLevel = picked !== 'unclear' && isRouted(picked) && levelConfidence(answers, picked) < ROUTED_LEVEL_CONFIDENCE ? 'normal' : picked
   const cost = predicate(answers, 'cost')
   const assessment: Assessment = {
     cost,
