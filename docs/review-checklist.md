@@ -82,5 +82,5 @@ more than once.
 - One topic per PR. Title in the repo's commit style (`feat(scope): …`,
   `fix(scope): …`, `docs(design): …`) with the `MIK-xx` ids.
 - The PR body follows `.github/pull_request_template.md`.
-- Migrations: additive (or idempotent), tested on a real Postgres; see `docs/migration-bootstrap.md` for when they run.
+- Migrations: idempotent and tested on a real Postgres; see `docs/migration-bootstrap.md` for when they run.
 - Small problems a reviewer finds are fixed by the reviewer directly.

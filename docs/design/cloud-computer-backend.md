@@ -127,7 +127,7 @@ Report findings in the issue before building on an assumption that failed.
   本任务内都允许 auto-approves later operations of the same run on the same
   desktop. A workspace `deny` still wins.
 
-Migrations: additive (or idempotent), tested on a real Postgres; see `docs/migration-bootstrap.md` for when they run.
+Additive migrations only, tested against a real Postgres; see `docs/migration-bootstrap.md` for when they run.
 
 ## 5. API contract for the frontend
 
