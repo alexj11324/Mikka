@@ -75,6 +75,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     await client.query(`INSERT INTO credential_access_events(credential_id,user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,$6,$7)`, [context.credentialId, context.userId, caller.botId, caller.runId, caller.subagentId, context.origin, restored ? 'session_restored' : 'password_filled'])
     await client.query('COMMIT'); completed = true
     await guard.end(target, guardToken)
+    if (caller.subagentId) await pool.query(`UPDATE bot_subagents SET status='running',needs=NULL WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 AND status='needs_you'`, [caller.subagentId, caller.userId, caller.workspaceId, caller.botId])
     return { status: 'submitted' as const, origin: context.origin }
   } catch (error) {
     if (!completed) await client.query('ROLLBACK')
