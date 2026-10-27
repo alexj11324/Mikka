@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | 建议 shows its items as one long list (icon, title, source and time per row), not cards per app (「卡片统一用最下面那种长方形形式」) | R-21 | Horizontal per-app cards (same day) |
 | 2026-10-27 | Mobile cards have no outline: a card in the chat (proactive card, thread card) is a filled grey surface like the bubble, the way 建议's cards are filled; secondary buttons inside are white. Source icons are the apps' own coloured marks, never a glyph on a tinted square (「描边的话不好看」「直接用那个带颜色的图标不行吗」) | | Outlined cards; tinted-square source icons |
 | 2026-10-27 | A thread is never drawn with its bot's bloub avatar: bots coordinate, threads do the work; a thread shows a status icon. The thread card has no step line under its name, only outputs as chips. Spinners are grey, colour is restrained. The mobile look follows the Claude app (header pill, status-icon session list, filter menu, New-thread pill) (「BOT 是不干事情的…左边居然用的是 BOT 的 blob 图像，这个是不对的」「下面的那些话不需要写在那上面」「用灰色就行，颜色要克制」「学习Claude的ui」). Bot text stays in its grey bubble (R-14, 「文字要用泡泡框住」) | R-62, R-66, glossary | Threads shown with the bot's avatar (2026-10-24); card step line (2026-10-25) |
 | 2026-10-27 | Mobile navigation is a side drawer like the ChatGPT iOS app: opens on the Coordinator chat; drawer = Coordinator, 建议, 线程, 任务, then 置顶 and 最近 bots/chats; the 线程 screen follows ChatGPT's Codex screen (machine filter chips, sections, floating composer) (「对，就按抽屉结构改」) | | Three bottom tabs (proposed same day) |
