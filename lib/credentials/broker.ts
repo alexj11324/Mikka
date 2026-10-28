@@ -25,13 +25,15 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
   let plaintext: Buffer | undefined
   try {
     await client.query('BEGIN')
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${caller.userId}:${context.origin}`])
-    await new CredentialStore(pool, kms).authorize(caller, client)
     // Policy changes take the same lock in the computer host. The signed
     // gateway capability must additionally be issued by the trusted host
     // after its existing computer_use decision; this query is not approval.
     if (!caller.subagentId || caller.runId || !target.observedInput) throw new CredentialError('credential_denied', 404)
+    // Global order: workspace policy before account/origin credentials. The
+    // invoking host must not hold either lock across this service call.
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${caller.workspaceId}`])
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${caller.userId}:${context.origin}`])
+    await new CredentialStore(pool, kms).authorize(caller, client)
     const bound = (await client.query(`SELECT s."targetId",s.epoch,COALESCE(p.version,0) AS "permissionVersion",p.permission
       FROM bot_subagents s LEFT JOIN workspace_computer_policies p ON p."workspaceId"=s."workspaceId"
       WHERE s.id=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3 AND s."botId"=$4 AND s.status IN ('running','needs_you')`,

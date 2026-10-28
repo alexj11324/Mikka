@@ -149,12 +149,14 @@ test('broker reports mechanical session application or submission without judgin
   const snapshot = await sealSession(kms, owner, password.wrappedDek, Buffer.from(JSON.stringify({ cookies: [], localStorage: [] })))
   for (const forcePassword of [false, true]) {
     const calls: string[] = []
+    const locks: string[] = []
     let guardEnded = false
     const claimed = { user_id: owner.userId, workspace_id: 'workspace', bot_id: 'bot', run_id: null, subagent_id: 'subagent', credential_id: owner.credentialId, origin: owner.origin, input_kind: 'password', target: { targetId: 'target', origin: owner.origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, credentialMode: forcePassword ? 'password' : 'session-first', observedInput: { loaderId: 'loader', backendNodeId: 7, credentialRole: 'password', epoch: 1, permissionVersion: 0 } } }
     const credential = { wrapped_dek: password.wrappedDek, nonce: password.nonce, ciphertext: password.ciphertext, username: 'fixture-user' }
     const session = { wrapped_dek: snapshot.wrappedDek, nonce: snapshot.nonce, ciphertext: snapshot.ciphertext }
     const client = {
-      async query(sql: string) {
+      async query(sql: string, values?: unknown[]) {
+        if (sql.includes('pg_advisory_xact_lock')) locks.push(String(values?.[0]))
         if (sql.includes('FROM bots ') || sql.includes('FROM agent_runs ')) return { rows: [{ id: 'ok' }] }
         if (sql.includes('FROM bot_subagents s LEFT JOIN')) return { rows: [{ targetId: 'target', epoch: 1, permissionVersion: 0, permission: 'ask' }] }
         if (sql.includes('FROM bot_subagents ')) return { rows: [{ id: 'ok' }] }
@@ -184,6 +186,7 @@ test('broker reports mechanical session application or submission without judgin
     assert.equal(result.status, forcePassword ? 'guarded' : 'session_applied')
     assert.equal(calls.includes('insertAtObservedInput'), forcePassword)
     assert.equal(calls.includes('Page.reload'), !forcePassword)
+    assert.deepEqual(locks, ['computer-policy:workspace', `credentials:${owner.userId}:${owner.origin}`])
     assert.equal(guardEnded, !forcePassword)
     assert(calls.includes('close'))
     if (forcePassword) {
