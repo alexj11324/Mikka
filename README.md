@@ -21,30 +21,30 @@ Every agent, from laptop to cloud, working as one team.
 
 </div>
 
-Mikka coordinates the coding agents you already use as a single team. Describe
-what you need to a bot in natural language. The bot breaks the request into
-tasks and assigns each one to Claude Code, Codex or Cursor. Tasks run on your
-own machines today; cloud computers are coming soon.
+Mikka brings the coding agents on your laptop, remote servers and cloud
+infrastructure together as one team. Describe what you need to a Bot: it
+organizes tasks and coordinates Claude Code, Codex and Cursor across connected
+devices. Work runs on your own machines, with Mikka Cloud computers on the way.
 
-You can follow each task in real time, step in when a decision is needed, and
-review the results.
+Follow each thread in real time, step in when needed and review the results.
 
 ## How Mikka works
 
 - **Bots coordinate. Threads execute.**
-  - A bot chats with you, plans the work and hands it out. It does not do the
-    work directly.
+  - A Bot chats with you, plans coding work and dispatches threads. Browser
+    sub-agents will extend Bots to web tasks.
   - Each piece of work runs in a **thread**: one work run with its own name,
     usually tied to a task. One bot can run many threads at once.
   - The full definitions are in the [glossary](docs/design/glossary.md).
-  - A **harness** is the execution layer, not another bot. The Coordinator uses Mikka's AI SDK / Workflow harness for chat and tools; dispatched coding work uses the daemon's Claude Code, Codex or Cursor CLI harness. The retired standalone Agent chat is available only as read-only history.
+  - A **harness** is the execution layer: Mikka's AI SDK / Workflow powers Bot
+    conversations, while Claude Code, Codex and Cursor CLIs execute coding threads.
 
 - **One Coordinator, multiple execution harnesses.**
   - The Coordinator is a long-running bot. It wakes when a run ends, a task
     changes state, or a worker asks a question, decides the next step, and
     notifies you only when your input is required.
-  - The Coordinator is the current built-in Bot. Its orchestration harness is
-    separate from the CLI harnesses that execute dispatched coding threads.
+  - The Coordinator organizes the team's tasks and routes execution to the
+    available agents and devices.
 
 - **Asks before it guesses.**
   - When a request is unclear, the Coordinator asks you for the missing details
@@ -59,9 +59,8 @@ review the results.
     to, so your existing plans and settings apply.
 
 - **Recovers from failures.**
-  - Each run holds a lease. Periodic checkpoints preserve work in progress so
-    an interrupted run can resume on another compatible online machine
-    ([PR #201](https://github.com/alexj11324/Mikka/pull/201)).
+  - Leases and periodic checkpoints let interrupted runs resume on another
+    compatible online machine.
 
 - **Fits into your existing tools.**
   - Tasks sync both ways with Linear, other agents can operate Mikka through
@@ -74,15 +73,9 @@ review the results.
   <img src="docs/assets/task-flow-light.svg" alt="How a task moves through Mikka: a request is triaged, clarified with you in chat when unclear, and dispatched; the agent can ask you questions while it works; planned Factory stages add review, verification, release approval and monitoring.">
 </picture>
 
-The diagram shows the current task-and-thread flow: a finished run reports its
-result in chat. The complete self-service path from connecting a device to
-returning a GitHub PR is still being integrated and awaits live Preview
-acceptance ([#357](https://github.com/alexj11324/Mikka/issues/357)).
-The dashed loop is the planned Factory process: independent review and verification
-([#193](https://github.com/alexj11324/Mikka/issues/193)), a fix run when a check fails, release approval by a person
-([#194](https://github.com/alexj11324/Mikka/issues/194)), and monitoring that turns incidents into issues
-([#195](https://github.com/alexj11324/Mikka/issues/195)). Systematic routing of ambiguous requests is tracked in
-[#192](https://github.com/alexj11324/Mikka/issues/192).
+A request becomes a task, an agent executes it in a thread, and the result
+returns to the Bot. The Factory roadmap extends this flow with independent
+review, verification, release approval and monitoring.
 
 ## What Mikka does today
 
@@ -91,8 +84,10 @@ The dashed loop is the planned Factory process: independent review and verificat
   you. You can change the assignment in one click.
 - **Makes progress visible.** Every thread shows what its agent
   is doing. Workers report progress, ask questions and flag blocks through
-  Mikka's MCP tools, and the Coordinator triages each one. A thread can also
-  be stopped from its composer ([PR #336](https://github.com/alexj11324/Mikka/pull/336)).
+  Mikka's MCP tools, and the Coordinator triages each one. You can reply to
+  or stop a thread directly.
+- **Continues across devices.** Worktrees and periodic checkpoints preserve
+  interrupted runs so another compatible device can continue the work.
 - **Cites its sources.** Replies show the tasks, runs and web pages they draw
   on as chips you can open.
 - **Keeps tasks in one place.** Tasks show on a board and a list, with
@@ -110,24 +105,15 @@ The dashed loop is the planned Factory process: independent review and verificat
 
 ## What we're building
 
-Work in progress is tracked in
-[GitHub issues](https://github.com/alexj11324/Mikka/issues), mirrored from
-Linear (`MIK-xx`).
-
-**Progress (October 28, 2026):** Thread stopping ([PR #336](https://github.com/alexj11324/Mikka/pull/336))
-and checkpoint-based cross-machine handoff ([PR #201](https://github.com/alexj11324/Mikka/pull/201))
-are merged. The local MVP integration PRs ([#358](https://github.com/alexj11324/Mikka/pull/358)–[#362](https://github.com/alexj11324/Mikka/pull/362))
-remain open; the full device-to-PR flow has not completed fixed-Preview
-acceptance ([#357](https://github.com/alexj11324/Mikka/issues/357)).
+Follow the roadmap in [GitHub issues](https://github.com/alexj11324/Mikka/issues).
 
 | Area | Planned | Tracking |
 | --- | --- | --- |
-| **Local device-to-PR MVP** | Finish self-service device setup, Coordinator issue tools, local Claude Code/Codex execution, approved GitHub PR delivery and real Preview acceptance. | [#357](https://github.com/alexj11324/Mikka/issues/357), [PRs #358–#362](https://github.com/alexj11324/Mikka/pull/362) |
-| **Cloud computer** | Each bot gets its own desktop, which you can watch live, take control of, and hand back. It sleeps when idle and keeps its disk. Your own machines can also be connected. The updated plan uses a shared cloud machine for Bot desktops and browser sub-agents, with a separate machine for each cloud coding thread. | [#172](https://github.com/alexj11324/Mikka/issues/172), [#342](https://github.com/alexj11324/Mikka/issues/342), [#147](https://github.com/alexj11324/Mikka/issues/147) |
+| **Device onboarding and delivery** | Connect a machine, dispatch coding work to Claude Code or Codex, and publish a GitHub PR with your approval. | [#357](https://github.com/alexj11324/Mikka/issues/357) |
+| **Cloud computer** | Bots share cloud infrastructure, each with its own desktop and browser sub-agents. Cloud coding threads run on dedicated machines. Watch and control desktops when needed. | [#172](https://github.com/alexj11324/Mikka/issues/172), [#342](https://github.com/alexj11324/Mikka/issues/342), [#147](https://github.com/alexj11324/Mikka/issues/147) |
 | **Approvals in chat** | When an agent needs authorization, you respond in the chat: allow once, deny, or allow for the rest of the task. | [#147](https://github.com/alexj11324/Mikka/issues/147), [#177](https://github.com/alexj11324/Mikka/issues/177) |
 | **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
 | **Factory** | An end-to-end delivery process: one run per task at a time, durable stage state, independent review and verification threads, and human release approval based on recorded evidence. | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
-| **Cross-machine handoff** | **Merged:** Save work in progress and resume interrupted runs on another compatible online machine. | [PR #201](https://github.com/alexj11324/Mikka/pull/201) |
 | **Scheduled tasks** | Bots run tasks at a set time or on a recurring schedule and report the results in chat. | [#179](https://github.com/alexj11324/Mikka/issues/179) |
 | **Connected apps** | Workflows for mail, calendar, documents and Slack that can take actions, not only read, subject to your approval. | [#177](https://github.com/alexj11324/Mikka/issues/177) |
 | **Secure credentials** | Agents request credentials through a secure form. A vault holds them, and a controlled browser uses them only for approved actions. | [#180](https://github.com/alexj11324/Mikka/issues/180) |
@@ -180,12 +166,8 @@ tools.
 Linear sync runs in a Cloudflare Worker that exchanges changes with Postgres
 through a durable inbox and outbox.
 
-Dashed boxes and lines are on the roadmap: the Scheduler
-([#179](https://github.com/alexj11324/Mikka/issues/179)), Factory stages ([#191](https://github.com/alexj11324/Mikka/issues/191)–[#194](https://github.com/alexj11324/Mikka/issues/194)), Monitoring
-([#195](https://github.com/alexj11324/Mikka/issues/195)), the cloud computer ([#172](https://github.com/alexj11324/Mikka/issues/172)), local computer use ([#147](https://github.com/alexj11324/Mikka/issues/147)), connected-app actions
-([#177](https://github.com/alexj11324/Mikka/issues/177)) and the credential vault ([#180](https://github.com/alexj11324/Mikka/issues/180)).
-Checkpoint-based handoff between compatible machines is already merged
-([PR #201](https://github.com/alexj11324/Mikka/pull/201)).
+The roadmap adds managed cloud computers, browser-based work, scheduling,
+Factory review and verification, and approved actions in connected apps.
 
 ## Built with
 
