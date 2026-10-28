@@ -99,6 +99,11 @@ async def main():
                         assert observation['targets']['0']==described['node']['backendNodeId'], 'target must bind the observed CDP node'
                         refs=await browser.rpc('Runtime.evaluate',{'expression':'document.querySelectorAll(\'[data-mikka-ref="0"]\').length','returnByValue':True})
                         assert refs['result']['value']==1, 'page-provided reference collisions are removed'
+                    await browser.rpc('Runtime.evaluate',{'expression':'window.__savedUser=document.querySelector("input[name=username]");window.__savedUser.remove()','returnByValue':True})
+                    async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as without_field:
+                        assert without_field.status==200
+                        assert (await without_field.json())['screenshot']!=observation['screenshot'], 'the empty input outline must remain visible to the model'
+                    await browser.rpc('Runtime.evaluate',{'expression':'document.body.insertBefore(window.__savedUser,document.querySelector("input[type=password]"))','returnByValue':True})
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[type=password]").value="synthetic-secret"','returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as secret:
                         assert secret.status==409, 'a populated password blocks observation'
@@ -107,6 +112,10 @@ async def main():
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as populated:
                         assert populated.status==200
                         assert (await populated.json())['screenshot']==observation['screenshot'], 'ordinary field values must be masked too'
+                    await browser.rpc('Runtime.evaluate',{'expression':"(()=>{const e=document.querySelector('input[name=username]');e.id='synthetic-css';e.placeholder='synthetic';const s=document.createElement('style');s.id='override';s.textContent='#synthetic-css::placeholder{-webkit-text-fill-color:red!important;color:red!important}';document.head.append(s)})()",'returnByValue':True})
+                    async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as override:
+                        assert override.status==409, 'page styles cannot override masking'
+                    await browser.rpc('Runtime.evaluate',{'expression':"document.querySelector('#override').remove();document.querySelector('input[name=username]').removeAttribute('id');document.querySelector('input[name=username]').removeAttribute('placeholder')",'returnByValue':True})
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=otp]").value="123456"','returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as otp:
                         assert otp.status==409, 'a populated OTP blocks observation'
@@ -114,6 +123,53 @@ async def main():
                     assert restored['result']['value']=={'username':'ordinary-text','otp':'123456','visibility':''}, 'masking must restore the page without reading or changing values'
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=otp]").value=""','returnByValue':True})
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value=""','returnByValue':True})
+                    grant.update({'backendNodeId':observation['targets']['0'],'credentialRole':'username','loaderId':observation['loaderId'],'origin':origin})
+                    grant['credentialRole']='password'
+                    async with client.post('/agents/case/credentials/begin?token=synthetic') as wrong_role:assert wrong_role.status==409
+                    assert browser.guard and browser.guard_file.exists()
+                    browser.guard=None;browser.guard_file.unlink();grant['credentialRole']='username'
+                    async with client.post('/agents/case/credentials/begin?token=synthetic') as observed_begin:
+                        assert observed_begin.status==200
+                        observed_token=(await observed_begin.json())['guardToken']
+                    observed_endpoint=f'/agents/case/credentials/cdp?guard={observed_token}'
+                    async with client.ws_connect(observed_endpoint) as ws:
+                        await ws.send_json({'id':1,'method':'Target.attachToTarget','params':{'targetId':target,'flatten':True}})
+                        while True:
+                            msg=await ws.receive(timeout=10)
+                            if msg.type==WSMsgType.TEXT and json.loads(msg.data).get('id')==1:break
+                        bound=json.loads(msg.data)['result']['sessionId']
+                        await ws.send_json({'id':2,'method':'DOM.focus','params':{'backendNodeId':observation['targets']['1']},'sessionId':bound})
+                        while (await ws.receive(timeout=10)).type==WSMsgType.TEXT:pass
+                    for _ in range(100):
+                        if not browser.broker_active:break
+                        await asyncio.sleep(.01)
+                    async with client.ws_connect(observed_endpoint) as ws:
+                        async def reply(ident):
+                            while True:
+                                message=await ws.receive(timeout=10)
+                                if message.type!=WSMsgType.TEXT:raise AssertionError('observed-node session closed')
+                                data=json.loads(message.data)
+                                if data.get('id')==ident:
+                                    assert 'error' not in data
+                                    return data['result']
+                        await ws.send_json({'id':1,'method':'Target.attachToTarget','params':{'targetId':target,'flatten':True}})
+                        session=(await reply(1))['sessionId']
+                        for ident,method,params in [(2,'Page.getFrameTree',{}),(3,'DOM.getDocument',{'depth':-1,'pierce':False}),(4,'DOM.focus',{'backendNodeId':grant['backendNodeId']})]:
+                            await ws.send_json({'id':ident,'method':method,'params':params,'sessionId':session});await reply(ident)
+                        await ws.send_json({'id':5,'method':'Runtime.evaluate','params':{'expression':'document.activeElement','returnByValue':False},'sessionId':session})
+                        active=(await reply(5))['result']['objectId']
+                        await ws.send_json({'id':6,'method':'DOM.describeNode','params':{'objectId':active},'sessionId':session})
+                        assert (await reply(6))['node']['backendNodeId']==grant['backendNodeId']
+                        await ws.send_json({'id':7,'method':'Input.insertText','params':{'text':'synthetic-observed'},'sessionId':session});await reply(7)
+                        result=await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value','returnByValue':True})
+                        assert result['result']['value']=='synthetic-observed'
+                    for _ in range(100):
+                        if not browser.broker_active:break
+                        await asyncio.sleep(.01)
+                    await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value=""','returnByValue':True})
+                    async with client.post('/agents/case/credentials/end?token=synthetic',json={'guardToken':observed_token}) as observed_end:assert observed_end.status==200
+                    await browser.rpc('Runtime.evaluate',{'expression':'window.focusHijacked=false;window.inputEvents=0','returnByValue':True})
+                    for key in ('backendNodeId','credentialRole','loaderId','origin'):grant.pop(key)
                     await browser.rpc('Runtime.evaluate',{'expression':"(()=>{const e=document.createElement('iframe');e.id='unsafe-test';document.body.append(e)})()",'returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as nested:
                         assert nested.status==409, 'nested documents cannot be captured without inspection'

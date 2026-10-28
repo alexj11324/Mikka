@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 from aiohttp import web, WSMsgType
 ROOT = Path('/run/mikka-subagents')
 AGENTS = {}
-BROKER_METHODS = frozenset(('Page.getFrameTree', 'DOM.getDocument', 'Runtime.evaluate', 'Runtime.callFunctionOn', 'Input.insertText', 'Network.setCookies', 'Network.getCookies', 'Page.reload'))
+BROKER_METHODS = frozenset(('Page.getFrameTree', 'DOM.getDocument', 'DOM.focus', 'DOM.describeNode', 'Runtime.evaluate', 'Runtime.callFunctionOn', 'Input.insertText', 'Network.setCookies', 'Network.getCookies', 'Page.reload'))
 BROKER_STORAGE_FUNCTION = 'function(entries){localStorage.clear();for(const [k,v] of entries)localStorage.setItem(k,v)}'
 BROKER_OTP_SELECTOR = 'input[autocomplete="one-time-code"],input[name="code"],input[name="otp"]'
 BROKER_FOCUS_SELECTORS = ('input[autocomplete="username"],input[type="email"],input[name="username"]', 'input[type="password"]')
@@ -37,27 +37,34 @@ SAFE_TO_RESUME = """(() => {
   return !fields.some(e => e.value && (e.tagName === 'TEXTAREA' ||
     !['hidden','checkbox','radio','button','submit','reset','image','file','range','color'].includes(e.type)));
 })()"""
-# The browser is script-frozen while this isolated-world operation hides every
-# editable control and its descendants. Original inline properties stay in the
-# isolated world and are restored before page scripts resume. A presence check
-# blocks populated sensitive controls; no field value is returned. Pseudo-
-# elements must also be hidden.
+# Keep input outlines visible for the vision model while masking editable text.
+# Original inline styles stay in an isolated world and are restored before
+# scripts resume. A presence check blocks populated sensitive controls.
 MASK_VISUAL_FIELDS = """(() => {
   globalThis.__mikkaMasks = [];
+  globalThis.__mikkaMaskStyle = null;
   if (document.readyState !== 'complete') return false;
   if ([...document.querySelectorAll('input,textarea')].some(e => e.value && (e.type === 'password' || /(?:otp|one[\\s_-]*time|verification[\\s_-]*code|security[\\s_-]*code|auth(?:entication)?[\\s_-]*code)/i.test([e.autocomplete,e.name,e.id,e.getAttribute('aria-label'),e.getAttribute('placeholder')].join(' '))))) return false;
-  const roots = [...document.querySelectorAll('input,textarea,select,[contenteditable]:not([contenteditable="false"])')];
+  const roots = [...document.querySelectorAll('input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not([type=file]):not([type=image]):not([type=range]):not([type=color]),textarea,select,[contenteditable]:not([contenteditable="false"])')];
   const elements = [...new Set(roots.flatMap(e => [e, ...e.querySelectorAll('*')]))];
-  globalThis.__mikkaMasks = elements.map(e => [e, e.style.getPropertyValue('visibility'), e.style.getPropertyPriority('visibility'), e.style.getPropertyValue('transition'), e.style.getPropertyPriority('transition')]);
-  for (const e of elements) { e.style.setProperty('transition','none','important'); e.style.setProperty('visibility','hidden','important'); }
-  return elements.every(e => ['','::before','::after'].every(p => getComputedStyle(e,p || null).visibility === 'hidden'));
+  const properties = ['color','-webkit-text-fill-color','text-shadow','caret-color','transition'];
+  globalThis.__mikkaMasks = elements.map(e => [e, properties.map(p => [p,e.style.getPropertyValue(p),e.style.getPropertyPriority(p)])]);
+  const style=document.createElement('style');
+  style.textContent='input::placeholder,textarea::placeholder{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important}';
+  document.head.appendChild(style); globalThis.__mikkaMaskStyle=style;
+  for (const e of elements) {
+    e.style.setProperty('transition','none','important'); e.style.setProperty('color','transparent','important');
+    e.style.setProperty('-webkit-text-fill-color','transparent','important'); e.style.setProperty('text-shadow','none','important'); e.style.setProperty('caret-color','transparent','important');
+  }
+  const hidden = s => s.webkitTextFillColor === 'rgba(0, 0, 0, 0)' && s.textShadow === 'none';
+  return elements.every(e => hidden(getComputedStyle(e)) && ['::before','::after'].every(p => { const s=getComputedStyle(e,p); return s.content==='none'||s.content==='normal'||hidden(s); }) && (!['INPUT','TEXTAREA'].includes(e.tagName)||hidden(getComputedStyle(e,'::placeholder'))));
 })()"""
 RESTORE_VISUAL_FIELDS = """(() => {
   if (!Array.isArray(globalThis.__mikkaMasks)) return false;
-  for (const [e,v,vp,t,tp] of globalThis.__mikkaMasks) {
-    if (v) e.style.setProperty('visibility',v,vp); else e.style.removeProperty('visibility');
-    if (t) e.style.setProperty('transition',t,tp); else e.style.removeProperty('transition');
+  for (const [e,properties] of globalThis.__mikkaMasks) {
+    for (const [p,v,priority] of properties) { if (v) e.style.setProperty(p,v,priority); else e.style.removeProperty(p); }
   }
+  globalThis.__mikkaMaskStyle?.remove(); delete globalThis.__mikkaMaskStyle;
   delete globalThis.__mikkaMasks; return true;
 })()"""
 OBSERVE_DOM = """(() => {
@@ -87,6 +94,22 @@ def observed_targets(document, count):
     visit(document.get('root'))
     if set(found)!=set(range(count)):raise web.HTTPConflict()
     return {str(index):found[index] for index in range(count)}
+
+def valid_observed_input(document, backend_id, role):
+    """Inspect only top-level DOM nodes; the caller separately rejects frames and shadows."""
+    def find(node):
+        if not isinstance(node,dict):return None
+        if node.get('backendNodeId')==backend_id:return node
+        for child in node.get('children',[]):
+            result=find(child)
+            if result:return result
+        return None
+    node=find(document.get('root')) if isinstance(document,dict) else None
+    attrs=node.get('attributes') if isinstance(node,dict) else None
+    if not isinstance(attrs,list) or len(attrs)%2 or any(not isinstance(v,str) for v in attrs):return False
+    values=dict(zip((k.lower() for k in attrs[::2]),attrs[1::2]))
+    allowed=('password',) if role=='password' else ('text','email','tel') if role=='username' else ()
+    return node.get('nodeName')=='INPUT' and 'disabled' not in values and 'readonly' not in values and values.get('type','text').lower() in allowed
 SENSITIVE_FIELD = "(e.type === 'password' || /(?:otp|one[\\s_-]*time|verification[\\s_-]*code|security[\\s_-]*code|auth(?:entication)?[\\s_-]*code)/i.test([e.autocomplete,e.name,e.id,e.getAttribute('aria-label'),e.getAttribute('placeholder')].join(' ')))"
 
 def safe_resume_snapshot(frames, document, evaluation):
@@ -124,7 +147,7 @@ def browser_origin(value):
         return f'{parsed.scheme}://{host}'+(f':{port}' if port and port != (443 if parsed.scheme=='https' else 80) else '')
     except (ValueError,TypeError):return None
 
-def broker_command_allowed(data, target, sessions, objects=None, origin=None):
+def broker_command_allowed(data, target, sessions, objects=None, origin=None, observed_node=None, active_objects=None):
     if not isinstance(data,dict) or type(data.get('id')) is not int or data['id'] < 1 or not isinstance(data.get('params'),dict):return False
     objects=objects or {}
     method=data.get('method')
@@ -132,8 +155,14 @@ def broker_command_allowed(data, target, sessions, objects=None, origin=None):
         return set(data)=={'id','method','params'} and not sessions and data['params']=={'targetId':target,'flatten':True}
     if set(data)!={'id','method','params','sessionId'} or not isinstance(method,str) or method not in BROKER_METHODS or not isinstance(data.get('sessionId'),str) or data['sessionId'] not in sessions:return False
     params=data['params']
+    if observed_node is not None:
+        if method not in ('Page.getFrameTree','DOM.getDocument','DOM.focus','DOM.describeNode','Runtime.evaluate','Input.insertText'):return False
+        if method=='Runtime.evaluate':return params=={'expression':'document.activeElement','returnByValue':False}
+        if method=='DOM.getDocument':return params=={'depth':-1,'pierce':False}
     if method in ('Page.getFrameTree','Page.reload'):return params=={}
     if method=='DOM.getDocument':return params=={'depth':-1,'pierce':True}
+    if method=='DOM.focus':return observed_node is not None and type(params.get('backendNodeId')) is int and params=={'backendNodeId':observed_node}
+    if method=='DOM.describeNode':return observed_node is not None and set(params)=={'objectId'} and isinstance(params['objectId'],str) and params['objectId']==(active_objects or {}).get(data['sessionId'])
     if method=='Runtime.evaluate':
         return set(params)=={'expression','returnByValue'} and isinstance(params['expression'],str) and ((params['expression'] in BROKER_EVALUATIONS and params['returnByValue'] is True) or (params['expression']=='globalThis' and params['returnByValue'] is False))
     if method=='Runtime.callFunctionOn':
@@ -295,6 +324,9 @@ async def begin(request):
     _,grant=authorize(request,'broker');b=browser(grant)
     async with b.lock:
         if b.guard:raise web.HTTPConflict()
+        node=grant.get('backendNodeId');role=grant.get('credentialRole')
+        if (node is not None or role is not None) and (type(node) is not int or node<=0 or role not in ('username','password') or not isinstance(grant.get('loaderId'),str) or not grant['loaderId'] or not browser_origin(grant.get('origin'))):raise web.HTTPForbidden()
+        b.guard_node=node;b.guard_role=role
         b.guard=secrets.token_urlsafe(32);b.guard_file.write_text(b.guard);b.frame=None
         display=b.grant.get('display')
         if display:
@@ -322,6 +354,7 @@ async def begin(request):
         b.guard_origin=browser_origin(tree['frameTree']['frame']['url'])
         document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
         if not b.guard_origin or not safe_resume_snapshot(tree,document,{'result':{'value':True}}):raise web.HTTPConflict()
+        if node is not None and (grant['loaderId']!=b.guard_loader or browser_origin(grant['origin'])!=b.guard_origin or not valid_observed_input(document,node,role)):raise web.HTTPConflict()
         for ws in list(b.viewer):await ws.close()
     base=f'https://{request.host}'
     return web.json_response({'cdpUrl':base.replace('https:','wss:')+request.path.replace('/credentials/begin','/credentials/cdp')+'?token='+request.query['token']+'&guard='+b.guard,'targetId':b.target,'guardToken':b.guard})
@@ -331,6 +364,7 @@ async def cdp(request):
     guard=request.query.get('guard','')
     async with b.lock:
         if not b.guard or not hmac.compare_digest(guard,b.guard):raise web.HTTPForbidden()
+        if getattr(b,'guard_node',None) is not None and (grant.get('backendNodeId')!=b.guard_node or grant.get('credentialRole')!=b.guard_role or grant.get('loaderId')!=b.guard_loader or browser_origin(grant.get('origin'))!=b.guard_origin):raise web.HTTPForbidden()
         if getattr(b,'broker_active',False):raise web.HTTPConflict()
         b.broker_active=True
     try:return await broker_cdp_session(request,b,grant,raw,guard)
@@ -340,7 +374,7 @@ async def cdp(request):
 async def broker_cdp_session(request,b,grant,raw,guard):
     ws=web.WebSocketResponse(max_msg_size=1024*1024);await ws.prepare(request)
     reader,writer=await asyncio.open_unix_connection(str(b.path/'cdp.sock'),limit=4*1024*1024)
-    sessions=set();pending={};objects={};focused={};origin=getattr(b,'guard_origin',None);input_done=asyncio.Event()
+    sessions=set();pending={};objects={};active_objects={};focused={};origin=getattr(b,'guard_origin',None);observed_node=getattr(b,'guard_node',None);input_done=asyncio.Event()
     if not origin:
         writer.close();await writer.wait_closed();await ws.close();return ws
     async def incoming():
@@ -349,13 +383,21 @@ async def broker_cdp_session(request,b,grant,raw,guard):
             if b.guard!=guard or message.type!=WSMsgType.TEXT:break
             data=json.loads(message.data)
             # Broker capability is scoped to this page, not a general CDP socket.
-            if not broker_command_allowed(data,b.target,sessions,objects,origin) or data['id'] in pending:break
+            if not broker_command_allowed(data,b.target,sessions,objects,origin,observed_node,active_objects) or data['id'] in pending:break
             if data['method']!='Target.attachToTarget' and browser_origin(await b.url())!=origin:break
             if data['method']=='Target.attachToTarget' and any(item[0]=='Target.attachToTarget' for item in pending.values()):break
             if data['method']=='Runtime.callFunctionOn':objects.pop(data['sessionId'],None)
             if data['method']=='Page.reload':objects.pop(data['sessionId'],None);focused.pop(data['sessionId'],None)
+            if data['method']=='DOM.focus':
+                if getattr(b,'credential_scripts_disabled',False):break
+                b.credential_scripts_disabled=True
+                await b.rpc('Emulation.setScriptExecutionDisabled',{'value':True},b.session)
+                tree=await b.rpc('Page.getFrameTree',session=b.session)
+                document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
+                frame=tree.get('frameTree',{}).get('frame',{})
+                if frame.get('loaderId')!=b.guard_loader or browser_origin(frame.get('url'))!=origin or not safe_resume_snapshot(tree,document,{'result':{'value':True}}) or not valid_observed_input(document,observed_node,b.guard_role):break
             if data['method']=='Runtime.evaluate':
-                focused.pop(data['sessionId'],None)
+                if data['params']['expression']!='document.activeElement':focused.pop(data['sessionId'],None)
                 if data['params']['expression'] in BROKER_FOCUS_EXPRESSIONS:
                     if getattr(b,'credential_scripts_disabled',False):break
                     # Freeze page scripts before focus, so a site callback or
@@ -368,12 +410,21 @@ async def broker_cdp_session(request,b,grant,raw,guard):
                 tree=await b.rpc('Page.getFrameTree',session=b.session)
                 document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
                 if not safe_resume_snapshot(tree,document,{'result':{'value':True}}):break
-                check=await b.rpc('Runtime.evaluate',{'expression':f"(()=>{{const e=document.querySelector({json.dumps(selector)});return e && !e.disabled && !e.readOnly && document.activeElement===e ? e : null}})()",'returnByValue':False},b.session)
+                if type(selector) is int:
+                    frame=tree.get('frameTree',{}).get('frame',{})
+                    if frame.get('loaderId')!=b.guard_loader or not valid_observed_input(document,selector,b.guard_role):break
+                    check=await b.rpc('Runtime.evaluate',{'expression':'document.activeElement','returnByValue':False},b.session)
+                else:
+                    check=await b.rpc('Runtime.evaluate',{'expression':f"(()=>{{const e=document.querySelector({json.dumps(selector)});return e && !e.disabled && !e.readOnly && document.activeElement===e ? e : null}})()",'returnByValue':False},b.session)
                 element=check.get('result',{}).get('objectId')
                 if not isinstance(element,str) or not element or browser_origin(await b.url())!=origin:break
+                if type(selector) is int:
+                    described=await b.rpc('DOM.describeNode',{'objectId':element},b.session)
+                    if described.get('node',{}).get('backendNodeId')!=selector:break
                 input_done.clear()
             else:element=None
-            pending[data['id']]=(data['method'],data.get('sessionId'),data.get('params',{}).get('expression'),element)
+            argument=data.get('params',{}).get('backendNodeId') if data['method']=='DOM.focus' else data.get('params',{}).get('expression')
+            pending[data['id']]=(data['method'],data.get('sessionId'),argument,element)
             writer.write((json.dumps(data)+'\n').encode());await writer.drain()
     async def outgoing():
         while line:=await reader.readline():
@@ -393,6 +444,10 @@ async def broker_cdp_session(request,b,grant,raw,guard):
             if call and call[0]=='Runtime.evaluate' and call[2]=='globalThis':
                 object_id=data.get('result',{}).get('result',{}).get('objectId')
                 if isinstance(object_id,str) and object_id:objects[call[1]]=object_id
+            if call and call[0]=='Runtime.evaluate' and call[2]=='document.activeElement':
+                object_id=data.get('result',{}).get('result',{}).get('objectId')
+                if isinstance(object_id,str) and object_id:active_objects[call[1]]=object_id
+            if call and call[0]=='DOM.focus' and 'error' not in data:focused[call[1]]=call[2]
             if call and call[0]=='Runtime.evaluate' and call[2] in BROKER_FOCUS_EXPRESSIONS and data.get('result',{}).get('result',{}).get('value') is True:
                 focused[call[1]]=BROKER_FOCUS_EXPRESSIONS[call[2]]
             if call and call[0]=='Input.insertText':

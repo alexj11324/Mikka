@@ -16,9 +16,10 @@ constants = {node.targets[0].id: ast.literal_eval(node.value)
 safe_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'safe_resume_snapshot')
 broker_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'broker_command_allowed')
 origin_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'browser_origin')
+observed_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'valid_observed_input')
 policy_nodes = [node for node in module.body if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id in ('BROKER_METHODS', 'BROKER_STORAGE_FUNCTION', 'BROKER_OTP_SELECTOR', 'BROKER_FOCUS_SELECTORS', 'BROKER_FOCUS_EXPRESSIONS', 'BROKER_EVALUATIONS')]
 namespace = {'json': json, 'math': math, 'urlsplit': urlsplit}
-exec(compile(ast.Module(body=[*policy_nodes, safe_node, origin_node, broker_node], type_ignores=[]), str(__file__), 'exec'), namespace)
+exec(compile(ast.Module(body=[*policy_nodes, safe_node, origin_node, observed_node, broker_node], type_ignores=[]), str(__file__), 'exec'), namespace)
 safe_resume_snapshot = namespace['safe_resume_snapshot']
 broker_command_allowed = namespace['broker_command_allowed']
 
@@ -89,6 +90,28 @@ class GuardTest(unittest.TestCase):
         self.assertFalse(check('Input.insertText', {'text':'synthetic','extra':True}))
         self.assertIsNone(namespace['browser_origin']('http://outside.example/login'))
         self.assertEqual(namespace['browser_origin']('http://127.0.0.1:6083/login'),'http://127.0.0.1:6083')
+
+    def test_observed_node_commands_are_bound_to_signed_target_and_role(self):
+        session={'bound'}; base={'id': 1, 'sessionId': 'bound'}
+        focus={**base,'method':'DOM.focus','params':{'backendNodeId':42}}
+        self.assertTrue(broker_command_allowed(focus,'target',session,observed_node=42))
+        self.assertFalse(broker_command_allowed(focus,'target',session,observed_node=43))
+        self.assertFalse(broker_command_allowed({**focus,'params':{'backendNodeId':42,'extra':1}},'target',session,observed_node=42))
+        for expression in namespace['BROKER_EVALUATIONS']:
+            if 'requestSubmit' in expression:
+                submit={**base,'method':'Runtime.evaluate','params':{'expression':expression,'returnByValue':True}}
+                self.assertFalse(broker_command_allowed(submit,'target',session,observed_node=42))
+        active={**base,'method':'Runtime.evaluate','params':{'expression':'document.activeElement','returnByValue':False}}
+        self.assertTrue(broker_command_allowed(active,'target',session,observed_node=42))
+        describe={**base,'method':'DOM.describeNode','params':{'objectId':'active'}}
+        self.assertTrue(broker_command_allowed(describe,'target',session,observed_node=42,active_objects={'bound':'active'}))
+        self.assertFalse(broker_command_allowed(describe,'target',session,observed_node=42,active_objects={'bound':'other'}))
+        document={'root':{'nodeName':'#document','children':[{'backendNodeId':42,'nodeName':'INPUT','attributes':['type','password']}]}}
+        self.assertTrue(namespace['valid_observed_input'](document,42,'password'))
+        self.assertFalse(namespace['valid_observed_input'](document,42,'username'))
+        self.assertFalse(namespace['valid_observed_input'](document,43,'password'))
+        document['root']['children'][0]['attributes'] += ['disabled','']
+        self.assertFalse(namespace['valid_observed_input'](document,42,'password'))
 
     def test_uninspectable_or_nested_documents_fail_closed(self):
         frames = {'frameTree': {'frame': {'id': 'main'}}}

@@ -24,7 +24,7 @@ mock.module(new URL('../../lib/cloud-computer/subagents.ts', import.meta.url).hr
 mock.module(new URL('../../lib/cloud-computer/credential-consumer.ts', import.meta.url).href, { namedExports: { executeCredentialIntent: async (input: Record<string, unknown>) => { invocations.push(input); return { status: resultStatus } } } })
 mock.module(new URL('../../lib/coordinator-event-store.ts', import.meta.url).href, { namedExports: { recordCoordinatorEvent: async () => {} } })
 mock.module(new URL('../../lib/coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: async () => {} } })
-mock.module('ai', { namedExports: { tool: (input: unknown) => input, generateText: async () => ({ toolCalls: [{ toolName: 'choose_browser_action', input: { action: modelAction, selector: modelSelector, step: 'Login', summary: 'Please take over' } }] }) } })
+mock.module('ai', { namedExports: { tool: (input: unknown) => input, generateText: async () => ({ toolCalls: [{ toolName: 'choose_browser_action', input: { action: modelAction, selector: modelSelector, loginRole: 'username', step: 'Login', summary: 'Please take over' } }] }) } })
 let tick: typeof import('./steps').tick
 before(async () => { process.env.MIKKA_BROWSER_VISION_MODEL = 'synthetic/test'; tick = (await import('./steps')).tick })
 after(() => { if (oldVisionModel === undefined) delete process.env.MIKKA_BROWSER_VISION_MODEL; else process.env.MIKKA_BROWSER_VISION_MODEL = oldVisionModel })
@@ -34,7 +34,7 @@ for (const status of ['session_applied', 'submitted'] as const) {
   test(`${status} preserves selected target and requires another observation`, async () => {
     resultStatus = status
     assert.equal(await tick(actor, 'bot', 'subagent'), 'running')
-    assert.deepEqual(invocations, [{ permissionAction: 'computer_use', actor, botId: 'bot', subagentId: 'subagent', epoch: 7, loaderId: 'document', origin: 'https://example.test', backendNodeId: 42, intent: { targetSelector: '[data-mikka-ref="1"]' } }])
+    assert.deepEqual(invocations, [{ permissionAction: 'computer_use', actor, botId: 'bot', subagentId: 'subagent', epoch: 7, loaderId: 'document', origin: 'https://example.test', backendNodeId: 42, intent: { targetSelector: '[data-mikka-ref="1"]', role: 'username' } }])
     assert.equal(updates.length, 0)
   })
 }
