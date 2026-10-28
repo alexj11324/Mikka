@@ -50,7 +50,7 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
       const action = browserMutationSchema.parse(next.action === 'key' ? { action: next.action, key: next.key } : next.action === 'click' ? { action: next.action, selector: next.selector } : { action: next.action, selector: next.selector, text: next.text })
       const review = await browserAction(pool, actor, botId, id, action, next.summary || next.step, next.irreversible)
       if (review.state === 'needs_you') {
-        await report(actor.userId, botId, id, `An irreversible browser action needs approval: ${review.summary}. Existing pending action ${review.actionId}. Ask the person to approve or deny this exact operation.`, `approval:${review.actionId}`)
+        await report(actor.userId, botId, id, `A browser action needs approval: ${review.summary}. Existing pending action ${review.actionId}. Ask the person to approve or deny this exact operation.`, `approval:${review.actionId}`)
         return 'waiting'
       }
       return 'running'
