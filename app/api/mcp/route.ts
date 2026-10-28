@@ -170,8 +170,8 @@ const handler = createMcpHandler(server => {
   }, async (input, ctx) => outcome(await runComposioAction(mcpUserId(ctx.http?.authInfo), 'read_slack_thread', input)))
 
   server.registerTool('list_agents', {
-    title: 'List agents',
-    description: 'List available local execution harnesses and their computers. Use the returned internal id as agentId for dispatch_run and provide the repository URL separately. In replies, call these computers and threads; never show internal Agent identities.',
+    title: 'List local execution tools',
+    description: 'List available local execution tools and their computers. Use the returned internal id as agentId for dispatch_run and provide the repository URL separately. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, never an Agent.',
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true },
   }, async (_input, ctx) => json(await actions.listAgents(mcpUserId(ctx.http?.authInfo))))

@@ -58,6 +58,7 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
   const { agentActor } = await import('../lib/activity-actor')
   const { saveIssue, listIssueVersions, setIssueScope } = await import('../app/actions/issues')
   const { updateIssueMetadata } = await import('../app/actions/issue-metadata')
+  const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
   const { createLinkedIssue, updateIssueRelation } = await import('../app/actions/issue-operations')
   const { removeMember } = await import('../app/actions/collaboration')
   const { createAppIssueFromLinear, applyLinearIssueToApp } = await import('../lib/linear-sync/issue-sync')
@@ -119,6 +120,13 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     assert.ok(copiedChild, 'duplicate path actually copied its child')
     await history(copiedChild.id, 'user', owner)
     saved = expectIssue(await actAs(owner, () => updateIssueMetadata({ id: root.id, revision: saved.revision, patch: { assignee: { kind: 'member', id: member } } })))
+    // R-60: crafted action input cannot assign a hidden execution identity.
+    const rejectedAssignee = await actAs(owner, () => updateIssueMetadata({
+      id: root.id, revision: saved.revision, patch: { assignee: { kind: 'agent', id: randomUUID() } },
+    } as unknown as Parameters<typeof updateIssueMetadata>[0]))
+    assert.deepEqual(rejectedAssignee, { error: 'issueMetadataInvalid' })
+    assert.equal((await latest(root.id)).revision, saved.revision)
+    assert.equal(readIssueMetadata((await latest(root.id)).content).assignee?.id, member)
     assert.deepEqual(await actAs(owner, () => removeMember(root.id, member)), { success: true })
     await history(root.id, 'user', owner)
     // Root was shared above; flipping it back to personal is the scope writer
@@ -156,6 +164,12 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     const legacy = expectIssue(await actAs(owner, () => saveIssue(input)))
     await db.update(issueVersions).set({ actorType: null, actorId: null }).where(eq(issueVersions.issueId, legacy.id))
     assert.equal((await actAs(owner, () => listIssueVersions(legacy.id)))[0].actor, null)
+    // Old execution-assignee metadata is retained when an unrelated property changes.
+    const legacyAssignee = { kind: 'agent' as const, id: randomUUID(), name: 'Historical executor', image: null }
+    const legacyContent = withIssueMetadata(legacy.content, { ...readIssueMetadata(legacy.content), assignee: legacyAssignee })
+    await db.update(issues).set({ content: legacyContent }).where(eq(issues.id, legacy.id))
+    const editedLegacy = expectIssue(await actAs(owner, () => updateIssueMetadata({ id: legacy.id, revision: legacy.revision, patch: { estimate: 8 } })))
+    assert.deepEqual(readIssueMetadata(editedLegacy.content).assignee, legacyAssignee)
   } finally {
     const owned = await db.select({ id: issues.id }).from(issues).where(eq(issues.userId, owner))
     for (const { id } of owned) {

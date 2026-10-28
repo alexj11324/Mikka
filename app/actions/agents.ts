@@ -15,7 +15,7 @@ import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
 import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
-import { runBotName } from '@/lib/run-bot-name'
+import { executionBotName, runBotName } from '@/lib/run-bot-name'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
@@ -123,7 +123,7 @@ export async function listLocalSshHosts(): Promise<SshHostView[]> {
 export async function listAgents(): Promise<AgentView[]> {
   const userId = await getUserId()
   const rows = await db.select({
-    id: agents.id, name: agents.name, description: agents.description, instructions: agents.instructions,
+    id: agents.id, name: executionBotName, description: agents.description, instructions: agents.instructions,
     harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name,
   }).from(agents).leftJoin(devices, eq(devices.id, agents.deviceId))
     .where(and(eq(agents.userId, userId), sql`not exists (select 1 from bot_cloud_runtimes bcr where bcr."agentId" = ${agents.id})`)).orderBy(asc(agents.name))

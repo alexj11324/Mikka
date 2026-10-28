@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { Pool } from 'pg'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { ensureDeviceAgents, localExecutionHarnesses } from './device-agents'
+
+type Pool = Parameters<typeof ensureDeviceAgents>[0]
 
 const codex: HarnessInfo = { harness: 'codex', installed: true, version: 'test' }
 const claude: HarnessInfo = { harness: 'claude_code', installed: true, version: 'test' }

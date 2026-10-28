@@ -1,11 +1,12 @@
 import 'server-only'
 import { and, desc, eq, sql, type SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { agentRuns, agents, bots, devices } from '@/lib/db/schema'
+import { agentRuns, agents, devices } from '@/lib/db/schema'
 import { citationSources } from '@/lib/coordinator/store'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { threadName } from '@/lib/issue-threads'
 import type { RunSource } from '@/lib/coordinator/citations'
+import { runBotName } from '@/lib/run-bot-name'
 
 /** The app's thread states (docs/design/mobile.md, 线程 screen icons). */
 export type MobileThreadStatus = 'running' | 'waiting' | 'failed' | 'done' | 'stopped'
@@ -32,7 +33,7 @@ export interface MobileThread {
   id: string
   name: string
   status: MobileThreadStatus
-  /** Who works it: the bot that started it, else the coding agent. */
+  /** The Bot that started the thread, including the Coordinator. */
   by: string
   harness: string
   device: { id: string; name: string; kind: 'cloud' | 'laptop' | 'server' } | null
@@ -55,11 +56,11 @@ type MachineKind = ReturnType<typeof machineKind>
 async function threadRows(userId: string, filter: SQL | undefined, limit: number): Promise<MobileThread[]> {
   const rows = await db.select({
     id: agentRuns.id, prompt: sql<string>`left(${agentRuns.prompt}, 300)`, status: agentRuns.status,
-    agentName: agents.name, harness: agents.harness, botName: bots.name,
+    agentName: runBotName, harness: agents.harness,
     deviceId: devices.id, deviceName: devices.name, platform: devices.platform,
     createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .leftJoin(bots, eq(bots.id, agentRuns.botId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
+    .leftJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(eq(agentRuns.userId, userId), filter))
     .orderBy(desc(agentRuns.createdAt)).limit(limit)
   const sources = rows.length ? await citationSources(userId, [], rows.map(row => row.id)) : {}
@@ -69,7 +70,7 @@ async function threadRows(userId: string, filter: SQL | undefined, limit: number
       id: row.id,
       name: nameOf(source?.kind === 'run' ? source : undefined, row.prompt, row.agentName),
       status: mobileThreadStatus(row.status),
-      by: row.botName ?? row.agentName,
+      by: row.agentName,
       harness: row.harness,
       device: row.deviceId ? { id: row.deviceId, name: row.deviceName ?? '', kind: machineKind({ name: row.deviceName, platform: row.platform }) } : null,
       createdAt: row.createdAt.toISOString(),
