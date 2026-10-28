@@ -20,7 +20,7 @@ test('web decision releases original MCP call and scripted model continues scree
     execute: async (_, call) => { calls++; return { content: [{ type: 'text', text: JSON.stringify(call) }] } },
   })
   await broker.listen()
-  t.after(() => { console.log(`Retained review test directory: ${dir}`) })
+  t.after(() => { broker.suspend(); console.log(`Retained review test directory: ${dir}`) })
   const grant = broker.spec(randomUUID(), 'ask', { display: ':2' })!
   const child = spawn(process.execPath, [new URL('./proxy.mjs', import.meta.url).pathname, grant.socketPath, grant.token])
   const lines = createInterface({ input: child.stdout })
@@ -64,7 +64,7 @@ test('review polling retries transport failures without granting and stops on ab
     driver: { installed: true, path: '/fake', version: 'test', fingerprint: 'f'.repeat(64) }, permitted: () => true,
     execute: async () => { executed++; return 'ok' },
   })
-  t.after(() => { console.log(`Retained review test directory: ${dir}`) })
+  t.after(() => { broker.suspend(); console.log(`Retained review test directory: ${dir}`) })
   const grant = broker.spec(randomUUID(), 'ask', { display: ':1' })!
   const result = broker.request(grant.token, { name: 'click', arguments: { x: 1, y: 2 } })
   const abort = new AbortController()

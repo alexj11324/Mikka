@@ -11,6 +11,7 @@ export class ComputerBroker {
   grants = new Map();
   pending = new Map();
   sockets = new Set();
+  suspended = false;
   constructor({
     driver,
     socketPath,
@@ -30,13 +31,14 @@ export class ComputerBroker {
     if (display !== undefined && !/^:[1-9][0-9]{0,2}$/.test(display))
       throw new Error("Invalid desktop display");
     // Missing or unknown policy never grants access.
-    if (!this.driver || !permission || !["ask", "allow"].includes(permission))
+    if (this.suspended || !this.driver || !permission || !["ask", "allow"].includes(permission))
       return undefined;
     const token = randomBytes(32).toString("hex");
     this.grants.set(token, { runId, fingerprint: this.driver.fingerprint, display, permission });
     return { socketPath: this.socketPath, token };
   }
   async listen() {
+    if (this.suspended) throw new Error("Broker suspended");
     rmSync(this.socketPath, { force: true });
     this.server = createServer((socket) => {
       this.sockets.add(socket);
@@ -169,7 +171,10 @@ export class ComputerBroker {
     }
     return { ok: true };
   }
-  async close() {
+  // Revoke admission and pending reviews without deleting or closing resources.
+  // An operation already handed to the driver cannot be undone here.
+  suspend() {
+    this.suspended = true;
     this.grants.clear();
     for (const row of this.pending.values()) {
       clearTimeout(row.timer);
@@ -177,6 +182,9 @@ export class ComputerBroker {
       row.reject(new Error("Daemon stopped; approval discarded"));
     }
     this.pending.clear();
+  }
+  async close() {
+    this.suspend();
     for (const socket of this.sockets) socket.destroy();
     if (this.server) await new Promise((resolve) => this.server.close(resolve));
     rmSync(this.socketPath, { force: true });

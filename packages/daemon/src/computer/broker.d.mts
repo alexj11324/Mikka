@@ -27,5 +27,6 @@ export class ComputerBroker {
   list(): PendingComputerRequest[];
   revoke(token: string): void;
   decide(id: string, digest: string, approve: boolean): Promise<{ ok: true }>;
+  suspend(): void;
   close(): Promise<void>;
 }

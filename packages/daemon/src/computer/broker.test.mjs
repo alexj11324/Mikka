@@ -24,7 +24,7 @@ async function fixture(t, overrides = {}) {
     }),
     ...overrides,
   });
-  t.after(() => { console.log(`Retained broker test directory: ${dir}`); });
+  t.after(() => { broker.suspend(); console.log(`Retained broker test directory: ${dir}`); });
   return broker;
 }
 test("revoking a run grant promptly rejects pending work without revoking another run", async (t) => {
@@ -40,6 +40,21 @@ test("revoking a run grant promptly rejects pending work without revoking anothe
   await assert.rejects(b.request(first.token, { name: 'get_desktop_state' }), /Not permitted/);
   assert.equal(await b.request(second.token, { name: 'get_desktop_state' }), 'ok');
   assert.equal(calls, 1);
+});
+test("suspending revokes grants and pending reviews without closing resources", async (t) => {
+  let calls = 0;
+  const b = await fixture(t, { execute: async () => { calls++; } });
+  const grant = b.spec("run", "ask");
+  const pending = assert.rejects(b.request(grant.token, { name: "get_desktop_state" }));
+  const row = b.list()[0];
+  b.suspend();
+  await pending;
+  assert.deepEqual(b.list(), []);
+  await assert.rejects(b.request(grant.token, { name: "get_desktop_state" }));
+  await assert.rejects(() => b.decide(row.id, row.digest, true));
+  assert.equal(b.spec("run", "allow"), undefined);
+  await assert.rejects(() => b.listen(), /suspended/);
+  assert.equal(calls, 0);
 });
 test("each broker action has its own trusted id and ask reuses the review id", async (t) => {
   const ids = [];
