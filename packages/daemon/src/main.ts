@@ -329,6 +329,7 @@ export class Daemon {
       worktrees: this.worktrees,
       adapters,
       startSubscription: hosted?.start,
+      prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
       bootstrap: hosted
         ? async (worktree, repo) => {
             if (

@@ -30,12 +30,12 @@ export async function recordPersonalSubmission(executor: Executor, userId: strin
   const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text, ...(taskDestination ? { taskDestination } : {}) } }
   const [inserted] = await executor.insert(coordinatorEvents).values({ id: randomUUID(), ...event })
     .onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
-  if (inserted) return { duplicate: false }
+  if (inserted) return { duplicate: false, eventId: inserted.id }
   // The unique index arbitrates concurrent writers. A separate read observes
   // the winning committed row without changing its payload or delivery state.
-  const [prior] = await executor.select({ userId: coordinatorEvents.userId, botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, issueId: coordinatorEvents.issueId, runId: coordinatorEvents.runId, payload: coordinatorEvents.payload })
+  const [prior] = await executor.select({ id: coordinatorEvents.id, userId: coordinatorEvents.userId, botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, issueId: coordinatorEvents.issueId, runId: coordinatorEvents.runId, payload: coordinatorEvents.payload })
     .from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey, dedupeKey)).limit(1)
   if (!prior) throw new Error('personalSubmissionUnavailable')
-  if (!submissionId || prior.userId !== userId || prior.botId !== botId || prior.kind !== event.kind || prior.issueId !== null || prior.runId !== null || !isDeepStrictEqual(prior.payload, event.payload)) throw new SubmissionConflictError()
-  return { duplicate: true }
+  if (!submissionId || prior.userId !== userId || prior.botId !== botId || prior.kind !== event.kind || (prior.issueId !== null && !taskDestination) || prior.runId !== null || !isDeepStrictEqual(prior.payload, event.payload)) throw new SubmissionConflictError()
+  return { duplicate: true, eventId: prior.id }
 }

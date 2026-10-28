@@ -1,4 +1,5 @@
 import 'server-only'
+import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
 import { freezeWorkerDefinition } from '@/lib/agent-kit/worker'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
@@ -6,7 +7,7 @@ import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db, pool } from '@/lib/db'
 import { SubscriptionRepository } from '@/lib/subscription-repository'
-import { agents, agentRuns, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { agents, agentRuns, bots, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
@@ -73,8 +74,16 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = process.env.MIKKA_AGENT_KIT === '1' || Boolean(execution)
   const subscription = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
+  const mailboxEnabled = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1'
+  let mailboxScope: { botId: string | null; workspaceId: string } | undefined
+  if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
+    const [bot] = botId ? await db.select({ workspaceId: bots.workspaceId }).from(bots)
+      .where(and(eq(bots.id, botId), eq(bots.ownerId, userId))).limit(1) : []
+    if (botId && !bot) throw new ActionFailureError('runInvalid')
+    mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
+  }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, mailboxEnabled, mailboxScope })
     : null
   await db.insert(agentRuns).values({
     id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,

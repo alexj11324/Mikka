@@ -57,3 +57,12 @@ test('mutations preserve the host user, Bot and scope and forward the SDK tool c
   assert.deepEqual(created.mock.calls[0].arguments, ['owner', { title: 'Requested task' }, 'durable-call', scope, 'bot'])
   assert.deepEqual(updated.mock.calls[0].arguments, ['owner', { issueId: '550e8400-e29b-41d4-a716-446655440000', status: 'doing' }, 'durable-call', scope, 'bot'])
 })
+
+test('create tool forwards only the host-provided request event, never a model argument', async () => {
+  const eventId = 'b4000000-0000-4000-8000-000000000004'
+  const tools = registry.createCoordinatorRegistry('owner', null, undefined, { taskEventId: eventId })
+  const options = { toolCallId: 'event-call', messages: [], context: {} }
+  assert.equal(createIssueInput.safeParse({ title: 'Task', taskEventId: 'forged' }).success, false)
+  await tools.create_issue!.execute!({ title: 'Task' }, options)
+  assert.deepEqual(created.mock.calls.at(-1)!.arguments, ['owner', { title: 'Task' }, 'event-call', undefined, null, eventId])
+})
