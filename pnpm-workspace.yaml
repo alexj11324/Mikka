@@ -1,5 +1,6 @@
 packages:
   - 'packages/*'
+  - 'apps/*'
 
 # Fix SWC's overflow-owner cache validation for next-intl in rootless Linux.
 # Keep Workflow's separate SWC 1.15.3 dependency unchanged.

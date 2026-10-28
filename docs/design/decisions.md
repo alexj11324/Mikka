@@ -12,6 +12,11 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | Build the mobile app now in `apps/mobile` with Expo, and verify screens with Expo web screenshots in the cloud, not the iOS simulator. Alex: 「你做一下移动端 APP…直接开 Expo 的 web 模式进行截图验证就行，不需要本地跑 iOS 的 simulator」 | — | — |
+| 2026-10-27 | Mobile composer: the 「+」 sits inside the input field at its left end, not as a separate circle beside it (as in ChatGPT iOS). Alex: 「加号改在里边」 | — | — |
+| 2026-10-27 | The briefing stays one bubble; only Hark's tone is adopted, not its one-bubble-per-item format, and no date label (「我只让你学他的口气…简报应该要写到一块儿…写到一个气泡里边」) | R-46 | Hark-style one bubble per item and date label (same day) |
+| 2026-10-27 | No visible times in the chat or on cards; swiping right-to-left reveals each message's time, as in iMessage and ChatGPT (「不要在左上角写这个时间…用手从右往左滑…跟 iMessage 是有点像的」) | | Time label above messages; time in card headers |
+| 2026-10-27 | ~~The daily briefing takes Hark's form: a centred date label, then one bubble per item, each ending with a concrete offer (「你可以看看hark他怎么写的这个风格」)~~ Replaced the same day: one bubble, Hark's tone only, no date label (row above) | R-46 | One long briefing bubble (same day) |
 | 2026-10-27 | Proactive work sits behind flags because of its cost: a deployment switch each for the profile and for background research (both off by default for self-hosters), per-user entitlement (internal first, research can become paid), the person's own 记忆 / 主动推荐 toggles, and a daily budget per person (「要做个开关吧，做一个 flag 是不是？毕竟这成本挺高的」) | R-73, `proactive.md` § 3 | |
 | 2026-10-27 | Add Hark's proactive half: a per-person fact profile, a nightly research run (deadlines, tool advisories, interests × what is new nearby), ranked and capped cards, routine and location triggers, and feedback from dismissals (「我觉得我们可以把hark这一套补齐到我们的产品」) | R-73, `proactive.md` | Reactive-only attention model (Comma) |
 | 2026-10-27 | The saved-login vault starts on Infisical with per-user application encryption; its KMS upgrade uses AWS KMS (not GCP) (「用aws」) | `credential-vault.md` | AWS or GCP left open |

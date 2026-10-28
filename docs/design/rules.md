@@ -93,7 +93,7 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-21** The right panel has two parts: 建议 on top, then 任务. 建议 is the
   normal-level items in one list, newest first, each row with its app's icon
   (no per-app cards). The daily briefing is not in 建议; it is the
-  Coordinator's 08:00 message. A 任务 here is a thread started by the
+  Coordinator's 08:00 message, also sent right after the person connects an app. A 任务 here is a thread started by the
   orchestrator or a bot; all of them stay listed. It is not a flat list of the
   board's issues. 建议 items are standalone cards, each one sentence: a verb
   chip, the app's icon inline, the concrete thing and its reason, deadline or
@@ -291,8 +291,11 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   secretary, never like a command list. The briefing and follow-ups are
   natural sentences: it says what it sorted and why, names the person, offers
   to take the next step, and ends with one easy question
-  (「早上好，Alex。今天有 4 件事，我按轻重排了一下。最急的是 Kevin 的邮件…
-  先从 Kevin 那封开始？」).
+  (「早上好，Alex。今天有 4 件事：Kevin 来信…我可以按你的日历先起草一封回复。…
+  先从 Kevin 那封开始吗？」).
+  The daily briefing is one message (one bubble). Its tone follows Hark:
+  for each item, what came in and why it matters to the person, then what
+  the Coordinator can do about it (「我可以按你的日历先起草一封回复」).
 
 ## Tokens
 
