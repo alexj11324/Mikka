@@ -2,8 +2,9 @@ import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { after, NextRequest, NextResponse } from 'next/server'
 import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
-import { getComposio, isComposioToolkit, readComposioAccountEmail, renameComposioAccount, retireComposioAccount } from '@/lib/composio'
-import { saveComposioAccountEmail } from '@/lib/composio-account-store'
+import { getComposio, readComposioAccountEmail, renameComposioAccount, retireComposioAccount } from '@/lib/composio'
+import { chooseComposioDefault, listComposioAccountRecords, saveComposioAccountEmail } from '@/lib/composio-account-store'
+import { followUpComposioConnect } from '@/lib/composio-connect'
 import { COMPOSIO_FLOW_COOKIE, composioFlowCookieOptions, decodeComposioFlow } from '@/lib/composio-flow'
 import { listComposioPages } from '@/lib/composio-pagination'
 import { isComposioCallbackVerifierConfigured } from '@/lib/composio-config'
@@ -62,25 +63,28 @@ async function handleGET(request: NextRequest) {
     const userId = session.user.id
     const flow = decodeComposioFlow(request.cookies.get(COMPOSIO_FLOW_COOKIE)?.value)
     try {
-      const items = await listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], cursor }))
-      const added = items.find(item => item.id === completed.connectedAccountId)
-      // A reconnect retires the account it replaces, only when this callback
-      // completes the link that reconnect started, and only the person's own
-      // account on the same toolkit.
-      const replaced = flow?.link === completed.connectedAccountId && flow.replace && flow.replace !== completed.connectedAccountId
-        ? items.find(item => item.id === flow.replace && item.toolkit.slug === completed.toolkitSlug && isComposioToolkit(item.toolkit.slug))
-        : undefined
-      if (replaced) await retireComposioAccount(composio, userId, replaced.id)
-      // Who the account is: the provider's email, kept by Mikka and used as the alias unless it has one.
-      if (added && isComposioToolkit(added.toolkit.slug)) {
-        const email = await readComposioAccountEmail(composio, userId, added.toolkit.slug, added.id)
-        if (email) {
-          await saveComposioAccountEmail(userId, added.toolkit.slug, added.id, email)
-          if (!added.alias?.trim()) await renameComposioAccount(composio, added.id, email).catch(() => undefined)
-        }
-      }
+      const [items, records] = await Promise.all([
+        listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], cursor })),
+        listComposioAccountRecords(userId),
+      ])
+      // A reconnect retires the account it replaces only when this callback
+      // completes the link that reconnect started; the old account's name and
+      // default move to the new one. The email is read either way.
+      await followUpComposioConnect({
+        items,
+        records,
+        addedId: completed.connectedAccountId,
+        replaceId: flow?.link === completed.connectedAccountId ? flow.replace : null,
+      }, {
+        readEmail: (toolkit, accountId) => readComposioAccountEmail(composio, userId, toolkit, accountId),
+        saveEmail: (toolkit, accountId, email) => saveComposioAccountEmail(userId, toolkit, accountId, email),
+        rename: (accountId, alias) => renameComposioAccount(composio, accountId, alias),
+        retire: accountId => retireComposioAccount(composio, userId, accountId),
+        chooseDefault: (toolkit, accountId) => chooseComposioDefault(userId, toolkit, accountId),
+        log: (step, error) => console.error('Composio connect follow-up failed', { step, error: error instanceof Error ? error.name : 'unknown' }),
+      })
     } catch (error) {
-      console.error('Composio connect follow-up failed', { error: error instanceof Error ? error.name : 'unknown' })
+      console.error('Composio connect follow-up failed', { step: 'list', error: error instanceof Error ? error.name : 'unknown' })
     }
     // Subscribe the new account's triggers and write the first briefing from what is there now.
     const timeZone = request.headers.get('x-vercel-ip-timezone')

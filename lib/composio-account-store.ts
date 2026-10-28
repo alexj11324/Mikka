@@ -9,7 +9,12 @@ import type { ComposioAccountRecord } from '@/lib/composio-accounts'
 // first; every write is also scoped to the user.
 
 export async function listComposioAccountRecords(userId: string): Promise<ComposioAccountRecord[]> {
-  return db.select({ accountId: composioAccounts.accountId, email: composioAccounts.email, isDefault: composioAccounts.isDefault })
+  return db.select({
+    accountId: composioAccounts.accountId,
+    email: composioAccounts.email,
+    emailChecked: sql<boolean>`${composioAccounts.emailCheckedAt} is not null`,
+    isDefault: composioAccounts.isDefault,
+  })
     .from(composioAccounts).where(eq(composioAccounts.userId, userId))
 }
 
@@ -29,9 +34,11 @@ export async function chooseComposioDefault(userId: string, toolkit: string, acc
   })
 }
 
-export async function saveComposioAccountEmail(userId: string, toolkit: string, accountId: string, email: string) {
-  await db.insert(composioAccounts).values({ accountId, userId, toolkit, email })
-    .onConflictDoUpdate({ target: composioAccounts.accountId, set: { email, updatedAt: new Date() }, setWhere: sql`${composioAccounts.userId} = ${userId}` })
+/** What the provider said: the email, or null when it gave none (kept too, so it is not asked again). */
+export async function saveComposioAccountEmail(userId: string, toolkit: string, accountId: string, email: string | null) {
+  const now = new Date()
+  await db.insert(composioAccounts).values({ accountId, userId, toolkit, email, emailCheckedAt: now })
+    .onConflictDoUpdate({ target: composioAccounts.accountId, set: { email, emailCheckedAt: now, updatedAt: now }, setWhere: sql`${composioAccounts.userId} = ${userId}` })
 }
 
 export async function forgetComposioAccount(userId: string, accountId: string) {

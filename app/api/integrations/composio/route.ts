@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH } from '@/lib/base-path'
-import { COMPOSIO_TOOLKITS, getComposio, isComposioToolkit, renameComposioAccount, retireComposioAccount } from '@/lib/composio'
-import { chooseComposioDefault, listComposioAccountRecords } from '@/lib/composio-account-store'
+import { COMPOSIO_TOOLKITS, getComposio, isComposioToolkit, readComposioAccountEmail, renameComposioAccount, retireComposioAccount } from '@/lib/composio'
+import { chooseComposioDefault, listComposioAccountRecords, saveComposioAccountEmail } from '@/lib/composio-account-store'
+import { backfillComposioEmails } from '@/lib/composio-connect'
 import { accountUpdateSchema, isDuplicateAliasError, safeReturnPath, toConnectedAccountView, withAccountRecords } from '@/lib/composio-accounts'
 import { isComposioCallbackVerifierConfigured } from '@/lib/composio-config'
 import { COMPOSIO_FLOW_COOKIE, composioFlowCookieOptions, encodeComposioFlow } from '@/lib/composio-flow'
@@ -18,6 +19,8 @@ const connectSchema = z.union([
   z.object({ toolkit: z.enum(COMPOSIO_TOOLKITS), returnTo: returnToSchema }).strict(),
   z.object({ accountId: accountIdSchema, returnTo: returnToSchema }).strict(),
 ])
+/** Each provider lookup while loading the list; the page waits for these. */
+const EMAIL_BACKFILL_TIMEOUT_MS = 3_000
 const disconnectSchema = z.object({ accountId: accountIdSchema })
 
 function sameOrigin(request: Request) {
@@ -47,7 +50,14 @@ async function handleGET(request: Request) {
       listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [session.user.id], cursor })),
       listComposioAccountRecords(session.user.id),
     ])
-    const accounts = withAccountRecords(items.flatMap(account => toConnectedAccountView(account) ?? []), records)
+    const userId = session.user.id
+    // Accounts connected before Mikka kept emails: a few per load, each asked once.
+    const filled = await backfillComposioEmails({ items, records }, {
+      readEmail: (toolkit, accountId) => readComposioAccountEmail(composio, userId, toolkit, accountId, EMAIL_BACKFILL_TIMEOUT_MS),
+      saveEmail: (toolkit, accountId, email) => saveComposioAccountEmail(userId, toolkit, accountId, email),
+      rename: (accountId, alias) => renameComposioAccount(composio, accountId, alias),
+    })
+    const accounts = withAccountRecords(items.flatMap(account => toConnectedAccountView(account) ?? []), filled)
     return NextResponse.json({ configured: true, callbackVerifierConfigured, webhookConfigured, accounts }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch {
     return NextResponse.json({ error: 'integrationsUnavailable' }, { status: 502 })

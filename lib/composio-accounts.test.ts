@@ -70,7 +70,7 @@ test('the default account is the chosen usable one, else the oldest usable one',
 test('stored emails and the chosen default are joined per toolkit', () => {
   const view = (id: string, toolkit: string, createdAt: string) => toConnectedAccountView({ ...account, id, toolkit: { slug: toolkit }, createdAt })!
   const accounts = [view('g1', 'gmail', '2026-09-01T00:00:00Z'), view('g2', 'gmail', '2026-10-01T00:00:00Z'), view('n1', 'notion', '2026-10-01T00:00:00Z')]
-  const joined = withAccountRecords(accounts, [{ accountId: 'g2', email: 'me@example.com', isDefault: true }, { accountId: 'other-user', email: 'x@example.com', isDefault: true }])
+  const joined = withAccountRecords(accounts, [{ accountId: 'g2', email: 'me@example.com', emailChecked: true, isDefault: true }, { accountId: 'other-user', email: 'x@example.com', emailChecked: true, isDefault: true }])
   assert.deepEqual(joined.map(item => [item.id, item.email, item.isDefault]), [['g1', null, false], ['g2', 'me@example.com', true], ['n1', null, true]])
   const fallback = withAccountRecords(accounts, [])
   assert.deepEqual(fallback.filter(item => item.isDefault).map(item => item.id), ['g1', 'n1'])

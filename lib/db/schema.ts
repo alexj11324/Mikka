@@ -511,6 +511,8 @@ export const composioAccounts = pgTable('composio_accounts', {
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
   toolkit: text('toolkit').notNull(),
   email: text('email'),
+  /** When the provider was asked for the email, found or not, so it is asked once. */
+  emailCheckedAt: timestamp('emailCheckedAt', { withTimezone: true }),
   isDefault: boolean('isDefault').notNull().default(false),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [

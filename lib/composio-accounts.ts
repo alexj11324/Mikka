@@ -65,7 +65,13 @@ export function pickDefaultAccountId(accounts: DefaultCandidate[], chosenId: str
   return usable.toSorted((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')) || a.id.localeCompare(b.id))[0]?.id ?? null
 }
 
-export type ComposioAccountRecord = { accountId: string; email: string | null; isDefault: boolean }
+export type ComposioAccountRecord = {
+  accountId: string
+  email: string | null
+  /** The provider was asked for the email (found or not), so it is not asked again. */
+  emailChecked: boolean
+  isDefault: boolean
+}
 
 /** Adds what Mikka stores (email, chosen default) to the accounts Composio listed. */
 export function withAccountRecords(accounts: ConnectedAccountView[], records: ComposioAccountRecord[]): ConnectedAccountView[] {
@@ -77,6 +83,20 @@ export function withAccountRecords(accounts: ConnectedAccountView[], records: Co
     defaults.set(app, pickDefaultAccountId(own.map(account => ({ ...account, isDisabled: !account.enabled })), chosen))
   }
   return accounts.map(account => ({ ...account, email: byId.get(account.id)?.email ?? null, isDefault: defaults.get(account.toolkit) === account.id }))
+}
+
+/**
+ * When `leavingId` stops being usable (turned off or disconnected), whether
+ * the bots were using it and which account of the same toolkit they use
+ * next: `{ affectsBots: false }` when it was not the default, otherwise the
+ * next account, or null when none is left.
+ */
+export function takeoverAccount(accounts: ConnectedAccountView[], leavingId: string): { affectsBots: false } | { affectsBots: true; next: ConnectedAccountView | null } {
+  const leaving = accounts.find(account => account.id === leavingId)
+  if (!leaving?.isDefault) return { affectsBots: false }
+  const rest = accounts.filter(account => account.toolkit === leaving.toolkit && account.id !== leavingId)
+  const nextId = pickDefaultAccountId(rest.map(account => ({ ...account, isDisabled: !account.enabled })), null)
+  return { affectsBots: true, next: rest.find(account => account.id === nextId) ?? null }
 }
 
 const EMAIL = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/

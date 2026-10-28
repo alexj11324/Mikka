@@ -38,23 +38,22 @@ export function cannotRevokeComposioAccount(error: unknown) {
 
 /**
  * The account's email as the provider reports it, through Composio's proxy
- * with the account's own token; null when the provider does not say or the
- * call fails. Only the sanitised address is returned.
+ * with the account's own token. Null when the provider answers without one
+ * (or refuses, e.g. a missing scope); throws when it could not be asked
+ * (network, timeout), so callers can try again later. Only the sanitised
+ * address is returned.
  */
-export async function readComposioAccountEmail(composio: ComposioClient, userId: string, toolkit: ComposioAppId, accountId: string): Promise<string | null> {
+export async function readComposioAccountEmail(composio: ComposioClient, userId: string, toolkit: ComposioAppId, accountId: string, timeoutMs = 8_000): Promise<string | null> {
   const identity = PROVIDER_IDENTITY[toolkit]
+  const signal = AbortSignal.timeout(timeoutMs)
   const call = async (endpoint: string, parameters: { in: 'query' | 'header'; name: string; value: string }[] = []) => {
-    const response = await composio.tools.proxyExecute({ endpoint, method: 'GET', connectedAccountId: accountId, userId, parameters }, { signal: AbortSignal.timeout(8_000) })
+    const response = await composio.tools.proxyExecute({ endpoint, method: 'GET', connectedAccountId: accountId, userId, parameters }, { signal })
     return response.status >= 200 && response.status < 300 ? response.data : null
   }
-  try {
-    const data = await call(identity.endpoint, Object.entries(identity.headers ?? {}).map(([name, value]) => ({ in: 'header' as const, name, value })))
-    if (toolkit !== 'slack') return sanitizeEmail(identity.email(data))
-    const user = slackUserId(identity.email(data))
-    return user ? sanitizeEmail(slackUserEmail(await call(SLACK_USER_INFO, [{ in: 'query', name: 'user', value: user }]))) : null
-  } catch {
-    return null
-  }
+  const data = await call(identity.endpoint, Object.entries(identity.headers ?? {}).map(([name, value]) => ({ in: 'header' as const, name, value })))
+  if (toolkit !== 'slack') return sanitizeEmail(identity.email(data))
+  const user = slackUserId(identity.email(data))
+  return user ? sanitizeEmail(slackUserEmail(await call(SLACK_USER_INFO, [{ in: 'query', name: 'user', value: user }]))) : null
 }
 
 /**

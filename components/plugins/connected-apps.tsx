@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import { useFormatter, useLocale, useTranslations } from 'next-intl'
 import { ArrowUpRight, ChevronRight, Ellipsis, Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { routing } from '@/i18n/routing'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
-import { COMPOSIO_APP_IDS, composioConnectRedirect, type ComposioAppId, type ConnectedAccountView } from '@/lib/composio-accounts'
+import { COMPOSIO_APP_IDS, composioConnectRedirect, takeoverAccount, type ComposioAppId, type ConnectedAccountView } from '@/lib/composio-accounts'
 import { cn } from '@/lib/utils'
 
 type IntegrationState = { configured: boolean; callbackVerifierConfigured: boolean; webhookConfigured: boolean; accounts: ConnectedAccountView[] }
@@ -56,6 +56,28 @@ export function AppTile({ app, size = 'default', dim = false }: { app: ComposioA
   const Icon = APP_ICONS[app]
   // An explicit size keeps a parent Button's svg sizing off the mark.
   return <IconTile size={size} variant="elevated" aria-hidden="true" className={cn(dim && 'opacity-50 grayscale')}><Icon className="size-(--icon-tile-icon-size)" /></IconTile>
+}
+
+/** The account's name as the page shows it: its alias, else its email, else "Gmail 账户". */
+function useAccountName() {
+  const t = useTranslations('Settings.integrations')
+  return (account: ConnectedAccountView) => account.alias ?? account.email ?? t('accountFallback', { name: t(account.toolkit) })
+}
+
+/**
+ * What changes for the bots when an account is turned off or disconnected:
+ * the account they use next, or that they can no longer use the app. Null
+ * when the bots were not using it.
+ */
+function useTakeoverText() {
+  const t = useTranslations('Settings.integrations')
+  const accountName = useAccountName()
+  return (accounts: ConnectedAccountView[], leavingId: string) => {
+    const takeover = takeoverAccount(accounts, leavingId)
+    if (!takeover.affectsBots) return null
+    const leaving = accounts.find(account => account.id === leavingId)!
+    return takeover.next ? t('takeoverNext', { account: accountName(takeover.next) }) : t('takeoverNone', { name: t(leaving.toolkit) })
+  }
 }
 
 /** An account Composio can no longer use until it is reconnected. */
@@ -112,19 +134,26 @@ export function useConnectedApps() {
 
   /** Turns the given accounts on or off; the switch moves at once and comes back if Composio refuses. */
   async function setEnabled(accountIds: string[], enabled: boolean) {
-    if (!accountIds.length) return
+    if (!accountIds.length) return false
     setError('')
     setState(current => current && { ...current, accounts: current.accounts.map(account => accountIds.includes(account.id) ? { ...account, enabled } : account) })
     const results = await Promise.all(accountIds.map(accountId => patch({ accountId, enabled }).catch(() => null)))
-    if (results.some(response => !response?.ok)) setError(t('updateFailed'))
+    const ok = results.every(response => response?.ok)
+    if (!ok) setError(t('updateFailed'))
     await refresh()
+    return ok
   }
 
   async function makeDefault(accountId: string) {
-    setError('')
-    const response = await patch({ accountId, default: true }).catch(() => null)
-    if (!response?.ok) setError(t('updateFailed'))
-    await refresh()
+    setPending(accountId); setError('')
+    try {
+      const response = await patch({ accountId, default: true }).catch(() => null)
+      if (!response?.ok) setError(t('updateFailed'))
+      await refresh()
+      return Boolean(response?.ok)
+    } finally {
+      setPending('')
+    }
   }
 
   /** Renames an account; the result tells the dialog what to say. */
@@ -195,7 +224,7 @@ function appState(accounts: ConnectedAccountView[]) {
  * way into the app's page. `onOpen` handles a plain click in place; the row is
  * still a real link (`appHref`) for a new tab or another page.
  */
-export function ConnectedAppsList({ apps, title, appHref, onOpen }: { apps: ConnectedApps; title: string; appHref: (app: ComposioAppId) => string; onOpen?: (app: ComposioAppId) => void }) {
+export function ConnectedAppsList({ apps, title, appHref, onOpen, action }: { apps: ConnectedApps; title: string; appHref: (app: ComposioAppId) => string; onOpen?: (app: ComposioAppId) => void; action?: ReactNode }) {
   const t = useTranslations('Settings.integrations')
   // A plain click opens the page in place; a modified click keeps the link's own behaviour.
   function openInPlace(event: MouseEvent<HTMLAnchorElement>, app: ComposioAppId) {
@@ -203,7 +232,7 @@ export function ConnectedAppsList({ apps, title, appHref, onOpen }: { apps: Conn
     event.preventDefault()
     onOpen(app)
   }
-  return <SettingsSection id="connected-apps-heading" title={title}>
+  return <SettingsSection id="connected-apps-heading" title={title} action={action}>
     {COMPOSIO_APP_IDS.map(app => {
       const accounts = apps.accountsFor(app)
       const name = t(app)
@@ -221,9 +250,16 @@ export function ConnectedAppsList({ apps, title, appHref, onOpen }: { apps: Conn
             <span className="line-clamp-2 text-xs text-muted-foreground">{t(`${app}Description`)}</span>
           </span>
         </Button>
-        {expired && <Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || Boolean(apps.pending)} onClick={() => void apps.reconnect(accounts[0].id)}>{apps.pending === accounts[0].id ? t('working') : t('reconnect')}</Button>}
+        {/* One account to reconnect: right here. Several: the app's page, where each has its own. */}
+        {expired && (accounts.length === 1
+          ? <Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || Boolean(apps.pending)} onClick={() => void apps.reconnect(accounts[0].id)}>{apps.pending === accounts[0].id ? t('working') : t('reconnect')}</Button>
+          : <Button variant="secondary" size="sm" nativeButton={false} role="link" render={<a href={appHref(app)} onClick={event => openInPlace(event, app)} />}>{t('reconnect')}</Button>)}
         {accounts.length
-          ? <Switch aria-label={t('enableApp', { name })} checked={on} disabled={expired} onCheckedChange={checked => void apps.setEnabled(usable.filter(account => account.enabled !== checked).map(account => account.id), checked)} />
+          ? <Switch aria-label={t('enableApp', { name })} checked={on} disabled={expired} onCheckedChange={checked => {
+            void apps.setEnabled(usable.filter(account => account.enabled !== checked).map(account => account.id), checked).then(ok => {
+              if (ok && !checked) toast.success(t('turnedOff', { name }), { description: t('takeoverNone', { name }) })
+            })
+          }} />
           : <Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || Boolean(apps.pending)} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button>}
         <Button variant="ghost" size="icon-sm" nativeButton={false} role="link" aria-label={t('openApp', { name })} render={<a href={appHref(app)} onClick={event => openInPlace(event, app)} />}><ChevronRight data-icon="inline-start" /></Button>
       </div>
@@ -246,7 +282,8 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
   const name = t(app)
   const about = APP_ABOUT[app]
   const busy = Boolean(apps.pending)
-  const accountName = (account: ConnectedAccountView) => account.alias ?? account.email ?? t('accountFallback', { name })
+  const accountName = useAccountName()
+  const takeoverText = useTakeoverText()
   const statusLabel = (account: ConnectedAccountView) => account.status === 'EXPIRED' ? t('statusExpired')
     : account.status === 'FAILED' ? t('statusFailed') : account.status !== 'ACTIVE' ? t('statusInactive') : null
   const closeRename = () => { setRenaming(null); setDialogError('') }
@@ -277,28 +314,40 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
         const status = statusLabel(account)
         const title = accountName(account)
         // The email under the name, unless the name is the email; otherwise when it was connected.
-        const detail = account.email && account.email !== title ? account.email
-          : t('connectedOn', { date: format.dateTime(new Date(account.createdAt), { year: 'numeric', month: 'short', day: 'numeric' }) })
+        // The default says the bots use it, in words, so it reads on touch too.
+        const defaultRow = several && account.isDefault
+        const email = account.email && account.email !== title ? account.email : null
+        const detail = email ?? t('connectedOn', { date: format.dateTime(new Date(account.createdAt), { year: 'numeric', month: 'short', day: 'numeric' }) })
         return <div key={account.id} className="flex items-center gap-3 py-3 pr-3 pl-5">
           <AppTile app={app} dim={off || broken} />
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <span className={cn('min-w-0 truncate text-sm font-medium', (off || broken) && 'text-muted-foreground')}>{title}</span>
-              {several && account.isDefault && <Badge variant="secondary">{t('default')}</Badge>}
+              {defaultRow && <Badge variant="secondary">{t('default')}</Badge>}
               {off && <Badge variant="secondary">{t('statusDisabled')}</Badge>}
               {status && <Badge tone="destructive">{status}</Badge>}
             </span>
             <span className="truncate text-xs text-muted-foreground">{detail}</span>
+            {defaultRow && <span className="text-xs text-muted-foreground">{t('botsUseThis')}</span>}
           </div>
           {broken && <Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || busy} onClick={() => void apps.reconnect(account.id)}>{apps.pending === account.id ? t('working') : t('reconnect')}</Button>}
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('accountActions', { name: title })} disabled={busy} />}><Ellipsis data-icon="inline-start" /></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuGroup>
-                {several && !account.isDefault && !broken && account.enabled && <DropdownMenuItem onClick={() => void apps.makeDefault(account.id)}>{t('makeDefault')}</DropdownMenuItem>}
+                {several && !account.isDefault && !broken && account.enabled && <DropdownMenuItem onClick={() => {
+                  void apps.makeDefault(account.id).then(ok => { if (ok) toast.success(t('madeDefault', { account: title })) })
+                }}>{t('makeDefault')}</DropdownMenuItem>}
                 <DropdownMenuItem onClick={() => { setAlias(account.alias ?? account.email ?? ''); setDialogError(''); setRenaming(account) }}>{t('rename')}</DropdownMenuItem>
                 <DropdownMenuItem disabled={!apps.canLink} onClick={() => void apps.reconnect(account.id)}>{t('reconnect')}</DropdownMenuItem>
-                {!broken && <DropdownMenuItem onClick={() => void apps.setEnabled([account.id], !account.enabled)}>{account.enabled ? t('turnOff') : t('turnOn')}</DropdownMenuItem>}
+                {!broken && <DropdownMenuItem onClick={() => {
+                  const turningOff = account.enabled
+                  // Worked out before the switch moves: who the bots use once this one is off.
+                  const takeover = turningOff ? takeoverText(accounts, account.id) : null
+                  void apps.setEnabled([account.id], !turningOff).then(ok => {
+                    if (ok && turningOff) toast.success(t('turnedOff', { name: title }), takeover ? { description: takeover } : undefined)
+                  })
+                }}>{account.enabled ? t('turnOff') : t('turnOn')}</DropdownMenuItem>}
                 <DropdownMenuItem variant="destructive" onClick={() => { setDialogError(''); setConfirming(account) }}>{t('disconnect')}</DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -355,7 +404,7 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogTitle>{t('disconnectTitle', { name: confirming ? accountName(confirming) : name })}</AlertDialogTitle>
-          <AlertDialogDescription>{t('disconnectConsequence', { name })}</AlertDialogDescription>
+          <AlertDialogDescription>{(confirming && takeoverText(accounts, confirming.id)) ?? t('disconnectConsequence', { name })}</AlertDialogDescription>
         </AlertDialogHeader>
         {dialogError && <p role="alert" className="text-xs text-destructive">{dialogError}</p>}
         <AlertDialogFooter>
@@ -363,10 +412,11 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
           <AlertDialogAction variant="destructive" disabled={busy} onClick={() => {
             if (!confirming) return
             const label = accountName(confirming)
+            const takeover = takeoverText(accounts, confirming.id)
             void apps.disconnect(confirming.id).then(done => {
               if (!done) { setDialogError(t('disconnectFailed')); return }
               closeConfirm()
-              toast.success(t('disconnected', { name: label }))
+              toast.success(t('disconnected', { name: label }), takeover ? { description: takeover } : undefined)
             })
           }}>{busy ? t('working') : t('disconnect')}</AlertDialogAction>
         </AlertDialogFooter>

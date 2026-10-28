@@ -1697,7 +1697,13 @@
       "makeDefault": "Make default",
       "aliasTaken": "Another account already uses this name.",
       "disconnectConsequence": "Bots will no longer be able to use this {name} account.",
-      "disconnected": "Disconnected {name}"
+      "disconnected": "Disconnected {name}",
+      "botsUseThis": "Bots use this account",
+      "takeoverNext": "Bots will use {account} instead",
+      "takeoverNone": "Bots can no longer use {name}",
+      "turnedOff": "Turned off {name}",
+      "madeDefault": "{account} is now the default",
+      "openInSettings": "Manage in Settings"
     },
     "telegram": {
       "heading": "Messaging",
