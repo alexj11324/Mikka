@@ -6,6 +6,7 @@ import type { AgentExecution } from '@/lib/agent-kit/store'
 import * as steps from './steps'
 import * as kit from './agent-kit-steps'
 import type { NativeToolScope } from './tool-scope'
+import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
 
 export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean }
 
@@ -34,6 +35,16 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       description: 'Read one issue: its text, status, priority and latest runs.',
       inputSchema: z.object({ issueId: id }),
       execute: input => steps.getIssue(userId, input, scope),
+    }),
+    create_issue: tool({
+      description: 'Create the task the person asked for, including requests from the new-task dialog. Write a short title and put details in body. The assignee can only be a person; dispatching a thread is a separate action. Defaults to todo and normal priority.',
+      inputSchema: createIssueInput,
+      execute: (input, options) => steps.createIssue(userId, input, options.toolCallId, scope, botId),
+    }),
+    update_issue: tool({
+      description: 'Update an existing task the person asked to change. Only supplied fields change; labels replaces the full label set. Read the task first. The assignee can only be a person.',
+      inputSchema: updateIssueInput,
+      execute: (input, options) => steps.updateIssue(userId, input, options.toolCallId, scope, botId),
     }),
     list_agents: tool({
       description: 'List the person\'s agents with their harness, whether their device is online, and the repositories on that device.',

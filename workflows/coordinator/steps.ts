@@ -31,6 +31,8 @@ import { queueCloudRun } from '@/lib/computer/queue-run'
 import { ComputerStore } from '@/lib/computer/store'
 import { bindBotSubscription } from '@/lib/computer/bot-subscription'
 import { recordDecision, settleTurn } from '@/lib/attention/store'
+import type { CreateIssueInput, UpdateIssueInput } from '@/lib/coordinator/issue-input'
+import { systemActor } from '@/lib/activity-actor'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -206,6 +208,20 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
   }
+}
+
+export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope?: NativeToolScope, botId: string | null = null) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
+  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId ?? 'coordinator'), toolCallId)
+}
+
+export async function updateIssue(userId: string, input: UpdateIssueInput, toolCallId: string, scope?: NativeToolScope, botId: string | null = null) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
+  return (await import('@/lib/mcp/actions')).updateIssue(userId, input, systemActor(botId ?? 'coordinator'), toolCallId)
 }
 
 export async function listAgents(userId: string, scope?: NativeToolScope) {

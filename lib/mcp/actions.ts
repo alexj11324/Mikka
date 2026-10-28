@@ -15,6 +15,7 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { getIssue as readIssue, saveIssue } from '@/app/actions/issues'
 import { updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issue-metadata'
 import { updateIssueRelation } from '@/app/actions/issue-operations'
+import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
 import { listProjects as readProjects, moveIssueToProject } from '@/app/actions/projects'
 
 // The MCP tools that change things, and the reads that need more than one
@@ -57,7 +58,7 @@ interface IssueChanges {
   priority?: string
   projectId?: string | null
   labels?: string[]
-  assigneeAgentId?: string | null
+  assigneeUserId?: string | null
 }
 
 /** Applies the changes one action at a time, each on the revision the last one left. */
@@ -74,7 +75,7 @@ async function applyChanges(userId: string, issueId: string, changes: IssueChang
     const known = await knownLabels(issue.userId)
     patch.labels = changes.labels.map(name => known.get(name.toLowerCase()) ?? { name, color: 'gray' })
   }
-  if (changes.assigneeAgentId !== undefined) patch.assignee = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
+  if (changes.assigneeUserId !== undefined) patch.assignee = changes.assigneeUserId ? { kind: 'member', id: changes.assigneeUserId } : null
   if (Object.keys(patch).length) issue = unwrap(await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch })).issue
   if (changes.projectId !== undefined) issue = unwrap(await moveIssueToProject({ issueId: issue.id, revision: issue.revision, projectId: changes.projectId })).issue
   return issue
@@ -88,17 +89,31 @@ function issueResult(issue: { id: string; title: string; status: string; priorit
   }
 }
 
-export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }, actor?: ActivityActor) {
+export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }, actor?: ActivityActor, toolCallId?: string) {
   return attempt(() => actAs(userId, async () => {
-    const created = unwrap(await saveIssue({ title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' })).issue
-    return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeAgentId: input.assigneeAgentId }))
+    const mutate = async () => {
+      const created = unwrap(await saveIssue({ title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' })).issue
+      return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeUserId: input.assigneeUserId }))
+    }
+    if (toolCallId === undefined) return mutate()
+    const parsed = createIssueInput.safeParse(input)
+    if (!parsed.success) return { error: 'validationGeneric' }
+    const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
+    try { return await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate) }
+    catch (error) { if (error instanceof IssueToolCallConflict) return { error: error.message }; throw error }
   }, actor))
 }
 
-export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }, actor?: ActivityActor) {
+export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }, actor?: ActivityActor, toolCallId?: string) {
   return attempt(() => actAs(userId, async () => {
     const { issueId, ...changes } = input
-    return issueResult(await applyChanges(userId, issueId, changes))
+    const mutate = async () => issueResult(await applyChanges(userId, issueId, changes))
+    if (toolCallId === undefined) return mutate()
+    const parsed = updateIssueInput.safeParse(input)
+    if (!parsed.success) return { error: 'validationGeneric' }
+    const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
+    try { return await idempotentIssueMutation(userId, 'update_issue', toolCallId, parsed.data, mutate) }
+    catch (error) { if (error instanceof IssueToolCallConflict) return { error: error.message }; throw error }
   }, actor))
 }
 

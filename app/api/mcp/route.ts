@@ -181,7 +181,7 @@ const handler = createMcpHandler(server => {
     priority: z.enum(ISSUE_PRIORITY_CODES).optional(),
     projectId: id.nullable().optional().describe('A project id from list_projects; null takes the issue out of its project.'),
     labels: z.array(z.string().trim().min(1).max(40)).max(12).optional().describe('The full set of label names; a known name keeps its color.'),
-    assigneeAgentId: id.nullable().optional().describe('An agent id from list_agents; null unassigns.'),
+    assigneeUserId: z.string().trim().min(1).max(200).nullable().optional().describe('A person who already has access to the task; null unassigns.'),
   }
 
   server.registerTool('create_issue', {
@@ -192,7 +192,7 @@ const handler = createMcpHandler(server => {
 
   server.registerTool('update_issue', {
     title: 'Update an issue',
-    description: 'Change an issue\'s title, status, priority, project, labels or assigned agent. Only the fields given change. The text is edited in the app, not here.',
+    description: 'Change an issue\'s title, status, priority, project, labels or human assignee. Only the fields given change. The text is edited in the app, not here.',
     inputSchema: z.object({ issueId: id, title: z.string().trim().min(1).max(200).optional(), ...issueChanges }),
     annotations: { idempotentHint: true },
   }, async (input, ctx) => outcome(await actions.updateIssue(mcpUserId(ctx.http?.authInfo), input, mcpActor(ctx.http?.authInfo))))

@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { coordinatorEvents } from './db/schema'
 import type { db } from './db'
+import { taskDestinationSchema, type TaskDestination } from './task-destination'
 
 /** Personal Coordinator HTTP contract. Question/approval fields are not supported. */
 export const personalSubmissionInput = z.object({
@@ -19,13 +20,14 @@ export class SubmissionConflictError extends Error {
 type Executor = Pick<typeof db, 'insert' | 'select'>
 
 /** Caller authenticates the person and validates any Bot ownership before calling. */
-export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId?: string | null } = {}) {
+export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId?: string | null; taskDestination?: TaskDestination } = {}) {
   const submissionId = personalSubmissionInput.shape.submissionId.parse(options.submissionId)
   const botId = options.botId ?? null
+  const taskDestination = options.taskDestination ? taskDestinationSchema.parse(options.taskDestination) : undefined
   const dedupeKey = submissionId
     ? `personal_submission:v1:${createHash('sha256').update(JSON.stringify([userId, botId, submissionId])).digest('hex')}`
     : `user_message:${randomUUID()}`
-  const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text } }
+  const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text, ...(taskDestination ? { taskDestination } : {}) } }
   const [inserted] = await executor.insert(coordinatorEvents).values({ id: randomUUID(), ...event })
     .onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
   if (inserted) return { duplicate: false }

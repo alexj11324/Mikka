@@ -38,6 +38,18 @@ export const issuePrefixes = pgTable('issue_prefixes', {
   prefix: varchar('prefix', { length: 4 }).notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** A successful issue mutation and its Workflow retry identity commit together. */
+export const issueToolCalls = pgTable('issue_tool_calls', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  toolCallId: text('toolCallId').notNull(),
+  operation: text('operation').$type<'create_issue' | 'update_issue'>().notNull(),
+  inputHash: text('inputHash').notNull(),
+  issueId: uuid('issueId').notNull(),
+  result: jsonb('result').$type<Record<string, unknown>>().notNull(),
+  effects: jsonb('effects').$type<import('@/lib/issue-effects').IssueEffect[]>().notNull().default([]),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.toolCallId] })])
 /**
  * A bot: what a person chats with in the left column. It runs only on Mikka's
  * own harness (AI SDK), never on a coding agent, so it is not a row in `agents`.

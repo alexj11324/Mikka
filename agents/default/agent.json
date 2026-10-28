@@ -17,6 +17,8 @@
     "web_search",
     "list_issues",
     "get_issue",
+    "create_issue",
+    "update_issue",
     "list_agents",
     "dispatch_run",
     "list_runs",
