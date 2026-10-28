@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import lockfile from 'proper-lockfile'
-import { daemonTestMode, normalizeRepository, remoteKey } from '@mikka/protocol/repository'
+import { daemonTestMode, normalizeRepository, remoteKey, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { Daemon } from '../src/main'
 import { runCli } from '../src/cli'
 import { RepositoryCache } from '../src/repositories'
@@ -21,18 +21,18 @@ afterEach(async () => { for (const daemon of daemons.splice(0)) await daemon.sto
 
 describe('repository URL boundary', () => {
   it('expands GitHub shorthand and matches HTTPS, SSH and scp identities', () => {
-    expect(normalizeRepository('Owner/Repo')).toEqual({ remoteUrl: 'https://github.com/Owner/Repo.git', key: 'github.com/owner/repo' })
+    expect(normalizeRepository('Owner/Repo')).toEqual({ remoteUrl: 'https://github.com/Owner/Repo.git', key: 'v2/github.com/owner/repo' })
     expect(normalizeRepository('Owner/Repo.git').remoteUrl).toBe('https://github.com/Owner/Repo.git')
     for (const url of ['https://github.com/Owner/Repo.git', 'git@github.com:Owner/Repo.git', 'ssh://git@github.com/Owner/Repo.git']) {
       expect(normalizeRepository(url).key).toBe(remoteKey(url))
-      expect(normalizeRepository(url).key).toBe('github.com/owner/repo')
+      expect(normalizeRepository(url).key).toBe('v2/github.com/owner/repo')
     }
   })
   it('refuses local paths, executable transports, URL credentials and path traversal', () => {
     for (const url of ['/tmp/repo', '../repo', '~/repo', 'C:\\repo', 'file:///tmp/repo', 'ext::sh -c true', 'git://host/owner/repo', 'http://host/owner/repo', 'https://secret@host/owner/repo', 'https://host/a/../owner/repo', 'https://host/a/%2e%2e/owner/repo', 'git@host:../repo', 'host:-oProxyCommand=bad']) {
       expect(() => normalizeRepository(url)).toThrow()
     }
-    expect(normalizeRepository('file:///tmp/origin.git', { allowFile: true }).key).toBe('file/localhost/tmp/origin')
+    expect(normalizeRepository('file:///tmp/origin.git', { allowFile: true }).key).toBe('v2/file/localhost/tmp/origin.git')
   })
   it('requires an explicit isolated test switch and never opens production', () => {
     expect(daemonTestMode({ NODE_ENV: 'test' })).toBe(false)
@@ -40,6 +40,30 @@ describe('repository URL boundary', () => {
     expect(daemonTestMode({ NODE_ENV: 'production', MIKKA_TEST_MODE: '1', CI: 'true' })).toBe(true)
     expect(daemonTestMode({ MIKKA_TEST_MODE: '1', VERCEL_ENV: 'preview' })).toBe(true)
     expect(daemonTestMode({ MIKKA_TEST_MODE: '1', CI: 'true', NODE_ENV: 'test', VERCEL_ENV: 'production' })).toBe(false)
+  })
+  it('separates routing namespaces and cache paths that the legacy key conflated', () => {
+    const cache = new RepositoryCache(join(tempDir(), 'repos'))
+    for (const [a, b] of [
+      ['https://git.example.com:8443/Team/Repo.git', 'https://git.example.com:9443/team/repo.git'],
+      ['https://git.example.com/Team/Repo.git', 'https://git.example.com/team/repo.git'],
+      ['https://git.example.com/team/repo', 'https://git.example.com/team/repo.git'],
+      ['ssh://alice@git.example.com/team/repo.git', 'ssh://bob@git.example.com/team/repo.git'],
+      ['git@git.example.com:team/repo.git', 'ssh://git@git.example.com/team/repo.git'],
+      ['ssh://git@git.example.com:22/team/repo.git', 'ssh://git@git.example.com:2222/team/repo.git'],
+      ['https://github.com:8443/owner/repo.git', 'https://github.com/owner/repo.git'],
+      ['ssh://alice@github.com/owner/repo.git', 'ssh://git@github.com/owner/repo.git'],
+      ['file:///tmp/Origin.git', 'file:///tmp/origin.git'],
+    ]) {
+      expect(remoteKey(a!)).not.toBe(remoteKey(b!))
+      expect(cache.pathFor(a!).toLowerCase()).not.toBe(cache.pathFor(b!).toLowerCase())
+      expect(repositoryBindingMatches(remoteKey(a!), b!)).toBe(false)
+    }
+    expect(remoteKey('https://GIT.example.com:443/Team/Repo.git')).toBe(remoteKey('https://git.example.com/Team/Repo.git'))
+    expect(repositoryBindingMatches('git.example.com/team/repo', 'https://git.example.com/Team/Repo.git')).toBe(false)
+    expect(repositoryBindingMatches('github.com/owner/repo', 'https://github.com/owner/repo.git')).toBe(false)
+    for (const url of ['ssh://git.example.com/team/repo.git', 'git.example.com:team/repo.git']) expect(() => normalizeRepository(url)).toThrow()
+    expect(repositoryBindingMatches(remoteKey('file:///tmp/origin.git'), 'file:///tmp/origin.git')).toBe(false)
+    expect(repositoryBindingMatches(remoteKey('file:///tmp/origin.git'), 'file:///tmp/origin.git', { allowFile: true })).toBe(true)
   })
 })
 
@@ -72,7 +96,7 @@ describe('daemon-owned clone cache', () => {
     const cache = new RepositoryCache(join(root, 'repos'), false)
     await expect(cache.prepare('file:///tmp/origin.git')).rejects.toThrow()
     mkdirSync(join(root, 'repos'))
-    symlinkSync(tempDir(), join(root, 'repos', 'github.com'))
+    symlinkSync(tempDir(), join(root, 'repos', 'v2'))
     await expect(cache.prepare('owner/repo')).rejects.toThrow(/symlink/)
     const linkedRoot = join(tempDir(), 'repos')
     symlinkSync(tempDir(), linkedRoot)
