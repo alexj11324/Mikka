@@ -42,12 +42,11 @@ process.stdout.write(JSON.stringify(eval(process.argv[2])));
 class GuardTest(unittest.TestCase):
     def test_actual_broker_client_commands_match_gateway_policy(self):
         result=subprocess.run(['node','--import','tsx',str(Path(__file__).with_name('broker-contract.test.mjs'))],check=True,capture_output=True,text=True)
-        commands=json.loads(result.stdout);sessions=set();objects={}
+        commands=json.loads(result.stdout);sessions=set();objects={};active_objects={}
         for command in commands:
-            self.assertTrue(broker_command_allowed(command,'target',sessions,objects,'https://example.test'),command['method'])
+            self.assertTrue(broker_command_allowed(command,'target',sessions,objects,'https://example.test',7,active_objects),command['method'])
             if command['method']=='Target.attachToTarget':sessions.add('bound')
-            if command['method']=='Runtime.evaluate' and command['params']['expression']=='globalThis':objects['bound']='known'
-            if command['method']=='Runtime.callFunctionOn':objects.pop('bound')
+            if command['method']=='Runtime.evaluate' and command['params']['expression']=='document.activeElement':active_objects['bound']='active'
     def test_broker_commands_bind_target_session_and_methods(self):
         attach = {'id': 1, 'method': 'Target.attachToTarget', 'params': {'targetId': 'target', 'flatten': True}}
         self.assertTrue(broker_command_allowed(attach, 'target', set()))

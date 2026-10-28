@@ -167,6 +167,17 @@ async def main():
                         if not browser.broker_active:break
                         await asyncio.sleep(.01)
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value=""','returnByValue':True})
+                    observed_url=str(client.make_url(observed_endpoint)).replace('http://','ws://',1)
+                    node=await asyncio.create_subprocess_exec('node','--import','tsx',str(Path(__file__).with_name('broker-real-client.test.mjs')),observed_url,target,origin,grant['loaderId'],str(grant['backendNodeId']),stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
+                    stdout,stderr=await asyncio.wait_for(node.communicate(),30)
+                    if node.returncode:raise RuntimeError('Actual broker client failed: '+stderr.decode())
+                    assert stdout.decode().startswith('PASS: actual broker client')
+                    result=await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value','returnByValue':True})
+                    assert result['result']['value']=='synthetic-user'
+                    for _ in range(100):
+                        if not browser.broker_active:break
+                        await asyncio.sleep(.01)
+                    await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value=""','returnByValue':True})
                     async with client.post('/agents/case/credentials/end?token=synthetic',json={'guardToken':observed_token}) as observed_end:assert observed_end.status==200
                     await browser.rpc('Runtime.evaluate',{'expression':'window.focusHijacked=false;window.inputEvents=0','returnByValue':True})
                     for key in ('backendNodeId','credentialRole','loaderId','origin'):grant.pop(key)
@@ -206,12 +217,6 @@ async def main():
                                 msg=await ws.receive(timeout=10)
                                 if msg.type in (WSMsgType.CLOSE,WSMsgType.CLOSED):break
                                 assert msg.type==WSMsgType.TEXT and 'id' not in json.loads(msg.data)
-                    endpoint_url=str(client.make_url(endpoint)).replace('http://','ws://',1)
-                    node=await asyncio.create_subprocess_exec('node','--import','tsx',str(Path(__file__).with_name('broker-real-client.test.mjs')),endpoint_url,target,origin,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
-                    stdout,stderr=await asyncio.wait_for(node.communicate(),30)
-                    if node.returncode:raise RuntimeError('Actual broker client failed: '+stderr.decode())
-                    assert stdout.decode().startswith('PASS: actual broker client')
-                    await browser.rpc('Runtime.evaluate',{'expression':'window.focusHijacked=false;window.inputEvents=0','returnByValue':True})
                     async with client.ws_connect(endpoint) as ws:
                         session=await attach(ws)
                         try:

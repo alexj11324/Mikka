@@ -21,7 +21,7 @@ before(async () => {
 
 test('combined login seam calls the real credential service contract with the bound actor', async () => {
   assert.deepEqual(await requestBrowserLogin(actor, 'https://example.test'), { status: 'submitted' })
-  assert.deepEqual(login.mock.calls[0].arguments, [actor, 'https://example.test'])
+  assert.deepEqual(login.mock.calls[0].arguments, [actor, 'https://example.test', undefined, undefined])
 })
 
 test('combined browser seam binds all actor dimensions and refuses guarded targets', async () => {
