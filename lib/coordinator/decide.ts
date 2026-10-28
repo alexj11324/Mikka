@@ -57,3 +57,20 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
 export async function decide(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal) {
   return (await invokeDecision(purpose, input, questions, signal))?.answers ?? null
 }
+
+/** Structural adapter for existing server-owned consumers (for example the
+ * monitor owner). This is not an HTTP/client approval or permission endpoint. */
+export interface DecisionTransportRequest {
+  model: typeof DECISION_MODEL
+  input: Array<{ type: 'input_text'; text: string } | { type: 'input_image'; image_url: string }>
+  questions: DecisionQuestion[]
+}
+export async function callDecisionRequest(request: DecisionTransportRequest, signal?: AbortSignal) {
+  if (request.model !== DECISION_MODEL || request.input[0]?.type !== 'input_text' || request.input.slice(1).some(part => part.type !== 'input_image')) return null
+  const result = await invokeDecision('consumer-judgment', {
+    text: request.input[0].text,
+    images: request.input.slice(1).map(part => ({ dataUrl: (part as { type: 'input_image'; image_url: string }).image_url })),
+  }, request.questions, signal)
+  if (!result) return null
+  return { answers: [...result.answers.values()], invocationId: result.execution.providerGenerationId, execution: result.execution }
+}

@@ -79,3 +79,11 @@ test('classification retries are bounded; transport receipts bind actual pixels 
  response={model:'different-model',answers:[{type:'choice',name:'tier',choice:'result'}]}
  assert.equal(await transport.invokeDecision('test','x',questions),null)
 })
+
+test('existing monitor-shaped consumer receives provider invocation ID, actual image input and host receipt',async()=>{
+ response={answers:[{type:'choice',name:'monitorHealth',choice:'unhealthy'}]}
+ const result=await transport.callDecisionRequest({model:DECISION_MODEL,input:[{type:'input_text',text:'synthetic host probe: HTTP200'},{type:'input_image',image_url:png}],questions:[{type:'choice',name:'monitorHealth',instructions:'Judge actual business health',choices:[{value:'healthy'},{value:'unhealthy'},{value:'inconclusive'}]}]})
+ assert.ok(result);assert.equal(result.invocationId,'synthetic-generation');assert.equal(result.execution.vision,'image-input-submitted');assert.equal(result.answers[0].type,'choice')
+ const parts=(requests[0].input as Array<{content:Array<{type:string;image_url?:string}>}>)[0].content
+ assert.equal(parts[1].image_url,png)
+})
