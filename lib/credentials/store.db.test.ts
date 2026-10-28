@@ -20,7 +20,7 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
   try {
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY); CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid); CREATE TABLE bot_subagents(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"botId" uuid,status text); CREATE TABLE agent_runs(id uuid,"userId" text,"botId" uuid,"stopRequestedAt" timestamptz,status text,"leaseExpiresAt" timestamptz)`)
-    await pool.query(await readFile(new URL('../../drizzle/20261027221500_account_credential_vault.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261028174823_account_credential_vault.sql', import.meta.url), 'utf8'))
     const a = { userId: 'owner-a', workspaceId: randomUUID(), botId: randomUUID(), subagentId: randomUUID() }
     const b = { userId: 'owner-b', workspaceId: a.workspaceId, botId: randomUUID(), subagentId: randomUUID() }
     await pool.query(`INSERT INTO "user"(id) VALUES('owner-a'),('owner-b')`)
