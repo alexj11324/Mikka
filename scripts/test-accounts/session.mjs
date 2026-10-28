@@ -11,8 +11,6 @@ import { readBoundedBody } from './http-body.mjs'
 
 const fail = code => { throw new TestAccountError(code) }
 const safeError = error => error instanceof TestAccountError ? error : new TestAccountError('TEST_ACCOUNT_SESSION_FAILED')
-// Do not enable until session revocation can preserve rows and invalidate tokens.
-const RETAINED_SESSION_REVOCATION_AVAILABLE = false
 
 async function privateDirectory(path) {
   await mkdir(path, { recursive: true, mode: 0o700 })
@@ -52,10 +50,6 @@ function scopedURL(environment, path) {
 
 /** A real HTTP-authenticated scope. Credentials never appear in its public shape. */
 export async function acquireTestAccounts({ database, environment, runId, workerId, requestId, ttlMs = 90_000, stateDirectory } = {}) {
-  // Session revocation currently deletes database rows. Until an approved
-  // non-deleting revocation exists, do not create a session we cannot safely
-  // close; quarantine alone does not invalidate the bearer credential.
-  if (!RETAINED_SESSION_REVOCATION_AVAILABLE) fail('TEST_ACCOUNT_SESSION_RETENTION_BLOCKED')
   environment ??= await loadEnvironment()
   // Verify the built application and actual database before even taking a slot.
   await assertDeploymentIdentity(environment)

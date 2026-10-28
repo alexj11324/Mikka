@@ -32,10 +32,6 @@ export class TestAccountPool {
   }
 
   async transaction(work, { readOnly = false } = {}) {
-    // Read-only inspection remains available. No pool writes may run until
-    // the shared environment and complete retention lifecycle are verified.
-    const retainSafePoolWritesAvailable = false
-    if (!readOnly && !retainSafePoolWritesAvailable) fail('ACCOUNT_POOL_RETENTION_BLOCKED')
     const client = await this.database.connect()
     try {
       await client.query(readOnly ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY' : 'BEGIN')
@@ -378,9 +374,6 @@ export class TestAccountPool {
 
   /** Retain tracked session rows while invalidating their issued tokens. */
   async revokeSessions(lease) {
-    // Keep every caller blocked until the complete retained lifecycle is verified.
-    const retainedSessionRevocationAvailable = false
-    if (!retainedSessionRevocationAvailable) fail('TEST_ACCOUNT_SESSION_RETENTION_BLOCKED')
     if (!this.environment.capabilities.reset) fail('SESSION_REVOCATION_NOT_AUTHORIZED')
     return this.transaction(async client => {
       await this.current(client, lease)

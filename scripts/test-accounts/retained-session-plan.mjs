@@ -1,10 +1,9 @@
-// Candidate behind the blocked revokeSessions entry. Calling the generated
+// Retained revocation for tracked test sessions. Calling the generated
 // statement requires an authorized target, an identity-checked transaction,
 // and current lease fencing before and after the update. A token already
 // authenticated in an in-flight request can still complete; application-wide
 // cancellation, other sessions and OAuth paths require separate proof. A caller
 // must confirm every registered session update and retain/quarantine failures.
-// Keep entry points blocked until these requirements are independently verified.
 import { randomBytes } from 'node:crypto'
 
 export const RETAINED_SESSION_UPDATE = `

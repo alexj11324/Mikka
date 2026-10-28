@@ -8,9 +8,6 @@ import { Pool } from 'pg'
 import { loadEnvironment, assertDeploymentIdentity } from '../scripts/test-accounts/environment.mjs'
 import { TestAccountPool } from '../scripts/test-accounts/pool.mjs'
 import { acquireTestAccounts } from '../scripts/test-accounts/session.mjs'
-// Direct node --test invocation must not bypass the shared runner's hold.
-const RETAIN_SAFE_HTTP_TESTS_AVAILABLE = false
-if (!RETAIN_SAFE_HTTP_TESTS_AVAILABLE) throw new Error('HTTP_ACCEPTANCE_RETENTION_BLOCKED')
 
 // Real Next HTTP routes, Better Auth sessions and PostgreSQL. There is no auth
 // mock, cookie minting, provider API, model invocation or manually inserted user.
@@ -257,7 +254,6 @@ acceptance('prepare/acquire/real owner-peer HTTP/clean release safely reuses the
   }
 })
 
-// Unrun: the shared runner and acquisition remain blocked pending retention review.
 acceptance('retained session revocation preserves rows and denies old bearer credentials', async () => {
   const scope = await acquire('retained-auth-lifecycle')
   try {

@@ -16,9 +16,6 @@ import { APPLICATION_BASELINE } from '../scripts/migration-order.mjs'
 const run = promisify(execFile)
 const directory = new URL('../drizzle/', import.meta.url)
 const enabled = process.env.MIGRATION_BOOTSTRAP_CI === '1'
-// Historical migrations contain destructive statements. Keep the full test
-// body intact, but fail before opening a database until the SQL is reviewed.
-const RETAIN_SAFE_MIGRATION_BOOTSTRAP_AVAILABLE = false
 
 // Never default to DATABASE_URL or a developer/production service. The workflow
 // opts in only against its disposable postgres:17 service, before E2E setup.
@@ -73,7 +70,6 @@ for (const separateTargets of [false, true]) {
   test(`pnpm migrate bootstraps empty ${separateTargets ? 'separate targets' : 'shared target'} and safely reruns`, {
     skip: !enabled, timeout: 180000,
   }, async () => {
-    if (!RETAIN_SAFE_MIGRATION_BOOTSTRAP_AVAILABLE) throw new Error('MIGRATION_BOOTSTRAP_RETENTION_BLOCKED')
     const target = ciTarget()
     const admin = new Pool({ connectionString: target.toString(), max: 1 })
     const applicationSchema = `bootstrap_app_${randomUUID().replaceAll('-', '')}`

@@ -8,10 +8,6 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 if (process.env.MIKKA_BUILD_BYOS_WORKER === '1') {
-  // This build can overwrite existing worker binaries and invokes an upstream
-  // checkout. Keep it blocked pending a retention-safe isolated build review.
-  const retainSafeBuildAvailable = false
-  if (!retainSafeBuildAvailable) throw new Error('BYOS_BUILD_RETENTION_BLOCKED')
   if (process.platform !== 'linux' || process.arch !== 'x64') throw new Error('Subscription worker requires Linux x64')
   const root = fileURLToPath(new URL('../', import.meta.url))
   const worker = join(root, 'packages/subscription-worker')

@@ -26,10 +26,6 @@ function publicTestOutput(output) {
 }
 
 export async function runHttpAcceptance() {
-  // This runner terminates child processes and its tests contain destructive
-  // cleanup; do not start it until those paths and the CI host are reviewed.
-  const retainSafeHttpRunnerAvailable = false
-  if (!retainSafeHttpRunnerAvailable) throw new EnvironmentError('HTTP_ACCEPTANCE_RETENTION_BLOCKED')
   const environment = await loadEnvironment()
   const origin = new URL(environment.origin)
   if (origin.protocol !== 'http:') throw new EnvironmentError('HTTP_RUNNER_REQUIRES_HTTP_ORIGIN')

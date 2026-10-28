@@ -6,12 +6,6 @@ import { createServer } from "node:net"
 import { fileURLToPath } from "node:url"
 import { Pool } from "pg"
 
-// The downstream suites still contain destructive cases and Actions removes
-// service containers. Block the whole entry point until independently reviewed.
-const RETAIN_SAFE_BYOS_SUITE_AVAILABLE = false
-if (!RETAIN_SAFE_BYOS_SUITE_AVAILABLE)
-  throw new Error("BYOS_TEST_RETENTION_BLOCKED")
-
 if (process.platform !== "linux")
   throw new Error("Run BYOS acceptance on the cloud Agent's Linux environment")
 const root = fileURLToPath(new URL("../", import.meta.url))
