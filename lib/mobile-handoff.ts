@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 import { z } from 'zod'
 
-const stateSchema = z.object({ cookies: z.array(z.string()).min(1).max(16), target: z.string(), csrf: z.string(), expires: z.number() }).strict()
+const stateSchema = z.object({ cookies: z.array(z.string()).min(1).max(16), target: z.string(), origin: z.string().url(), csrf: z.string(), expires: z.number() }).strict()
 export type MobileHandoff = z.infer<typeof stateSchema>
 const key = (secret: string) => createHash('sha256').update('mikka-mobile-handoff-v1\0').update(secret).digest()
 

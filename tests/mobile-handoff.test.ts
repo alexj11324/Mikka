@@ -90,6 +90,8 @@ test('confirmation rejects expired, tampered state and a revoked underlying sess
   const cookie = cookieHeader(response.headers)
   const encoded = cookie.slice(cookie.indexOf('=') + 1)
   const state = openHandoff(encoded, secret)!
+  const otherOrigin = sealHandoff({ ...state, origin: 'https://other-preview.test' }, secret)
+  assert.equal((await confirm(response, 'https://handoff.test', `mikka-mobile-handoff=${otherOrigin}`)).status, 403)
   const expired = sealHandoff({ ...state, expires: Date.now() - 1 }, secret)
   assert.equal((await confirm(response, 'https://handoff.test', `mikka-mobile-handoff=${expired}`)).status, 403)
   assert.equal(openHandoff(encoded + 'x', secret), null)

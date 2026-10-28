@@ -25,7 +25,7 @@ async function handleGET(request: Request) {
   try {
     const { headers, response: session } = await auth.api.verifyOneTimeToken({ body: { token }, headers: request.headers, returnHeaders: true })
     const csrf = randomBytes(32).toString('base64url')
-    const state = sealHandoff({ cookies: headers.getSetCookie(), target, csrf, expires: Date.now() + 60_000 }, (await auth.$context).secret)
+    const state = sealHandoff({ cookies: headers.getSetCookie(), target, origin: url.origin, csrf, expires: Date.now() + 60_000 }, (await auth.$context).secret)
     if (state.length > 3500) throw new Error('Mobile handoff cookie exceeds browser limit')
     const copy = (request.headers.get('accept-language')?.startsWith('zh') ? zh : en).MobileHandoff
     const html = `<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(copy.title)}</title><main><h1>${escape(copy.title)}</h1><p>${escape(session.user.email)}</p><form method="post" action="${escape(path)}"><input type="hidden" name="csrf" value="${csrf}"><button type="submit">${escape(copy.confirm)}</button></form><a href="${escape(withBasePath(target))}">${escape(copy.cancel)}</a></main></html>`
@@ -45,7 +45,7 @@ async function handlePOST(request: Request) {
   const state = cookie ? openHandoff(cookie, (await auth.$context).secret) : null
   const form = await request.formData().catch(() => null)
   const csrf = form?.get('csrf')
-  if (!state || typeof csrf !== 'string' || !same(state.csrf, csrf)) return new NextResponse(null, { status: 403, headers: safeHeaders })
+  if (!state || state.origin !== url.origin || typeof csrf !== 'string' || !same(state.csrf, csrf)) return new NextResponse(null, { status: 403, headers: safeHeaders })
   const session = await auth.api.getSession({ headers: new Headers({ cookie: handoffSessionCookie(state.cookies) }), query: { disableCookieCache: true } })
   if (!session) return new NextResponse(null, { status: 403, headers: safeHeaders })
   const response = NextResponse.redirect(new URL(withBasePath(mobileWebTarget(state.target)), url.origin), { status: 303, headers: safeHeaders })
