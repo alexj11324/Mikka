@@ -12,6 +12,9 @@ run's optional mailbox reference and message recipient/sender/idempotency/reply/
 origin/ACK/failure/sequence fields; relaxes the old run-only message reference;
 and adds lookup/deduplication indexes and foreign keys. It neither backfills
 historical messages as human-approved nor creates a role or grants privileges.
+The new NOT NULL sequence default assigns sequence values to existing rows;
+installation may rewrite/lock the message table and requires explicit migration
+impact review before execution.
 
 Dependencies already represented on main are `agent_runs`, `run_messages`,
 `agents`, `devices`, `run_tokens`, `bots` and the three AgentKit version/head/
@@ -45,3 +48,11 @@ This is preparation for a separately reviewed server batch. Pure handler and
 pool-model tests cannot establish genuine PG locking, cross-database revocation,
 positive TLS or provider behavior. A new compiled Next/PG/MCP round needs a new
 finite plan; previous R4 nonces, tokens and numeric remainder are not reusable.
+
+New worker mailbox grants use capability version 2 and digest-bind the exact
+host-derived Bot (including explicit null) and namespace at dispatch. Deleting
+or rebinding a Bot cannot fall back to a personal mailbox before first use.
+Legacy v1 or missing-scope grants keep normal worker execution but receive no
+mailbox tools; stored historical definitions are never rewritten to grant them.
+This changes no DDL. A future acceptance round must create newly frozen v2
+workers rather than mutating retained v1 runs or reusing their old allowance.

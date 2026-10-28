@@ -3,7 +3,7 @@ import test from 'node:test'
 import { makeSnapshot, digest } from './agent-kit/definition'
 import { DEFAULT_AGENT_DEFINITION } from './agent-kit/builtin'
 import { freezeWorkerDefinition, retryWorkerDefinition } from './agent-kit/worker'
-import { personalWorkerMailboxTools, snapshotMailboxTools } from './personal-mailbox-capability'
+import { personalWorkerMailboxTools, personalWorkerMailboxScopeMatches, snapshotMailboxTools } from './personal-mailbox-capability'
 import { mailboxGrantTools } from './personal-mailbox-grant'
 import { SessionMailbox } from './session-mailbox'
 import { personalMailboxInstructions } from './personal-mailbox-instructions'
@@ -33,7 +33,7 @@ test('only new host-enabled explicit parent selections freeze worker mailbox too
   const old = freezeWorkerDefinition(input), oldJSON = JSON.stringify(old)
   assert.deepEqual(personalWorkerMailboxTools('codex', old), [])
   assert.deepEqual(snapshotMailboxTools(makeSnapshot(revision, 1, DEFAULT_AGENT_DEFINITION, 'HOST', { harness: 'ai_sdk', model: 'synthetic' })), [])
-  const granted = freezeWorkerDefinition({ ...input, mailboxEnabled: true })
+  const granted = freezeWorkerDefinition({ ...input, mailboxEnabled: true, mailboxScope: { botId, workspaceId: namespace } })
   assert.deepEqual(personalWorkerMailboxTools('codex', granted), ['mailbox_inbox'])
   assert.notEqual(old.definitionDigest, granted.definitionDigest)
   const retry = retryWorkerDefinition(granted, 'Retry')!
@@ -61,7 +61,7 @@ test('frozen/current intersection preserves replay permissions and immediately r
   assert.deepEqual(await mailboxGrantTools(f.q, f.identity), [])
 })
 test('stored parent scope/version/digest and owner are required; completed parent can still authorize its live worker', async () => {
-  const f = fixture(), worker = freezeWorkerDefinition({ harness: 'codex', instructions: 'Bound', prompt: 'Task', parent: f.state.snapshot, executionId, mailboxEnabled: true })
+  const f = fixture(), worker = freezeWorkerDefinition({ harness: 'codex', instructions: 'Bound', prompt: 'Task', parent: f.state.snapshot, executionId, mailboxEnabled: true, mailboxScope: { botId, workspaceId: namespace } })
   f.state.status = 'completed'
   assert.deepEqual(await mailboxGrantTools(f.q, { ...f.identity, worker }), ['mailbox_inbox'])
   await assert.rejects(mailboxGrantTools(f.q, f.identity), /execution unavailable/)
@@ -70,7 +70,7 @@ test('stored parent scope/version/digest and owner are required; completed paren
   f.state.rowVersion = 'different'; await assert.rejects(mailboxGrantTools(f.q, { ...f.identity, worker }), /execution unavailable/)
 })
 test('Coordinator may delegate to its owned Bot; another named Bot never supplies its parent grant', async () => {
-  const f = fixture(), worker = freezeWorkerDefinition({ harness: 'codex', instructions: 'Bound', prompt: 'Task', parent: f.state.snapshot, executionId, mailboxEnabled: true })
+  const f = fixture(), worker = freezeWorkerDefinition({ harness: 'codex', instructions: 'Bound', prompt: 'Task', parent: f.state.snapshot, executionId, mailboxEnabled: true, mailboxScope: { botId, workspaceId: namespace } })
   f.state.key = 'coordinator'; f.state.namespace = null
   assert.deepEqual(await mailboxGrantTools(f.q, { ...f.identity, worker }), ['mailbox_inbox'])
   f.state.key = 'another-bot'
@@ -99,4 +99,33 @@ test('controlled concurrent revocation waits for the same transaction grant lock
   assert.equal(committed, 1)
   await assert.rejects(store.inbox(actor), /revoked/)
   assert.equal(committed, 1)
+})
+
+test('worker v2 scope is host-frozen, checksum-bound and retained across retry without retroactive v1 expansion', () => {
+  const f = fixture(), input = { harness: 'codex' as const, instructions: 'Bound', prompt: 'Task', parent: f.state.snapshot, executionId, mailboxEnabled: true }
+  assert.deepEqual(personalWorkerMailboxTools('codex', freezeWorkerDefinition(input)), [], 'missing dispatch scope never infers personal access')
+  const bound = freezeWorkerDefinition({ ...input, mailboxScope: { botId, workspaceId: namespace } })
+  assert.equal(bound.mailbox!.version, 2)
+  assert.equal(personalWorkerMailboxScopeMatches('codex', bound, { botId, workspaceId: namespace }), true)
+  for (const scope of [{ botId: null, workspaceId: namespace }, { botId, workspaceId: revision }, { botId: revision, workspaceId: namespace }]) {
+    assert.equal(personalWorkerMailboxScopeMatches('codex', bound, scope), false)
+    const edited = structuredClone(bound); edited.mailbox!.scope = scope
+    assert.deepEqual(personalWorkerMailboxTools('codex', edited), [])
+  }
+  const oldGrant = { version: 1, tools: ['mailbox_inbox'] }
+  const historical = { ...bound, mailbox: oldGrant, definitionDigest: digest({ harness: 'codex', instructions: bound.instructions, mailbox: oldGrant }) }
+  assert.deepEqual(personalWorkerMailboxTools('codex', historical), [], 'even a valid v1 checksum cannot authorize an inferred namespace')
+  const malformed = { ...bound, mailbox: { ...bound.mailbox!, scope: { botId, workspaceId: namespace, origin: 'owner' } } }
+  assert.deepEqual(personalWorkerMailboxTools('codex', malformed), [])
+  const retry = retryWorkerDefinition(bound, 'Retry')!
+  assert.deepEqual(retry.mailbox!.scope, bound.mailbox!.scope)
+  retry.mailbox!.scope.botId = null
+  assert.equal(bound.mailbox!.scope.botId, botId)
+})
+test('effect grant refuses a deleted or rebound Bot before reading parent grants', async () => {
+  const f = fixture(), worker = freezeWorkerDefinition({ harness: 'codex', instructions: 'Bound', prompt: 'Task', parent: f.state.snapshot, executionId, mailboxEnabled: true, mailboxScope: { botId, workspaceId: namespace } })
+  for (const identity of [{ ...f.identity, botId: null }, { ...f.identity, workspaceId: revision }]) {
+    await assert.rejects(mailboxGrantTools(f.q, { ...identity, worker }, true), /worker scope mismatch/)
+  }
+  assert.equal(f.queries.length, 0)
 })

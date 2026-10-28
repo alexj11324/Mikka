@@ -5,7 +5,7 @@ import { WORKSPACE_ID } from '@/lib/device-link'
 import { SessionMailbox } from './session-mailbox'
 import { nativeMailboxFence, workerMailboxFence, type PersonalNativeScope } from './personal-mailbox-fence'
 import { personalMailboxRequest, personalMailboxAction } from './personal-mailbox-action'
-import { personalWorkerMailboxSupported } from './personal-mailbox-capability'
+import { personalWorkerMailboxSupported, personalWorkerMailboxScopeMatches } from './personal-mailbox-capability'
 import { mailboxGrantTools } from './personal-mailbox-grant'
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
 import type { MailboxToolName } from '@mikka/protocol/mailbox'
@@ -55,7 +55,7 @@ export async function personalWorkerMailboxAdvertised(userId: string, runId: str
   const lease = run?.leaseExpiresAt == null ? NaN : new Date(run.leaseExpiresAt).getTime()
   const valid = Boolean(run?.deviceId && (!run.botId || run.workspaceId) && !run.stopRequestedAt && Number.isFinite(lease) && lease > Date.now()
     && ['queued', 'preparing', 'running', 'waiting_input', 'finishing'].includes(run.status)
-    && personalWorkerMailboxSupported(run.harness, run.agentDefinition))
+    && personalWorkerMailboxScopeMatches(run.harness, run.agentDefinition, { botId: run.botId, workspaceId: run.workspaceId ?? WORKSPACE_ID }))
   if (!valid) return []
   try { await assertMailboxScope(userId, run.botId, run.workspaceId ?? WORKSPACE_ID)
     return await mailboxGrantTools(pool, { userId, botId: run.botId, workspaceId: run.workspaceId ?? WORKSPACE_ID,
@@ -70,6 +70,7 @@ export async function personalWorkerMailbox(userId: string, runId: string, input
   if (!run || !run.deviceId || (run.botId && !run.workspaceId)) return { status: 403, body: { error: 'Run namespace unavailable' } }
   if (!personalWorkerMailboxSupported(run.harness, run.agentDefinition)) return { status: 409, body: { error: 'Worker mailbox capability is not frozen for this runtime' } }
   const namespace = run.workspaceId ?? WORKSPACE_ID
+  if (!personalWorkerMailboxScopeMatches(run.harness, run.agentDefinition, { botId: run.botId, workspaceId: namespace })) return { status: 403, body: { error: 'Worker mailbox scope changed' } }
   const tokenHash = createHash('sha256').update(verifiedToken).digest('hex')
   const parsed = personalMailboxRequest.safeParse(input)
   if (!parsed.success) return { status: 400, body: { error: 'Invalid mailbox request' } }

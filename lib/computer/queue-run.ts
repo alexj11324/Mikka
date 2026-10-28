@@ -49,7 +49,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     }
     const subscription = captureDefinition ? await new SubscriptionRepository(client).nativeBinding(actor.userId,input.agentId,target.harness) : null
     if (captureDefinition && !subscription) throw new ComputerError(409,'Bot subscription unavailable')
-    const agentDefinition = captureDefinition ? freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,mailboxEnabled:process.env.MIKKA_PERSONAL_MAILBOX_ENABLED==='1' }) : null
+    const agentDefinition = captureDefinition ? freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,mailboxEnabled:process.env.MIKKA_PERSONAL_MAILBOX_ENABLED==='1',mailboxScope:{botId:input.botId,workspaceId:actor.workspaceId} }) : null
     await client.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId"${agentDefinition ? ',"agentDefinition"' : ''})
       VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9${agentDefinition ? ',$10' : ''})`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, target.baseBranch, prompt, input.botId,...(agentDefinition ? [JSON.stringify(agentDefinition)] : [])])
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])

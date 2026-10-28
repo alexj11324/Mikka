@@ -2,7 +2,7 @@ import type { Pool } from 'pg'
 import type { MailboxToolName } from '@mikka/protocol/mailbox'
 import { digest, parseDefinition, type DefinitionSnapshot } from './agent-kit/definition'
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
-import { snapshotMailboxTools, personalWorkerMailboxTools } from './personal-mailbox-capability'
+import { snapshotMailboxTools, personalWorkerMailboxTools, personalWorkerMailboxScopeMatches } from './personal-mailbox-capability'
 import { MailboxError } from './mailbox-error'
 
 /** Existing authenticated definition-save/approve writes are the grant source.
@@ -14,6 +14,7 @@ export async function mailboxGrantTools(q: Pick<Pool, 'query'>, identity: {
 }, lock = false): Promise<MailboxToolName[]> {
   let key = identity.botId ?? 'coordinator'
   if (identity.worker) {
+    if (!personalWorkerMailboxScopeMatches(identity.worker.harness, identity.worker, identity)) throw new MailboxError('Mailbox worker scope mismatch', 403)
     // The built-in Coordinator can explicitly dispatch an owned Bot's cloud
     // run. Resolve its parent scope from the stored execution, not the model
     // or the target Bot. A named Bot can only delegate to its own namespace.

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { Harness } from '@mikka/protocol/harness'
 import { digest, type DefinitionSnapshot } from './definition'
-import { snapshotMailboxTools, type WorkerMailboxGrant } from '../personal-mailbox-capability'
+import { snapshotMailboxTools, workerMailboxScope, type WorkerMailboxScope, type WorkerMailboxGrant } from '../personal-mailbox-capability'
 
 export interface WorkerDefinitionSnapshot {
   schemaVersion: 1
@@ -19,12 +19,13 @@ export interface WorkerDefinitionSnapshot {
 }
 
 /** Captured atomically with dispatch, not retroactively inferred from a renamed Agent. */
-export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; subscription?: { id: string; modelId: string; route: string } | null; mailboxEnabled?: boolean }): WorkerDefinitionSnapshot {
+export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; subscription?: { id: string; modelId: string; route: string } | null; mailboxEnabled?: boolean; mailboxScope?: WorkerMailboxScope }): WorkerDefinitionSnapshot {
   if (Boolean(input.parent) !== Boolean(input.executionId)) throw new Error('agentWorkerParentIncomplete')
   const subscription = input.subscription ? { bindingId:z.uuid().parse(input.subscription.id),modelId:z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).parse(input.subscription.modelId),route:input.subscription.route } : undefined
   if (subscription && subscription.route !== (input.harness === 'codex' ? 'codex_cli' : input.harness === 'claude_code' ? 'claude_code_cli' : null)) throw new Error('agentWorkerSubscriptionMismatch')
   const tools = input.mailboxEnabled ? snapshotMailboxTools(input.parent) : []
-  const mailbox = tools.length && ['claude_code', 'codex'].includes(input.harness) ? { version: 1 as const, tools } : undefined
+  const mailbox = tools.length && input.mailboxScope && ['claude_code', 'codex'].includes(input.harness)
+    ? { version: 2 as const, tools, scope: workerMailboxScope.parse(input.mailboxScope) } : undefined
   return {
     schemaVersion: 1, kind: 'worker', harness: input.harness, instructions: input.instructions,
     definitionDigest: digest({ harness: input.harness, instructions: input.instructions, ...(subscription ? { subscription } : {}), ...(mailbox ? { mailbox } : {}) }),

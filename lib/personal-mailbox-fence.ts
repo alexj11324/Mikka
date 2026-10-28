@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg'
 import { MailboxError } from './mailbox-error'
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
+import { personalWorkerMailboxScopeMatches } from './personal-mailbox-capability'
 import { mailboxGrantTools } from './personal-mailbox-grant'
 import type { MailboxToolName } from '@mikka/protocol/mailbox'
 import type { MailboxTransactionLease } from './mailbox-transaction-guard'
@@ -19,6 +20,7 @@ export function workerMailboxFence(identity: {
   return async client => {
     if (!enabled()) throw new MailboxError('personal_mailbox_unavailable', 503)
     const denied = () => new MailboxError('Worker mailbox scope is no longer authorized', 403)
+    if (!personalWorkerMailboxScopeMatches(identity.snapshot.harness, identity.snapshot, identity)) throw denied()
     if (identity.botId && !(await client.query('SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR SHARE', [identity.botId, identity.userId, identity.workspaceId])).rowCount) throw denied()
     if (!(await client.query('SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2 AND enabled FOR SHARE', [identity.deviceId, identity.userId])).rowCount) throw denied()
     if (!(await client.query('SELECT id FROM agents WHERE id=$1 AND "userId"=$2 FOR SHARE', [identity.agentId, identity.userId])).rowCount) throw denied()

@@ -18,15 +18,17 @@ const boxId = '28700000-0000-4000-8000-000000000003'
 const bearer = 'mkw_' + 'x'.repeat(43)
 let validToken = true, botOwned = true, enabled = true, stopped = false, expired = false
 let memberStatus = 'active', currentHarness = 'codex'
-let botId: string | null = null
+let botId: string | null = '28700000-0000-4000-8000-000000000004'
+let parentBotKey = '28700000-0000-4000-8000-000000000004'
+const mailboxNamespace = () => botId ? namespace : '28700000-0000-4000-8000-000000000099'
 let parent = makeSnapshot('28700000-0000-4000-8000-000000000081', 1, { ...DEFAULT_AGENT_DEFINITION, tools: Object.keys(mailboxInputs) }, 'HOST', { harness: 'ai_sdk', model: 'synthetic' })
 const parentId = '28700000-0000-4000-8000-000000000082'
-const grantedWorker = (kind: 'codex' | 'claude_code' = 'codex') => freezeWorkerDefinition({ harness: kind, instructions: 'Fixture', prompt: 'Task', parent, executionId: parentId, mailboxEnabled: true })
+const grantedWorker = (kind: 'codex' | 'claude_code' = 'codex') => freezeWorkerDefinition({ harness: kind, instructions: 'Fixture', prompt: 'Task', parent, executionId: parentId, mailboxEnabled: true, mailboxScope: { botId, workspaceId: mailboxNamespace() } })
 let agentDefinition: unknown = grantedWorker(), harness = 'codex'
 let currentDefinition = parent.definition
 function grantQuery(sql: string) {
-  if (sql.startsWith('select bot_key from agent_kit_executions')) return { rows: [{ bot_key: '28700000-0000-4000-8000-000000000004' }] }
-  if (sql.startsWith('select active_version,workspace_id from agent_kit_heads')) return { rows: [{ active_version: parent.revisionId, workspace_id: namespace }] }
+  if (sql.startsWith('select bot_key from agent_kit_executions')) return { rows: [{ bot_key: parentBotKey }] }
+  if (sql.startsWith('select active_version,workspace_id from agent_kit_heads')) return { rows: [{ active_version: parent.revisionId, workspace_id: parentBotKey === 'coordinator' ? null : namespace }] }
   if (sql.startsWith('select snapshot,status,version_id from agent_kit_executions')) return { rows: [{ snapshot: parent, status: 'completed', version_id: parent.revisionId }] }
   if (sql.startsWith('select definition,digest from agent_kit_versions')) return { rows: [{ definition: currentDefinition, digest: digest(currentDefinition) }] }
 }
@@ -53,7 +55,7 @@ const client = { release() {}, async query(sql: string, params: unknown[] = []) 
     return { rows: validToken ? [{ id: 'synthetic-token' }] : [], rowCount: validToken ? 1 : 0 }
   }
   if (sql.startsWith('select 1 from session_mailboxes')) return { rows: enabled ? [{}] : [], rowCount: enabled ? 1 : 0 }
-  if (sql.startsWith('select * from session_mailboxes')) return { rows: [{ id: boxId, userId: owner, workspaceId: namespace, kind: 'run', sessionKey: runId, disabled: !enabled }] }
+  if (sql.startsWith('select * from session_mailboxes')) return { rows: [{ id: boxId, userId: owner, workspaceId: mailboxNamespace(), kind: 'run', sessionKey: runId, disabled: !enabled }] }
   if (sql.startsWith('select r.status')) return { rows: [{ status: 'running', stopRequestedAt: stopped ? new Date() : null, leaseExpiresAt: new Date(expired ? 0 : Date.now() + 60000), enabled }] }
   if (sql.startsWith('update run_messages set "deliveredAt"')) { afterData(); return { rows: [] } }
   return { rows: [] }
@@ -263,12 +265,46 @@ test('pinned worker harness survives Agent edits; removed/suspended membership f
 })
 
 test('personal Coordinator-owned worker pre-abort refuses APP checkout even without a workspace guard', async () => {
-  const previousBot = botId, controller = new AbortController(), before = connections
-  botId = null; controller.abort()
+  const previousBot = botId, previousDefinition = agentDefinition, controller = new AbortController(), before = connections
+  botId = null; agentDefinition = grantedWorker(); controller.abort()
   try {
     const response = await POST(new Request('http://127.0.0.1/mikka/v1/mailbox', { method: 'POST', signal: controller.signal,
       headers: { 'content-type': 'application/json', authorization: 'Bearer ' + bearer }, body: JSON.stringify({ action: 'inbox' }) }))
     assert.equal(response.status, 403)
     assert.equal(connections, before, 'APP cancellation is required independently of Bot membership')
-  } finally { botId = previousBot }
+  } finally { botId = previousBot; agentDefinition = previousDefinition }
+})
+test('personal Coordinator-owned worker keeps its real APP grant and cancels before COMMIT without WS', async () => {
+  const previousBot = botId, previousParent = parentBotKey, previousDefinition = agentDefinition, controller = new AbortController()
+  botId = null; parentBotKey = 'coordinator'; agentDefinition = grantedWorker()
+  try {
+    const wsBefore = memberConnections
+    assert.equal((await call()).status, 200)
+    assert.equal(memberConnections, wsBefore)
+    let cancelAt = -1
+    afterData = () => { cancelAt = queries.length; controller.abort() }
+    const response = await POST(new Request('http://127.0.0.1/mikka/v1/mailbox', { method: 'POST', signal: controller.signal,
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + bearer }, body: JSON.stringify({ action: 'inbox' }) }))
+    assert.equal(response.status, 403)
+    assert.notEqual(cancelAt, -1)
+    assert.equal(queries.slice(cancelAt).some(query => query.sql === 'commit'), false)
+    assert.equal(memberConnections, wsBefore)
+  } finally { afterData = () => {}; botId = previousBot; parentBotKey = previousParent; agentDefinition = previousDefinition }
+})
+
+test('Bot deletion before the first mailbox attachment cannot widen a Coordinator-delegated worker namespace', async () => {
+  const previousBot = botId, previousDefinition = agentDefinition, previousParent = parentBotKey
+  // The real schema's ON DELETE SET NULL leaves a run with no Bot. The parent
+  // Coordinator remains valid, so the immutable target scope must deny first.
+  parentBotKey = 'coordinator'; agentDefinition = grantedWorker(); botId = null
+  const before = connections
+  try {
+    assert.equal((await call()).status, 403)
+    const list = await packet(await rpc('tools/list', {}))
+    assert.equal(list.result.tools.some((tool: { name: string }) => tool.name.startsWith('mailbox_')), false)
+    assert.equal(list.result.tools.some((tool: { name: string }) => tool.name === 'report'), true)
+    const result = await packet(await rpc('tools/call', { name: 'mailbox_inbox', arguments: {} }))
+    assert.ok(result.error || result.result?.isError)
+    assert.equal(connections, before, 'no mailbox attachment or effect transaction is admitted')
+  } finally { botId = previousBot; agentDefinition = previousDefinition; parentBotKey = previousParent }
 })
