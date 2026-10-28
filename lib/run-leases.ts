@@ -1,5 +1,6 @@
 import 'server-only'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
+import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { retryWorkerDefinition } from '@/lib/agent-kit/worker'
 import { after } from 'next/server'
@@ -82,9 +83,9 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
  */
 async function takeoverTarget(run: { id: string; userId: string; agentId: string; deviceId: string | null; deviceRepoId: string | null; agentDefinition?: Run['agentDefinition'] }, now: Date): Promise<(TakeoverCandidate & { deviceRepoId: string }) | null> {
   if (!run.deviceRepoId) return null
-  const [repo] = await db.select({ remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
+  const [repo] = await db.select({ remoteUrl: deviceRepos.remoteUrl, repoPath: deviceRepos.repoPath }).from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
   const [agent] = await db.select({ harness: agents.harness }).from(agents).where(eq(agents.id, run.agentId)).limit(1)
-  if (!repo?.remoteUrl || !agent) return null
+  if (!repo?.remoteUrl || !agent || !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) return null
   const bound = await db.execute(sql`select 1 from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
   if (bound.rows.length) return null
   const candidates = await db.select({ deviceId: devices.id, harnesses: devices.harnesses })

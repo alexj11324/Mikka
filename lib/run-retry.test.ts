@@ -45,11 +45,12 @@ test('a resumed session gets only the note on what happened', () => {
 })
 
 test('https and ssh spellings of one remote match', () => {
-  const key = 'github.com/alexj11324/mikka'
-  for (const url of ['https://github.com/alexj11324/Mikka.git', 'git@github.com:alexj11324/Mikka.git', 'ssh://git@github.com/alexj11324/Mikka', 'https://token@github.com/alexj11324/mikka/']) {
+  const key = 'v2/github.com/alexj11324/mikka'
+  for (const url of ['https://github.com/alexj11324/Mikka.git', 'git@github.com:alexj11324/Mikka.git', 'ssh://git@github.com/alexj11324/Mikka']) {
     assert.equal(remoteKey(url), key, url)
   }
-  assert.equal(remoteKey('ssh://git@host:2222/team/repo.git'), 'host/team/repo')
+  assert.equal(remoteKey('ssh://git@host:2222/team/repo.git'), 'v2/ssh/host/2222/user/git/absolute/team/repo.git')
+  assert.throws(() => remoteKey('https://token@github.com/alexj11324/mikka/'))
 })
 
 const candidate = (deviceId: string, extra: Partial<TakeoverCandidate> = {}): TakeoverCandidate => ({
