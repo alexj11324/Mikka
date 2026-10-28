@@ -45,6 +45,15 @@ test('run result publication commits one owner-scoped result through retries and
   const { prepareRunPublication, persistRunCompletion, publishRunResult } = await import('../lib/run-publications')
   const { PublicationError } = await import('../lib/run-publication-result')
   const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
+  const waitForBlockedBy = async (pid: number) => {
+    const deadline = Date.now() + 5_000
+    while (Date.now() < deadline) {
+      const { rows } = await pool.query('select 1 from pg_stat_activity where $1 = any(pg_blocking_pids(pid)) limit 1', [pid])
+      if (rows.length) return
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    throw new Error('Expected transaction did not block on the held approval lock')
+  }
   const fixtures: Fixture[] = []
   let githubId = 800_000
 
@@ -314,7 +323,7 @@ test('run result publication commits one owner-scoped result through retries and
         await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['repository-approval', f.userId, f.remoteKey])])
         await client.query('update repository_settings set push=$3 where "userId"=$1 and "remoteKey"=$2', [f.userId, f.remoteKey, JSON.stringify({ approved: false, remote: 'origin', approvedByUserId: f.userId, approvedAt: new Date().toISOString() })])
         const message = sendOwnedRunMessage(db, f.userId, { runId: f.runId, text: 'contended' })
-        await new Promise(resolve => setImmediate(resolve))
+        await waitForBlockedBy((await client.query('select pg_backend_pid() as pid')).rows[0].pid)
         await client.query('commit')
         await assert.rejects(message)
         assert.equal(Number((await pool.query('select count(*) from run_messages where "runId"=$1', [f.runId])).rows[0].count), 0)
@@ -330,7 +339,7 @@ test('run result publication commits one owner-scoped result through retries and
         await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['repository-approval', f.userId, f.remoteKey])])
         await client.query('update repository_settings set push=$3 where "userId"=$1 and "remoteKey"=$2', [f.userId, f.remoteKey, JSON.stringify({ approved: false, remote: 'origin', approvedByUserId: f.userId, approvedAt: new Date().toISOString() })])
         const queued = queueRun(f.userId, { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl })
-        await new Promise(resolve => setImmediate(resolve))
+        await waitForBlockedBy((await client.query('select pg_backend_pid() as pid')).rows[0].pid)
         await client.query('commit')
         await assert.rejects(queued)
         assert.equal(Number((await pool.query('select count(*) from agent_runs where "issueId"=$1', [f.issueId])).rows[0].count), 1)
