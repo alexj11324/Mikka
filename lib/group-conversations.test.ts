@@ -44,7 +44,11 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
   const pool = new Pool({ connectionString: dbURL, max: 16 })
   // Isolated schema inside the ephemeral CI database; no dependency on bootstrap #115.
   const schema = `group_test_${randomUUID().replaceAll('-', '')}`
+  const reverseSchema = `group_test_${randomUUID().replaceAll('-', '')}`
   await pool.query(`CREATE SCHEMA "${schema}"`)
+  console.log(`Retaining synthetic group test schema ${schema} at ${new Date().toISOString()}`)
+  await pool.query(`CREATE SCHEMA "${reverseSchema}"`)
+  console.log(`Retaining synthetic group test schema ${reverseSchema} at ${new Date().toISOString()}`)
   const scoped = new Pool({ connectionString: dbURL, max: 16, options: `-c search_path=${schema}` })
   try {
     const migration = await readFile(new URL('../drizzle/20261023213851_group_conversations.sql', import.meta.url), 'utf8')
@@ -52,9 +56,12 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     await scoped.query(migration) // production retry / coexistence with #69
     const reads = await readFile(new URL('../tests/fixtures/conversation-reads-69.sql', import.meta.url), 'utf8')
     await scoped.query(reads) // this migration first, then #69
-    await scoped.query('DROP TABLE conversation_reads')
-    await scoped.query(reads) // #69 first, then this migration
-    await scoped.query(migration)
+    // Exercise the reverse migration order in a second retained schema.
+    const reverse = new Pool({ connectionString: dbURL, max: 1, options: `-c search_path=${reverseSchema}` })
+    try {
+      await reverse.query(reads) // #69 first, then this migration
+      await reverse.query(migration)
+    } finally { await reverse.end() }
     const run = (changes: Partial<GroupRequest>) => handleGroup(scoped, directory, { ...base, ...changes })
     for (const input of [undefined, '{', JSON.stringify({ workspaceId, title: '', members: [] }), JSON.stringify({ workspaceId: randomUUID(), title: 'foreign' }), JSON.stringify({ workspaceId, title: 'private', members: [{ memberType: 'agent', memberId: privateAgent }] })]) {
       assert.ok([404, 422].includes((await run({ method: 'POST', body: input })).status))
@@ -140,7 +147,6 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     assert.equal(((await run({})).body as typeof list).conversations[0].lastMessage.position, '9007199254740993')
   } finally {
     await scoped.end()
-    await pool.query(`DROP SCHEMA "${schema}" CASCADE`)
     await pool.end()
   }
 })

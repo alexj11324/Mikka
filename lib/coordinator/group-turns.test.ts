@@ -60,6 +60,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
   const pool = new Pool({ connectionString: dbURL })
   const schema = `turns_${randomUUID().replaceAll('-','')}`
   await pool.query(`CREATE SCHEMA "${schema}"`)
+  console.log(`Retaining synthetic group-turn test schema ${schema} at ${new Date().toISOString()}`)
   const scoped = new Pool({ connectionString: dbURL, max: 12, options: `-c search_path=${schema}` })
   let releasePending = () => {}
   try {
@@ -242,7 +243,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await assert.rejects(processGroupTurn(scoped,id,{...runtime,async authorized() {return false},async generate() {assert.fail('revoked actor must not generate')}}),/no_longer_authorized/)
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[revoked])).rows[0].status,'failed')
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
-  } finally { releasePending(); await scoped.end(); await pool.query(`DROP SCHEMA "${schema}" CASCADE`); await pool.end() }
+  } finally { releasePending(); await scoped.end(); await pool.end() }
 })
 test('expired execution budget cancels before generation/status publication', async () => {
   await assert.rejects(runGroupRounds({by:'mention',responders:[a]},message,{
