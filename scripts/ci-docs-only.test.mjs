@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -93,5 +93,41 @@ test('real git diffs handle rename, deletion, executable files and missing base 
     mkdirSync(join(dir, 'docs'), { recursive: true }); writeFileSync(join(dir, 'docs', 'tool.md'), 'tool\n'); git('add', '.'); git('update-index', '--chmod=+x', 'docs/tool.md'); git('commit', '-qm', 'executable')
     assert.match(classify('base'), /docs_only=false/)
     assert.match(classify('missing'), /docs_only=false/)
+    git('reset', '--hard', 'base'); git('rm', 'code.js'); git('commit', '-qm', 'delete code')
+    assert.match(classify('base'), /docs_only=false/)
+    git('reset', '--hard', 'base'); git('mv', 'docs/old.md', 'moved.js'); git('commit', '-qm', 'move docs to code')
+    assert.match(classify('base'), /docs_only=false/)
+    git('reset', '--hard', 'base'); symlinkSync('old.md', join(dir, 'docs', 'link.md')); git('add', '.'); git('commit', '-qm', 'symlink')
+    assert.match(classify('base'), /docs_only=false/)
+    git('reset', '--hard', 'base'); writeFileSync(join(dir, 'docs', 'new.md'), 'docs\n'); git('add', '.'); git('commit', '-qm', 'docs')
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim()
+    const base = execFileSync('git', ['rev-parse', 'base'], { cwd: dir, encoding: 'utf8' }).trim()
+    const eventFile = join(dir, 'event.json')
+    writeFileSync(eventFile, JSON.stringify({ pull_request: { base: { sha: base }, head: { sha: head, repo: { full_name: 'fork/repo' } } } }))
+    const event = execFileSync(process.execPath, [script], { cwd: dir, encoding: 'utf8', env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: eventFile } })
+    assert.match(event, /docs_only=true/)
+    writeFileSync(eventFile, JSON.stringify({ pull_request: { base: { sha: '0'.repeat(40) }, head: { sha: head } } }))
+    const missing = execFileSync(process.execPath, [script], { cwd: dir, encoding: 'utf8', env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: eventFile } })
+    assert.match(missing, /docs_only=false/)
   } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+
+test('all required gates reject failed classification and skipped full jobs', () => {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+    const source = readFileSync(file, 'utf8')
+    const blocks = [...source.matchAll(/      - name: Require the full suite unless only documentation changed\n([\s\S]*?)(?=\n  [a-z][a-z-]*:|$)/g)]
+    assert.equal(blocks.length, file.includes('ui-policy') ? 2 : 1)
+    for (const [, block] of blocks) {
+      const script = block.split('        run: |\n')[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
+      const result = (changes, docs, full) => {
+        try { execFileSync('bash', ['-e', '-c', script], { env: { ...process.env, CHANGES_RESULT: changes, DOCS_ONLY: docs, FULL_RESULT: full }, stdio: 'ignore' }); return true } catch { return false }
+      }
+      assert.equal(result('failure', 'true', 'skipped'), false)
+      assert.equal(result('success', 'false', 'skipped'), false)
+      assert.equal(result('success', 'false', 'failure'), false)
+      assert.equal(result('success', 'false', 'success'), true)
+      assert.equal(result('success', 'true', 'skipped'), true)
+    }
+  }
 })

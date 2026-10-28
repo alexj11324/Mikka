@@ -116,7 +116,7 @@ export function main() {
   }
 
   const reason = result.files.length
-    ? `${result.files.length} changed file(s): ${result.files.join(', ')}`
+    ? `${result.files.length} changed file(s)`
     : 'no changed files'
   output(isDocsOnly(result.files, result.unsafeModes), result.unsafeModes ? `${reason}; non-regular path or unmerged entry` : reason)
 }
