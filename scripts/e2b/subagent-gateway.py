@@ -7,6 +7,7 @@ from pathlib import Path
 from aiohttp import web, WSMsgType
 ROOT = Path('/run/mikka-subagents')
 AGENTS = {}
+BROKER_METHODS = frozenset(('Page.getFrameTree', 'DOM.getDocument', 'Runtime.evaluate', 'Runtime.callFunctionOn', 'Input.insertText', 'Network.setCookies', 'Network.getCookies', 'Page.reload'))
 # Capture the loaded files at process startup, not on each request: replacing
 # files on disk does not change an already-running Python gateway.
 VERSION = hashlib.sha256(Path(__file__).read_bytes() + Path(__file__).with_name('subagent-cdp.mjs').read_bytes()).hexdigest()
@@ -46,6 +47,14 @@ def inspect_mutation_expression(mutation):
     # Text and form metadata are hints, not a proof of a page's JS effects.
     selector=json.dumps(str(mutation.get('selector',''))[:500])
     return f"(() => {{ const e={('document.activeElement' if mutation.get('action')=='key' else 'document.querySelector('+selector+')')}; if (!e) return {{requiresApproval:true}}; const text=(e.innerText||e.getAttribute('aria-label')||'').slice(0,500); const risk=/pay|purchase|buy|delete|remove|cancel|unsubscribe|transfer|send|publish|submit|confirm|付款|支付|购买|删除|取消|转账|发送|发布|确认/i.test(text); return {{requiresApproval:risk || (e.type==='submit' && e.form?.method.toLowerCase()!=='get') || ({json.dumps(mutation.get('action')=='key' and mutation.get('key')=='Enter')} && e.form?.method.toLowerCase()!=='get')}}; }})()"
+
+def broker_command_allowed(data, target, sessions):
+    if not isinstance(data,dict) or type(data.get('id')) is not int or not isinstance(data.get('params',{}),dict):return False
+    method=data.get('method')
+    if method=='Target.attachToTarget':
+        params=data.get('params',{})
+        return data.get('sessionId') is None and params.get('targetId')==target and params.get('flatten') is True
+    return method in BROKER_METHODS and data.get('sessionId') in sessions
 
 def decode(value):
     return base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))
@@ -204,17 +213,27 @@ async def cdp(request):
     if not b.guard or not hmac.compare_digest(guard,b.guard):raise web.HTTPForbidden()
     ws=web.WebSocketResponse(max_msg_size=1024*1024);await ws.prepare(request)
     reader,writer=await asyncio.open_unix_connection(str(b.path/'cdp.sock'),limit=4*1024*1024)
+    sessions=set();attaching=set()
     async def incoming():
         async for message in ws:
             token(raw,'broker')
             if b.guard!=guard or message.type!=WSMsgType.TEXT:break
-            # Broker is a trusted deterministic service, never a model session.
             data=json.loads(message.data)
+            # Broker capability is scoped to this page, not a general CDP socket.
+            if not broker_command_allowed(data,b.target,sessions):break
+            if data['method']=='Target.attachToTarget':
+                if data['id'] in attaching:break
+                attaching.add(data['id'])
             writer.write((json.dumps(data)+'\n').encode());await writer.drain()
     async def outgoing():
         while line:=await reader.readline():
             token(raw,'broker')
             if b.guard!=guard:break
+            data=json.loads(line)
+            if data.get('id') in attaching:
+                attaching.discard(data['id'])
+                session=data.get('result',{}).get('sessionId')
+                if isinstance(session,str) and session:sessions.add(session)
             await ws.send_str(line.decode().strip())
     async def expiry():
         await asyncio.sleep(max(0,grant['exp']-time.time()))
