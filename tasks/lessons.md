@@ -175,3 +175,20 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 验证时看 HTTP 状态（404）、浏览器 `document.documentElement.lang` 与页面文案三者是否一致。
 另外 `JSON.parse` 会静默丢掉重复 key，检查器应能发现重复键，或至少用 `jq`/脚本单独查一次。
 
+
+## 2026-10-28 README 的「已上线」不能只看代码是否存在
+
+**发生了什么**：README 仍把跨设备接续、连接应用审批操作、多 bot 写成「规划中」，
+而这几项早已合并；反过来，云端电脑、原生 Coordinator、iOS App 的代码也在 main 上，
+但分别被生产 flag、环境变量和 TestFlight 验收挡住，不能算上线。
+
+**规则**：
+
+1. 判断是否上线至少看三层证据：PR 是否 merged、是否有 feature flag / 环境变量门禁、
+   对应 issue 是否仍 OPEN。
+2. 合并 PR 的描述里如果记录了生产回调验证（如 Slack #51），才算线上可用；
+   仅有代码和单测只算「已实现」。
+3. 文档里「规划中」的条目要按能力拆分：同一块能力可能一部分已上线
+   （邮件/日历审批），另一部分仍未上线（文档、Slack 操作）。
+4. 改 README 图表前先找生成脚本（`scripts/generate-diagrams.mjs`），
+   不要手改 SVG；改完渲染明暗、中英四种组合抽查。

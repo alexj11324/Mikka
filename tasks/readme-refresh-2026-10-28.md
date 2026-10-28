@@ -26,4 +26,10 @@
 - [x] 更新 `README.md`
 - [x] 更新 `README.zh-CN.md`
 - [x] 渲染 SVG 检查版面（中英、明暗共 4 张抽样）
-- [ ] 建分支、提交、推送并开 PR
+- [x] 建分支、提交、推送并开 PR
+
+## 结果
+
+- PR: [#384](https://github.com/alexj11324/Mikka/pull/384)
+- 提交: `2cbf4e34` `docs: refresh README and diagrams for shipped features`
+- 额外修正：多 bot（PR #322）已上线，README 原来的「Coordinator 是当前唯一内置 Bot」已过时，改为「左侧栏是 bot 列表，Coordinator 是其中之一」。
