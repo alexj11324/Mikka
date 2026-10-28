@@ -154,6 +154,21 @@ test('the workflow-extracted trusted classifier executes as an ES module', () =>
   }
 })
 
+test('trusted workflow classifier executes as an ES module from its retained temporary file', () => {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+    const workflow = readFileSync(file, 'utf8')
+    const command = /trusted="\$\((mktemp[^)]+)\)"/.exec(workflow)?.[1]
+    assert.equal(command, 'mktemp --suffix=.mjs')
+    const trusted = execFileSync('mktemp', ['--suffix=.mjs'], { encoding: 'utf8' }).trim()
+    console.log(`Retained trusted classifier fixture: ${trusted}`)
+    writeFileSync(trusted, readFileSync('scripts/ci-docs-only.mjs', 'utf8'))
+    const output = execFileSync(process.execPath, [trusted], {
+      encoding: 'utf8', env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main' },
+    })
+    assert.match(output, /docs_only=false/)
+  }
+})
+
 test('all required gates reject failed classification and skipped full jobs', () => {
   for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
     const source = readFileSync(file, 'utf8')
