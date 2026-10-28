@@ -2,7 +2,6 @@ import { preserveMessageSources } from '@/lib/coordinator/message-safety'
 import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
 import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
 import type { AgentExecution } from '@/lib/agent-kit/store'
-import { listAgents as listLocalExecutors } from '@/lib/mcp/actions'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { createHash } from 'node:crypto'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
@@ -227,7 +226,7 @@ export async function updateIssue(userId: string, input: UpdateIssueInput, toolC
 export async function listAgents(userId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return listLocalExecutors(userId)
+  return (await import('@/lib/mcp/actions')).listAgents(userId)
 }
 
 /** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
