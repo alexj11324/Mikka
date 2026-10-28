@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from './settings-link'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { ArrowLeft, Building2, KeyRound, Monitor, Plus, Plug, Search, SlidersHorizontal, SquareUserRound, UserRound, Users } from 'lucide-react'
+import { ArrowLeft, Brain, Building2, KeyRound, Monitor, Plus, Plug, Search, SlidersHorizontal, SquareUserRound, UserRound, Users } from 'lucide-react'
 import { listTeams } from '@/app/actions/teams'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
@@ -17,6 +17,7 @@ const navigation = [
   { title: 'Personal', key: 'personal', items: [
     { title: 'Preferences', section: 'preferences', icon: SlidersHorizontal },
     { title: 'Profile', section: 'profile', icon: UserRound },
+    { title: 'Memory', section: 'memory', icon: Brain },
     { title: 'Account', section: 'account', icon: KeyRound },
     { title: 'Integrations', section: 'integrations', icon: Plug },
     { title: 'Devices', section: 'devices', icon: Monitor },
@@ -64,7 +65,7 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
       return
     }
     const next = destination.pathname.endsWith('/members') ? 'members' : destination.searchParams.get('section')
-    onSectionChange(next === 'profile' || next === 'account' || next === 'workspace' || next === 'members' || next === 'integrations' || next === 'devices' ? next : 'preferences')
+    onSectionChange(next === 'profile' || next === 'memory' || next === 'account' || next === 'workspace' || next === 'members' || next === 'integrations' || next === 'devices' ? next : 'preferences')
   }
   return <Sidebar variant="sidebar" aria-label={i18nText("FeatureCopy.c_a8c7ae4f")}>
     <SidebarHeader className="px-4 pt-3 pb-2">

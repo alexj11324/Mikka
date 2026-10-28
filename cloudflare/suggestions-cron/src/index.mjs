@@ -2,6 +2,7 @@
 export const SCHEDULES = {
   '*/15 * * * *': '/api/cron/briefings',
   '0 * * * *': '/api/cron/suggestions-reconcile',
+  '30 * * * *': '/api/cron/user-facts',
 }
 
 /** @typedef {{ MIKKA_URL?: string, CRON_SECRET?: string }} Env */
