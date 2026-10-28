@@ -22,6 +22,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/run-visibility.ts', file: 'tests/team-visibility.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/issue-search.ts', file: 'tests/issue-search.db.test.ts', script: 'test:issue-search-db' },
   { marker: 'tests/workspace-migration.test.mjs', file: 'tests/workspace-migration.test.mjs', script: 'test:workspace-migration-db' },
+  { marker: 'tests/local-repository-migration.db.test.mjs', file: 'tests/local-repository-migration.db.test.mjs', script: 'test:local-repository-migration-db' },
   { marker: 'drizzle/20261027164500_artifact_legacy_compat.sql', file: 'tests/artifact-legacy-migration.test.mjs', script: 'test:artifact-migration-db' },
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
 ]
