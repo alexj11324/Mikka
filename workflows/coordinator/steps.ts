@@ -1,3 +1,4 @@
+import { FactoryError } from '@/lib/factory/contract'
 import { preserveMessageSources } from '@/lib/coordinator/message-safety'
 import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
 import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
@@ -49,7 +50,7 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError) return { error: error.code }
+    if (error instanceof ActionFailureError || error instanceof FactoryError) return { error: error.code }
     throw error
   }
 }
@@ -197,7 +198,7 @@ export async function listIssues(userId: string, input: { status?: string }, sco
   }))
 }
 
-export async function getIssue(userId: string, input: { issueId: string }, scope?: NativeToolScope) {
+export async function getIssue(userId: string, input: { issueId: string }, scope?: NativeToolScope, botId: string | null = null) {
   'use step'
   await assertNativeToolScope(userId,scope)
   const issue = await issueForUser(userId, input.issueId)
@@ -207,6 +208,7 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
     id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
+    ...(process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listForIssue(userId,issue.id) } : {}),
   }
 }
 
@@ -385,4 +387,41 @@ export async function webSearchStep(userId: string, input: { query: string; limi
   'use step'
   await assertNativeToolScope(userId,scope)
   return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
+}
+
+/** Durable personal intake; existing issue receipts recover a crash before routing. */
+export async function intakeFactoryRequest(userId: string, input: import('@/lib/factory/intake').IntakeInput, scope?: NativeToolScope, botId: string | null = null) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  return asToolResult(async () => {
+    const { factoryForBot, factoryRequestSource } = await import('@/lib/factory/server')
+    const { intakeRequest } = await import('@/lib/factory/intake')
+    const store=factoryForBot(botId)
+    return intakeRequest(input, {
+      source:id=>factoryRequestSource(userId,botId,id),
+      create:(body,key)=>createIssue(userId,body,key,scope,botId),
+      route:route=>store.route(userId,route),
+    })
+  })
+}
+export async function listFactoryRequests(userId:string,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryRequestSource(userId,botId))
+}
+export async function readFactoryTask(userId:string,taskId:string,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryForBot(botId).read(userId,taskId))
+}
+export async function resolveFactoryTask(userId:string,input: import('@/lib/factory/intake').ResolveInput,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryForBot(botId).apply(userId,input.binding,input.eventId,input.change))
+}
+
+export async function stopFactoryTask(userId:string,input:import('@/lib/factory/intake').StopInput,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryForBot(botId).apply(userId,input.binding,input.eventId,{action:input.action,reason:input.reason}))
 }
