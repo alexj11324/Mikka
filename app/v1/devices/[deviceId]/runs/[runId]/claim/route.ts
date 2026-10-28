@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { RUN_LEASE_MS } from '@mikka/protocol/device'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
@@ -11,6 +12,7 @@ import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
+import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,13 +31,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const [run] = await db
     .select()
     .from(agentRuns)
-    .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'queued')))
     .limit(1)
   if (!run) return NextResponse.json({ error: 'Run is not queued for this device.' }, { status: 409 })
   const [agent] = await db.select().from(agents).where(eq(agents.id, run.agentId)).limit(1)
   const [repo] = run.deviceRepoId
     ? await db.select().from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
     : []
+  if ((agent && agent.userId !== caller.userId) || (repo && (repo.userId !== caller.userId || repo.deviceId !== deviceId)))
+    return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409 })
   if (!agent || !repo || !run.issueId) {
     await db.update(agentRuns)
       .set({ status: 'failed', stopReason: 'error', error: 'Run is missing its agent, repository or issue.', finishedAt: new Date(), updatedAt: new Date() })
@@ -64,7 +68,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
   const mcp = await issueRunToken(run)
-      .then(({ token }) => ({ url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token }))
+      .then(async ({ token }) => {
+        const tools = personalMailboxEnabled() ? await (await import('@/lib/personal-mailbox-runtime')).personalWorkerMailboxAdvertised(caller.userId, run.id) : []
+        return { url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token, ...(tools.length ? { mailbox: true as const } : {}) }
+      })
       .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
   // A retry after a lost lease works on in the lost attempt's worktree and,
   // when the harness can, its session; the daemon falls back to `prompt`.
@@ -88,7 +95,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
     ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
-    ...(computer ? { computer } : {}),
+    ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion },
+      policy: { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: computer.permission } } } : {}),
     ...retry,
   })
 }

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -20,10 +20,9 @@ test('web decision releases original MCP call and scripted model continues scree
     execute: async (_, call) => { calls++; return { content: [{ type: 'text', text: JSON.stringify(call) }] } },
   })
   await broker.listen()
-  t.after(async () => { await broker.close(); await rm(dir, { recursive: true, force: true }) })
+  t.after(() => { broker.suspend(); console.log(`Retained review test directory: ${dir}`) })
   const grant = broker.spec(randomUUID(), 'ask', { display: ':2' })!
   const child = spawn(process.execPath, [new URL('./proxy.mjs', import.meta.url).pathname, grant.socketPath, grant.token])
-  t.after(() => child.kill())
   const lines = createInterface({ input: child.stdout })
   t.after(() => lines.close())
   const replies: any[] = []
@@ -65,7 +64,7 @@ test('review polling retries transport failures without granting and stops on ab
     driver: { installed: true, path: '/fake', version: 'test', fingerprint: 'f'.repeat(64) }, permitted: () => true,
     execute: async () => { executed++; return 'ok' },
   })
-  t.after(async () => { await broker.close(); await rm(dir, { recursive: true, force: true }) })
+  t.after(() => { broker.suspend(); console.log(`Retained review test directory: ${dir}`) })
   const grant = broker.spec(randomUUID(), 'ask', { display: ':1' })!
   const result = broker.request(grant.token, { name: 'click', arguments: { x: 1, y: 2 } })
   const abort = new AbortController()

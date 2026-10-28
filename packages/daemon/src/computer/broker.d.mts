@@ -13,7 +13,7 @@ export class ComputerBroker {
     driver: ComputerDriver | null;
     socketPath: string;
     permitted: (runId: string) => boolean;
-    execute?: (driver: ComputerDriver, input: unknown, display: string | undefined, runId: string) => Promise<unknown>;
+    execute?: (driver: ComputerDriver, input: ComputerCall, display: string | undefined, runId: string, context: { actionId: string; assertLive: () => void }) => Promise<unknown>;
     now?: () => number;
     ttl?: number;
   });
@@ -25,6 +25,8 @@ export class ComputerBroker {
   listen(): Promise<void>;
   request(token: string, value: unknown, signal?: AbortSignal): Promise<unknown>;
   list(): PendingComputerRequest[];
+  revoke(token: string): void;
   decide(id: string, digest: string, approve: boolean): Promise<{ ok: true }>;
+  suspend(): void;
   close(): Promise<void>;
 }
