@@ -9,6 +9,7 @@ import {
 } from "../factory/publication-operation";
 import type { PublicationAdapterReceipt } from "../factory/publication-receipt";
 import { digest } from "./contract";
+import { isModelEvaluationResult } from "./evaluation-comparison";
 import { lockSkillScope, resolveSkillVersion } from "./registry";
 
 export const SKILL_ACTIVATION_TARGET = "mikka-builtin:run-report";
@@ -67,7 +68,8 @@ export async function readSkillApprovalEvidence(
   );
   if (
     !evaluation ||
-    evaluation.result?.passed !== true ||
+    !isModelEvaluationResult(evaluation.result) ||
+    evaluation.result.passed !== true ||
     evaluation.digest !== digest(evaluation.result) ||
     evaluation.result.evaluationId !== evaluation.id ||
     evaluation.result.proposalId !== metadata.proposalId ||

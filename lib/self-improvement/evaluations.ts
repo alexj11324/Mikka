@@ -1,15 +1,17 @@
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { runExecution } from '@mikka/protocol/run'
 import type { SkillArtifactRef } from '@mikka/protocol/skill'
 import type { QueueFactoryRun } from '../factory/dispatch'
 import { assignedSkillForRun } from './assignments'
+import { compareRegisteredEvaluation, currentModelEvaluation, type ComparisonState, type EvaluationComparisonSnapshot } from './evaluation-comparison'
+import type { RegisteredSkillEvaluator } from './registered-evaluation'
 import { BASELINE_ARTIFACT } from './builtin-skill'
 import { digest, ImprovementError } from './contract'
 import type { FailureQualityProvider, ReportQualitySignals } from './regression'
 import { resolveSkillVersion, type CurrentSkillRun } from './registry'
-import { REPORT_BENCHMARK, buildTask, compareOutcomes, freezeBenchmarkInstance, evaluateTask, type ReportBenchmarkRun } from './report-benchmark'
+import { REPORT_BENCHMARK, buildTask, freezeBenchmarkInstance, evaluateTask, type ReportBenchmarkRun } from './report-benchmark'
 
 const settingsSchema = z.object({ harness: z.string().trim().min(1), model: z.string().trim().min(1),
   policyDigest: z.string().regex(/^[a-f0-9]{64}$/), fixtureDigest: z.string().regex(/^[a-f0-9]{64}$/),
@@ -24,6 +26,7 @@ type Authorize = (userId: string, issueId: string, tx: PoolClient) => Promise<bo
 export type BenchmarkSourceRun = CurrentSkillRun & { userId: string; deviceId: string; report: { sourceCommit?: string }; harness: string }
 export type EvaluationDependencies = {
   authorize: Authorize
+  assess?: RegisteredSkillEvaluator
   queue: QueueFactoryRun
   settings: (tx: PoolClient, userId: string, source: BenchmarkSourceRun) => Promise<EvaluationSettings>
   selectVersion: (userId: string, runId: string, versionId: string,
@@ -220,8 +223,7 @@ export function createSkillEvaluations(pool: Pool, dependencies: EvaluationDepen
       return {...result,complete:false}
     })
   }
-  async function compare(userId: string,evaluationId: string,existing?:PoolClient) {
-    return transaction(async tx => {
+  async function comparisonState(tx:PoolClient,userId:string,evaluationId:string):Promise<ComparisonState> {
       await lockEvaluationTask(tx,userId,evaluationId)
       const {evaluation,instance} = await evaluationFor(tx,userId,evaluationId)
       const {rows} = await tx.query(`SELECT b.*,r.status,r.report,r."sessionId",r."stopRequestedAt",r."finishedAt",r."deviceId",to_jsonb(m) AS mount
@@ -239,20 +241,43 @@ export function createSkillEvaluations(pool: Pool, dependencies: EvaluationDepen
         arms[row.arm as 'baseline'|'candidate'].push(benchmarkEvidence(row,{sourceCommit:instance.sourceCommit,instanceDigest:instance.instanceDigest,
           settings:instance.settings,artifact:assigned.skillArtifact,receiptId:assigned.skillReceipt.id}))
       }
-      const result = compareOutcomes(arms.baseline,arms.candidate,frozen(instance))
-      const record = { ...result, evaluationId, instanceId:instance.id, proposalId:evaluation.proposalId,
-        candidateVersionId:evaluation.candidateVersionId, scope:evaluation.scope, evidenceDigest:digest(rows) }
-      await tx.query('INSERT INTO improvement_evaluation_results("evaluationId",result,digest) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[evaluationId,JSON.stringify(record),digest(record)])
-      const {rows:[stored]} = await tx.query('SELECT * FROM improvement_evaluation_results WHERE "evaluationId"=$1',[evaluationId])
-      if (stored.digest !== digest(record) || digest(stored.result)!==digest(record)) throw new ImprovementError('conflict')
-      return stored.result as typeof record
-    },existing)
+      // Metadata only, bounded identically to the collector. No object storage
+      // or provider operation runs with this transaction's locks held.
+      const {rows:documents}=await tx.query(`SELECT a.id AS "artifactId",a."runId",a.kind,v.version,v."storageKey",v."inlineContent",v.sha256,v.size,v."createdAt"
+        FROM artifacts a JOIN artifact_versions v ON v."artifactId"=a.id
+        JOIN agent_runs r ON r.id=a."runId" AND r."userId"=a."userId" AND r."issueId"=a."issueId"
+        WHERE a."userId"=$1 AND a."issueId"=$2 AND a."runId"=ANY($3::uuid[]) ORDER BY a.id,v.version LIMIT 101`,
+        [userId,instance.issueId,rows.map(row=>row.runId)])
+      const {rows:[stored]}=await tx.query('SELECT result,digest FROM improvement_evaluation_results WHERE "evaluationId"=$1',[evaluationId])
+      const snapshot:EvaluationComparisonSnapshot={evaluationId,instanceId:instance.id,proposalId:evaluation.proposalId,
+        candidateVersionId:evaluation.candidateVersionId,scope:evaluation.scope,instanceDigest:instance.instanceDigest,
+        baselineSha256:arms.baseline[0].provenance.artifactDigest,candidateSha256:arms.candidate[0].provenance.artifactDigest,
+        evidenceDigest:createHash('sha256').update(JSON.stringify({rows,documents})).digest('hex')}
+      return {snapshot,stored:stored??null}
+  }
+  async function compare(userId:string,evaluationId:string) {
+    return compareRegisteredEvaluation(userId,{
+      assess:dependencies.assess,
+      read:()=>transaction(tx=>comparisonState(tx,userId,evaluationId)),
+      commit:(before,record)=>transaction(async tx=>{
+        const after=await comparisonState(tx,userId,evaluationId)
+        if(digest(after.snapshot)!==digest(before))throw new ImprovementError('sourceMismatch')
+        if(after.stored)return currentModelEvaluation(after.stored,after.snapshot)
+        await tx.query('INSERT INTO improvement_evaluation_results("evaluationId",result,digest) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[evaluationId,JSON.stringify(record),digest(record)])
+        const {rows:[stored]}=await tx.query('SELECT result,digest FROM improvement_evaluation_results WHERE "evaluationId"=$1',[evaluationId])
+        return currentModelEvaluation(stored,after.snapshot)
+      }),
+    })
   }
   async function passingEvaluation(tx:PoolClient,userId:string,proposalId:string,candidateVersionId:string,evaluationId:string) {
     await lockEvaluationTask(tx,userId,evaluationId)
     const {evaluation}=await evaluationFor(tx,userId,evaluationId)
     if (evaluation.proposalId!==proposalId || evaluation.candidateVersionId!==candidateVersionId) throw new ImprovementError('sourceMismatch')
-    const result=await compare(userId,evaluationId,tx)
+    // Publication/approval never starts model or storage I/O. It only consumes
+    // a prior assessed immutable result and checks the current mechanical scope.
+    const state=await comparisonState(tx,userId,evaluationId)
+    if(!state.stored)throw new ImprovementError('sourceRequired')
+    const result=currentModelEvaluation(state.stored,state.snapshot)
     if (!result.passed) throw new ImprovementError('sourceMismatch')
     return {evaluationId,digest:digest(result),result}
   }

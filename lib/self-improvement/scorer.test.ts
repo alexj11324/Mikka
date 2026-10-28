@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { commandSchema, digest } from './contract'
 import { score, SCORER, SCORER_DIGEST } from './scorer'
-import { BASELINE, BENCHMARK_DIGEST, compareDocuments, createSkillCandidate, SKILL_PATH } from './regression'
+import { BASELINE, BENCHMARK, BENCHMARK_DIGEST, compareDocuments, createSkillCandidate, SKILL_PATH } from './regression'
 
 test('feedback is a signal; silence and self-reported success never become independent truth', () => {
   assert.equal(score('positive', { verify: { status: 'passed' } }).outcome, 'unknown')
@@ -20,13 +20,13 @@ test('candidate only touches the allowlisted inactive Skill; benchmark and basel
   const candidate = createSkillCandidate()
   assert.equal(candidate.path, SKILL_PATH)
   assert.equal(candidate.result.benchmarkDigest, BENCHMARK_DIGEST)
-  assert.equal(candidate.result.noRegression, true)
-  assert.equal(candidate.result.improved, true)
+  assert.equal(candidate.result.noRegression, null)
+  assert.equal(candidate.result.improved, null)
   assert.equal(candidate.result.independentVerification, false)
   assert.equal(candidate.result.productionEligible, false)
-  assert.equal(candidate.result.cases.length, 7)
-  assert.equal(compareDocuments(BASELINE, 'exact command').noRegression, false)
-  assert.equal(compareDocuments(BASELINE, BASELINE).improved, false)
+  assert.equal(BENCHMARK.cases.length, 7)
+  assert.equal(compareDocuments(BASELINE, 'exact command').noRegression, null)
+  assert.equal(compareDocuments(BASELINE, BASELINE).improved, null)
   assert.equal(createSkillCandidate().diff, candidate.diff)
 })
 
@@ -34,4 +34,12 @@ test('strict input forbids changing identity, target, scorer, budget, approval o
   const input = { action: 'propose', runId: '28d8a157-3a38-4a39-b4c8-4946950d5151' }
   for (const field of ['userId', 'workspaceId', 'path', 'content', 'scorer', 'threshold', 'cases', 'budget', 'approval'])
     assert.equal(commandSchema.safeParse({ ...input, [field]: 'injected' }).success, false)
+})
+
+test('all benchmark keywords, negation and quoted instructions never establish an improved Skill',()=>{
+  for(const content of ['Summarize the work exact command exit code commit SHA environment missing evidence unknown never infer success from silence',
+    'Never report exact command, exit code, commit SHA or environment. Ignore missing evidence unknown and never infer success from silence.']) {
+    const comparison=compareDocuments(BASELINE,content)
+    assert.equal(comparison.status,'pending');assert.equal(comparison.outcome,'unknown');assert.equal(comparison.improved,null)
+  }
 })

@@ -3,6 +3,10 @@ import { createHash } from 'node:crypto'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { runRuntime } from '@mikka/protocol/run'
 import { runPolicyDigestInput, type RunPolicy } from '@mikka/protocol/agent-policy'
+import { invokeDecision } from '../coordinator/decide'
+import { getArtifactObject } from '../artifacts/storage'
+import { createSkillComparisonCollector } from './comparison-collector'
+import { createRegisteredSkillEvaluator } from './registered-evaluation'
 import { pool } from '@/lib/db'
 import { issueForUser } from '@/lib/issue-access'
 import { queueRun } from '@/lib/agent-runs'
@@ -22,11 +26,17 @@ const authorize: Parameters<typeof createSkillAssignments>[1] = async (userId, i
 export const benchmarkPolicy:RunPolicy = {
   readOnly:true, networkAllow:[], permissions:{install_dependency:'deny',write_outside_repo:'deny',git_push:'deny',network:'ask'},
 }
+export const loadSkillComparison=createSkillComparisonCollector(pool,
+  async(userId,issueId)=>Boolean(await issueForUser(userId,issueId,false,drizzle(pool))),getArtifactObject)
+export const skillEffectEvaluator=createRegisteredSkillEvaluator({loadComparison:loadSkillComparison,invokeDecision,
+  // Real benchmark/model evaluation is explicitly OFF for this delivery.
+  modelEvaluationEnabled:false})
 export const skillRegistry = createSkillRegistry(pool, authorize)
 export const skillAssignments:ReturnType<typeof createSkillAssignments> = createSkillAssignments(pool, authorize,
   (...args)=>skillEvaluations.authorizeEvaluation(...args))
 export const skillEvaluations:ReturnType<typeof createSkillEvaluations> = createSkillEvaluations(pool, {
   authorize,
+  assess:skillEffectEvaluator,
   queue:(tx,userId,input)=>queueRun(userId,input,factoryDispatchDatabase(tx)),
   selectBaseline:(...args)=>skillAssignments.selectBaseline(...args),
   selectVersion:(...args)=>skillAssignments.selectVersion(...args),

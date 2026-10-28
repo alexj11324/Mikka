@@ -4,6 +4,7 @@ import test from "node:test";
 import type { PoolClient } from "pg";
 import { BASELINE_ARTIFACT } from "./builtin-skill";
 import { digest } from "./contract";
+import { syntheticModelResult } from "./testing/evaluation-result-fixture";
 import { SKILL_PATH } from "./regression";
 import { canonicalSkill } from "./registry";
 import {
@@ -55,19 +56,15 @@ function fixture(environment = "preview") {
     createdAt: new Date(),
   };
   const scope = {
+    sourceCommit: "c".repeat(40),
     factoryTaskId: taskId,
     candidateId,
     issueId,
     agentId,
     repoId,
   };
-  const result = {
-    passed: true,
-    evaluationId,
-    proposalId,
-    candidateVersionId: candidateId,
-    scope,
-  };
+  const result = syntheticModelResult({evaluationId,instanceId:randomUUID(),proposalId,candidateVersionId:candidateId,
+    scope,instanceDigest:"5".repeat(64),baselineSha256:BASELINE_ARTIFACT.sha256,candidateSha256:artifact.sha256,evidenceDigest:"6".repeat(64)});
   const evaluation = {
     id: evaluationId,
     scope,
@@ -271,7 +268,7 @@ test("activation fails before effect for absent transaction, stale binding, revo
   assert.equal(f.lifecycle.length, 0);
 });
 
-test("approval evidence binds canonical bytes and immutable independently passing evaluation", async () => {
+test("approval evidence binds canonical bytes and immutable model assessment", async () => {
   const f = fixture();
   const manifest = await readSkillApprovalEvidence(f.tx, f.task as never);
   assert.equal(manifest?.markdown.includes("Candidate report"), true);
@@ -425,4 +422,12 @@ test("Skill monitor outcome checks require exact proof and distinguish real fail
     ),
     false,
   );
+});
+
+test("historical CPU pass cannot stand in for a model assessment or rewrite the result ledger", async () => {
+  const f=fixture();
+  const legacy={passed:true,evaluationId:f.evaluation.id,proposalId:f.metadata.proposalId,candidateVersionId:f.metadata.versionId,scope:f.evaluation.scope};
+  f.evaluation.result=legacy as never;f.evaluation.digest=digest(legacy);
+  await assert.rejects(readSkillApprovalEvidence(f.tx,f.task as never),/factorySkillActivationEvidenceRequired/);
+  assert.equal(f.lifecycle.length,0);
 });
