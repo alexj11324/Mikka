@@ -71,7 +71,8 @@ export class Outbox {
       runId: string,
       item: OutboxItem,
       error: unknown
-    ) => void = () => undefined
+    ) => void = () => undefined,
+    private readonly retainResources = false
   ) {
     mkdirSync(dir, { recursive: true, mode: 0o700 })
   }
@@ -261,6 +262,7 @@ export class Outbox {
   }
 
   private remove(runId: string) {
+    if (this.retainResources) return
     rmSync(this.file(runId), { force: true })
     rmSync(this.ackFile(runId), { force: true })
   }

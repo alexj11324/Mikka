@@ -10,5 +10,5 @@ delete process.env.MIKKA_E2E_DEVICE_TOKEN
 // Exercise the actual supported --token login, then the actual CLI/HTTP daemon.
 const login = await runCli(['daemon', 'login', '--token', token, '--data-dir', dataDir, '--server', `${MVP_ORIGIN}/mikka`])
 if (login !== 0) throw new Error('The real daemon token login failed')
-const code = await runCli(['daemon', '--data-dir', dataDir, '--server', `${MVP_ORIGIN}/mikka`, '--mock-speed', '1', '--fixtures-dir', resolve('tests/mvp/fixtures')])
+const code = await runCli(['daemon', '--data-dir', dataDir, '--server', `${MVP_ORIGIN}/mikka`, '--mock-speed', '1', '--fixtures-dir', resolve('tests/mvp/fixtures'), '--retain-resources'])
 if (code !== null) process.exitCode = code

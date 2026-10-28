@@ -102,6 +102,8 @@ export interface DaemonOptions {
   stallMs?: number
   /** Finished worktrees older than this are removed. */
   retentionMs?: number
+  /** Keep acceptance worktrees, refs and failed clones for later inspection. */
+  retainResources?: boolean
   /** Skip CLI detection (tests). */
   harnesses?: HarnessInfo[]
   /**
@@ -255,10 +257,11 @@ export class Daemon {
       this.options.link,
       this.log,
       undefined,
-      (runId, _item, error) => this.supervisor.markUndeliverable(runId, error)
+      (runId, _item, error) => this.supervisor.markUndeliverable(runId, error),
+      this.options.retainResources
     )
-    this.worktrees = new WorktreeManager(paths.worktrees)
-    this.repositories = new RepositoryCache(paths.repos)
+    this.worktrees = new WorktreeManager(paths.worktrees, this.options.retainResources)
+    this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
     // Hosted subscriptions use their dedicated container sandbox. Local
     // adapters require the separately probed sandbox-runtime from main.
     this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
@@ -633,7 +636,7 @@ export class Daemon {
       return sandbox
     } catch (err) {
       this.log.warn({ err }, "agent sandbox unavailable")
-      await sandbox.reset().catch((resetError: unknown) => {
+      if (!this.options.retainResources) await sandbox.reset().catch((resetError: unknown) => {
         this.log.warn({ err: resetError }, "agent sandbox cleanup failed")
       })
       return null
@@ -1106,7 +1109,7 @@ export class Daemon {
       } finally {
         const sandbox = this.ownedSandbox
         this.ownedSandbox = null
-        await sandbox?.reset().catch((err: unknown) => {
+        if (!this.options.retainResources) await sandbox?.reset().catch((err: unknown) => {
           this.log.warn({ err }, "agent sandbox cleanup failed")
         })
       }

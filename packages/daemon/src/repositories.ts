@@ -10,7 +10,7 @@ import { FETCH_GIT, FETCH_TIMEOUT_MS, isInside } from './worktrees'
 
 /** A standard clone owned by the daemon, shared only through per-run worktrees. */
 export class RepositoryCache {
-  constructor(private readonly root: string, private readonly allowFile = daemonTestMode(process.env)) {}
+  constructor(private readonly root: string, private readonly allowFile = daemonTestMode(process.env), private readonly retainResources = false) {}
 
   pathFor(remoteUrl: string): string {
     const { key } = normalizeRepository(remoteUrl, { allowFile: this.allowFile })
@@ -38,13 +38,13 @@ export class RepositoryCache {
         try {
           await git(['clone', '--no-checkout', '--no-hardlinks', '--no-recurse-submodules', '--', remote, temporary])
           renameSync(temporary, path)
-        } finally { rmSync(temporary, { recursive: true, force: true }) }
+        } finally { if (!this.retainResources) rmSync(temporary, { recursive: true, force: true }) }
       } else {
         this.assertClone(path)
         // The validated assignment is authoritative. A cache's stale remote
         // must never select another repository or an executable transport.
         await git(['remote', 'set-url', 'origin', remote], path)
-        await git(['fetch', '--prune', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', 'origin'], path)
+        await git(['fetch', ...(this.retainResources ? [] : ['--prune']), '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', 'origin'], path)
       }
       this.assertClone(path)
       // Refresh when the host changes its default branch after the first clone.

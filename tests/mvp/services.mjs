@@ -148,6 +148,8 @@ export async function startMvpServices(port = 3191) {
   return {
     origin: `http://127.0.0.1:${server.address().port}`,
     async close() {
+      server.closeAllConnections()
+      await new Promise(resolve => server.close(resolve))
       await finishMvpResources()
     },
   }

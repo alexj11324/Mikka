@@ -1,6 +1,6 @@
 import { constants } from 'node:fs'
-import { lstat, open } from 'node:fs/promises'
-import { isAbsolute, dirname } from 'node:path'
+import { lstat, mkdir, open } from 'node:fs/promises'
+import { isAbsolute, dirname, resolve } from 'node:path'
 
 // Preservation is mandatory in every environment until cleanup is authorized.
 export function retainMvpResources(_env = process.env) { return true }
@@ -20,8 +20,9 @@ export function resourceRecord(kind, value) {
 
 export async function indexMvpResource(kind, value, env = process.env) {
   if (!retainMvpResources(env)) return
-  const path = env.MIKKA_MVP_RESOURCE_INDEX
-  if (!path || !isAbsolute(path)) throw new Error('Retain mode requires an absolute MIKKA_MVP_RESOURCE_INDEX')
+  const path = env.MIKKA_MVP_RESOURCE_INDEX ?? resolve('.cache/mvp-retained/resources.jsonl')
+  if (!isAbsolute(path)) throw new Error('Retain mode requires an absolute MIKKA_MVP_RESOURCE_INDEX')
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
   const dir = await lstat(dirname(path))
   if (!dir.isDirectory() || dir.isSymbolicLink() || (dir.mode & 0o077) || (process.getuid && dir.uid !== process.getuid())) throw new Error('MVP index directory must be private')
   const file = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_APPEND | constants.O_NOFOLLOW, 0o600)

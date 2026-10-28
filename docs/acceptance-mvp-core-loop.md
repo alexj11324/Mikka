@@ -30,18 +30,37 @@ do not complete the separate frozen-Preview acceptance gate below.
 
 ## Deterministic CI gate
 
-The MVP-owned teardown no longer removes daemon,
-repository or workflow directories, kills child processes, or closes fixture
-services. Device-token revocation remains a separate non-deleting operation.
-The private resource index requires an absolute `MIKKA_MVP_RESOURCE_INDEX` in
-an existing owner-private directory and records identifiers and paths only.
+The MVP-owned teardown retains daemon, repository and workflow directories.
+Fixture HTTP sockets close without removing their directories. Device-token
+revocation remains a separate non-deleting operation. The daemon receives
+`--retain-resources`, preserving worktrees, refs, failed clones and outbox files.
+The private resource index records identifiers and paths only; by default it is
+created under `.cache/mvp-retained`, or at an absolute `MIKKA_MVP_RESOURCE_INDEX`.
 
-The shared account helpers,
-Playwright output lifecycle, Actions service lifecycle and daemon repository /
-worktree lifecycle need an independently reviewed retention path. In particular,
-the daemon currently prunes worktrees and remote refs and removes a temporary
-clone in `finally`; the MVP wrapper cannot safely override those behaviors.
+The shared account helpers, Playwright output lifecycle and Actions service
+lifecycle retain their separate acceptance scope. This wrapper does not grant
+permission to clean up an existing shared or retained resource.
 No local browser or DB run on this retained candidate is claimed below.
+
+### Retained Preview database provisioned on 2026-10-28
+
+The user authorized creation, tracked migrations and Preview binding. Neon
+project `long-recipe-96305188`, branch `br-ancient-sea-b50a21nt`
+(`acceptance/pr362-retained-20261028`), database `mikka_acceptance`, was created
+from the acceptance template after confirming zero users, accounts, issues and
+sessions. Production and Staging were not used. Nine pending repository
+migrations from source `b7258bab35554fcf0590f4b2ce8d67822ab576cc` committed through
+the Neon SQL channel, including their migration receipts; the template's direct
+TCP connection was refused by the execution environment. The resulting ledger
+has 71 entries and the repository settings, device authorization, issue-tool
+receipt and publication tables exist. No account was seeded during provisioning.
+
+The connection is stored in Infisical Mikka/dev `/vercel` under
+`MIKKA_PR362_DATABASE_URL`. Vercel project `prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH`
+has branch-specific, sensitive `DATABASE_URL` and `MIKKA_DATABASE_URL` variables
+for `codex/mvp-e2e`, targeting Preview only. Neither values nor connection URLs
+are part of this record. Provisioning and binding are infrastructure evidence;
+the deployed login, model, daemon and GitHub App scenarios remain pending.
 
 The `Browser tests (before merge)` job runs `pnpm test:e2e:mvp` after the
 production build and performance gate, before the existing functional browser
