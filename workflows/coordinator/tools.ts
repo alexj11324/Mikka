@@ -88,7 +88,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
         execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.bindComputerSubscription(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
       }),
       dispatch_bot_computer: tool({
-        description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Computer operations still require their approval.',
+        description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Follow the authoritative effective execution policy: allow executes, ask uses the existing wait, deny or revocation stops. Do not add another blanket confirmation.',
         inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional() }),
         execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerTask(userId, { ...input, botId: target }, options.toolCallId, scope, execution ?? undefined) : { error: 'botMismatch' } },
       }),
