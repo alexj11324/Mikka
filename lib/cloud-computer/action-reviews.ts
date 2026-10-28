@@ -14,7 +14,7 @@ export type BrowserMutation = z.infer<typeof browserMutationSchema>
 const approvedSchema = z.object({ actionId: z.uuid(), workspaceId: z.uuid(), botId: z.uuid(), subagentId: z.uuid(), epoch: z.number().int(), policyVersion: z.number().int().nonnegative(), expiresAt: z.number().finite(), loaderId: z.string(), origin: z.string(), mutation: browserMutationSchema, summary: z.string().max(500), digest: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
 /** Reuse the existing pending_actions ledger and decidePendingAction server
  * action. No subagent run, replacement permission system or new UI is created. */
-export async function browserAction(pool: Pool, actor: Actor, botId: string, id: string, mutation: BrowserMutation, summary: string, _irreversible: boolean) {
+export async function browserAction(pool: Pool, actor: Actor, botId: string, id: string, mutation: BrowserMutation, summary: string) {
   const store = new SubagentStore(pool)
   const row = await store.get(actor, botId, id)
   if (row.status !== 'running') throw new ComputerError(409, 'Subagent is waiting')

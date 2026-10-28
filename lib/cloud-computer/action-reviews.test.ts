@@ -35,7 +35,7 @@ beforeEach(() => { calls.length = 0; updates.length = 0; queries.length = 0; aut
 
 test('model-selected ordinary action executes without a metadata business classifier', async () => {
   const mutation = { action: 'click' as const, selector: '#continue' }
-  const result = await browserAction(pool, actor, 'bot', 'subagent', mutation, 'Continue', false)
+  const result = await browserAction(pool, actor, 'bot', 'subagent', mutation, 'Continue')
   assert.equal(result.state, 'running')
   assert.deepEqual(calls, [{ action: 'inspectMutation', mutation }])
   assert.deepEqual(executed[0], { actor, botId: 'bot', subagentId: 'subagent', epoch: 7, policyVersion: 2, expiresAt: authority!.expiresAt, loaderId: 'document', origin: 'https://example.test', mutation })
@@ -45,7 +45,7 @@ test('model-selected ordinary action executes without a metadata business classi
 test('host ask reuses the authority review without a second pending action', async () => {
   authority!.decision = 'ask'
   const mutation = { action: 'click' as const, selector: '#confirm' }
-  const result = await browserAction(pool, actor, 'bot', 'subagent', mutation, 'Confirm task', true)
+  const result = await browserAction(pool, actor, 'bot', 'subagent', mutation, 'Confirm task')
   assert.equal(result.state, 'needs_you')
   assert.deepEqual(calls, [{ action: 'inspectMutation', mutation }])
   assert.equal(queries.length, 0)
@@ -55,21 +55,21 @@ test('host ask reuses the authority review without a second pending action', asy
   assert.equal(updates.length, 1)
 })
 
-test('trusted allow applies even when the model flags an action irreversible', async () => {
-  const result = await browserAction(pool, actor, 'bot', 'subagent', { action: 'click', selector: '#confirm' }, 'Confirm task', true)
+test('trusted allow executes the selected action', async () => {
+  const result = await browserAction(pool, actor, 'bot', 'subagent', { action: 'click', selector: '#confirm' }, 'Confirm task')
   assert.equal(result.state, 'running')
   assert.equal(queries.length, 0)
 })
 
-test('trusted ask applies even when the model does not flag an action irreversible', async () => {
+test('trusted ask requires the existing authority review', async () => {
   authority!.decision = 'ask'
-  const result = await browserAction(pool, actor, 'bot', 'subagent', { action: 'click', selector: '#continue' }, 'Continue', false)
+  const result = await browserAction(pool, actor, 'bot', 'subagent', { action: 'click', selector: '#continue' }, 'Continue')
   assert.equal(result.state, 'needs_you')
 })
 
 test('ask without the authority review fails closed rather than creating another approval', async () => {
   authority!.decision = 'ask'; authority!.review = undefined
-  await assert.rejects(browserAction(pool, actor, 'bot', 'subagent', { action: 'click', selector: '#continue' }, 'Continue', false))
+  await assert.rejects(browserAction(pool, actor, 'bot', 'subagent', { action: 'click', selector: '#continue' }, 'Continue'))
   assert.equal(queries.length, 0)
   assert.equal(updates.length, 0)
 })
@@ -81,7 +81,7 @@ for (const condition of ['deny', 'expired', 'readonly', 'unavailable', 'stopped'
     if (condition === 'readonly') authority!.readOnly = true
     if (condition === 'unavailable') authority = undefined
     if (condition === 'stopped') status = 'stopped'
-    await assert.rejects(browserAction(pool, actor, 'bot', 'subagent', { action: 'click', selector: '#continue' }, 'Continue', false))
+    await assert.rejects(browserAction(pool, actor, 'bot', 'subagent', { action: 'click', selector: '#continue' }, 'Continue'))
     assert.ok(calls.every(call => call.action === 'inspectMutation'))
     assert.equal(executed.length, 0)
     assert.equal(queries.length, 0)

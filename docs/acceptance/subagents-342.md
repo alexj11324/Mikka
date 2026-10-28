@@ -67,11 +67,10 @@ actual registration and heartbeat use the same transport as daemon polling.
 
 Ordinary browser navigate/click/type/key actions are implemented. Password and
 OTP typing is broker-only; sensitive observations and display access remain
-blocked until cleared. The model is instructed to request confirmation before
-irreversible actions; its `irreversible` flag routes selected actions through the existing
-pending_actions ledger, bound to the document and origin. This model decision
-is not a general guarantee about arbitrary page-script effects. Normal
-navigation does not request per-action approval.
+blocked until cleared. The model chooses the next action; the trusted host's
+existing allow/ask/deny decision governs execution and any required approval.
+The host authority integration is not yet complete, so browser mutations and
+navigation fail closed until that integration is available.
 The credential broker's guarded CDP transport is a separate boundary: it only
 attaches to the bound target, accepts the broker's fixed login/session scripts,
 and rejects unknown methods, scripts, parameters and sessions. Cookie access is
