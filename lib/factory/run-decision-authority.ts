@@ -23,6 +23,10 @@ import {
   type FactoryDecisionAuthority,
   type FactoryDecisionScope,
 } from "./policy-authorization";
+import {
+  factoryDecisionExecution,
+  factoryDecisionExecutionMatches,
+} from "./decision-execution";
 
 const id = z.string().min(1).max(2000);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -53,7 +57,13 @@ export const factoryRunReview = z
     issuedAt: z.iso.datetime(),
     expiresAt: z.iso.datetime(),
     checks: z.array(checkReceipt).length(2),
-    judgment: verifiedFactoryDecision.shape.judgment,
+    judgment: verifiedFactoryDecision.shape.judgment
+      .extend({
+        choice: z.literal("publish_current"),
+        requestDigest: hash,
+        execution: factoryDecisionExecution,
+      })
+      .strict(),
   })
   .strict();
 export const factoryRunReviewEnvelope = z
@@ -119,6 +129,8 @@ export interface FactoryPublicationHost {
   executionRunId: string;
   /** Hash of the already authenticated existing run token; never model input. */
   tokenHash: string;
+  /** Actual shared transport's selected vision-capable model, from host config. */
+  decisionModelId: string;
   /** Trusted host-review public keys. No live attestation producer or key is
    * configured here; absence rejects. No production identity is installed. */
   reviewKey(issuer: string, keyId: string): KeyObject | undefined;
@@ -344,6 +356,21 @@ export function createFactoryRunDecisionAuthority(
           new Date(expected.expiresAt).getTime()
       )
         fail("factoryPolicyDecisionMismatch");
+      if (
+        body.judgment.receiptId !== body.judgment.execution.executionId ||
+        body.judgment.model !== body.judgment.execution.modelId ||
+        !factoryDecisionExecutionMatches(body.judgment.execution, {
+          modelId: host.decisionModelId,
+          requestDigest: body.judgment.requestDigest,
+          imageDigests: body.judgment.imageDigests,
+          requiresVisual: body.judgment.visualInputRequired,
+          scopeDigest: body.scopeDigest,
+          evidenceDigest: expected.evidenceDigest,
+          startedAfter: new Date(run.startedAt!).toISOString(),
+          observedAt: body.issuedAt,
+        })
+      )
+        fail("factoryPolicyModelEvidenceUnavailable");
       const current = await approvalEvidence(tx, task);
       if (
         current.evidenceDigest !== expected.evidenceDigest ||

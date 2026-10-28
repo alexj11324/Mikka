@@ -536,21 +536,18 @@ test(
             provider.state.dropCreateResponse = window === "lost-response";
             if (window === "sql-rollback")
               await pool.query(
-                `CREATE FUNCTION reject_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected rollback'; END $$; CREATE TRIGGER reject_event BEFORE INSERT ON factory_events FOR EACH ROW EXECUTE FUNCTION reject_event()`,
+                `CREATE FUNCTION reject_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF current_setting('factory194.inject_failure',true) IS DISTINCT FROM 'off' THEN RAISE EXCEPTION 'injected rollback'; END IF; RETURN NEW; END $$; CREATE TRIGGER reject_event BEFORE INSERT ON factory_events FOR EACH ROW WHEN (NEW."taskId"='${x.task.id}'::uuid) EXECUTE FUNCTION reject_event()`,
               );
-            try {
-              await assert.rejects(
-                () => f.service().publish(actor, p),
-                window === "sql-rollback"
-                  ? /injected rollback/
-                  : (e: unknown) => e instanceof PublicationDeferred,
+            await assert.rejects(
+              () => f.service().publish(actor, p),
+              window === "sql-rollback"
+                ? /injected rollback/
+                : (e: unknown) => e instanceof PublicationDeferred,
+            );
+            if (window === "sql-rollback")
+              await pool.query(
+                "ALTER FUNCTION reject_event() SET factory194.inject_failure='off'",
               );
-            } finally {
-              if (window === "sql-rollback")
-                await pool.query(
-                  "DROP TRIGGER reject_event ON factory_events; DROP FUNCTION reject_event()",
-                );
-            }
             assert.equal(provider.posts(), before + 1);
             const ledger = await f.service().ledger(actor, x.task.id),
               op = ledger.publications[0];

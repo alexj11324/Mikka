@@ -8,6 +8,7 @@ import {
   FactoryError,
 } from "./approval-contract";
 import { digest } from "./evidence";
+import { factoryDecisionExecution } from "./decision-execution";
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const identifier = z.string().min(1).max(2000);
@@ -72,6 +73,12 @@ export const verifiedFactoryDecision = z
         scopeDigest: hash,
         evidenceDigest: hash,
         imageDigests: z.array(hash).max(100),
+        choice: z.literal("publish_current").optional(),
+        requestDigest: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+        execution: factoryDecisionExecution.optional(),
       })
       .strict(),
     confirmation: z

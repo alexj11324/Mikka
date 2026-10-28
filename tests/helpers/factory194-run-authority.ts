@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, randomUUID, sign } from "node:crypto";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { factoryPublicationJudgment } from "../../lib/factory/decision-execution";
 import { join } from "node:path";
 import type { TestContext } from "node:test";
 import { runEventBatchSchema } from "@mikka/protocol/device";
@@ -149,6 +150,7 @@ export async function factoryRunAuthorityCases(
       ownerId: actor.userId,
       executionRunId: runId,
       tokenHash,
+      decisionModelId: "synthetic-vision-capable-model",
       reviewKey: (issuer, keyId) =>
         state.keyAvailable &&
         issuer === "synthetic-review-transport" &&
@@ -243,15 +245,41 @@ export async function factoryRunAuthorityCases(
       issuedAt: now.toISOString(),
       expiresAt: request.expiresAt,
       checks,
-      judgment: {
-        receiptId: "synthetic-model-invocation",
-        model: "synthetic-vision-capable-model",
-        capability: "vision",
-        visualInputRequired: false,
-        scopeDigest: digest(scope),
-        evidenceDigest: evidence.evidenceDigest,
-        imageDigests: [],
-      },
+      judgment: factoryPublicationJudgment(
+        {
+          answers: new Map([
+            [
+              "publication",
+              {
+                type: "choice",
+                name: "publication",
+                choice: "publish_current",
+              },
+            ],
+          ]),
+          // Structural synthetic receipt, not a model call or provider evidence.
+          execution: {
+            executionId: credentialId,
+            modelId: host.decisionModelId,
+            providerGenerationId: "synthetic-generation",
+            startedAt: now.toISOString(),
+            completedAt: now.toISOString(),
+            requestDigest: "a".repeat(64),
+            imageDigests: [],
+            vision: "no-image-input",
+          },
+        },
+        {
+          modelId: host.decisionModelId,
+          requestDigest: "a".repeat(64),
+          imageDigests: [],
+          requiresVisual: false,
+          scopeDigest: digest(scope),
+          evidenceDigest: evidence.evidenceDigest,
+          startedAfter: now.toISOString(),
+          observedAt: now.toISOString(),
+        },
+      )!,
     };
     const identity = {
       issuer: "synthetic-review-transport",
@@ -381,6 +409,12 @@ export async function factoryRunAuthorityCases(
           "readonly-run",
           "device",
           "missing-policy",
+          "model-selection",
+          "model-request",
+          "model-future",
+          "model-visual",
+          "model-receipt",
+          "model-defer",
         ]) {
           const c = await fixture();
           if (scenario === "signature") c.envelope.signature = "A".repeat(86);
@@ -401,6 +435,28 @@ export async function factoryRunAuthorityCases(
               privateKey,
             ).toString("base64url");
           }
+          if (scenario === "model-selection")
+            c.host.decisionModelId = "different-host-model";
+          if (scenario.startsWith("model-") && scenario !== "model-selection") {
+            const judgment = c.envelope.payload.judgment;
+            if (scenario === "model-request")
+              judgment.requestDigest = "e".repeat(64);
+            if (scenario === "model-future")
+              judgment.execution.completedAt = "2099-01-01T00:00:00.000Z";
+            if (scenario === "model-visual")
+              judgment.visualInputRequired = true;
+            if (scenario === "model-receipt") judgment.receiptId = randomUUID();
+            if (scenario === "model-defer")
+              Object.assign(judgment, { choice: "defer" });
+            // Invalid defer is rejected by the signer schema too. Persist it
+            // with the old signature to exercise the reader's parse rejection.
+            if (scenario !== "model-defer")
+              c.envelope.signature = sign(
+                null,
+                factoryRunReviewSignatureInput(c.envelope.payload, c.envelope),
+                privateKey,
+              ).toString("base64url");
+          }
           if (scenario === "self-allow")
             Object.assign(c.envelope.payload, { decision: "allow" });
           if (
@@ -411,7 +467,8 @@ export async function factoryRunAuthorityCases(
               "trusted-alias",
               "expired-review",
               "self-allow",
-            ].includes(scenario)
+            ].includes(scenario) ||
+            scenario.startsWith("model-")
           )
             await pool.query("UPDATE run_chunks SET chunk=$2 WHERE id=$1", [
               c.chunkId,
@@ -491,9 +548,10 @@ export async function factoryRunAuthorityCases(
               [c.runId],
             );
           if (scenario === "check")
-            await pool.query('DELETE FROM factory_events WHERE "taskId"=$1', [
-              c.x.task.id,
-            ]);
+            await pool.query(
+              `UPDATE factory_events SET result='{"invalidSyntheticCheck":true}'::jsonb WHERE "taskId"=$1`,
+              [c.x.task.id],
+            );
           if (scenario === "readonly")
             await pool.query(
               'UPDATE factory_policy_fixture SET "readOnly"=true WHERE "runId"=$1',
@@ -625,6 +683,6 @@ export async function factoryRunAuthorityCases(
     );
   } finally {
     for (const root of directories)
-      await rm(root, { recursive: true, force: true });
+      console.info("Factory194 retained artifact directory", root);
   }
 }

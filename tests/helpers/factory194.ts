@@ -358,7 +358,7 @@ export async function factory194Fixture(connectionString: string) {
     async close() {
       await provider.close();
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      console.info("Factory194 retained schema", schema);
       await admin.end();
     },
   };

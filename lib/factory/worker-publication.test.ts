@@ -67,7 +67,11 @@ const deps = {
     assert.equal(identity.botId, botId);
     return store;
   },
-  host: { reviewKey: () => undefined, policy: async () => null },
+  host: {
+    decisionModelId: "synthetic-vision-capable-model",
+    reviewKey: () => undefined,
+    policy: async () => null,
+  },
 };
 test("worker backend rejects absent/invalid existing run-token authentication before constructing a publication service", async () => {
   const { factoryPublicationForWorker } = await publicationModule;

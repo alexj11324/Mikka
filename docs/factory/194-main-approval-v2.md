@@ -147,6 +147,36 @@ predicate for committed check passes; semantic validators, model invocation and
 current policy data remain explicitly synthetic. No real deployment authorization
 is signed and no real provider is called.
 
+### Actual shared model receipt consumer
+
+The shared #193 source `7760bcb7556ae918948aba58a377e4359b91ea5c`
+exports `invokeDecision()` and its host-produced `DecisionExecution` in
+`lib/coordinator/decide.ts`. This batch's `decision-execution.ts` consumes that
+actual structural result: `factoryPublicationJudgment(result, expected)` takes
+the returned answer Map and host execution receipt. It returns semantic evidence
+only when the model chooses `publication=publish_current`; missing, refusal and
+`defer` produce no judgment. Confidence is not another program threshold or
+confirmation. The normalizer defines no caller, signer or permission issuer.
+
+The concrete signed run review now requires `choice`, `requestDigest` and
+`execution` in its judgment. Execution fields are `executionId`, `modelId`,
+`providerGenerationId`, `startedAt`, `completedAt`, `requestDigest`, ordered
+`imageDigests` and `vision` (`image-input-submitted` or `no-image-input`). The host
+supplies its actual selected `decisionModelId`; the verifier compares model,
+receipt identity, request digest, ordered pixel digests, visual-input requirement
+and times between executor start and signed review issuance (which must precede
+server event observation). These are
+provenance/integrity checks, not program evaluation of the scene. Submitted images
+do not establish visual understanding or permission. A claimed execution nested
+inside a model answer cannot replace the actual host receipt.
+
+Compile-time consumption was checked against the actual shared frozen source,
+without loading/calling its transport. Isolated tests use structural synthetic
+receipts and explicitly do not prove a real model run. The trusted producer must
+call the actual shared transport with real required images, derive expectations
+from its actual request, then attest that result. No live producer/key/policy
+source is configured here; a model-supplied receipt or `allow` is insufficient.
+
 ## #192 integration
 
 The intake-only `283a64232fe444505a59fed15d8364214512f26a` lacks lifecycle
@@ -233,3 +263,20 @@ consumption does not erase history. The legacy V1 reader rejects production.
 reference and actual production-domain routing. Provider READY is not user-flow
 health. No real-user acceptance video is claimed until that chain is exercised on
 an authorized real target with real evidence.
+
+## Test resource retention
+
+The #194 fixture teardown retains database schemas and rows, artifact directories
+and protocol audit JSON by default. It has no schema/record/directory/container
+deletion option. Fault injection invalidates a synthetic check without deleting
+its event. Its scoped rollback trigger and function remain installed in the
+isolated schema. HTTP substitutes persist request/deployment audit data and
+unref their listener rather than destroy connections. PostgreSQL client shutdown
+does not remove the database or container. These changes do not retroactively
+authorize or establish retention for earlier runs.
+
+Shared CI startup/teardown scripts outside #194 still include destructive paths
+(including migration-fixture schema drops and Docker `--rm`/`rm -f`). They must be
+coordinated with their owners before a new ref update automatically runs those
+jobs. Do not treat the older head's CI as acceptance of this source or launch a
+build/test cleanup path merely because the Factory feature is disabled.

@@ -1,5 +1,8 @@
 import { createServer } from "node:http";
 import { once } from "node:events";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   createVercelClient,
   MIKKA_VERCEL,
@@ -94,10 +97,26 @@ export async function vercelProtocolFixture() {
     }),
     posts: () => requests.filter((r) => r.method === "POST").length,
     async close() {
-      server.closeAllConnections();
-      await new Promise<void>((resolve, reject) =>
-        server.close((e) => (e ? reject(e) : resolve())),
+      // Retain audit data by default. Do not destroy a fixture listener or any
+      // database/container/directory in test teardown. unref only lets the test
+      // runner finish; the listener remains available for this process's life.
+      const audit = await mkdtemp(join(tmpdir(), "factory194-protocol-"));
+      await writeFile(
+        join(audit, "protocol.json"),
+        JSON.stringify(
+          {
+            origin,
+            requests,
+            deployments: [...deployments.values()],
+            state,
+          },
+          null,
+          2,
+        ),
+        { mode: 0o600 },
       );
+      console.info("Factory194 retained protocol audit", audit, origin);
+      server.unref();
     },
   };
 }
