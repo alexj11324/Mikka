@@ -4,7 +4,9 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import * as schema from './schema'
 import { mikkaDatabaseURL } from './config'
 
-function createPool(connectionString = mikkaDatabaseURL(process.env)) {
+const defaultConnectionString = mikkaDatabaseURL(process.env)
+
+function createPool(connectionString = defaultConnectionString) {
   return new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 })
 }
 
@@ -13,8 +15,8 @@ function createDatabase(client: Pool) {
 }
 
 const globalDb = globalThis as unknown as { mikkaPool?: Pool }
-const defaultPool = globalDb.mikkaPool ?? createPool()
-if (process.env.NODE_ENV !== 'production') globalDb.mikkaPool = defaultPool
+const defaultPool = process.env.VERCEL_ENV === 'preview' ? createPool() : globalDb.mikkaPool ?? createPool()
+if (process.env.NODE_ENV !== 'production' && process.env.VERCEL_ENV !== 'preview') globalDb.mikkaPool = defaultPool
 const defaultDatabase = createDatabase(defaultPool)
 const requestDatabase = new AsyncLocalStorage<{ pool: Pool; db: typeof defaultDatabase }>()
 type Transaction = Parameters<Parameters<typeof defaultDatabase.transaction>[0]>[0]
