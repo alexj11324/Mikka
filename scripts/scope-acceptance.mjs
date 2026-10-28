@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { execFileSync, fork } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { SCOPE_DATABASES, SCOPE_RETAINED_DATABASE, SCOPE_RETIRED_APPROVALS, SCOPE_LIMITS, scopeUrl, checkedScopeUrl, scopePolicy, controlledChild } from './scope-acceptance-policy.mjs'
+import { SCOPE_DATABASES, SCOPE_RETAINED_DATABASE, SCOPE_RETIRED_APPROVALS, SCOPE_LIMITS, SCOPE_MIGRATION_COUNT, scopeUrl, checkedScopeUrl, scopePolicy, controlledChild } from './scope-acceptance-policy.mjs'
 import { verifyScopeResumeEvidence,scopeResumeSchema,validateScopeResumeState,SCOPE_RESUME_QUERIES } from './scope-resume.mjs'
 import {TEAM_DATABASES,TEAM_CATALOG_QUERIES,verifyTeamResumeEvidence,verifyTeamResumeMetadata,validateTeamResumeState} from './team-resume.mjs'
 import { scopeWireOutput } from './scope-exec-file.mjs'
@@ -14,10 +14,10 @@ const digest = value => createHash('sha256').update(value).digest('hex')
 export function verifyScopeManifest(manifest, read = readFileSync) {
   if(manifest.mode==='team-after-migrated-empty')verifyTeamResumeEvidence(manifest,read)
   if(manifest.mode==='fresh-exclusive-scope')verifyFreshScopeTargets(manifest)
-  if (manifest.migrations.length !== 70 || manifest.sources.length < 10) throw Error('scope manifest inventory mismatch')
+  if (manifest.migrations.length !== SCOPE_MIGRATION_COUNT || manifest.sources.length < 10) throw Error('scope manifest inventory mismatch')
   for (const file of [...manifest.sources, ...manifest.migrations]) if (digest(read(file.path)) !== file.sha256) throw Error('scope source/hash mismatch: ' + file.path)
   if(manifest.mode==='resume-scope-after-bootstrap'){verifyScopeResumeEvidence(manifest,read);if(JSON.stringify(scopeResumeSchema(manifest.migrations,read))!==JSON.stringify(manifest.resume.schema))throw Error('resume schema expectation/source mismatch')}
-  if (new Set(manifest.migrations.map(file => file.path)).size !== 70 || manifest.migrations.filter(file => file.target === 'DATABASE_URL').length !== 7) throw Error('scope migration targets mismatch')
+  if (new Set(manifest.migrations.map(file => file.path)).size !== SCOPE_MIGRATION_COUNT || manifest.migrations.filter(file => file.target === 'DATABASE_URL').length !== 7) throw Error('scope migration targets mismatch')
 }
 export function scopeWorkerMode(mode) {
   if(!['suite','migrate'].includes(mode))throw Error('scope worker mode mismatch')

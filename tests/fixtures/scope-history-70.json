@@ -1,0 +1,285 @@
+{
+  "sourceCandidate": "2f693671c33f1db0821667fbd4a4ec3ebf939e07",
+  "files": [
+    {
+      "name": "0001_agents_devices.sql",
+      "sha256": "ab8fd9841ef49e52f2a30e27cec5164d82ebc566ea2ba892578200605c5da50a"
+    },
+    {
+      "name": "0002_device_enabled.sql",
+      "sha256": "8301f9c5c0b29be29aee5c9dde6a8ac6c312762999ed77595efa0f63d548f20c"
+    },
+    {
+      "name": "0003_agents_columns.sql",
+      "sha256": "63e6f68897d7cadf3c18c9c21d9b7776d27ce2ec4633a1f8c0f3deb409da8721"
+    },
+    {
+      "name": "0004_linear_sync.sql",
+      "sha256": "6929eb77de6654a2e15bdc0468d2e3ab62ea907981c9390d02a1cc92eb0ff23c"
+    },
+    {
+      "name": "0004_mikka_workspace_tables.sql",
+      "sha256": "36f4344dc917a8485bd4274319177742edbe599fc5cde42f3b383fca2ffe3cd8"
+    },
+    {
+      "name": "0004_telegram_chat.sql",
+      "sha256": "16d98249c0fca48b0635952fe0b187f2d73802d6a998ebb80472208f93fd1985"
+    },
+    {
+      "name": "0005_linear_sync_retry_and_comment_keys.sql",
+      "sha256": "608b59709b28a463b625b69e4e949b5344ff5859b5e551f40d89d8837b470e91"
+    },
+    {
+      "name": "0005_mikka_issue_metadata.sql",
+      "sha256": "3984dadc125298725dd8f3757c8c83053682b492f341098455d1e24490ba4777"
+    },
+    {
+      "name": "0006_linear_comment_authorship.sql",
+      "sha256": "625cfad882adaa2c76f90e9bda9d631ce2280f2cb2001eccccaf3420abfbe5a6"
+    },
+    {
+      "name": "0006_workspace_tables.sql",
+      "sha256": "5a9a90201e05f5dfe793add5b503a11ae927dee7898883db0d65c854e57e5551"
+    },
+    {
+      "name": "0007_coordinator_events.sql",
+      "sha256": "7492fa8394f059b0cfbe5e6cbbb4ec3be9e4873ba38bf34a85e6dc9611560677"
+    },
+    {
+      "name": "0007_linear_description_snapshot.sql",
+      "sha256": "3212fbfaa18d5025783bf4f9e4b65b1c42d00d923be5d9e773ef15d47fa46477"
+    },
+    {
+      "name": "0008_coordinator_sessions.sql",
+      "sha256": "780be522b698a1fb6016c90c7bdf988f1fbe0543b0a8ffa38e1346c2e20423af"
+    },
+    {
+      "name": "0008_linear_mikka_issue_metadata.sql",
+      "sha256": "308682af4f62bd6db8de890a37800c12980248ffa1971283f7e82b6ecfdbc3f0"
+    },
+    {
+      "name": "0009_oauth_provider.sql",
+      "sha256": "f48b4a2ccb57b4d04548e21d1ad21b45c6be69b8ec505cefb282cc305fd8fc18"
+    },
+    {
+      "name": "0010_coordinator_session_error.sql",
+      "sha256": "231a1650f4008169a7f5d86897d52f7bf09f3ac6d64b5021fa834912d274dfc0"
+    },
+    {
+      "name": "0011_coordinator_event_tier.sql",
+      "sha256": "39cee0717d468bf9bd97c4501f606166923050a039407d07d7c783ea2060e9ac"
+    },
+    {
+      "name": "0012_run_tokens.sql",
+      "sha256": "50677d70b2ba3bd685a3c9f7c4edf856d46c9de5cd261baa61e138036a6a4bda"
+    },
+    {
+      "name": "0014_workspace_teams.sql",
+      "sha256": "ebde945d5cfcb4e4d7bf961e218cafc23dcd6164e49d88fa315e5547089af967"
+    },
+    {
+      "name": "20261023143000_decision_calls.sql",
+      "sha256": "7ad1cab7e334d4d9f6a681107a96c23f2c69c62503457a6ca3b3df489fb248b6"
+    },
+    {
+      "name": "20261023150000_suggestions.sql",
+      "sha256": "fbbd0136f812f58754c9df8419ffc34434c16677109aa956d609c1edba652928"
+    },
+    {
+      "name": "20261023154800_issue_scope.sql",
+      "sha256": "4b249014ee2cc234f05c20e2cc921b3fbe61cb79036730c90ffa1e9e86b3efd4"
+    },
+    {
+      "name": "20261023161128_issue_scope_source.sql",
+      "sha256": "442ff358673f4c1aaacf545606decc1ca94b12a19759c0b107f7e3706a03cd14"
+    },
+    {
+      "name": "20261023170500_drop_decision_calls.sql",
+      "sha256": "dd6d17a3f63e17612e5f91d8698b7552571706be7f804d9df93a1040f5bfa4d6"
+    },
+    {
+      "name": "20261023171500_suggestion_trigger_checks.sql",
+      "sha256": "74c7ebedf9d734d370401ee1be2b1513cbd7dbb61e689892a88897e0d30b0259"
+    },
+    {
+      "name": "20261023213851_group_conversations.sql",
+      "sha256": "06e89de74f5020841870ee7e2874dfd9ba802628aee72b64eab123959657364e"
+    },
+    {
+      "name": "20261023221259_application_baseline.sql",
+      "sha256": "6eaec7b0239944c023d07774fb4c88cd953edce0cd85079f73032a35f35adb8f"
+    },
+    {
+      "name": "20261025000400_run_retries.sql",
+      "sha256": "fd680c90c3253257d42a64402157be9119d985ac952795d7ca99990d24e9957d"
+    },
+    {
+      "name": "20261025005500_mikka_team_tables.sql",
+      "sha256": "2b957375fd1fa374d28a951cbd5ea1906d25cda4e4138e54fdfb5d69420ef47a"
+    },
+    {
+      "name": "20261025005600_mikka_linear_sync_setting.sql",
+      "sha256": "5fd1f0dcf1d2e31ad8dcaf1d6c19538d06f2cf4e52e266a3149e7c749fd38251"
+    },
+    {
+      "name": "20261025013400_run_checkpoints.sql",
+      "sha256": "c0a58f822c37bb0ffe2b214f0c768483250ed9f27046062560b681f89e7d4070"
+    },
+    {
+      "name": "20261025043000_pending_actions.sql",
+      "sha256": "95da87cf61ec9147d10eac1734ae7dda1650e3ee8dba2bd09d0f8019b546c31d"
+    },
+    {
+      "name": "20261025200000_activity_version_actor.sql",
+      "sha256": "e4c42f88835616d8ed6d366e58b02f7c8cd395a10ec8ef207b1c4660377a5996"
+    },
+    {
+      "name": "20261025232200_issue_list_indexes.sql",
+      "sha256": "f84682f2835d39ae6a6f248dea519cf1a0c2da4c2720bffe362f3cb81ba84fdf"
+    },
+    {
+      "name": "20261025232201_workspace_list_indexes.sql",
+      "sha256": "6ac282dab7113b14eca37be4d5f463143272193722a37b96e95339e4d501e5da"
+    },
+    {
+      "name": "20261026013000_issue_search_pg_trgm.sql",
+      "sha256": "11e77074b66e1cdf3da7fd7f4390812ed67c49b386661d7acc119a99e3d5b1d3"
+    },
+    {
+      "name": "20261026013001_issue_search_title_idx.sql",
+      "sha256": "6998628c74b1d6a9e601e08b627c2b83ba02bf22e6514fd3750e7722c23b77e5"
+    },
+    {
+      "name": "20261026013002_issue_search_recent_idx.sql",
+      "sha256": "5a1983521da8486d9ad538d4d2fd61b8a40398dff4cc48d276f5ea5f5e9b5b28"
+    },
+    {
+      "name": "20261026013003_issue_search_number_idx.sql",
+      "sha256": "f91c53d5e410ded8aa777192b243ac2fab4e1e9dee6031ca88cc4ff1ddc058d3"
+    },
+    {
+      "name": "20261026170000_native_coordinator.sql",
+      "sha256": "89229703ec1f9c2c7b8f9cfea779a064a01da4d085fc6197d47862f3bb993604"
+    },
+    {
+      "name": "20261027010000_bots.sql",
+      "sha256": "050314723686252859c21cdc240aa6fb6ae4aff7fff36fcb543d9b55e737b407"
+    },
+    {
+      "name": "20261027010100_artifacts.sql",
+      "sha256": "ab7fc6a2e67e30e9cc9d0103c6fefacfde9868b38ed2aae6832839cfa712c58c"
+    },
+    {
+      "name": "20261027010200_bot_conversations.sql",
+      "sha256": "33cff384ca924d19f351d0201c03cf43f1ed476712898746573e2b2a29302820"
+    },
+    {
+      "name": "20261027011046_user_time_zones.sql",
+      "sha256": "7b7c13c7a82a20a2a84a4a794281a257df1cc5111c8c06940312d648cd6351cf"
+    },
+    {
+      "name": "20261027120000_coordinator_attention.sql",
+      "sha256": "322093d3b4c8aad9c58b8f154dd976508bff9da13da2d90a5efd07ca0e89e72f"
+    },
+    {
+      "name": "20261027164500_artifact_legacy_compat.sql",
+      "sha256": "e82a90aec2a61675877e8fb12d66ac62d02ae4fbdcd174d543b82e03a2fc49a8"
+    },
+    {
+      "name": "20261027164501_cloud_computers.sql",
+      "sha256": "018c0fbf7941f607b42e02c1d56bdeebef38ab9717ef9a84bce9df7f173ffe65"
+    },
+    {
+      "name": "20261027164502_computer_run_bindings.sql",
+      "sha256": "fbb9384171873aeb0762481e09d35051cd7adc09569332e8594ecfb459cffaf5"
+    },
+    {
+      "name": "20261027164503_byos_credential_publications.sql",
+      "sha256": "1ec983216f55262ceaf1adbdafd191168a3e2ac552909f8c529eb04ad74865e3"
+    },
+    {
+      "name": "20261027164504_byos_bindings_oauth.sql",
+      "sha256": "daa6b4adc31536f66b9cc56bb2c4142c834efc4c540e3073340b023dcd3839d8"
+    },
+    {
+      "name": "20261027164505_byos_device_authorization.sql",
+      "sha256": "6e4aa98f3efa36a48af3c0937b7eddd64bb1d03498c65cc92b48461dd7a0ce9f"
+    },
+    {
+      "name": "20261027164506_byos_access_and_cleanup.sql",
+      "sha256": "5f08ca8b2814f5539af0013f7ef927ab264c895007d7cbc766fdbb0055aaca6d"
+    },
+    {
+      "name": "20261027164507_byos_native_runs.sql",
+      "sha256": "8dd7726b41a89b602cf2b6e70217ab7a2374de4664a66b2ea4b7ea5c21bb3333"
+    },
+    {
+      "name": "20261027164508_byos_enrollment_transfers.sql",
+      "sha256": "8e8887e88e39c74f9e240d7bf125029a511817038ef9e787d5a2c97d741daf43"
+    },
+    {
+      "name": "20261027164509_byos_enrollment_cleanup.sql",
+      "sha256": "3c159f69bc6ed132b0289499e2ea71d240f0b7a0324caecca7a5b6b206cb6ea4"
+    },
+    {
+      "name": "20261027164510_local_computer_reviews.sql",
+      "sha256": "f213d360b2b130a9536b33bf1eb8646fd83824415f8839fb77513b4115abb85b"
+    },
+    {
+      "name": "20261027164511_cloud_device_scope.sql",
+      "sha256": "889bb9ffabc776a3df8dc4caef13e6fdfcb615d8ec84f89d00672a9c3c40d3bd"
+    },
+    {
+      "name": "20261027164512_cloud_worker_leases.sql",
+      "sha256": "24fc7695775eb37d350de4ab08c8e425c95161468c7e65e4ac823d84e638ceb3"
+    },
+    {
+      "name": "20261027164513_computer_run_approvals.sql",
+      "sha256": "c9164c3b066dff4c0d6fa0566bbca028e6b8df8974cd10f8982256721de58f80"
+    },
+    {
+      "name": "20261027164514_bot_cloud_runtimes.sql",
+      "sha256": "2b752bada07de7569781d8f4f5bfd3200179c16c831f212cd81964c22259d4e7"
+    },
+    {
+      "name": "20261027164515_workspace_computer_policy.sql",
+      "sha256": "b776298be218ee6f741347df61c99ada1565d92d813aa7da396725a3a967c76e"
+    },
+    {
+      "name": "20261027183117_personal_scope_detachment.sql",
+      "sha256": "35571a392ba8fa4476d2c15b35e1caab076ea243778bd074814fc3cd2b98ac10"
+    },
+    {
+      "name": "20261027183118_issue_scope_generation.sql",
+      "sha256": "fd602bfcef233b455036b6567355f4ea5337f3655dd77f2b3a13777c85fa9257"
+    },
+    {
+      "name": "20261027183119_linear_publications.sql",
+      "sha256": "12a094cc1141543c449baa0c1b9ad7df0f3f38719483460fe2c2b6f61a5a3db6"
+    },
+    {
+      "name": "20261027183120_explicit_workspace_scope.sql",
+      "sha256": "0c4d4d3a4b70cffbb2322772d8d80c0e7b098cc80536555027fe2d4bf8ec1770"
+    },
+    {
+      "name": "20261027183121_team_issue_creation_gate.sql",
+      "sha256": "aff3a09d121043595c9fd9543d857d965745a9a45d109208575aa6902ac5a200"
+    },
+    {
+      "name": "20261027183122_team_issue_create_receipts.sql",
+      "sha256": "8417e276c34ead32912ab2db4228a479ee70888228e8610b704fe776886c1dfd"
+    },
+    {
+      "name": "20261027183123_require_verified_team_promotion.sql",
+      "sha256": "1221dba4b87e81fbdb1118263000e47b47df959411243c0f74d0a4fb62d8f40a"
+    },
+    {
+      "name": "20261027183124_team_issue_promotions.sql",
+      "sha256": "1b144fe0e2f0c9b8a1592fac1f04821749290b1a2d91453cf5c08d74d3f953ec"
+    },
+    {
+      "name": "20261027183125_team_issue_promotion_receipts.sql",
+      "sha256": "46cd44923c9dc40a6872c5b5b06a42299d50864047943484aa7d90fd304f8ddc"
+    }
+  ]
+}

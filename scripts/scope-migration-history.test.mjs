@@ -18,16 +18,17 @@ test('scope aliases pin identical SQL and keep the two-body historical name ambi
     assert.match(file.sql.replace(/^--[^\n]*\n/gm, '').trimStart(), /^begin;/i)
     assert.equal((file.sql.match(/\bcommit;/ig) ?? []).length, 1)
     assert.equal(scopeMigrationBeforeCommit(file.name, file.sql) + 'commit;\n', file.sql)
+    assert.equal(alreadyApplied(file.name, new Set([file.previous]), file.sql), true)
     if (file.ambiguousOldHashes) {
-      assert.equal(MIGRATION_EQUIVALENTS[file.name], undefined)
+      assert.deepEqual(MIGRATION_EQUIVALENTS[file.name], [file.previous])
       const earlier = file.sql.replace(/-- Preserve old jobs while revoking claims[\s\S]*(?=commit;)/, '')
       assert.equal(createHash('sha256').update(earlier).digest('hex'), file.ambiguousOldHashes[0])
       assert.throws(() => alreadyApplied(file.name, new Set([file.old]), file.sql), /ambiguous scope migration/)
     } else {
-      assert.deepEqual(MIGRATION_EQUIVALENTS[file.name], [file.old])
+      assert.deepEqual(MIGRATION_EQUIVALENTS[file.name], [file.previous, file.old])
       assert.equal(alreadyApplied(file.name, new Set([file.old]), file.sql), true)
     }
-    for (const ledger of [new Set(), new Set([file.old]), new Set([file.name])])
+    for (const ledger of [new Set(), new Set([file.old]), new Set([file.previous]), new Set([file.name])])
       assert.throws(() => alreadyApplied(file.name, ledger, file.sql + ' '), /content changed/)
     assert.equal(alreadyApplied(file.name, new Set([file.old + '.unknown']), file.sql), false)
   }
@@ -35,18 +36,19 @@ test('scope aliases pin identical SQL and keep the two-body historical name ambi
 
 test('all partial and mixed ledger models either preserve ordered progress or fail closed', () => {
   const groups = ['MIKKA_DATABASE_URL', 'DATABASE_URL'].map(target => sources.filter(file => file.target === target))
-  for (const mode of ['canonical', 'historical', 'mixed', 'both']) {
+  for (const mode of ['canonical', 'previous', 'historical', 'mixed', 'both', 'all']) {
     for (let mask = 0; mask < 1 << sources.length; mask++) {
       const ledger = new Set()
       sources.forEach((file, index) => {
         if (!(mask & (1 << index))) return
-        if (mode === 'canonical' || mode === 'both' || (mode === 'mixed' && index % 2 === 0)) ledger.add(file.name)
-        if (mode === 'historical' || mode === 'both' || (mode === 'mixed' && index % 2 !== 0)) ledger.add(file.old)
+        if (['canonical','both','all'].includes(mode) || (mode === 'mixed' && index % 3 === 0)) ledger.add(file.name)
+        if (['previous','all'].includes(mode) || (mode === 'mixed' && index % 3 === 1)) ledger.add(file.previous)
+        if (['historical','both','all'].includes(mode) || (mode === 'mixed' && index % 3 === 2)) ledger.add(file.old)
       })
       const before = [...ledger]
-      const present = file => ledger.has(file.name) || ledger.has(file.old)
+      const present = file => ledger.has(file.name) || ledger.has(file.previous) || ledger.has(file.old)
       const hole = groups.some(group => group.some((file, index) => present(file) && group.slice(0, index).some(earlier => !present(earlier))))
-      const ambiguous = sources.some(file => file.ambiguousOldHashes && ledger.has(file.old) && !ledger.has(file.name))
+      const ambiguous = sources.some(file => file.ambiguousOldHashes && ledger.has(file.old) && !ledger.has(file.name) && !ledger.has(file.previous))
       if (hole || ambiguous) assert.throws(() => plan(ledger), /history has a gap|ambiguous scope migration/)
       else assert.deepEqual(plan(ledger), sources.filter(file => !present(file)).map(file => file.name))
       assert.deepEqual([...ledger], before, 'planning never backfills or rewrites ledger identities')
@@ -159,6 +161,30 @@ test('actual runner model skips old DDL, applies only missing suffixes, and repl
   const first = [...model.ddl]
   await runEntrypoint(model)
   assert.deepEqual(model.ddl, first)
+})
+
+test('renamed scope sources preserve the complete previous ledger without DDL or replacement entries',async()=>{
+  const app=sources.filter(file=>file.target==='MIKKA_DATABASE_URL').map(file=>file.previous)
+  const workspace=sources.filter(file=>file.target==='DATABASE_URL').map(file=>file.previous)
+  const model=modelFor(app,workspace),before={app:[...model.app],workspace:[...model.workspace]}
+  await runEntrypoint(model)
+  assert.deepEqual(model.ddl,[]);assert.deepEqual(model.commits,[])
+  assert.deepEqual({app:[...model.app],workspace:[...model.workspace]},before)
+  assert.deepEqual(plan(new Set([...app,...workspace])),[])
+})
+
+test('mixed previous and oldest unambiguous prefixes execute only the missing suffix',async()=>{
+  const app=sources.filter(file=>file.target==='MIKKA_DATABASE_URL'),workspace=sources.filter(file=>file.target==='DATABASE_URL')
+  const prefix=app.slice(0,5).map((file,index)=>index%2?file.old:file.previous)
+  const model=modelFor(prefix,[workspace[0].previous])
+  await runEntrypoint(model)
+  assert.deepEqual(model.ddl,[...app.slice(5),workspace[1]].map(file=>file.name))
+  for(const name of prefix)assert.ok(model.app.has(name))
+  const before={app:[...model.app],workspace:[...model.workspace],ddl:[...model.ddl]}
+  await runEntrypoint(model)
+  assert.deepEqual({app:[...model.app],workspace:[...model.workspace],ddl:[...model.ddl]},before)
+  const gap=modelFor([app[1].previous])
+  await assert.rejects(runEntrypoint(gap),/history has a gap/);assert.deepEqual(gap.ddl,[])
 })
 
 test('actual runner model refuses ambiguous, gapped or changed history before pending DDL', async () => {

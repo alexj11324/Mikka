@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {readFileSync,readdirSync} from 'node:fs'
-import {orderMigrations} from './migration-order.mjs'
-import {scopeMigrationBeforeCommit} from './scope-migration-history.mjs'
+import {retainedScope70Fixture} from '../tests/support/scope-history-fixture.mjs'
 import {createHash} from 'node:crypto'
 import {scopeResumeSchema,verifyScopeResumeEvidence,validateScopeResumeState} from './scope-resume.mjs'
 import {scopePolicy,scopeUrl,SCOPE_RETAINED_DATABASE} from './scope-acceptance-policy.mjs'
@@ -12,10 +10,7 @@ const hash=value=>createHash('sha256').update(value).digest('hex')
 const files={predecessor:'memory:predecessor',result:'memory:result',readback:'memory:readback',journal:'memory:journal'}
 function fixture(){
   // Synthetic filesystem/journal model only: no ledger rows or DB records are written.
-  const migrations=orderMigrations(readdirSync('drizzle').filter(name=>name.endsWith('.sql'))).map(name=>{
-    const path='drizzle/'+name,sql=readFileSync(path,'utf8'),before=scopeMigrationBeforeCommit(name,sql)
-    return {path,sha256:hash(sql),bytes:Buffer.byteLength(sql),target:/^--\s*target:\s*(\w+)/m.exec(sql)?.[1]??'MIKKA_DATABASE_URL',...(before===null?{}:{beforeCommitSha256:hash(before)})}
-  })
+  const {migrations,readSource}=retainedScope70Fixture()
   const previous={candidate:'2da9834018a3a0aa0f4fc8b8c4fd965e4d51be39',migrations}
   const ledger=migrations.map(file=>({name:file.path.split('/').at(-1)})).sort((a,b)=>a.name<b.name?-1:1)
   const tables=[{name:'schema_migrations',rows:70},...Array.from({length:93},(_,n)=>({name:'synthetic_table_'+n,rows:0}))]
@@ -26,11 +21,11 @@ function fixture(){
   const snapshot={tableCount:94,totalCommittedRows:70,nonemptyTables:[{name:'schema_migrations',rows:70}]}
   const readback={teamStageStarted:false,fixtureMigrationReplays:0,listenersStarted:0,providerRequests:0,remainingWorkerConnections:[],targets:[{oid:'65537'}],snapshots:[snapshot,snapshot]}
   const bytes=new Map([[files.predecessor,Buffer.from(JSON.stringify(previous))],[files.result,Buffer.from(JSON.stringify(result))],[files.readback,Buffer.from(JSON.stringify(readback))],[files.journal,Buffer.from(journal.map(row=>JSON.stringify(row)).join('\n'))]])
-  const manifest={mode:'resume-scope-after-bootstrap',migrations:previous.migrations,resume:{database:SCOPE_RETAINED_DATABASE,oid:'65537',owner:'postgres',predecessorManifestSha256:hash(bytes.get(files.predecessor)),schema:scopeResumeSchema(previous.migrations),evidence:Object.entries(files).map(([kind,path])=>({kind,path,sha256:hash(bytes.get(path))}))}}
-  const read=path=>bytes.get(path)??readFileSync(path)
+  const manifest={mode:'resume-scope-after-bootstrap',migrations:previous.migrations,resume:{database:SCOPE_RETAINED_DATABASE,oid:'65537',owner:'postgres',predecessorManifestSha256:hash(bytes.get(files.predecessor)),schema:scopeResumeSchema(previous.migrations,readSource),evidence:Object.entries(files).map(([kind,path])=>({kind,path,sha256:hash(bytes.get(path))}))}}
+  const read=path=>bytes.get(path)??readSource(path)
   const expected=verifyScopeResumeEvidence(manifest,read)
   const bodies={}
-  for(const file of manifest.migrations)for(const match of readFileSync(file.path,'utf8').matchAll(/create\s+(?:or\s+replace\s+)?function\s+([\w."]+)\s*\([^)]*\)[\s\S]*?\bas\s+(\$[\w]*\$)([\s\S]*?)\2\s*;/gi))bodies[match[1]]=match[3]
+  for(const file of manifest.migrations)for(const match of readSource(file.path).toString('utf8').matchAll(/create\s+(?:or\s+replace\s+)?function\s+([\w."]+)\s*\([^)]*\)[\s\S]*?\bas\s+(\$[\w]*\$)([\s\S]*?)\2\s*;/gi))bodies[match[1]]=match[3]
   const actual={identity:{database:SCOPE_RETAINED_DATABASE,oid:'65537',role:'postgres'},counts:structuredClone(expected.tables),workerConnections:[],ledger:manifest.migrations.map(file=>({name:file.path.split('/').at(-1)})).sort((a,b)=>a.name<b.name?-1:1),functions:Object.entries(bodies).map(([name,body])=>({name,body,language:'plpgsql',securityDefiner:false,arguments:'',returns:'trigger',config:null,volatility:'v',owner:'postgres'})),triggers:Object.entries(manifest.resume.schema.triggers).map(([key,definition])=>({table:key.split('/')[0],name:key.split('/')[1],enabled:'O',definition})),columns:Object.entries(manifest.resume.schema.columns).map(([key,value])=>({table:key.split('/')[0],name:key.split('/')[1],...value})),constraints:[{table:'linear_comment_links',definition:'FOREIGN KEY ("issueLinkId") REFERENCES public.linear_issue_links(id) ON DELETE CASCADE'}],indexes:[]}
   return {manifest,bytes,read,expected,actual}
 }
@@ -57,7 +52,7 @@ test('explicit retained ownership is separate from creation and refuses bootstra
   assert.throws(()=>p.connect('scope',{url}),/mismatch/)
   assert.throws(()=>p.grant('scope',{url:scopeUrl('issue184_e2e'),text:`create database "${SCOPE_RETAINED_DATABASE}"`}),/only its exact/)
   const file=f.manifest.migrations[0]
-  assert.throws(()=>p.grant('scope:migrate',{url,text:readFileSync(file.path,'utf8')}),/mismatch/)
+  assert.throws(()=>p.grant('scope:migrate',{url,text:f.read(file.path).toString('utf8')}),/mismatch/)
 })
 test('bootstrap skip requires the explicit supervisor capability; failure propagates without a fake stdout success',async()=>{
   assert.equal(await scopeResumeBootstrap(SCOPE_RETAINED_DATABASE),false)

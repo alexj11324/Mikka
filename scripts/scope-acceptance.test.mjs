@@ -116,10 +116,21 @@ test('native facade applies per-connection timeouts, logs SQL failure and closes
   await runtime.close();assert.ok(trace.includes('client-end'));assert.ok(trace.includes('pool-end'))
 })
 test('manifest validation is source-only and refuses drift before any executor is invoked',()=>{
-  const migrations=Array.from({length:70},(_,i)=>({path:`sql-${i}`,sha256:sqlHash('sql'),target:i<7?'DATABASE_URL':'MIKKA_DATABASE_URL'}))
+  const migrations=Array.from({length:73},(_,i)=>({path:`sql-${i}`,sha256:sqlHash('sql'),target:i<7?'DATABASE_URL':'MIKKA_DATABASE_URL'}))
   const manifest={migrations,sources:Array.from({length:10},(_,i)=>({path:`source-${i}`,sha256:sqlHash('source')}))}
   assert.doesNotThrow(()=>verifyScopeManifest(manifest,path=>Buffer.from(path.startsWith('sql')?'sql':'source')))
   assert.throws(()=>verifyScopeManifest(manifest,()=>Buffer.from('changed')),/hash mismatch/)
+})
+
+test('current main table additions fit the separately proposed snapshot budget',async()=>{
+  const {readFileSync}=await import('node:fs')
+  const additions=['20261027181000_agent_kit.sql','20261027203647_mobile_push.sql','20261027231815_user_facts.sql']
+  const tables=additions.flatMap(name=>[...readFileSync('drizzle/'+name,'utf8').matchAll(/create table if not exists\s+([\w"]+)/ig)].map(match=>match[1]))
+  assert.equal(tables.length,12);assert.equal(new Set(tables).size,12)
+  // Original retained scope bootstrap:94 tables. One decision_calls fixture
+  // table is added by the unchanged business suite. No live schema is queried.
+  assert.ok(SCOPE_LIMITS.snapshotTables>=94+tables.length+1)
+  assert.equal(SCOPE_LIMITS.snapshotTables,120,'new limit requires a new approval; it is not the previous 100-table permit')
 })
 
 

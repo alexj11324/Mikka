@@ -7,11 +7,17 @@ export const SCOPE_DATABASES = Object.freeze({
   app: 'team184_app_69649a2f38184d8b8edf1fe6a6524f31_e2e',
   workspace: 'team184_workspace_1bf3cc4e4430443c841d27f4a5115dc9_e2e',
 })
+// Current integration inventory: 64 main sources plus nine immutable scope
+// payloads. Earlier 70-source manifests remain evidence for their original SHA.
+export const SCOPE_MIGRATION_COUNT = 73
 export const SCOPE_LIMITS = Object.freeze({ totalMs: 300000, phaseMs: 140000, migrationMs: 60000, graceMs: 5000,
   statementMs: 20000, lockMs: 10000, idleTransactionMs: 30000, connectionMs: 3000,
   queries: { scope: 11000, team: 7000, 'scope:migrate': 1000, 'team:migrate': 1000 },
   rootQueries: 128, outputBytes: 1 << 20, journalBytes: 32 << 20, listeners: { scope: 5, team: 1 },
-  snapshotTables: 100, snapshotLiveRows: 10000 })
+  // Next acceptance only: main adds twelve tables to the old 94-table scope
+  // bootstrap, plus its one fixture table. The prior 100-table permit is not
+  // reusable for this new 120-table readback limit.
+  snapshotTables: 120, snapshotLiveRows: 10000 })
 export const sqlHash = text => createHash('sha256').update(text).digest('hex')
 export function scopeUrl(database) { return `postgresql://postgres@127.0.0.1:55484/${database}` }
 export function checkedScopeUrl(value, phase) {
@@ -76,7 +82,7 @@ export function scopePolicy(migrations, record = () => {}, {allowResume=false,al
           if (input.text !== 'insert into schema_migrations (name) values ($1)' || !migrations.some(file => file.path.endsWith('/' + input.ledgerName) && state.migrations.has(database + '/' + file.path))) throw Error('unexpected migration query/ledger identity')
         }
       } else if (file) {
-        const replay = ['20261027183121_', '20261027183123_', '20261027183124_'].some(prefix => file.path.split('/').at(-1).startsWith(prefix))
+        const replay = ['20261028072004_', '20261028072006_', '20261028072007_'].some(prefix => file.path.split('/').at(-1).startsWith(prefix))
         if (phase !== 'scope' || !replay || state.replays.has(file.path)) throw Error('unexpected fixture migration replay')
         state.replays.add(file.path)
       }
@@ -103,7 +109,7 @@ export function scopePolicy(migrations, record = () => {}, {allowResume=false,al
     return {id}
   }
   function migrated(phase) {
-    const expected = phase === 'scope' ? 70 : 70
+    const expected = SCOPE_MIGRATION_COUNT
     if ([...state.migrations].filter(key => phase === 'scope' ? key.startsWith(SCOPE_DATABASES.scope + '/') : !key.startsWith(SCOPE_DATABASES.scope + '/')).length !== expected) throw Error('incomplete migration file count')
   }
   function migrationCall(phase) { active();if(allowTeamResume)throw Error('team resume migration child denied'); if (state.migrationCalls.has(phase)) throw Error('migration child repeated'); state.migrationCalls.add(phase) }

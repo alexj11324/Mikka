@@ -46,7 +46,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const migrated = await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], {
     env: { ...process.env, MIGRATE: '1', VERCEL_ENV: '' }, maxBuffer: 4 << 20,
   })
-  assert.match(migrated.stdout, /applied 20261027183117_personal_scope_detachment.sql/)
+  assert.match(migrated.stdout, /applied 20261028072000_personal_scope_detachment.sql/)
   }
   const pool = new Pool({ connectionString: connection, max: 5 })
   const { changeIssueScopeLocally } = await import('../lib/issue-scope-store')
@@ -105,7 +105,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   // Recreate the pre-verification migration state in this fresh synthetic DB
   // so an unlinked terminal job can exist exactly as it could before 2242.
   // Later replays restore 2242 and 2243 before any application assertions.
-  await pool.query(await readFile(new URL('../drizzle/20261027183121_team_issue_creation_gate.sql',import.meta.url),'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261028072004_team_issue_creation_gate.sql',import.meta.url),'utf8'))
   const legacyFailed=randomUUID()
   await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Legacy failed-only task\',$3,\'todo\',\'normal\',\'workspace\')',[legacyFailed,owner,doc])
   await pool.query('update linear_sync_outbox set status=\'failed\',attempts=8 where "issueId"=$1',[legacyFailed])
@@ -122,10 +122,10 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   assert.equal((await pool.query('select "externalTargetVerified" from linear_issue_links where id=$1',[legacyLink])).rows[0].externalTargetVerified,false)
   // Replay the tracked migration's legacy backfill while the isolated DB has
   // only this synthetic legacy fixture. It includes its normal trigger DDL.
-  await pool.query(await readFile(new URL('../drizzle/20261027183123_require_verified_team_promotion.sql',import.meta.url),'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261028072006_require_verified_team_promotion.sql',import.meta.url),'utf8'))
   // Restore the subsequent tracked scope gate; the older migration replaces
   // its function body. This leaves the suite on the exact final policy.
-  await pool.query(await readFile(new URL('../drizzle/20261027183124_team_issue_promotions.sql',import.meta.url),'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261028072007_team_issue_promotions.sql',import.meta.url),'utf8'))
   assert.equal((await pool.query('select "externalTargetVerified" from linear_issue_links where id=$1',[legacyLink])).rows[0].externalTargetVerified,true)
   fixtureIds.push(legacyImported)
   await pool.query('insert into devices (id,"ownerId",name) values ($1,$2,\'Synthetic\')', [device,member])

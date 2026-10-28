@@ -5,6 +5,8 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync, chmodSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+const retainFixtures = process.env.MIKKA_RETAIN_TEST_FILES === '1'
+
 test('explicit MIGRATE=0 exits before filesystem or database work in production', () => {
   const dir = mkdtempSync(join(tmpdir(), 'migration-mode-'))
   try {
@@ -34,7 +36,7 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
       assert.doesNotMatch(result.stdout, /migrate: skipped/)
       assert.match(result.stderr, /ENOENT/)
     }
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+  } finally { if (retainFixtures) console.log(`Retained migration-mode fixture: ${dir}`); else rmSync(dir, { recursive: true, force: true }) }
 })
 
 
@@ -61,5 +63,5 @@ esac
     })
     assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'pnpm lint', 'next build'])
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+  } finally { if (retainFixtures) console.log(`Retained build-mode fixture: ${dir}`); else rmSync(dir, { recursive: true, force: true }) }
 })

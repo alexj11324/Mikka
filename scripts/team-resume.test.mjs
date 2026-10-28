@@ -1,19 +1,14 @@
 import './credential-diagnostics-offline.mjs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {readFileSync,readdirSync} from 'node:fs'
-import {orderMigrations} from './migration-order.mjs'
-import {scopeMigrationBeforeCommit} from './scope-migration-history.mjs'
+import {retainedScope70Fixture} from '../tests/support/scope-history-fixture.mjs'
 import {TEAM_DATABASES,TEAM_OIDS,TEAM_PRESERVED_SCOPES,TEAM_CATALOG_QUERIES,teamHash,verifyTeamResumeTargets,verifyTeamResumeEvidence,verifyTeamResumeMetadata,validateTeamResumeState} from './team-resume.mjs'
 import {SCOPE_DATABASES,SCOPE_RETAINED_DATABASE,SCOPE_RETIRED_APPROVALS,scopePolicy,scopeUrl} from './scope-acceptance-policy.mjs'
 import {scopeExecutionMode,scopePlanSummary} from './scope-acceptance.mjs'
 import {teamResumeBootstrap} from '../tests/support/scope-acceptance.mjs'
 
 function fixture() {
-  const migrations=orderMigrations(readdirSync('drizzle').filter(x=>x.endsWith('.sql'))).map(name=>{
-    const path='drizzle/'+name,sql=readFileSync(path,'utf8'),before=scopeMigrationBeforeCommit(name,sql)
-    return {path,sha256:teamHash(sql),target:/^--\s*target:\s*(\w+)/m.exec(sql)?.[1]??'MIKKA_DATABASE_URL',...(before===null?{}:{beforeCommitSha256:teamHash(before)})}
-  })
+  const {migrations,readSource}=retainedScope70Fixture()
   const predecessor={candidate:'a15fc81d3a6ae4d4ac56965862c49fdeea99e8af',resource:{name:'mikka-issue184-pg',id:'memory-original-server',image:'memory-image',volume:'memory-volume',role:'postgres',address:'127.0.0.1:55484',adminDb:'issue184_e2e',mustAlreadyBeRunning:true},migrations}
   const journal=[],actual=[]
   for(const [index,file]of migrations.entries()){
@@ -37,7 +32,7 @@ function fixture() {
   }
   for(const [kind,value]of Object.entries(data))set(kind,value)
   const manifest={resource:{...predecessor.resource},mode:'team-after-migrated-empty',databases:TEAM_DATABASES,approvalTransfer:false,retiredApprovalIds:SCOPE_RETIRED_APPROVALS,preservedDatabases:TEAM_PRESERVED_SCOPES,migrations,resume:{evidence,catalogQuerySha256:Object.fromEntries(Object.entries(TEAM_CATALOG_QUERIES).map(([key,sql])=>[key,teamHash(sql)])),states:actual.map(row=>({database:row.database,oid:row.identity.oid,owner:'postgres',counts:structuredClone(row.counts),ledgerSha256:teamHash(JSON.stringify(row.ledger)),catalogSha256:teamHash(JSON.stringify(row.catalog))}))}}
-  return {manifest,actual,data,set,read:path=>bytes.get(path)}
+  return {manifest,actual,data,set,readSource,read:path=>bytes.get(path)}
 }
 
 test('team-only proof binds exact successful SQL receipts,63/7ledger, empty snapshots and separate readonly catalog',()=>{
@@ -72,7 +67,7 @@ test('team-only ownership grants no CREATE, init, replay, ledger, scope bucket o
   for(const database of [SCOPE_RETAINED_DATABASE,SCOPE_DATABASES.scope])assert.throws(()=>p.connect('team',{url:scopeUrl(database)}),/mismatch/)
   assert.throws(()=>p.connect('scope',{url:scopeUrl(SCOPE_DATABASES.scope)}),/bucket mismatch/)
   assert.throws(()=>p.grant('team',{url:scopeUrl('issue184_e2e'),text:`create database "${TEAM_DATABASES[0]}"`}),/cannot create/)
-  assert.throws(()=>p.grant('team',{url:scopeUrl(TEAM_DATABASES[0]),text:readFileSync(f.manifest.migrations[0].path,'utf8')}),/initialization/)
+  assert.throws(()=>p.grant('team',{url:scopeUrl(TEAM_DATABASES[0]),text:f.readSource(f.manifest.migrations[0].path).toString('utf8')}),/initialization/)
   assert.throws(()=>p.grant('team',{url:scopeUrl(TEAM_DATABASES[0]),text:'insert into schema_migrations (name) values ($1)'}),/ledger/)
   assert.throws(()=>p.migrationCall('team'),/migration child denied/)
   assert.equal(events.filter(x=>x.event==='query-attempt').length,0)
