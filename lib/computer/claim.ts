@@ -1,13 +1,14 @@
 import 'server-only'
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 
 /** The existing local daemon cannot operate a Bot's cloud desktop. Keep its
  * claim serialized with Bot binding and fail closed until a cloud worker with
  * the computer tool and approval gate can claim the run. */
-export async function claimLocalRun(pool: Pool, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId?: string): Promise<'claimed' | 'unavailable' | 'cloud-required'> {
+export async function claimLocalRun(pool: Pool, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId?: string, beforeClaim?: (tx: PoolClient) => Promise<boolean>): Promise<'claimed' | 'unavailable' | 'cloud-required'> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    if (beforeClaim && !(await beforeClaim(client))) { await client.query('ROLLBACK'); return 'unavailable' }
     const run = (await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND status=$3 FOR UPDATE', [runId, deviceId, 'queued'])).rows[0]
     if (!run) { await client.query('COMMIT'); return 'unavailable' }
     const bound = (await client.query('SELECT 1 FROM computer_run_bindings WHERE "runId"=$1', [runId])).rowCount
@@ -24,10 +25,11 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
 
 /** The scoped cloud device may claim only a run bound to its owner's Bot
  * and its workspace's machine. Binding and claim use the same run row lock. */
-export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number } | null> {
+export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string, beforeClaim?: (tx: PoolClient) => Promise<boolean>): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number } | null> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    if (beforeClaim && !(await beforeClaim(client))) { await client.query('ROLLBACK'); return null }
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
     if (policy?.permission === 'deny') { await client.query('COMMIT'); return null }

@@ -311,6 +311,8 @@ export const runAssignmentSchema = z.object({
    * new session with `prompt`, which always carries the full brief.
    */
   resumeSessionId: z.string().max(500).optional(),
+  requireSessionResume: z.boolean().optional(),
+  questionId: z.uuid().optional(),
   /**
    * What this run adds on top of the brief (a person's message, an answer,
    * a fix request). A resumed session gets only this as its next message;

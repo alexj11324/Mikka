@@ -1,3 +1,4 @@
+import { lifecycleCases } from "./lifecycle.db-cases";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
@@ -266,6 +267,7 @@ test(
           );
         },
       );
+      await lifecycleCases(t,pool,authorize,fixture);
     } finally {
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);

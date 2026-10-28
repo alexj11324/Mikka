@@ -65,6 +65,7 @@ try {
     await pool.query(await readFile(new URL(`../drizzle/${name}`, import.meta.url), 'utf8'))
   }
   await pool.query(await readFile(new URL('../drizzle/20261028070000_factory_192_routing.sql', import.meta.url), 'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261028182317_factory_192_questions.sql', import.meta.url), 'utf8'))
   for (const statement of postgresSchemaStatements) await pool.query(statement)
   console.log('独立 E2E 数据库已就绪；认证表使用 Better Auth 迁移，业务表来自现有 Drizzle schema。')
 } finally {

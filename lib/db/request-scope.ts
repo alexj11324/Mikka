@@ -20,10 +20,12 @@ if (process.env.NODE_ENV !== 'production' && process.env.VERCEL_ENV !== 'preview
 const defaultDatabase = createDatabase(defaultPool)
 const requestDatabase = new AsyncLocalStorage<{ pool: Pool; db: typeof defaultDatabase }>()
 type Transaction = Parameters<Parameters<typeof defaultDatabase.transaction>[0]>[0]
+const heldClient = new AsyncLocalStorage<PoolClient>()
 const transactionDatabase = new AsyncLocalStorage<Transaction | NodePgDatabase<typeof schema>>()
 
 export const pool = new Proxy(defaultPool, {
   get(target, property) {
+    if (property === 'query' && heldClient.getStore()) return heldClient.getStore()!.query.bind(heldClient.getStore()!)
     const current = requestDatabase.getStore()?.pool ?? target
     const value = Reflect.get(current, property, current)
     return typeof value === 'function' ? value.bind(current) : value
@@ -45,7 +47,7 @@ export function withDatabaseTransaction<T>(transaction: Transaction, callback: (
 
 /** Reuse an already-open SQL transaction without acquiring another pool connection. */
 export function withDatabaseClient<T>(client: PoolClient, callback: () => T): T {
-  return transactionDatabase.run(drizzle(client, { schema }), callback)
+  return heldClient.run(client, () => transactionDatabase.run(drizzle(client, { schema }), callback))
 }
 
 export function createRequestDatabaseScope(connectionString: string) {

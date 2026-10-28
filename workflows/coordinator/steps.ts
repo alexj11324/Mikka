@@ -137,6 +137,11 @@ export async function pushToPhones(userId: string, botId: string | null, text: s
  */
 export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
+  if (process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1') {
+    const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
+    await factoryRuntimeForBot(botId).reconcile(userId)
+  }
+
   let { summary, memory, messages } = await store.loadConversation(userId, botId)
   const summaryTrust = { key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) }
   const cut = compactionCut(summary, messages, summaryTrust)
@@ -424,4 +429,25 @@ export async function stopFactoryTask(userId:string,input:import('@/lib/factory/
   'use step'
   await assertNativeToolScope(userId,scope)
   return asToolResult(async()=> (await import('@/lib/factory/server')).factoryForBot(botId).apply(userId,input.binding,input.eventId,{action:input.action,reason:input.reason}))
+}
+
+export async function dispatchFactoryTask(userId:string,input:import('@/lib/factory/dispatch').FactoryDispatchInput,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).dispatch(userId,input))
+}
+export async function listFactoryQuestions(userId:string,taskId:string,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).questions.list(userId,taskId))
+}
+export async function answerFactoryContext(userId:string,input:import('@/lib/factory/questions/contract').ContextQuestionAnswer,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).questions.answer({source:'orchestrator',userId},input))
+}
+export async function escalateFactoryQuestion(userId:string,input:import('zod').z.infer<typeof import('@/lib/factory/questions/contract').questionEscalationSchema>,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).questions.escalate(userId,input))
 }

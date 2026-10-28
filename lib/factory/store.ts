@@ -3,6 +3,8 @@ import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import {
   bindingSchema,
+  candidateSchema,
+  nextStage,
   changeSchema,
   FactoryError,
   routeSchema,
@@ -61,6 +63,20 @@ export type FactoryAuthorize = (
   issueId: string,
   tx: PoolClient,
 ) => Promise<boolean>;
+export type FactoryGate = (
+  tx: PoolClient,
+  task: FactoryTask,
+  attempt: FactoryAttempt,
+  change: Extract<FactoryChange, { action: "finish" }>,
+) => Promise<boolean>;
+export type FactoryGates = Partial<
+  Record<"review" | "verify" | "approval" | "publish" | "monitor", FactoryGate>
+>;
+/** Host-installed callbacks run inside the authorized task transaction. */
+export interface FactoryLifecycle {
+  gates?: FactoryGates;
+  independent?: (tx: PoolClient, task: FactoryTask, runId: string) => Promise<boolean>;
+}
 const terminal = (task: FactoryTask) =>
   task.status === "cancelled" || task.status === "revoked";
 function fail(code: string): never {
@@ -75,6 +91,7 @@ export function createFactoryStore(
   pool: Pool,
   authorize: FactoryAuthorize,
   botId: string | null = null,
+  lifecycle?: FactoryLifecycle,
 ) {
   async function transaction<T>(
     fn: (tx: PoolClient) => Promise<T>,
@@ -116,6 +133,7 @@ export function createFactoryStore(
       'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
       [taskId, userId],
     );
+    if (task) await tx.query('SELECT id FROM issues WHERE id=$1 FOR SHARE', [task.issueId]);
     if (
       !task ||
       task.botId !== botId ||
@@ -170,6 +188,16 @@ export function createFactoryStore(
     );
     return result;
   }
+  async function runFor(tx: PoolClient, task: FactoryTask, runId: string) {
+    const {
+      rows: [run],
+    } = await tx.query(
+      'SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "issueId"=$3 FOR UPDATE',
+      [runId, task.userId, task.issueId],
+    );
+    if (!run || run.stopRequestedAt) fail("factoryRunMismatch");
+    return run;
+  }
   async function freshAttempt(
     tx: PoolClient,
     task: FactoryTask,
@@ -187,6 +215,7 @@ export function createFactoryStore(
     task.status = "pending";
   }
   return {
+    lockTask: owned,
     async route(userId: string, input: unknown) {
       const parsed = routeSchema.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
@@ -314,6 +343,8 @@ export function createFactoryStore(
           [task.attemptId, task.id],
         );
         if (!attempt) fail("factoryAttemptMissing");
+        if (!["resolve", "cancel", "revoke"].includes(change.action) && !lifecycle)
+          fail("factoryTransitionUnavailable");
         if (change.action === "cancel" || change.action === "revoke") {
           task.status = change.action === "cancel" ? "cancelled" : "revoked";
           task.reason = change.reason;
@@ -370,7 +401,264 @@ export function createFactoryStore(
               ],
             );
           }
-        } else fail("factoryTransitionUnavailable");
+        } else if (change.action === "adopt_retry") {
+          if (
+            !["spec", "execute"].includes(task.stage) ||
+            !attempt.runId ||
+            !["running", "failed"].includes(task.status)
+          )
+            fail("factoryTransition");
+          const prior = await runFor(tx, task, attempt.runId);
+          const retry = await runFor(tx, task, change.runId);
+          if (
+            prior.stopReason !== "device_lost" ||
+            prior.status !== "failed" ||
+            retry.retryOf !== prior.id
+          )
+            fail("factoryRunMismatch");
+          await tx.query(
+            'UPDATE factory_attempts SET status=\'failed\',reason=$2,"sessionId"=$3,"finishedAt"=now() WHERE id=$1',
+            [
+              attempt.id,
+              String(prior.error ?? "Device lost").slice(0, 4000),
+              prior.sessionId,
+            ],
+          );
+          task.reason = change.reason;
+          if (task.stage === "execute") task.candidateId = null;
+          await freshAttempt(tx, task, task.stage, change.reason);
+          await tx.query(
+            'UPDATE factory_attempts SET status=\'running\',"runId"=$2,"sessionId"=$3 WHERE id=$1',
+            [task.attemptId, retry.id, retry.sessionId],
+          );
+          task.status = "running";
+        } else if (change.action === "bind_run") {
+          if (task.status !== "pending" || attempt.runId)
+            fail("factoryTransition");
+          const run = await runFor(tx, task, change.runId);
+          if (
+            ![
+              "queued",
+              "preparing",
+              "running",
+              "waiting_input",
+              "finishing",
+            ].includes(run.status)
+          )
+            fail("factoryRunMismatch");
+          if (["review", "verify"].includes(task.stage)) {
+            const { rows } = await tx.query(
+              'SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND "runId"=$2',
+              [task.id, run.id],
+            );
+            if (rows.length) fail("factoryIndependentRunRequired");
+          }
+          await tx.query(
+            'UPDATE factory_attempts SET "runId"=$2,"sessionId"=$3 WHERE id=$1',
+            [attempt.id, run.id, run.sessionId],
+          );
+          task.status = "running";
+        } else if (change.action === "candidate") {
+          if (
+            task.stage !== "execute" ||
+            task.candidateId !== null || attempt.candidateId !== null ||
+            task.status !== "running" ||
+            attempt.runId !== change.runId
+          )
+            fail("factoryTransition");
+          await runFor(tx, task, change.runId);
+          const candidate = candidateSchema.parse(change.candidate),
+            candidateId = randomUUID();
+          await tx.query(
+            'INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,$3,$4,$5,$6,$7)',
+            [
+              candidateId,
+              task.id,
+              candidate.sha,
+              candidate.repository,
+              candidate.environment,
+              candidate.scope,
+              change.runId,
+            ],
+          );
+          task.candidateId = candidateId;
+          await tx.query(
+            'UPDATE factory_attempts SET "candidateId"=$2 WHERE id=$1',
+            [attempt.id, candidateId],
+          );
+        } else if (change.action === "finish") {
+          if (!["pending", "running", "waiting"].includes(task.status))
+            fail("factoryTransition");
+          if (attempt.runId) {
+            const {
+              rows: [provenance],
+            } = await tx.query(
+              'SELECT "sessionId" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "issueId"=$3',
+              [attempt.runId, userId, task.issueId],
+            );
+            if (!provenance && change.status !== "blocked")
+              fail("factoryRunMismatch");
+            if (provenance)
+              await tx.query(
+                'UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1',
+                [attempt.id, provenance.sessionId],
+              );
+          }
+          if (["review", "verify", "monitor"].includes(task.stage) &&
+              ["passed", "failed"].includes(change.status)) {
+            if (!attempt.runId || !lifecycle?.independent ||
+                !(await lifecycle.independent(tx, task, attempt.runId)))
+              fail("factoryIndependentRunRequired");
+          }
+          if (change.status === "passed") {
+            const consumerStage = [
+              "review",
+              "verify",
+              "approval",
+              "publish",
+              "monitor",
+            ].includes(task.stage);
+            if (consumerStage) {
+              const gate = lifecycle?.gates?.[task.stage as keyof FactoryGates];
+              if (!gate || !(await gate(tx, task, attempt, change)))
+                fail("factoryConsumerGateRequired");
+            }
+            if (
+              (!task.candidateId && task.stage !== "spec") ||
+              !change.evidence.length
+            )
+              fail("factoryEvidenceRequired");
+            const {
+              rows: [candidate],
+            } = await tx.query(
+              'SELECT * FROM factory_candidates WHERE id=$1 AND "taskId"=$2',
+              [task.candidateId, task.id],
+            );
+            for (const evidence of change.evidence) {
+              if (
+                evidence.candidateId !== task.candidateId ||
+                evidence.sha !== (candidate?.sha ?? null) ||
+                (candidate && evidence.environment !== candidate.environment)
+              )
+                fail("factoryEvidenceMismatch");
+            }
+            if (["approval", "publish", "monitor"].includes(task.stage)) {
+              // These consumers verify human identity, artifacts and exact target/action
+              // inside their gate on this locked transaction. They need not own a run.
+            } else {
+              if (!attempt.runId) fail("factoryEvidenceRequired");
+              const run = await runFor(tx, task, attempt.runId);
+              if (run.status !== "succeeded" || !run.sessionId)
+                fail("factoryEvidenceRequired");
+              if (
+                task.stage === "execute" &&
+                (run.report?.publish?.commit !== candidate?.sha ||
+                  run.stopReason !== "submitted" ||
+                  run.report?.verify?.status !== "passed")
+              )
+                fail("factoryEvidenceMismatch");
+              for (const evidence of change.evidence) {
+                if (
+                  evidence.runId !== run.id ||
+                  evidence.sessionId !== run.sessionId
+                )
+                  fail("factoryEvidenceMismatch");
+                if (
+                  evidence.kind === "report" &&
+                  evidence.artifact === `run-report:${run.id}` &&
+                  run.report
+                )
+                  continue;
+                if (
+                  evidence.kind !== "log" ||
+                  !evidence.artifact.startsWith("run-chunk:")
+                )
+                  fail("factoryArtifactMissing");
+                const chunkId = evidence.artifact.slice("run-chunk:".length);
+                uuid(chunkId);
+                const { rows } = await tx.query(
+                  'SELECT id FROM run_chunks WHERE id=$1 AND "runId"=$2',
+                  [chunkId, run.id],
+                );
+                if (!rows.length) fail("factoryArtifactMissing");
+              }
+              await tx.query(
+                'UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1',
+                [attempt.id, run.sessionId],
+              );
+            }
+          }
+          task.status = change.status;
+          task.reason = change.reason;
+          await tx.query(
+            "UPDATE factory_attempts SET output=$2,evidence=$3 WHERE id=$1",
+            [
+              attempt.id,
+              JSON.stringify(change.output),
+              JSON.stringify(change.evidence),
+            ],
+          );
+        } else if (change.action === "advance") {
+          if (
+            task.status !== "passed" ||
+            change.stage !== nextStage(task.stage)
+          )
+            fail("factoryTransition");
+          task.reason = change.reason;
+          await freshAttempt(tx, task, change.stage, change.reason);
+        } else if (change.action === "retry" || change.action === "repair") {
+          if (task.stage === "clarify") fail("factoryTransition");
+          const pendingQuestion = await tx.query(
+            "SELECT id FROM factory_questions WHERE \"taskId\"=$1 AND \"attemptId\"=$2 AND status IN ('open','waiting_user') LIMIT 1",
+            [task.id, attempt.id],
+          );
+          if (pendingQuestion.rows.length) fail("factoryQuestionPending");
+          // A completed monitor observation can open another observation of the
+          // same candidate. freshAttempt retains the candidate, never run evidence.
+          const nextMonitorCycle =
+            change.action === "retry" &&
+            task.stage === "monitor" &&
+            task.status === "passed" &&
+            task.candidateId !== null &&
+            attempt.stage === "monitor" &&
+            attempt.status === "passed" &&
+            attempt.candidateId === task.candidateId;
+          if (
+            !nextMonitorCycle &&
+            !["failed", "blocked", "waiting"].includes(task.status)
+          )
+            fail("factoryTransition");
+          if (
+            change.action === "repair" &&
+            !["review", "verify", "monitor"].includes(task.stage)
+          )
+            fail("factoryTransition");
+          // A live old run must stop before another attempt can bind work.
+          if (attempt.runId) {
+            const {
+              rows: [run],
+            } = await tx.query(
+              "SELECT status FROM agent_runs WHERE id=$1 FOR UPDATE",
+              [attempt.runId],
+            );
+            if (
+              run &&
+              !["succeeded", "failed", "stopped", "cancelled"].includes(
+                run.status,
+              )
+            )
+              fail("factoryRunStillActive");
+          }
+          task.reason = change.reason;
+          if (change.action === "repair") task.candidateId = null;
+          await freshAttempt(
+            tx,
+            task,
+            change.action === "repair" ? "execute" : task.stage,
+            change.reason,
+          );
+        }
+        else fail("factoryTransitionUnavailable");
         const stoppedFinishedAttempt =
           (change.action === "cancel" || change.action === "revoke") &&
           ["passed", "failed", "blocked"].includes(attempt.status);
