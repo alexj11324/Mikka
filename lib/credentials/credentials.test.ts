@@ -280,7 +280,7 @@ test('revocation retains rows and disables credential, session and leases', asyn
 })
 
 test('saving an existing login retains and expires sessions', async () => {
-  process.env.BETTER_AUTH_SECRET = 'synthetic-test-auth-secret'
+  process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
   const statements: string[] = []
   const client = { async query(sql: string) {
     statements.push(sql)
@@ -290,7 +290,7 @@ test('saving an existing login retains and expires sessions', async () => {
     return { rows: [], rowCount: 0 }
   }, release() {} }
   const store = new CredentialStore({ async connect() { return client } } as never, fixtureKms())
-  assert.deepEqual(await store.save({ userId: 'fixture', workspaceId: 'workspace', botId: 'bot', runId: 'run' }, { nonce: 'a'.repeat(43), origin: owner.origin, username: 'fixture', password: 'synthetic' }), { status: 'saved', origin: owner.origin })
+  assert.deepEqual(await store.save({ userId: 'fixture', workspaceId: 'workspace', botId: 'bot', runId: 'run' }, { nonce: 'a'.repeat(43), origin: owner.origin, username: 'fixture', password: randomBytes(24).toString('base64url') }), { status: 'saved', origin: owner.origin })
   assert(statements.some(sql => sql.includes('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now())')))
   assert(statements.includes('COMMIT'))
   assert(!statements.some(sql => /\bDELETE\b/i.test(sql)))

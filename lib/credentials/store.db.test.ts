@@ -12,7 +12,7 @@ const databaseURL = process.env.CREDENTIAL_TEST_DATABASE_URL ?? process.env.E2E_
 if (databaseURL && process.env.CREDENTIAL_TEST_RETAIN_RESOURCES !== '1') throw new Error('Credential database tests require explicit resource retention')
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Credential test database is required')
 test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation and opaque responses', { skip: !databaseURL }, async () => {
-  process.env.BETTER_AUTH_SECRET = 'isolated-credential-test-fingerprint-key'
+  process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
   const target = new URL(databaseURL!)
   const isolated = target.pathname === '/credential_test' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && target.hostname === '127.0.0.1' && target.pathname === '/mikka_e2e')
   if (!isolated) throw new Error('Use the isolated credential test database')
@@ -30,10 +30,11 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
       await pool.query(`INSERT INTO bot_subagents VALUES($1,$2,$3,$4,'needs_you')`, [caller.subagentId, caller.userId, caller.workspaceId, caller.botId])
     }
     const kms: Kms = { generate: async () => ({ plaintext: randomBytes(32), wrapped: 'synthetic-kms-context-tested-in-unit-suite' }), decrypt: async () => { throw new Error('Must not decrypt in rejected paths') } }
+    const fixturePassword = randomBytes(24).toString('base64url')
     const store = new CredentialStore(pool, kms), origin = 'https://example.com'
     const browserTarget = { targetId: 'test-page', origin, endpoint: 'https://123.e2b.app/rpc?token=private', expiresAt: Date.now() + 120000 }
     const challenge = await store.challenge(a, origin)
-    const input = { nonce: challenge.nonce, origin, username: 'test-account', password: 'test-password' }
+    const input = { nonce: challenge.nonce, origin, username: 'test-account', password: fixturePassword }
     await assert.rejects(store.save({ ...a, userId: b.userId }, input), CredentialError)
     await assert.rejects(store.save({ ...a, workspaceId: randomUUID() }, input), CredentialError)
     const saved = await store.save(a, input)
@@ -43,7 +44,7 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
     const metadata = await store.list(a)
     assert.equal(metadata.length, 1)
     assert(!JSON.stringify(metadata).includes('credentialId'))
-    assert(!JSON.stringify(metadata).includes('test-password'))
+    assert(!JSON.stringify(metadata).includes(input.password))
     const otherBot = { ...a, botId: randomUUID(), subagentId: randomUUID() }
     await pool.query('INSERT INTO bots VALUES($1,$2,$3)', [otherBot.botId, a.userId, a.workspaceId])
     await pool.query(`INSERT INTO bot_subagents VALUES($1,$2,$3,$4,'running')`, [otherBot.subagentId, a.userId, a.workspaceId, otherBot.botId])
@@ -88,7 +89,7 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
 })
 
 test('real PostgreSQL: observed credential lease inserts once and stays guarded', { skip: !databaseURL }, async () => {
-  process.env.BETTER_AUTH_SECRET = 'isolated-credential-test-fingerprint-key'
+  process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
   const targetUrl = new URL(databaseURL!)
   const isolated = targetUrl.pathname === '/credential_test' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && targetUrl.hostname === '127.0.0.1' && targetUrl.pathname === '/mikka_e2e')
   if (!isolated) throw new Error('Use the isolated credential test database')
@@ -108,11 +109,12 @@ test('real PostgreSQL: observed credential lease inserts once and stays guarded'
       async generate() { key = randomBytes(32); return { plaintext: Buffer.from(key), wrapped: 'synthetic-key' } },
       async decrypt() { decrypts++; if (!key) throw new Error('missing fixture key'); return Buffer.from(key) },
     }
+    const fixturePassword = randomBytes(24).toString('base64url')
     const store = new CredentialStore(pool, kms), origin = 'https://example.com'
     const challenge = await store.challenge(actor, origin)
-    await store.save(actor, { nonce: challenge.nonce, origin, username: 'fixture-user', password: 'synthetic-fixture' })
+    await store.save(actor, { nonce: challenge.nonce, origin, username: 'fixture-user', password: fixturePassword })
     const target = { targetId: 'fixture-target', origin, endpoint: 'https://fixture.e2b.app/', expiresAt: Date.now() + 60000, observedInput: { loaderId: 'fixture-loader', backendNodeId: 7, credentialRole: 'password' as const, epoch: 1, permissionVersion: 1 } }
-    const cdp = { async attach() {}, async origin() {}, async call() { return { frameTree: { frame: { url: origin, loaderId: 'fixture-loader' } } } }, async insertAtObservedInput(_origin: string, _loader: string, _node: number, _role: string, value: string) { assert.equal(value, 'synthetic-fixture'); inserted++ }, close() {} }
+    const cdp = { async attach() {}, async origin() {}, async call() { return { frameTree: { frame: { url: origin, loaderId: 'fixture-loader' } } } }, async insertAtObservedInput(_origin: string, _loader: string, _node: number, _role: string, value: string) { assert.equal(value, fixturePassword); inserted++ }, close() {} }
     const guard = { async begin() {
       const observer = await pool.connect()
       try {
@@ -147,7 +149,7 @@ test('real PostgreSQL: observed credential lease inserts once and stays guarded'
     await claimed
     try {
       const updateChallenge = await store.challenge(actor, origin)
-      await store.save(actor, { nonce: updateChallenge.nonce, origin, username: 'fixture-user', password: 'replacement-synthetic' })
+      await store.save(actor, { nonce: updateChallenge.nonce, origin, username: 'fixture-user', password: randomBytes(24).toString('base64url') })
     } finally { resumeClaim() }
     await refused
     assert.equal(decrypts, 1); assert.equal(inserted, 1)
