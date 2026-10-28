@@ -24,3 +24,7 @@ test("alias movement, prepublication and target mismatch block even healthy outp
   assert.equal(check(receipt, { ...observation, target: { ...target, [key]: "wrong" } }), "blocked", key);
  assert.equal(check({ ...receipt, action: "merge" }), "blocked");
 });
+
+test("missing alias body evidence blocks even with immutable failure", () => {
+ assert.equal(check(receipt, { ...observation, health: { ...observation.health, immutableStatus: 503, aliasBodyValid: null } }), "blocked");
+});

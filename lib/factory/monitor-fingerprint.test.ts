@@ -18,3 +18,7 @@ test("missing workspace association narrows to issue rather than personal namesp
   assert.notEqual(monitorWorkspacePartition(input), monitorWorkspacePartition({ ...input, issueId: "b" }));
   assert.equal(monitorWorkspacePartition({ ...input, workspaceId: "w" }), "workspace:w");
 });
+
+test("adapter HTTP codes remain distinct", () => {
+ assert.notEqual(monitorFingerprint({ ...base, failure: "health-http-503" }).fingerprint, monitorFingerprint({ ...base, failure: "health-http-401" }).fingerprint);
+});

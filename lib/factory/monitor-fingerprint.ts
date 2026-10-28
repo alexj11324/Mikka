@@ -29,7 +29,7 @@ export function normalizeMonitorFailure(value: string): string {
     .replace(/\b[a-f0-9]{8}-[a-f0-9-]{27,}\b/gi, "<id>")
     .replace(/\b[a-f0-9]{32,}\b/gi, "<hash>")
     .replace(/\b\d{4}-\d{2}-\d{2}T[\d:.+-]+Z?\b/g, "<time>")
-    .replace(/\bHTTP\s+([45]\d{2})\b/gi, "HTTP_STATUS_$1")
+    .replace(/\bHTTP(?:\s+|-)([45]\d{2})\b/gi, "HTTP_STATUS_$1")
     .replace(/\b\d+\b/g, "<n>")
     .replace(/\s+/g, " ")
     .trim();

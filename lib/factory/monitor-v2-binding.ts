@@ -36,7 +36,7 @@ export function validateMonitorV2Observation(
     if (!configuredProductionOrigin.startsWith("https://") || !a || a.origin !== configuredProductionOrigin || a.before !== p.deploymentId || a.after !== p.deploymentId) return "blocked";
   } else if (observation.alias !== null || observation.health.aliasStatus !== null || observation.health.aliasBodyValid !== null) return "blocked";
   const checks = [{ status: observation.health.immutableStatus, valid: observation.health.immutableBodyValid }, ...(production ? [{ status: observation.health.aliasStatus, valid: observation.health.aliasBodyValid }] : [])];
-  if (checks.some(c => c.status === null || (c.status !== 200 && !(c.status >= 500 && c.status <= 599)))) return "blocked";
+  if (checks.some(c => (c.status === 200 && typeof c.valid !== "boolean") || c.status === null || (c.status !== 200 && !(c.status >= 500 && c.status <= 599)))) return "blocked";
   if (checks.every(c => c.status === 200 && c.valid === true)) return "healthy";
   if (checks.some(c => (c.status !== null && c.status >= 500) || (c.status === 200 && c.valid === false))) return "unhealthy";
   return "blocked";
