@@ -21,8 +21,8 @@ function fixture() {
 describe('credential broker execution callback', () => {
   it('consumes the host action and returns only a bounded outcome', async () => {
     const { execute, fill, ordinary } = fixture()
-    expect(await execute(driver, call, ':1', 'run')).toEqual({ status: 'session_applied' })
-    await expect(execute(driver, call, ':1', 'run')).rejects.toThrow('already consumed')
+    expect(await execute(driver, call, ':1', 'run', { actionId: 'action' })).toEqual({ status: 'session_applied' })
+    await expect(execute(driver, call, ':1', 'run', { actionId: 'action' })).rejects.toThrow('already consumed')
     expect(fill).toHaveBeenCalledTimes(1); expect(ordinary).not.toHaveBeenCalled()
   })
   it('does not fill after policy revision or STOP', async () => {
@@ -30,8 +30,13 @@ describe('credential broker execution callback', () => {
       const { execute, state, fill } = fixture()
       if (mode === 'version') state.version++
       else state.running = false
-      await expect(execute(driver, call, ':1', 'run')).rejects.toThrow('unavailable')
+      await expect(execute(driver, call, ':1', 'run', { actionId: 'action' })).rejects.toThrow('unavailable')
       expect(fill).not.toHaveBeenCalled()
     }
+  })
+  it('rejects a mismatched broker action identity before filling', async () => {
+    const { execute, fill } = fixture()
+    await expect(execute(driver, call, ':1', 'run', { actionId: 'other' })).rejects.toThrow('unavailable')
+    expect(fill).not.toHaveBeenCalled()
   })
 })
