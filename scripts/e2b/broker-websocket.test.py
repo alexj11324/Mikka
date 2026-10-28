@@ -59,8 +59,8 @@ async def main():
                 unix=await asyncio.start_unix_server(bridge,path=str(path/'cdp.sock'))
                 grant={'subagentId':'case','ownerId':'owner','workspaceId':'workspace','botId':'bot','epoch':1,'role':'broker','exp':9999999999}
                 class Browser:
-                    guard='guard';guard_origin=origin;stopped=False;session=control_session
-                    def __init__(self):self.path=path;self.target=target;self.grant=grant;self.override_url=None;self.seq=100
+                    guard=None;guard_origin=origin;stopped=False;session=control_session
+                    def __init__(self):self.path=path;self.target=target;self.grant=grant;self.override_url=None;self.seq=100;self.lock=asyncio.Lock();self.guard_file=path/'guard';self.frame=None;self.viewer=set()
                     async def rpc(self,method,params=None,session=None):
                         self.seq+=1;ident=self.seq
                         await internal.send_json({'id':ident,'method':method,'params':params or {},'sessionId':session or self.session})
@@ -71,11 +71,25 @@ async def main():
                                 return data['result']
                     async def url(self):return self.override_url or (await self.rpc('Page.getFrameTree'))['frameTree']['frame']['url']
                 browser=Browser();gateway.AGENTS['case']=browser
+                for _ in range(100):
+                    if gateway.browser_origin(await browser.url())==origin:
+                        ready=await browser.rpc('Runtime.evaluate',{'expression':'document.readyState','returnByValue':True})
+                        if ready.get('result',{}).get('value')=='complete':break
+                    await asyncio.sleep(.05)
+                else:raise AssertionError('synthetic HTTPS fixture did not finish loading')
                 gateway.authorize=lambda request,role:('synthetic',grant)
                 gateway.token=lambda raw,role:grant
-                app=web.Application();app.router.add_get('/agents/{id}/credentials/cdp',gateway.cdp)
+                app=web.Application();app.router.add_get('/agents/{id}/credentials/cdp',gateway.cdp);app.router.add_post('/agents/{id}/credentials/begin',gateway.begin)
                 async with TestClient(TestServer(app)) as client:
-                    endpoint='/agents/case/credentials/cdp?guard=guard'
+                    await browser.rpc('Runtime.evaluate',{'expression':"(()=>{const e=document.createElement('iframe');e.id='unsafe-test';document.body.append(e)})()",'returnByValue':True})
+                    async with client.post('/agents/case/credentials/begin?token=synthetic') as denied_begin:assert denied_begin.status==409
+                    assert browser.guard and browser.guard_file.exists(), 'failed begin must stay guarded'
+                    await browser.rpc('Runtime.evaluate',{'expression':"document.querySelector('#unsafe-test').remove()",'returnByValue':True})
+                    browser.guard=None;browser.guard_file.unlink()
+                    async with client.post('/agents/case/credentials/begin?token=synthetic') as accepted_begin:
+                        assert accepted_begin.status==200
+                        token=(await accepted_begin.json())['guardToken']
+                    endpoint=f'/agents/case/credentials/cdp?guard={token}'
                     async def response(ws,ident):
                         while True:
                             message=await ws.receive(timeout=10)
@@ -157,6 +171,21 @@ async def main():
                             msg=await ws.receive(timeout=10)
                             if msg.type in (WSMsgType.CLOSE,WSMsgType.CLOSED):break
                             assert msg.type==WSMsgType.TEXT and 'id' not in json.loads(msg.data)
+                    for injection in (
+                        "(()=>{const e=document.createElement('iframe');e.id='unsafe-test';document.body.append(e)})()",
+                        "(()=>{const e=document.createElement('div');e.id='unsafe-test';document.body.append(e);e.attachShadow({mode:'closed'}).innerHTML='<input>'})()",
+                    ):
+                        async with client.ws_connect(endpoint) as ws:
+                            session=await attach(ws)
+                            focus=next(expr for expr,selector in gateway.BROKER_FOCUS_EXPRESSIONS.items() if selector==gateway.BROKER_FOCUS_SELECTORS[0])
+                            await ws.send_json({'id':2,'method':'Runtime.evaluate','params':{'expression':focus,'returnByValue':True},'sessionId':session});await response(ws,2)
+                            await browser.rpc('Runtime.evaluate',{'expression':injection,'returnByValue':True})
+                            await ws.send_json({'id':3,'method':'Input.insertText','params':{'text':'synthetic'},'sessionId':session})
+                            while True:
+                                msg=await ws.receive(timeout=10)
+                                if msg.type in (WSMsgType.CLOSE,WSMsgType.CLOSED):break
+                                assert msg.type==WSMsgType.TEXT and 'id' not in json.loads(msg.data)
+                        await browser.rpc('Runtime.evaluate',{'expression':"document.querySelector('#unsafe-test').remove()",'returnByValue':True})
                     await browser.rpc('Page.navigate',{'url':f'https://localhost:{fixture_port}/login'})
                     for _ in range(100):
                         if gateway.browser_origin(await browser.url())!=origin:break
