@@ -322,6 +322,8 @@ export const runAssignmentSchema = z.object({
    * Absent from an older server: the daemon applies the ADR 0009 defaults.
    */
   policy: runPolicySchema.optional(),
+  /** Trusted server revision for the exact run policy; older servers omit it. */
+  policyRevision: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   /**
    * The skills mounted on this run's agent and still enabled, resolved at
    * claim time the way `policy` is. The daemon inlines them into the agent's

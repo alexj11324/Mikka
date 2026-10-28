@@ -100,12 +100,14 @@ export function serverUrl(base: string, path: string): URL {
 
 export class HttpServerLink implements ServerLink {
   async prepareRunToolApproval(assignment: RunAssignment, _signal: AbortSignal, check: () => void) {
+    if (!assignment.policy || !assignment.policyRevision) throw new Error('Run policy unavailable')
+    const policyRevision = assignment.policyRevision
     const path = `/v1/runs/${seg(assignment.runId)}/tool-approval`
     const proposal = z.object({ id: z.uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/), status: z.string() })
     const response = z.object({ decision: z.enum(['pending', 'allow', 'deny']) })
     return new ToolApprovalGate(assignment.runId, {
       permission: request => toolApprovalDecision(request, assignment.policy),
-      isLive: () => { try { check(); return true } catch { return false } },
+      isLive: async () => { try { check(); const current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean() }) }); check(); return current.live } catch { return false } },
       ask: async (request, signal) => {
         const delay = () => new Promise<void>((resolve, reject) => {
           const done = () => { signal.removeEventListener('abort', stop); resolve() }
@@ -120,7 +122,7 @@ export class HttpServerLink implements ServerLink {
             catch (error) { if (signal.aborted || !(error instanceof ServerUnreachableError)) throw error; await delay() }
           }
         }
-        const created = await retry(() => this.call('POST', path, { body: { operation: 'propose', deviceId: assignment.deviceId, requestId: request.requestId, harness: request.harness, method: request.method, input: request.input }, schema: proposal, signal }))
+        const created = await retry(() => this.call('POST', path, { body: { operation: 'propose', deviceId: assignment.deviceId, policyRevision, requestId: request.requestId, harness: request.harness, method: request.method, input: request.input }, schema: proposal, signal }))
         try {
           for (;;) {
             const result = await retry(() => this.call('POST', path, { body: { operation: 'take', deviceId: assignment.deviceId, id: created.id, digest: created.digest }, schema: response, signal }))

@@ -414,7 +414,9 @@ export class Daemon {
       ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
       : (this.options.harnesses ?? (await detectHarnesses()))
     if (this.stopped) throw new Error("daemon stopped during startup")
-    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({ ...info, coordinator: hosted ? false : coordinatorCapable(info) }))
+    // Do not advertise enforcement merely because an approval callback exists:
+    // each harness must prove that all policy-gated operations reach it.
+    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({ ...info, toolApproval: undefined, coordinator: hosted ? false : coordinatorCapable(info) }))
     // Runs survive restarts: pick up what the journal says was active.
     this.supervisor.resumeAll()
     if (!hosted && this.options.quotaSource !== null) {

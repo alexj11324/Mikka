@@ -5,6 +5,7 @@ import {freezeWorkerDefinition, retryWorkerDefinition} from './worker'
 import {runPrompt} from '../run-prompt'
 import {DEFAULT_AGENT_DEFINITION} from './builtin'
 import {makeSnapshot} from './definition'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 
 const owner=randomUUID(),workspace=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID(),botId=randomUUID(),issueId=randomUUID()
 const binding={id:randomUUID(),ownerId:owner,workspaceId:workspace,consumerId:agentId,connectionId:randomUUID(),connectionRevision:1,route:'codex_cli',modelId:'frozen-model'}
@@ -21,7 +22,8 @@ let selectIndex=0
 const db={select:()=>({from:()=>({where:()=>({limit:async()=>[[{id:randomUUID(),userId:owner,agentId,deviceId,deviceRepoId:repoId,issueId,kind:'implement',prompt:'task',agentDefinition:definition}],[{id:agentId,userId:owner,harness:'claude_code'}],[{id:repoId,userId:owner,baseBranch:'main'}]][selectIndex++]})})})}
 let cloud=false
 stub('../db/index.ts',{db,pool:{}})
-stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,kind:cloud?'cloud':'local',harnesses:[{harness:'codex',installed:true,subscriptionBroker:true,computerBroker:true}]})})
+stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,kind:cloud?'cloud':'local',harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
+stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:defaultRunPolicy(),revision:'a'.repeat(64)})})
 stub('../mcp/worker.ts',{issueRunToken:async()=>({token:'synthetic-only'})})
 stub('../mcp/resource.ts',{mcpResourceURL:null})
 stub('../run-leases.ts',{latestCheckpoint:async()=>null})

@@ -108,6 +108,12 @@ function texts(chunks: RunChunk[]) {
     .join("")
 }
 
+it('does not advertise policy enforcement from callback availability alone', async () => {
+  const { server } = await setup()
+  const reported = server.devices.get(DEVICE)?.info.harnesses ?? []
+  expect(reported.some(item => item.toolApproval === true)).toBe(false)
+})
+
 describe.each(["claude_code", "codex", "cursor"] as const)(
   "%s adapter",
   (harness) => {
