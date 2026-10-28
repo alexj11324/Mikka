@@ -2731,6 +2731,23 @@
     "retry": "重试",
     "incomplete": "此历史回复未完成。"
   },
+  "Browser": {
+    "label": "浏览器",
+    "back": "后退",
+    "forward": "前进",
+    "reload": "刷新",
+    "address": "地址",
+    "addressPlaceholder": "输入网址",
+    "selectElement": "选择元素",
+    "selectRegion": "框选区域",
+    "openInTab": "在新标签页打开",
+    "close": "关闭浏览器",
+    "frameTitle": "网页",
+    "note": "给 {label} 写备注",
+    "notePlaceholder": "写备注",
+    "addNote": "放进对话",
+    "removeNote": "移除备注 {n}"
+  },
   "MobilePush": {
     "verificationCode": "收到一条验证码"
   }

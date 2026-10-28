@@ -21,6 +21,9 @@ import { BoardPage } from './board-page'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { GlobalSearch, SearchPill } from '@/components/nav/global-search'
 import { ContextPanel } from '@/components/nav/context-panel'
+import { BrowserPane } from '@/components/browser/browser-pane'
+import { BrowserNotesProvider } from '@/components/browser/browser-notes'
+import { BrowserToggle } from '@/components/browser/browser-toggle'
 import type { CoordinatorPrefill } from '@/components/coordinator/coordinator-chat'
 import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
 import { listThreads } from '@/app/actions/task-runs'
@@ -129,6 +132,11 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const [panelOpen, setPanelOpen] = useState(true)
   useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])
   function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem('mikka:context-panel', next ? '1' : '0') } catch { /* storage unavailable */ } }
+  // The app-wide browser (top bar 🌐): while open it takes the right panel's place.
+  const [browserOpen, setBrowserOpen] = useState(false)
+  // Not inside a frame: the app opened in its own browser must not open another one.
+  useEffect(() => { try { if (window.self === window.top && window.localStorage.getItem('mikka:browser') === '1') setBrowserOpen(true) } catch { /* storage unavailable */ } }, [])
+  function showBrowser(next: boolean) { setBrowserOpen(next); try { window.localStorage.setItem('mikka:browser', next ? '1' : '0') } catch { /* storage unavailable */ } }
   const [coordinatorPrefill, setCoordinatorPrefill] = useState<CoordinatorPrefill>()
   const [teamId, setTeamId] = useState<string | null>(params.get('team'))
   const activeTeam = teams.find(team => team.id === teamId)
@@ -355,8 +363,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
     {dialogs}
   </AppShell></SignOutBoundary>
-  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><AppFrame
-    bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={isConversation && !panelOpen && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground xl:inline-flex" aria-label={i18nText('Shell.panel.open')} onClick={() => showPanel(true)} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>} />}
+  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider><AppFrame
+    bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={<>{isConversation && !panelOpen && !browserOpen && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground xl:inline-flex" aria-label={i18nText('Shell.panel.open')} onClick={() => showPanel(true)} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}<BrowserToggle open={browserOpen} onToggle={() => showBrowser(!browserOpen)} /></>} />}
     rail={<IconRail active={rail} onNavigate={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}>
     {/* The board keeps only the rail on its left (MIK-45). */}
     {rail !== 'board' && <BotList bots={bots} threads={threads} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}
@@ -370,8 +378,9 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
         <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />
       </>}
     </AppShellContent>
-    {isConversation && panelOpen && <ContextPanel userName={user.name || user.email} issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onArrange={arrange} onConnect={() => openRail('plugins')} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
+    {browserOpen && <BrowserPane onClose={() => showBrowser(false)} />}
+    {isConversation && panelOpen && !browserOpen && <ContextPanel userName={user.name || user.email} issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onArrange={arrange} onConnect={() => openRail('plugins')} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}
     {dialogs}
-  </AppFrame></ComputerAgentsProvider></SignOutBoundary>
+  </AppFrame></BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
 }

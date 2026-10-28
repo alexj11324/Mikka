@@ -175,7 +175,14 @@ function frameScript() {
   else mount()
 }
 
-const SCRIPT = `<script>(${frameScript.toString()})()</script>`
+/**
+ * The quoting script as source. The app-wide browser also puts it into pages of
+ * the app's own origin, which it can reach, so picking an element there works
+ * and looks the same as in an artifact.
+ */
+export const FRAME_SCRIPT = `(${frameScript.toString()})()`
+
+const SCRIPT = `<script>${FRAME_SCRIPT}</script>`
 
 /** The artifact with the quoting script in front, so it runs before the page's own scripts. */
 export function frameDocument(html: string): string {

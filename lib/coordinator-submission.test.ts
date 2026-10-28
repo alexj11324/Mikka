@@ -233,3 +233,16 @@ test('actual action freezes serialized quotes across retries and rejects quote c
   assert.deepEqual([...current.rows.values()], original)
   assert.equal(callbacks.length, 2)
 })
+
+test('actual action puts validated browser notes after the quote and rejects bad ones', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  const note = { n: 1, kind: 'region' as const, url: 'https://example.org/pricing', label: 'example.org/pricing', note: 'Wrong price', rect: { x: 1, y: 2, width: 30, height: 40, viewportWidth: 560, viewportHeight: 800 } }
+  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, submissionId, [note]), { queued: true })
+  const [row] = [...current.rows.values()]
+  assert.match(row.payload.text, /^<browser-note n="1" kind="region" url="https:\/\/example.org\/pricing"[^>]*>Wrong price<\/browser-note>\nhello$/)
+  current = fixture()
+  for (const bad of [{ ...note, url: 'javascript:alert(1)' }, { ...note, note: ' ' }, { ...note, extra: true }]) {
+    assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, [bad as typeof note]), { error: 'messageRequired', params: undefined })
+  }
+  assert.equal(current.rows.size, 0)
+})
