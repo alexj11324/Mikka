@@ -31,6 +31,11 @@ existing external MCP create/update path retains its pre-rollout behavior
 without querying `issue_tool_calls`. Enabling a flag never adds tools absent
 from an execution's recorded `effectiveTools`.
 
+The legacy MCP schema retains agent assignment and does not offer the new
+human-assignee field. Unknown MCP fields are rejected instead of silently
+discarded; direct no-tool-ID human-assignee calls fail before any write. The
+human-assignee path is available only through the guarded durable tool.
+
 The operator must first verify the actual application database binding, apply
 the reviewed `drizzle/20261028015330_issue_tool_calls.sql` to an authorized
 target and verify its schema/primary key, then separately authorize enablement.
@@ -67,12 +72,9 @@ Normal UI actions continue scheduling the same work with `after()`.
 
 ## New-task entry
 
-The existing dialog keeps its layout. Mikka Cloud is first and selected by
-default (R-22/R-23); the person's chosen local machine remains in the request.
-Submitting preserves a request UUID across a retry with the same text, so a
-lost acknowledgement cannot enqueue the same request twice. The Coordinator's
-instructions require creating the issue before dispatch and retaining the
-task if execution is unavailable. It must not silently switch machines.
+The dialog, destination selection and submission retry changes are layered
+over the backend-only batch in this PR. They require the issue-tool rollout,
+matching schema, fixed Preview and UI acceptance before release.
 
 ## Verification
 

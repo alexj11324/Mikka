@@ -61,6 +61,7 @@ interface IssueChanges {
   projectId?: string | null
   labels?: string[]
   assigneeUserId?: string | null
+  assigneeAgentId?: string | null
 }
 
 /** Applies the changes one action at a time, each on the revision the last one left. */
@@ -81,6 +82,7 @@ async function applyChanges(userId: string, issueId: string, changes: IssueChang
     patch.labels = changes.labels.map(name => known.get(name.toLowerCase()) ?? { name, color: 'gray' })
   }
   if (changes.assigneeUserId !== undefined) patch.assignee = changes.assigneeUserId ? { kind: 'member', id: changes.assigneeUserId } : null
+  if (changes.assigneeAgentId !== undefined) patch.assignee = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
   if (Object.keys(patch).length) issue = unwrap(await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch })).issue
   if (changes.projectId !== undefined) issue = unwrap(await moveIssueToProject({ issueId: issue.id, revision: issue.revision, projectId: changes.projectId })).issue
   return issue
@@ -96,9 +98,13 @@ function issueResult(issue: { id: string; title: string; status: string; priorit
 
 export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }, actor?: ActivityActor, toolCallId?: string) {
   return attempt(() => actAs(userId, async () => {
+    if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
+    // The legacy MCP contract has no human-assignee field. Do not introduce a
+    // multi-action write without the durable transaction and access checks.
+    if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
     const mutate = async () => {
       const created = unwrap(await saveIssue({ title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' })).issue
-      return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeUserId: input.assigneeUserId }))
+      return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeUserId: input.assigneeUserId, assigneeAgentId: input.assigneeAgentId }))
     }
     if (toolCallId === undefined) return mutate()
     if (!issueMutationsEnabled()) return { error: 'issueToolsDisabled' }
@@ -112,6 +118,8 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
 
 export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }, actor?: ActivityActor, toolCallId?: string) {
   return attempt(() => actAs(userId, async () => {
+    if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
+    if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
     const { issueId, ...changes } = input
     const mutate = async () => issueResult(await applyChanges(userId, issueId, changes))
     if (toolCallId === undefined) return mutate()
