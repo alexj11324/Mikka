@@ -6,6 +6,9 @@ import { canonicalOrigin, assertSameOrigin, submitSchema, otpSchema, CredentialE
 import { seal, open, sealSession, type Kms } from './kms'
 import { checkCredentialRequest, credentialBody, credentialFailure } from './http'
 import { Cdp } from './browser'
+import { fillCredential } from './broker'
+import { CredentialStore } from './store'
+import { assertCredentialPageBinding, type CredentialPageBinding } from './page-binding'
 import { assertNoSecret, fingerprint } from './fingerprint'
 
 function fixtureKms(): Kms {
@@ -138,4 +141,128 @@ test('verification codes use a separate authenticated envelope purpose', async (
   await assert.rejects(open(kms, owner, code))
   assert(otpSchema.safeParse({ nonce: 'a'.repeat(43), origin: owner.origin, code: '123456' }).success)
   assert(!otpSchema.safeParse({ nonce: 'a'.repeat(43), origin: owner.origin, code: '123456', credentialId: 'forged' }).success)
+})
+
+test('broker reports mechanical session application or submission without judging login state', async () => {
+  const kms = fixtureKms()
+  const password = await seal(kms, owner, Buffer.from(JSON.stringify({ username: 'fixture-user', password: 'fixture-password' })))
+  const snapshot = await sealSession(kms, owner, password.wrappedDek, Buffer.from(JSON.stringify({ cookies: [], localStorage: [] })))
+  for (const forcePassword of [false, true]) {
+    const calls: string[] = []
+    const claimed = { user_id: owner.userId, workspace_id: 'workspace', bot_id: 'bot', run_id: 'run', subagent_id: null, credential_id: owner.credentialId, origin: owner.origin, input_kind: 'password', target: { targetId: 'target', origin: owner.origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, credentialMode: forcePassword ? 'password' : 'session-first' } }
+    const credential = { wrapped_dek: password.wrappedDek, nonce: password.nonce, ciphertext: password.ciphertext, username: 'fixture-user' }
+    const session = { wrapped_dek: snapshot.wrappedDek, nonce: snapshot.nonce, ciphertext: snapshot.ciphertext }
+    const client = {
+      async query(sql: string) {
+        if (sql.includes('FROM bots ') || sql.includes('FROM agent_runs ')) return { rows: [{ id: 'ok' }] }
+        if (sql.includes('JOIN credential_secrets')) return { rows: [credential] }
+        if (sql.includes('FROM browser_sessions')) return { rows: [session] }
+        return { rows: [] }
+      }, release() {},
+    }
+    const pool = { async query() { return { rows: [claimed] } }, async connect() { return client } }
+    const cdp = {
+      async attach() {}, async origin() {}, async safeToResume() { return true }, close() {},
+      async fill() { calls.push('fill') },
+      async call(method: string) {
+        calls.push(method)
+        if (method === 'Page.getFrameTree') return { frameTree: { frame: { url: owner.origin } } }
+        if (method === 'Runtime.evaluate') return { result: { objectId: 'fixture' } }
+        if (method === 'Network.getCookies') return { cookies: [] }
+        return {}
+      },
+      async evaluate(expression: string) { calls.push(`evaluate:${expression}`); return [] },
+    }
+    const result = await fillCredential(pool as never, 'a'.repeat(43), { kms, guard: { begin: async () => ({ cdpUrl: 'wss://example.e2b.app/', targetId: 'target', guardToken: 'fixture' }), end: async () => {} }, connect: (async () => cdp) as never })
+    assert.equal(result.status, forcePassword ? 'submitted' : 'session_applied')
+    assert.equal(calls.includes('fill'), forcePassword)
+    assert.equal(calls.includes('Page.reload'), !forcePassword)
+    assert(!calls.some(call => /readyState|one-time-code|input\[type/.test(call)))
+  }
+})
+
+test('password retry is bound to the server-authorized caller and its one-use target', async () => {
+  const caller = { userId: 'owner-a', workspaceId: 'workspace-a', botId: 'bot-a', runId: 'run-a' }
+  const captured: { values?: unknown[] } = {}
+  const pool = { async query(sql: string, values: unknown[]) {
+    if (sql.includes('FROM bots ')) return { rows: values[1] === caller.userId && values[2] === caller.workspaceId ? [{ id: caller.botId }] : [] }
+    if (sql.includes('FROM agent_runs ')) return { rows: values[1] === caller.userId && values[2] === caller.botId ? [{ id: caller.runId }] : [] }
+    if (sql.includes('FROM credentials ')) return { rows: [{ id: 'credential-fixture' }] }
+    if (sql.includes('INSERT INTO credential_fill_leases')) { captured.values = values; return { rows: [] } }
+    throw new Error('unexpected query')
+  } }
+  const store = new CredentialStore(pool as never, fixtureKms())
+  const target = { targetId: 'target', origin: owner.origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000 }
+  const result = await store.lease(caller, owner.origin, target, undefined, true)
+  assert.equal(result.status, 'ready')
+  assert.ok(captured.values)
+  assert.equal((captured.values[8] as { credentialMode?: string }).credentialMode, 'password')
+  assert.deepEqual(captured.values.slice(2, 7), [caller.userId, caller.workspaceId, caller.botId, null, caller.runId])
+  captured.values = undefined
+  await assert.rejects(store.lease({ ...caller, workspaceId: 'other' }, owner.origin, target, undefined, true), CredentialError)
+  assert.equal(captured.values, undefined)
+})
+
+test('credential action fails closed when the trusted page binding changes', () => {
+  const page: CredentialPageBinding = { userId: 'owner', workspaceId: 'workspace', botId: 'bot', subagentId: 'subagent', epoch: 7, targetId: 'target', origin: 'https://example.com', loaderId: 'loader', permissionAction: 'computer_use', permissionVersion: 1 }
+  const lease = { ...page, expiresAt: 2000 }
+  assert.doesNotThrow(() => assertCredentialPageBinding(lease, page, 1000))
+  for (const changed of [
+    { userId: 'other' }, { workspaceId: 'other' }, { botId: 'other' }, { subagentId: 'other' },
+    { epoch: 8 }, { targetId: 'other' }, { origin: 'https://other.example' }, { loaderId: 'other' },
+    { permissionAction: 'other' as never }, { permissionVersion: 2 },
+  ]) assert.throws(() => assertCredentialPageBinding(lease, { ...page, ...changed }, 1000), CredentialError)
+  assert.throws(() => assertCredentialPageBinding(lease, page, 2000), CredentialError)
+  assert.throws(() => assertCredentialPageBinding({ ...lease, origin: 'https://user@example.com' }, page, 1000), CredentialError)
+})
+
+test('observed input focus uses a top-document CDP node with a matching type', async () => {
+  const cdp = Object.create(Cdp.prototype) as Cdp
+  const calls: string[] = []
+  let root: unknown = { nodeName: '#document', children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password'] }] }
+  let focusedNode = 7
+  cdp.call = async (method, params) => {
+    calls.push(method)
+    if (method === 'DOM.getDocument') return { root }
+    if (method === 'Runtime.evaluate') return { result: { objectId: 'focused-fixture' } }
+    if (method === 'DOM.describeNode') return { node: { backendNodeId: focusedNode } }
+    return { params }
+  }
+  await cdp.focusObservedInput(7, 'password')
+  assert.deepEqual(calls, ['DOM.getDocument', 'DOM.focus', 'Runtime.evaluate', 'DOM.describeNode'])
+  focusedNode = 8
+  await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
+  focusedNode = 7
+  await assert.rejects(cdp.focusObservedInput(7, 'username'), CredentialError)
+  await assert.rejects(cdp.focusObservedInput(7, 'code' as never), CredentialError)
+  await assert.rejects(cdp.focusObservedInput(8, 'password'), CredentialError)
+  root = { nodeName: '#document', children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password', 'disabled', ''] }] }
+  await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
+  root = { nodeName: '#document', children: [{ nodeName: 'IFRAME', contentDocument: { children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password'] }] } }] }
+  await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
+  root = { nodeName: '#document', children: [{ nodeName: 'DIV', shadowRoots: [{ children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password'] }] }] }] }
+  await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
+})
+
+test('insertion uses only the observed node on the bound origin and document', async () => {
+  const cdp = Object.create(Cdp.prototype) as Cdp
+  let actualLoader = 'loader', actualOrigin = 'https://example.com', focused = 7
+  const calls: string[] = []
+  cdp.call = async method => {
+    calls.push(method)
+    if (method === 'Page.getFrameTree') return { frameTree: { frame: { loaderId: actualLoader, url: actualOrigin } } }
+    if (method === 'DOM.getDocument') return { root: { nodeName: '#document', children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password'] }] } }
+    if (method === 'Runtime.evaluate') return { result: { objectId: 'fixture' } }
+    if (method === 'DOM.describeNode') return { node: { backendNodeId: focused } }
+    return {}
+  }
+  await cdp.insertAtObservedInput('https://example.com', 'loader', 7, 'password', 'synthetic')
+  assert.equal(calls.filter(method => method === 'Input.insertText').length, 1)
+  for (const [loader, origin, node] of [['other', 'https://example.com', 7], ['loader', 'https://other.example', 7], ['loader', 'https://example.com', 8]] as const) {
+    actualLoader = loader; actualOrigin = origin; focused = node; calls.length = 0
+    await assert.rejects(cdp.insertAtObservedInput('https://example.com', 'loader', 7, 'password', 'synthetic'), CredentialError)
+    assert(!calls.includes('Input.insertText'))
+  }
+  await assert.rejects(cdp.fill('https://example.com', 'synthetic', 'synthetic'), CredentialError)
+  await assert.rejects(cdp.fillOtp('https://example.com', '123456'), CredentialError)
 })

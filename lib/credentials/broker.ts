@@ -18,7 +18,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
   if (!claimed) throw new CredentialError('credential_denied', 404)
   const caller = { userId: claimed.user_id, workspaceId: claimed.workspace_id, botId: claimed.bot_id, subagentId: claimed.subagent_id, runId: claimed.run_id }
   const context = { userId: caller.userId, credentialId: claimed.credential_id, origin: claimed.origin }
-  const target = claimed.target as BrowserTarget
+  const target = claimed.target as BrowserTarget & { credentialMode?: 'password' | 'session-first' }
   const client = await pool.connect()
   let cdp: Cdp | undefined, guardToken: string | undefined, completed = false
   let plaintext: Buffer | undefined
@@ -36,8 +36,8 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     const initialUrl = (await cdp.call('Page.getFrameTree')).frameTree.frame.url as string
     // Only this broker process ever receives cookie/password plaintext.
     const session = (await client.query('SELECT * FROM browser_sessions WHERE credential_id=$1 AND expires_at>now()', [context.credentialId])).rows[0]
-    let restored = false
-    if (session && claimed.input_kind !== 'otp') {
+    let sessionApplied = false
+    if (session && claimed.input_kind !== 'otp' && target.credentialMode !== 'password') {
       try {
         plaintext = await open(kms, context, rowEnvelope(session), 'session')
         const state = JSON.parse(plaintext.toString('utf8'))
@@ -51,22 +51,17 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
             functionDeclaration: 'function(entries){localStorage.clear();for(const [k,v] of entries)localStorage.setItem(k,v)}',
             arguments: [{ value: state.localStorage }], returnByValue: true })
         }
-        // HttpOnly cookies only. Login restoration is verified after reload;
-        // if the login form remains, fall back to the saved password.
+        // Applying state is mechanical; only the caller's visual model may
+        // decide whether the site accepted it or needs another login step.
         await cdp.call('Page.reload')
-        const deadline = Date.now() + 5000
-        do {
-          await new Promise(resolve => setTimeout(resolve, 250))
-          await cdp.origin(context.origin)
-          restored = await cdp.evaluate(`document.readyState==='complete'&&!document.querySelector('input[type="password"]')`) === true
-        } while (!restored && Date.now() < deadline)
-      } catch { restored = false } finally { plaintext?.fill(0); plaintext = undefined }
+        sessionApplied = true
+      } finally { plaintext?.fill(0); plaintext = undefined }
     }
     if (claimed.input_kind === 'otp') {
       plaintext = await open(kms, context, claimed.input_envelope, 'otp')
       await cdp.fillOtp(context.origin, plaintext.toString())
       plaintext.fill(0); plaintext = undefined
-    } else if (!restored) {
+    } else if (!sessionApplied) {
       plaintext = await open(kms, context, rowEnvelope(credential))
       let value = JSON.parse(plaintext.toString('utf8'))
       plaintext.fill(0); plaintext = undefined
@@ -84,29 +79,27 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     } while (!safe && Date.now() < deadline)
     if (!safe) throw new CredentialError('credential_login_pending', 409)
     await cdp.origin(context.origin)
-    const needsCode = await cdp.evaluate(`Boolean([...document.querySelectorAll('input[autocomplete="one-time-code"],input[name="code"],input[name="otp"]')].find(e=>!e.disabled&&e.getClientRects().length))`) === true
-    if (!needsCode) {
+    if (!sessionApplied) {
       const cookies = (await cdp.call('Network.getCookies', { urls: [context.origin] })).cookies
       const localStorage = await cdp.evaluate('Object.entries(localStorage)')
       const sessionEnvelope = await sealSession(kms, context, credential.wrapped_dek, Buffer.from(JSON.stringify({ cookies, localStorage })))
       await client.query(`INSERT INTO browser_sessions(credential_id,wrapped_dek,nonce,ciphertext,expires_at) VALUES($1,$2,$3,$4,now()+interval '7 days') ON CONFLICT(credential_id) DO UPDATE SET wrapped_dek=$2,nonce=$3,ciphertext=$4,expires_at=excluded.expires_at`, [context.credentialId, sessionEnvelope.wrappedDek, sessionEnvelope.nonce, sessionEnvelope.ciphertext])
     }
     await client.query('UPDATE credentials SET last_used_at=now() WHERE id=$1', [context.credentialId])
-    await client.query(`INSERT INTO credential_access_events(credential_id,user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,$6,$7)`, [context.credentialId, context.userId, caller.botId, caller.runId, caller.subagentId, context.origin, restored ? 'session_restored' : 'password_filled'])
+    await client.query(`INSERT INTO credential_access_events(credential_id,user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,$6,$7)`, [context.credentialId, context.userId, caller.botId, caller.runId, caller.subagentId, context.origin, sessionApplied ? 'session_applied' : claimed.input_kind === 'otp' ? 'otp_submitted' : 'password_submitted'])
     await client.query('COMMIT'); completed = true
     await guard.end(target, guardToken)
     if (caller.subagentId) {
-      const needs = needsCode ? { kind: 'code', site: new URL(context.origin).hostname, account: credential.username } : null
-      // State and its data-subagent event are one statement: viewers never miss
-      // the credential continuation or a second-factor request.
+      // Resume the caller to observe the page after the guard ends. The
+      // broker does not decide whether login succeeded or MFA is required.
       await pool.query(`WITH changed AS (
         UPDATE bot_subagents SET status=$5,needs=$6,step=$7
         WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 AND status IN ('running','needs_you') RETURNING *
       ) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event)
       SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`,
-      [caller.subagentId, caller.userId, caller.workspaceId, caller.botId, needsCode ? 'needs_you' : 'running', needs ? JSON.stringify(needs) : null, needsCode ? 'needs_code' : 'running'])
+      [caller.subagentId, caller.userId, caller.workspaceId, caller.botId, 'running', null, 'running'])
     }
-    return { status: needsCode ? 'needs_code' as const : 'submitted' as const, origin: context.origin }
+    return { status: sessionApplied ? 'session_applied' as const : 'submitted' as const, origin: context.origin }
   } catch (error) {
     if (!completed) await client.query('ROLLBACK')
     await pool.query(`INSERT INTO credential_access_events(user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,'denied_or_failed')`, [context.userId, caller.botId, caller.runId, caller.subagentId, context.origin])

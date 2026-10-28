@@ -52,7 +52,7 @@ export class CredentialStore {
       return { status: 'saved' as const, origin }
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   }
-  async lease(caller: BrowserCaller, origin: string, target: BrowserTarget, username?: string) {
+  async lease(caller: BrowserCaller, origin: string, target: BrowserTarget, username?: string, forcePassword = false) {
     await this.authorize(caller)
     origin = canonicalOrigin(origin)
     if (canonicalOrigin(target.origin) !== origin || target.expiresAt < Date.now() + 5000) throw denied()
@@ -60,7 +60,7 @@ export class CredentialStore {
     // Never choose a different account silently when several logins exist.
     if (rows.length !== 1) return { status: 'needs_login' as const, origin }
     const value = nonce()
-    await this.pool.query(`INSERT INTO credential_fill_leases(nonce_hash,credential_id,user_id,workspace_id,bot_id,subagent_id,run_id,origin,target,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '30 seconds')`, [hashNonce(value), rows[0].id, ...callerValues(caller), origin, target])
+    await this.pool.query(`INSERT INTO credential_fill_leases(nonce_hash,credential_id,user_id,workspace_id,bot_id,subagent_id,run_id,origin,target,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '30 seconds')`, [hashNonce(value), rows[0].id, ...callerValues(caller), origin, { ...target, credentialMode: forcePassword ? 'password' : 'session-first' }])
     return { status: 'ready' as const, lease: value }
   }
   async list(actor: Actor) {
