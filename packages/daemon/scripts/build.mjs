@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const source = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
-const packageName = process.env.MIKKA_DAEMON_PACKAGE_NAME ?? source.name
+const packageName = process.env.MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka'
 if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(packageName)) throw new Error('Invalid daemon npm package name')
 const out = resolve(root, 'dist')
 await rm(out, { recursive: true, force: true })

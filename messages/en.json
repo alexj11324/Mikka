@@ -2067,6 +2067,12 @@
     "usedTools": "Used {tools}",
     "pendingActions": {
       "label": "Waiting for your approval",
+      "approve_repository_push": "Allow repository push",
+      "repository": "Repository",
+      "permission": "Permission",
+      "pushToOrigin": "Push to this repository's origin",
+      "approvePush": "Allow push",
+      "pushApproved": "Repository push approved",
       "send_email": "Send email",
       "create_calendar_event": "New event",
       "update_calendar_event": "Change event",

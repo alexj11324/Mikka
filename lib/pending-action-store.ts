@@ -1,13 +1,28 @@
 import 'server-only'
-import { and, desc, eq, gt } from 'drizzle-orm'
+import { and, desc, eq, gt, sql } from 'drizzle-orm'
 import { isApprovalAction, parseActionInput } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
 import { pendingActions } from '@/lib/db/schema'
 import { calendarEventSummary, PENDING_ACTION_TTL_MS, type PendingActionView } from '@/lib/pending-action-view'
+import { prepareRepositoryApproval, validateRepositoryApproval } from '@/lib/repository-approval-proposal'
 
 /** Most proposals one person can have waiting at once. */
 const MAX_PENDING = 20
+
+/** Prepare only: the repository permission is never changed by the model. */
+export async function proposeRepositoryPush(userId: string, input: unknown) {
+  const parsed = prepareRepositoryApproval(input)
+  if (!parsed) return { error: 'repositoryInvalid' }
+  const waiting = await db.$count(pendingActions, and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
+  if (waiting >= MAX_PENDING) return { error: 'tooManyPendingActions' }
+  const id = crypto.randomUUID()
+  await db.transaction(async tx => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['repository-approval', userId, parsed.remoteKey])}, 0))`)
+    await tx.insert(pendingActions).values({ id, userId, action: 'approve_repository_push', input: parsed, context: null })
+  })
+  return { status: 'awaiting_approval', actionId: id }
+}
 
 /**
  * Saves what an agent wants to do in the person's accounts, for the person to
@@ -36,7 +51,8 @@ export async function listPendingActions(userId: string): Promise<PendingActionV
   const rows = await db.select().from(pendingActions)
     .where(and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
     .orderBy(desc(pendingActions.createdAt)).limit(MAX_PENDING)
-  return rows.flatMap(row => isApprovalAction(row.action)
-    ? [{ id: row.id, action: row.action, input: row.input, context: row.context as PendingActionView['context'], status: row.status, createdAt: row.createdAt.toISOString() }]
-    : [])
+  return rows.flatMap(row => {
+    if (!isApprovalAction(row.action) && !(row.action === 'approve_repository_push' && validateRepositoryApproval(row.input))) return []
+    return [{ id: row.id, action: row.action as PendingActionView['action'], input: row.input, context: row.context as PendingActionView['context'], status: row.status, createdAt: row.createdAt.toISOString() }]
+  })
 }

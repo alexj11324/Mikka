@@ -8,7 +8,7 @@ export const AGENT_TOOL_IDS = [
   'search_notion_pages', 'read_notion_page_blocks', 'search_slack_messages', 'read_slack_thread',
   'search_gmail', 'read_gmail_message', 'list_calendar_events', 'get_calendar_event', 'send_email',
   'create_calendar_event', 'update_calendar_event', 'web_search', 'list_issues', 'get_issue', 'create_issue', 'update_issue',
-  'list_agents', 'dispatch_run', 'list_runs', 'get_run', 'send_to_run', 'remember', 'forget',
+  'request_repository_push_approval', 'list_agents', 'dispatch_run', 'list_runs', 'get_run', 'send_to_run', 'remember', 'forget',
   'stop_run', 'load_skill', 'record_attention',
   ...COMPUTER_TOOL_IDS,
 ] as const

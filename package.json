@@ -84,7 +84,7 @@
     "test:agent-kit-model": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-execution-model.test.ts lib/subscription-model-snapshot.test.ts lib/subscription-workflow-model.test.ts lib/subscription-workflow-turn.test.ts lib/agent-kit/hosted-replay.test.ts lib/agent-kit/live-eval-disabled.test.ts lib/agent-kit/core-entry.test.ts lib/agent-kit/disabled-entry.test.ts lib/agent-kit/message-safety-compat.test.ts lib/agent-kit/tool-defaults-compat.test.ts lib/agent-kit/defaults-consumers.test.ts",
     "test:coordinator-issue-tools": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/issue-tools.test.ts lib/mcp/issue-mutation.test.ts",
     "test:coordinator-issue-tools-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/issue-tool-calls.db.test.ts",
-    "test:run-publication": "node --import tsx --test lib/github/run-pull-request.test.ts lib/run-publication-policy.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/run-completion-route.test.ts",
+    "test:run-publication": "node --import tsx --test lib/github/run-pull-request.test.ts lib/run-publication-policy.test.ts lib/repository-approval-proposal.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/run-completion-route.test.ts tests/repository-approval-actions.test.ts lib/repository-approval-transaction.test.ts",
     "test:run-publication-db": "NODE_ENV=test node --import ./tests/support/server-only.mjs --import tsx --test tests/run-publications.db.test.ts"
   },
   "dependencies": {

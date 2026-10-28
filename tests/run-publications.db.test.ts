@@ -331,11 +331,50 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await publishRunResult(f.runId, open), { done: true })
       assert.equal(attempts, 2)
     })
+    await t.test('repository push proposals require an owner decision and bind the v2 endpoint', async () => {
+      if (process.env.VERCEL || process.env.MIKKA_NATIVE_COORDINATOR || process.env.AI_GATEWAY_API_KEY) throw new Error('Approval regression requires the isolated no-provider CI environment')
+      const { proposeRepositoryPush } = await import('../lib/pending-action-store')
+      const { decidePendingAction } = await import('../lib/pending-actions')
+      const { writeRepositoryPushApproval } = await import('../lib/repository-approval-write')
+      const owner = await fixture(), other = await fixture()
+      const repo = 'https://git.example.com:8443/Team/Repo.git'
+      const request = await proposeRepositoryPush(owner.userId, { repo })
+      assert.ok('actionId' in request && request.actionId)
+      const id = request.actionId
+      const count = async () => Number((await pool.query('select count(*) from repository_settings where "userId"=$1 and "remoteKey"=$2', [owner.userId, repositoryKey(repo)])).rows[0].count)
+      assert.equal(await count(), 0, 'the model proposal alone cannot grant a push')
+      await assert.rejects(decidePendingAction(other.userId, id, true))
+      assert.equal(await count(), 0)
+      assert.equal((await decidePendingAction(owner.userId, id, true)).status, 'done')
+      const { rows } = await pool.query('select push from repository_settings where "userId"=$1 and "remoteKey"=$2', [owner.userId, repositoryKey(repo)])
+      assert.equal(rows[0].push.approvedByUserId, owner.userId)
+      assert.equal(rows[0].push.approved, true)
+      assert.equal((await pool.query('select count(*)::int as n from repository_settings where "userId"=$1 and "remoteKey"=$2', [owner.userId, repositoryKey('https://git.example.com:9443/Team/Repo.git')])).rows[0].n, 0)
+      await assert.rejects(decidePendingAction(owner.userId, id, true), 'a consumed approval cannot be replayed')
+      const pending = await proposeRepositoryPush(owner.userId, { repo })
+      assert.ok('actionId' in pending && pending.actionId)
+      const raced = await Promise.allSettled([
+        decidePendingAction(owner.userId, pending.actionId, true),
+        writeRepositoryPushApproval(owner.userId, repositoryKey(repo), false),
+      ])
+      assert.equal(raced[1].status, 'fulfilled')
+      assert.equal((await pool.query('select push from repository_settings where "userId"=$1 and "remoteKey"=$2', [owner.userId, repositoryKey(repo)])).rows[0].push.approved, false)
+      await assert.rejects(decidePendingAction(owner.userId, pending.actionId, true), 'revocation invalidates old pending confirmations')
+      const declined = await proposeRepositoryPush(owner.userId, { repo: 'other/repo' })
+      assert.ok('actionId' in declined && declined.actionId)
+      assert.equal((await decidePendingAction(owner.userId, declined.actionId, false)).status, 'declined')
+      assert.equal((await pool.query('select count(*)::int as n from repository_settings where "userId"=$1 and "remoteKey"=$2', [owner.userId, repositoryKey('other/repo')])).rows[0].n, 0)
+      const tampered = await proposeRepositoryPush(owner.userId, { repo: 'team/repo' })
+      assert.ok('actionId' in tampered && tampered.actionId)
+      await pool.query('update pending_actions set input = jsonb_set(input, \'{remoteKey}\', to_jsonb($2::text)) where id=$1', [tampered.actionId, 'github.com/team/repo'])
+      await assert.rejects(decidePendingAction(owner.userId, tampered.actionId, true))
+      assert.equal((await pool.query('select status from pending_actions where id=$1', [tampered.actionId])).rows[0].status, 'pending')
+    })
   } finally {
     const users = fixtures.map(fixture => fixture.userId)
     if (users.length) {
       // All identifiers belong to this test's disposable fixtures.
-      for (const table of ['coordinator_events', 'run_publications', 'run_tokens', 'agent_runs', 'issue_versions', 'issues', 'repository_settings', 'github_repository_installations', 'device_repos', 'agents']) await pool.query(`delete from ${table} where "userId"=any($1::text[])`, [users])
+      for (const table of ['pending_actions', 'coordinator_events', 'run_publications', 'run_tokens', 'agent_runs', 'issue_versions', 'issues', 'repository_settings', 'github_repository_installations', 'device_repos', 'agents']) await pool.query(`delete from ${table} where "userId"=any($1::text[])`, [users])
       await pool.query('delete from devices where "ownerId"=any($1::text[])', [users])
       await pool.query('delete from "user" where id=any($1::text[])', [users])
     }

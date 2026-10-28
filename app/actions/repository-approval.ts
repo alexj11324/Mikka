@@ -2,15 +2,14 @@
 
 import { z } from 'zod'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
-import { db } from '@/lib/db'
-import { repositorySettings } from '@/lib/db/schema'
+import { writeRepositoryPushApproval } from '@/lib/repository-approval-write'
 import { getSession } from '@/lib/session'
 import { verifyGitHubRepositoryAccess, PublicationError } from '@/lib/github/run-pull-request'
 import { linkedGitHubAccountId, saveRepositoryInstallation } from '@/lib/github/repository-installation'
 
 /**
- * Human-session-only backend. The proposed chat approval entry point is still
- * awaiting Alex; this action is deliberately absent from Coordinator/MCP tools.
+ * Human-session-only backend for direct repository approval or revocation.
+ * Coordinator tools can only create a separate pending confirmation.
  */
 export async function setRepositoryPushApproval(input: { repo: string; approved: boolean }) {
   const session = await getSession()
@@ -21,10 +20,7 @@ export async function setRepositoryPushApproval(input: { repo: string; approved:
   try { key = normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }).key }
   catch { return { error: 'repositoryInvalid' as const } }
   const userId = session.user.id
-  const push = { approved: parsed.data.approved, remote: 'origin', approvedByUserId: userId, approvedAt: new Date().toISOString() }
-  await db.insert(repositorySettings).values({ userId, remoteKey: key, push }).onConflictDoUpdate({
-    target: [repositorySettings.userId, repositorySettings.remoteKey], set: { push, updatedAt: new Date() },
-  })
+  await writeRepositoryPushApproval(userId, key, parsed.data.approved)
   return { success: true as const }
 }
 

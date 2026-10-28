@@ -32,6 +32,7 @@ test('registry-installed tarball runs its CLI and a real mock-daemon git task wi
   const sourceManifest = JSON.parse(await readFile(join(root, 'dist/package.json'), 'utf8'))
   const installed = join(installation, 'node_modules', sourceManifest.name)
   const manifest = JSON.parse(await readFile(join(installed, 'package.json'), 'utf8'))
+  assert.equal(manifest.name, '@aspectlylabs/mikka')
   assert.equal(manifest.private, false)
   assert.equal(manifest.bin.mikka, './mikka.js')
   assert.ok(!manifest.dependencies['@mikka/protocol'])
@@ -49,9 +50,12 @@ test('registry-installed tarball runs its CLI and a real mock-daemon git task wi
   const command = join(installed, 'mikka.js')
   const help = execFileSync(process.execPath, [command, '--help'], { encoding: 'utf8', cwd: temporary, env: runtimeEnv, timeout: 20_000, killSignal: 'SIGKILL' })
   assert.match(help, /mikka daemon login/)
+  const installedCommand = join(installation, 'node_modules', '.bin', 'mikka')
+  const installedHelp = execFileSync(installedCommand, ['--help'], { encoding: 'utf8', cwd: temporary, env: runtimeEnv, timeout: 20_000, killSignal: 'SIGKILL' })
+  assert.match(installedHelp, /mikka daemon login/)
   const data = join(temporary, 'data')
   const token = `orv_${'t'.repeat(43)}`
-  execFileSync(process.execPath, [command, 'daemon', 'login', '--token', token, '--data-dir', data], { cwd: temporary, env: runtimeEnv, stdio: 'pipe', timeout: 20_000, killSignal: 'SIGKILL' })
+  execFileSync(installedCommand, ['daemon', 'login', '--token', token, '--data-dir', data], { cwd: temporary, env: runtimeEnv, stdio: 'pipe', timeout: 20_000, killSignal: 'SIGKILL' })
   assert.equal(JSON.parse(await readFile(join(data, 'device.json'), 'utf8')).credential, token)
   // These child scripts are resolved relative to bundled entries at runtime.
   for (const asset of ['mikka-mcp.mjs', 'agents/native-container.mjs', 'computer/proxy.mjs', 'computer/driver.mjs', 'fixtures/success-edit.jsonl']) {

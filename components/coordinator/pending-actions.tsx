@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { CalendarClock, Mail } from 'lucide-react'
+import { CalendarClock, GitBranch, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import { decidePendingAction } from '@/app/actions/pending-actions'
 import { Button } from '@/components/ui/button'
@@ -51,7 +51,7 @@ export function PendingActions() {
       const result = await decidePendingAction(item.id, approve)
       if (result.error) toast.error(actionError(result.error))
       else if (result.status === 'failed') toast.error(t('failed', { error: result.reason ?? '' }))
-      else if (result.status === 'done') toast.success(t(item.action === 'send_email' ? 'sent' : 'saved'))
+      else if (result.status === 'done') toast.success(t(item.action === 'approve_repository_push' ? 'pushApproved' : item.action === 'send_email' ? 'sent' : 'saved'))
       await mutate()
     } catch { toast.error(actionError()) } finally { setBusy(null) }
   }
@@ -60,11 +60,15 @@ export function PendingActions() {
     {data.map(item => {
       const input = item.input
       const email = item.action === 'send_email'
+      const repository = item.action === 'approve_repository_push'
       const title = t(item.action)
       return <li key={item.id} className="flex flex-col gap-3 rounded-[14px] bg-muted/60 px-4 py-3">
-        <p className="flex items-center gap-2 text-sm font-medium">{email ? <Mail className="size-4" /> : <CalendarClock className="size-4" />}{title}</p>
+        <p className="flex items-center gap-2 text-sm font-medium">{repository ? <GitBranch className="size-4" /> : email ? <Mail className="size-4" /> : <CalendarClock className="size-4" />}{title}</p>
         <dl className="flex flex-col gap-1">
-          {email ? <>
+          {repository ? <>
+            <Row label={t('repository')}>{typeof input.repo === 'string' ? input.repo : null}</Row>
+            <Row label={t('permission')}>{t('pushToOrigin')}</Row>
+          </> : email ? <>
             <Row label={t('to')}>{list(input.to)}</Row>
             <Row label={t('cc')}>{list(input.cc)}</Row>
             <Row label={t('bcc')}>{list(input.bcc)}</Row>
@@ -81,7 +85,7 @@ export function PendingActions() {
         {typeof (email ? input.body : input.description) === 'string' && <p className="max-h-48 overflow-y-auto rounded-lg bg-background/70 px-3 py-2 text-sm whitespace-pre-wrap">{String(email ? input.body : input.description)}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" disabled={busy !== null} onClick={() => void decide(item, false)}>{t('decline')}</Button>
-          <Button type="button" size="sm" disabled={busy !== null} onClick={() => void decide(item, true)}>{busy === item.id ? <Spinner /> : null}{email ? t('approveSend') : t('approveSave')}</Button>
+          <Button type="button" size="sm" disabled={busy !== null} onClick={() => void decide(item, true)}>{busy === item.id ? <Spinner /> : null}{repository ? t('approvePush') : email ? t('approveSend') : t('approveSave')}</Button>
         </div>
       </li>
     })}
