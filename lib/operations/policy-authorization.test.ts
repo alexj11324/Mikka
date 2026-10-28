@@ -1,14 +1,19 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
+import { digest, makeSnapshot } from '@/lib/agent-kit/definition'
 import { withWritePolicy } from './policy-authorization'
 import type { OperationIntent } from './ledger'
 
 function fixture() {
  const run = randomUUID(), bot = randomUUID(), workspace = randomUUID(), id = randomUUID()
- const binding: OperationIntent = { operationId: id, ownerId: 'owner', workspaceId: 'personal:owner', provider: 'fixture', accountId: 'account', action: 'write_document', target: 'target', approvalId: id, proposalDigest: 'a'.repeat(64), payloadDigest: 'b'.repeat(64), executionRunId: run, policyScope: { botId: bot, workspaceId: workspace, version: '1' } }
+ const binding: OperationIntent = { operationId: id, ownerId: 'owner', workspaceId: 'personal:owner', provider: 'fixture', accountId: 'account', action: 'send_slack_message', target: 'target', approvalId: id, proposalDigest: 'a'.repeat(64), payloadDigest: 'b'.repeat(64), executionRunId: run, policyScope: { botId: bot, workspaceId: workspace, version: '1' } }
+ const revision = randomUUID()
+ const definition = { ...DEFAULT_AGENT_DEFINITION, tools: ['send_slack_message'] as typeof DEFAULT_AGENT_DEFINITION.tools }
+ const snapshot = makeSnapshot(revision, 1, definition, 'host', { harness:'ai_sdk', model:'fixture' })
  const state = { choice: 'allow', version: '1', bindingChecks: 0, approvals: 0, approved: false }
- const tx = { query: async (sql: string) => sql.includes('agent_kit_heads') ? { rows: [{ workspace_id: workspace, external_write_permissions: { write_document: state.choice }, external_write_policy_version: state.version }] } : { rows: [{ status: 'running', snapshot: { effectiveTools: ['write_document'] } }] } } as unknown as Parameters<ReturnType<typeof withWritePolicy>>[0]
+ const tx = { query: async (sql: string) => sql.includes('agent_kit_heads') ? { rows: [{ workspace_id: workspace, active_version: revision, external_write_permissions: { send_slack_message: state.choice }, external_write_policy_version: state.version }] } : sql.includes('agent_kit_executions') ? { rows: [{ status: 'running', version_id: revision, snapshot }] } : { rows: [{ definition, digest:digest(definition) }] } } as unknown as Parameters<ReturnType<typeof withWritePolicy>>[0]
  const authorize = withWritePolicy(async (_tx, b) => { state.bindingChecks++; if (b.accountId !== 'account' || b.target !== 'target') throw Error('binding changed') }, async () => { state.approvals++; if (!state.approved) throw Error('approval required') })
  return { run, binding, state, tx, authorize }
 }
