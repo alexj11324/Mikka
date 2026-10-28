@@ -274,7 +274,8 @@ async def begin(request):
         tree=await b.rpc('Page.getFrameTree',session=b.session)
         b.guard_loader=tree['frameTree']['frame']['loaderId']
         b.guard_origin=browser_origin(tree['frameTree']['frame']['url'])
-        if not b.guard_origin:raise web.HTTPConflict()
+        document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
+        if not b.guard_origin or not safe_resume_snapshot(tree,document,{'result':{'value':True}}):raise web.HTTPConflict()
         for ws in list(b.viewer):await ws.close()
     base=f'https://{request.host}'
     return web.json_response({'cdpUrl':base.replace('https:','wss:')+request.path.replace('/credentials/begin','/credentials/cdp')+'?token='+request.query['token']+'&guard='+b.guard,'targetId':b.target,'guardToken':b.guard})
@@ -303,6 +304,9 @@ async def cdp(request):
             if data['method']=='Input.insertText':
                 selector=focused.pop(data['sessionId'],None)
                 if not selector:break
+                tree=await b.rpc('Page.getFrameTree',session=b.session)
+                document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
+                if not safe_resume_snapshot(tree,document,{'result':{'value':True}}):break
                 check=await b.rpc('Runtime.evaluate',{'expression':f"(()=>{{const e=document.querySelector({json.dumps(selector)});return !!e && !e.disabled && !e.readOnly && document.activeElement===e}})()",'returnByValue':True},b.session)
                 if check.get('result',{}).get('value') is not True or browser_origin(await b.url())!=origin:break
             pending[data['id']]=(data['method'],data.get('sessionId'),data.get('params',{}).get('expression'))
