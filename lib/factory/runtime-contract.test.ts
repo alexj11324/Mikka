@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { before, mock, test } from 'node:test';
-import type { PoolClient } from 'pg';
 import type { FactoryConsumerAdapter } from './consumer-contract';
 let databaseCalls=0;
 const unexpected = async () => {databaseCalls++;throw Error('unexpected database operation');};
@@ -16,7 +15,7 @@ test('actual runtime stays default-off and rejects incomplete or conflicting hos
   try {
     for(const key of keys)delete process.env[key];
     assert.throws(()=>runtime.factoryRuntimeForBot('bot'),/factoryLifecycleUnavailable/);
-    assert.deepEqual(await runtime.guardFactoryClaim({query:unexpected} as unknown as PoolClient,'owner','device','run','future'),{});
+    assert.deepEqual(await runtime.guardFactoryClaim({query:unexpected} as unknown as Parameters<FactoryConsumerAdapter['validateClaim']>[0],'owner','device','run','future'),{});
     for(const key of keys)process.env[key]='1';
     assert.throws(()=>runtime.factoryRuntimeForBot('bot',{}, {},undefined,{},[{...adapter,gate:undefined} as unknown as FactoryConsumerAdapter]),/factoryConsumerRegistrationInvalid/);
     assert.throws(()=>runtime.factoryRuntimeForBot('bot',{}, {monitor:adapter.configure},undefined,{},[adapter]),/factoryConsumerRegistrationInvalid/);

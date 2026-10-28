@@ -1,10 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { PoolClient } from 'pg';
 import type { FactoryTask } from './store';
 import { composeFactoryConsumers, assertFactoryArtifactBinding, type FactoryConsumerAdapter } from './consumer-contract';
 const task = {id:'task',userId:'owner',botId:'bot',issueId:'issue',sourceEventId:'source',attemptId:'attempt',revision:4,candidateId:'candidate',stage:'monitor',status:'running'} as FactoryTask;
-const run = {id:'run',userId:'owner',botId:'bot',issueId:'issue',sessionId:'session',stopRequestedAt:null,definitionDigest:'frozen'};
+const run: Parameters<typeof assertFactoryArtifactBinding>[1] = {id:'run',userId:'owner',botId:'bot',issueId:'issue',sessionId:'session',stopRequestedAt:null,definitionDigest:'frozen'};
 const now = Date.parse('2026-10-28T19:00:00Z');
 const artifact = {userId:task.userId,botId:task.botId,issueId:task.issueId,sourceEventId:task.sourceEventId,taskId:task.id,attemptId:task.attemptId,revision:task.revision,candidateId:'candidate',stage:'monitor' as const,runId:run.id,sessionId:'session',sha:'a'.repeat(40),definitionDigest:'frozen',artifactId:'trusted:artifact',artifactDigest:'b'.repeat(64),observedAt:new Date(now-1000).toISOString(),expiresAt:new Date(now+1000).toISOString()};
 const check = (a=artifact,t=task,r=run) => assertFactoryArtifactBinding(t,r,'a'.repeat(40),a,{now,maxAgeMs:5000});
@@ -20,7 +19,7 @@ test('trusted binding envelope rejects every identity change and expiry; does no
   assert.throws(()=>check(artifact,task,{...run,sessionId:'new-session'}),/factoryArtifactBindingInvalid/);
 });
 test('all hooks required atomically; duplicate and missing phase registration deny',async()=>{
-  const tx={} as PoolClient;
+  const tx={} as Parameters<FactoryConsumerAdapter['validateClaim']>[0];
   let called=0;
   const adapter:FactoryConsumerAdapter={stage:'monitor',configure:async()=>{},gate:async()=>false,validateClaim:async(actualTx,actualTask,id)=>{assert.equal(actualTx,tx);assert.equal(actualTask,task);assert.equal(id,'run');called++;return {fixture:true};},reconcile:async()=>{}};
   const installed=composeFactoryConsumers([adapter]);
