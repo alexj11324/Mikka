@@ -9,8 +9,8 @@ fails, fix it first; do not show work with known failures.
 ### Model
 
 - [ ] Left column lists bots and group chats only; no thread names (R-01).
-- [ ] Right 详情 header = the selected bot's avatar and name; caption
-      「<Bot 名> 的屏幕」 (R-02, R-17).
+- [ ] Right 概览 header = the selected bot's avatar and name, then 详情 /
+      线程 / PR / 电脑; no screen caption (R-02, R-17, R-50).
 - [ ] Switching bots switches chat, threads and computer together (R-03).
 - [ ] No 新建云端电脑, no per-bot computer list (R-04).
 

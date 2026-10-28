@@ -20,7 +20,9 @@ stays with the bot: one of its sub-agents (分身) does it in its own browser,
 it shows only as a card in the chat, never in the thread list, and the bot
 reports the result itself (R-72). Every thread belongs to exactly one bot but
 is never drawn with the bot's avatar; it shows a status icon (decisions
-2026-10-27). A cloud thread runs on its own thread machine, not on its bot's
+2026-10-27). The one exception is the right panel's 全部线程, where each row
+carries a 16px avatar of its bot so threads from different bots can be told
+apart (R-50, decisions 2026-10-28). A cloud thread runs on its own thread machine, not on its bot's
 machine (`cloud-computer-backend.md` § 2).
 
 ## Rules for designs
@@ -30,14 +32,26 @@ machine (`cloud-computer-backend.md` § 2).
 - The bot list holds bots and group chats only. A thread name ("#66 …",
   "MIK-11 …") is never a left-column row. A bot row's preview line may quote
   the latest message, which may mention a thread, but the row is the bot.
-- The right panel's 详情 header is the selected bot (the same avatar and
-  name as its left row), followed by 「<Bot 名> 的屏幕」. A thread's name
-  appears only as its row in the thread list, never as that header
-  (Alex, 2026-10-24 21:13; `rules.md` R-02).
+- The right panel's 概览 header is the selected bot (the same avatar and
+  name as its left row), followed by the tabs 详情 / 线程 / PR / 电脑. A
+  thread's name appears only as its row in a thread list, never as that
+  header (Alex, 2026-10-28; `rules.md` R-02, R-50).
 - Choosing another bot on the left changes the center chat and the right
   column's thread and computer together.
 - A task (issue, `MIK-xx`) is not a thread. A thread works on a task, and a
   task can have several threads over time.
+
+## Other words
+
+Decided by Alex, 2026-10-28.
+
+| Word | 中文 | What it is |
+| --- | --- | --- |
+| **Artifact** | Artifact | Something a thread or bot produces for the person to look at or accept: an acceptance (验收), a document, a web page, an image, slides, a video. The word is never translated (not 产物, 工件 or 成果). Lives on the Artifact rail page (R-56). |
+| **Library** | 资料库 | A bot's files, listed read-only under 概览 › 详情 (R-51). Files are added with the composer's 「+」. |
+| **Thread** | 线程 | As above. The right panel's tab is 线程, never 任务 (R-43). |
+| **Browser** | 浏览器 | The person's own local browser, one for the whole app, opened from the globe in the top bar (R-57). |
+| **Computer** | 电脑 | A bot's cloud computer, one per bot, shown in the 电脑 tab of 概览 (R-50). Never called 浏览器. |
 
 ## Words to avoid
 
@@ -47,5 +61,8 @@ machine (`cloud-computer-backend.md` § 2).
   `components/nav/conversation-list.tsx` are today's implementation, which
   still lists sessions; that is a known gap, not the model.
 - "会话" for a run (e.g. "打开会话" on a task's run). Say **线程**.
+- "任务" for the right panel's thread tab. Say **线程**.
+- A Chinese word for Artifact. Keep **Artifact**.
+- "浏览器" for a bot's cloud computer, or "电脑" for the local browser.
 - "Agent" when you mean the thing on the left. Say **bot**. "Agent" is fine
   for the coding agents that run threads (`agents` table, Claude Code, Codex).
