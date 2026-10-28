@@ -24,6 +24,7 @@ export async function requireWorkspaceComputerPolicy(client: PoolClient, workspa
 /** A server-owned run policy can only narrow the current workspace policy.
  * Missing or invalid run context never turns into an implicit allow. */
 export function effectiveWebComputerPermission(workspace: 'allow' | 'ask' | 'deny', rawRunPolicy: unknown) {
+  if (!['allow', 'ask', 'deny'].includes(workspace)) throw new ComputerError(503, 'Computer policy unavailable')
   const parsed = runPolicySchema.safeParse(rawRunPolicy)
   if (!parsed.success) throw new ComputerError(503, 'Web run policy unavailable')
   const policy = parsed.data

@@ -30,4 +30,5 @@ test('the trusted run may only narrow the current workspace decision', () => {
   assert.equal(effectiveWebComputerPermission('allow', { ...run, permissions: { ...run.permissions, computer_use: 'ask' } }), 'ask')
   assert.equal(effectiveWebComputerPermission('allow', { ...run, permissions: { ...run.permissions, computer_use: 'deny' } }), 'deny')
   assert.throws(() => effectiveWebComputerPermission('allow', undefined), { status: 503 })
+  assert.throws(() => effectiveWebComputerPermission('invalid' as never, run), { status: 503 })
 })
