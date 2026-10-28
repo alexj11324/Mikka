@@ -17,18 +17,19 @@ Shorthand expands to `https://github.com/owner/repo.git`. Local paths,
 
 The server upserts a repository history row for `(deviceId, remoteKey(url))`.
 The row retains its foreign key for claims, retries and takeover. Its
-`repoPath` is a logical key such as `github.com/owner/repo`; `remoteUrl` is the
+`repoPath` is a versioned logical key such as `v2/github.com/owner/repo`; `remoteUrl` is the
 complete clone URL. Existing remote-matched registrations keep their IDs and
 branch values but their checkout path is replaced by the logical key.
 
-`remoteKey` preserves the existing retry identity contract: HTTPS, SSH and
-scp spellings compare equally, path casing is ignored, and SSH ports do not
-distinguish identities. Consequently repositories distinguished only by path
-case or port on the same host cannot be used as separate Mikka repositories.
-The submitted clone URL retains its spelling and port for Git transport.
+`remoteKey` uses a versioned identity. Standard GitHub HTTPS and `git` SSH
+endpoints share a case-insensitive owner/repository key. Other hosts keep
+transport, port, SSH user, path namespace, path case and literal `.git`
+suffix distinct. SSH requires an explicit user. Legacy or mismatched keys
+cannot claim or take over runs; the original clone URL of an existing record
+is retained.
 
 The daemon owns a standard clone under
-`<dataDir>/repos/<host>/<owner>/<repo>` and a worktree under
+`<dataDir>/repos/v2/<sha256-of-identity>` and a worktree under
 `<dataDir>/worktrees/<runId>`. Clone and fetch serialize on a filesystem lock;
 the lock wait and Git child process can be cancelled. A new clone uses
 `--no-checkout`, fetch uses the shared safe Git configuration and disables

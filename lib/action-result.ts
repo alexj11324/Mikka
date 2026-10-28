@@ -2,6 +2,7 @@ export const ACTION_ERROR_CODES = [
   'generic',
   'authRequired',
   'validationGeneric',
+  'issueToolsDisabled',
   'validationTitleRequired',
   'validationDocument',
   'validationNameRequired',

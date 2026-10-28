@@ -17,6 +17,7 @@ import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destinat
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { coordinatorWelcome } from '@/lib/agent-welcome'
+import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -69,9 +70,11 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     if (quoted && !quoted.success) throw new ActionFailureError('messageRequired')
     const destination = taskDestinationSchema.optional().safeParse(taskDestination)
     if (!destination.success) throw new ActionFailureError('validationGeneric')
+    if (destination.data && !issueMutationsEnabled()) throw new ActionFailureError('issueToolsDisabled')
+    if (destination.data && !parsed.data.submissionId) throw new ActionFailureError('validationGeneric')
     if (destination.data?.kind === 'device') {
       const [device] = await db.select({ id: devices.id }).from(devices)
-        .where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).limit(1)
+        .where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true))).limit(1)
       if (!device) throw new ActionFailureError('deviceNotFound')
     }
     try { await recordPersonalSubmission(db, userId, withQuote(parsed.data.text, quoted?.data), { botId: bot?.id ?? null, submissionId: parsed.data.submissionId, taskDestination: destination.data }) }
