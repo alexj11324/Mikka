@@ -101,6 +101,7 @@ test('an after-hook failure does not report a successful external effect as fail
 test('tool errors and pending approvals are distinguishable from completed effects', () => {
   assert.equal(toolOutcome({ error:'unavailable' }),'error')
   assert.equal(toolOutcome({ status:'pending_approval' }),'approval_pending')
+  assert.equal(toolOutcome({ status:'awaiting_approval' }),'approval_pending')
   assert.equal(toolOutcome({ approvalRequired:true }),'approval_pending')
   assert.equal(toolOutcome({ ok:true }),'ok')
 })
