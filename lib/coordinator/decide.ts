@@ -23,7 +23,13 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
   if (!key || signal?.aborted) return null
   try {
     const requestInput = decisionRequestInput(input)
-    const body = JSON.stringify({ model: DECISION_MODEL, input: requestInput, questions })
+    const requestedQuestions = structuredClone(questions)
+    const body = JSON.stringify({ model: DECISION_MODEL, input: requestInput, questions: requestedQuestions })
+    // Snapshot the same normalized bytes as body before yielding to I/O. The
+    // caller may mutate its image objects while this request is in flight.
+    const imageDigests = typeof requestInput === 'string' ? [] : requestInput.flatMap(message => message.content.flatMap(part => part.type === 'input_image'
+      ? [createHash('sha256').update(Buffer.from(part.image_url.slice(part.image_url.indexOf(',') + 1), 'base64')).digest('hex')]
+      : []))
     const executionId = randomUUID(), startedAt = new Date().toISOString()
     const response = await fetch(DECISIONS_URL, {
       method: 'POST',
@@ -33,13 +39,11 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
     })
     if (!response.ok) { await response.body?.cancel(); throw Error('decisionProviderUnavailable') }
     const payload: unknown = await response.json()
-    const answers = validatedAnswers(payload, questions)
+    const answers = validatedAnswers(payload, requestedQuestions)
     // These fields come from the response envelope, not an answer or input.
     const metadata = payload as { model?: unknown; provider_metadata?: { gateway?: { generationId?: unknown } } }
     const generation = metadata?.provider_metadata?.gateway?.generationId
     if (!answers || signal?.aborted || metadata.model !== DECISION_MODEL || typeof generation !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(generation)) return null
-    const images = typeof input === 'string' ? [] : input.images ?? []
-    const imageDigests = images.map(image => createHash('sha256').update(Buffer.from(image.dataUrl.slice(image.dataUrl.indexOf(',') + 1), 'base64')).digest('hex'))
     const execution: DecisionExecution = {
       executionId, modelId: DECISION_MODEL, providerGenerationId: generation,
       startedAt, completedAt: new Date().toISOString(), requestDigest: hash(body),

@@ -5,18 +5,18 @@ const selection = { type:'subscription' as const,bindingId:'00000000-0000-4000-8
 const scope={ownerId:'owner',botId:selection.consumerId,workspaceId:selection.workspaceId}
 const calls: Array<{kind:string;options:Record<string,unknown>}>=[]
 const resolutions: HostedRuntimeSnapshot[]=[]
-let refuse=false,reply='synthetic compressed text'
+let refuse=false,reply='synthetic compressed text',finishReason='stop'
 mock.module(new URL('../subscription-model-snapshot.ts',import.meta.url).href,{namedExports:{resolveFrozenHostedModel:async(actualScope:unknown,runtime:HostedRuntimeSnapshot,_dependencies:unknown,signal:AbortSignal)=>{
  signal.throwIfAborted();assert.deepEqual(actualScope,scope);resolutions.push(runtime);if(refuse)throw Error('binding_mismatch');return runtime.modelSelection?{provider:'synthetic-stream-only'}:runtime.model
 }}})
 mock.module('ai',{namedExports:{
- generateText:async(options:Record<string,unknown>)=>{calls.push({kind:'generate',options});return {text:reply}},
- streamText:(options:Record<string,unknown>)=>{calls.push({kind:'stream',options});return {text:Promise.resolve(reply)}},
+ generateText:async(options:Record<string,unknown>)=>{calls.push({kind:'generate',options});return {text:reply,finishReason}},
+ streamText:(options:Record<string,unknown>)=>{calls.push({kind:'stream',options});return {text:Promise.resolve(reply),finishReason:Promise.resolve(finishReason)}},
  pruneMessages:({messages}:{messages:unknown[]})=>messages,
 }})
 let compact:typeof import('./compaction-model')
 before(async()=>{compact=await import('./compaction-model')})
-beforeEach(()=>{calls.length=0;resolutions.length=0;refuse=false;reply='synthetic compressed text'})
+beforeEach(()=>{calls.length=0;resolutions.length=0;refuse=false;reply='synthetic compressed text';finishReason='stop'})
 const dependencies={service:()=>{throw Error('No real service')},workspace:async()=>{}}
 test('compaction consumes the exact frozen default or subscription selection with no SDK retries',async()=>{
  for(const runtime of [{harness:'ai_sdk',model:'frozen-default'},{harness:'ai_sdk',model:selection.modelId,modelSelection:selection}]){
@@ -32,4 +32,12 @@ test('binding refusal, cancellation and empty output cannot produce a default-mo
  refuse=true;await assert.rejects(compact.compactWithFrozenModel(scope,runtime,[],dependencies),/binding_mismatch/);assert.equal(calls.length,0)
  refuse=false;const controller=new AbortController();controller.abort();await assert.rejects(compact.compactWithFrozenModel(scope,runtime,[],dependencies,controller.signal));assert.equal(calls.length,0)
  reply=' ';await assert.rejects(compact.compactWithFrozenModel(scope,runtime,[],dependencies),/compactionModelUnavailable/);assert.equal(calls.length,1);assert.equal(calls[0].kind,'stream')
+})
+
+test('partial streaming text is not accepted after abnormal finish',async()=>{
+ const runtime={harness:'ai_sdk',model:selection.modelId,modelSelection:selection}
+ for(const reason of ['error','other','content-filter','length','tool-calls']){
+  finishReason=reason;reply='partial text before failure'
+  await assert.rejects(compact.compactWithFrozenModel(scope,runtime,[],dependencies),/compactionModelUnavailable/)
+ }
 })

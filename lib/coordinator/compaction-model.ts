@@ -13,7 +13,10 @@ export async function compactWithFrozenModel(scope: HostedModelScope, runtime: H
   // catch/default gateway fallback, including after partial output or refusal.
   const result = runtime.modelSelection ? streamText(options) : await generateText(options)
   const text = await result.text
+  const finishReason = await result.finishReason
   budget.throwIfAborted()
-  if (!text.trim()) throw new Error('compactionModelUnavailable')
+  // A stream can resolve partial text after an error/length/filter outcome.
+  // It must not advance the persisted summary cursor and hide old context.
+  if (!text.trim() || finishReason !== 'stop') throw new Error('compactionModelUnavailable')
   return text
 }

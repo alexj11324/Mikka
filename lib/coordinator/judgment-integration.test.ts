@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import {createHash} from 'node:crypto'
 import { before, beforeEach, after, mock, test } from 'node:test'
 import { DECISION_MODEL, decisionRequestInput, validatedAnswers } from './decision'
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='
@@ -94,4 +95,29 @@ test('existing monitor-shaped consumer receives provider invocation ID, actual i
  assert.ok(result);assert.equal(result.invocationId,'synthetic-generation');assert.equal(result.execution.vision,'image-input-submitted');assert.equal(result.answers[0].type,'choice')
  const parts=(requests[0].input as Array<{content:Array<{type:string;image_url?:string}>}>)[0].content
  assert.equal(parts[1].image_url,png)
+})
+
+test('receipt binds submitted image bytes even when the caller mutates its image during fetch',async()=>{
+ const originalFetch=globalThis.fetch
+ const context={text:'observed screenshot',images:[{dataUrl:png}],requiresVisual:true}
+ const different='data:image/png;base64,'+Buffer.concat([Buffer.from(png.split(',')[1],'base64'),Buffer.from('tail')]).toString('base64')
+ const questions=[{type:'choice' as const,name:'tier',instructions:'Observe',choices:[{value:'result'}]}]
+ try{
+  globalThis.fetch=async(...args)=>{context.images[0].dataUrl=different;return originalFetch(...args)}
+  const result=await transport.invokeDecision('mutation-regression',context,questions)
+  assert.ok(result)
+  const sent=(requests[0].input as Array<{content:Array<{image_url?:string}>}>)[0].content[1].image_url
+  assert.equal(sent,png);assert.equal(context.images[0].dataUrl,different)
+  assert.deepEqual(result.execution.imageDigests,[createHash('sha256').update(Buffer.from(png.split(',')[1],'base64')).digest('hex')])
+ }finally{globalThis.fetch=originalFetch}
+})
+
+test('response validation keeps the questions actually sent despite in-flight caller mutation',async()=>{
+ const originalFetch=globalThis.fetch
+ const questions=[{type:'choice' as const,name:'tier',instructions:'Observe',choices:[{value:'result'}]}]
+ try{
+  globalThis.fetch=async(...args)=>{questions[0].choices=[{value:'forged'}];response={answers:[{type:'choice',name:'tier',choice:'forged'}]};return originalFetch(...args)}
+  assert.equal(await transport.invokeDecision('question-mutation','x',questions),null)
+  assert.deepEqual((requests[0].questions as typeof questions)[0].choices,[{value:'result'}])
+ }finally{globalThis.fetch=originalFetch}
 })

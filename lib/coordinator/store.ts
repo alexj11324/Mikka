@@ -46,8 +46,9 @@ async function nextPosition(executor: Executor, userId: string, botId: string | 
   return Number(row?.last ?? 0) + 1
 }
 
-/** Only classified events wake/enter a turn. A missing judgment remains pending. */
-const wakingEvent = and(isNull(coordinatorEvents.deliveredAt), isNotNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background'))
+/** Direct user input is deliverable without a classifier. Other events need
+ * a classification; a missing runtime judgment remains pending. */
+const wakingEvent = and(isNull(coordinatorEvents.deliveredAt), or(eq(coordinatorEvents.kind, 'user_message'), and(isNotNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background'))))
 function waking(userId: string, botId: string | null) {
   return and(eventsOf(userId, botId), wakingEvent)
 }
