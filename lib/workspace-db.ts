@@ -12,3 +12,5 @@ const pool = process.env.VERCEL_ENV === 'preview'
   : globalDb.workspacePool ?? new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 })
 if (process.env.NODE_ENV !== 'production' && process.env.VERCEL_ENV !== 'preview') globalDb.workspacePool = pool
 export const workspaceDb = drizzle(pool, { schema })
+// Existing identity/pool, exposed only for bounded host read-lock guards.
+export const workspacePool = pool
