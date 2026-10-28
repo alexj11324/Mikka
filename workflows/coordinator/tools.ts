@@ -47,7 +47,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       execute: (input, options) => steps.updateIssue(userId, input, options.toolCallId, scope, botId),
     }),
     list_agents: tool({
-      description: 'List available local execution harnesses and their computers. Use the internal id as agentId for dispatch_run with a repository URL; no repository registration is needed. In replies, call these computers and threads, never Agents.',
+      description: 'List available local execution tools and their computers. Use the internal id as agentId for dispatch_run with a repository URL; no repository registration is needed. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, never an Agent.',
       inputSchema: z.object({}),
       execute: () => steps.listAgents(userId, scope),
     }),

@@ -9,7 +9,15 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   await expect(dialog).toContainText('mikka daemon login --server')
   await expect(dialog).toContainText(new URL(page.url()).origin + app('/'))
   await expect(dialog).not.toContainText('pnpm daemon')
+  await expect(dialog.getByRole('textbox')).toHaveCount(0)
   await testInfo.attach('connect-device-light', { body: await page.screenshot(), contentType: 'image/png' })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await testInfo.attach('connect-device-dark', { body: await page.screenshot(), contentType: 'image/png' })
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await testInfo.attach('connect-device-narrow', { body: await page.screenshot(), contentType: 'image/png' })
+  await page.setViewportSize({ width: 1440, height: 960 })
   await dialog.getByRole('button', { name: '完成', exact: true }).click()
 
   const before = await (await page.request.get(app('/api/auth/get-session'))).json()
@@ -22,8 +30,27 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   await expect(page.getByText(grant.user_code, { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '允许', exact: true })).toBeEnabled()
   await testInfo.attach('device-code-review-light', { body: await page.screenshot(), contentType: 'image/png' })
-  await page.getByRole('button', { name: '允许', exact: true }).click()
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await testInfo.attach('device-code-review-dark', { body: await page.screenshot(), contentType: 'image/png' })
+  await page.emulateMedia({ colorScheme: 'light' })
+  // Hold only delivery of the real approval response while capturing pending UI.
+  let releaseApproval!: () => void
+  const approvalReleased = new Promise<void>(resolve => { releaseApproval = resolve })
+  const approvalPath = '**/api/auth/device/approve'
+  await page.route(approvalPath, async route => {
+    const actual = await route.fetch()
+    await approvalReleased
+    await route.fulfill({ response: actual })
+  })
+  try {
+    await page.getByRole('button', { name: '允许', exact: true }).click()
+    await expect(page.getByRole('button', { name: '正在批准…', exact: true })).toBeDisabled()
+    await testInfo.attach('device-code-approving', { body: await page.screenshot(), contentType: 'image/png' })
+  } finally { releaseApproval() }
   await expect(page.getByRole('heading', { name: '已批准', exact: true })).toBeVisible()
+  await page.unroute(approvalPath)
+  await testInfo.attach('device-code-approved', { body: await page.screenshot(), contentType: 'image/png' })
 
   const tokenResponse = await page.request.post(app('/api/auth/device/token'), {
     data: { client_id: 'mikka-daemon', device_code: grant.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' },
@@ -43,6 +70,7 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   await page.goto(denied.verification_uri_complete)
   await page.getByRole('button', { name: '拒绝', exact: true }).click()
   await expect(page.getByRole('heading', { name: '已拒绝', exact: true })).toBeVisible()
+  await testInfo.attach('device-code-denied', { body: await page.screenshot(), contentType: 'image/png' })
   const denial = await page.request.post(app('/api/auth/device/token'), {
     data: { client_id: 'mikka-daemon', device_code: denied.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' },
   })

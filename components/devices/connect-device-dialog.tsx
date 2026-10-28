@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, TerminalSquare } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useSWRConfig } from 'swr'
@@ -14,28 +14,35 @@ import { daemonCommands } from '@/lib/daemon-commands'
 /** The public name is confirmed with the release; no workspace checkout is needed. */
 const packageName = process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@mikka/daemon'
 
-export function ConnectDeviceDialog() {
+export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTrigger = false }: {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  hideTrigger?: boolean
+} = {}) {
   const t = useTranslations('Devices.connect')
   const commonT = useTranslations('Common')
   const { mutate } = useSWRConfig()
-  const [open, setOpen] = useState(false)
+  const [localOpen, setLocalOpen] = useState(false)
+  const open = controlledOpen ?? localOpen
   const [commands, setCommands] = useState<ReturnType<typeof daemonCommands> | null>(null)
 
+  useEffect(() => {
+    if (!open) return
+    try { setCommands(daemonCommands({ origin: window.location.origin, basePath: BASE_PATH, packageName })) }
+    catch { setCommands(null) }
+  }, [open])
+
   function changeOpen(next: boolean) {
-    if (next) {
-      try { setCommands(daemonCommands({ origin: window.location.origin, basePath: BASE_PATH, packageName })) }
-      catch { setCommands(null) }
-    } else {
-      void mutate('devices')
-    }
-    setOpen(next)
+    if (!next) void mutate('devices')
+    setLocalOpen(next)
+    onOpenChange?.(next)
   }
 
   return <Dialog open={open} onOpenChange={changeOpen}>
-    <DialogTrigger render={<Button size="sm" />}>
+    {!hideTrigger && <DialogTrigger render={<Button size="sm" />}>
       <Plus data-icon="inline-start" />
       {t('trigger')}
-    </DialogTrigger>
+    </DialogTrigger>}
     <DialogContent closeLabel={commonT('close')} className="sm:max-w-xl" aria-describedby={undefined}>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">

@@ -16,6 +16,10 @@ approve or deny that connection.
 Settings › 设备 › 连接电脑 opens the command dialog. The daemon prints a link to
 `<origin><basePath>/device?user_code=...`. Signed-out users return to that exact
 page after the existing sign-in flow. No new login provider or method is added.
+The Settings button, its keyboard shortcut and reconnect action all use this
+same dialog. Directly connected Linux computers are 本机 too; the operating
+system is not evidence that a computer is an SSH target. The old SSH setup
+dialog is no longer the Settings entry point.
 
 ## Layout and states
 
