@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { decideLocalComputerReview, pendingLocalComputerReviews } from './local-reviews'
+import { localComputerAuthority } from './local-authority'
 
 const url = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !url) throw new Error('Computer database test URL required')
@@ -27,6 +28,13 @@ test('local decisions bind owner, device, live run and exact digest, and cannot 
     const botId = randomUUID(), workspaceId = randomUUID()
     await pool.query("INSERT INTO bots VALUES ($1,'owner',$2)", [botId, workspaceId])
     await pool.query("INSERT INTO agent_runs VALUES ($1,$2,'owner','running',NULL,now()+interval '1 minute',$3)", [run, device, botId])
+    assert.deepEqual(await localComputerAuthority(pool, 'owner', device, run), { botId, ownerId: 'owner', workspaceId, permission: 'ask', policyVersion: 0 })
+    assert.equal(await localComputerAuthority(pool, 'other', device, run), null)
+    await pool.query("INSERT INTO workspace_computer_policies VALUES ($1,'allow',3)", [workspaceId])
+    assert.deepEqual(await localComputerAuthority(pool, 'owner', device, run), { botId, ownerId: 'owner', workspaceId, permission: 'allow', policyVersion: 3 })
+    await pool.query("UPDATE workspace_computer_policies SET permission='deny',version=4 WHERE \"workspaceId\"=$1", [workspaceId])
+    assert.equal(await localComputerAuthority(pool, 'owner', device, run), null)
+    await pool.query("UPDATE workspace_computer_policies SET permission='ask',version=5 WHERE \"workspaceId\"=$1", [workspaceId])
     await pool.query(`INSERT INTO local_computer_reviews VALUES ($1,$2,$3,'owner','target',NULL,'{"name":"click"}',$4,now()+interval '1 minute',now(),NULL)`, [id, device, run, digest])
     assert.equal((await pendingLocalComputerReviews(pool, 'other')).length, 0)
     assert.equal((await pendingLocalComputerReviews(pool, 'owner')).length, 1)
