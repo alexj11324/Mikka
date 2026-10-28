@@ -22,6 +22,7 @@ import {
   policyInstructions,
   pushDecision,
   runDomains,
+  rawCliShellAvailable,
 } from "./permissions"
 
 describe("permission policy (ADR 0009)", () => {
@@ -185,7 +186,7 @@ describe("applying the workspace's policy (ADR 0028)", () => {
   it("gives Claude Code ask or deny rules for installs and always denies git push", () => {
     expect(claudePermissionRules(policy({}))).toMatchObject({
       ask: expect.arrayContaining(["Bash(npm install:*)"]),
-      deny: ["Bash(git push:*)"],
+      deny: ['Bash','PowerShell','Monitor',"Bash(git push:*)"],
     })
     const denied = claudePermissionRules(policy({ install_dependency: "deny" }))
     expect(denied.ask).toEqual([])
@@ -194,7 +195,8 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     )
     expect(
       claudePermissionRules(policy({ install_dependency: "allow" }))
-    ).toEqual({ allow: [], ask: [], deny: ["Bash(git push:*)"] })
+    ).toEqual({ allow: [], ask: [], deny: ['Bash','PowerShell','Monitor',"Bash(git push:*)"] })
+    expect(claudePermissionRules(policy({install_dependency:'allow',git_push:'allow'}))).toEqual({allow:[],ask:[],deny:['Bash(git push:*)']})
     const settings = claudeSettings(
       {
         allowWrite: ["/work"],
@@ -268,7 +270,15 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(strict).toContain("Do not install or add dependencies")
     expect(strict).toContain("Writing outside it is not allowed")
     const defaults = runInstructions("/wt")
-    expect(defaults).toContain("limited to an allow-list")
-    expect(defaults).toContain("needs a person's approval")
+    expect(defaults).toContain("limited to the workspace ceiling")
+    expect(defaults).toContain("wait for a host approval")
+    expect(defaults).toContain("Native shell execution is unavailable")
+  })
+  it('does not expose a raw native shell when any untyped install/push action is restricted', () => {
+    for (const install of ['allow','ask','deny'] as const) for (const push of ['allow','ask','deny'] as const) {
+      const value=policy({install_dependency:install,git_push:push})
+      expect(rawCliShellAvailable(value)).toBe(install==='allow' && push==='allow')
+      expect(rawCliShellAvailable({...value,readOnly:true})).toBe(false)
+    }
   })
 })

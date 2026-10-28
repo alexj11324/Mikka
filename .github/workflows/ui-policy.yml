@@ -99,12 +99,15 @@ jobs:
         run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
       - run: pnpm --filter @mikka/daemon test
       - name: Install sandbox runtime dependencies without changing host namespace policy
+        if: ${{ !cancelled() }}
         run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
       - name: Install pinned official CLI for offline protocol diagnostics
+        if: ${{ !cancelled() }}
         run: |
           npm install --prefix "$RUNNER_TEMP/pr13-codex-contract" --no-audit --no-fund --ignore-scripts @openai/codex@0.163.0
           echo "CODEX_CONTRACT_BIN=$RUNNER_TEMP/pr13-codex-contract/node_modules/.bin/codex" >> "$GITHUB_ENV"
       - name: Require real sandbox probe and daemon lifecycle acceptance (no skips)
+        if: ${{ !cancelled() }}
         run: pnpm --filter @mikka/daemon test
         env:
           MIKKA_SANDBOX_ACCEPTANCE: '1'

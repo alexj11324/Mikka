@@ -96,7 +96,7 @@ function sse(response: ServerResponse, id: string, item: JsonObject) {
   response.end()
 }
 
-async function provider(command: string, native: "enabled" | "disabled") {
+async function provider(command: string, native: "enabled" | "disabled" | "restricted") {
   const requests: JsonObject[] = []
   const failures: string[] = []
   const toolOutput = deferred<JsonObject>()
@@ -129,7 +129,7 @@ async function provider(command: string, native: "enabled" | "disabled") {
       }
       const tools = declaredTools(input.tools)
       const raw = tools.filter((tool) => ["exec_command", "shell", "shell_command", "write_stdin"].includes(tool.name))
-      if (native === "disabled" && raw.length) throw new Error(`native shell still advertised: ${raw.map((tool) => tool.name).join(",")}`)
+      if (native !== "enabled" && raw.length) throw new Error(`native shell still advertised: ${raw.map((tool) => tool.name).join(",")}`)
       const exec = tools.find((tool) => tool.name === "exec_command")
       if (native === "enabled" && !exec) throw new Error("official CLI did not advertise exec_command")
       // In disabled mode deliberately send an unavailable native call as a
@@ -148,7 +148,7 @@ async function provider(command: string, native: "enabled" | "disabled") {
   return { ...listening, requests, failures, toolOutput }
 }
 
-function wrapper(dir: string, binary: string, baseUrl: string, native: "enabled" | "disabled") {
+function wrapper(dir: string, binary: string, baseUrl: string, native: "enabled" | "disabled" | "restricted") {
   const file = join(dir, "official-codex-wrapper.sh")
   const config = [
     'model_provider="synthetic_acceptance"',
@@ -160,8 +160,8 @@ function wrapper(dir: string, binary: string, baseUrl: string, native: "enabled"
     "model_providers.synthetic_acceptance.supports_websockets=false",
     "features.responses_websockets=false",
     "features.responses_websockets_v2=false",
-    `features.shell_tool=${native === "enabled"}`,
-    `features.unified_exec=${native === "enabled"}`,
+    ...(native === 'restricted' ? [] : [`features.shell_tool=${native === "enabled"}`]),
+    `features.unified_exec=${native !== "disabled"}`,
     "analytics.enabled=false",
   ].flatMap((value) => ["-c", value])
   // sandbox-runtime inserts loopback NO_PROXY entries. Clear these inside
@@ -206,7 +206,7 @@ function probeResult(value: unknown, depth = 0): {status:number;body:string} | u
     }
   }
 }
-async function diagnostic(binary: string, decision: Decision, native: "enabled" | "disabled" = "enabled") {
+async function diagnostic(binary: string, decision: Decision, native: "enabled" | "disabled" | "restricted" = "enabled") {
   const dir = mkdtempSync(join(tmpdir(), "mikka-official-codex-synthetic-"))
   const cwd = await makeRepo()
   console.info(`Retained official CLI synthetic diagnostic: ${dir}; worktree: ${cwd}`)
@@ -280,7 +280,7 @@ async function diagnostic(binary: string, decision: Decision, native: "enabled" 
     expect(synthetic.failures).toEqual([])
     expect(synthetic.requests.length).toBeGreaterThan(0)
     expect(approvals.some((request) => object(request.input) && request.input.port === synthetic.port)).toBe(true)
-    if (native === "disabled") {
+    if (native !== "enabled") {
       expect(existsSync(marker)).toBe(false)
       expect(asks).toEqual([])
       expect(hits).toEqual([])
@@ -348,4 +348,7 @@ describe.skipIf(!enabled)("official Codex / synthetic provider / real outer sand
   it("omits disabled native shell tools and rejects a forced exec call without executing it", async () => {
     await diagnostic(binary, "allow", "disabled")
   }, 90_000)
+  it('uses the production restricted-policy shell boundary even with unified_exec enabled', async () => {
+    await diagnostic(binary,'allow','restricted')
+  },90_000)
 })

@@ -1,6 +1,6 @@
 import { networkDomainSchema, type RunPolicy } from '@mikka/protocol/agent-policy'
 import type { ToolApprovalRequest } from './tool-approval'
-import { classifyWrite } from '../permissions'
+import { classifyWrite, rawCliShellAvailable } from '../permissions'
 
 /** Native CLI callbacks do not attest which Mikka action a shell command
  * performs. Do not infer authority from command text or ask for unrelated
@@ -15,10 +15,11 @@ export function toolApprovalDecision(request: Readonly<ToolApprovalRequest>, pol
   }
   if (request.method.startsWith('cli/') && policy && worktree) {
     const tool = request.method.slice(4)
-    const input = request.input as {file_path?: unknown; path?: unknown} | null
+    if (tool === 'Bash' || tool === 'PowerShell') return rawCliShellAvailable(policy) ? 'allow' : 'unavailable'
+    const input = request.input as {file_path?: unknown; notebook_path?: unknown} | null
     if (['Write','Edit','MultiEdit','NotebookEdit'].includes(tool)) {
       if (policy.readOnly) return 'deny'
-      const path = input?.file_path
+      const path = tool === 'NotebookEdit' ? input?.notebook_path : input?.file_path
       if (typeof path !== 'string') return 'unavailable'
       // Resolve symlinks against the host-owned worktree. A callback cannot
       // expand the launcher's immutable filesystem ceiling.

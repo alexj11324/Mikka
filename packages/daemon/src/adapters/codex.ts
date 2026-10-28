@@ -35,6 +35,7 @@ import type { AgentSandbox } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
 import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
 import { runNetworkApproval } from "../agents/run-network"
+import { rawCliShellAvailable, runPolicy } from "../permissions"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
@@ -323,6 +324,7 @@ export class CodexAdapter implements AgentAdapter {
     const argv = [
       this.options.binary ?? "codex",
       "app-server",
+      "-c", `features.shell_tool=${rawCliShellAvailable(runPolicy(options.policy))}`,
       "-c",
       `mcp_servers.${MCP_SERVER_NAME}.command=${toml(mcp.command)}`,
       "-c",
@@ -605,7 +607,7 @@ export class CodexAdapter implements AgentAdapter {
       )
       // Public schemas omit the experimental dynamicTools field. Support only
       // the exact pinned CLI whose Rust protocol and response were audited.
-      if (options.mailbox && !/(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(initialized.userAgent ?? '')) throw new Error('Run mailbox requires the audited Codex0.163.0 dynamic-tools interface')
+      if ((options.mailbox || !rawCliShellAvailable(runPolicy(options.policy))) && !/(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(initialized.userAgent ?? '')) throw new Error('Run permissions require the audited Codex0.163.0 tool interface')
       await rpc.sendNotification("initialized")
       if (externalAuth) {
         try {
