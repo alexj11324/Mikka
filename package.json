@@ -89,7 +89,7 @@
     "test:migration-steps-db": "node --test tests/migration-steps.db.test.mjs",
     "test:coordinator-issue-tools": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/issue-tools.test.ts lib/mcp/issue-mutation.test.ts && pnpm test:factory-routing",
     "test:coordinator-issue-tools-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/issue-tool-calls.db.test.ts",
-    "test:factory-routing": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/intake.test.ts lib/factory/tools.test.ts lib/factory/consumer-contract.test.ts",
+    "test:factory-routing": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/intake.test.ts lib/factory/tools.test.ts lib/factory/consumer-contract.test.ts lib/factory/runtime-contract.test.ts",
     "test:factory-routing-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/routing.db.test.ts",
     "test:write-transactions": "node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-transaction.test.ts",
     "test:approved-writes": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-preparation.test.ts lib/operations/write-discovery.test.ts lib/operations/write-http.test.ts lib/operations/write-provider.test.ts lib/operations/write-route.test.ts lib/operations/write-view.test.ts",
