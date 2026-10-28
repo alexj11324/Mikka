@@ -13,6 +13,14 @@ References: [v0 branches and previews](https://v0.app/docs/github), [v0 deployme
 
 ## Authentication
 
+For authorized product acceptance, a dedicated test account is stored in the
+Infisical project `Mikka Test Account Vault`, environment `dev`, path
+`/test-account`, as `MIKKA_TEST_ACCOUNT_EMAIL` and
+`MIKKA_TEST_ACCOUNT_PASSWORD`. Retrieve it only in memory when needed; never
+put the values in source, logs, screenshots or model-visible output. This
+project is separate from cloud-computer execution credentials. Google may
+require a trusted browser or additional verification; do not bypass its checks.
+
 - Sign in directly with Google or GitHub OAuth in a top-level browser window. Reuse existing authorized provider/browser sessions. Do not ask the user to enter a Mikka password as a routine acceptance step or as the default response to an OAuth error.
 - If the provider itself requires MFA or reauthentication, hand over that specific provider step once. Never request passwords or verification codes in chat, and resume using the resulting session.
 - For `account_not_linked`, diagnose the provider identity, existing account and verification state. Preserve account ownership checks. Use an already working authorized OAuth provider for general acceptance; report the conflicting provider as blocked rather than repeatedly sending the user through password login. Passing GitHub does not establish Google acceptance.

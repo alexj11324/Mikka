@@ -9,6 +9,8 @@ export interface ExternalNotification {
   source: SuggestionSource
   /** Stable per source, so a repeat delivery is recognised. */
   externalId: string
+  /** The matter it belongs to: the mail thread, Slack thread, page, issue or pull request. Repeated notices share it. */
+  matterKey: string
   action: SuggestionAction
   title: string
   url: string | null
@@ -58,7 +60,7 @@ function date(...values: unknown[]): Date {
 }
 
 function base(userId: string, source: SuggestionSource, fields: Partial<ExternalNotification> & Pick<ExternalNotification, 'externalId' | 'action' | 'title'>): ExternalNotification {
-  return { userId, source, url: null, actor: null, occurredAt: new Date(), required: false, direct: false, fromSelf: false, automated: false, excerpt: '', ...fields, title: oneLine(fields.title), ...(fields.excerpt ? { excerpt: fields.excerpt.slice(0, EXCERPT_MAX) } : {}) }
+  return { userId, source, matterKey: `${source}:${fields.externalId}`, url: null, actor: null, occurredAt: new Date(), required: false, direct: false, fromSelf: false, automated: false, excerpt: '', ...fields, title: oneLine(fields.title), ...(fields.excerpt ? { excerpt: fields.excerpt.slice(0, EXCERPT_MAX) } : {}) }
 }
 
 // --- Gmail (Composio trigger GMAIL_NEW_GMAIL_MESSAGE, or GMAIL_FETCH_EMAILS) --
@@ -82,6 +84,7 @@ export function gmailNotification(userId: string, message: Json): ExternalNotifi
   const subject = str(message.subject, preview.subject)
   return base(userId, 'gmail', {
     externalId: id,
+    matterKey: `gmail:${threadId}`,
     action: 'reply',
     title: subject || sender || '(no subject)',
     url: `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(threadId)}`,
@@ -104,6 +107,7 @@ export function slackNotification(userId: string, event: Json): ExternalNotifica
   const channelType = str(event.channel_type)
   return base(userId, 'slack', {
     externalId: `${channel}:${ts}`,
+    matterKey: `slack:${channel}:${str(event.thread_ts) || ts}`,
     action: 'reply',
     title: text,
     actor: str(event.user, event.user_id, event.username) || null,
@@ -124,6 +128,7 @@ export function notionNotification(userId: string, event: Json): ExternalNotific
   const editedAt = str(event.last_edited_time, page.last_edited_time)
   return base(userId, 'notion', {
     externalId: `${id}:${editedAt}`,
+    matterKey: `notion:${id}`,
     action: 'read',
     title,
     url: str(event.url, page.url) || null,
@@ -179,6 +184,7 @@ export function linearIssueNotification(recipient: LinearRecipient, payload: Jso
   if (!id) return null
   return base(recipient.userId, 'linear', {
     externalId: `issue:${id}:assigned:${str(payload.webhookTimestamp, data.updatedAt)}`,
+    matterKey: `linear:${id}`,
     action: 'handle',
     title: str(data.title) || str(data.identifier),
     url: str(payload.url, data.url) || null,
@@ -202,6 +208,7 @@ export function linearCommentNotification(recipient: LinearRecipient, payload: J
   const actor = record(payload.actor)
   return base(recipient.userId, 'linear', {
     externalId: `comment:${id}`,
+    matterKey: `linear:${str(data.issueId, issue.id) || id}`,
     action: 'reply',
     title: body,
     url: str(payload.url, data.url) || null,
@@ -243,26 +250,27 @@ export function githubNotification(recipient: GitHubRecipient, event: string, pa
   const issue = record(payload.issue)
   const action = str(payload.action)
   const isMe = (value: unknown) => str(record(value).id) === recipient.githubId
+  const matter = (item: Json) => `github:${repo}#${str(item.number)}`
 
   if (event === 'pull_request' && action === 'review_requested' && isMe(payload.requested_reviewer)) {
-    return base(recipient.userId, 'github', { ...common, externalId: `${repo}#${str(pr.number)}:review_requested:${str(pr.updated_at)}`, action: 'review', title: str(pr.title), url: str(pr.html_url) || null, occurredAt: date(pr.updated_at), required: true, excerpt: `${repo}#${str(pr.number)} ${str(pr.title)}\n${str(pr.body)}` })
+    return base(recipient.userId, 'github', { ...common, matterKey: matter(pr), externalId: `${repo}#${str(pr.number)}:review_requested:${str(pr.updated_at)}`, action: 'review', title: str(pr.title), url: str(pr.html_url) || null, occurredAt: date(pr.updated_at), required: true, excerpt: `${repo}#${str(pr.number)} ${str(pr.title)}\n${str(pr.body)}` })
   }
   if ((event === 'pull_request' || event === 'issues') && action === 'assigned' && isMe(payload.assignee)) {
     const item = event === 'pull_request' ? pr : issue
-    return base(recipient.userId, 'github', { ...common, externalId: `${repo}#${str(item.number)}:assigned:${str(item.updated_at)}`, action: 'handle', title: str(item.title), url: str(item.html_url) || null, occurredAt: date(item.updated_at), required: true, excerpt: `${repo}#${str(item.number)} ${str(item.title)}\n${str(item.body)}` })
+    return base(recipient.userId, 'github', { ...common, matterKey: matter(item), externalId: `${repo}#${str(item.number)}:assigned:${str(item.updated_at)}`, action: 'handle', title: str(item.title), url: str(item.html_url) || null, occurredAt: date(item.updated_at), required: true, excerpt: `${repo}#${str(item.number)} ${str(item.title)}\n${str(item.body)}` })
   }
   if (event === 'issue_comment' && action === 'created' && isMe(issue.user)) {
     const comment = record(payload.comment)
-    return base(recipient.userId, 'github', { ...common, externalId: `comment:${str(comment.id)}`, action: 'reply', title: str(comment.body), url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(issue.number)} ${str(issue.title)}\n${str(comment.body)}` })
+    return base(recipient.userId, 'github', { ...common, matterKey: matter(issue), externalId: `comment:${str(comment.id)}`, action: 'reply', title: str(comment.body), url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(issue.number)} ${str(issue.title)}\n${str(comment.body)}` })
   }
   if (event === 'pull_request_review_comment' && action === 'created' && isMe(pr.user)) {
     const comment = record(payload.comment)
-    return base(recipient.userId, 'github', { ...common, externalId: `review_comment:${str(comment.id)}`, action: 'reply', title: str(comment.body), url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(pr.number)} ${str(pr.title)}\n${str(comment.body)}` })
+    return base(recipient.userId, 'github', { ...common, matterKey: matter(pr), externalId: `review_comment:${str(comment.id)}`, action: 'reply', title: str(comment.body), url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(pr.number)} ${str(pr.title)}\n${str(comment.body)}` })
   }
   if (event === 'pull_request_review' && action === 'submitted' && isMe(pr.user)) {
     const review = record(payload.review)
     const state = str(review.state)
-    return base(recipient.userId, 'github', { ...common, externalId: `review:${str(review.id)}`, action: 'reply', title: str(pr.title), url: str(review.html_url, pr.html_url) || null, occurredAt: date(review.submitted_at), required: state === 'changes_requested', direct: true, excerpt: `review ${state} on ${repo}#${str(pr.number)} ${str(pr.title)}\n${str(review.body)}` })
+    return base(recipient.userId, 'github', { ...common, matterKey: matter(pr), externalId: `review:${str(review.id)}`, action: 'reply', title: str(pr.title), url: str(review.html_url, pr.html_url) || null, occurredAt: date(review.submitted_at), required: state === 'changes_requested', direct: true, excerpt: `review ${state} on ${repo}#${str(pr.number)} ${str(pr.title)}\n${str(review.body)}` })
   }
   return null
 }

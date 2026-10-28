@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { DAEMON_RPC_ERRORS } from "@mikka/protocol"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { RunChunk } from "../src/chunks"
 import { Daemon } from "../src/main"
@@ -629,28 +629,49 @@ describe("run stops", () => {
 
   it("lease: a run whose lease cannot be renewed stops as device_lost", async () => {
     const { server, dataDir } = await setup(undefined, 300)
-    const daemon = await boot(server, dataDir)
-    const runId = queue(server, "stall")
-    await daemon.syncWithServer()
-    await waitFor(() => daemon.supervisor.get(runId).state === "running")
-    expect(daemon.supervisor.get(runId).leaseExpiresAt).toBeDefined()
-    // The heartbeat renews the lease while the server is reachable.
-    await new Promise((resolve) => setTimeout(resolve, 600))
-    expect(daemon.supervisor.get(runId).state).toBe("running")
+    // Git/child startup on a busy runner is not a lease-timer assertion. Keep
+    // real I/O/timers, but advance the shared host/server clock deliberately.
+    let now = Date.now()
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now)
+    try {
+      const daemon = await boot(server, dataDir)
+      const runId = queue(server, "stall")
+      await daemon.syncWithServer()
+      await waitFor(() => daemon.supervisor.get(runId).state === "running")
+      const firstLease = Date.parse(daemon.supervisor.get(runId).leaseExpiresAt!)
+      expect(firstLease).toBe(now + 300)
+      expect(daemon.supervisor.computerRunAllowed(runId)).toBe(true)
+      // A real heartbeat renews the same 300ms lease before it expires.
+      now += 200
+      await daemon.syncWithServer()
+      const renewed = Date.parse(daemon.supervisor.get(runId).leaseExpiresAt!)
+      expect(renewed).toBe(now + 300)
+      expect(renewed).toBeGreaterThan(firstLease)
+      expect(daemon.supervisor.get(runId).state).toBe("running")
+      expect(daemon.supervisor.computerRunAllowed(runId)).toBe(true)
 
-    server.online = false
-    await daemon.supervisor.idle()
-    expect(daemon.supervisor.get(runId).stopReason).toBe("device_lost")
-    // Meanwhile the server sees an active run without a fresh lease.
-    expect(server.unownedRuns()).toEqual([runId])
+      server.online = false
+      now = renewed - 1
+      expect(daemon.supervisor.computerRunAllowed(runId)).toBe(true)
+      now = renewed
+      expect(daemon.supervisor.computerRunAllowed(runId)).toBe(false)
+      now += 1
+      await daemon.supervisor.idle()
+      expect(daemon.supervisor.get(runId).stopReason).toBe("device_lost")
+      expect(daemon.supervisor.computerRunAllowed(runId)).toBe(false)
+      // Meanwhile the server sees an active run without a fresh lease.
+      expect(server.unownedRuns()).toEqual([runId])
 
-    server.online = true
-    await waitFor(() => daemon.status().pendingUploads === 0)
-    expect(server.issueOwner.get("issue-stall")).toEqual({
-      owner: "external",
-      reason: "device_offline",
-    })
-    expect(server.unownedRuns()).toEqual([])
+      server.online = true
+      await waitFor(() => daemon.status().pendingUploads === 0)
+      expect(server.issueOwner.get("issue-stall")).toEqual({
+        owner: "external",
+        reason: "device_offline",
+      })
+      expect(server.unownedRuns()).toEqual([])
+    } finally {
+      clock.mockRestore()
+    }
   })
 
   it("lease: a run the server took back stops at the next heartbeat", async () => {

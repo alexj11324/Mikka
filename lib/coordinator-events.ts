@@ -41,6 +41,14 @@ export function userMessageEvent(
   }
 }
 
+/** OAuth delegates access to an Agent; it does not turn Agent prose into a
+ * human decision. Result tier preserves the existing wake-on-send behaviour.
+ */
+export function peerCoordinatorMessageEvent(userId: string, text: string): CoordinatorEventInput & { tier: 'result' } {
+  return { userId, kind: 'run_report', dedupeKey: 'peer_message:' + crypto.randomUUID(), issueId: null, runId: null,
+    payload: { text, source: 'oauth_agent_mcp' }, tier: 'result' }
+}
+
 /** Unique Telegram destinations for the user messages in one claimed batch. */
 export function telegramReplyTargets(events: ReadonlyArray<Pick<CoordinatorEventInput, 'kind' | 'payload'>>): TelegramReplyTarget[] {
   const targets = new Map<string, TelegramReplyTarget>()

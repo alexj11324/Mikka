@@ -1,11 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
+import { actionLocale, actionTitlePrompt, clampTitle, displayTitle, parseActionTitles } from './action-title'
 import { BRIEFING_HOUR, briefingContent, dueBriefingZones, localClock, localDate, localInstant, safeTimeZone } from './briefing'
 import { verifyGitHubSignature } from './github-webhook'
-import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, notionNotification, notionSearchNotification, slackNotification, type ExternalNotification } from './notification'
+import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, notionNotification, notionSearchNotification, slackNotification } from './notification'
 import { missingTriggers, needsConfig, triggerSlugs } from './triggers'
-import { fallbackVerdict, modelVerdict, ruleVerdict, SHOW_THRESHOLD, suggestionState } from './rules'
 
 const me = 'user-1'
 
@@ -69,29 +69,28 @@ test('GitHub signatures are checked against the raw body', () => {
   assert.equal(verifyGitHubSignature(body, null, 's3cret'), false)
 })
 
-const notification = (fields: Partial<ExternalNotification>): ExternalNotification => ({ userId: me, source: 'gmail', externalId: 'x', action: 'reply', title: 't', url: null, actor: null, occurredAt: new Date(), required: false, direct: false, fromSelf: false, automated: false, excerpt: '', ...fields })
-
-test('rules decide the clear cases and leave the rest to the model', () => {
-  assert.deepEqual(ruleVerdict(notification({ fromSelf: true, required: true })), { shown: false, decidedBy: 'rule', probability: null })
-  assert.deepEqual(ruleVerdict(notification({ automated: true })), { shown: false, decidedBy: 'rule', probability: null })
-  assert.deepEqual(ruleVerdict(notification({ required: true })), { shown: true, decidedBy: 'rule', probability: null })
-  assert.equal(ruleVerdict(notification({ direct: true })), null)
-  assert.equal(modelVerdict(SHOW_THRESHOLD).shown, true)
-  assert.equal(modelVerdict(0.2).shown, false)
-  assert.equal(fallbackVerdict(notification({ direct: true })).shown, true)
-  assert.equal(fallbackVerdict(notification({})).shown, false)
-  assert.equal(suggestionState(notification({ excerpt: 'body' })).content, 'body')
+test('notices about one thread share a matter', () => {
+  const first = gmailNotification(me, { messageId: 'm1', threadId: 't1', subject: 'Invoice' })!
+  const second = gmailNotification(me, { messageId: 'm2', threadId: 't1', subject: 'Re: Invoice' })!
+  assert.equal(first.matterKey, 'gmail:t1')
+  assert.equal(second.matterKey, first.matterKey)
+  assert.equal(slackNotification(me, { channel: 'C1', ts: '2', thread_ts: '1', text: 'still failing' })!.matterKey, 'slack:C1:1')
+  const recipient = { userId: me, githubId: '42' }
+  const comment = githubNotification(recipient, 'issue_comment', { repository: { full_name: 'a/b' }, sender: { id: 7 }, action: 'created', issue: { number: 9, title: 'x', user: { id: 42 } }, comment: { id: 3, body: 'ping' } })!
+  assert.equal(comment.matterKey, 'github:a/b#9')
+  assert.equal(linearCommentNotification({ userId: me, linearUserId: 'lin-me' }, { type: 'Comment', action: 'create', data: { id: 'c1', body: 'hi', issueId: 'i1' } })!.matterKey, 'linear:i1')
 })
 
-test('the briefing names required items first and counts by source', () => {
+test('the briefing names the highest levels first and counts by source', () => {
   const at = (minutes: number) => new Date(Date.UTC(2026, 9, 23, 8, minutes))
   const content = briefingContent([
-    { id: 'a', source: 'gmail', action: 'reply', required: false, probability: 0.9, occurredAt: at(1) },
-    { id: 'b', source: 'github', action: 'review', required: true, probability: null, occurredAt: at(0) },
-    { id: 'c', source: 'gmail', action: 'reply', required: false, probability: 0.6, occurredAt: at(5) },
-    { id: 'd', source: 'slack', action: 'reply', required: false, probability: 0.6, occurredAt: at(2) },
+    { id: 'a', source: 'gmail', action: 'reply', required: false, level: 'high', probability: null, occurredAt: at(1) },
+    { id: 'b', source: 'github', action: 'review', required: true, level: 'normal', probability: null, occurredAt: at(0) },
+    { id: 'c', source: 'gmail', action: 'reply', required: false, level: 'critical', probability: null, occurredAt: at(5) },
+    // A row from before the levels ranks as normal by its old probability.
+    { id: 'd', source: 'slack', action: 'reply', required: false, level: null, probability: 0.9, occurredAt: at(2) },
   ])
-  assert.deepEqual(content.highlights, ['b', 'a', 'c'])
+  assert.deepEqual(content.highlights, ['c', 'a', 'd'])
   assert.deepEqual(content.counts, { gmail: 2, github: 1, slack: 1 })
   assert.equal(content.total, 4)
 })
@@ -121,6 +120,38 @@ test('only missing triggers are created, so a re-check is safe', () => {
   const wanted = [{ connectedAccountId: 'a1', slug: 'GMAIL_NEW_GMAIL_MESSAGE' }, { connectedAccountId: 'a2', slug: 'NOTION_PAGE_ADDED_TRIGGER' }]
   assert.deepEqual(missingTriggers(wanted, [{ connectedAccountId: 'a1', triggerName: 'GMAIL_NEW_GMAIL_MESSAGE', disabledAt: null }]), [wanted[1]])
   assert.deepEqual(missingTriggers(wanted, [{ connectedAccountId: 'a1', triggerName: 'GMAIL_NEW_GMAIL_MESSAGE', disabledAt: '2026-10-23T00:00:00Z' }]), wanted)
+})
+
+test('action lines (R-45): the prompt carries the rule and examples, the answer is checked, and the raw title is the fallback', () => {
+  const items = [
+    { id: 's1', source: 'gmail', action: 'reply', title: 'Re: Thursday', actor: 'Kevin', excerpt: 'Can we move Thursday to Wednesday? Need to know by noon tomorrow.' },
+    { id: 's2', source: 'github', action: 'review', title: 'Fix types', actor: 'dana', excerpt: 'Fix types' },
+  ]
+  const zh = actionTitlePrompt(items, 'zh-CN')
+  assert.match(zh.instructions, /Simplified Chinese, at most 30 characters/)
+  assert.match(zh.instructions, /Start with a verb/)
+  assert.match(zh.instructions, /「回复 Kevin：周四的会改到周三，明天中午前要定」/)
+  assert.match(zh.instructions, /Bad: 「CI 挂了」/)
+  assert.match(zh.instructions, /untrusted evidence/)
+  const sent = JSON.parse(zh.prompt).notifications
+  assert.equal(sent[0].text, items[0].excerpt)
+  assert.equal(sent[1].text, undefined, 'an excerpt that only repeats the title is not sent')
+  assert.match(actionTitlePrompt(items, 'en').instructions, /English, at most 60 characters/)
+
+  const answer = 'Sure: {"titles": [{"id": "s1", "title": "回复 Kevin：周四的会改到周三，明天中午前要定"}, {"id": "s9", "title": "x"}, {"id": "s2", "title": "  "}]}'
+  assert.deepEqual([...parseActionTitles(answer, ['s1', 's2'], 'zh-CN')], [['s1', '回复 Kevin：周四的会改到周三，明天中午前要定']])
+  assert.equal(parseActionTitles('not json', ['s1'], 'zh-CN').size, 0)
+  assert.equal(parseActionTitles('{"titles": "no"}', ['s1'], 'zh-CN').size, 0)
+  const long = parseActionTitles(JSON.stringify({ titles: [{ id: 's1', title: '回'.repeat(40) }] }), ['s1'], 'zh-CN').get('s1')!
+  assert.equal([...long].length, 30)
+  assert.ok(long.endsWith('…'))
+  assert.equal(clampTitle('a'.repeat(70), 'en').length, 60)
+
+  assert.equal(displayTitle({ title: 'Re: Thursday', actionTitle: '回复 Kevin：改到周三' }), '回复 Kevin：改到周三')
+  assert.equal(displayTitle({ title: 'Re: Thursday', actionTitle: null }), 'Re: Thursday')
+  assert.equal(displayTitle({ title: 'Re: Thursday', actionTitle: ' ' }), 'Re: Thursday')
+  assert.equal(actionLocale('en'), 'en')
+  assert.equal(actionLocale(null), 'zh-CN')
 })
 
 test('08:00 local is found across offsets and DST changes', () => {

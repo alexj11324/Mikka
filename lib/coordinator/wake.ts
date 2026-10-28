@@ -1,5 +1,6 @@
 import 'server-only'
 import { start } from 'workflow/api'
+import { releaseAttention } from '@/lib/attention/store'
 import { hasWakingEvents, setEventTier, untriagedEvents, wakingChats } from '@/lib/coordinator/store'
 import { decide } from '@/lib/coordinator/decide'
 import { decisionInput } from '@/lib/coordinator/decision'
@@ -31,14 +32,16 @@ async function triageInbox(userId: string, botId: string | null): Promise<void> 
 }
 
 /**
- * Triages the inbox and starts a turn for each of the person's chats (the
- * Coordinator's and any bot's) unless all that waits there is background.
- * Call it after the event is committed. Never throws: an event whose wake
- * fails waits for the next one.
+ * Hands over the next waiting matter from connected apps (a snooze that is
+ * due included) to the Coordinator, then triages the inbox and starts a turn
+ * for each of the person's chats (the Coordinator's and any bot's) unless all
+ * that waits there is background. Call it after the event is committed.
+ * Never throws: an event whose wake fails waits for the next one.
  */
 export async function wakeCoordinator(userId: string): Promise<void> {
   if (!coordinatorEnabled()) return
   try {
+    await releaseAttention(userId)
     for (const botId of await wakingChats(userId)) {
       await triageInbox(userId, botId)
       if (await hasWakingEvents(userId, botId)) await start(coordinatorTurn, [userId, botId])

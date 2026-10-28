@@ -97,3 +97,73 @@ test('Issue threads open on the right as a conversation; comments are cards with
     expect(colleagueErrors).toEqual([])
   }
 })
+
+test('The owner stops a live thread from its composer; it reads 正在停止… until the run ends', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  const { email } = await register(page)
+  const title = `Thread stop ${randomUUID()}`
+  await seedTask(page, title)
+  const pool = isolatedPool()
+  const runs: Record<string, string> = {}
+  try {
+    const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
+    const { rows: [issue] } = await pool.query<{ id: string }>('SELECT id FROM issues WHERE "userId" = $1 AND title = $2', [user.id, title])
+    const agentId = randomUUID()
+    await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Thread agent'])
+    for (const [status, prompt] of [['waiting_input', 'Pick a cache key'], ['running', 'Trim the bundle']] as const) {
+      runs[status] = randomUUID()
+      await pool.query('INSERT INTO agent_runs (id, "userId", "issueId", "agentId", status, prompt) VALUES ($1, $2, $3, $4, $5, $6)', [runs[status], user.id, issue.id, agentId, status, prompt])
+    }
+  } finally { await pool.end() }
+  await openIssueFromSearch(page, title)
+  const threads = page.getByRole('region', { name: /^线程/ })
+
+  // Waiting for a reply is still live, so it can be stopped too.
+  await threads.getByRole('button', { name: '打开线程 Pick a cache key', exact: true }).click()
+  let panel = page.getByRole('region', { name: 'Pick a cache key', exact: true })
+  await expect(panel.getByRole('button', { name: '停止', exact: true })).toBeVisible()
+
+  await threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true }).click()
+  panel = page.getByRole('region', { name: 'Trim the bundle', exact: true })
+  const composer = panel.getByRole('textbox', { name: '告诉 Thread agent 下一步做什么…' })
+  const stop = panel.getByRole('button', { name: '停止', exact: true })
+  // Typing turns stop into send; clearing the draft brings stop back.
+  await composer.fill('Keep the polyfills')
+  await expect(panel.getByRole('button', { name: '发送', exact: true })).toBeEnabled()
+  await expect(stop).toHaveCount(0)
+  await composer.fill('')
+  await expect(stop).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('thread-stop-running.png') })
+
+  await page.clock.install()
+  await stop.click()
+  await expect(panel.getByText('正在停止…', { exact: true })).toBeVisible()
+  await expect(threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true })).toContainText('正在停止…')
+  await expect(stop).toHaveCount(0)
+  await expect(composer).toBeEditable()
+  await composer.fill('Keep this draft while stopping')
+  await expect(panel.getByRole('button', { name: '发送', exact: true })).toBeDisabled()
+  const check = isolatedPool()
+  try {
+    await expect.poll(async () => (await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt).not.toBeNull()
+    const originalStop = (await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt
+    await page.screenshot({ path: testInfo.outputPath('thread-stop-stopping.png') })
+    // An offline daemon never acknowledges. The timeout unlocks retry, not the draft.
+    await page.clock.fastForward(30_100)
+    await expect(panel.getByRole('alert')).toContainText('没停下来，再试一次')
+    await expect(composer).toHaveValue('Keep this draft while stopping')
+    await expect(composer).toBeEditable()
+    await page.screenshot({ path: testInfo.outputPath('thread-stop-timeout.png') })
+    await panel.getByRole('button', { name: '重试', exact: true }).click()
+    await expect(panel.getByRole('alert')).toHaveCount(0)
+    await expect(composer).toHaveValue('Keep this draft while stopping')
+    await expect(panel.getByText('正在停止…', { exact: true })).toBeVisible()
+    expect((await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt).toEqual(originalStop)
+    // The daemon ends the run: the thread shows it stopped and the composer goes away.
+    await check.query('UPDATE agent_runs SET status = $2, "finishedAt" = now() WHERE id = $1', [runs.running, 'stopped'])
+    await page.clock.fastForward(2_100)
+  } finally { await check.end() }
+  await expect(panel.getByText('已停止', { exact: true })).toBeVisible()
+  await expect(threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true })).toContainText('已停止')
+  await expect(panel.getByRole('textbox')).toHaveCount(0)
+})

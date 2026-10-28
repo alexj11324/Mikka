@@ -7,6 +7,13 @@
 export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access"
 export type AskForApproval = "untrusted" | "on-request" | "never"
 
+/** Experimental official app-server host-managed auth. Private runner RPC only. */
+export interface ChatGPTAuthTokens {
+  accessToken: string
+  chatgptAccountId: string
+  chatgptPlanType?: string
+}
+
 export type UserInput = {
   type: "text"
   text: string
@@ -14,6 +21,8 @@ export type UserInput = {
 }
 
 export interface ThreadStartParams {
+  /** Experimental host tools, audited against official Codex0.163.0. */
+  dynamicTools?: { type: 'function'; name: string; description: string; inputSchema: Record<string, unknown> }[]
   cwd?: string | null
   approvalPolicy?: AskForApproval | null
   sandbox?: SandboxMode | null

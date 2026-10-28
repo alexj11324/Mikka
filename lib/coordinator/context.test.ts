@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
-import { chatItems, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, SUMMARY_PREFIX, type StoredMessage } from './context'
+import { chatItems, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
 
 function stored(messages: ModelMessage[]): StoredMessage[] {
   return messages.map((message, index) => ({ position: index + 1, message }))
@@ -23,7 +23,8 @@ test('token estimate counts Chinese closer to a token a character', () => {
 test('the summary leads the prompt', () => {
   const prompt = promptMessages('they prefer Codex', stored([{ role: 'user', content: 'hi' }]))
   assert.equal(prompt[0].role, 'user')
-  assert.equal(prompt[0].content, `${SUMMARY_PREFIX}\n\nthey prefer Codex`)
+  assert.equal(JSON.parse(prompt[0].content as string).untrustedData.summary, 'they prefer Codex')
+  assert.equal(JSON.parse(prompt[0].content as string).authority, 'not_user_approval')
   assert.equal(prompt.length, 2)
 })
 
@@ -100,19 +101,20 @@ test('the chat folds one reply\'s steps together and marks events', () => {
 
 test('a reply that dispatches a run carries it as a thread, once', () => {
   const at = new Date('2026-10-22T00:00:00Z')
-  const dispatch = (id: string, value: unknown): ModelMessage[] => [
-    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: id, toolName: 'dispatch_run', input: {} }] },
-    { role: 'tool', content: [{ type: 'tool-result', toolCallId: id, toolName: 'dispatch_run', output: { type: 'json', value } }] },
+  const dispatch = (id: string, value: unknown, toolName = 'dispatch_run'): ModelMessage[] => [
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: id, toolName, input: {} }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: id, toolName, output: { type: 'json', value } }] },
   ] as ModelMessage[]
   const rows = [
     { role: 'user', content: 'speed up the home page' },
     ...dispatch('c1', { runId: 'r1', status: 'queued' }),
     ...dispatch('c2', { error: 'runInvalid' }),
     ...dispatch('c3', { runId: 'r1', status: 'queued' }),
+    ...dispatch('c4', { runId: 'r2', status: 'queued' }, 'dispatch_bot_computer'),
     { role: 'assistant', content: [{ type: 'text', text: 'On it.' }] },
   ] as ModelMessage[]
   const items = chatItems(rows.map((message, index) => ({ position: index + 1, message, createdAt: at })))
-  assert.deepEqual(items.map(item => [item.from, item.threads]), [['person', []], ['coordinator', ['r1']]])
+  assert.deepEqual(items.map(item => [item.from, item.threads]), [['person', []], ['coordinator', ['r1', 'r2']]])
 })
 
 test('chatItems marks inbox (pending) user messages so they are never reported as read', () => {

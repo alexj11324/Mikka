@@ -10,6 +10,7 @@ const pool = new Pool({ connectionString: target.href, max: 1 })
 const owner = randomUUID(), viewer = randomUUID(), outsider = randomUUID(), removed = randomUUID()
 const issue = randomUUID(), other = randomUUID(), workspace = randomUUID(), team = randomUUID(), agent = randomUUID()
 const run = randomUUID(), removedRun = randomUUID(), otherRun = randomUUID()
+const bot = randomUUID()
 const excessRuns = Array.from({ length: 21 }, () => randomUUID())
 test('real actions keep thread content with its owner; current members see only whose threads exist and their status', async () => {
   const { listIssueThreads, getIssueThread, sendIssueThreadMessage } = await import('../app/actions/agents')
@@ -21,6 +22,8 @@ test('real actions keep thread content with its owner; current members see only 
     await pool.query('INSERT INTO issue_members ("issueId","userId","memberId") VALUES ($1,$2,$3),($1,$2,$4)', [issue, owner, viewer, removed])
     await pool.query('INSERT INTO agents (id,"userId",harness,name,instructions) VALUES ($1,$2,$3,$4,$5)', [agent,owner,'codex','Mikka Backend','PRIVATE INSTRUCTIONS'])
     for (const [id, userId, issueId, status] of [[run,owner,issue,'running'],[removedRun,removed,issue,'succeeded'],[otherRun,owner,other,'succeeded']]) await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt,report,error) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id,userId,issueId,agent,status,'Route group replies',JSON.stringify({summary:'Routed'}),null])
+    await pool.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)', [bot, workspace, owner, 'Owned Bot'])
+    await pool.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [run, bot, workspace, owner])
     await pool.query('INSERT INTO run_chunks (id,"runId",seq,chunk) VALUES ($1,$2,1,$3)', [randomUUID(),run,JSON.stringify({type:'text-delta',id:'a',delta:'Reproduced it'})])
     await assert.rejects(actAs(outsider, () => listIssueThreads(issue)))
     await assert.rejects(actAs(viewer, () => listIssueThreads(other)))
@@ -32,6 +35,7 @@ test('real actions keep thread content with its owner; current members see only 
     await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Must not reach the agent' })))
     const own = await actAs(owner, () => getIssueThread(issue, run))
     assert.equal(own.thread.detail?.name, 'Route group replies')
+    assert.equal(own.thread.detail?.agentName, 'Owned Bot', 'a computer thread displays its owning Bot, not the internal executor')
     await assert.rejects(actAs(owner, () => getIssueThread(other, run)))
 
     // A workspace issue: current members read and join every collaborator's thread.
@@ -43,7 +47,7 @@ test('real actions keep thread content with its owner; current members see only 
     // A workspace issue: teammates see whose threads exist and their status, never their content.
     const listed = await actAs(viewer, () => listIssueThreads(issue))
     assert.deepEqual(listed.map(row => [row.detail, row.ownerName, row.ownedByCurrentUser]).sort(), [[null, 'Isolated run test', false], [null, 'Isolated run test', false]])
-    assert.ok(!/Route|Mikka Backend|Routed|PRIVATE/.test(JSON.stringify(listed)))
+    assert.ok(!/Route|Mikka Backend|Owned Bot|Routed|PRIVATE/.test(JSON.stringify(listed)))
     await assert.rejects(actAs(viewer, () => getIssueThread(issue, run)))
     await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' })))
     // The owner still reads and talks in their own thread.
@@ -54,9 +58,15 @@ test('real actions keep thread content with its owner; current members see only 
     await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: otherRun, text: 'Wrong issue' })))
     await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: '   ' })))
     // Stopping stays with the owner.
-    await requestRunStop(viewer, run)
+    await assert.rejects(requestRunStop(viewer, run), /runNotFound/)
     const {rows:[unchanged]} = await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1',[run])
     assert.equal(unchanged.stopRequestedAt,null)
+    await requestRunStop(owner, run)
+    const {rows:[stopped]} = await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1',[run])
+    assert.ok(stopped.stopRequestedAt instanceof Date)
+    await requestRunStop(owner, run)
+    const {rows:[repeated]} = await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1',[run])
+    assert.equal(repeated.stopRequestedAt.getTime(),stopped.stopRequestedAt.getTime())
     // Suspension or removal from the workspace ends access, even with stale direct membership.
     await pool.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2',[workspace,removed,'suspended'])
     assert.deepEqual((await actAs(viewer,()=>listIssueThreads(issue))).map(row=>row.id),[run])
@@ -72,6 +82,7 @@ test('real actions keep thread content with its owner; current members see only 
     await pool.query('DELETE FROM run_messages WHERE "runId"=ANY($1::uuid[])',[[run,removedRun,otherRun]])
     await pool.query('DELETE FROM run_chunks WHERE "runId"=ANY($1::uuid[])',[[run,removedRun,otherRun,...excessRuns]])
     await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])',[[run,removedRun,otherRun,...excessRuns]])
+    await pool.query('DELETE FROM bots WHERE id=$1',[bot])
     await pool.query('DELETE FROM agents WHERE id=$1',[agent])
     await pool.query('DELETE FROM issue_members WHERE "issueId"=ANY($1::uuid[])',[[issue,other]])
     await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1',[issue])

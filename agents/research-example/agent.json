@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "research-example",
+  "instructionsFile": "instructions.md",
+  "tools": ["web_search", "load_skill"],
+  "skills": [
+    {
+      "id": "source-checking",
+      "name": "Source checking",
+      "description": "Use when a research task requires current facts and attributed evidence.",
+      "bodyFile": "skills/source-checking/SKILL.md"
+    }
+  ],
+  "hooks": ["audit", "failure_cases"],
+  "memory": { "scope": "owner-bot" },
+  "evalSuite": "mikka.core.v1"
+}

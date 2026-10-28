@@ -25,7 +25,8 @@ concurrency:
 jobs:
   cloud-secret-access:
     name: Cloud credential access (OIDC)
-    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka'
+    # This migration-only candidate must not retrieve live provider credentials.
+    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -84,9 +85,18 @@ jobs:
       - run: pnpm i18n:check
       - run: pnpm test:ssh-target
       - run: pnpm test:linear-sync
+      - run: pnpm check:agent-definitions
+      - run: pnpm test:mailbox-verification
+      - run: pnpm test:personal-mailbox-core
+      - run: pnpm test:agent-kit
+      - run: pnpm test:agent-kit-compat
       - run: pnpm test:coordinator-events
+      - run: pnpm test:mobile-push
       - run: pnpm test:coordinator-native-relay
       - run: pnpm test:coordinator-native-scope
+      - run: pnpm test:coordinator-issue-tools
+      - name: Prepare pinned hosted-runner test image
+        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
       - run: pnpm --filter @mikka/daemon test
       - name: Install sandbox runtime dependencies without changing host namespace policy
         run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
@@ -96,11 +106,14 @@ jobs:
           MIKKA_SANDBOX_ACCEPTANCE: '1'
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/protocol typecheck
+      - run: pnpm --filter @mikka/mobile typecheck
       - run: pnpm test:active-agents
         env:
           # Database regressions run against ephemeral Postgres in browser-tests below.
           MIKKA_DATABASE_URL: ""
       - run: pnpm test:auth-composio
+      - name: Test environment binding and fail-closed guards
+        run: pnpm test:test-accounts
       - name: Authentication email integration tests (isolated Postgres)
         run: node scripts/test-auth-email.mjs
       - run: pnpm test:groups
@@ -172,6 +185,8 @@ jobs:
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
@@ -184,17 +199,25 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
-        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
       - run: pnpm test:e2e:setup
+      - name: Bind the disposable test environment to the exact checkout
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
       - name: Verify thread sharing, membership and privacy against isolated database
         run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-threads.integration.ts
       - name: Required DB suites (temporary Postgres 17, no skips)
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:bot-chats-db,test:conversation-reads,test:coordinator-native,test:groups,test:issue-search-db,test:relation-cycle,test:visibility-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:active-agents,test:approved-writes-db,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:migration-steps-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db
       - run: pnpm build
