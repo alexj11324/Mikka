@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 import { after } from 'node:test'
+import { lostScopeSupervisor } from './scope-acceptance-policy.mjs'
 import { scopeNativeRuntime } from './scope-acceptance-runtime.mjs'
 if (!process.send || !['scope','team'].includes(process.env.SCOPE_ACCEPTANCE_PHASE)) throw Error('scope worker requires supervisor IPC')
 const manifest = JSON.parse(readFileSync(process.env.SCOPE_ACCEPTANCE_MANIFEST, 'utf8'))
@@ -14,7 +15,8 @@ const pending = new Map()
 const rpc = (kind, input = {}) => new Promise((resolve, reject) => {
   const id = ++sequence;pending.set(id, { resolve, reject });process.send({ id, kind, input })
 })
-let runtime
+let runtime, completed=false
+process.on('disconnect',()=>{if(!completed)void lostScopeSupervisor(async()=>{runtime?.cancel();await runtime?.close()},code=>process.exit(code))})
 process.on('message', message => {
   if(message.control==='abort'){runtime?.cancel();return}
   const request = pending.get(message.id)
@@ -31,12 +33,12 @@ runtime = scopeNativeRuntime(pg, rpc, phase, mode)
 runtime.install(frozenSources)
 if (mode !== 'migrate') after(async () => {
   try { await runtime.close();await rpc('finished', runtime.stats()) }
-  finally { if(process.connected)process.disconnect() }
+  finally { completed=true;if(process.connected)process.disconnect() }
 })
 try {
   if (mode === 'migrate') {
     await import('./migrate.mjs')
-    await runtime.close();await rpc('finished', runtime.stats());if(process.connected)process.disconnect()
+    await runtime.close();await rpc('finished', runtime.stats());completed=true;if(process.connected)process.disconnect()
   } else {
     const file = phase === 'scope' ? '../tests/issue-scope-detachment.db.test.ts' : '../tests/team-issue-create.db.test.ts'
     await import(file)

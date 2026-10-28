@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { EventEmitter } from 'node:events'
-import { SCOPE_DATABASES as names, SCOPE_LIMITS, scopeUrl, checkedScopeUrl, scopePolicy, controlledChild, sqlHash } from './scope-acceptance-policy.mjs'
+import { SCOPE_DATABASES as names, SCOPE_LIMITS, scopeUrl, checkedScopeUrl, scopePolicy, controlledChild, sqlHash, lostScopeSupervisor } from './scope-acceptance-policy.mjs'
 import { scopeNativeRuntime, SCOPE_IDENTITY_SQL, frozenScopeModule } from './scope-acceptance-runtime.mjs'
 import { verifyScopeManifest, scopePhases, scopeWorkerMode } from './scope-acceptance.mjs'
 import { scopeSubtest } from '../tests/support/scope-acceptance.mjs'
@@ -200,4 +200,12 @@ test('cancellation while awaiting a granted query is rechecked before native sub
   assert.equal(nativeQueries,1)
   assert.ok(results.some(result=>result.id==='cancelled'&&result.code==='CANCELLED_BEFORE_SUBMIT'))
   await runtime.close()
+})
+
+
+test('loss of supervisor closes only owned worker resources and forces exit if teardown stalls',async()=>{
+  const trace=[]
+  await lostScopeSupervisor(async()=>{trace.push('close-owned')},code=>trace.push(code),20)
+  assert.deepEqual(trace,['close-owned',1])
+  await new Promise(resolve=>{void lostScopeSupervisor(()=>new Promise(()=>{}),code=>{assert.equal(code,1);resolve()},5)})
 })

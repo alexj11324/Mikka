@@ -18,12 +18,12 @@ export function scopeWorkerMode(mode) {
   return {MIGRATE:mode==='migrate'?'1':'0',VERCEL_ENV:''}
 }
 export async function scopePhases(run) { for(const phase of ['scope','team'])await run(phase) }
-async function execute(manifest, manifestPath, manifestHash, output, approvalReference) {
+async function execute(manifest, manifestPath, manifestHash, output, approvalReference, started) {
   if(approvalReference&&Buffer.byteLength(approvalReference)>256)throw Error('scope approval reference too long')
   if (!approvalReference) throw Error('scope execution needs separately granted approval reference; this flag is not approval')
   if(resolve(output)!==manifest.evidenceDirectory)throw Error('scope evidence directory mismatch')
   if (Object.keys(process.env).some(key => key.startsWith('PG') && process.env[key])) throw Error('ambient PG configuration is not permitted')
-  const inspection = JSON.parse(execFileSync('docker', ['inspect','--format','{"id":"{{.Id}}","running":{{.State.Running}},"image":"{{.Image}}","mounts":{{json .Mounts}},"ports":{{json .NetworkSettings.Ports}}}','mikka-issue184-pg'], { encoding: 'utf8' }))
+  const inspection = JSON.parse(execFileSync('docker', ['inspect','--format','{"id":"{{.Id}}","running":{{.State.Running}},"image":"{{.Image}}","mounts":{{json .Mounts}},"ports":{{json .NetworkSettings.Ports}}}','mikka-issue184-pg'], { encoding: 'utf8', timeout:5000 }))
   if (inspection.id !== manifest.resource.id || inspection.image !== manifest.resource.image || !inspection.running || !inspection.mounts.some(mount => mount.Name === manifest.resource.volume && mount.Destination === '/var/lib/postgresql/data') || inspection.ports['5432/tcp']?.[0]?.HostIp !== '127.0.0.1' || inspection.ports['5432/tcp']?.[0]?.HostPort !== '55484') throw Error('original scope server not running or identity changed; no start/replacement is authorized')
   // Native module import constructs no client/connection and precedes owned timers.
   const pg = (await import('pg')).default
@@ -39,7 +39,7 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
     if(journalBytes>SCOPE_LIMITS.journalBytes-4096){journalFull=true;writeSync(journal,'{"event":"journal-budget-exhausted"}\n');throw Error('scope journal budget exhausted')}
     writeSync(journal,line)
   }
-  const executionDeadline=Date.now()+SCOPE_LIMITS.totalMs
+  const executionDeadline=started+SCOPE_LIMITS.totalMs
   let readDeadline=executionDeadline
   const controller = new AbortController(), policy = scopePolicy(manifest.migrations,record)
   const all = new Set(), ended = new Set()
@@ -49,8 +49,8 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
     for(const worker of all)worker.kill('SIGKILL')
     try{record({event:'hard-stop',pendingQueries:[...policy.state.pending.keys()],outcomesMayBeUnknown:true})}catch{}
     process.exit(1)
-  },SCOPE_LIMITS.totalMs+30000)
-  const timer = setTimeout(() => abort(Error('scope acceptance total timeout')), SCOPE_LIMITS.totalMs)
+  },Math.max(1,started+SCOPE_LIMITS.totalMs+30000-Date.now()))
+  const timer = setTimeout(() => abort(Error('scope acceptance total timeout')), Math.max(1,executionDeadline-Date.now()))
   const poolOptions = database => ({ connectionString: scopeUrl(database), max:1, statement_timeout:1000, lock_timeout:1000, idle_in_transaction_session_timeout:3000, connectionTimeoutMillis:1000, query_timeout:1500 })
   const admin = new pg.Pool(poolOptions('issue184_e2e'))
   async function read(pool,text,values) {
@@ -169,16 +169,17 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
   }
 }
 export async function main(args=process.argv.slice(2)) {
+  const started=Date.now()
   const [mode,manifestInput,expectedHash,approvalReference,output]=args
   if(!['--plan','--run'].includes(mode)||!manifestInput||!expectedHash)throw Error('usage: --plan|--run manifest sha256 [approval-reference output-new-directory]')
   const manifestPath=resolve(manifestInput),bytes=readFileSync(manifestPath)
   if(digest(bytes)!==expectedHash)throw Error('scope manifest SHA mismatch')
   const manifest=JSON.parse(bytes);verifyScopeManifest(manifest)
   if(process.versions.node!==manifest.nodeVersion)throw Error('scope Node version mismatch')
-  const git=(...argv)=>execFileSync('git',argv,{encoding:'utf8'}).trim()
+  const git=(...argv)=>execFileSync('git',argv,{encoding:'utf8',timeout:5000}).trim()
   if(git('rev-parse','HEAD')!==manifest.candidate||git('rev-parse','HEAD^{tree}')!==manifest.tree||git('status','--porcelain'))throw Error('scope candidate/worktree mismatch')
   if(mode==='--plan'){console.log(JSON.stringify({candidate:manifest.candidate,manifestHash:expectedHash,limits:SCOPE_LIMITS,databases:SCOPE_DATABASES,executed:false}));return}
   if(!output)throw Error('scope requires a new retained evidence directory')
-  await execute(manifest,manifestPath,expectedHash,resolve(output),approvalReference)
+  await execute(manifest,manifestPath,expectedHash,resolve(output),approvalReference,started)
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)main().catch(error=>{console.error(error.message);process.exitCode=1})

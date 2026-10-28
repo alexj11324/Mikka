@@ -123,3 +123,10 @@ export function controlledChild(child, { timeoutMs, graceMs = SCOPE_LIMITS.grace
     })
   })
 }
+
+
+export async function lostScopeSupervisor(close,terminate,graceMs=2000) {
+  const timer=setTimeout(()=>terminate(1),graceMs)
+  try { await close() }
+  finally { clearTimeout(timer);terminate(1) }
+}
