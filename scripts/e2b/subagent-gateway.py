@@ -8,6 +8,16 @@ from aiohttp import web, WSMsgType
 ROOT = Path('/run/mikka-subagents')
 AGENTS = {}
 
+# A site need not label an OTP field with autocomplete. Keep the guarded
+# session closed while any text entry remains populated, including OTP fields
+# with arbitrary names. Hidden and non-text controls commonly have fixed values.
+SAFE_TO_RESUME = """(() => {
+  const fields = Array.from(document.querySelectorAll('input,textarea'));
+  return !fields.some(e => e.value && (e.tagName === 'TEXTAREA' ||
+    !['hidden','checkbox','radio','button','submit','reset','image','file','range','color'].includes(e.type)));
+})()"""
+SENSITIVE_FIELD = "(e.type === 'password' || /(?:otp|one[\\s_-]*time|verification[\\s_-]*code|security[\\s_-]*code|auth(?:entication)?[\\s_-]*code)/i.test([e.autocomplete,e.name,e.id,e.getAttribute('aria-label'),e.getAttribute('placeholder')].join(' ')))"
+
 def decode(value):
     return base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))
 
@@ -190,7 +200,7 @@ async def end(request):
     _,grant=authorize(request,'broker');b=browser(grant);data=await request.json()
     async with b.lock:
         if not b.guard or not hmac.compare_digest(data.get('guardToken',''),b.guard):raise web.HTTPForbidden()
-        check=await b.rpc('Runtime.evaluate',{'expression':"!Array.from(document.querySelectorAll('input')).some(e => e.value && (e.type==='password'||e.autocomplete==='one-time-code'))",'returnByValue':True},b.session)
+        check=await b.rpc('Runtime.evaluate',{'expression':SAFE_TO_RESUME,'returnByValue':True},b.session)
         tree=await b.rpc('Page.getFrameTree',session=b.session)
         if check.get('result',{}).get('value') is not True:raise web.HTTPConflict()
         # Clear the last frame so no buffered pre-fill frame races resumption.
@@ -229,7 +239,7 @@ async def action(request):
             return web.json_response({'observation':json.loads(text['result']['value'])})
         elif name=='type':
             selector=json.dumps(str(data.get('selector',''))[:500])
-            expression=f"(() => {{ const e=document.querySelector({selector}); if (!e || e.type==='password' || e.autocomplete==='one-time-code' || !['INPUT','TEXTAREA'].includes(e.tagName)) return false; e.focus(); return true; }})()"
+            expression=f"(() => {{ const e=document.querySelector({selector}); if (!e || {SENSITIVE_FIELD} || !['INPUT','TEXTAREA'].includes(e.tagName)) return false; e.focus(); return true; }})()"
             focused=await b.rpc('Runtime.evaluate',{'expression':expression,'returnByValue':True},b.session)
             if focused.get('result',{}).get('value') is not True:raise web.HTTPForbidden()
             await b.rpc('Input.insertText',{'text':str(data.get('text',''))[:2000]},b.session)
