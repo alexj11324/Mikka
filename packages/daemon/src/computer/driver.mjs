@@ -80,6 +80,49 @@ export const TOOLS = [
     },
   },
 ];
+// Cloud computer captures: evidence for the person, kept with the thread.
+// They never return the image to the model, so they need no review; the
+// server binds them to the run's own desktop (lib/captures/screen.ts).
+const captureTitle = { type: "string", minLength: 1, maxLength: 200, description: "What it shows, for the person." };
+export const CAPTURE_TOOLS = [
+  {
+    name: "capture_screenshot",
+    description:
+      "Save a screenshot of this thread's computer as evidence for the person. It is kept with the thread; you do not get the image back.",
+    inputSchema: { type: "object", properties: { title: captureTitle }, required: ["title"], additionalProperties: false },
+  },
+  {
+    name: "start_screen_recording",
+    description:
+      "Start recording this thread's computer screen as evidence for the person. One recording at a time; it stops by itself after maxSeconds (default 120, at most 300). Call stop_screen_recording when the flow you are showing is done.",
+    inputSchema: {
+      type: "object",
+      properties: { title: captureTitle, maxSeconds: { type: "integer", minimum: 5, maximum: 300 } },
+      required: ["title"], additionalProperties: false,
+    },
+  },
+  {
+    name: "stop_screen_recording",
+    description: "Stop the screen recording and keep it with the thread.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+];
+const CAPTURE_ACTIONS = { capture_screenshot: "screenshot", start_screen_recording: "start_recording", stop_screen_recording: "stop_recording" };
+export function normalizeCaptureCall(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid tool call");
+  if (Object.keys(value).some((k) => !["name", "arguments"].includes(k))) throw new Error("Unknown call fields");
+  const { name, arguments: args = {} } = value;
+  const action = Object.hasOwn(CAPTURE_ACTIONS, name) ? CAPTURE_ACTIONS[name] : undefined;
+  if (!action || !args || typeof args !== "object" || Array.isArray(args)) throw new Error("Unsupported tool or arguments");
+  const keys = Object.keys(args).sort().join(",");
+  const title = typeof args.title === "string" ? args.title.replace(/\s+/g, " ").trim() : "";
+  if (action === "stop_recording" && !keys) return { action };
+  if (action === "screenshot" && keys === "title" && title && title.length <= 200) return { action, title };
+  if (action === "start_recording" && ["title", "maxSeconds,title"].includes(keys) && title && title.length <= 200 && (args.maxSeconds === undefined || (Number.isInteger(args.maxSeconds) && args.maxSeconds >= 5 && args.maxSeconds <= 300)))
+    return { action, title, ...(args.maxSeconds === undefined ? {} : { maxSeconds: args.maxSeconds }) };
+  throw new Error("Unsupported tool or arguments");
+}
+export const isCaptureTool = (name) => Object.hasOwn(CAPTURE_ACTIONS, name);
 export function normalizeCall(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("Invalid tool call");

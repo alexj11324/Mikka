@@ -115,6 +115,10 @@ Questions waiting on Alex. Move a row to "Decided" when he answers.
 | --- | --- | --- |
 | 2026-10-24 | Remove white hairlines app-wide (dialog and popover rings, column borders), not only inputs? | Inputs only |
 | 2026-10-24 | Token drift between Figma and code (`rules.md` § Tokens): which side moves? | Code value ships, Figma follows |
+| 2026-10-28 | 待 Alex 确认: a thread's screenshots and recordings are evidence kept with the thread, not artifacts: own table, no card in the chat, no Coordinator wake; the acceptance view (Figma waiting on approval) will show them | Built that way (`docs/mcp.md` § Run captures) |
+| 2026-10-28 | 待 Alex 确认: only the thread's owner sees its captures, as its content (R-62); share links work as artifact links | Owner only, links as artifacts |
+| 2026-10-28 | 待 Alex 确认: cloud computer captures need no per-call approval (the image never goes to the model), but are refused while the person holds the desktop or the workspace turned computers off. A recording already going keeps going if the person takes over | No approval; refused while held; a running recording continues |
+| 2026-10-28 | 待 Alex 确认: limits: images 10 MB, videos 100 MB; one recording per thread, 120 s by default and at most 300 s, 10 fps MP4; the run's end stops and keeps it | These limits |
 
 
 ## 2026-10-25: Retire standalone Agent generation

@@ -16,6 +16,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 import type { z } from "zod"
 import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
+import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCaptureResponse, type CaptureUploadRequest, type CaptureUploadResponse, type ScreenCaptureRequest } from '@mikka/protocol/capture'
 
 import {
   CLIENT_VERSION_HEADER,
@@ -264,6 +265,41 @@ export class HttpServerLink implements ServerLink {
       throw new Error('subscription_native_unavailable')
     }
     return {contentType,body:response.body}
+  }
+
+  async beginCapture(runId: string, request: CaptureUploadRequest) {
+    return this.call("POST", capturePaths.begin(checkId(runId)), { body: request, schema: captureUploadResponse })
+  }
+
+  /** Straight to object storage with the signed headers, or to the server when it has no bucket. */
+  async sendCapture(runId: string, captureId: string, upload: CaptureUploadResponse["upload"], bytes: Uint8Array, contentType: string) {
+    const server = upload.target === "server"
+    let response: Response
+    try {
+      response = await this.fetchImpl(server ? serverUrl(this.baseUrl, capturePaths.upload(checkId(runId), checkId(captureId))) : upload.url, {
+        method: "PUT",
+        headers: server
+          ? { "content-type": contentType, [CLIENT_VERSION_HEADER]: this.clientVersion, ...(this.credential ? { authorization: `Bearer ${this.credential}` } : {}), ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) }
+          : upload.headers,
+        body: bytes,
+        redirect: "error",
+        signal: AbortSignal.timeout(300_000),
+      })
+    } catch (error) {
+      throw new ServerUnreachableError(error)
+    }
+    if (response.status >= 500 || response.status === 429) throw new ServerUnreachableError(response.status)
+    if (response.status === 401 && server) throw new SessionRejectedError()
+    if (!response.ok) throw new DaemonError(response.status, `PUT capture failed: ${response.status}`, { status: response.status })
+  }
+
+  async completeCapture(runId: string, captureId: string) {
+    const { capture } = await this.call("POST", capturePaths.complete(checkId(runId), checkId(captureId)), { schema: captureCompleteResponse, timeoutMs: 120_000 })
+    return capture
+  }
+
+  async screenCapture(runId: string, request: ScreenCaptureRequest, signal?: AbortSignal) {
+    return this.call("POST", capturePaths.screen(checkId(runId)), { body: request, schema: screenCaptureResponse, signal, timeoutMs: 120_000 })
   }
 
   async appendRunChunks(runId: string, batch: ChunkBatch) {

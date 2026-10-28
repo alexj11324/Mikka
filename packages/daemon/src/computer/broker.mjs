@@ -6,7 +6,7 @@ import {
 } from "node:crypto";
 import { chmodSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
-import { normalizeCall, executeDriver } from "./driver.mjs";
+import { normalizeCall, normalizeCaptureCall, executeDriver } from "./driver.mjs";
 export class ComputerBroker {
   grants = new Map();
   pending = new Map();
@@ -16,10 +16,11 @@ export class ComputerBroker {
     socketPath,
     permitted,
     execute = (driver, call, display) => executeDriver(driver, call, display),
+    capture,
     now = Date.now,
     ttl = 300000,
   }) {
-    Object.assign(this, { driver, socketPath, permitted, execute, now, ttl });
+    Object.assign(this, { driver, socketPath, permitted, execute, capture, now, ttl });
   }
   spec(runId, permission, { display } = {}) {
     // Cloud desktops must be bound by the trusted caller, never the model.
@@ -59,6 +60,11 @@ export class ComputerBroker {
             const body = JSON.parse(text.slice(0, text.indexOf("\n")));
             const abort = new AbortController();
             socket.once("close", () => abort.abort());
+            if (body.capture !== undefined) {
+              const outcome = await this.captureRequest(body.token, body.capture, abort.signal);
+              socket.end(JSON.stringify(outcome) + "\n");
+              return;
+            }
             const result = await this.request(body.token, body.call, abort.signal);
             socket.end(JSON.stringify({ result }) + "\n");
           } catch {
@@ -112,6 +118,21 @@ export class ComputerBroker {
         timer,
       });
     });
+  }
+  // Captures keep evidence for the person and return no desktop content to
+  // the model, so they skip review; the grant and the run must still hold.
+  async captureRequest(token, value, signal) {
+    const grant = this.grants.get(token);
+    if (!grant || signal?.aborted || !this.capture || !this.permitted(grant.runId))
+      return { error: "Not permitted" };
+    const call = normalizeCaptureCall(value);
+    try {
+      return { result: await this.capture(grant.runId, call, signal) };
+    } catch (error) {
+      // Only the server's own fixed wording, never transport or provider detail.
+      const detail = typeof error?.safeMessage === "string" ? error.safeMessage.slice(0, 300) : undefined;
+      return { error: "Capture failed", ...(detail ? { detail } : {}) };
+    }
   }
   // Authenticated owner RPC or digest-bound web decisions call these methods.
   // The model-facing request socket deliberately has no decision/list method.

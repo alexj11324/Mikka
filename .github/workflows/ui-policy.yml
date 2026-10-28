@@ -118,6 +118,7 @@ jobs:
       - run: pnpm test:agent
       - run: pnpm test:acceptance
       - run: pnpm test:suggestions
+      - run: pnpm test:captures
       - run: pnpm test:db-runner
       - run: pnpm test:csv
       - run: pnpm test:settings
@@ -203,5 +204,5 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-native,test:groups,test:issue-search-db,test:relation-cycle,test:user-facts-db,test:visibility-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:captures-db,test:computer-db,test:conversation-reads,test:coordinator-native,test:groups,test:issue-search-db,test:relation-cycle,test:user-facts-db,test:visibility-db,test:workspace-migration-db
       - run: pnpm build

@@ -75,3 +75,39 @@ run and its issue, and the author shown is the agent's name.
   the artifact as a card under its next reply. A quote the person sends from
   the reader reaches the Coordinator as
   `<quote artifact=".." version="2" kind="text|element">…</quote>` before the message.
+
+## Run captures (screenshots and recordings)
+
+A thread keeps screenshots and screen recordings as evidence of its work
+(`lib/captures`). They are not artifacts: binary, immutable, unversioned, and
+they post no card and wake no Coordinator. Each belongs to one run, its
+issue and its Bot, and only the run's owner reads it (R-62).
+
+- Types and limits (`packages/protocol/src/capture.ts`): PNG, JPEG, WebP up to
+  10 MB; MP4, WebM up to 100 MB. The type is read from the file's bytes,
+  never its name or a declared type.
+- Files go to the artifacts R2 bucket under
+  `<userId>/runs/<runId>/captures/<id>.<ext>`; rows live in `run_captures`,
+  share links in `run_capture_shares` (hashed `mkc_…` tokens, revocable, as
+  artifact shares). Without R2 keys the file stays in the row (previews,
+  tests; uploads there are capped at 4 MB); production refuses.
+- Reads: `GET /api/runs/:runId/evidence` lists a run's captures and the
+  documents it handed over; `GET /api/captures/:id` serves one (byte ranges
+  for video); `GET /api/captures/shared/:token` serves a shared one. Media is
+  served with `nosniff` and a `sandbox` CSP.
+
+Two ways in, both through the daemon, since a run's agent has no server
+credential (cloud threads also have no network):
+
+| Where the thread runs | Tools | Path |
+| --- | --- | --- |
+| Local daemon (Playwright on the person's machine) | `submit_capture { path, title }` on the daemon's `mikka` MCP | The MCP copies a file from the worktree or the run's temp dir into the run dir; the daemon checks it again (no links, bytes, limit), then `POST /v1/runs/:runId/captures` → PUT to a presigned R2 URL (or the server without a bucket) → `POST …/:captureId/complete`, where the server re-reads the object and checks size, sha256 and type before it counts |
+| Cloud computer | `capture_screenshot { title }`, `start_screen_recording { title, maxSeconds? }`, `stop_screen_recording {}` on `mikka_computer` | The cloud worker relays the call to `POST /v1/runs/:runId/screen`; the server picks the desktop from the run's binding and runs `scripts/e2b/screen-capture.sh` (ffmpeg x11grab) in the sandbox through E2B |
+
+Cloud captures need no per-call review: the image never goes back to the
+model. They are refused while the person holds the desktop and when the
+workspace turned computers off. A recording is one per thread, 120 seconds
+by default and at most 300; ffmpeg's `-t` and `timeout` end it on the machine
+even if nobody calls stop, and the run's end (completion or lease loss) stops
+and keeps whatever is still recording. Files nobody collected are deleted on
+the machine after an hour.

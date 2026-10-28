@@ -16,6 +16,6 @@ export async function cloudDeviceScopeAllows(request: Request, deviceId: string,
     const nestedRun = /^runs\/([^/]+)\/(?:claim|subscription)$/.exec(tail)
     return nestedRun ? await runBelongs(nestedRun[1], deviceId) : false
   }
-  const run = /^\/v1\/runs\/([^/]+)(?:\/(?:events|complete|checkpoint))?$/.exec(path)
+  const run = /^\/v1\/runs\/([^/]+)(?:\/(?:events|complete|checkpoint|screen|captures(?:\/[0-9a-f-]{36}(?:\/complete)?)?))?$/.exec(path)
   return run ? await runBelongs(run[1], deviceId) : false
 }

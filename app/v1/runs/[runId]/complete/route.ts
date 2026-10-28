@@ -10,6 +10,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { revokeRunTokens } from '@/lib/mcp/worker'
+import { stopRecordingsAfter } from '@/lib/captures/run-end'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   // Only the completion that ended the run tells the Coordinator.
   if (ended.length) {
     await revokeRunTokens(runId)
+    stopRecordingsAfter([runId])
     await recordCoordinatorEvent(db, runFinishedEvent({ ...run, status, stopReason, report }))
     after(() => wakeCoordinator(run.userId))
   }

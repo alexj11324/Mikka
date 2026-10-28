@@ -1,0 +1,193 @@
+import assert from 'node:assert/strict'
+import { createHash, randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
+import test from 'node:test'
+
+// Run captures belong to one run and its owner: teammates, other devices and
+// other workspaces never read, share or make them. Uploads count only once
+// the bytes match what was announced; cloud recordings never outlive their
+// run. Database regressions execute only in CI against ephemeral Postgres 17.
+// Local pure runs skip them; REQUIRE_DB=1 makes a missing database fail.
+let databaseUrl: string | undefined
+try {
+  const target = new URL(process.env.E2E_DATABASE_URL ?? '')
+  if (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true'
+    && ['postgres:', 'postgresql:'].includes(target.protocol)
+    && target.hostname === '127.0.0.1' && target.port === '5432' && target.pathname === '/mikka_e2e'
+    && !target.search && !target.hash && process.env.MIKKA_DATABASE_URL === target.href
+    && process.env.DATABASE_URL === target.href) databaseUrl = target.href
+} catch { /* no eligible disposable CI database */ }
+if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')
+const dbTest = databaseUrl ? test : test.skip
+
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Buffer.from('IHDR-test-image')])
+const MP4 = new Uint8Array([0, 0, 0, 0x18, ...Buffer.from('ftypisom-test-video')])
+const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+
+dbTest('captures stay with their run\'s owner, uploads are checked, and recordings end with their run', async t => {
+  const [{ createRequestDatabaseScope, pool }, store, { ScreenCaptures }, { artifactStorage }] = await Promise.all([
+    import('../db'), import('./store'), import('./screen'), import('../artifacts/storage'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const alice = `test-captures-alice-${randomUUID()}`
+  const bob = `test-captures-bob-${randomUUID()}`
+  const workspaceId = randomUUID(), botId = randomUUID(), agentId = randomUUID(), bobAgentId = randomUUID()
+  const cloudDevice = randomUUID(), localDevice = randomUUID(), bobDevice = randomUUID()
+  const cloudRun = randomUUID(), localRun = randomUUID(), bobRun = randomUUID(), artifactId = randomUUID()
+  const runs = [cloudRun, localRun, bobRun]
+  t.after(async () => {
+    await scope.run(async () => {
+      await pool.query('DELETE FROM artifacts WHERE id=$1', [artifactId])
+      await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [runs])
+      await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])
+      await pool.query('DELETE FROM cloud_machines WHERE "workspaceId"=$1', [workspaceId])
+      await pool.query('DELETE FROM bots WHERE id=$1', [botId])
+      await pool.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[agentId, bobAgentId]])
+      await pool.query('DELETE FROM devices WHERE id=ANY($1::uuid[])', [[cloudDevice, localDevice, bobDevice]])
+      await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[alice, bob]])
+    })
+    await scope.close()
+  })
+
+  await scope.run(async () => {
+    assert.equal(artifactStorage(), 'inline', 'the test database keeps files in rows, never in a bucket')
+    // The E2E schema comes from the Drizzle tables; the migration adds its
+    // indexes and constraints, and must be safe to run again over them.
+    const migration = await readFile(new URL('../../drizzle/20261028040000_run_captures.sql', import.meta.url), 'utf8')
+    await pool.query(migration); await pool.query(migration)
+    for (const id of [alice, bob]) await pool.query(`INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [id, `${id}@example.com`])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'cloud','cloud'),($3,$2,'mac','local'),($4,$5,'bob','local')`, [cloudDevice, alice, localDevice, bobDevice, bob])
+    await pool.query(`INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,'codex',$3,$4),($5,$6,'codex',$7,$8)`, [agentId, alice, `Codex ${agentId}`, cloudDevice, bobAgentId, bob, `Codex ${bobAgentId}`, bobDevice])
+    await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)`, [botId, workspaceId, alice, `Captures ${botId}`])
+    await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","sandboxId","operationId","runtimeReady",state,"deviceId") VALUES ($1,$2,$3,$4,true,'running',$5)`, [workspaceId, alice, `sandbox-${workspaceId}`, randomUUID(), cloudDevice])
+    await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display,control) VALUES ($1,$2,$3,3,'agent')`, [botId, workspaceId, alice])
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","botId","deviceId",status) VALUES ($1,$2,$3,$4,$5,'running'),($6,$2,$3,null,$7,'running'),($8,$9,$10,null,$11,'running')`,
+      [cloudRun, alice, agentId, botId, cloudDevice, localRun, localDevice, bobRun, bob, bobAgentId, bobDevice])
+    await pool.query(`INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)`, [cloudRun, botId, workspaceId, alice])
+    await pool.query(`INSERT INTO artifacts (id,"userId",kind,title,"runId") VALUES ($1,$2,'markdown','Acceptance notes',$3)`, [artifactId, alice, cloudRun])
+
+    const local = { userId: alice, runId: localRun, issueId: null, botId: null }
+
+    // Saved captures: the owner reads them with the run's documents; nobody else does.
+    const saved = await store.saveCapture(local, { bytes: PNG, title: '  Sign-in   page ', source: 'local' })
+    assert.ok(!('error' in saved))
+    assert.deepEqual([saved.kind, saved.contentType, saved.title, saved.size], ['image', 'image/png', 'Sign-in page', PNG.length])
+    assert.equal(('error' in await store.saveCapture(local, { bytes: new TextEncoder().encode('<!doctype html><script>'), title: 'x', source: 'local' })), true)
+    const evidence = await store.runEvidence(alice, localRun)
+    assert.deepEqual(evidence?.captures.map(capture => capture.id), [saved.id])
+    assert.equal(await store.runEvidence(bob, localRun), null, 'another person cannot list the run')
+    assert.equal(await store.readCapture(bob, saved.id), null, 'nor read its captures')
+    assert.deepEqual((await store.readCapture(alice, saved.id))?.bytes, PNG)
+    assert.deepEqual((await store.runEvidence(alice, cloudRun))?.artifacts.map(artifact => artifact.id), [artifactId], 'documents the run handed over are listed too')
+
+    // Daemon uploads: announced, sent, then checked against the announcement.
+    const begun = await store.beginUpload(local, { title: 'Checkout', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
+    assert.ok(!('error' in begun))
+    assert.deepEqual(begun.upload, { target: 'server' })
+    assert.equal(('error' in await store.receiveUpload(local, begun.captureId, PNG.slice(1))), true, 'a short file is refused')
+    assert.equal(('error' in await store.receiveUpload({ ...local, runId: bobRun, userId: bob }, begun.captureId, PNG)), true, 'another run cannot send it')
+    assert.deepEqual(await store.receiveUpload(local, begun.captureId, PNG), { ok: true })
+    const completed = await store.completeUpload(local, begun.captureId)
+    assert.ok(!('error' in completed))
+    assert.equal(completed.title, 'Checkout')
+
+    const swapped = new Uint8Array(PNG); swapped[PNG.length - 1] ^= 1
+    const tampered = await store.beginUpload(local, { title: 'Tampered', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
+    assert.ok(!('error' in tampered))
+    await store.receiveUpload(local, tampered.captureId, swapped)
+    assert.match((await store.completeUpload(local, tampered.captureId) as { message: string }).message, /sha256/)
+    const disguised = await store.beginUpload(local, { title: 'Disguised', contentType: 'video/mp4', size: PNG.length, sha256: sha(PNG) })
+    assert.ok(!('error' in disguised))
+    await store.receiveUpload(local, disguised.captureId, PNG)
+    assert.match((await store.completeUpload(local, disguised.captureId) as { message: string }).message, /not video\/mp4/)
+    assert.equal((await store.beginUpload(local, { title: 'Huge', contentType: 'video/mp4', size: store.INLINE_UPLOAD_MAX_BYTES + 1, sha256: sha(MP4) }) as { error: string }).error, 'too_large')
+    const stale = await store.beginUpload(local, { title: 'Stale', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
+    assert.ok(!('error' in stale))
+    await pool.query(`UPDATE run_captures SET "expiresAt"=now()-interval '1 minute' WHERE id=$1`, [stale.captureId])
+    assert.equal(('error' in await store.completeUpload(local, stale.captureId)), true, 'an expired upload never completes')
+    await store.beginUpload(local, { title: 'Next', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
+    assert.equal((await pool.query('SELECT status FROM run_captures WHERE id=$1', [stale.captureId])).rows[0].status, 'failed')
+    assert.deepEqual((await store.runEvidence(alice, localRun))?.captures.map(capture => capture.title), ['Sign-in page', 'Checkout'], 'only checked files are listed')
+
+    // Share links work as artifact links: the owner makes and ends them.
+    assert.equal(await store.createCaptureShare(bob, saved.id), null)
+    const share = await store.createCaptureShare(alice, saved.id)
+    assert.ok(share?.token.startsWith('mkc_'))
+    assert.deepEqual((await store.sharedCapture(share!.token))?.bytes, PNG)
+    assert.equal(await store.revokeCaptureShares(bob, saved.id), 0)
+    assert.equal(await store.revokeCaptureShares(alice, saved.id), 1)
+    assert.equal(await store.sharedCapture(share!.token), null)
+    assert.equal(await store.sharedCapture(`mks_${share!.token.slice(4)}`), null)
+
+    // Cloud computer: the run's own desktop, through a fake E2B runtime.
+    const calls: string[] = []
+    let failStart = false, gone = false
+    const runtime = {
+      async connectComputer(id: string) { if (gone) throw new Error('https://api.e2b.invalid/secret'); calls.push(`connect ${id}`); return { sandboxId: id } },
+      async captureScreenshot(_sandbox: unknown, display: number) { calls.push(`shot :${display}`); return PNG },
+      async startScreenRecording(_sandbox: unknown, display: number, id: string, seconds: number) { if (failStart) throw new Error('ffmpeg missing'); calls.push(`record :${display} ${id} ${seconds}`) },
+      async stopScreenRecording(_sandbox: unknown, display: number, id: string) { calls.push(`stop :${display} ${id}`); return { bytes: MP4, durationMs: 4200 } },
+      async discardScreenRecording(_sandbox: unknown, display: number, id: string) { calls.push(`discard :${display} ${id}`) },
+    } as unknown as ConstructorParameters<typeof ScreenCaptures>[0]
+    const screen = new ScreenCaptures(runtime)
+    const worker = { userId: alice, workspaceId, deviceId: cloudDevice }
+
+    const shot = await screen.screenshot(worker, cloudRun, 'Dashboard')
+    assert.ok(!('error' in shot))
+    assert.equal(shot.source, 'cloud_computer')
+    assert.deepEqual(calls, [`connect sandbox-${workspaceId}`, 'shot :3'])
+    assert.equal((await pool.query('SELECT "botId" FROM run_captures WHERE id=$1', [shot.id])).rows[0].botId, botId)
+    for (const caller of [{ ...worker, deviceId: localDevice }, { ...worker, workspaceId: randomUUID() }, { ...worker, userId: bob }])
+      assert.equal((await screen.screenshot(caller, cloudRun, 'x') as { error: string }).error, 'not_found')
+    assert.equal((await screen.screenshot(worker, localRun, 'x') as { error: string }).error, 'not_found', 'a run with no cloud computer')
+
+    await pool.query(`UPDATE bot_desktops SET control='user',"controlledBy"=$2,"controlUntil"=now()+interval '5 minutes' WHERE "botId"=$1`, [botId, alice])
+    assert.equal((await screen.screenshot(worker, cloudRun, 'x') as { error: string }).error, 'conflict', 'not while the person holds the desktop')
+    await pool.query(`UPDATE bot_desktops SET control='agent',"controlledBy"=null,"controlUntil"=null WHERE "botId"=$1`, [botId])
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version) VALUES ($1,'deny',1)`, [workspaceId])
+    assert.equal((await screen.screenshot(worker, cloudRun, 'x') as { error: string }).error, 'unavailable', 'not when the workspace turned computers off')
+    await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])
+
+    calls.length = 0
+    const started = await screen.startRecording(worker, cloudRun, 'Checkout flow', 9999)
+    assert.ok(!('error' in started))
+    assert.ok(calls.includes(`record :3 ${started.recordingId} 300`), 'the limit is clamped')
+    assert.equal((await screen.startRecording(worker, cloudRun, 'Again') as { error: string }).error, 'conflict')
+    const stopped = await screen.stopRecording(worker, cloudRun)
+    assert.ok(!('error' in stopped))
+    assert.deepEqual([stopped.id, stopped.kind, stopped.durationMs], [started.recordingId, 'video', 4200])
+    assert.equal((await screen.stopRecording(worker, cloudRun) as { error: string }).error, 'not_found')
+
+    failStart = true
+    assert.equal((await screen.startRecording(worker, cloudRun, 'Broken') as { error: string }).error, 'unavailable')
+    failStart = false
+    assert.equal(await store.currentRecording(cloudRun), null, 'a recording that did not start frees its slot')
+
+    // A recording past its limit is kept when the next one starts.
+    const late = await screen.startRecording(worker, cloudRun, 'Late')
+    assert.ok(!('error' in late))
+    await pool.query(`UPDATE run_captures SET "expiresAt"=now()-interval '1 second' WHERE id=$1`, [late.recordingId])
+    const after = await screen.startRecording(worker, cloudRun, 'After')
+    assert.ok(!('error' in after))
+    assert.equal((await pool.query('SELECT status FROM run_captures WHERE id=$1', [late.recordingId])).rows[0].status, 'ready')
+
+    // The run ends with a recording going: it is stopped and kept.
+    await pool.query(`UPDATE agent_runs SET status='completed',"finishedAt"=now() WHERE id=$1`, [cloudRun])
+    await screen.stopRunRecordings([cloudRun])
+    assert.equal((await pool.query('SELECT status FROM run_captures WHERE id=$1', [after.recordingId])).rows[0].status, 'ready')
+    assert.equal((await screen.startRecording(worker, cloudRun, 'Too late') as { error: string }).error, 'not_found', 'an ended run records nothing')
+
+    // The machine went away mid-recording: the slot is marked failed, not left open.
+    await pool.query(`UPDATE agent_runs SET status='running',"finishedAt"=null WHERE id=$1`, [cloudRun])
+    const orphan = await screen.startRecording(worker, cloudRun, 'Orphan')
+    assert.ok(!('error' in orphan))
+    gone = true
+    await screen.stopRunRecordings([cloudRun])
+    assert.equal((await pool.query('SELECT status FROM run_captures WHERE id=$1', [orphan.recordingId])).rows[0].status, 'failed')
+    assert.equal(await store.currentRecording(cloudRun), null)
+
+    const listed = await store.runEvidence(alice, cloudRun)
+    assert.deepEqual(listed?.captures.map(capture => capture.title), ['Dashboard', 'Checkout flow', 'Late', 'After'])
+    assert.equal(listed?.recording, false)
+  })
+})

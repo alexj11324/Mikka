@@ -14,6 +14,7 @@
     "./relay": "./src/relay.ts",
     "./relay-client": "./src/relay-client.ts",
     "./run-transcript": "./src/run-transcript.ts",
+    "./capture": "./src/capture.ts",
     "./run": "./src/run.ts",
     "./skill": "./src/skill.ts",
     "./skill-presets": "./src/skill-presets/index.ts",

@@ -92,6 +92,8 @@ export interface SupervisorDeps {
   /** The device's current allow-list (`device_repo`). */
   repos: () => DeviceRepo[]
   log: Logger
+  /** Uploads what the run's agent queued with `submit_capture` (`captures.ts`). */
+  captures?: { flush(runId: string): Promise<void> }
   /** Watchdog: no progress for this long stops the run (`timeout`). */
   stallMs?: number
   /** How long `stop()` waits for runs to let go (default 3 s). */
@@ -722,6 +724,16 @@ export class RunSupervisor {
     })
   }
 
+  /** Waits for the run's capture uploads, but never longer than a minute. */
+  private async flushCaptures(runId: string): Promise<void> {
+    if (!this.deps.captures) return
+    let timer: NodeJS.Timeout | undefined
+    await Promise.race([
+      this.deps.captures.flush(runId),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, 60_000) }),
+    ]).finally(() => clearTimeout(timer))
+  }
+
   /**
    * The handoff report: the agent's own words (summary, questions, next
    * step, blocker) plus what only the daemon may state: changed files and,
@@ -1061,8 +1073,11 @@ export class RunSupervisor {
           if (
             event.chunk.type === "tool-output-available" ||
             event.chunk.type === "tool-output-error"
-          )
+          ) {
             run.checkpointDue = true
+            // A tool call ended, perhaps submit_capture: upload in the background.
+            void this.deps.captures?.flush(runId)
+          }
           this.emit(runId, event.chunk)
           continue
         }
@@ -1106,6 +1121,8 @@ export class RunSupervisor {
           )
           report = { ...report, publish }
         }
+        // Captures go up before the run reports its end; a stopping daemon does not wait for them.
+        if (!this.stopping) await this.flushCaptures(runId)
         this.finish(runId, stopReason, error ?? verifyError, report)
         log.info(
           { outcome: event.outcome, stop_reason: stopReason },

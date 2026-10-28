@@ -470,7 +470,7 @@ export async function createHostedBotRunner(host: {
       const computerGrant = computer ? host.computerBroker!.spec(assignment.runId, "ask", { display: computer.display }) : undefined;
       if (computer && !computerGrant) { await close(); throw unavailable(); }
       const computerMcp = computerGrant ? {
-        command: "node", args: ["/mikka-computer/proxy.mjs", "/run/mikka-computer.sock", computerGrant.token], env: {},
+        command: "node", args: ["/mikka-computer/proxy.mjs", "/run/mikka-computer.sock", computerGrant.token, "--captures"], env: {},
       } : undefined;
       const containerArgs = [
         "create",

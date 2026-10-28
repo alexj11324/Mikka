@@ -4,15 +4,17 @@
 // after the authenticated reviewer decides; text 'resume' cannot approve it.
 import { connect } from "node:net";
 import { createInterface } from "node:readline";
-import { TOOLS, normalizeCall } from "./driver.mjs";
-const [socketPath, token] = process.argv.slice(2);
+import { CAPTURE_TOOLS, TOOLS, isCaptureTool, normalizeCall, normalizeCaptureCall } from "./driver.mjs";
+const [socketPath, token, ...flags] = process.argv.slice(2);
 if (!socketPath || !token) process.exit(2);
-async function request(call) {
+// Only a cloud computer thread gets the capture tools (the hosted runner passes --captures).
+const captures = flags.includes("--captures");
+async function request(call, kind = "call") {
   return new Promise((resolve, reject) => {
     const socket = connect(socketPath);
     let text = "";
     socket.on("connect", () =>
-      socket.write(JSON.stringify({ token, call }) + "\n"),
+      socket.write(JSON.stringify({ token, [kind]: call }) + "\n"),
     );
     socket.on("error", reject);
     socket.on("data", (data) => {
@@ -25,7 +27,7 @@ async function request(call) {
     socket.on("end", () => {
       try {
         const body = JSON.parse(text);
-        body.error ? reject(new Error(body.error)) : resolve(body.result);
+        body.error ? reject(Object.assign(new Error(body.error), { detail: body.detail })) : resolve(body.result);
       } catch (error) {
         reject(error);
       }
@@ -52,8 +54,18 @@ lines.on("line", (line) => {
           capabilities: { tools: {} },
           serverInfo: { name: "mikka-approved-computer", version: "1" },
         });
-      if (msg.method === "tools/list") return send(msg.id, { tools: TOOLS });
+      if (msg.method === "tools/list") return send(msg.id, { tools: captures ? [...TOOLS, ...CAPTURE_TOOLS] : TOOLS });
       if (msg.method !== "tools/call") return send(msg.id, {});
+      if (captures && isCaptureTool(msg.params?.name)) {
+        try {
+          // Checked here for a quick refusal; the broker checks the same call again.
+          normalizeCaptureCall(msg.params);
+          const result = await request({ name: msg.params.name, arguments: msg.params.arguments ?? {} }, "capture");
+          return send(msg.id, { content: [{ type: "text", text: JSON.stringify(result) }] });
+        } catch (error) {
+          return send(msg.id, { isError: true, content: [{ type: "text", text: typeof error?.detail === "string" ? error.detail : "Capture failed; no automatic retry." }] });
+        }
+      }
       const result = await request(normalizeCall(msg.params));
       send(msg.id, {
         ...result,

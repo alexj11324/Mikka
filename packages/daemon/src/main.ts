@@ -45,6 +45,7 @@ import { MockAdapter } from "./adapters/mock"
 import type { AgentAdapter } from "./adapters/types"
 import { publishRun, snapshotTree } from "./agents/publish"
 import { runPaths } from "./agents/run-context"
+import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
 import { SandboxRuntime, type AgentSandbox } from "./agents/sandbox"
 import { buildChildEnv } from "./env"
@@ -273,6 +274,18 @@ export class Daemon {
           if (!computer || computer.display !== display || computer.ownerId !== entry?.assignment.subscriptionBinding?.ownerId || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
           return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId, policyVersion: computer.policyVersion })
         },
+        // The server picks the desktop from the run's binding; the call names none.
+        capture: async (runId, call, signal) => {
+          const entry = this.journal.get(runId)
+          if (!entry?.assignment.computer || !this.supervisor.computerRunAllowed(runId) || !this.options.link.screenCapture) throw new Error('Cloud computer run unavailable')
+          try {
+            return await this.options.link.screenCapture(runId, call, signal)
+          } catch (error) {
+            // A refusal carries the server's own fixed wording (a recording already going, the person holds the desktop).
+            const detail = error instanceof DaemonError && typeof (error.data as { error?: unknown } | undefined)?.error === 'string' ? (error.data as { error: string }).error : undefined
+            throw Object.assign(new Error('Capture failed'), detail ? { safeMessage: detail } : {})
+          }
+        },
       })
     }
     const hosted = this.options.hostedSubscriptions
@@ -353,6 +366,7 @@ export class Daemon {
         : undefined,
       repos: () => this.device.repos ?? [],
       log: this.log,
+      captures: new CaptureUploader((runId) => join(runPaths(paths.adapterState, runId).runDir, CAPTURES_DIR), this.options.link, this.log),
       stallMs: this.options.stallMs,
       verify: hosted
         ? (run) =>

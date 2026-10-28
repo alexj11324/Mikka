@@ -18,3 +18,10 @@ export function executeDriver(
   display?: string,
   leaseGuard?: { botId: string; ownerId: string; policyVersion: number },
 ): Promise<unknown>;
+export type CaptureCall =
+  | { action: "screenshot"; title: string }
+  | { action: "start_recording"; title: string; maxSeconds?: number }
+  | { action: "stop_recording" };
+export const CAPTURE_TOOLS: { name: string; description: string; inputSchema: Record<string, unknown> }[];
+export function normalizeCaptureCall(value: unknown): CaptureCall;
+export function isCaptureTool(name: unknown): boolean;

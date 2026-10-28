@@ -35,6 +35,7 @@ import {
   runPolicy,
   type RunPolicy,
 } from "../permissions"
+import { CAPTURES_DIR } from "../captures"
 import { ownDir } from "./harness-home"
 import type { SandboxPolicy } from "./sandbox"
 
@@ -190,6 +191,8 @@ export class RunContext {
   readonly skillsDir: string
   /** Scratch dir for the CLI's own temp files (writable, never committed). */
   readonly tmpDir: string
+  /** Screenshots and recordings `submit_capture` queued; the daemon uploads them (`captures.ts`). */
+  readonly capturesDir: string
 
   constructor(private readonly options: RunContextOptions) {
     this.worktree = realpathSync(options.worktree)
@@ -206,6 +209,8 @@ export class RunContext {
     this.skillsDir = join(this.runDir, SKILLS_DIR)
     this.tmpDir = join(this.runDir, "tmp")
     ownDir(this.tmpDir)
+    this.capturesDir = join(this.runDir, CAPTURES_DIR)
+    ownDir(this.capturesDir)
     this.writeSkills()
   }
 
@@ -299,7 +304,10 @@ export class RunContext {
     const command = this.options.nodeBinary ?? process.execPath
     return {
       command,
-      args: [MCP_SERVER_SCRIPT, "--handoff", this.handoffFile],
+      args: [
+        MCP_SERVER_SCRIPT, "--handoff", this.handoffFile,
+        "--captures", this.capturesDir, "--capture-root", this.worktree, "--capture-root", this.tmpDir,
+      ],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
       env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},
     }

@@ -9,6 +9,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent, runRetriedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { revokeRunTokens } from '@/lib/mcp/worker'
+import { stopRecordingsAfter } from '@/lib/captures/run-end'
 import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATTEMPTS, pickTakeover, RETRY_QUEUE_WAIT_MS, retryPrompt, type TakeoverCandidate } from '@/lib/run-retry'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -137,7 +138,10 @@ async function reclaimLostRun(run: Run, now: Date) {
     await recordCoordinatorEvent(tx, runRetriedEvent(run, { runId: retryId, attempt: outcome.attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedToDeviceId: target?.deviceId ?? null }))
     return true
   })
-  if (retried) await revokeRunTokens(run.id)
+  if (retried) {
+    await revokeRunTokens(run.id)
+    stopRecordingsAfter([run.id])
+  }
 }
 
 /** Ends a run that is still in one of `from`; false when something else ended it first. */
@@ -152,6 +156,7 @@ async function endRun(runId: string, from: readonly Run['status'][], end: { stat
 /** Same as a completion from the daemon: tokens off, and the Coordinator hears it. A failure lands in 等你. */
 async function announceEnd(run: Run & { status: 'failed' | 'stopped' }) {
   await revokeRunTokens(run.id)
+  stopRecordingsAfter([run.id])
   await recordCoordinatorEvent(db, runFinishedEvent({ ...run, stopReason: 'device_lost', report: null }))
   after(() => wakeCoordinator(run.userId))
 }

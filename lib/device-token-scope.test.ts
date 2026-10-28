@@ -20,3 +20,8 @@ test('registration must explicitly name the bound device', async () => {
   }
   assert.equal(await cloudDeviceScopeAllows(req('/v1/devices/register'), own, belongs), false)
 })
+test('cloud device token reaches only its own run\'s capture routes', async () => {
+  const capture = '5c0b8a0e-31b2-4a7e-9d0e-6a8f0c2d9b11'
+  for (const path of [`/v1/runs/${run}/screen`, `/v1/runs/${run}/captures`, `/v1/runs/${run}/captures/${capture}`, `/mikka/v1/runs/${run}/captures/${capture}/complete`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), true)
+  for (const path of [`/v1/runs/${other}/screen`, `/v1/runs/${other}/captures`, `/v1/runs/${run}/captures/${capture}/share`, `/v1/runs/${run}/captures/not-a-capture-id`, `/v1/runs/${run}/screen/extra`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), false)
+})

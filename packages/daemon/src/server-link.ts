@@ -32,6 +32,7 @@ import {
 } from "@mikka/protocol"
 
 import type { LocalComputerDecision, LocalComputerRequest } from "@mikka/protocol/computer"
+import type { CaptureUploadRequest, CaptureUploadResponse, CaptureView, ScreenCaptureRequest, ScreenCaptureResponse } from "@mikka/protocol/capture"
 import type { RunChunk } from "./chunks"
 import type { NativeBrokerContext, NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
@@ -87,6 +88,15 @@ export interface ServerLink {
   /** Private hosted-run channel; these methods never return provider tokens. */
   nativeContext?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeBrokerContext>
   nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>
+  /**
+   * Screenshots and recordings a run keeps as evidence (`@mikka/protocol/capture`).
+   * Optional: links without them keep the files on this machine.
+   */
+  beginCapture?(runId: string, request: CaptureUploadRequest): Promise<CaptureUploadResponse>
+  sendCapture?(runId: string, captureId: string, upload: CaptureUploadResponse["upload"], bytes: Uint8Array, contentType: string): Promise<void>
+  completeCapture?(runId: string, captureId: string): Promise<CaptureView>
+  /** The cloud computer's capture tools for a run on this cloud worker. */
+  screenCapture?(runId: string, request: ScreenCaptureRequest, signal?: AbortSignal): Promise<ScreenCaptureResponse>
   /** Appends to the run's event stream; returns the new tail offset. */
   appendRunChunks(runId: string, batch: ChunkBatch): Promise<{ offset: string }>
   updateRun(runId: string, patch: RunPatch): Promise<void>

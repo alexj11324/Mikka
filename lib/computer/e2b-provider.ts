@@ -88,3 +88,60 @@ export async function viewerGrant(sandbox: Sandbox, lease: DesktopLease, userId:
   const signature = createHmac('sha256', key).update(payload).digest('base64url')
   return { url: `wss://${sandbox.getHost(6080)}/vnc?token=${payload}.${signature}`, expiresAt: new Date(exp * 1000).toISOString() }
 }
+
+// --- Screen captures (lib/captures/screen.ts) ---------------------------------
+// ffmpeg's x11grab on the Bot's own display, as the desktop account. The
+// noVNC viewer is untouched: captures read the X display, not the viewer.
+
+const CAPTURE_DIR = '/home/user/.mikka/captures'
+const CAPTURE_SCRIPT = '/opt/mikka/computer/screen-capture.sh'
+const captureId = (id: string) => { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) throw new Error('Invalid capture id'); return id }
+const captureDisplay = (display: number) => { if (!Number.isInteger(display) || display < 1 || display > 999) throw new Error('Invalid display'); return display }
+
+async function installCaptureScript(sandbox: Sandbox) {
+  // Machines provisioned by an older deployment lack it; writing it each time keeps them current.
+  // Bundled for the /v1/runs/*/screen route (next.config.mjs).
+  const script = await readFile(join(process.cwd(), 'scripts/e2b/screen-capture.sh'), 'utf8')
+  await sandbox.files.write(CAPTURE_SCRIPT, script, { user: 'root' })
+  await sandbox.commands.run(`chmod 0755 ${CAPTURE_SCRIPT}`, { user: 'root', timeoutMs: 10_000 })
+}
+
+async function takeFile(sandbox: Sandbox, display: number, id: string, name: string) {
+  try {
+    return await sandbox.files.read(`${CAPTURE_DIR}/${name}`, { user: 'user', format: 'bytes' })
+  } finally {
+    await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} discard ${display} ${id}`, { user: 'user', timeoutMs: 10_000 }).catch(() => undefined)
+  }
+}
+
+export async function captureScreenshot(sandbox: Sandbox, display: number, id: string): Promise<Uint8Array> {
+  captureDisplay(display); captureId(id)
+  await installCaptureScript(sandbox)
+  await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} shot ${display} ${id}`, { user: 'user', timeoutMs: 20_000 })
+  return takeFile(sandbox, display, id, `${id}.png`)
+}
+
+export async function startScreenRecording(sandbox: Sandbox, display: number, id: string, seconds: number) {
+  captureDisplay(display); captureId(id)
+  if (!Number.isInteger(seconds) || seconds < 5 || seconds > 300) throw new Error('Invalid recording length')
+  await installCaptureScript(sandbox)
+  await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} record ${display} ${id} ${seconds}`, { user: 'user', background: true, timeoutMs: 0 })
+  await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} started ${display} ${id}`, { user: 'user', timeoutMs: 10_000 })
+}
+
+/** Ends the recording and returns the mp4 with its length; the file leaves the machine. */
+export async function stopScreenRecording(sandbox: Sandbox, display: number, id: string): Promise<{ bytes: Uint8Array; durationMs: number }> {
+  // The script the recording started with is on the machine; a run ending
+  // elsewhere (heartbeat, completion) need not bundle it.
+  captureDisplay(display); captureId(id)
+  const stopped = await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} stop ${display} ${id}`, { user: 'user', timeoutMs: 30_000 })
+  const seconds = Number.parseFloat(stopped.stdout.trim().split('\n').at(-1) ?? '')
+  const bytes = await takeFile(sandbox, display, id, `${id}.mp4`)
+  return { bytes, durationMs: Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 0 }
+}
+
+/** Stops and deletes a recording without keeping it. */
+export async function discardScreenRecording(sandbox: Sandbox, display: number, id: string) {
+  captureDisplay(display); captureId(id)
+  await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} discard ${display} ${id}`, { user: 'user', timeoutMs: 10_000 })
+}

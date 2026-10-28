@@ -3,6 +3,7 @@ import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, times
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
+import type { CaptureContentType, CaptureKind, CaptureSource } from '@mikka/protocol/capture'
 import type { AttentionLevel } from '@/lib/attention/judgment'
 import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
 
@@ -627,6 +628,53 @@ export const artifactShares = pgTable('artifact_shares', {
   revokedAt: timestamp('revokedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('artifact_shares_token_key').on(table.tokenHash), index('artifact_shares_artifact_idx').on(table.artifactId)])
+
+// --- Run captures ------------------------------------------------------------
+//
+// Screenshots and screen recordings a thread keeps as evidence (lib/captures).
+// Binary, immutable and unversioned, so they are not artifacts: a capture is
+// one file in the artifacts bucket under `storageKey`, bound to its run.
+
+export const RUN_CAPTURE_STATUSES = ['recording', 'uploading', 'ready', 'failed'] as const
+export type RunCaptureStatus = (typeof RUN_CAPTURE_STATUSES)[number]
+
+export const runCaptures = pgTable('run_captures', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  issueId: uuid('issueId').references(() => issues.id, { onDelete: 'set null' }),
+  botId: uuid('botId').references(() => bots.id, { onDelete: 'set null' }),
+  kind: text('kind').$type<CaptureKind>().notNull(),
+  contentType: text('contentType').$type<CaptureContentType>().notNull(),
+  source: text('source').$type<CaptureSource>().notNull(),
+  status: text('status').$type<RunCaptureStatus>().notNull(),
+  title: varchar('title', { length: 200 }).notNull(),
+  /** Object key in the artifacts bucket; set once the file is there. */
+  storageKey: text('storageKey'),
+  /** The file itself, only where no bucket is configured (previews, tests); production always uses R2. */
+  inlineContent: bytea('inlineContent'),
+  /** Declared by the uploader until the file is ready, then measured. */
+  size: integer('size'), sha256: text('sha256'),
+  durationMs: integer('durationMs'),
+  /** A cloud computer recording: the desktop it records and when it stops by itself. */
+  display: integer('display'),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  error: text('error'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  index('run_captures_run_idx').on(table.runId, table.createdAt),
+  index('run_captures_user_idx').on(table.userId, table.createdAt),
+  uniqueIndex('run_captures_recording_key').on(table.runId).where(sql`${table.status} = 'recording'`),
+])
+
+/** A link anyone can open, as `artifact_shares`: only the token's hash is stored; revoking ends it. */
+export const runCaptureShares = pgTable('run_capture_shares', {
+  id: uuid('id').primaryKey(),
+  captureId: uuid('captureId').notNull().references(() => runCaptures.id, { onDelete: 'cascade' }),
+  tokenHash: text('tokenHash').notNull(), createdBy: text('createdBy').notNull(),
+  revokedAt: timestamp('revokedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('run_capture_shares_token_key').on(table.tokenHash), index('run_capture_shares_capture_idx').on(table.captureId)])
 /**
  * Something an agent wants to do in the person's own accounts (send an email,
  * create or change a calendar event). It stays `pending` until the person
