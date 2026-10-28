@@ -32,7 +32,7 @@ export class ComputerBroker {
     if (display !== undefined && !/^:[1-9][0-9]{0,2}$/.test(display))
       throw new Error("Invalid desktop display");
     // Missing or unknown policy never grants access.
-    if (this.suspended || !this.driver || !permission || !["ask", "allow"].includes(permission))
+    if (this.suspended || (this.transport === "tcp" && !this.server?.listening) || !this.driver || !permission || !["ask", "allow"].includes(permission))
       return undefined;
     const token = randomBytes(32).toString("hex");
     this.grants.set(token, { runId, fingerprint: this.driver.fingerprint, display, permission });

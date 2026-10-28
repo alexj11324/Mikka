@@ -91,8 +91,8 @@ app.run()
       permitted: () => true,
     });
     t.after(() => broker.close());
-    const grant = broker.spec("isolated-test", "ask");
     await broker.listen();
+    const grant = broker.spec("isolated-test", "ask");
     const proxy = spawn(process.execPath, [
       new URL("./proxy.mjs", import.meta.url).pathname,
       grant.socketPath,

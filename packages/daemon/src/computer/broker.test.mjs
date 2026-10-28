@@ -27,6 +27,14 @@ async function fixture(t, overrides = {}) {
   t.after(async () => { await broker.close(); await rm(dir, { recursive: true, force: true }); });
   return broker;
 }
+test("TCP grants require the actual listening endpoint", async (t) => {
+  const broker = await fixture(t, { transport: "tcp" });
+  assert.equal(broker.spec("run", "allow"), undefined);
+  await broker.listen();
+  const grant = broker.spec("run", "allow");
+  assert.match(grant.socketPath, /^tcp:\/\/127\.0\.0\.1:[0-9]+$/);
+  assert.equal(grant.socketPath, broker.socketPath);
+});
 test("revoking a run grant promptly rejects pending work without revoking another run", async (t) => {
   let calls = 0;
   const b = await fixture(t, { execute: async () => { calls++; return 'ok'; } });
