@@ -23,7 +23,7 @@ function digest(binding: CredentialActionBinding, actionId: string, admission: '
 export const newCredentialActionId = () => randomUUID()
 
 /** The decision and stable id must come from the authenticated host, never model input. */
-export async function recordCredentialAction(pool: Pool, raw: CredentialActionBinding, decision: 'allow' | 'ask' | 'deny', readOnly: boolean, actionId: string) {
+export async function recordCredentialAction(pool: Pick<Pool, 'query'>, raw: CredentialActionBinding, decision: 'allow' | 'ask' | 'deny', readOnly: boolean, actionId: string) {
   const binding = bindingSchema.parse(raw)
   const origin = new URL(binding.origin)
   if (origin.protocol !== 'https:' || origin.origin !== binding.origin || origin.username || origin.password || binding.expiresAt <= Date.now()) throw new ComputerError(403, 'Credential action unavailable')

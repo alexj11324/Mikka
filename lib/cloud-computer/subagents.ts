@@ -2,12 +2,13 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { subagentEventSchema, type SubagentEvent } from '@mikka/protocol/subagent'
+import { defaultRunPolicy, runPolicySchema, type RunPolicy } from '@mikka/protocol/agent-policy'
 import { ComputerError } from '@/lib/computer/store'
 import { createComputer, connectComputer } from '@/lib/computer/e2b-provider'
 import { installSubagentRuntime, runtimeRequest, grant, endpointPath, type BrowserBinding } from './runtime'
-import { requireWorkspaceComputerPolicy, withWorkspaceComputerPermission } from './workspace-policy'
+import { requireWorkspaceComputerPolicy, resolveWorkspaceComputerPolicy, withWorkspaceComputerPermission } from './workspace-policy'
 export type Actor = { userId: string; workspaceId: string }
-export type Subagent = BrowserBinding & { task: string; status: SubagentEvent['data']['state']; step: string; needs: SubagentEvent['data']['needs']; targetId: string | null }
+export type Subagent = BrowserBinding & { task: string; status: SubagentEvent['data']['state']; step: string; needs: SubagentEvent['data']['needs']; targetId: string | null; runPolicy: RunPolicy | null }
 export class SubagentStore {
   constructor(private pool: Pool) {}
   async get(actor: Actor, botId: string, id: string, client: Pool | PoolClient = this.pool): Promise<Subagent> {
@@ -15,13 +16,25 @@ export class SubagentStore {
     if (!row) throw new ComputerError(404, 'Subagent unavailable')
     return row
   }
-  async create(actor: Actor, botId: string, task: string, id: string = randomUUID()) {
-    const bot = (await this.pool.query('SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [botId, actor.userId, actor.workspaceId])).rows[0]
-    if (!bot) throw new ComputerError(404, 'Bot unavailable')
-    await this.pool.query(`INSERT INTO bot_subagents (id,"ownerId","workspaceId","botId",task) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(id) DO NOTHING`, [id, actor.userId, actor.workspaceId, botId, task])
-    const row = await this.get(actor, botId, id)
-    if (row.task !== task) throw new ComputerError(409, 'Web task request changed')
-    return row
+  async create(actor: Actor, botId: string, task: string, id: string = randomUUID(), inheritedPolicy?: RunPolicy) {
+    // Only trusted host code may supply inheritedPolicy. It is deliberately
+    // absent from the model tool and HTTP request schemas.
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      const workspace = await resolveWorkspaceComputerPolicy(client, actor.workspaceId)
+      const bot = (await client.query('SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [botId, actor.userId, actor.workspaceId])).rows[0]
+      if (!bot) throw new ComputerError(404, 'Bot unavailable')
+      const defaults = defaultRunPolicy()
+      const policy = inheritedPolicy === undefined
+        ? { ...defaults, permissions: { ...defaults.permissions, computer_use: workspace.permission } }
+        : runPolicySchema.parse(inheritedPolicy)
+      await client.query(`INSERT INTO bot_subagents (id,"ownerId","workspaceId","botId",task,"runPolicy") VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO NOTHING`, [id, actor.userId, actor.workspaceId, botId, task, JSON.stringify(policy)])
+      const row = await this.get(actor, botId, id, client)
+      if (row.task !== task) throw new ComputerError(409, 'Web task request changed')
+      await client.query('COMMIT')
+      return row
+    } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   }
   private async publish(client: Pool | PoolClient, row: Subagent) {
     const event = subagentEventSchema.parse({ type: 'data-subagent', data: { botId: row.botId, subagentId: row.id, task: row.task, state: row.status, step: row.step, needs: row.needs } })
