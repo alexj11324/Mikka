@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import type { PoolClient } from "pg";
 import { FactoryError } from "./approval-contract";
 import { digest } from "./evidence";
 import {
@@ -13,7 +12,7 @@ import {
 const now = new Date("2026-10-28T20:00:00Z");
 const tx = {
   query: async () => ({ rows: [{ now }] }),
-} as unknown as PoolClient;
+} as unknown as Parameters<typeof authorizeFactoryDecision>[0];
 const expected: FactoryDecisionScope = {
   ownerId: "synthetic-owner",
   binding: {
