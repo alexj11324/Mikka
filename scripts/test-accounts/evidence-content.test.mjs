@@ -11,6 +11,13 @@ import { createEvidenceScanBudget, forbiddenRecordingPath, scanEvidenceContent }
 import { formatEvidenceFailure } from './evidence.mjs'
 
 const canary = 'synthetic-report-credential-349'
+test('actual browser configuration never records authentication traffic for upload', async () => {
+  const { default: config } = await import('../../playwright.config.ts')
+  assert.equal(config.use.trace, 'off')
+  assert.equal(config.use.video, 'off')
+  assert.equal(config.use.screenshot, 'only-on-failure')
+  assert.equal(config.captureGitInfo.diff, false)
+})
 function crc(data) {
   let value = -1
   for (const byte of data) {
