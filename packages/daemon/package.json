@@ -24,7 +24,8 @@
     "daemon": "tsx bin/mikka.ts daemon",
     "dev": "tsx watch bin/mikka.ts daemon --dev --server memory",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run && pnpm test:mailbox-cli",
+    "test:mailbox-cli": "node --import tsx --test test/run-mailbox.node-test.ts",
     "codex:types": "codex app-server generate-ts --out \"${TMPDIR:-/tmp}/mikka-codex-types\" && echo \"Generated; compare v2/ with src/adapters/codex-protocol.ts\"",
     "test:real": "MIKKA_REAL_AGENTS=${MIKKA_REAL_AGENTS:-claude_code,codex,cursor} vitest run test/real-agents.test.ts",
     "test:changed": "vitest run --changed origin/main --passWithNoTests"
