@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { RUN_LEASE_MS } from '@mikka/protocol/device'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
@@ -13,6 +14,7 @@ import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
+import { localComputerAuthority } from '@/lib/computer/local-authority'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,19 +27,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId, runId } = await params
+  if (caller.scopeDeviceId && caller.scopeDeviceId !== deviceId) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const device = await ownedDevice(deviceId, caller.userId)
   if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   if (!device.enabled) return NextResponse.json({ error: 'Scheduling is off for this device.' }, { status: 409 })
   const [run] = await db
     .select()
     .from(agentRuns)
-    .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'queued')))
     .limit(1)
   if (!run) return NextResponse.json({ error: 'Run is not queued for this device.' }, { status: 409 })
   const [agent] = await db.select().from(agents).where(eq(agents.id, run.agentId)).limit(1)
   const [repo] = run.deviceRepoId
     ? await db.select().from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
     : []
+  if ((agent && agent.userId !== caller.userId) || (repo && (repo.userId !== caller.userId || repo.deviceId !== deviceId)))
+    return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409 })
   if (!agent || !repo || !run.issueId) {
     await db.update(agentRuns)
       .set({ status: 'failed', stopReason: 'error', error: 'Run is missing its agent, repository or issue.', finishedAt: new Date(), updatedAt: new Date() })
@@ -57,6 +62,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let computer: Awaited<ReturnType<typeof claimCloudRun>> = null
+  let localComputer: Awaited<ReturnType<typeof localComputerAuthority>> = null
   if (device.kind === 'cloud') {
     if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id)
@@ -64,6 +70,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   } else {
     const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id)
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
+    if (device.computerUse?.installed) {
+      const current = await localComputerAuthority(pool, caller.userId, deviceId, runId)
+      if (current && (!caller.scopeWorkspaceId || caller.scopeWorkspaceId === current.workspaceId)) localComputer = current
+    }
   }
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
@@ -95,7 +105,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
     ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
-    ...(computer ? { computer } : {}),
+    ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion },
+      policy: { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: computer.permission } } } : {}),
+    ...(localComputer ? { localComputer,
+      policy: { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: localComputer.permission } } } : {}),
     ...retry,
   })
 }

@@ -30,6 +30,7 @@ import {
   RunContext,
   runPaths,
   type McpServerSpec,
+  type ComputerSpecProvider,
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import type { RunChunk } from "../chunks"
@@ -66,6 +67,7 @@ export interface CodexAdapterOptions {
   onHostedSession?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
+  computerProvider?: ComputerSpecProvider
   /** The user's own `CODEX_HOME` (for the auth link); `~/.codex` by default. */
   userHome?: string
   /** Trusted, owner-bound broker only; never a task/model-supplied credential. */
@@ -313,6 +315,7 @@ export class CodexAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (threadId && earlier) return endedSession(threadId, earlier)
     ctx.clearHandoff()
+    const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
     const mcp = ctx.mcpServer()
     const argv = [
       this.options.binary ?? "codex",
@@ -325,10 +328,10 @@ export class CodexAdapter implements AgentAdapter {
         "-c",
         `mcp_servers.${MCP_SERVER_NAME}.env.${key}=${toml(value)}`,
       ]),
-      ...(this.options.computerMcp ? [
-        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.command=${toml(this.options.computerMcp.command)}`,
-        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.args=${toml(this.options.computerMcp.args)}`,
-        ...Object.entries(this.options.computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
+      ...(computerMcp ? [
+        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.command=${toml(computerMcp.command)}`,
+        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.args=${toml(computerMcp.args)}`,
+        ...Object.entries(computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
       ] : []),
       // Its shells get a filtered env; give them writable temp dirs.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
