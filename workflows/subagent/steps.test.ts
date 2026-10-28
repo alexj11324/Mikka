@@ -4,7 +4,7 @@ import { after, before, beforeEach, mock, test } from 'node:test'
 const actor = { userId: 'owner', workspaceId: 'workspace' }
 const invocations: Record<string, unknown>[] = []
 const updates: unknown[] = []
-let resultStatus: 'session_applied' | 'submitted' = 'submitted'
+let resultStatus: 'session_applied' | 'submitted' | 'guarded' = 'submitted'
 let currentLoader = 'document'
 let targetIdentity: unknown = 42
 let modelAction: 'login' | 'waiting' = 'login'
@@ -38,6 +38,14 @@ for (const status of ['session_applied', 'submitted'] as const) {
     assert.equal(updates.length, 0)
   })
 }
+
+test('guarded credential insertion waits without claiming login or observing again', async () => {
+  resultStatus = 'guarded'
+  assert.equal(await tick(actor, 'bot', 'subagent'), 'waiting')
+  assert.equal(invocations.length, 1)
+  assert.equal(updates.length, 1)
+  assert.deepEqual((updates[0] as unknown[]).slice(3), ['needs_you', 'Secure login continuation unavailable'])
+})
 
 test('a changed document never reaches the credential broker', async () => {
   currentLoader = 'different-document'

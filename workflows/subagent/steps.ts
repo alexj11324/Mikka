@@ -46,6 +46,13 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
         return 'waiting'
       }
       if (login.status === 'session_applied' || login.status === 'submitted') return 'running'
+      if (login.status === 'guarded') {
+        // The broker has inserted an input but deliberately kept the viewer
+        // locked. Do not observe, resubmit, or claim that login completed.
+        await store.update(actor, botId, id, 'needs_you', 'Secure login continuation unavailable')
+        await report(actor.userId, botId, id, 'The web task is waiting because the secure login cannot continue yet.', 'credential-guarded')
+        return 'waiting'
+      }
       await store.update(actor, botId, id, 'needs_you', 'needs_you', { kind: 'login', site })
       await report(actor.userId, botId, id, `The web task needs a login at ${site}. Ask for the saved-login card; never request credentials in chat.`, 'login')
       return 'waiting'
