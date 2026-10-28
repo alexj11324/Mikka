@@ -92,6 +92,51 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.equal(completed.title, 'Checkout')
 
     const swapped = new Uint8Array(PNG); swapped[PNG.length - 1] ^= 1
+    assert.ok('error' in await store.receiveUpload(local, begun.captureId, swapped), 'a completed upload cannot be overwritten')
+    assert.deepEqual((await store.readCapture(alice, begun.captureId))?.bytes, PNG)
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const racing = await store.beginUpload(local, { title: 'Race', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
+      assert.ok(!('error' in racing))
+      await store.receiveUpload(local, racing.captureId, PNG)
+      await Promise.all([store.completeUpload(local, racing.captureId), store.receiveUpload(local, racing.captureId, swapped)])
+      const visible = await store.readCapture(alice, racing.captureId)
+      if (visible) assert.deepEqual(visible.bytes, PNG, 'a racing PUT cannot change verified bytes')
+      await pool.query('DELETE FROM run_captures WHERE id=$1', [racing.captureId])
+    }
+
+    // Simulate an R2 client entirely in memory. A presigned PUT is reusable:
+    // rewriting its staging key after completion must not change the evidence.
+    const originalFetch = globalThis.fetch
+    const names = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_ARTIFACTS_BUCKET'] as const
+    const previous = Object.fromEntries(names.map(name => [name, process.env[name]]))
+    const objects = new Map<string, Uint8Array>()
+    try {
+      Object.assign(process.env, { R2_ACCOUNT_ID: 'synthetic', R2_ACCESS_KEY_ID: 'synthetic', R2_SECRET_ACCESS_KEY: 'synthetic', R2_ARTIFACTS_BUCKET: 'test' })
+      globalThis.fetch = async (input, init) => {
+        const request = new Request(input, init)
+        const url = new URL(request.url)
+        assert.equal(url.hostname, 'synthetic.r2.cloudflarestorage.com')
+        const key = url.pathname
+        if (request.method === 'PUT') {
+          if (request.headers.get('if-none-match') === '*' && objects.has(key)) return new Response(null, { status: 412 })
+          objects.set(key, new Uint8Array(await request.arrayBuffer()))
+          return new Response(null, { status: 200 })
+        }
+        if (request.method === 'DELETE') { objects.delete(key); return new Response(null, { status: 204 }) }
+        const bytes = objects.get(key)
+        return bytes ? new Response(new Uint8Array(bytes)) : new Response(null, { status: 404 })
+      }
+      const r2 = await store.beginUpload(local, { title: 'R2', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
+      assert.ok(!('error' in r2) && r2.upload.target === 'storage')
+      await fetch(r2.upload.url, { method: 'PUT', headers: r2.upload.headers, body: PNG })
+      const verified = await store.completeUpload(local, r2.captureId)
+      assert.ok(!('error' in verified))
+      await fetch(r2.upload.url, { method: 'PUT', headers: r2.upload.headers, body: swapped })
+      assert.deepEqual((await store.readCapture(alice, r2.captureId))?.bytes, PNG, 'replayed signed PUT cannot replace verified evidence')
+    } finally {
+      globalThis.fetch = originalFetch
+      for (const name of names) if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]
+    }
     const tampered = await store.beginUpload(local, { title: 'Tampered', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
     assert.ok(!('error' in tampered))
     await store.receiveUpload(local, tampered.captureId, swapped)
@@ -107,7 +152,7 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.equal(('error' in await store.completeUpload(local, stale.captureId)), true, 'an expired upload never completes')
     await store.beginUpload(local, { title: 'Next', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
     assert.equal((await pool.query('SELECT status FROM run_captures WHERE id=$1', [stale.captureId])).rows[0].status, 'failed')
-    assert.deepEqual((await store.runEvidence(alice, localRun))?.captures.map(capture => capture.title), ['Sign-in page', 'Checkout'], 'only checked files are listed')
+    assert.deepEqual((await store.runEvidence(alice, localRun))?.captures.map(capture => capture.title), ['Sign-in page', 'Checkout', 'R2'], 'only checked files are listed')
 
     // Share links work as artifact links: the owner makes and ends them.
     assert.equal(await store.createCaptureShare(bob, saved.id), null)

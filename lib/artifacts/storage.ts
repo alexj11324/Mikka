@@ -59,9 +59,9 @@ export async function deleteArtifactObject(key: string): Promise<void> {
 }
 
 /**
- * A URL that lets its holder PUT exactly one object, with these headers, for
- * `seconds`. The caller still checks the object once it is there: nothing the
- * uploader sends is trusted until then.
+ * A URL that lets its holder repeatedly PUT the same object key, with these
+ * headers, for `seconds`. Callers must not expose this key as immutable
+ * evidence: the holder can overwrite it until the signature expires.
  */
 export async function presignArtifactPut(key: string, contentType: string, seconds: number): Promise<{ url: string; headers: Record<string, string> }> {
   const config = r2Config()
