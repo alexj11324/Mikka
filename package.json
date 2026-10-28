@@ -75,7 +75,7 @@
     "test:byos-worker": "node scripts/test-subscription-worker.mjs",
     "test:slack": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/slack/webhook.test.ts lib/slack/owner.test.ts tests/slack-bot.test.mjs",
     "test:accounts": "node scripts/test-accounts/cli.mjs",
-    "test:test-accounts": "node --test scripts/test-accounts/environment.test.mjs scripts/test-accounts/session.test.mjs scripts/test-accounts/evidence-content.test.mjs",
+    "test:test-accounts": "node --test scripts/test-accounts/environment.test.mjs scripts/test-accounts/session.test.mjs scripts/test-accounts/evidence-content.test.mjs scripts/test-accounts/retained-session-plan.test.mjs",
     "test:test-accounts-db": "node --test tests/test-account-pool.db.test.mjs",
     "test:test-accounts-http": "node scripts/test-accounts/run-http.mjs",
     "test:personal-message-safety": "node --import tsx --test lib/personal-agent-message.test.ts lib/coordinator/message-safety.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/message-safety-consumers.test.ts lib/coordinator/message-safety-ingress.test.ts lib/coordinator/message-safety-handler.test.ts",
