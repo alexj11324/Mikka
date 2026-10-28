@@ -13,6 +13,7 @@ import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
 import { modelWriteTools, type ModelWriteCall, type ModelWriteTool } from '@/lib/operations/model-write-tools'
 import { personalWritesEnabled } from '@/lib/operations/write-feature'
 import { PERSONAL_WRITE_TOOL_IDS } from '@/lib/agent-kit/registry'
+import { writeSchemas } from '@/lib/operations/write-schema'
 
 export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
 
@@ -24,7 +25,11 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
   // may select any authorized Bot on the person's explicit instruction.
   const botInput = botId ? id.optional() : id
   const targetBot = (requested?: string) => botId ? (!requested || requested === botId ? botId : null) : requested ?? null
-  const writeTools = options.writeTools
+  const writeTools = options.writeTools ?? (execution ? { catalog: [
+    { name:'append_notion_paragraph', description:'Append text to a Notion page.', inputSchema:writeSchemas.append_notion_paragraph },
+    { name:'send_slack_message', description:'Send a Slack message.', inputSchema:writeSchemas.send_slack_message },
+    { name:'cancel_calendar_event', description:'Cancel a calendar event.', inputSchema:writeSchemas.cancel_calendar_event },
+  ], submit:(call:ModelWriteCall) => steps.personalWrite(userId,botId,execution.id,call,scope) } : undefined)
   if (writeTools && writeTools.catalog.some(entry => !(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(entry.name))) throw new Error('invalidWriteToolCatalog')
   return {
     ...modelWriteTools(personalWritesEnabled() && Boolean(execution) && Boolean(writeTools), writeTools?.catalog ?? [], call => writeTools!.submit(call)),
@@ -161,7 +166,7 @@ export function coordinatorTools(userId: string, botId: string | null, scope?: N
   const requested = execution.snapshot.effectiveTools.filter(name =>
     (issueMutationsEnabled() || (name !== 'create_issue' && name !== 'update_issue')) &&
     (!Object.hasOwn(mailboxInputs, name) || (options.mailboxEnabled && options.mailboxTools?.includes(name as MailboxToolName))) &&
-    (!(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(name) || (personalWritesEnabled() && options.writeTools?.catalog.some(entry => entry.name === name))))
+    (!(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(name) || (personalWritesEnabled() && Boolean(execution) && (!options.writeTools || options.writeTools.catalog.some(entry => entry.name === name)))))
   return instrumentTools(registry,requested,{
     before:(callId,name) => kit.beforeAgentTool(userId,botId,execution.id,callId,name,scope),
     after:(callId,name,outcome) => kit.afterAgentTool(userId,botId,execution.id,callId,name,outcome,scope),

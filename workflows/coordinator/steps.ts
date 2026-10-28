@@ -409,3 +409,11 @@ export async function webSearchStep(userId: string, input: { query: string; limi
   await assertNativeToolScope(userId,scope)
   return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
 }
+
+/** Host-owned identity and native fence are not model arguments. */
+export async function personalWrite(userId:string, botId:string | null, executionId:string, call:import('@/lib/operations/model-write-tools').ModelWriteCall, scope?:NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  const { personalWriteFromRun } = await import('@/lib/operations/write-runtime')
+  return personalWriteFromRun(userId,botId,executionId,call,scope)
+}
