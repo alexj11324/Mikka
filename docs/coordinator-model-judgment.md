@@ -74,6 +74,9 @@ historical evaluations/definitions are not rewritten.
 Model calls occur after the evaluation reservation transaction and before the
 short result-persistence transaction. Replay lookup happens before running a new
 evaluation. Compaction resolves/calls its model outside the summary-save operation.
+Parseable JSON from an errored, truncated, filtered, unfinished or cancelled
+generation cannot become an evaluation trace; completion is checked before the
+semantic judge runs. The offline regression exercises this with the installed SDK.
 The evaluation/compaction corrections themselves require no new SQL. The durable
 triage attempt/receipt correction below has its own schema prerequisite.
 
