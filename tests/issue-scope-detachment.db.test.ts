@@ -436,11 +436,9 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       const report={summary:'Synthetic verified completion',filesChanged:[],verify:{status:'passed'},openQuestions:[],nextStep:null}
       responsePromise=fetch(`${origin}/complete`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`,'content-type':'application/json'},body:JSON.stringify({stopReason:'submitted',report})})
       await prepared.promise
-      assert.deepEqual(await actAs(localOwner,()=>setIssueScope({id,revision:1,scope:'personal'})),{error:'issueScopeConfirmationRequired'})
-      const preview=await actAs(localOwner,()=>previewIssuePersonalScope(id))
-      assert.ok('preview' in preview && preview.preview)
-      const changed=await actAs(localOwner,()=>confirmIssuePersonalScope({id,revision:1,confirmation:preview.preview.confirmation}))
+      const changed=await actAs(localOwner,()=>setIssueScope({id,revision:1,scope:'personal'}))
       assert.ok('issue' in changed)
+      assert.deepEqual(await actAs(localOwner,()=>setIssueScope({id,revision:1,scope:'personal'})),{error:'issueStale'})
       release.resolve()
       assert.equal((await responsePromise).status,204)
       const row=(await pool.query('select status,scope from issues where id=$1',[id])).rows[0]

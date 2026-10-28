@@ -22,10 +22,12 @@ async function createTask(page: Page, title: string, team?: string) {
   await teamSelect.click()
   await page.getByRole('option', { name: team, exact: true }).click()
   const save = page.getByRole('button', { name: '保存团队归属', exact: true })
-  // Moving a task between teams asks for confirmation first.
-  page.once('dialog', dialog => { void dialog.accept() })
+  // Saving an explicit local target does not ask for another approval.
+  const unexpectedDialog = (dialog: import('@playwright/test').Dialog) => { void dialog.dismiss(); throw new Error('Unexpected task-team confirmation') }
+  page.on('dialog', unexpectedDialog)
   await save.click()
   await expect(save).toHaveCount(0)
+  page.off('dialog', unexpectedDialog)
   await expect(teamSelect).toContainText(team)
   // Team assignment keeps personal scope; these collaboration fixtures explicitly publish.
   await page.getByRole('button', { name: '归属：个人', exact: true }).click()

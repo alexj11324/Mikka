@@ -1,5 +1,15 @@
 # Personal task scope batch (#184 / #301)
 
+## 19:49 scope audit correction (2026-10-28)
+
+An explicit task-team save no longer adds a native confirmation dialog. It still rechecks authorization/current relation and emits sharing intent only on success. Changing local team association and choosing workspace visibility remain separate operations; a saved relationship alone is not permission to publish.
+
+An owner can move a local-only workspace task to personal with one `setIssueScope` call and its current revision. There is no blanket second approval for a task with no link, retained publication or queued/processing/failed outbox. Those external or uncertain states still fail closed pending disposition policy. A supplied preview digest remains a state-consistency fence, not proof of a separate human approval; stale digests, stale revisions and unauthorized owners still fail.
+
+The legacy probability helper no longer turns a score into workspace authority. The actual scheduled `runIssueEffect(scope)` callback enters the retired judge without a DB/model/provider operation. This prevents inferred sharing; it does not constitute an implementation or acceptance of visual-model business judgment. MCP/Coordinator creation currently has no explicit-team target in its input contract; it must not infer one or bypass the real-session team action boundary.
+
+This patch has offline component/store/callback coverage. New PostgreSQL/browser/Preview acceptance is pending; earlier e293b28 evidence is not transferred. Production schema readiness is separately unproved/blocked and merge/deploy remains HOLD. Later historical sections describe their original checkpoints.
+
 ## Current integration checkpoint (2026-10-28)
 
 The successor batch branch preserves the completed2e0e41c build evidence and combines main c6ca4d88 (#354). Its only merge conflict is the required DB suite list, resolved as the union: scope-detachment and test-account suites both remain required; account evidence scanning and guarded HTTP/browser runners remain intact. Local account unit fixtures support the same MIKKA_RETAIN_TEST_FILES=1 preservation switch without printing private/canary paths; default CI cleanup and all assertions are unchanged.
@@ -30,6 +40,7 @@ These are Next server actions exported by `app/actions/issues.ts` under the exis
 | `createIssueForTeam` | `{ requestId, teamId, title, content, status, priority }`; both IDs are UUIDs; `content` is a JSONContent document object, with a 250,000-character JSON serialization limit. A human session and the selected team's active workspace membership are required. |
 | `promoteIssueToTeam` | `{ requestId, issueId, revision, teamId, expectedTeamId }`; IDs are UUIDs, revision is a positive integer, and `expectedTeamId` is the confirmed current relation UUID or null. Keeps the existing task and owner. |
 | `getIssueTeam` | Existing collaboration action returns the current team ID as `string | null`. A successful null means no relation; pending or failed reads are not null. Relation is unique per issue. |
+| `setIssueScope` | `{ id, revision, scope: 'personal' }` performs a local-only owner transition without a second approval. External/uncertain publication fails with `issueScopeInLinear`; stale revisions fail. Untargeted workspace promotion is refused; use the explicit-team action. |
 | `previewIssuePersonalScope` | Takes the task UUID; owner-only result `{ preview: { revision, scope, scopeVersion, hasLinearLink, hasRetainedPublication, externalCopyPossible, confirmation } }`. The confirmation is a SHA256 digest of the current task and recorded external activity. No provider request. |
 | `confirmIssuePersonalScope` | `{ id, revision, confirmation }`; owner and digest are rechecked under the task lock. Changed state returns `issueStale`. Recorded links, retained publications or queued/processing/failed outbound jobs keep the action closed with `issueScopeInLinear`. |
 

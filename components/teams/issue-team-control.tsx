@@ -29,7 +29,6 @@ export function IssueTeamControl({ issueId, disabled, onChosen }: { issueId: str
   const currentLabel = choices.find(item => item.value === (selected || 'none'))?.label ?? noTeam
   async function save() {
     if (data === undefined || pending || disabled) return
-    if (!window.confirm(selected ? i18nText("FeatureCopy.c_3b154930") : i18nText("FeatureCopy.c_81a1f593"))) return
     setPending(true); setError('')
     try {
       const result = await setIssueTeam({ issueId, teamId: selected || null, expectedTeamId: data })

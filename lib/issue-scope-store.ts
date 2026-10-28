@@ -64,7 +64,9 @@ async function changeScopeTransaction(userId: string, input: { id: string; revis
       const [publication] = await tx.select({ id: linearIssuePublications.id }).from(linearIssuePublications).where(eq(linearIssuePublications.issueId, input.id)).limit(1)
       if (currentLink || outgoing || publication) return { error: 'issueScopeInLinear' as const }
     }
-    if (input.scope === 'personal' && latest.scope === 'workspace' && !options.allowLinkedPersonal && !options.confirmation) return { error: 'issueScopeConfirmationRequired' as const }
+    // The owner's explicit local action is sufficient when the locked checks
+    // above prove no recorded or uncertain external publication. A preview
+    // digest, when supplied, still has to match the current state.
     const [saved] = await tx.update(issues).set({ scope: input.scope, scopeSetBy: 'user', scopeConfidence: null, revision: latest.revision + 1, updatedAt: new Date() })
       .where(and(eq(issues.id, latest.id), eq(issues.userId, userId), eq(issues.revision, input.revision))).returning()
     await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })
