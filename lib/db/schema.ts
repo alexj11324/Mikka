@@ -303,6 +303,10 @@ export const coordinatorEvents = pgTable('coordinator_events', {
   payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
   /** Null until triaged; an untriaged event wakes the Coordinator. */
   tier: text('tier').$type<CoordinatorEventTier>(),
+  /** Host scheduling metadata, separate from untrusted notification payload. */
+  lastTriageAttemptAt: timestamp('lastTriageAttemptAt', { withTimezone: true }),
+  /** Model response envelope bound to the event and winning attempt, not approval. */
+  triageDecision: jsonb('triageDecision').$type<Record<string, unknown>>(),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt)])

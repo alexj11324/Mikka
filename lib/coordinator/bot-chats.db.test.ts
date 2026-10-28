@@ -170,3 +170,52 @@ dbTest('unclassified runtime data stays pending while direct user input and clas
     assert.equal(remaining.length,51,'unjudged rows remain undelivered')
   })
 })
+
+dbTest('durable attempts advance past one inbox batch and persist only a matching event receipt',async t=>{
+  const [{createRequestDatabaseScope,db},schema,store,{eq,and,sql}]=await Promise.all([
+    import('../db'),import('../db/schema'),import('./store'),import('drizzle-orm'),
+  ])
+  const scope=createRequestDatabaseScope(databaseUrl!),owner=`test-triage-attempt-${randomUUID()}`
+  t.after(async()=>{
+    t.diagnostic(JSON.stringify({event:'coordinator_db_fixture_retained',fixtureOwnerId:owner,database:'mikka_e2e'}))
+    await scope.close()
+  })
+  await scope.run(async()=>{
+    await db.execute(sql`insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values(${owner},'Synthetic attempt owner',${`${owner}@example.invalid`},false,now(),now())`)
+    for(let index=0;index<53;index++)await db.insert(schema.coordinatorEvents).values({
+      id:randomUUID(),userId:owner,botId:null,kind:'run_report',dedupeKey:`triage:${owner}:${index}`,
+      issueId:null,runId:null,payload:{text:`synthetic report ${index}`},
+      // Exercise real PG microseconds, which a driver Date rounds to millis.
+      createdAt:sql`'2026-10-28T01:00:00.123456Z'::timestamptz`,
+    })
+    const first=await store.untriagedEvents(owner)
+    assert.equal(first.length,50)
+    const event=first[0],identity={userId:owner,botId:null}
+    const claims=await Promise.all([store.claimTriageAttempt(event,identity),store.claimTriageAttempt(event,identity)])
+    const tokens=claims.filter((value):value is Date=>value!==null)
+    assert.equal(tokens.length,1,'one scoped compare-and-set wins the claim')
+    const next=await store.untriagedEvents(owner)
+    assert.equal(next.length,50)
+    assert.equal(next.some(item=>item.id===event.id),false,'in-flight/cooling attempt cannot monopolize the next wake')
+    assert.ok(next.some(item=>!first.some(prior=>prior.id===item.id)),'selection advances beyond the original fifty rows')
+    const execution={executionId:randomUUID(),modelId:'openai/gpt-6-luna-decisions' as const,
+      providerGenerationId:'synthetic-db-contract',startedAt:'2026-10-28T22:00:00Z',completedAt:'2026-10-28T22:00:00Z',
+      requestDigest:'a'.repeat(64),imageDigests:[],vision:'no-image-input' as const}
+    const judgment={tier:'result' as const,execution}
+    assert.equal(await store.completeTriageAttempt(event,{userId:owner+'-foreign',botId:null},tokens[0],judgment),false)
+    await db.update(schema.coordinatorEvents).set({payload:{text:'a newer synthetic report'}}).where(eq(schema.coordinatorEvents.id,event.id))
+    assert.equal(await store.completeTriageAttempt(event,identity,tokens[0],judgment),false,'a model response cannot classify a changed event payload')
+    const fresh=next[0],token=await store.claimTriageAttempt(fresh,identity)
+    assert.ok(token)
+    assert.equal(await store.completeTriageAttempt(fresh,identity,token,judgment),true,'microsecond creation time does not falsely reject the observed event')
+    const [stored]=await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId,owner),eq(schema.coordinatorEvents.id,fresh.id)))
+    assert.equal(stored.tier,'result')
+    assert.equal(stored.triageDecision?.eventId,fresh.id)
+    const storedExecution=stored.triageDecision?.execution
+    assert.ok(storedExecution && typeof storedExecution==='object')
+    assert.equal((storedExecution as {providerGenerationId:string}).providerGenerationId,'synthetic-db-contract')
+    assert.equal(await store.completeTriageAttempt(fresh,identity,token,judgment),false,'a duplicate completion cannot overwrite a chosen tier')
+    const [changed]=await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id,event.id))
+    assert.equal(changed.tier,null);assert.equal(changed.triageDecision,null)
+  })
+})

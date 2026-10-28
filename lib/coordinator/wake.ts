@@ -1,10 +1,11 @@
 import 'server-only'
 import { start } from 'workflow/api'
 import { releaseAttention } from '@/lib/attention/store'
-import { hasWakingEvents, setEventTier, untriagedEvents, wakingChats } from '@/lib/coordinator/store'
+import { claimTriageAttempt, completeTriageAttempt, hasWakingEvents, setEventTier, untriagedEvents, wakingChats } from '@/lib/coordinator/store'
 import { invokeDecision } from '@/lib/coordinator/decide'
-import { ruleTier, tierFromDecision, triageQuestions, triageInput } from '@/lib/coordinator/triage'
+import { tierFromDecision, triageQuestions, triageInput } from '@/lib/coordinator/triage'
 import { coordinatorTurn } from '@/workflows/coordinator/workflow'
+import { runTriageBatch, TRIAGE_BATCH_BUDGET_MS } from './triage-batch'
 
 /**
  * Whether the Coordinator runs here: on Vercel (the AI Gateway signs in with
@@ -17,23 +18,19 @@ export function coordinatorEnabled(): boolean {
 
 /** No answer leaves the event pending; it does not become background, result or a request for human approval. */
 export async function triageInbox(userId: string, botId: string | null = null): Promise<void> {
-  // Retry only this classification, at most twice within a ten-second inbox
-  // budget. No answer is persisted as a business outcome. A later wake can
-  // revisit the still-untriaged event without duplicating delivery.
-  const budget = AbortSignal.timeout(10_000)
-  for (const event of await untriagedEvents(userId, botId)) {
-    let tier = ruleTier(event)
-    for (let attempt = 0; tier === null && attempt < 2 && !budget.aborted; attempt++) {
-      const result = await invokeDecision('triage', triageInput(event), triageQuestions(event), budget)
-      tier = tierFromDecision(result?.answers.get('tier'))
-      if (result && tier !== null) console.info('Coordinator model judgment observed', { eventId: event.id, ...result.execution })
-    }
-    if (tier === null) {
-      console.error('Coordinator event judgment pending', { eventId: event.id })
-      continue
-    }
-    await setEventTier(event.id, tier, { userId, botId })
-  }
+  const scope = { userId, botId }
+  const budget = AbortSignal.timeout(TRIAGE_BATCH_BUDGET_MS)
+  const outcome = await runTriageBatch(await untriagedEvents(userId, botId), {
+    claim: event => claimTriageAttempt(event, scope),
+    deliverUser: event => setEventTier(event.id, 'attention', scope),
+    classify: async (event, signal) => {
+      const result = await invokeDecision('triage', triageInput(event), triageQuestions(event), signal)
+      return { tier: tierFromDecision(result?.answers.get('tier')), execution: result?.execution ?? null }
+    },
+    complete: (event, attemptedAt, judgment) => completeTriageAttempt(event, scope, attemptedAt, judgment),
+    observe: (event, judgment, application) => console.info('Coordinator model judgment observed', { eventId: event.id, ...judgment.execution, application }),
+  }, budget)
+  for (const eventId of outcome.pending) console.error('Coordinator event judgment pending', { eventId })
 }
 
 /**

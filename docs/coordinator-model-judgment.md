@@ -4,6 +4,22 @@ This change is based on main `dd6d8d4febbfe56bba5671cc5302c20f8e0e533d`.
 It changes source and offline contracts. It does not establish runtime acceptance,
 turn on a feature, run live evaluations, or permit a merge/deployment.
 
+## Continuous task goal
+
+The user assigned this thread independent delivery of the shared Coordinator
+model-judgment executor, authenticated image entry, unknown/bounded retry behavior
+and host-bound execution receipts, compatible with the group, Factory and action
+consumers. No thread set-goal tool is available; this is the continuing task goal,
+not a platform goal-setting receipt.
+
+Implementation, source review, retention audit, applicable real functional
+acceptance on the final exact SHA and required platform gates must all complete
+before a normal fixed-SHA merge. Historical green checks, mocks, default-off flags,
+live-eval or benchmark scores cannot replace that acceptance. Existing access,
+single-writer boundaries, the resource-retention hold, live-eval OFF and native
+Coordinator unset remain in force. No formal GitHub APPROVE is authorized by this
+goal. Shared retain scripts belong to #364 and issue-scope logic to #301.
+
 | Responsibility | Consumer and behavior |
 | --- | --- |
 | Business judgment | `triage.ts` asks for an explicit model choice for runtime events; `wake.ts` retains an unavailable judgment as a nullable, undelivered tier. No failed/blocked status automatically means a person is needed. |
@@ -58,12 +74,38 @@ historical evaluations/definitions are not rewritten.
 Model calls occur after the evaluation reservation transaction and before the
 short result-persistence transaction. Replay lookup happens before running a new
 evaluation. Compaction resolves/calls its model outside the summary-save operation.
-No new SQL or migration is needed by these source changes.
+The evaluation/compaction corrections themselves require no new SQL. The durable
+triage attempt/receipt correction below has its own schema prerequisite.
 
-The bounded retry loop still has an unresolved fairness gap: a slow first event
-can consume a wake's whole budget, and repeatedly selecting the oldest batch can
-starve later runtime events. A durable, scoped attempt cursor is being coordinated
-with the shared schema owner. It is not implemented or database-accepted here.
+The source now claims a scoped attempt before inference and orders future batches
+by the last attempt or original creation time. A fifteen-second cooldown is longer
+than the ten-second classification budget. Each chat/wake performs at most eight
+model requests, with at most two attempts per event. Direct user delivery does not
+consume that model budget. Unknown or cancelled classification stays pending;
+untouched rows do not receive a fabricated attempt time.
+
+Completion atomically records the tier and host model receipt only when owner,
+Bot, event ID/kind/payload/run/issue, observed creation time and attempt token still
+match and the event remains unclassified/undelivered. A logged provider response
+is not proof that the compare-and-set won. The original creation timestamp is not
+repurposed as a retry cursor; PG microseconds are compared at the driver's observed
+millisecond precision.
+
+The new schema-only prerequisite is
+`drizzle/20261028223600_coordinator_triage_attempt.sql`: nullable
+`coordinator_events.lastTriageAttemptAt` and `triageDecision`, no cleanup or data
+backfill. This source has not executed that SQL. Schema must precede the code,
+including when optional features are off, because full-row Drizzle reads include
+the added columns. Resource-retention, target authorization and real database
+acceptance remain prerequisites; historical Agent Kit DDL permission is not reused.
+
+`triage-batch.test.mjs` is a separate proposed native-Node offline scheduling
+check: only Node built-ins and the production type-stripped scheduler, without
+tsx/esbuild, filesystem fixtures, DB, network or teardown. It must receive an
+independent static execution-closure review before being run. It does not establish
+SQL fairness, provider behavior or real visual acceptance. Existing framework
+integration and PG cases remain HOLD; their assertions have not been removed to
+obtain a green result.
 
 ## Authenticated user images
 
@@ -142,7 +184,11 @@ runner rejects TODO, so this is not a passed migration gate.
 
 The `a6bede2` isolated build started at 21:49:55 UTC and its task-exclusive process
 group 8684 was paused with SIGSTOP at 21:51:23 UTC, without TERM/KILL, cleanup or
-resume. Its log proves four migration-mode fixture cleanup callbacks had already
+resume by this thread. At 22:47:05 UTC a readback found parent 8684 absent and
+the remaining group members zombie/PPID 1. The transition time and cause are
+unknown; do not claim they remain paused or restore/recreate them. The original
+build directory/log still exist, without a result file. Its log proves four
+migration-mode fixture cleanup callbacks had already
 completed. Random directory suffixes and deleted file counts were not logged;
 they are unknown. Do not reconstruct or restore them. Older passing runs remain
 historical execution evidence, not acceptance under the new retention rule.

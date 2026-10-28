@@ -20,6 +20,9 @@ import { threadName } from '@/lib/issue-threads'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 import { readPreferences } from '@/lib/preferences'
 import { pushReasons, type PushReason } from '@/lib/push-reasons'
+import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
+import type { TriageJudgment } from './triage-batch'
+import type { DecisionExecution } from './decide'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -140,12 +143,15 @@ export async function releaseLease(userId: string, holder: string, botId: string
   return hasWakingEvents(userId, botId)
 }
 
-/** Direct user delivery first, then oldest runtime events. An unavailable
- * classifier must not let a pending runtime backlog starve new user input. */
+/** Direct user delivery first. Runtime ordering uses the last attempt, falling
+ * back to original creation time. Trying a slow event advances the durable
+ * cursor instead of repeatedly hiding all events after the oldest batch. */
 export async function untriagedEvents(userId: string, botId: string | null = null) {
+  const retryBefore = new Date(Date.now() - TRIAGE_RETRY_COOLDOWN_MS)
   const events = await db.select().from(coordinatorEvents)
-    .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier)))
-    .orderBy(desc(eq(coordinatorEvents.kind, 'user_message')), asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+    .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier),
+      or(eq(coordinatorEvents.kind, 'user_message'), isNull(coordinatorEvents.lastTriageAttemptAt), lt(coordinatorEvents.lastTriageAttemptAt, retryBefore))))
+    .orderBy(desc(eq(coordinatorEvents.kind, 'user_message')), asc(sql`coalesce(${coordinatorEvents.lastTriageAttemptAt}, ${coordinatorEvents.createdAt})`), asc(coordinatorEvents.id)).limit(INBOX_BATCH)
   const runIds = [...new Set(events.flatMap(event => event.runId ? [event.runId] : []))]
   // Reuse the existing visibility gate; teammate projections stay restricted.
   const observed = new Map((runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length }) : [])
@@ -153,8 +159,40 @@ export async function untriagedEvents(userId: string, botId: string | null = nul
   return events.map(event => ({ ...event, observedRun: event.runId ? observed.get(event.runId) ?? null : null }))
 }
 
-export async function setEventTier(id: string, tier: CoordinatorEventTier, scope?: { userId: string; botId: string | null }): Promise<void> {
-  await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier), scope ? eventsOf(scope.userId, scope.botId) : undefined))
+export async function setEventTier(id: string, tier: CoordinatorEventTier, scope: { userId: string; botId: string | null }): Promise<boolean> {
+  const applied = await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier), eventsOf(scope.userId, scope.botId))).returning({ id: coordinatorEvents.id })
+  return applied.length === 1
+}
+
+type TriageEventRecord = typeof coordinatorEvents.$inferSelect
+export async function claimTriageAttempt(event: TriageEventRecord, scope: { userId: string; botId: string | null }): Promise<Date | null> {
+  const now = new Date(), retryBefore = new Date(now.getTime() - TRIAGE_RETRY_COOLDOWN_MS)
+  const [claimed] = await db.update(coordinatorEvents).set({ lastTriageAttemptAt: now })
+    .where(and(eventsOf(scope.userId, scope.botId), eq(coordinatorEvents.id, event.id), ne(coordinatorEvents.kind, 'user_message'),
+      isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier),
+      event.lastTriageAttemptAt ? sql`date_trunc('milliseconds', ${coordinatorEvents.lastTriageAttemptAt}) = ${event.lastTriageAttemptAt}` : isNull(coordinatorEvents.lastTriageAttemptAt),
+      or(isNull(coordinatorEvents.lastTriageAttemptAt), lt(coordinatorEvents.lastTriageAttemptAt, retryBefore))))
+    .returning({ attemptedAt: coordinatorEvents.lastTriageAttemptAt })
+  return claimed?.attemptedAt ?? null
+}
+
+/** Winning attempt and the exact event payload must still match. Persisting the
+ * actual host receipt with the tier does not turn that choice into permission. */
+export async function completeTriageAttempt(event: TriageEventRecord & { observedRun?: unknown }, scope: { userId: string; botId: string | null }, attemptedAt: Date, judgment: TriageJudgment & { tier: CoordinatorEventTier; execution: DecisionExecution }): Promise<boolean> {
+  const receipt = { version: 1, method: 'model', eventId: event.id, eventKind: event.kind,
+    attemptedAt: attemptedAt.toISOString(), chosenTier: judgment.tier, observedRun: event.observedRun ?? null, execution: judgment.execution }
+  const applied = await db.update(coordinatorEvents).set({ tier: judgment.tier, triageDecision: receipt })
+    .where(and(eventsOf(scope.userId, scope.botId), eq(coordinatorEvents.id, event.id), eq(coordinatorEvents.kind, event.kind),
+      event.runId ? eq(coordinatorEvents.runId, event.runId) : isNull(coordinatorEvents.runId),
+      event.issueId ? eq(coordinatorEvents.issueId, event.issueId) : isNull(coordinatorEvents.issueId),
+      // pg Date values expose milliseconds, whereas default now() can contain
+      // microseconds. Compare the same observable precision, not a rounded
+      // parameter against the full timestamp (which would reject real events).
+      sql`date_trunc('milliseconds', ${coordinatorEvents.createdAt}) = ${event.createdAt}`,
+      eq(coordinatorEvents.payload, event.payload), eq(coordinatorEvents.lastTriageAttemptAt, attemptedAt),
+      isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier)))
+    .returning({ id: coordinatorEvents.id })
+  return applied.length === 1
 }
 
 /**

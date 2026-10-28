@@ -5,12 +5,18 @@ import { DECISION_MODEL, decisionRequestInput, validatedAnswers } from './decisi
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='
 const priorVercel=process.env.VERCEL
 const priorKey=process.env.DECISION_GATEWAY_API_KEY, priorFetch=globalThis.fetch, priorConsole=console.error
-let events: Array<{id:string;kind:'run_finished'|'run_question'|'run_blocked'|'issue_done'|'user_message';payload:Record<string,unknown>;tier:string|null}>=[]
+let events: Array<{id:string;kind:'run_finished'|'run_question'|'run_blocked'|'issue_done'|'user_message';payload:Record<string,unknown>;tier:string|null;lastTriageAttemptAt?:Date|null}>=[]
 let starts=0
 const requests: Array<Record<string,unknown>>=[]
 let response:unknown
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
-stub('./store.ts',{untriagedEvents:async()=>events.filter(e=>e.tier===null),setEventTier:async(id:string,tier:string,scope:unknown)=>{assert.deepEqual(scope,{userId:'synthetic',botId:null});events.find(e=>e.id===id)!.tier=tier},wakingChats:async()=>[null],hasWakingEvents:async()=>events.some(e=>e.tier!==null&&e.tier!=='background')})
+stub('./store.ts',{
+ untriagedEvents:async()=>events.filter(e=>e.tier===null),
+ claimTriageAttempt:async(event:typeof events[number],scope:unknown)=>{assert.deepEqual(scope,{userId:'synthetic',botId:null});event.lastTriageAttemptAt=new Date();return event.lastTriageAttemptAt},
+ completeTriageAttempt:async(event:typeof events[number],scope:unknown,attemptedAt:Date,judgment:{tier:string;execution:unknown})=>{assert.deepEqual(scope,{userId:'synthetic',botId:null});assert.equal(event.lastTriageAttemptAt,attemptedAt);assert.ok(judgment.execution);event.tier=judgment.tier;return true},
+ setEventTier:async(id:string,tier:string,scope:unknown)=>{assert.deepEqual(scope,{userId:'synthetic',botId:null});events.find(e=>e.id===id)!.tier=tier;return true},
+ wakingChats:async()=>[null],hasWakingEvents:async()=>events.some(e=>e.tier!==null&&e.tier!=='background'),
+})
 stub('../attention/store.ts',{releaseAttention:async()=>{}})
 stub('../../workflows/coordinator/workflow.ts',{coordinatorTurn:()=>{}})
 mock.module('workflow/api',{namedExports:{start:async()=>{starts++}}})
