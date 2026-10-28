@@ -470,7 +470,10 @@ async def action(request):
                     raise web.HTTPConflict()
             # Exclude all form values, cookies, storage and raw HTML.
             text=await b.rpc('Runtime.evaluate',{'expression':'(() => { const copy=document.body.cloneNode(true); copy.querySelectorAll(\'input,textarea,select,script,style,noscript\').forEach(e=>e.remove()); const elements=Array.from(document.querySelectorAll(\'a,button,input,textarea,select\')).slice(0,150).map((e,i)=>{e.setAttribute(\'data-mikka-ref\',String(i));return {selector:\'[data-mikka-ref=\\"\'+i+\'\\"]\',tag:e.tagName,type:e.type||null,text:[\'INPUT\',\'TEXTAREA\',\'SELECT\'].includes(e.tagName)?null:e.innerText.slice(0,200),label:e.getAttribute(\'aria-label\')||e.getAttribute(\'placeholder\'),href:e.tagName===\'A\'?e.href:null}});return JSON.stringify({url:location.origin+location.pathname,title:document.title,text:(copy.innerText||copy.textContent||\'\').slice(0,16000),elements,needsLogin:Array.from(document.querySelectorAll(\'input[type=password]\')).some(e=>e.getClientRects().length>0)})})()','returnByValue':True},b.session)
-            return web.json_response({'observation':json.loads(text['result']['value']),'screenshot':screenshot['data']})
+            current=await b.rpc('Page.getFrameTree',session=b.session)
+            before=tree['frameTree']['frame'];after=current['frameTree']['frame']
+            if before.get('id')!=after.get('id') or before.get('loaderId')!=after.get('loaderId') or before.get('url')!=after.get('url'):raise web.HTTPConflict()
+            return web.json_response({'observation':json.loads(text['result']['value']),'screenshot':screenshot['data'],'loaderId':before.get('loaderId')})
         elif name=='type':
             selector=json.dumps(str(data.get('selector',''))[:500])
             expression=f"(() => {{ const e=document.querySelector({selector}); if (!e || {SENSITIVE_FIELD} || !['INPUT','TEXTAREA'].includes(e.tagName)) return false; e.focus(); return true; }})()"

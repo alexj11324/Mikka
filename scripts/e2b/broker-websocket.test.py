@@ -91,6 +91,7 @@ async def main():
                         observation=await observed.json()
                         assert observation['screenshot'].startswith('/9j/'), 'real JPEG must accompany the observation'
                         assert observation['observation']['url']==origin+'/login'
+                        assert isinstance(observation['loaderId'],str) and observation['loaderId'], 'visual observation is bound to a document'
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[type=password]").value="synthetic-secret"','returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as secret:
                         assert secret.status==409, 'a populated password blocks observation'
