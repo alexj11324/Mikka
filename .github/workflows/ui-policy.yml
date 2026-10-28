@@ -212,15 +212,11 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
-      - name: Default-off personal mailbox compatibility on tracked schema (no mailbox migration)
-        run: pnpm test:personal-mailbox-default-off-db
-        env:
-          MIKKA_MAILBOX_DEFAULT_OFF_CI: '1'
       - name: Verify thread sharing, membership and privacy against isolated database
         run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-threads.integration.ts
       - name: Required DB suites (temporary Postgres 17, no skips)
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db
       - run: pnpm build
