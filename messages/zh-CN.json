@@ -2406,7 +2406,13 @@
       "handbackFailed": "没能交还，请重试。"
     },
     "approval": {
-      "action": { "click": "点击屏幕", "type": "输入文字", "key": "按键", "scroll": "滚动", "screenshot": "查看屏幕" },
+      "action": {
+        "click": "点击屏幕",
+        "type": "输入文字",
+        "key": "按键",
+        "scroll": "滚动",
+        "screenshot": "查看屏幕"
+      },
       "allowRun": "本任务内都允许",
       "deny": "拒绝",
       "allow": "允许",
@@ -2418,9 +2424,12 @@
       "title": "线程",
       "empty": "还没有线程",
       "untitled": "未命名线程",
-      "waiting": "等你回复",
-      "failed": "失败",
-      "screen": "屏幕"
+      "group": {
+        "waiting": "等待回复（{count}）",
+        "running": "进行中（{count}）",
+        "idle": "空闲（{count}）",
+        "resolved": "已解决（{count}）"
+      }
     },
     "newBot": {
       "title": "新建 Bot",
@@ -2486,25 +2495,31 @@
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
     "panel": {
       "label": "右栏",
+      "views": "右栏视图",
+      "overview": "概览",
+      "allThreads": "全部线程",
       "tabs": "右栏内容",
       "details": "详情",
-      "tasks": "任务",
-      "browser": "浏览器",
-      "knowledge": "知识库",
-      "schedules": "定时任务",
+      "threads": "线程",
+      "prs": "PR",
+      "computer": "电脑",
+      "routines": "例行",
+      "library": "资料库",
+      "expand": "展开",
+      "noRoutines": "还没有例行",
+      "noLibrary": "还没有资料",
+      "noPullRequests": "还没有 PR",
+      "noComputer": "还没有电脑",
+      "prGroup": {
+        "review": "等待审查（{count}）",
+        "running": "进行中（{count}）",
+        "merged": "已合并（{count}）"
+      },
       "search": "搜索",
       "widen": "加宽右栏",
       "narrow": "恢复右栏宽度",
       "close": "关闭右栏",
       "open": "打开右栏"
-    },
-    "details": {
-      "conversation": "当前对话",
-      "kind": "类型",
-      "coordinatorKind": "Coordinator",
-      "agentKind": "Agent 对话",
-      "updated": "最近活动",
-      "none": "还没有消息"
     },
     "suggestions": {
       "title": "建议",
@@ -2529,32 +2544,6 @@
         "github": "GitHub",
         "linear": "Linear"
       }
-    },
-    "tasks": {
-      "mine": "任务",
-      "waiting": "等你",
-      "running": "运行中",
-      "failed": "出错",
-      "doneToday": "已完成",
-      "today": "今天 {count}",
-      "empty": "还没有任务",
-      "status": {
-        "waiting_input": "等你回复",
-        "queued": "排队中",
-        "preparing": "准备中",
-        "running": "运行中",
-        "finishing": "收尾中",
-        "failed": "失败",
-        "succeeded": "已完成"
-      }
-    },
-    "empty": {
-      "browser": "还没打开过网页",
-      "knowledge": "还没有资料",
-      "schedules": "还没有定时任务",
-      "arrange": "让 Agent 安排",
-      "knowledgePrompt": "帮我把常用的资料整理进知识库：",
-      "schedulesPrompt": "帮我设一个定时任务："
     },
     "newTaskDialog": {
       "title": "新建任务",

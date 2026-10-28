@@ -86,7 +86,8 @@ function checkUtility(token, policy, report, options = {}) {
 }
 
 // MIK-8: the 「新」 unread divider is the only chat file allowed to draw a horizontal rule.
-export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx']
+// The right column's group headers (「等待回复（2）」 and a rule, Figma 395:27702, Alex 2026-10-28) are the other.
+export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx', 'components/nav/group-header.tsx']
 const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx']
 
 export function auditSource(file, text, policy) {
