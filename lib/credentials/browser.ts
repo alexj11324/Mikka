@@ -79,6 +79,37 @@ export class Cdp {
     if (result.exceptionDetails) throw new CredentialError()
     return result.result?.value
   }
+  /** Focus an observed CDP backend node in the top document. This is a
+   * mechanical check only; caller must independently consume a trusted,
+   * document-bound policy decision before any credential operation. */
+  async focusObservedInput(backendNodeId: number, role: 'username' | 'password' | 'code') {
+    if (!Number.isSafeInteger(backendNodeId) || backendNodeId <= 0) throw new CredentialError('credential_denied', 404)
+    const result = await this.call('DOM.getDocument', { depth: -1, pierce: false })
+    const find = (node: unknown): Record<string, any> | undefined => {
+      if (!node || typeof node !== 'object' || Array.isArray(node)) return undefined
+      const item = node as Record<string, any>
+      if (item.backendNodeId === backendNodeId) return item
+      // Do not traverse shadow roots or iframe content documents.
+      if (!Array.isArray(item.children)) return undefined
+      for (const child of item.children) {
+        const found = find(child)
+        if (found) return found
+      }
+      return undefined
+    }
+    const input = find(result.root)
+    if (!input || input.nodeName !== 'INPUT' || !Array.isArray(input.attributes) || input.attributes.length % 2 !== 0) throw new CredentialError('credential_denied', 404)
+    const attributes = new Map<string, string>()
+    for (let i = 0; i < input.attributes.length; i += 2) {
+      const key = input.attributes[i], value = input.attributes[i + 1]
+      if (typeof key !== 'string' || typeof value !== 'string') throw new CredentialError('credential_denied', 404)
+      attributes.set(key.toLowerCase(), value)
+    }
+    const type = (attributes.get('type') ?? 'text').toLowerCase()
+    const allowed = role === 'password' ? ['password'] : role === 'username' ? ['text', 'email', 'tel'] : ['text', 'tel', 'number']
+    if (attributes.has('disabled') || attributes.has('readonly') || !allowed.includes(type)) throw new CredentialError('credential_denied', 404)
+    await this.call('DOM.focus', { backendNodeId })
+  }
   async fill(origin: string, username: string, password: string) {
     await this.origin(origin)
     // Focus only top-frame inputs. No cross-origin iframe or model-selected JS.

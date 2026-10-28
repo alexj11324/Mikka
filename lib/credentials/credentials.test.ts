@@ -8,6 +8,7 @@ import { checkCredentialRequest, credentialBody, credentialFailure } from './htt
 import { Cdp } from './browser'
 import { fillCredential } from './broker'
 import { CredentialStore } from './store'
+import { assertCredentialPageBinding, type CredentialPageBinding } from './page-binding'
 import { assertNoSecret, fingerprint } from './fingerprint'
 
 function fixtureKms(): Kms {
@@ -200,4 +201,34 @@ test('password retry is bound to the server-authorized caller and its one-use ta
   captured.values = undefined
   await assert.rejects(store.lease({ ...caller, workspaceId: 'other' }, owner.origin, target, undefined, true), CredentialError)
   assert.equal(captured.values, undefined)
+})
+
+test('credential action fails closed when the trusted page binding changes', () => {
+  const page: CredentialPageBinding = { userId: 'owner', workspaceId: 'workspace', botId: 'bot', subagentId: 'subagent', epoch: 7, targetId: 'target', origin: 'https://example.com', loaderId: 'loader', action: 'fill_login', permissionVersion: 'v1' }
+  const lease = { ...page, expiresAt: 2000 }
+  assert.doesNotThrow(() => assertCredentialPageBinding(lease, page, 1000))
+  for (const changed of [
+    { userId: 'other' }, { workspaceId: 'other' }, { botId: 'other' }, { subagentId: 'other' },
+    { epoch: 8 }, { targetId: 'other' }, { origin: 'https://other.example' }, { loaderId: 'other' },
+    { action: 'submit_login' as const }, { permissionVersion: 'v2' },
+  ]) assert.throws(() => assertCredentialPageBinding(lease, { ...page, ...changed }, 1000), CredentialError)
+  assert.throws(() => assertCredentialPageBinding(lease, page, 2000), CredentialError)
+  assert.throws(() => assertCredentialPageBinding({ ...lease, origin: 'https://user@example.com' }, page, 1000), CredentialError)
+})
+
+test('observed input focus uses a top-document CDP node with a matching type', async () => {
+  const cdp = Object.create(Cdp.prototype) as Cdp
+  const calls: string[] = []
+  let root: unknown = { nodeName: '#document', children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password'] }] }
+  cdp.call = async (method, params) => { calls.push(method); return method === 'DOM.getDocument' ? { root } : { params } }
+  await cdp.focusObservedInput(7, 'password')
+  assert.deepEqual(calls, ['DOM.getDocument', 'DOM.focus'])
+  await assert.rejects(cdp.focusObservedInput(7, 'username'), CredentialError)
+  await assert.rejects(cdp.focusObservedInput(8, 'password'), CredentialError)
+  root = { nodeName: '#document', children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password', 'disabled', ''] }] }
+  await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
+  root = { nodeName: '#document', children: [{ nodeName: 'IFRAME', contentDocument: { children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password'] }] } }] }
+  await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
+  root = { nodeName: '#document', children: [{ nodeName: 'DIV', shadowRoots: [{ children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password'] }] }] }] }
+  await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
 })
