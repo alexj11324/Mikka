@@ -46,7 +46,20 @@ test('PG17: nontransactional indexes, invalid retry, ledger and separate validat
 
   // General no-transaction statements are supported, not just concurrent indexes.
   await apply('constraint.sql', `${NOTX}alter table t add constraint positive check (a > 0) not valid`)
-  await apply('validate.sql', `${NOTX}alter table t validate constraint positive`)
+  // A second session can validate after the ADD query returns: its table lock was
+  // released. First prove this assertion would fail while an exclusive lock is held.
+  const other = new Client({ connectionString: process.env.E2E_DATABASE_URL })
+  await other.connect()
+  t.after(async () => { await other.end() })
+  await other.query(`set search_path to ${schema}`)
+  await other.query("set lock_timeout = '500ms'")
+  const validation = planMigration('validate.sql', `${NOTX}alter table t validate constraint positive`)
+  await client.query('begin; lock table t in access exclusive mode')
+  try {
+    await assert.rejects(applyMigration(other, 'validate.sql', validation), { code: '55P03' })
+    assert.deepEqual(await recorded(), ['constraint.sql', 'dup.sql', 'ok.sql'])
+  } finally { await client.query('rollback') }
+  await applyMigration(other, 'validate.sql', validation)
   assert.equal((await client.query("select convalidated from pg_constraint where conrelid='t'::regclass and conname='positive'")).rows[0].convalidated, true)
   assert.deepEqual(await recorded(), ['constraint.sql', 'dup.sql', 'ok.sql', 'validate.sql'])
 })
