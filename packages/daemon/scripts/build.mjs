@@ -1,15 +1,14 @@
-import { build } from 'esbuild'
-import { chmod, copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { appendFile, chmod, copyFile, cp, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const source = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
 const packageName = process.env.MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka'
 if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(packageName)) throw new Error('Invalid daemon npm package name')
-const out = resolve(root, 'dist')
-await rm(out, { recursive: true, force: true })
-await mkdir(out, { recursive: true })
+const out = await mkdtemp(join(root, '.retained-build-'))
+console.log(`Retained build directory: ${out}`)
+const { build } = await import('esbuild')
 
 // Runtime SDKs retain their assets and native dependencies. The private
 // workspace protocol is bundled, so installing the tarball needs no workspace.
@@ -48,4 +47,5 @@ await writeFile(resolve(out, 'package.json'), `${JSON.stringify({
   publishConfig: { access: 'public', provenance: true }, dependencies,
 }, null, 2)}\n`)
 await chmod(resolve(out, 'mikka.js'), 0o755)
-console.log(`Built ${packageName}@${source.version} in packages/daemon/dist`)
+console.log(`Built ${packageName}@${source.version} in ${out}`)
+if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `package-directory=${out}\n`)

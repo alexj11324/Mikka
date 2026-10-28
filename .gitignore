@@ -46,3 +46,5 @@ next-env.d.ts
 /packages/subscription-worker/.cache/
 /packages/subscription-worker/bin/
 /packages/daemon/dist/
+/packages/daemon/.retained-build-*/
+/packages/daemon/.retained-package-test-*/

@@ -1,35 +1,39 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { join, sep } from 'node:path'
+import { isAbsolute, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 
-test('registry-installed tarball runs its CLI and a real mock-daemon git task without workspace dependencies', { timeout: 240_000 }, async t => {
-  const temporary = await mkdtemp(join(tmpdir(), 'mikka-package-'))
-  t.after(() => rm(temporary, { recursive: true, force: true }))
+test('registry-installed tarball runs its CLI and a real mock-daemon git task without workspace dependencies', { timeout: 240_000 }, async () => {
+  const buildDirectory = process.env.MIKKA_DAEMON_DIST_DIR
+  if (!buildDirectory || !isAbsolute(buildDirectory)) throw new Error('MIKKA_DAEMON_DIST_DIR must name the exact absolute build directory')
+  const buildPath = await realpath(buildDirectory)
+  const temporary = await mkdtemp(join(root, '.retained-package-test-'))
+  console.log(`Retained package fixture directory: ${temporary}`)
+  const scratch = join(temporary, 'tmp')
+  await mkdir(scratch)
   // Preserve the managed network proxy/CA, but never pass registry tokens,
   // user npm config, model credentials, NODE_PATH or a TypeScript loader.
-  const env = { PATH: process.env.PATH, LANG: 'C.UTF-8' }
+  const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', TMPDIR: scratch, TMP: scratch, TEMP: scratch }
   for (const name of ['HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'NO_PROXY', 'https_proxy', 'http_proxy', 'all_proxy', 'no_proxy', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE']) {
     if (process.env[name]) env[name] = process.env[name]
   }
   const userConfig = join(temporary, 'user.npmrc'), globalConfig = join(temporary, 'global.npmrc')
   await Promise.all([writeFile(userConfig, ''), writeFile(globalConfig, '')])
   const npmOptions = ['--userconfig', userConfig, '--globalconfig', globalConfig, '--cache', join(temporary, 'npm-cache'), '--registry', 'https://registry.npmjs.org']
-  const packed = JSON.parse(execFileSync('npm', ['pack', join(root, 'dist'), '--json', '--ignore-scripts', '--pack-destination', temporary, ...npmOptions], { encoding: 'utf8', env, timeout: 30_000, killSignal: 'SIGKILL' }))[0]
+  const packed = JSON.parse(execFileSync('npm', ['pack', buildPath, '--json', '--ignore-scripts', '--pack-destination', temporary, ...npmOptions], { cwd: temporary, encoding: 'utf8', env, timeout: 30_000, killSignal: 'SIGKILL' }))[0]
   assert.ok(packed.files.length > 10)
   assert.ok(packed.files.every(file => !file.path.endsWith('.ts') && !file.path.startsWith('node_modules/')))
   const installation = join(temporary, 'installation')
   await mkdir(installation)
   await writeFile(join(installation, 'package.json'), JSON.stringify({ private: true }))
   execFileSync('npm', ['install', join(temporary, packed.filename), '--prefix', installation, '--ignore-scripts', '--no-audit', '--no-fund', '--omit=dev', ...npmOptions], { encoding: 'utf8', cwd: installation, env, timeout: 120_000, killSignal: 'SIGKILL' })
-  const sourceManifest = JSON.parse(await readFile(join(root, 'dist/package.json'), 'utf8'))
+  const sourceManifest = JSON.parse(await readFile(join(buildPath, 'package.json'), 'utf8'))
   const installed = join(installation, 'node_modules', sourceManifest.name)
   const manifest = JSON.parse(await readFile(join(installed, 'package.json'), 'utf8'))
   assert.equal(manifest.name, '@aspectlylabs/mikka')
@@ -46,7 +50,7 @@ test('registry-installed tarball runs its CLI and a real mock-daemon git task wi
     const dependencyPath = await realpath(requireInstalled.resolve(dependency))
     assert.ok(dependencyPath.startsWith((await realpath(installation)) + sep))
   }
-  const runtimeEnv = { PATH: process.env.PATH, LANG: 'C.UTF-8', NODE_ENV: 'test', MIKKA_TEST_MODE: '1', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: userConfig }
+  const runtimeEnv = { PATH: process.env.PATH, LANG: 'C.UTF-8', NODE_ENV: 'test', MIKKA_TEST_MODE: '1', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: userConfig, TMPDIR: scratch, TMP: scratch, TEMP: scratch }
   const command = join(installed, 'mikka.js')
   const help = execFileSync(process.execPath, [command, '--help'], { encoding: 'utf8', cwd: temporary, env: runtimeEnv, timeout: 20_000, killSignal: 'SIGKILL' })
   assert.match(help, /mikka daemon login/)
@@ -66,6 +70,7 @@ test('registry-installed tarball runs its CLI and a real mock-daemon git task wi
   assert.ok(!output.includes(token))
   console.log(JSON.stringify({ package: manifest.name, version: manifest.version,
     tarballSha256: createHash('sha256').update(await readFile(join(temporary, packed.filename))).digest('hex'),
+    retained: { buildDirectory: buildPath, fixtureDirectory: temporary, tarball: join(temporary, packed.filename), installation, dataDirectory: data },
     installedFrom: 'local tarball with fresh public-registry dependencies', runtime: 'packaged mock daemon and real local-bare git task',
     realProvider: false, published: false }))
 })
