@@ -1,3 +1,5 @@
+import { assertRetainedMigrationBootstrap } from '../../scripts/test-retention.mjs'
+if(process.env.CI==='true'||process.env.FACTORY_LOCAL_DB_TESTS==='1'||Object.keys(process.env).some(name=>/^(FACTORY_|IMPROVEMENT_TEST_|DISPATCH_|RUN_DISPATCH_)/.test(name)&&process.env[name])) assertRetainedMigrationBootstrap()
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -425,7 +427,7 @@ test(
           );
           assert.deepEqual(await counts(task.id), before);
           assert.deepEqual(await attemptRow(task.attemptId), old);
-          await pool.query("DROP TRIGGER reject_cycle_event ON factory_events");
+          await pool.query("ALTER TABLE factory_events DISABLE TRIGGER reject_cycle_event");
           const tx = await pool.connect();
           try {
             await tx.query("BEGIN");
@@ -510,7 +512,7 @@ test(
       );
     } finally {
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      // Retain this test-owned schema and its records for audit.
       await admin.end();
     }
   },

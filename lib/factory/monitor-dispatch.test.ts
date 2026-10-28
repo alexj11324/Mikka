@@ -1,7 +1,9 @@
+import { assertRetainedMigrationBootstrap } from '../../scripts/test-retention.mjs'
+if(process.env.CI==='true'||process.env.FACTORY_LOCAL_DB_TESTS==='1'||Object.keys(process.env).some(name=>/^(FACTORY_|IMPROVEMENT_TEST_|DISPATCH_|RUN_DISPATCH_)/.test(name)&&process.env[name])) assertRetainedMigrationBootstrap()
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -629,7 +631,7 @@ test(
             {},
           );
           await pool.query(
-            "DROP TRIGGER reject_monitor_dispatch ON factory_events",
+            "ALTER TABLE factory_events DISABLE TRIGGER reject_monitor_dispatch",
           );
           const result = await dispatch("owner", input(f.task));
           const other = new Pool({
@@ -664,9 +666,9 @@ test(
       );
     } finally {
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      // Retain this test-owned schema and its records for audit.
       await admin.end();
-      await rm(root, { recursive: true, force: true });
+    // Retain this test-owned directory and its files for audit.
     }
   },
 );

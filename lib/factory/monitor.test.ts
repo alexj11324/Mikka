@@ -1,3 +1,6 @@
+import { assertRetainedMigrationBootstrap } from '../../scripts/test-retention.mjs'
+if(process.env.CI==='true'||process.env.FACTORY_LOCAL_DB_TESTS==='1'||Object.keys(process.env).some(name=>/^(FACTORY_|IMPROVEMENT_TEST_|DISPATCH_|RUN_DISPATCH_)/.test(name)&&process.env[name])) assertRetainedMigrationBootstrap()
+import { blockDestructiveFixture } from '../../scripts/test-retention.mjs'
 import { createFactoryDispatch } from "./dispatch";
 import { factoryDispatchDatabase } from "./transaction";
 import { insertRunOnce } from "../run-dispatch";
@@ -8,7 +11,6 @@ import {
   readdir,
   mkdtemp,
   mkdir,
-  rm,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -986,11 +988,13 @@ test(
                 'UPDATE agent_runs SET "sessionId"=(SELECT "sessionId" FROM factory_attempts WHERE "taskId"=$2 AND stage=\'verify\') WHERE id=$1',
                 [invalid.runId, invalid.task.id],
               );
-            if (tamper === "missing-verification-run")
+            if (tamper === "missing-verification-run") {
+              blockDestructiveFixture('inherited Factory deletion behavior test')
               await pool.query(
                 'DELETE FROM agent_runs WHERE id=(SELECT "runId" FROM factory_attempts WHERE "taskId"=$1 AND stage=\'verify\')',
                 [invalid.task.id],
               );
+            }
             assert.equal(
               (await monitor.consume("owner", invalid.input)).outcome,
               "blocked",
@@ -1204,6 +1208,7 @@ test(
             ).rows[0].n,
             0,
           );
+          blockDestructiveFixture('inherited Factory deletion behavior test')
           await pool.query("DELETE FROM issues WHERE id=$1", [originalIssue]);
           assert.equal(
             (
@@ -1546,9 +1551,9 @@ test(
       );
     } finally {
       await cloud.close();
-      await rm(targetRoot, { recursive: true, force: true });
+    // Retain this test-owned directory and its files for audit.
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      // Retain this test-owned schema and its records for audit.
       await admin.end();
     }
   },

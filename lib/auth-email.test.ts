@@ -7,6 +7,9 @@ import { Pool } from 'pg'
 import { signJWT } from 'better-auth/crypto'
 import { createAuthEmail, AUTH_EMAIL_FROM, type AuthMailContext } from './auth-email'
 import { verificationNavigationResponse } from './auth-verification-response'
+import { blockDestructiveFixture } from '../scripts/test-retention.mjs'
+
+blockDestructiveFixture('authentication fixture account deletion and library migrations')
 
 const databaseURL = process.env.AUTH_EMAIL_TEST_DATABASE_URL
 if (!databaseURL) throw new Error('Run node scripts/test-auth-email.mjs; never inherit an application database')

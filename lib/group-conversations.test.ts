@@ -5,6 +5,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { groupDirectory } from './group-conversations-directory'
 import { handleGroup, type GroupRequest } from './group-conversations-store'
+import { blockDestructiveFixture } from '../scripts/test-retention.mjs'
 
 const workspaceId = randomUUID(), ownAgent = randomUUID(), privateAgent = randomUUID()
 const directory = groupDirectory({
@@ -41,6 +42,7 @@ if (dbURL) {
   if (target.hostname !== '127.0.0.1' || target.pathname !== '/mikka_e2e') throw new Error('Group tests require CI temporary mikka_e2e')
 }
 test('Postgres17 migration, atomic history, pagination, unread counts, membership and privacy', { skip: !dbURL }, async () => {
+  blockDestructiveFixture('group fixture DROP TABLE and membership DELETE paths')
   const pool = new Pool({ connectionString: dbURL, max: 16 })
   // Isolated schema inside the ephemeral CI database; no dependency on bootstrap #115.
   const schema = `group_test_${randomUUID().replaceAll('-', '')}`
@@ -140,7 +142,7 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     assert.equal(((await run({})).body as typeof list).conversations[0].lastMessage.position, '9007199254740993')
   } finally {
     await scoped.end()
-    await pool.query(`DROP SCHEMA "${schema}" CASCADE`)
+    // Retain this test-owned schema and its records for audit.
     await pool.end()
   }
 })

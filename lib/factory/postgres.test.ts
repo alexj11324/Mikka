@@ -1,3 +1,6 @@
+import { assertRetainedMigrationBootstrap } from '../../scripts/test-retention.mjs'
+if(process.env.CI==='true'||process.env.FACTORY_LOCAL_DB_TESTS==='1'||Object.keys(process.env).some(name=>/^(FACTORY_|IMPROVEMENT_TEST_|DISPATCH_|RUN_DISPATCH_)/.test(name)&&process.env[name])) assertRetainedMigrationBootstrap()
+import { blockDestructiveFixture } from '../../scripts/test-retention.mjs'
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -276,7 +279,7 @@ test(
         /injected dispatch/,
       );
       await pool.query(
-        "DROP TRIGGER factory_inject_dispatch ON factory_events",
+        "ALTER TABLE factory_events DISABLE TRIGGER factory_inject_dispatch",
       );
       assert.equal(
         (
@@ -469,7 +472,7 @@ test(
           store.apply("owner", binding(state.task), rollbackEventId, blocked),
         /injected precommit/,
       );
-      await pool.query("DROP TRIGGER factory_inject ON factory_events");
+      await pool.query("ALTER TABLE factory_events DISABLE TRIGGER factory_inject");
       assert.deepEqual(await store.read("owner", state.task.id), before);
       state = await store.apply(
         "owner",
@@ -723,7 +726,7 @@ test(
           () => store.apply("owner", phaseBinding, phaseEvent, wait),
           /injected precommit/,
         );
-        await pool.query("DROP TRIGGER factory_inject ON factory_events");
+        await pool.query("ALTER TABLE factory_events DISABLE TRIGGER factory_inject");
         assert.deepEqual(await store.read("owner", phase.task.id), beforePhase);
         phase = await store.apply("owner", phaseBinding, phaseEvent, wait);
         const reconnect = new Pool({
@@ -771,6 +774,7 @@ test(
         action: "bind_run",
         runId: deletedRun,
       });
+          blockDestructiveFixture('inherited Factory deletion behavior test')
       await pool.query("DELETE FROM agents WHERE id=$1", [deletedAgent]);
       assert.equal(
         (
@@ -816,7 +820,7 @@ test(
       );
     } finally {
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      // Retain this test-owned schema and its records for audit.
       await admin.end();
     }
   },

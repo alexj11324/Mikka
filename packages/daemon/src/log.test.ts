@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -10,8 +10,7 @@ import { closeLogger, createLogger } from "./log"
 const dirs: string[] = []
 
 afterEach(() => {
-  for (const dir of dirs.splice(0))
-    rmSync(dir, { recursive: true, force: true })
+  for (const dir of dirs) console.info('Retained test directory:',dir)
 })
 
 describe("daemon log", () => {

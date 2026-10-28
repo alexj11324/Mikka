@@ -121,7 +121,7 @@ for (const separateTargets of [false, true]) {
     } finally {
       await app.end()
       await workspace.end()
-      for (const schema of schemas) await admin.query(`drop schema if exists "${schema}" cascade`)
+      // Retain these test-owned schemas and their migration ledgers for audit.
       await admin.end()
     }
   })

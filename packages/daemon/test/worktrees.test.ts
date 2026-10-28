@@ -1,3 +1,5 @@
+import { blockDestructiveFixture } from '../../../scripts/test-retention.mjs'
+blockDestructiveFixture('daemon fixture indirect file/worktree/process cleanup not yet authorized')
 import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"

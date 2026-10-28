@@ -1,6 +1,8 @@
+import { assertRetainedMigrationBootstrap } from '../../scripts/test-retention.mjs'
+if(process.env.CI==='true'||process.env.FACTORY_LOCAL_DB_TESTS==='1'||Object.keys(process.env).some(name=>/^(FACTORY_|IMPROVEMENT_TEST_|DISPATCH_|RUN_DISPATCH_)/.test(name)&&process.env[name])) assertRetainedMigrationBootstrap()
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFile, readdir, mkdtemp, rm } from "node:fs/promises";
+import { readFile, readdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -779,7 +781,7 @@ test(
             () => service.approve(actor, req),
             /injected rollback/,
           );
-          await pool.query("DROP TRIGGER reject_194 ON factory_events");
+          await pool.query("ALTER TABLE factory_events DISABLE TRIGGER reject_194");
           assert.equal(
             (await store.read(actor.userId, s.task.id)).task.stage,
             "approval",
@@ -1044,7 +1046,7 @@ test(
               /injected rollback/,
             );
           } finally {
-            await pool.query("DROP TRIGGER reject_194 ON factory_events");
+            await pool.query("ALTER TABLE factory_events DISABLE TRIGGER reject_194");
           }
           assert.equal(
             (
@@ -1139,7 +1141,7 @@ test(
                 } finally {
                   if (window === "sql-rollback")
                     await pool.query(
-                      "DROP TRIGGER reject_194 ON factory_events",
+                      "ALTER TABLE factory_events DISABLE TRIGGER reject_194",
                     );
                 }
                 assert.equal(f.posts(), 1);
@@ -1595,9 +1597,9 @@ test(
       );
     } finally {
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      // Retain this test-owned schema and its records for audit.
       await admin.end();
-      await rm(directory, { recursive: true, force: true });
+    // Retain this test-owned directory and its files for audit.
     }
   },
 );

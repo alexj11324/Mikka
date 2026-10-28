@@ -1,3 +1,6 @@
+import { assertRetainedMigrationBootstrap } from '../../scripts/test-retention.mjs'
+if(process.env.CI==='true'||process.env.FACTORY_LOCAL_DB_TESTS==='1'||Object.keys(process.env).some(name=>/^(FACTORY_|IMPROVEMENT_TEST_|DISPATCH_|RUN_DISPATCH_)/.test(name)&&process.env[name])) assertRetainedMigrationBootstrap()
+import { assertRetainOnlySql } from '../../scripts/test-retention.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -30,7 +33,7 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!proces
   const pool=new Pool({connectionString:target.toString(),max:12})
   t.after(async()=>{await pool.end();await admin.end()})
   const dir=new URL('../../drizzle/',import.meta.url)
-  for(const name of orderMigrations((await readdir(dir)).filter(n=>n.endsWith('.sql')))) await pool.query(await readFile(new URL(name,dir),'utf8'))
+  for(const name of orderMigrations((await readdir(dir)).filter(n=>n.endsWith('.sql')))) {const sql=await readFile(new URL(name,dir),'utf8');assertRetainOnlySql(sql,name);await pool.query(sql)}
   await pool.query(await readFile(new URL('20261028213126_improvement_skill_assignments.sql',dir),'utf8'))
   const userId=`synthetic-${randomUUID()}`,issueId=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID()
   await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Synthetic rehearsal','{}','todo','normal')`,[issueId,userId])

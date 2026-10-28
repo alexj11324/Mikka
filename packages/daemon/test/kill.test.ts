@@ -1,3 +1,5 @@
+import { blockDestructiveFixture } from '../../../scripts/test-retention.mjs'
+blockDestructiveFixture('daemon fixture indirect file/worktree/process cleanup not yet authorized')
 // AC4: SIGKILL the headless daemon mid-run, start it again, and the run
 // resumes to completion. Uses the real CLI entry (`mikka daemon --dev
 // --server memory`) in a child process.
@@ -49,7 +51,7 @@ async function connect(dataDir: string): Promise<DaemonClient> {
 }
 
 afterEach(() => {
-  for (const child of children.splice(0)) child.kill("SIGKILL")
+  // Retain any test-owned child processes; no automatic termination.
   cleanupTempDirs()
 })
 

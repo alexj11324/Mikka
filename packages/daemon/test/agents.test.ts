@@ -1,3 +1,5 @@
+import { blockDestructiveFixture } from '../../../scripts/test-retention.mjs'
+blockDestructiveFixture('daemon fixture indirect file/worktree/process cleanup not yet authorized')
 // The pieces real adapters share: Mikka's MCP hand-in server, the run
 // context's handoff file, sandbox-runtime's write and network limits on this
 // machine, and the daemon's commit and push of a verified run.
@@ -58,7 +60,7 @@ function mcpClient(handoff: string) {
         waiting.set(current, resolve as (value: unknown) => void),
       )
     },
-    close: () => child.kill(),
+    close: () => console.info('Retained test child process:',child.pid),
   }
 }
 

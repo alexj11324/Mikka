@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -16,8 +16,8 @@ export function tempDir(prefix = "orvd-"): string {
 }
 
 export function cleanupTempDirs() {
-  for (const dir of dirs.splice(0))
-    rmSync(dir, { recursive: true, force: true })
+  // Compatibility name: callers now retain every test-owned directory.
+  return [...dirs]
 }
 
 /** A git repo with one commit on `main`, a git-ignored `.env.local` and an npm test script. */

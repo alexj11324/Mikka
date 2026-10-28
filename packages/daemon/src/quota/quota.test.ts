@@ -9,7 +9,7 @@ import {
 import { DatabaseSync } from "node:sqlite"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync } from "node:fs"
 
 import { describe, expect, it } from "vitest"
 
@@ -194,7 +194,7 @@ describe("Claude quota", () => {
     expect(snapshot.status).toBe("unknown")
     expect(urls).toEqual(["https://api.anthropic.com/api/oauth/usage"])
     expectNoSecret(snapshot)
-    rmSync(home, { recursive: true, force: true })
+    // Retain this test-owned directory and its files for audit.
   })
 
   it("retries once when the re-read finds a new token", async () => {
@@ -271,7 +271,7 @@ describe("Claude quota", () => {
     expect(linked.status).toBe("unknown")
     expectNoSecret(broad)
     expectNoSecret(linked)
-    rmSync(home, { recursive: true, force: true })
+    // Retain this test-owned directory and its files for audit.
   })
 
   it("uses the keychain on macOS when the file is absent", async () => {
@@ -375,7 +375,7 @@ describe("Codex quota", () => {
     expect(statSync(file).mtimeMs).toBe(before)
     expect(urls).toEqual(["https://chatgpt.com/backend-api/wham/usage"])
     expectNoSecret(snapshot)
-    rmSync(home, { recursive: true, force: true })
+    // Retain this test-owned directory and its files for audit.
   })
 
   it("does not refresh when the usage endpoint returns 401", async () => {
@@ -516,7 +516,7 @@ describe("Cursor quota", () => {
     expect(urls).toEqual(["https://cursor.com/api/usage-summary"])
     expectNoSecret(snapshot)
     expect(JSON.stringify(snapshot)).not.toContain(token)
-    rmSync(home, { recursive: true, force: true })
+    // Retain this test-owned directory and its files for audit.
   })
 })
 
@@ -539,7 +539,7 @@ describe("local credential source", () => {
     ])
     expect(quotas.every((quota) => quota.status === "unknown")).toBe(true)
     expectNoSecret(quotas)
-    rmSync(home, { recursive: true, force: true })
+    // Retain this test-owned directory and its files for audit.
   })
 
   it("reads all three vendors from one home directory", async () => {
@@ -581,7 +581,7 @@ describe("local credential source", () => {
     expect(urls).toHaveLength(3)
     expectNoSecret(quotas)
     expect(JSON.stringify(quotas)).not.toContain(token)
-    rmSync(home, { recursive: true, force: true })
+    // Retain this test-owned directory and its files for audit.
   })
 })
 

@@ -1,9 +1,10 @@
+import { blockDestructiveFixture } from '../../../scripts/test-retention.mjs'
+blockDestructiveFixture('daemon fixture indirect file/worktree/process cleanup not yet authorized')
 import {
   appendFileSync,
   existsSync,
   mkdtempSync,
   readFileSync,
-  rmSync,
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
@@ -23,8 +24,7 @@ function tempDir() {
   return dir
 }
 afterEach(() => {
-  for (const dir of dirs.splice(0))
-    rmSync(dir, { recursive: true, force: true })
+  for (const dir of dirs) console.info('Retained test directory:',dir)
 })
 
 const log = createLogger()

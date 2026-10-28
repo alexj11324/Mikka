@@ -1,3 +1,6 @@
+import { assertRetainedMigrationBootstrap } from '../../../scripts/test-retention.mjs'
+if(process.env.CI==='true'||process.env.FACTORY_LOCAL_DB_TESTS==='1'||Object.keys(process.env).some(name=>/^(FACTORY_|IMPROVEMENT_TEST_|DISPATCH_|RUN_DISPATCH_)/.test(name)&&process.env[name])) assertRetainedMigrationBootstrap()
+import { blockDestructiveFixture } from '../../../scripts/test-retention.mjs'
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -491,7 +494,7 @@ test(
             (await store.read(userId, f.task.id)).attempts.length,
             1,
           );
-          await pool.query("DROP TRIGGER fail_question_bind ON factory_events");
+          await pool.query("ALTER TABLE factory_events DISABLE TRIGGER fail_question_bind");
           const result = await questions.answer(orchestrator, request);
           const reconnect = new Pool({
             connectionString: dbURL,
@@ -588,6 +591,7 @@ test(
           const f = await fixture();
           const request = facts(f);
           const answer = await questions.answer(orchestrator, request);
+          blockDestructiveFixture('inherited Factory deletion behavior test')
           await pool.query("DELETE FROM agent_runs WHERE id=$1", [
             answer.continuationRunId,
           ]);
@@ -672,7 +676,7 @@ test(
       );
     } finally {
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      // Retain this test-owned schema and its records for audit.
       await admin.end();
     }
   },

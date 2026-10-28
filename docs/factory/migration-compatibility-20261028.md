@@ -1,5 +1,12 @@
 # Candidate migration compatibility with current main
 
+The earlier PG run replayed historical DROP statements in owned isolated
+fixtures. Their execution was reported; object pre-state and row counts were
+not captured. It cannot be treated as authorized acceptance. No replay or
+cleanup may run again under the current retention-only scope. The test body
+is blocked, teardown defaults to retain, and full CI was cancelled at build.
+The source/hash/ledger logic below remains a candidate requiring safe validation.
+
 The audit pins main `dd6d8d4febbfe56bba5671cc5302c20f8e0e533d`, whose last
 migration is `20261028143921_approved_write_binding.sql`. None of the seven
 #247 migration filenames occurs in that main tree; none has byte-identical SQL

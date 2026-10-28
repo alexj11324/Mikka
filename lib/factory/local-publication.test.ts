@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -162,6 +162,6 @@ test("real nonproduction target write/readback, exact SHA/repository/environment
     await writeFile(join(root, `${input.idempotencyKey}.json`), "corrupt");
     await assert.rejects(() => adapter.execute(input), FactoryError);
   } finally {
-    await rm(root, { recursive: true, force: true });
+    // Retain this test-owned directory and its files for audit.
   }
 });

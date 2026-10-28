@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs"
+import { mkdirSync, mkdtempSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -76,7 +76,7 @@ describe("permission policy (ADR 0009)", () => {
       expect(classifyWrite(worktree, "linked-file")).toBe("write_outside_repo")
       expect(classifyWrite(worktree, "real/new.txt")).toBe("write_in_worktree")
     } finally {
-      rmSync(base, { recursive: true, force: true })
+    // Retain this test-owned directory and its files for audit.
     }
   })
 })

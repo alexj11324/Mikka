@@ -246,13 +246,7 @@ test("Factory check claim pins SHA/read-only/command and preserves trusted recei
   } finally {
     await client.dispose();
     await anonymous.dispose();
-    await pool.query(`DELETE FROM issues WHERE id=$1`, [issueId]);
-    await pool.query(`DELETE FROM agents WHERE id=$1`, [agentId]);
-    await pool.query(`DELETE FROM device_tokens WHERE id=$1`, [tokenId]);
-    await pool.query(`DELETE FROM devices WHERE id=$1`, [deviceId]);
-    await pool.query(`DELETE FROM coordinator_events WHERE id=$1`, [
-      sourceEventId,
-    ]);
+    // Retain synthetic issues, devices, tokens and events for audit.
     await pool.end();
   }
 });

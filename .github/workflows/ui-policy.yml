@@ -12,6 +12,9 @@ on:
   pull_request:
   merge_group:
 
+env:
+  MIKKA_TEST_RETAIN_RESOURCES: '1'
+
 permissions:
   contents: read
 

@@ -6,6 +6,7 @@ import { promisify } from 'node:util'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { MIGRATION_HISTORY } from '../scripts/migration-history.mjs'
+import { blockDestructiveFixture } from '../scripts/test-retention.mjs'
 
 const execute = promisify(execFile)
 const MAIN = 'dd6d8d4febbfe56bba5671cc5302c20f8e0e533d'
@@ -14,6 +15,9 @@ const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['
 test('PG17 current-main upgrades preserve actual historical SQL/ledger in shared and split targets', {
   skip: !process.env.IMPROVEMENT_TEST_URL, timeout: 120000,
 }, async t => {
+  // Historical main replay contains DROP. Keep the proof code for inspection,
+  // but it cannot run again under the current retention-only authorization.
+  blockDestructiveFixture('current-main historical SQL replay')
   const target = new URL(process.env.IMPROVEMENT_TEST_URL)
   assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(target.hostname))
   assert.equal(target.pathname, '/mikka_improvement')

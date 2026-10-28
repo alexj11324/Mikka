@@ -4,7 +4,11 @@ This candidate repairs the keyword-based effectiveness judgment in #237/#247.
 It does not complete real Harness, candidate-artifact or production acceptance.
 The original assignment/lineage acceptance gaps remain; Factory release is on
 hold. There is no deployment, merge, live provider call, new production SQL,
-credential change, data deletion or candidate activation in this repair.
+credential change or candidate activation in this repair. The later migration
+test setup did replay historical DROP statements in task-owned isolated test
+databases. That was reported; pre-state and deleted-row counts were not recorded
+and must not be inferred from synthetic fixture timing. Those old runs cannot
+be claimed as authorized acceptance. Resources and audit records are retained.
 
 The isolated branch starts at #247 `a3aab96af7a406d85aa46e6a15314788dd2907b4`.
 It consumes the parent-supplied #331 source contract from
@@ -91,3 +95,8 @@ there; they cannot be treated as applied just because related tables exist.
 The follow-up [migration compatibility record](factory/migration-compatibility-20261028.md)
 documents unchanged SQL, pinned historical-name recognition and actual PG
 upgrade/ledger tests. It does not establish production migration or acceptance.
+Historical replay and destructive deletion assertions are now blocked by
+default; teardown retains schemas, containers and directories. Independent
+static setup/teardown review and any required explicit resource authorization
+must precede another related test run. A failed/pending guard is not a passing
+acceptance result.

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync } from 'node:fs'
 import { execFile, execFileSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import { tmpdir } from 'node:os'
@@ -240,7 +240,7 @@ test('lint permits imported components but fails handwritten business UI without
     assert.equal(rawBlock.status, 1)
     assert.ok(rawBlock.report.diagnostics.some(d => d.file === 'components/blocks/example.tsx' && d.rule === 'interaction/use-button-component'))
   } finally {
-    rmSync(cwd, { recursive: true, force: true })
+    // Retain this test-owned directory and its files for audit.
   }
 })
 

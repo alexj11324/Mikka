@@ -1,3 +1,6 @@
+import { assertRetainedMigrationBootstrap } from '../../scripts/test-retention.mjs'
+if(process.env.CI==='true'||process.env.FACTORY_LOCAL_DB_TESTS==='1'||Object.keys(process.env).some(name=>/^(FACTORY_|IMPROVEMENT_TEST_|DISPATCH_|RUN_DISPATCH_)/.test(name)&&process.env[name])) assertRetainedMigrationBootstrap()
+import { assertRetainOnlySql } from '../../scripts/test-retention.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -26,7 +29,7 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
   t.after(async () => { await pool.end(); await admin.end() })
   const dir = new URL('../../drizzle/', import.meta.url)
   const files = orderMigrations((await readdir(dir)).filter(name => name.endsWith('.sql')))
-  for (const name of files) await pool.query(await readFile(new URL(name, dir), 'utf8'))
+  for (const name of files) { const sql=await readFile(new URL(name,dir),'utf8'); assertRetainOnlySql(sql,name); await pool.query(sql) }
   await pool.query(await readFile(new URL('20261028213125_self_improvement.sql', dir), 'utf8'))
   assert.equal((await pool.query(`SELECT count(*) FROM pg_constraint c
     JOIN pg_class child ON child.oid=c.conrelid JOIN pg_namespace n ON n.oid=child.relnamespace

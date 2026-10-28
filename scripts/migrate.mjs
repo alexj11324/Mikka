@@ -9,6 +9,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { orderMigrations } from './migration-order.mjs'
 import { alreadyApplied } from './migration-history.mjs'
+import { assertRetainOnlySql } from './test-retention.mjs'
 
 const shouldRun = process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production'
 if (!shouldRun) {
@@ -32,6 +33,7 @@ const files = orderMigrations(sqlFiles)
 const byTarget = new Map()
 for (const name of files) {
   const sql = readFileSync(new URL(name, dir), 'utf8')
+  if (process.env.MIKKA_TEST_RETAIN_RESOURCES === '1') assertRetainOnlySql(sql, name)
   const target = /^--\s*target:\s*(\w+)/m.exec(sql)?.[1] ?? 'MIKKA_DATABASE_URL'
   if (!(target in targets)) throw new Error(`migrate: ${name} names unknown target ${target}`)
   if (!byTarget.has(target)) byTarget.set(target, [])

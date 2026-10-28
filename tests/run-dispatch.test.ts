@@ -1,3 +1,5 @@
+import { assertRetainedMigrationBootstrap } from '../scripts/test-retention.mjs'
+if(process.env.CI==='true'||process.env.FACTORY_LOCAL_DB_TESTS==='1'||Object.keys(process.env).some(name=>/^(FACTORY_|IMPROVEMENT_TEST_|DISPATCH_|RUN_DISPATCH_)/.test(name)&&process.env[name])) assertRetainedMigrationBootstrap()
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -128,7 +130,7 @@ test('real Postgres dispatch transactions and recovery', {
     })
   } finally {
     await client.end()
-    await admin.query(`drop schema if exists "${schema}" cascade`)
+    // Retain this test-owned schema and dispatch records for audit.
     await admin.end()
   }
 })

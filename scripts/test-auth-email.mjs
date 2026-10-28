@@ -2,6 +2,9 @@
 import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
+import { blockDestructiveFixture } from './test-retention.mjs'
+
+blockDestructiveFixture('authentication fixture account deletion and library migrations')
 
 if (process.platform !== 'linux') throw new Error('Authentication acceptance requires cloud Linux')
 const suffix = randomUUID()
@@ -14,7 +17,7 @@ const run = (args, options = {}) => {
 }
 let pool
 try {
-  run(['docker', 'run', '-d', '--rm', '--name', name, '--memory=256m', '--cpus=1',
+  run(['docker', 'run', '-d', '--name', name, '--memory=256m', '--cpus=1',
     '-p', '127.0.0.1::5432', '-e', 'POSTGRES_USER=mikka_test', '-e', `POSTGRES_PASSWORD=${password}`,
     '-e', 'POSTGRES_DB=mikka_auth_email_e2e', 'postgres:17-alpine'])
   const port = run(['docker', 'port', name, '5432/tcp']).split(':').at(-1)
@@ -31,5 +34,5 @@ try {
   })
 } finally {
   await pool?.end()
-  spawnSync('docker', ['rm', '-f', name], { stdio: 'ignore', timeout: 10_000 })
+  console.log('Test container retained:', name)
 }
