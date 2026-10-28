@@ -11,7 +11,7 @@ import { setCliPolicy } from './policy-settings'
 const url = process.env.APPROVAL_TEST_DATABASE_URL
 if (!url) throw new Error('An isolated local approval_e2e database is required')
 const target = new URL(url)
-if (!['localhost','127.0.0.1','[::1]'].includes(target.hostname) || target.pathname !== '/approval_e2e') throw new Error('Refusing non-isolated database')
+if (!['localhost','127.0.0.1','[::1]'].includes(target.hostname) || !/^\/approval_e2e(?:_[a-f0-9]{24})?$/.test(target.pathname)) throw new Error('Refusing non-isolated database')
 const pool = new Pool({ connectionString: url })
 const store = new AgentToolApprovalStore(pool)
 const runId = randomUUID(), deviceId = randomUUID(), actor = { userId: 'synthetic-owner', deviceId }

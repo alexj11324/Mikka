@@ -11,7 +11,7 @@ import { Pool } from 'pg'
 const url = process.env.APPROVAL_TEST_DATABASE_URL
 if (!url) throw new Error('isolated database required')
 const target = new URL(url)
-if (!['localhost','127.0.0.1','[::1]'].includes(target.hostname) || target.pathname !== '/approval_e2e') throw new Error('Refusing non-isolated database')
+if (!['localhost','127.0.0.1','[::1]'].includes(target.hostname) || !/^\/approval_e2e(?:_[a-f0-9]{24})?$/.test(target.pathname)) throw new Error('Refusing non-isolated database')
 const pool = new Pool({ connectionString: url }); const runId = randomUUID(), deviceId = randomUUID(), agentId = randomUUID()
 const owner = `synthetic-${randomUUID()}`, issueId = randomUUID(), repoId = randomUUID()
 let selectIndex = 0, support = true
