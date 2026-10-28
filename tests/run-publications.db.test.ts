@@ -321,6 +321,36 @@ test('run result publication commits one owner-scoped result through retries and
       } finally { await client.query('rollback').catch(() => {}); client.release() }
     })
 
+    await t.test('queued task admission waits for an in-flight revocation', async () => {
+      const { queueRun } = await import('../lib/agent-runs')
+      const f = await fixture({ approved: true })
+      const client = await pool.connect()
+      try {
+        await client.query('begin')
+        await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['repository-approval', f.userId, f.remoteKey])])
+        await client.query('update repository_settings set push=$3 where "userId"=$1 and "remoteKey"=$2', [f.userId, f.remoteKey, JSON.stringify({ approved: false, remote: 'origin', approvedByUserId: f.userId, approvedAt: new Date().toISOString() })])
+        const queued = queueRun(f.userId, { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl })
+        await new Promise(resolve => setImmediate(resolve))
+        await client.query('commit')
+        await assert.rejects(queued)
+        assert.equal(Number((await pool.query('select count(*) from agent_runs where "issueId"=$1', [f.issueId])).rows[0].count), 1)
+      } finally { await client.query('rollback').catch(() => {}); client.release() }
+    })
+
+    await t.test('lost-device retry retains the original admission and target', async () => {
+      const { reclaimLostRuns } = await import('../lib/run-leases')
+      const f = await fixture({ approved: true })
+      await pool.query('update agent_runs set "leaseExpiresAt"=now()-interval \'1 minute\' where id=$1', [f.runId])
+      await reclaimLostRuns(f.userId)
+      const retry = (await pool.query('select "deviceId","agentId","deviceRepoId","repositoryAdmission",status from agent_runs where "retryOf"=$1', [f.runId])).rows[0]
+      assert.ok(retry)
+      assert.equal(retry.status, 'queued')
+      assert.equal(retry.deviceId, f.deviceId)
+      assert.equal(retry.agentId, f.agentId)
+      assert.equal(retry.deviceRepoId, f.repoId)
+      assert.deepEqual(retry.repositoryAdmission, f.repositoryAdmission)
+    })
+
     await t.test('a created PR remains in receipt and chat if task metadata fills during the GitHub call', async () => {
       const f = await fixture({ approved: true })
       await prepareRunPublication(assignment(f), f.remoteUrl)
