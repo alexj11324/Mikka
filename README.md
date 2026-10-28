@@ -31,7 +31,7 @@ execution infrastructure exist in the repository. The complete self-service
 request-to-PR workflow is still being integrated ([#357](https://github.com/alexj11324/Mikka/issues/357));
 cloud computers and everyday browser-based assistance are in development.
 
-## From request to result
+## How Mikka delivers
 
 You describe **what** you want to achieve. Mikka takes care of **how** the work is organized and carried through, instead of asking you to manage a collection of AI sessions.
 
