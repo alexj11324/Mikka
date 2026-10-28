@@ -113,10 +113,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     setSendError(null)
     const notes = withNotes && browser?.notes.length ? [...browser.notes] : undefined
     try {
-      const result = notes ? await sendCoordinatorMessage(text, embedded?.quote, botId, undefined, notes) : botId ? await sendCoordinatorMessage(text, embedded?.quote, botId) : await sendCoordinatorMessage(text, embedded?.quote)
+      const result = await sendCoordinatorMessage(text, embedded?.quote, botId, undefined, notes)
       if (result.error) { setSendError(actionError(result.error)); return false }
       embedded?.clearQuote()
-      if (notes) browser?.clear()
+      if (notes) browser?.removeMany(notes.map(note => note.n))
       await mutate()
       return true
     } catch { setSendError(actionError()); return false } finally { setSending(false) }

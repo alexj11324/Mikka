@@ -23,7 +23,7 @@ import { GlobalSearch, SearchPill } from '@/components/nav/global-search'
 import { ContextPanel } from '@/components/nav/context-panel'
 import { BrowserPane } from '@/components/browser/browser-pane'
 import { BrowserNotesProvider } from '@/components/browser/browser-notes'
-import { BrowserToggle } from '@/components/browser/browser-toggle'
+import { BrowserToggle, useBrowserFits } from '@/components/browser/browser-toggle'
 import type { CoordinatorPrefill } from '@/components/coordinator/coordinator-chat'
 import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
 import { listThreads } from '@/app/actions/task-runs'
@@ -136,6 +136,9 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const [browserOpen, setBrowserOpen] = useState(false)
   // Not inside a frame: the app opened in its own browser must not open another one.
   useEffect(() => { try { if (window.self === window.top && window.localStorage.getItem('mikka:browser') === '1') setBrowserOpen(true) } catch { /* storage unavailable */ } }, [])
+  // Below lg the toggle is hidden, so the browser counts as closed and the right panel stays.
+  const browserFits = useBrowserFits()
+  const browserShown = browserOpen && browserFits
   function showBrowser(next: boolean) { setBrowserOpen(next); try { window.localStorage.setItem('mikka:browser', next ? '1' : '0') } catch { /* storage unavailable */ } }
   const [coordinatorPrefill, setCoordinatorPrefill] = useState<CoordinatorPrefill>()
   const [teamId, setTeamId] = useState<string | null>(params.get('team'))
@@ -364,7 +367,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     {dialogs}
   </AppShell></SignOutBoundary>
   return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider><AppFrame
-    bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={<>{isConversation && !panelOpen && !browserOpen && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground xl:inline-flex" aria-label={i18nText('Shell.panel.open')} onClick={() => showPanel(true)} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}<BrowserToggle open={browserOpen} onToggle={() => showBrowser(!browserOpen)} /></>} />}
+    bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={<>{isConversation && !panelOpen && !browserShown && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground xl:inline-flex" aria-label={i18nText('Shell.panel.open')} onClick={() => showPanel(true)} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}<BrowserToggle open={browserShown} onToggle={() => showBrowser(!browserShown)} /></>} />}
     rail={<IconRail active={rail} onNavigate={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}>
     {/* The board keeps only the rail on its left (MIK-45). */}
     {rail !== 'board' && <BotList bots={bots} threads={threads} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}
@@ -378,8 +381,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
         <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />
       </>}
     </AppShellContent>
-    {browserOpen && <BrowserPane onClose={() => showBrowser(false)} />}
-    {isConversation && panelOpen && !browserOpen && <ContextPanel userName={user.name || user.email} issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onArrange={arrange} onConnect={() => openRail('plugins')} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
+    {browserShown && <BrowserPane onClose={() => showBrowser(false)} />}
+    {isConversation && panelOpen && !browserShown && <ContextPanel userName={user.name || user.email} issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onArrange={arrange} onConnect={() => openRail('plugins')} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}
     {dialogs}
   </AppFrame></BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>

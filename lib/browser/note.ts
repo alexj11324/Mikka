@@ -3,9 +3,13 @@
 // there is one, so the bot reads them in place and the chat can show them as
 // chips above the text:
 //   <browser-note n="1" kind="element" url="https://…/memories" label="按钮 · 删除" selector="…">删了，刷新又回来了</browser-note>
-// `element` is a part of a same-origin page, found again by its selector.
+// `element` is a part of a same-origin page, named by the item it sits in and
+// its own name (「周会 · 删除」) and found again by its selector; none of the
+// page's text is sent.
 // `region` is an area dragged over a page the app cannot look inside (another
 // origin): only the URL, the box in the frame's viewport and the note are known.
+
+import { MESSAGE_MAX } from '@/lib/message-limits'
 
 export interface BrowserNoteRect { x: number; y: number; width: number; height: number; viewportWidth: number; viewportHeight: number }
 
@@ -15,14 +19,12 @@ export interface BrowserNote {
   kind: 'element' | 'region'
   /** The page the note is on. */
   url: string
-  /** For an element: 「按钮 · 删除」. For a region: the page's host and path. */
+  /** For an element: the item it sits in and its name, 「周会 · 删除」. For a region: the page's host and path. */
   label: string
   /** What the person wrote. */
   note: string
   /** For an element: a CSS selector that finds it on that page. */
   selector?: string
-  /** For an element: its text, clipped. */
-  text?: string
   /** For a region: the dragged box, in CSS pixels of the frame's viewport. */
   rect?: BrowserNoteRect
 }
@@ -30,9 +32,15 @@ export interface BrowserNote {
 export const NOTE_MAX = 500
 export const NOTES_MAX = 20
 
-/** The words on a note's chip: 「1 · 按钮 · 删除 · 删了，刷新又回来了」. */
+/** The words on a note's chip: 「1 · 周会 · 删除 · 删了，刷新又回来了」. */
 export function noteChipText(note: Pick<BrowserNote, 'n' | 'label' | 'note'>): string {
   return [String(note.n), note.label, note.note].filter(Boolean).join(' · ')
+}
+
+/** An element note's label: the item it sits in, then its own name (「周会 · 删除」); either may be missing. */
+export function elementLabel(context: string, name: string): string {
+  const parts = [context.trim(), name.trim()].filter(Boolean)
+  return (parts.length === 2 && parts[0] === parts[1] ? [parts[0]] : parts).join(' · ').slice(0, 200)
 }
 
 /** What the address bar typed means: an http(s) URL, or null. A bare host gets https; a path stays on `origin`. */
@@ -71,7 +79,6 @@ const unescape = (value: string) => value.replace(/&lt;/g, '<').replace(/&quot;/
 function serialize(note: BrowserNote): string {
   const attributes: [string, string][] = [['n', String(note.n)], ['kind', note.kind], ['url', note.url], ['label', note.label]]
   if (note.selector) attributes.push(['selector', note.selector])
-  if (note.text) attributes.push(['text', note.text])
   if (note.rect) {
     const { x, y, width, height, viewportWidth, viewportHeight } = note.rect
     attributes.push(['rect', [x, y, width, height].map(Math.round).join(',')], ['viewport', `${Math.round(viewportWidth)}x${Math.round(viewportHeight)}`])
@@ -79,10 +86,10 @@ function serialize(note: BrowserNote): string {
   return `<browser-note ${attributes.map(([key, value]) => `${key}="${escapeAttribute(value)}"`).join(' ')}>${escapeBody(note.note.slice(0, NOTE_MAX))}</browser-note>`
 }
 
-/** The message text with the notes in front, one per line. */
-export function withBrowserNotes(text: string, notes: readonly BrowserNote[] | null | undefined): string {
-  if (!notes?.length) return text
-  return `${notes.map(serialize).join('\n')}\n${text}`
+/** The message text with the notes in front, one per line; null when that is longer than a message may be (`MESSAGE_MAX`). */
+export function withBrowserNotes(text: string, notes: readonly BrowserNote[] | null | undefined): string | null {
+  const message = notes?.length ? `${notes.map(serialize).join('\n')}\n${text}` : text
+  return message.length > MESSAGE_MAX ? null : message
 }
 
 const NOTE = /^<browser-note ((?:[a-z]+="[^"]*"\s*)+)>([\s\S]*?)<\/browser-note>\n?/
@@ -93,7 +100,6 @@ function parse(attributeText: string, body: string): BrowserNote | null {
   if (!Number.isInteger(n) || n < 1 || (attributes.kind !== 'element' && attributes.kind !== 'region') || !attributes.url || !attributes.label) return null
   const note: BrowserNote = { n, kind: attributes.kind, url: attributes.url, label: attributes.label, note: unescape(body) }
   if (attributes.selector) note.selector = attributes.selector
-  if (attributes.text) note.text = attributes.text
   const box = attributes.rect?.split(',').map(Number)
   const viewport = attributes.viewport?.split('x').map(Number)
   if (box?.length === 4 && viewport?.length === 2 && [...box, ...viewport].every(Number.isFinite)) {

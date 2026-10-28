@@ -2,28 +2,51 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
-import { ArrowLeft, ArrowRight, ArrowUp, ExternalLink, RotateCw, SquareDashed, SquareDashedMousePointer, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowUp, RotateCw, SquareDashedMousePointer, X } from 'lucide-react'
 import { ELEMENT_ROLES, FRAME_SCRIPT, type ElementRole, type FromFrame, type ToFrame } from '@mikka/protocol/artifact-frame'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { NOTE_MAX, normalizeAddress, pageLabel, sameOrigin, type BrowserNote } from '@/lib/browser/note'
+import { NOTE_MAX, elementLabel, normalizeAddress, pageLabel, type BrowserNote } from '@/lib/browser/note'
 import { cn } from '@/lib/utils'
 import { useBrowserNotes } from './browser-notes'
 
 const STORAGE_KEY = 'mikka:browser-url'
 const PICKER_FLAG = '__mikkaPicker'
+/**
+ * Every page gets the same sandbox: scripts, forms and popups work, but the
+ * page can never navigate the app (no allow-top-navigation*). A page of the
+ * app's own origin keeps that origin, so the browser can reach it to pick.
+ */
+const SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox'
 
 type Box = { x: number; y: number; width: number; height: number }
 type Draft = Omit<BrowserNote, 'n' | 'note'> & { anchor: Box }
-type Mode = 'off' | 'element' | 'region'
 
 const pressed = 'bg-sidebar-primary-soft text-sidebar-primary-soft-foreground hover:bg-sidebar-primary-soft hover:text-sidebar-primary-soft-foreground'
 
 function boxOf(start: { x: number; y: number }, end: { x: number; y: number }): Box {
   return { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y), width: Math.abs(end.x - start.x), height: Math.abs(end.y - start.y) }
 }
+
+/** Put into a reachable page: reports client-side navigation (pushState, replaceState, back) to the browser. Plain ES2017, runs inside the frame. */
+function locationScript() {
+  const report = (replace: boolean) => window.parent.postMessage({ source: 'mikka-frame', type: 'location', href: window.location.href, replace }, window.location.origin)
+  const wrap = (method: 'pushState' | 'replaceState', replace: boolean) => {
+    const original = window.history[method]
+    window.history[method] = function (this: History, ...args: Parameters<History['pushState']>) {
+      const result = original.apply(this, args)
+      report(replace)
+      return result
+    }
+  }
+  wrap('pushState', false)
+  wrap('replaceState', true)
+  window.addEventListener('popstate', () => report(true))
+  window.addEventListener('hashchange', () => report(true))
+}
+const LOCATION_SCRIPT = `(${locationScript.toString()})()`
 
 /**
  * The app-wide browser (Figma 412:8066), opened from the top bar's globe: an
@@ -33,10 +56,10 @@ function boxOf(start: { x: number; y: number }, end: { x: number; y: number }): 
  *
  * What it can honestly see: a page on the app's own origin can be reached, so
  * 选择元素 puts the artifact frame's picking script into it and names the
- * element clicked. Any other origin is closed to the app (and many sites refuse
- * to be framed at all), so there only 框选区域 works: the person drags a box
- * over the frame and the note carries the URL and that box, nothing read from
- * the page.
+ * element clicked by its item and name. Any other origin is closed to the app
+ * (and many sites refuse to be framed at all), so there the same button lets
+ * the person drag a box over the frame instead: the note carries the URL and
+ * that box, nothing read from the page.
  */
 export function BrowserPane({ onClose }: { onClose: () => void }) {
   const t = useTranslations('Browser')
@@ -52,26 +75,46 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
   const [invalid, setInvalid] = useState(false)
   // True once the loaded page turned out to be reachable (same origin) and has the picking script.
   const [reachable, setReachable] = useState(false)
-  const [mode, setMode] = useState<Mode>('off')
+  const [picking, setPicking] = useState(false)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [text, setText] = useState('')
   const [drag, setDrag] = useState<{ start: { x: number; y: number }; end: { x: number; y: number } } | null>(null)
+  // The first load after a navigation from here: a different address then is a server redirect.
+  const firstLoad = useRef(false)
   const current = history.entries[history.index] ?? null
   const canNote = Boolean(notes?.hasComposer)
+  // One button: a reachable page picks elements, any other page drags a box.
+  const selecting = picking && reachable
+  const dragging = picking && !reachable
 
   const roles = Object.fromEntries(ELEMENT_ROLES.map(role => [role, tRoles(role)])) as Record<ElementRole, string>
-  const state = useRef({ mode, draft, roles, current, notes: notes?.notes ?? [] })
-  state.current = { mode, draft, roles, current, notes: notes?.notes ?? [] }
+  const state = useRef({ selecting, draft, roles, current, notes: notes?.notes ?? [] })
+  state.current = { selecting, draft, roles, current, notes: notes?.notes ?? [] }
+
+  function remember(src: string) {
+    try { window.localStorage.setItem(STORAGE_KEY, src) } catch { /* storage unavailable */ }
+  }
 
   function load(src: string, push: boolean) {
     setFrame(previous => ({ src, id: (previous?.id ?? 0) + 1 }))
+    firstLoad.current = true
     setReachable(false)
     setDraft(null)
-    setMode('off')
+    setPicking(false)
     setAddress(src)
     setInvalid(false)
     if (push) setHistory(previous => ({ entries: [...previous.entries.slice(0, previous.index + 1), src], index: previous.index + 1 }))
-    try { window.localStorage.setItem(STORAGE_KEY, src) } catch { /* storage unavailable */ }
+    remember(src)
+  }
+
+  /** The page moved on its own: a redirect or in-page navigation replaces the entry, a followed link adds one. */
+  function follow(href: string, replace: boolean) {
+    if (href === state.current.current) return
+    setAddress(href)
+    setHistory(previous => replace && previous.index >= 0
+      ? { entries: previous.entries.map((entry, index) => index === previous.index ? href : entry), index: previous.index }
+      : { entries: [...previous.entries.slice(0, previous.index + 1), href], index: previous.index + 1 })
+    remember(href)
   }
 
   // Reopening the browser comes back to the last page.
@@ -100,38 +143,32 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
 
   const post = (message: ToFrame) => frameRef.current?.contentWindow?.postMessage(message, window.location.origin)
   function sync() {
-    const { mode: currentMode, draft: currentDraft, roles: words, current: page } = state.current
-    post({ source: 'mikka', type: 'select', on: currentMode === 'element' && !currentDraft, roles: words })
+    const { selecting: on, draft: currentDraft, roles: words, current: page } = state.current
+    post({ source: 'mikka', type: 'select', on: on && !currentDraft, roles: words })
     const marked = state.current.notes.filter(note => note.kind === 'element' && note.url === page && note.selector).map(note => note.selector!)
     if (currentDraft?.selector) marked.push(currentDraft.selector)
     post({ source: 'mikka', type: 'mark', selectors: marked })
   }
 
-  /** The page the frame shows now: for a reachable page its own address, which may differ after a link was followed. */
-  function frameAddress(): string | null {
-    try {
-      const href = frameRef.current?.contentWindow?.location.href
-      return href && href !== 'about:blank' ? href : null
-    } catch { return null }
-  }
-
   function onFrameLoad() {
+    const redirect = firstLoad.current
+    firstLoad.current = false
     let doc: Document | null = null
-    try { doc = frameRef.current?.contentDocument ?? null } catch { doc = null }
+    let href: string | null = null
+    try {
+      doc = frameRef.current?.contentDocument ?? null
+      href = frameRef.current?.contentWindow?.location.href ?? null
+    } catch { doc = null }
     const win = frameRef.current?.contentWindow as (Window & { [PICKER_FLAG]?: true }) | null
-    if (!doc || !win || !frame || !sameOrigin(frame.src, window.location.origin)) { setReachable(false); return }
-    const href = frameAddress()
-    // A link followed inside the page: the address bar and history follow it.
-    if (href && href !== state.current.current) {
-      setAddress(href)
-      setHistory(previous => ({ entries: [...previous.entries.slice(0, previous.index + 1), href], index: previous.index + 1 }))
-      try { window.localStorage.setItem(STORAGE_KEY, href) } catch { /* storage unavailable */ }
-    }
+    if (!doc || !win || !href || href === 'about:blank') { setReachable(false); return }
+    follow(href, redirect)
     if (!win[PICKER_FLAG]) {
       win[PICKER_FLAG] = true
-      const script = doc.createElement('script')
-      script.textContent = FRAME_SCRIPT
-      ;(doc.head ?? doc.documentElement).appendChild(script)
+      for (const source of [LOCATION_SCRIPT, FRAME_SCRIPT]) {
+        const script = doc.createElement('script')
+        script.textContent = source
+        ;(doc.head ?? doc.documentElement).appendChild(script)
+      }
     }
     setReachable(true)
   }
@@ -139,38 +176,38 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     function receive(event: MessageEvent) {
       if (!frameRef.current || event.source !== frameRef.current.contentWindow || event.origin !== window.location.origin) return
-      const data = event.data as FromFrame
+      const data = event.data as FromFrame | { source: 'mikka-frame'; type: 'location'; href: unknown; replace: unknown }
       if (!data || data.source !== 'mikka-frame') return
       if (data.type === 'ready') sync()
-      if (data.type === 'select-off') setMode('off')
-      if (data.type === 'quote' && typeof data.selector === 'string' && typeof data.label === 'string' && state.current.mode === 'element') {
+      if (data.type === 'select-off') setPicking(false)
+      if (data.type === 'location' && typeof data.href === 'string' && /^https?:/.test(data.href)) follow(data.href, data.replace === true)
+      if (data.type === 'quote' && typeof data.selector === 'string' && typeof data.label === 'string' && state.current.selecting) {
         const selector = data.selector.slice(0, 1000)
         let anchor: Box = { x: 16, y: 16, width: 0, height: 0 }
         try {
           const rect = frameRef.current.contentDocument?.querySelector(selector)?.getBoundingClientRect()
           if (rect) anchor = { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
         } catch { /* the selector no longer matches */ }
-        const url = frameAddress() ?? state.current.current ?? ''
+        const label = elementLabel(typeof data.context === 'string' ? data.context : '', typeof data.name === 'string' ? data.name : '') || data.label.slice(0, 200)
         setText('')
-        setDraft({ kind: 'element', url, label: data.label.slice(0, 200), selector, text: String(data.text ?? '').slice(0, 500), anchor })
+        setDraft({ kind: 'element', url: state.current.current ?? '', label, selector, anchor })
       }
     }
     window.addEventListener('message', receive)
     return () => window.removeEventListener('message', receive)
   }, [])
-  useEffect(sync, [mode, draft, notes?.notes, reachable])
+  useEffect(sync, [selecting, draft, notes?.notes, reachable])
 
   // Escape leaves picking; inside a reachable page its own script reports it.
   useEffect(() => {
-    if (mode === 'off' || draft) return
-    const leave = (event: KeyboardEvent) => { if (event.key === 'Escape') { setDrag(null); setMode('off') } }
+    if (!picking || draft) return
+    const leave = (event: KeyboardEvent) => { if (event.key === 'Escape') { setDrag(null); setPicking(false) } }
     window.addEventListener('keydown', leave)
     return () => window.removeEventListener('keydown', leave)
-  }, [mode, draft])
+  }, [picking, draft])
 
-  // Without a chat to send to, or once the page is gone, nothing can be picked.
-  useEffect(() => { if (!canNote) { setMode('off'); setDraft(null) } }, [canNote])
-  useEffect(() => { if (mode === 'element' && !reachable) setMode('off') }, [mode, reachable])
+  // Without a chat to send to, nothing can be picked.
+  useEffect(() => { if (!canNote) { setPicking(false); setDraft(null) } }, [canNote])
 
   function point(event: ReactPointerEvent) {
     const rect = stageRef.current!.getBoundingClientRect()
@@ -182,9 +219,8 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
     setDrag(null)
     if (box.width < 8 || box.height < 8 || !current) return
     const stage = stageRef.current!
-    const url = frameAddress() ?? current
     setText('')
-    setDraft({ kind: 'region', url, label: pageLabel(url), rect: { ...box, viewportWidth: stage.clientWidth, viewportHeight: stage.clientHeight }, anchor: box })
+    setDraft({ kind: 'region', url: current, label: pageLabel(current), rect: { ...box, viewportWidth: stage.clientWidth, viewportHeight: stage.clientHeight }, anchor: box })
   }
 
   function addNote(event?: { preventDefault: () => void }) {
@@ -195,7 +231,7 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
     notes.add({ ...rest, note: note.slice(0, NOTE_MAX) })
     setDraft(null)
     setText('')
-    setMode('off')
+    setPicking(false)
   }
   function cancelDraft() { setDraft(null); setText('') }
 
@@ -218,7 +254,7 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
   const tool = (label: string, icon: ReactNode, props: { onClick?: () => void; disabled?: boolean; pressed?: boolean }) =>
     <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', props.pressed && pressed)} aria-label={label} aria-pressed={props.pressed} disabled={props.disabled} onClick={props.onClick} />}>{icon}</TooltipTrigger><TooltipContent side="bottom">{label}</TooltipContent></Tooltip>
 
-  return <aside aria-label={t('label')} data-slot="browser-pane" className="hidden min-h-0 w-140 max-w-[50%] shrink-0 flex-col border-l lg:flex">
+  return <aside aria-label={t('label')} data-slot="browser-pane" className="flex min-h-0 w-140 max-w-[50%] shrink-0 flex-col border-l">
     <div className="flex h-11 shrink-0 items-center gap-0.5 px-2">
       {tool(t('back'), <ArrowLeft data-icon="inline-start" />, { onClick: () => go(-1), disabled: history.index <= 0 })}
       {tool(t('forward'), <ArrowRight data-icon="inline-start" />, { onClick: () => go(1), disabled: history.index >= history.entries.length - 1 })}
@@ -227,19 +263,12 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
         onChange={event => { setAddress(event.target.value); setInvalid(false) }} onFocus={event => event.target.select()}
         onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); submitAddress() } }}
         className="mx-1 h-8 min-w-0 flex-1 rounded-lg border-0 bg-muted px-2.5 text-sm text-muted-foreground focus-visible:text-foreground" />
-      {tool(t('selectElement'), <SquareDashedMousePointer data-icon="inline-start" />, { onClick: () => { setDraft(null); setMode(value => value === 'element' ? 'off' : 'element') }, disabled: !canNote || !reachable, pressed: mode === 'element' })}
-      {tool(t('selectRegion'), <SquareDashed data-icon="inline-start" />, { onClick: () => { setDraft(null); setMode(value => value === 'region' ? 'off' : 'region') }, disabled: !canNote || !current, pressed: mode === 'region' })}
-      {current
-        ? <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" nativeButton={false} aria-label={t('openInTab')} render={<a href={current} target="_blank" rel="noopener noreferrer" />} />}><ExternalLink data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openInTab')}</TooltipContent></Tooltip>
-        : tool(t('openInTab'), <ExternalLink data-icon="inline-start" />, { disabled: true })}
+      {tool(t('selectElement'), <SquareDashedMousePointer data-icon="inline-start" />, { onClick: () => { setDraft(null); setPicking(value => !value) }, disabled: !canNote || !current, pressed: picking })}
       {tool(t('close'), <X data-icon="inline-start" />, { onClick: onClose })}
     </div>
     <div ref={stageRef} data-slot="browser-stage" className="relative min-h-0 flex-1 overflow-hidden bg-background">
-      {frame && (sameOrigin(frame.src, window.location.origin)
-        ? <iframe ref={frameRef} key={frame.id} src={frame.src} title={t('frameTitle')} onLoad={onFrameLoad} className="size-full border-0" />
-        : <iframe ref={frameRef} key={frame.id} src={frame.src} title={t('frameTitle')} onLoad={onFrameLoad} referrerPolicy="no-referrer"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox" className="size-full border-0" />)}
-      {mode === 'region' && !draft && <div data-slot="browser-region-layer" className="absolute inset-0 cursor-crosshair touch-none"
+      {frame && <iframe ref={frameRef} key={frame.id} src={frame.src} title={t('frameTitle')} onLoad={onFrameLoad} sandbox={SANDBOX} referrerPolicy="no-referrer" className="size-full border-0" />}
+      {dragging && !draft && <div data-slot="browser-region-layer" className="absolute inset-0 cursor-crosshair touch-none"
         onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); const at = point(event); setDrag({ start: at, end: at }) }}
         onPointerMove={event => { if (drag) setDrag({ ...drag, end: point(event) }) }}
         onPointerUp={endDrag} onPointerCancel={() => setDrag(null)} />}

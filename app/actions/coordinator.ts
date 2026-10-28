@@ -56,7 +56,7 @@ const quoteSchema = z.object({
 const notesSchema = z.array(z.object({
   n: z.number().int().min(1).max(99), kind: z.enum(['element', 'region']), url: z.url({ protocol: /^https?$/ }).max(2000),
   label: z.string().trim().min(1).max(200), note: z.string().trim().min(1).max(NOTE_MAX),
-  selector: z.string().max(1000).optional(), text: z.string().max(500).optional(),
+  selector: z.string().max(1000).optional(),
   rect: z.object({ x: z.number(), y: z.number(), width: z.number().min(0), height: z.number().min(0), viewportWidth: z.number().min(0), viewportHeight: z.number().min(0) }).optional(),
 }).strict()).max(NOTES_MAX)
 
@@ -76,7 +76,9 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     if (quoted && !quoted.success) throw new ActionFailureError('messageRequired')
     const noted = notes?.length ? notesSchema.safeParse(notes) : null
     if (noted && !noted.success) throw new ActionFailureError('messageRequired')
-    try { await recordPersonalSubmission(db, userId, withQuote(withBrowserNotes(parsed.data.text, noted?.data), quoted?.data), { botId: bot?.id ?? null, submissionId: parsed.data.submissionId }) }
+    const withNotes = withBrowserNotes(parsed.data.text, noted?.data)
+    if (withNotes === null) throw new ActionFailureError('messageTooLong')
+    try { await recordPersonalSubmission(db, userId, withQuote(withNotes, quoted?.data), { botId: bot?.id ?? null, submissionId: parsed.data.submissionId }) }
     catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error

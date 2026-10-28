@@ -11,7 +11,8 @@ interface BrowserNotes {
   /** Pins a note; its number is the next one. Ignored when no chat can take it. */
   add: (note: Omit<BrowserNote, 'n'>) => void
   remove: (n: number) => void
-  clear: () => void
+  /** Removes these notes, such as the ones just sent; any pinned since stay. */
+  removeMany: (ns: readonly number[]) => void
   /** Whether a chat composer is on screen to take notes. */
   hasComposer: boolean
   /** A chat composer calls this while it is mounted; returns the cleanup. */
@@ -23,19 +24,19 @@ const Context = createContext<BrowserNotes | null>(null)
 /**
  * The notes pinned in the app-wide browser, waiting in the current chat's
  * composer. The browser column adds them; the chat on screen shows them as
- * chips and sends them with the next message, then clears them.
+ * chips and sends them with the next message, then drops the ones it sent.
  */
 export function BrowserNotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<BrowserNote[]>([])
   const [composers, setComposers] = useState(0)
   const add = useCallback((note: Omit<BrowserNote, 'n'>) => setNotes(current => current.length >= NOTES_MAX ? current : [...current, { ...note, n: Math.max(0, ...current.map(item => item.n)) + 1 }]), [])
   const remove = useCallback((n: number) => setNotes(current => current.filter(item => item.n !== n)), [])
-  const clear = useCallback(() => setNotes([]), [])
+  const removeMany = useCallback((ns: readonly number[]) => setNotes(current => current.filter(item => !ns.includes(item.n))), [])
   const attachComposer = useCallback(() => {
     setComposers(count => count + 1)
     return () => setComposers(count => count - 1)
   }, [])
-  const value = useMemo(() => ({ notes, add, remove, clear, hasComposer: composers > 0, attachComposer }), [notes, add, remove, clear, composers, attachComposer])
+  const value = useMemo(() => ({ notes, add, remove, removeMany, hasComposer: composers > 0, attachComposer }), [notes, add, remove, removeMany, composers, attachComposer])
   return <Context value={value}>{children}</Context>
 }
 
@@ -56,7 +57,7 @@ const NoteIcon = ({ kind }: { kind: BrowserNote['kind'] }) => kind === 'element'
   ? <SquareDashedMousePointer aria-hidden="true" className="size-3.5 shrink-0" />
   : <BoxSelect aria-hidden="true" className="size-3.5 shrink-0" />
 
-/** One note waiting in the composer: 「1 · 按钮 · 删除 · 删了，刷新又回来了」 and ✕ (Figma 412:8066). */
+/** One note waiting in the composer: 「1 · 周会 · 删除 · 删了，刷新又回来了」 and ✕ (Figma 412:8066). */
 export function BrowserNoteChip({ note, onRemove }: { note: BrowserNote; onRemove: () => void }) {
   const t = useTranslations('Browser')
   const words = noteChipText(note)

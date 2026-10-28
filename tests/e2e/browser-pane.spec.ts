@@ -34,16 +34,19 @@ test('The globe opens the browser in place of the right panel; notes on a page g
   await note.press('Enter')
   const chips = page.locator('[data-slot="browser-note-chip"]')
   await expect(chips).toHaveCount(1)
-  await expect(chips.first()).toContainText(/^1 · 按钮 · .+ · 按钮文案改成发送$/)
+  await expect(chips.first()).toHaveText('1 · 重置密码 · 发送重置链接 · 按钮文案改成发送')
   await testInfo.attach('element-note', { body: await page.screenshot(), contentType: 'image/png' })
 
-  // Another origin is closed to the app: no element picking, only a dragged area with the URL.
+  // Another origin is closed to the app: the same button drags a box, and the note has only the URL.
   // A stand-in for another site, so the test does not depend on the network.
   await page.context().route('https://example.com/**', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><h1>Pricing</h1>' }))
   await address.fill('example.com/pricing')
   await address.press('Enter')
-  await expect(pick).toBeDisabled()
-  await browser.getByRole('button', { name: '框选区域', exact: true }).click()
+  await expect(address).toHaveValue('https://example.com/pricing')
+  await expect(browser.getByRole('button', { name: '框选区域' })).toHaveCount(0)
+  await expect(browser.getByRole('button', { name: '在新标签页打开' })).toHaveCount(0)
+  await pick.click()
+  await expect(pick).toHaveAttribute('aria-pressed', 'true')
   const stage = browser.locator('[data-slot="browser-stage"]')
   const box = (await stage.boundingBox())!
   await page.mouse.move(box.x + 40, box.y + 40)
@@ -53,7 +56,7 @@ test('The globe opens the browser in place of the right panel; notes on a page g
   await browser.getByRole('textbox', { name: '给 example.com/pricing 写备注', exact: true }).fill('价格不对')
   await browser.getByRole('button', { name: '放进对话', exact: true }).click()
   await expect(chips).toHaveCount(2)
-  await expect(chips.nth(1)).toContainText('2 · example.com/pricing · 价格不对')
+  await expect(chips.nth(1)).toHaveText('2 · example.com/pricing · 价格不对')
   await testInfo.attach('region-note', { body: await page.screenshot(), contentType: 'image/png' })
 
   await page.getByRole('button', { name: '移除备注 1', exact: true }).click()

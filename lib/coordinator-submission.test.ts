@@ -241,8 +241,10 @@ test('actual action puts validated browser notes after the quote and rejects bad
   const [row] = [...current.rows.values()]
   assert.match(row.payload.text, /^<browser-note n="1" kind="region" url="https:\/\/example.org\/pricing"[^>]*>Wrong price<\/browser-note>\nhello$/)
   current = fixture()
-  for (const bad of [{ ...note, url: 'javascript:alert(1)' }, { ...note, note: ' ' }, { ...note, extra: true }]) {
+  for (const bad of [{ ...note, url: 'javascript:alert(1)' }, { ...note, note: ' ' }, { ...note, extra: true }, { ...note, text: 'page text is never sent' }]) {
     assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, [bad as typeof note]), { error: 'messageRequired', params: undefined })
   }
+  assert.equal(current.rows.size, 0)
+  assert.deepEqual(await sendCoordinatorMessage('x'.repeat(9_990), null, null, undefined, [note]), { error: 'messageTooLong', params: undefined })
   assert.equal(current.rows.size, 0)
 })
