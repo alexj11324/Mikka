@@ -27,6 +27,17 @@ export const gatewayGuard: BrowserGuard = {
   },
 }
 
+/** Server-only continuation after the already-authorized host operation. The
+ * token remains inside trusted services and is never returned to the model.
+ * This is a safety check, not an authorization or an instruction to submit. */
+export async function endCredentialGuardWhenSafe(cdp: Pick<Cdp, 'origin' | 'safeToResume'>, guard: BrowserGuard, target: BrowserTarget, guardToken: string, origin: string, initialUrl: string) {
+  if (!guardToken) throw new CredentialError('credential_denied', 404)
+  await cdp.origin(origin)
+  if (!await cdp.safeToResume(initialUrl)) throw new CredentialError('credential_login_pending', 409)
+  await cdp.origin(origin)
+  await guard.end(target, guardToken)
+}
+
 /** Deliberately no CDP logger, remote exception, message body or console handler. */
 export class Cdp {
   private id = 0

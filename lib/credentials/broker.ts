@@ -2,7 +2,7 @@ import type { Pool } from 'pg'
 import { CredentialError } from './contracts'
 import { awsKms, open, type Kms } from './kms'
 import { CredentialStore, hashNonce, rowEnvelope, type BrowserTarget } from './store'
-import { Cdp, gatewayGuard, type BrowserGuard } from './browser'
+import { Cdp, gatewayGuard, endCredentialGuardWhenSafe, type BrowserGuard } from './browser'
 import { assertCredentialPageBinding } from './page-binding'
 
 /** Imported only by services/credential-broker, which runs under the broker
@@ -102,7 +102,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     await client.query('UPDATE credentials SET last_used_at=now() WHERE id=$1', [context.credentialId])
     await client.query(`INSERT INTO credential_access_events(credential_id,user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,$6,$7)`, [context.credentialId, context.userId, caller.botId, caller.runId, caller.subagentId, context.origin, sessionApplied ? 'session_applied' : claimed.input_kind === 'otp' ? 'otp_submitted' : 'password_submitted'])
     await client.query('COMMIT'); completed = true
-    await guard.end(target, guardToken)
+    await endCredentialGuardWhenSafe(cdp, guard, target, guardToken, context.origin, initialUrl)
     if (caller.subagentId) {
       // Resume the caller to observe the page after the guard ends. The
       // broker does not decide whether login succeeded or MFA is required.

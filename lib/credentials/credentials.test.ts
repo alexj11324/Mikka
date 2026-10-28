@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm'
 import { canonicalOrigin, assertSameOrigin, submitSchema, otpSchema, CredentialError, type EncryptionContext } from './contracts'
 import { seal, open, sealSession, type Kms } from './kms'
 import { checkCredentialRequest, credentialBody, credentialFailure } from './http'
-import { Cdp } from './browser'
+import { Cdp, endCredentialGuardWhenSafe } from './browser'
 import { fillCredential } from './broker'
 import { CredentialStore } from './store'
 import { assertCredentialPageBinding, type CredentialPageBinding } from './page-binding'
@@ -310,4 +310,19 @@ test('insertion uses only the observed node on the bound origin and document', a
   }
   await assert.rejects(cdp.fill('https://example.com', 'synthetic', 'synthetic'), CredentialError)
   await assert.rejects(cdp.fillOtp('https://example.com', '123456'), CredentialError)
+})
+
+test('guard continuation requires safe inputs and a matching origin', async () => {
+  const target = { targetId: 'target', origin: owner.origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000 }
+  let safe = false, validOrigin = true, ends = 0
+  const cdp = { async origin() { if (!validOrigin) throw new CredentialError() }, async safeToResume() { return safe } }
+  const guard = { async begin() { throw new Error('not used') }, async end() { ends++ } }
+  await assert.rejects(endCredentialGuardWhenSafe(cdp, guard, target, 'fixture-token', owner.origin, owner.origin), CredentialError)
+  assert.equal(ends, 0)
+  safe = true; validOrigin = false
+  await assert.rejects(endCredentialGuardWhenSafe(cdp, guard, target, 'fixture-token', owner.origin, owner.origin), CredentialError)
+  assert.equal(ends, 0)
+  validOrigin = true
+  await endCredentialGuardWhenSafe(cdp, guard, target, 'fixture-token', owner.origin, owner.origin)
+  assert.equal(ends, 1)
 })
