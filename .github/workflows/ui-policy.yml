@@ -25,7 +25,8 @@ concurrency:
 jobs:
   cloud-secret-access:
     name: Cloud credential access (OIDC)
-    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka'
+    # This migration-only candidate must not retrieve live provider credentials.
+    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -217,5 +218,5 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:credentials-db,test:active-agents,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:credentials-db,test:active-agents,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:migration-steps-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db
       - run: pnpm build

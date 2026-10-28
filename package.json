@@ -14,7 +14,7 @@
     "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && pnpm lint && next build",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
-    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-targets.test.mjs",
+    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-steps.test.mjs scripts/migration-targets.test.mjs",
     "dev": "node scripts/dev-preview.mjs",
     "test:preview": "node --test tests/preview-ready.test.mjs",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
@@ -86,6 +86,7 @@
     "check:agent-definitions": "tsx scripts/agent-kit.mts validate agents/default && tsx scripts/agent-kit.mts validate agents/research-example",
     "test:agent-kit-compat": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-kit/main-compat.test.ts lib/agent-kit/registry-compat.test.ts && pnpm test:agent-kit-model",
     "test:agent-kit-model": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-execution-model.test.ts lib/subscription-model-snapshot.test.ts lib/subscription-workflow-model.test.ts lib/subscription-workflow-turn.test.ts lib/agent-kit/hosted-replay.test.ts lib/agent-kit/live-eval-disabled.test.ts lib/agent-kit/core-entry.test.ts lib/agent-kit/disabled-entry.test.ts lib/agent-kit/message-safety-compat.test.ts lib/agent-kit/tool-defaults-compat.test.ts lib/agent-kit/defaults-consumers.test.ts",
+    "test:migration-steps-db": "node --test tests/migration-steps.db.test.mjs",
     "test:coordinator-issue-tools": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/issue-tools.test.ts lib/mcp/issue-mutation.test.ts",
     "test:coordinator-issue-tools-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/issue-tool-calls.db.test.ts",
     "test:write-transactions": "node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-transaction.test.ts"
