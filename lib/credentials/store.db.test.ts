@@ -34,7 +34,7 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
     const store = new CredentialStore(pool, kms), origin = 'https://example.com'
     const browserTarget = { targetId: 'test-page', origin, endpoint: 'https://123.e2b.app/rpc?token=private', expiresAt: Date.now() + 120000 }
     const challenge = await store.challenge(a, origin)
-    const input = { nonce: challenge.nonce, origin, username: 'test-account', password: 'test-password' }
+    const input = { nonce: challenge.nonce, origin, username: 'test-account', password: fixturePassword }
     await assert.rejects(store.save({ ...a, userId: b.userId }, input), CredentialError)
     await assert.rejects(store.save({ ...a, workspaceId: randomUUID() }, input), CredentialError)
     const saved = await store.save(a, input)
@@ -44,7 +44,7 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
     const metadata = await store.list(a)
     assert.equal(metadata.length, 1)
     assert(!JSON.stringify(metadata).includes('credentialId'))
-    assert(!JSON.stringify(metadata).includes('test-password'))
+    assert(!JSON.stringify(metadata).includes(input.password))
     const otherBot = { ...a, botId: randomUUID(), subagentId: randomUUID() }
     await pool.query('INSERT INTO bots VALUES($1,$2,$3)', [otherBot.botId, a.userId, a.workspaceId])
     await pool.query(`INSERT INTO bot_subagents VALUES($1,$2,$3,$4,'running')`, [otherBot.subagentId, a.userId, a.workspaceId, otherBot.botId])
