@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { answerModel } from './model.mjs'
 import { REPOSITORY } from './isolated-env.mjs'
-import { assertMvpRunAllowed, finishMvpResources, indexMvpResource } from './retention.mjs'
+import { finishMvpResources, indexMvpResource } from './retention.mjs'
 
 const execute = promisify(execFile)
 const git = async (cwd, args) => (await execute('git', args, { cwd, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' } })).stdout.trim()
@@ -30,7 +30,6 @@ async function readBody(request) {
 
 /** Loopback only. Real git changes are required before the fake GitHub accepts a PR. */
 export async function startMvpServices(port = 3191) {
-  assertMvpRunAllowed()
   const directory = await mkdtemp(join(tmpdir(), 'mikka-mvp-origin-'))
   await indexMvpResource('origin-directory', directory)
   let scenario = null

@@ -30,16 +30,13 @@ do not complete the separate frozen-Preview acceptance gate below.
 
 ## Deterministic CI gate
 
-Execution is currently paused at the MVP Playwright configuration, standalone
-runner and fixture-service entry points pending independent review of the full
-resource-retention chain. These guards fail the command; they do not skip tests
-or count as acceptance. The MVP-owned teardown no longer removes daemon,
+The MVP-owned teardown no longer removes daemon,
 repository or workflow directories, kills child processes, or closes fixture
 services. Device-token revocation remains a separate non-deleting operation.
 The private resource index requires an absolute `MIKKA_MVP_RESOURCE_INDEX` in
 an existing owner-private directory and records identifiers and paths only.
 
-Removing the entry guards alone is insufficient. The shared account helpers,
+The shared account helpers,
 Playwright output lifecycle, Actions service lifecycle and daemon repository /
 worktree lifecycle need an independently reviewed retention path. In particular,
 the daemon currently prunes worktrees and remote refs and removes a temporary

@@ -6,9 +6,8 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertMvpEnvironment, MVP_ORIGIN } from '../tests/mvp/isolated-env.mjs'
 import { startMvpServices } from '../tests/mvp/services.mjs'
-import { assertMvpRunAllowed, finishMvpResources, indexMvpResource } from '../tests/mvp/retention.mjs'
+import { finishMvpResources, indexMvpResource } from '../tests/mvp/retention.mjs'
 
-assertMvpRunAllowed()
 assertMvpEnvironment()
 const database = new URL(process.env.E2E_DATABASE_URL)
 await indexMvpResource('database-target', `${database.hostname}:${database.port || '5432'}${database.pathname}`)

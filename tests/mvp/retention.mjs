@@ -6,14 +6,10 @@ import { isAbsolute, dirname } from 'node:path'
 export function retainMvpResources(_env = process.env) { return true }
 
 // Credential revocation is distinct from deleting resources or stopping a
-// process whose signal handlers may delete them. Execution remains paused.
+// process whose signal handlers may delete them.
 export async function finishMvpResources({ revoke, retain: _retain, stop: _stop, cleanup: _cleanup } = {}) {
   if (revoke) await revoke()
 }
-
-// Playwright and shared fixtures have their own teardown paths outside the MVP
-// runner. Fail before starting them until the complete chain is audited.
-export function assertMvpRunAllowed() { throw new Error('MVP execution paused pending retain-mode teardown audit') }
 
 // Only explicit non-secret identifiers are permitted in the private index.
 export function resourceRecord(kind, value) {

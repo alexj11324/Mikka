@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { assertMvpRunAllowed, finishMvpResources, resourceRecord, retainMvpResources } from './retention.mjs'
+import { finishMvpResources, resourceRecord, retainMvpResources } from './retention.mjs'
 
-test('all environments retain resources while cleanup is paused', () => {
+test('all environments retain resources', () => {
   assert.equal(retainMvpResources({}), true)
   assert.equal(retainMvpResources({ MIKKA_MVP_RETAIN: '0' }), true)
   assert.equal(retainMvpResources({ CI: 'true', GITHUB_ACTIONS: 'true' }), true)
@@ -15,7 +15,6 @@ test('retention revokes credentials without invoking stop or resource cleanup', 
   assert.deepEqual(calls, ['revoke'])
   await finishMvpResources({ retain: false, stop: async () => calls.push('ci-stop'), cleanup: async () => calls.push('ci-cleanup') })
   assert.deepEqual(calls, ['revoke'])
-  assert.throws(() => assertMvpRunAllowed(), /paused/)
 })
 
 test('resource index admits only explicitly identified resource types', () => {
