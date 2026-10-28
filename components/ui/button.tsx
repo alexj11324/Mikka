@@ -54,7 +54,7 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot="button"
-      data-variant={tone ? undefined : variant}
+      data-button-variant={tone ? undefined : variant}
       data-tone={tone}
       className={cn(buttonVariants({ variant: tone ? 'status' : variant, size }), tone && 'rounded-md hover:brightness-95 aria-expanded:brightness-95', tone && statusTones[tone], className)}
       {...props}
