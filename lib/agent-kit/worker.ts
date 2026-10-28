@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { Harness } from '@mikka/protocol/harness'
 import { digest, type DefinitionSnapshot } from './definition'
+import { snapshotMailboxTools, type WorkerMailboxGrant } from '../personal-mailbox-capability'
 
 export interface WorkerDefinitionSnapshot {
   schemaVersion: 1
@@ -13,18 +14,23 @@ export interface WorkerDefinitionSnapshot {
   modelSource: 'native-default' | 'subscription'
   subscription?: { bindingId: string; modelId: string; route: string }
   parent: { executionId: string; revisionId: string; revision: number; definitionDigest: string } | null
+  /** Explicit parent-selected tools, frozen only for newly authorized runs. */
+  mailbox?: WorkerMailboxGrant
 }
 
 /** Captured atomically with dispatch, not retroactively inferred from a renamed Agent. */
-export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; subscription?: { id: string; modelId: string; route: string } | null }): WorkerDefinitionSnapshot {
+export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; subscription?: { id: string; modelId: string; route: string } | null; mailboxEnabled?: boolean }): WorkerDefinitionSnapshot {
   if (Boolean(input.parent) !== Boolean(input.executionId)) throw new Error('agentWorkerParentIncomplete')
   const subscription = input.subscription ? { bindingId:z.uuid().parse(input.subscription.id),modelId:z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).parse(input.subscription.modelId),route:input.subscription.route } : undefined
   if (subscription && subscription.route !== (input.harness === 'codex' ? 'codex_cli' : input.harness === 'claude_code' ? 'claude_code_cli' : null)) throw new Error('agentWorkerSubscriptionMismatch')
+  const tools = input.mailboxEnabled ? snapshotMailboxTools(input.parent) : []
+  const mailbox = tools.length && ['claude_code', 'codex'].includes(input.harness) ? { version: 1 as const, tools } : undefined
   return {
     schemaVersion: 1, kind: 'worker', harness: input.harness, instructions: input.instructions,
-    definitionDigest: digest({ harness: input.harness, instructions: input.instructions, ...(subscription ? { subscription } : {}) }),
+    definitionDigest: digest({ harness: input.harness, instructions: input.instructions, ...(subscription ? { subscription } : {}), ...(mailbox ? { mailbox } : {}) }),
     promptDigest: digest(input.prompt), modelSource: subscription ? 'subscription' : 'native-default', ...(subscription ? { subscription } : {}),
     parent: input.parent && input.executionId ? { executionId: input.executionId,revisionId: input.parent.revisionId,revision: input.parent.revision,definitionDigest: input.parent.definitionDigest } : null,
+    ...(mailbox ? { mailbox } : {}),
   }
 }
 

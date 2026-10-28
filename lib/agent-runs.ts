@@ -69,7 +69,7 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   const captureDefinition = process.env.MIKKA_AGENT_KIT === '1' || Boolean(execution)
   const subscription = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, mailboxEnabled: process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1' })
     : null
   await db.insert(agentRuns).values({
     id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
