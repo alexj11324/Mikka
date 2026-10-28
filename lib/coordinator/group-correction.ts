@@ -4,7 +4,8 @@ export class GroupJudgmentPendingError extends Error { constructor() { super('gr
 
 export type CorrectionJudgment =
   | { kind: 'correction'; rightId: string | null }
-  | { kind: 'not_correction' | 'uncertain' }
+  | { kind: 'not_correction' }
+  | { kind: 'uncertain' }
 
 /** Validate model output against the actual members; invalid output is never a fact. */
 export function checkedCorrection(
