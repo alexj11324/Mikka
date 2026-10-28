@@ -1,3 +1,4 @@
+import { preserveMessageSources } from '@/lib/coordinator/message-safety'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { createHash } from 'node:crypto'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
@@ -122,19 +123,22 @@ export async function sendTelegramChunk(threadId: string, chunk: string) {
 export async function preparePrompt(userId: string, botId: string | null = null): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
   let { summary, memory, messages } = await store.loadConversation(userId, botId)
-  const cut = compactionCut(summary, messages)
+  const summaryTrust = { key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) }
+  const cut = compactionCut(summary, messages, summaryTrust)
   if (cut !== null) {
+    if (summaryTrust.key.length < 32) throw new Error('Existing host auth secret required for summary provenance')
     const folded = messages.filter(row => row.position <= cut)
     const { text } = await generateText({
       model: COORDINATOR_MODEL,
       instructions: SUMMARY_INSTRUCTIONS,
-      messages: [...promptMessages(summary, folded), { role: 'user', content: 'Write the summary now.' }],
+      maxOutputTokens: 4096,
+      messages: [...promptMessages(summary, folded, summaryTrust), { role: 'user', content: 'Write the summary now.' }],
     })
-    await store.saveSummary(userId, text, cut, botId)
-    summary = text
+    summary = preserveMessageSources(text, folded, summary, summaryTrust)
+    await store.saveSummary(userId, summary, cut, botId)
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages) }
+  return { instructions: instructionsWithMemory(await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope, botId: string | null = null) {
@@ -339,7 +343,7 @@ export async function getRun(userId: string, input: { runId: string }, scope?: N
 export async function sendToRun(userId: string, input: { runId: string; text: string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => { await addRunMessage(userId, input); return { sent: true } })
+  return asToolResult(async () => { await addRunMessage(userId, input, 'peer'); return { sent: true } })
 }
 
 export async function stopRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
