@@ -79,6 +79,7 @@ export async function acquireTestAccounts({ database, environment, runId, worker
   const credentialsDirectory = join(directory, 'credentials')
   const statesDirectory = join(directory, 'sessions')
   const auditFile = join(directory, 'secret-audit.jsonl')
+  const stateFiles = []
   const listeners = new Set()
   const pendingRequests = new Set()
   const abort = new AbortController()
@@ -137,8 +138,13 @@ export async function acquireTestAccounts({ database, environment, runId, worker
         // Revoke tracked bearer credentials without removing rows or evidence.
         // Pending requests remain dirty: revocation cannot cancel authenticated work.
         await pool.revokeSessions(lease)
-        const releaseOutcome = (pending.length || tainted) && outcome === 'clean' ? 'dirty' : outcome
+        let statesValid = true
+        for (const path of stateFiles) {
+          try { await readPrivate(path) } catch { statesValid = false }
+        }
+        const releaseOutcome = (pending.length || tainted || !statesValid) && outcome === 'clean' ? 'dirty' : outcome
         const result = await pool.release(lease, { outcome: releaseOutcome })
+        if (!statesValid) fail('SESSION_STATE_RETENTION_FAILED')
         if (outcome === 'clean' && result.state !== 'released') fail('ACCOUNT_DIRTY')
         return result
       } finally {
@@ -266,6 +272,7 @@ export async function acquireTestAccounts({ database, environment, runId, worker
       if (provision) await pool.sealAccount(lease, slot.slotId)
       const storageStatePath = join(statesDirectory, `${lease.id}-${lease.generation}-${slot.role}.json`)
       await writePrivate(storageStatePath, { cookies: [...cookies.values()], origins: [] })
+      stateFiles.push(storageStatePath)
       scope[slot.role] = { userId, slotId: slot.slotId, namespace: slot.namespace, role: slot.role, storageStatePath, request }
     }
     return scope

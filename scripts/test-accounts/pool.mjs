@@ -390,6 +390,16 @@ export class TestAccountPool {
         ORDER BY r.id FOR UPDATE`, [lease.id])).rows
       let revoked = 0
       for (const session of sessions) {
+        // Better Auth may already have removed this exact tracked row during
+        // sign-out. Record observed absence without recreating it or claiming
+        // that it was retained. A row owned by someone else is never adopted.
+        const existing = (await client.query('SELECT "userId" FROM public.session WHERE id=$1 FOR UPDATE', [session.id])).rows
+        if (existing.length === 0) {
+          const marked = await client.query("UPDATE mikka_test_accounts.resources SET state='cleaned' WHERE lease_id=$1 AND type='session' AND id=$2 AND owner_id=$3 AND state='created'", [lease.id, session.id, session.owner_id])
+          if (marked.rowCount !== 1) fail('RESOURCE_NOT_OWNED')
+          continue
+        }
+        if (existing.length !== 1 || existing[0].userId !== session.owner_id) fail('RESOURCE_OWNER_MISMATCH')
         const plan = retainedSessionUpdate({ sessionId: session.id, ownerId: session.owner_id, leaseId: lease.id, generation: lease.generation })
         const result = await client.query(plan.text, plan.values)
         assertOneRetainedSessionUpdated(result)
