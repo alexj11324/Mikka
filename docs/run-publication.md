@@ -70,6 +70,10 @@ included in the single `run_finished` event. If metadata attachment becomes
 impossible after GitHub created the PR, its link remains in the durable receipt
 and conversation with the attachment error. No external result is silently lost.
 
+Trusted completion instructions and execution-identity discovery remain in model
+context only; the chat shows the Coordinator's separate result reply and the
+existing thread card, while a person's own text is not hidden by an event prefix.
+
 ## Configuration
 
 Existing Infisical-managed variables: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`.

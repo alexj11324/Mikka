@@ -1,4 +1,4 @@
-import { modelMessage, summaryMessage, type SummaryTrust } from './message-safety'
+import { modelMessage, summaryMessage, type SourcedMessage, type SummaryTrust } from './message-safety'
 import { pruneMessages, type ModelMessage } from 'ai'
 import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from '@/lib/attention/handoff'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
@@ -180,8 +180,8 @@ function publicationPrompt(value: unknown): string[] {
   ]
 }
 
-/** Bookkeeping the chat leaves out: the Coordinator records its attention decisions with it. */
-const HIDDEN_TOOLS = new Set(['record_attention'])
+/** Internal bookkeeping: attention decisions and execution-identity discovery stay out of the chat. */
+const HIDDEN_TOOLS = new Set(['record_attention', 'list_agents'])
 
 /** Longest the memory may grow; past this the Coordinator must forget something first. */
 export const MEMORY_MAX_CHARS = 8000
@@ -263,6 +263,13 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
   }
   for (const { id, position, message, createdAt, pending } of rows) {
     if (message.role === 'user') {
+      const source = message as SourcedMessage
+      // Completion instructions are model context. Trust the host event marker,
+      // not a text prefix a person can also write; its reply starts a new message.
+      if (!source.mikkaUserEvent && source.mikkaEvent?.eventKind === 'run_finished') {
+        briefingBoundary = true
+        continue
+      }
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
       // The request for its welcome is for the Coordinator only.
       if (raw.startsWith(COORDINATOR_WELCOME_MARK)) continue
@@ -276,7 +283,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         briefingBoundary = true
         continue
       }
-      const event = raw.startsWith('[Event]')
+      const event = !source.mikkaUserEvent && raw.startsWith('[Event]')
       if (event) {
         const cited = takeArtifacts(raw.split('\n')[0])
         if (cited.ids.length) {
@@ -305,7 +312,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       } else if (cited.text || tools.length || shown.length) {
         items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)] })
         waiting.ids = []
-        // Only a reply that shows ends the boundary: a tool-only step (record_attention) before the text does not.
+        // Only a reply that shows ends the boundary; hidden tool-only steps do not.
         briefingBoundary = false
       }
     } else if (message.role === 'tool') {
