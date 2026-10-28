@@ -612,8 +612,8 @@ export function createFactoryQuestions(
         );
         // A task-thread answer is retained in the addressed run, not stranded in its old inbox.
         await tx.query(
-          `INSERT INTO run_messages (id,"runId","userId",text,"deliveredAt") VALUES ($1,$2,$3,$4,now()) ON CONFLICT (id) DO NOTHING`,
-          [input.answerId, q.originRunId, actor.userId, answerText],
+          `INSERT INTO run_messages (id,"runId","userId",text,"deliveredAt",origin) VALUES ($1,$2,$3,$4,now(),$5) ON CONFLICT (id) DO NOTHING`,
+          [input.answerId, q.originRunId, actor.userId, answerText, actor.source === "human" ? "user" : "peer"],
         );
         return result;
       });

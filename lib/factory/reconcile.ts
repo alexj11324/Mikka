@@ -286,12 +286,22 @@ export function createFactoryReconciler(
         recovered++;
       } catch (error) {
         await tx.query("ROLLBACK");
-        if (
-          !(error instanceof FactoryError) ||
-          error.code !== "factoryNotFound"
-        )
-          throw error;
-        // Current access was revoked. Do not dispatch, retry, or fabricate success.
+        if (!(error instanceof FactoryError)) throw error;
+        // One blocked consumer must not prevent unrelated tasks from progressing.
+        // Never mutate a task whose permission or cancellation fence denied access.
+        if (!["factoryNotFound", "factoryStopped", "factoryStale"].includes(error.code)) {
+          try {
+            await tx.query("BEGIN");
+            const current = await store.lockTask(tx, userId, item.id);
+            if (current.status === "running") await store.apply(userId,binding(current),
+              factoryEventId(`reconcile-blocked:${error.code}`,current.attemptId),
+              {action:"finish",status:"blocked",reason:`Reconciliation blocked: ${error.code}`,evidence:[],output:{errorCode:error.code}},tx);
+            await tx.query("COMMIT");
+          } catch (blockedError) {
+            await tx.query("ROLLBACK");
+            if (!(blockedError instanceof FactoryError)) throw blockedError;
+          }
+        }
       } finally {
         tx.release();
       }

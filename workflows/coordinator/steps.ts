@@ -1,3 +1,4 @@
+import { FACTORY_QUESTION_INSTRUCTIONS } from '@/lib/factory/instructions'
 import { FactoryError } from '@/lib/factory/contract'
 import { preserveMessageSources } from '@/lib/coordinator/message-safety'
 import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
@@ -158,7 +159,8 @@ export async function preparePrompt(userId: string, botId: string | null = null,
     await store.saveSummary(userId, summary, cut, botId)
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages, summaryTrust) }
+  const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS : ''
+  return { instructions: instructionsWithMemory(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory) + factoryPolicy, messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope, botId: string | null = null) {

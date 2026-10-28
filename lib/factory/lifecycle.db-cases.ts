@@ -55,6 +55,7 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
     await denies(()=>questions.answer({source:'orchestrator',userId:'owner'},{...answer,facts:[{...answer.facts[0],quote:'invented'}]}),'factoryQuestionFactMismatch');
     const result=await questions.answer({source:'orchestrator',userId:'owner'},answer);
     assert.equal(result.task.revision,q.waitingBinding.revision+2);
+    assert.equal((await pool.query('SELECT origin FROM run_messages WHERE id=$1',[answer.answerId])).rows[0].origin,'peer');
     assert.equal((await questions.answer({source:'orchestrator',userId:'owner'},answer)).continuationRunId,result.continuationRunId);
     await denies(()=>questions.answer({source:'orchestrator',userId:'owner'},{...answer,answerId:randomUUID()}),'factoryQuestionAnswerConflict');
     const tx=await pool.connect();
@@ -115,6 +116,7 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
       const results=await Promise.all(responses.map(response=>response.json() as Promise<{continuationRunId:string}>));
       assert.equal(new Set(results.map(result=>result.continuationRunId)).size,1);
       const result=results[0];
+      assert.equal((await pool.query('SELECT origin FROM run_messages WHERE id=$1',[answer.answerId])).rows[0].origin,'user');
       const replay=await send(answer);assert.equal(replay.status,200);
       assert.equal((await replay.json() as {continuationRunId:string}).continuationRunId,result.continuationRunId);
       const current=await store.read('owner',r.task.id);
@@ -163,6 +165,19 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
     assert.deepEqual(await store.apply('owner',binding,id,{action:'retry',reason:'next'}),next);
     await denies(()=>store.apply('owner',binding,randomUUID(),{action:'retry',reason:'next'}),'factoryStale');
     await denies(()=>store.apply('owner',factoryBinding(next.task),randomUUID(),{action:'finish',status:'passed',reason:'model says passed',evidence:[],output:{}}),'factoryIndependentRunRequired');
+  });
+  await t.test('missing consumer blocks only its task and does not stall another question',async()=>{
+    const r=await store.route('owner',await fixture());
+    const d=await dispatch('owner',{binding:factoryBinding(r.task),agentId,deviceRepoId:repoId});
+    await pool.query("UPDATE factory_tasks SET stage='monitor' WHERE id=$1",[r.task.id]);
+    await pool.query("UPDATE factory_attempts SET stage='monitor' WHERE id=$1",[r.task.attemptId]);
+    await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='missing-consumer' WHERE id=$1`,[d.runId]);
+    const other=await store.route('owner',await fixture());
+    const queued=await dispatch('owner',{binding:factoryBinding(other.task),agentId,deviceRepoId:repoId});
+    await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"='independent-question',report='{"openQuestions":["Need input"]}' WHERE id=$1`,[queued.runId]);
+    await createFactoryReconciler(pool,store,questions)('owner');
+    assert.equal((await store.read('owner',r.task.id)).task.status,'blocked');
+    assert.equal((await store.read('owner',other.task.id)).task.status,'waiting');
   });
   await t.test('asked_human completion reconciles into waiting rather than cancelled',async()=>{
     const r=await store.route('owner',await fixture());
