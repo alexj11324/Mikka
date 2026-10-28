@@ -1,19 +1,26 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import {
-  agents, agentRuns, deviceRepos, deviceTokens, devices,
+  agents, agentRuns, deviceRepos, deviceTokens, devices, issueMembers, runChunks, runMessages, users,
   SUPPORTED_HARNESSES, type SupportedHarness,
 } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/device-link'
 import { listSshHosts } from '@/lib/ssh'
-import { addRunMessage, queueRun, readRun, requestRunStop, runViewColumns, type RunDetail, type RunView } from '@/lib/agent-runs'
+import { citationSources } from '@/lib/coordinator/store'
+import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
+import { requireIssueAccess } from '@/lib/issue-access'
+import { workspaceDb } from '@/lib/workspace-db'
+import { teamIssues } from '@/lib/db/team-schema'
+import { workspaceMembers } from '@/lib/db/workspace-schema'
+import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, type IssueThread } from '@/lib/issue-threads'
+import { runIsActive } from '@/lib/issue-run-conversation'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
 async function getUserId(): Promise<string> {
@@ -53,12 +60,10 @@ export interface AgentView {
   deviceName: string | null
 }
 
-export type { RunDetail, RunView } from '@/lib/agent-runs'
-
 /** Every device this person owns, with the repos agents may work in. */
 export async function listDevices(): Promise<DeviceView[]> {
   const userId = await getUserId()
-  const rows = await db.select().from(devices).where(eq(devices.ownerId, userId)).orderBy(desc(devices.lastSeenAt))
+  const rows = await db.select().from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'))).orderBy(desc(devices.lastSeenAt))
   const repos = rows.length
     ? await db.select().from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []
@@ -146,7 +151,7 @@ export async function listAgents(): Promise<AgentView[]> {
     id: agents.id, name: agents.name, description: agents.description, instructions: agents.instructions,
     harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name,
   }).from(agents).leftJoin(devices, eq(devices.id, agents.deviceId))
-    .where(eq(agents.userId, userId)).orderBy(asc(agents.name))
+    .where(and(eq(agents.userId, userId), sql`not exists (select 1 from bot_cloud_runtimes bcr where bcr."agentId" = ${agents.id})`)).orderBy(asc(agents.name))
   return rows
 }
 
@@ -216,28 +221,95 @@ async function ownedDeviceWithHarness(deviceId: string, harness: SupportedHarnes
   return device.harnesses.some(info => info.harness === harness && info.installed) ? device : null
 }
 
-/** Queues one run of one agent against one issue. */
-export async function startRun(input: { issueId: string; agentId: string; deviceRepoId: string }): Promise<{ runId: string }> {
-  return queueRun(await getUserId(), input)
+/** Who currently collaborates on the issue (R-26): they see that its threads exist. */
+async function issueThreadAccess(issueId: string) {
+  const { issue, user } = await requireIssueAccess(issueId)
+  // A team-linked issue follows the same active-workspace membership rule as requireIssueAccess.
+  // Direct issue membership must not resurrect access after removal from its workspace.
+  const [link] = await workspaceDb.select({ workspaceId: teamIssues.workspaceId }).from(teamIssues)
+    .where(eq(teamIssues.issueId, issue.id)).limit(1)
+  let memberIds: string[]
+  if (link) {
+    const members = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, link.workspaceId), eq(workspaceMembers.status, 'active')))
+    memberIds = members.map(member => member.id)
+  } else {
+    const members = await db.select({ id: issueMembers.memberId }).from(issueMembers).where(eq(issueMembers.issueId, issue.id))
+    memberIds = [issue.userId, ...members.map(member => member.id)]
+  }
+  return { issue, user, memberIds: new Set(memberIds) }
 }
 
-export async function listRuns(issueId: string): Promise<RunView[]> {
+const threadColumns = {
+  id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt,
+  report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
+  agentName: sql<string>`coalesce((select b.name from computer_run_bindings crb join bots b on b.id=crb."botId" and b."ownerId"=crb."ownerId" where crb."runId"=${agentRuns.id}), ${agents.name})`, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt,
+}
+
+/** The issue's threads, as much of each as this viewer may see (R-62). */
+export async function listIssueThreads(issueId: string): Promise<IssueThread[]> {
+  const { issue, user, memberIds } = await issueThreadAccess(issueId)
+  if (!memberIds.has(user.id)) return []
+  const rows = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
+    .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds])))
+    .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
+  return projectIssueThreads(rows, issue.id, user.id, memberIds)
+}
+
+async function readableThread(issueId: string, runId: string) {
+  const access = await issueThreadAccess(issueId)
+  if (!z.uuid().safeParse(runId).success) throw new ActionFailureError('runNotFound')
+  const [row] = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.issueId, access.issue.id))).limit(1)
+  if (!row || !canReadThread(row.userId, access.user.id, access.memberIds)) throw new ActionFailureError('runNotFound')
+  return { row, user: access.user }
+}
+
+export interface IssueThreadDetail {
+  /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
+  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null }
+  chunks: { chunk: Record<string, unknown>; at: Date }[]
+  messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
+}
+
+/** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
+export async function getIssueThread(issueId: string, runId: string): Promise<IssueThreadDetail> {
+  const { row, user } = await readableThread(issueId, runId)
+  const chunks = await db.select({ chunk: runChunks.chunk, at: runChunks.createdAt }).from(runChunks)
+    .where(eq(runChunks.runId, row.id)).orderBy(asc(runChunks.seq))
+  const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
+    .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
+    .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
+  const [thread] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
+  return {
+    thread: { ...thread, prompt: row.prompt, stopRequestedAt: row.stopRequestedAt },
+    chunks,
+    messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
+  }
+}
+
+/** Something a person says in a running thread; the daemon delivers it to the agent. */
+export async function sendIssueThreadMessage(input: { issueId: string; runId: string; text: string }): Promise<void> {
+  const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
+  if (!text.success) throw new ActionFailureError('messageRequired')
+  const { row, user } = await readableThread(input.issueId, input.runId)
+  if (!runIsActive(row.status)) throw new ActionFailureError('runNotFound')
+  await addRunMessage(user.id, { runId: row.id, text: text.data })
+}
+
+/**
+ * A thread's name: the task it works on, as "MIK-11 群聊建表" (glossary:
+ * a thread is one run, named for its work, never for its bot). Null when the
+ * run is not this person's or works on no task.
+ */
+export async function getThreadName(runId: string): Promise<string | null> {
   const userId = await getUserId()
-  const parsed = z.uuid().safeParse(issueId)
-  if (!parsed.success) return []
-  const rows = await db.select(runViewColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(and(eq(agentRuns.issueId, parsed.data), eq(agentRuns.userId, userId)))
-    .orderBy(desc(agentRuns.createdAt)).limit(20)
-  return rows
-}
-
-export async function getRun(runId: string): Promise<RunDetail | null> {
-  return readRun(await getUserId(), runId)
-}
-
-/** A message a person sends the running agent; the daemon delivers it. */
-export async function sendRunMessage(input: { runId: string; text: string }): Promise<void> {
-  await addRunMessage(await getUserId(), input)
+  const parsed = z.uuid().safeParse(runId)
+  if (!parsed.success) return null
+  const source = (await citationSources(userId, [`[[run:${parsed.data}]]`]))[parsed.data]
+  if (source?.kind !== 'run' || !source.issue) return null
+  const key = source.issue.identifier ?? (source.issue.number === null ? null : `#${source.issue.number}`)
+  return key ? `${key} ${source.issue.title}` : source.issue.title
 }
 
 /** Asks the daemon to stop the run; it repeats until the run has ended. */

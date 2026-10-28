@@ -1,25 +1,24 @@
 // Applies pending drizzle/*.sql files in order and records each one, so a
-// file runs once per database. Runs as part of `pnpm build`, but only for
-// Vercel production builds unless MIGRATE=1 is set; preview and local builds
-// skip it.
+// file runs once per database. Invoke separately with `pnpm migrate` after
+// approving the target and SQL manifest. Default `pnpm build` never invokes it.
+// Explicit invocation runs in Vercel production or with MIGRATE=1; MIGRATE=0
+// skips before reading files or opening a database.
 //
 // A file targets MIKKA_DATABASE_URL unless its first lines contain
-// `-- target: DATABASE_URL` (the workspace database).
+// `-- target: DATABASE_URL` (the workspace database). In Preview both targets
+// resolve to its explicit DATABASE_URL, matching the application runtime.
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
-import { orderMigrations } from './migration-order.mjs'
+import { alreadyApplied, orderMigrations } from './migration-order.mjs'
+import { migrationTargets } from './migration-targets.mjs'
 
-const shouldRun = process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production'
+const shouldRun = process.env.MIGRATE !== '0' && (process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production')
 if (!shouldRun) {
-  console.log('migrate: skipped (not a Vercel production build; set MIGRATE=1 to force)')
+  console.log('migrate: skipped (explicit MIGRATE=0 or non-production; set MIGRATE=1 to apply)')
   process.exit(0)
 }
 
-const targets = {
-  // ORVILO_DATABASE_URL is the pre-rename name.
-  MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL ?? process.env.ORVILO_DATABASE_URL,
-  DATABASE_URL: process.env.DATABASE_URL,
-}
+const targets = migrationTargets(process.env)
 
 const dir = new URL('../drizzle/', import.meta.url)
 // 旧迁移是 NNNN_*.sql，新迁移是 YYYYMMDDHHMMSS_*.sql（UTC）。按文件名排序时时间戳文件排在所有旧文件之后。
@@ -47,7 +46,7 @@ for (const [target, pending] of byTarget) {
     const { rows } = await pool.query('select name from schema_migrations')
     const applied = new Set(rows.map((row) => row.name))
     for (const { name, sql } of pending) {
-      if (applied.has(name)) continue
+      if (alreadyApplied(name, applied, sql)) continue
       const client = await pool.connect()
       try {
         // Files may manage their own transaction; the record is written after.

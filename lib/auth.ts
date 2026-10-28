@@ -3,17 +3,31 @@ import { createAuthMiddleware } from 'better-auth/api'
 import { multiSession } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
 import { oauthProvider } from '@better-auth/oauth-provider'
+import { expo } from '@better-auth/expo'
 import { oAuthProxy } from 'better-auth/plugins'
 import { pool } from '@/lib/db'
 import { withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
 import { authOAuthProxyOptions, authTrustedOrigins } from '@/lib/auth-config'
+import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
+import { after } from 'next/server'
+import { githubVerifiedProfile } from '@/lib/auth-github-profile'
+import { newUserAvatar } from '@/lib/default-avatar'
+
+/** The iOS app's URL scheme: OAuth returns here, and its requests carry it as their origin. */
+export const MOBILE_APP_ORIGIN = 'mikka://'
 
 export const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
 export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
 export const authBaseURL = appOrigin
 const proxyOptions = authOAuthProxyOptions(process.env)
 export const oauthCallbackBaseURL = proxyOptions?.productionURL ?? authBaseURL
+const email = createAuthEmail({
+  origin: authBaseURL ?? 'http://localhost:3000',
+  apiKey: () => process.env.RESEND_API_KEY,
+  context: async (): Promise<AuthMailContext> => auth.$context,
+  background: task => after(task),
+})
 
 export type DeviceSessionSummary = {
   session: { token: string }
@@ -26,6 +40,8 @@ export const auth = betterAuth({
   database: pool,
   account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } },
   databaseHooks: {
+    // A new account without a picture gets a default avatar now; older accounts are left as they are.
+    user: { create: { before: async user => ({ data: { ...user, image: user.image || newUserAvatar(user.name || user.email) } }) } },
     account: {
       create: { before: async account => ({ data: { ...account, idToken: null } }) },
       update: { before: async account => ({ data: { ...account, idToken: null } }) },
@@ -35,6 +51,8 @@ export const auth = betterAuth({
     ...(githubEnabled ? { github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      getUserInfo: githubVerifiedProfile(),
+      requireEmailVerification: true,
     } } : {}),
     ...(googleEnabled ? { google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -47,10 +65,15 @@ export const auth = betterAuth({
   baseURL: authBaseURL,
   // Its routes sit under the app's base path (app/api/auth → /mikka/api/auth).
   basePath: withBasePath('/api/auth'),
-  emailAndPassword: { enabled: true, autoSignIn: true },
+  emailAndPassword: email.emailAndPassword,
+  emailVerification: email.emailVerification,
+  rateLimit: email.rateLimit,
   trustedOrigins: [
     ...authTrustedOrigins(process.env),
     ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : []),
+    // The iOS app's deep link (apps/mobile app.json scheme); Expo Go uses exp:// while developing.
+    MOBILE_APP_ORIGIN,
+    ...(process.env.NODE_ENV === 'development' ? ['exp://'] : []),
   ],
   // Makes the app an OAuth 2.1 server so agents (Claude Code, Codex…) can sign
   // in to the MCP server at /api/mcp as the person. Clients register
@@ -58,6 +81,8 @@ export const auth = betterAuth({
   // the database, and lib/mcp/auth.ts checks them.
   plugins: [
     ...(proxyOptions ? [oAuthProxy(proxyOptions)] : []),
+    // The iOS app signs in through the system browser and keeps its session cookie in the keychain.
+    expo(),
     multiSession(),
     oauthProvider({
       loginPage: withBasePath('/sign-in'),
@@ -75,7 +100,14 @@ export const auth = betterAuth({
     nextCookies(),
   ],
   hooks: {
+    before: createAuthMiddleware(async ctx => email.before(ctx)),
     after: createAuthMiddleware(async ctx => {
+      if (ctx.path === '/verify-email' || ctx.path?.startsWith('/reset-password')) {
+        ctx.setHeader('referrer-policy', 'no-referrer')
+        ctx.setHeader('cache-control', 'no-store')
+      }
+      const requestResult = await email.publicRequestResult(ctx.path, ctx.context.returned, ctx.request)
+      if (requestResult) return Response.json(requestResult, { status: 202, headers: { 'cache-control': 'no-store' } })
       // Preserve sessions issued before multi-session was enabled when adding the first extra account.
       if (ctx.path !== '/get-session' || !ctx.request || ctx.headers?.get('cookie')?.includes('_multi-')) return
       const active = ctx.context.session

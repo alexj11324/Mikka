@@ -17,3 +17,7 @@ export * from "./relay"
 export * from "./run"
 export * from "./skill"
 export * from "./version"
+
+export * from "./coordinator"
+export * from "./computer"
+export * from "./subscription"

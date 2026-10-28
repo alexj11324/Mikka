@@ -59,11 +59,13 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
   let releasePending = () => {}
   try {
     await scoped.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql', import.meta.url),'utf8'))
-    const migration = await readFile(new URL('../../drizzle/20261025020248_group_turns.sql', import.meta.url),'utf8')
+    const migration = await readFile(new URL('../../drizzle/20261028173000_group_turns.sql', import.meta.url),'utf8')
     await Promise.all([scoped.query(migration),scoped.query(migration)]); await scoped.query(migration)
     // Minimal real agent_runs columns used by the bridge; full tracked schema
     // bootstrap is an independent gate in the same ephemeral-PG17 CI job.
-    await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now())`)
+    await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid)`)
+    await scoped.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text, "lastSeenAt" timestamptz); CREATE TABLE coordinator_sessions ("userId" text, "botId" uuid, "leaseHolder" text, "leaseUntil" timestamptz, "updatedAt" timestamptz)` )
+    for (const member of members) await scoped.query('INSERT INTO agents (id,"userId",name) VALUES ($1,$2,$3)', [member.id, 'owner', member.name])
     const workspaceId = randomUUID()
     const base: GroupRequest = { userId: 'owner', method: 'POST', resource: 'conversations', origin: 'http://localhost:3100', host: 'localhost:3100' }
     const directory = async (w: string,u: string, selected: { memberType: string; memberId: string }[] = []) => w === workspaceId && ['owner','member'].includes(u) && selected.every(m => m.memberType === 'user' ? ['owner','member'].includes(m.memberId) : u === 'owner' && members.some(a => a.id === m.memberId))
@@ -111,6 +113,17 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const activeRuns = async (owner = 'owner', now = new Date()) => (await scoped.query(`SELECT id,"agentId","userId",kind FROM agent_runs WHERE "userId"=$1 AND status IN ('preparing','running','waiting_input','finishing') AND "leaseExpiresAt">$2`, [owner,now])).rows
     const active = await activeRuns()
     assert.equal(active.length,1); assert.equal(active[0].agentId,a); assert.equal(active[0].kind,'group_chat')
+    // Exercise the current main reader and HTTP response against the actual bridge row.
+    const [{ drizzle }, schema, { listActiveAgents, activeAgentsResponse }] = await Promise.all([import('drizzle-orm/node-postgres'), import('../db/schema'), import('../active-agents')])
+    const db = drizzle(scoped, { schema })
+    const request = new Request('http://local/api/agent/sessions/active')
+    const copy = { pleaseSignIn: 'sign in', unavailable: 'unavailable', noParameters: 'no params' }
+    const response = await activeAgentsResponse(request, 'owner', user => listActiveAgents(db, user), copy)
+    assert.equal(response.status, 200)
+    const body = await response.json() as { agents: { id: string; runId: string }[] }
+    assert.equal(body.agents.length, 1); assert.equal(body.agents[0].id, a); assert.equal(body.agents[0].runId, active[0].id)
+    const otherResponse = await activeAgentsResponse(request, 'member', user => listActiveAgents(db, user), copy)
+    assert.deepEqual(await otherResponse.json(), { agents: [] })
     assert.equal((await activeRuns('member')).length,0); assert.equal((await activeRuns('outsider')).length,0)
     assert.equal((await activeRuns('owner',new Date(Date.now()+61000))).length,0) // crash cannot leave perpetual active status
     const laterRoot = await send(id,'not you',[b])

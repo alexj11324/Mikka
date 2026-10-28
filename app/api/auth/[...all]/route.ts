@@ -1,5 +1,7 @@
-import { auth } from '@/lib/auth'
+import { withRequestLog } from '@/lib/request-log'
+import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH } from '@/lib/base-path'
+import { verificationNavigationResponse } from '@/lib/auth-verification-response'
 import { toNextJsHandler } from 'better-auth/next-js'
 
 const handler = toNextJsHandler(auth)
@@ -15,5 +17,7 @@ function withBasePathURL(route: (request: Request) => Promise<Response>) {
   }
 }
 
-export const GET = withBasePathURL(handler.GET)
-export const POST = withBasePathURL(handler.POST)
+export const GET = withRequestLog('/api/auth/[...all]', withBasePathURL(async request => verificationNavigationResponse(
+  request, await handler.GET(request), authBaseURL ?? 'http://localhost:3000',
+)))
+export const POST = withRequestLog('/api/auth/[...all]', withBasePathURL(handler.POST))

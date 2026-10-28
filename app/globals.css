@@ -40,6 +40,7 @@
 --color-destructive: var(--destructive);
 --color-destructive-foreground: var(--destructive-foreground);
 --color-border: var(--border);
+--color-rule: var(--rule);
 --color-input: var(--input);
 --color-ring: var(--ring);
 --color-chart-1: var(--chart-1);
@@ -74,6 +75,10 @@
 --color-success: var(--success);
 --color-label-violet: var(--label-violet);
 --color-label-blue: var(--label-blue);
+--color-attention: var(--attention);
+--color-attention-foreground: var(--attention-foreground);
+--color-screen: var(--screen);
+--color-screen-foreground: var(--screen-foreground);
 /* App shell layers (Nav v3.1): the top bar and icon rail, then the list and right panels, then the conversation. */
 --color-shell-chrome: var(--shell-chrome);
 --color-shell-panel: var(--shell-panel);
@@ -83,6 +88,19 @@
 --color-avatar-3: var(--avatar-3);
 --color-avatar-4: var(--avatar-4);
 --color-avatar-5: var(--avatar-5);
+/* bloub's palette (components/nav/bot-avatar.tsx), for the 新建 Bot colour swatches. */
+--color-bot-encre: var(--bot-encre);
+--color-bot-brun: var(--bot-brun);
+--color-bot-rouge: var(--bot-rouge);
+--color-bot-orange: var(--bot-orange);
+--color-bot-ambre: var(--bot-ambre);
+--color-bot-vert: var(--bot-vert);
+--color-bot-turquoise: var(--bot-turquoise);
+--color-bot-bleu: var(--bot-bleu);
+--color-bot-violet: var(--bot-violet);
+--color-bot-rose: var(--bot-rose);
+--color-bot-gris: var(--bot-gris);
+--color-bot-creme: var(--bot-creme);
 --color-avatar-foreground: var(--avatar-foreground);
 /* Source chips and lists (components/ui/streaming-text), on the shadcn palette so both themes follow. */
 --color-page: var(--page);
@@ -102,6 +120,19 @@
 }
 
 :root {
+--bot-encre: #0a0a0c;
+--bot-brun: #8b5e3c;
+--bot-rouge: #e8483f;
+--bot-orange: #f08a24;
+--bot-ambre: #f0b429;
+--bot-vert: #3ecf8e;
+--bot-turquoise: #2fbfa0;
+--bot-bleu: #3b93f0;
+--bot-violet: #8b5cf6;
+--bot-rose: #e152b0;
+--bot-gris: #a3a3a3;
+--bot-creme: #f1efe9;
+/* The Coordinator's star (Figma 202:4518). */
 --settings-background: oklch(0.98 0.002 286);
 --settings-foreground: oklch(0.145 0 0);
 --settings-card: var(--card);
@@ -157,6 +188,8 @@
 --accent-foreground: oklch(0.205 0 0);
 --destructive: oklch(0.577 0.245 27.325);
 --border: oklch(0.922 0 0);
+/* R-61/R-63 lines on the issue page; dark is a solid grey, never white at low opacity (R-31). */
+--rule: oklch(0.922 0 0);
 --input: oklch(0.922 0 0);
 --ring: oklch(0.708 0 0);
 --chart-1: oklch(0.87 0 0);
@@ -184,6 +217,11 @@
 --warning-foreground: var(--color-yellow-900);
 --invert: var(--color-zinc-900);
 --invert-foreground: var(--color-zinc-50);
+/* The computer: orange while it waits on you or you hold control; the viewer is dark in both themes. */
+--attention: var(--color-orange-500);
+--attention-foreground: var(--color-orange-600);
+--screen: oklch(0.17 0 0);
+--screen-foreground: oklch(0.985 0 0);
 }
 
 .dark {
@@ -222,8 +260,9 @@
 --accent: oklch(0.269 0 0);
 --accent-foreground: oklch(0.985 0 0);
 --destructive: oklch(0.704 0.191 22.216);
---border: oklch(1 0 0 / 10%);
---input: oklch(1 0 0 / 15%);
+--border: oklch(1 0 0 / 6%);
+--rule: oklch(0.269 0 0);
+--input: oklch(1 0 0 / 6%);
 --ring: oklch(0.556 0 0);
 --chart-1: oklch(0.87 0 0);
 --chart-2: oklch(0.556 0 0);
@@ -249,6 +288,10 @@
 --warning-foreground: var(--color-yellow-600);
 --invert: var(--color-zinc-700);
 --invert-foreground: var(--color-zinc-50);
+--attention: var(--color-orange-500);
+--attention-foreground: var(--color-orange-400);
+--screen: oklch(0.17 0 0);
+--screen-foreground: oklch(0.985 0 0);
 }
 
 @layer base {
@@ -262,3 +305,4 @@ body {
   @apply bg-background text-foreground;
 }
 }
+

@@ -30,6 +30,12 @@ export interface RunSource {
   harness: string
   status: string
   issue: { id: string; number: number | null; identifier: string | null; title: string } | null
+  /** The thread's name: the first line of what it was asked to do. */
+  name: string
+  /** How it ended, once it has. */
+  summary: string | null
+  /** Tool calls so far: the steps it handed to the coding agent. */
+  steps: number
   createdAt: string
   finishedAt: string | null
 }

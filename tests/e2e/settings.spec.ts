@@ -13,7 +13,7 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
   await register(page)
   // The conversation list is an in-flow sidebar (collapsible="none"), not the offcanvas container.
   const workspaceSidebar = page.locator('[data-slot="sidebar"]')
-  await expect(workspaceSidebar.getByRole('button', { name: '新对话', exact: true })).toBeVisible()
+  await expect(workspaceSidebar.getByRole('button', { name: '新建 Bot', exact: true })).toBeVisible()
   await expect(workspaceSidebar.getByRole('link', { name: '浏览与管理团队', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeEnabled()
   await page.route('**/*', route => {
@@ -234,8 +234,8 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   await expect(form).not.toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(sidebar.getByRole('link', { name: '设置回归团队', exact: true })).toHaveAttribute('aria-current', 'page')
-  await expect(sidebar.locator('[data-slot="sidebar-group-label"]')).toHaveText(['Personal', 'Administration', 'Your teams'])
-  const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^Administration$/ }) })
+  await expect(sidebar.locator('[data-slot="sidebar-group-label"]')).toHaveText(['个人', '管理', '你的团队'])
+  const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^管理$/ }) })
   await expect(administration.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['工作区', '团队', '成员'])
   await expect(sidebar.locator('[data-slot="sidebar-menu-sub"]')).toHaveCount(0)
   await expect(sidebar.getByRole('link', { name: '团队常规设置', exact: true })).toHaveCount(0)

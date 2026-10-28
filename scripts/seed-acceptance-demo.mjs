@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto'
 import { Pool } from 'pg'
 
 const email = process.argv[2]
-if (!/^acceptance-[\da-f-]+@preview\.(mikka|orvilo)\.invalid$/.test(email ?? '')) throw new Error('Provide an existing Acceptance Guest email')
-const main = new Pool({ connectionString: process.env.MIKKA_DATABASE_URL ?? process.env.ORVILO_DATABASE_URL, max: 1 })
+if (!/^acceptance-[\da-f-]+@preview\.mikka\.invalid$/.test(email ?? '')) throw new Error('Provide an existing Acceptance Guest email')
+const main = new Pool({ connectionString: process.env.MIKKA_DATABASE_URL, max: 1 })
 const projects = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 })
 const id = key => {
   const h = createHash('sha256').update(`${email}:demo-v1:${key}`).digest('hex')
@@ -37,7 +37,7 @@ try {
       const metadata = { number: ++next, project: group.name, assignee: { kind: 'member', id: member.id, name: member.name, image: null }, labels: [{ name: '演示数据', color: 'gray' }, { name: ['体验优化', '平台开发', '质量保障'][g], color: ['violet', 'blue', 'green'][g] }], pullRequests: [], parentId: i === 1 ? id(`issue-${g}-0`) : null, blockedByIds: i === 2 ? [id(`issue-${g}-1`)] : [], relatedIds: i === 3 ? [id(`issue-${g}-2`)] : [], duplicateOfId: i === 6 ? id(`issue-${g}-1`) : null, dueDate: `2026-11-${String(2 + g * 7 + i).padStart(2, '0')}`, estimate: [1, 2, 3, 5][i % 4], favoriteUserIds: i === 2 ? [guest.id] : [], subscriberUserIds: [guest.id], deletedAt: null }
       const content = { type: 'doc', attrs: { mikka: metadata }, content: [{ type: 'paragraph', content: [{ type: 'text', text: `这是 ${group.name} 的演示任务，支持编辑、状态切换、成员分配和项目关联。` }] }, { type: 'paragraph', content: [{ type: 'text', text: '验收标准：交互反馈清晰；刷新后数据保留；桌面与移动端均可使用。' }] }] }
       const inserted = await main.query('INSERT INTO issues (id,"userId",title,content,status,priority,revision) VALUES ($1,$2,$3,$4,$5,$6,1) ON CONFLICT (id) DO NOTHING RETURNING id', [issueId, guest.id, title, JSON.stringify(content), statuses[i], priorities[(g + i) % 4]])
-      if (inserted.rowCount) await main.query('INSERT INTO issue_versions (id,"issueId","userId",revision,title,content,status,priority) VALUES ($1,$2,$3,1,$4,$5,$6,$7)', [id(`version-${g}-${i}`), issueId, guest.id, title, JSON.stringify(content), statuses[i], priorities[(g + i) % 4]])
+      if (inserted.rowCount) await main.query('INSERT INTO issue_versions (id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id) VALUES ($1,$2,$3,1,$4,$5,$6,$7,$8,$9)', [id(`version-${g}-${i}`), issueId, guest.id, title, JSON.stringify(content), statuses[i], priorities[(g + i) % 4], 'system', 'acceptance-seed'])
       for (const collaborator of members.slice(1)) await main.query('INSERT INTO issue_members ("issueId","userId","memberId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [issueId, guest.id, collaborator.id])
     }
     await main.query('COMMIT')

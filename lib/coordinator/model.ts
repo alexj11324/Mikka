@@ -1,18 +1,19 @@
+import { roundStep } from '@/lib/agent-rounds'
+
 /**
  * The Coordinator's model, through Vercel AI Gateway. On Vercel the gateway
  * signs in with the deployment's OIDC token; elsewhere set AI_GATEWAY_API_KEY.
  */
-export const COORDINATOR_MODEL = 'deepseek/deepseek-v4.1-flash-1017'
-
-/** Tool-call rounds the Coordinator may take to answer one batch of messages. */
-export const COORDINATOR_MAX_STEPS = 20
+export const COORDINATOR_MODEL = 'nvidia/nemotron-3.5-lightning-free'
 
 /**
- * Tools are off for the last allowed step, so a turn that runs out of steps
- * still ends with a reply instead of a tool call nobody answers.
+ * Settings for the Coordinator's next step under the shared round cap
+ * (lib/agent-rounds.ts): the round notice rides on the instructions, and the
+ * last round has tools off so the turn still ends with a reply.
  */
-export function coordinatorStep({ stepNumber }: { stepNumber: number }): { toolChoice?: 'none' } {
-  return stepNumber >= COORDINATOR_MAX_STEPS - 1 ? { toolChoice: 'none' } : {}
+export function coordinatorStep({ stepNumber, initialInstructions }: { stepNumber: number; initialInstructions?: unknown }): { toolChoice?: 'none'; system?: string } {
+  const { toolChoice, instructions } = roundStep(stepNumber, typeof initialInstructions === 'string' ? initialInstructions : '')
+  return { ...(toolChoice ? { toolChoice } : {}), ...(instructions && typeof initialInstructions === 'string' ? { system: instructions } : {}) }
 }
 
 /**

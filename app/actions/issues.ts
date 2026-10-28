@@ -1,12 +1,13 @@
 'use server'
 
-import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
 import { currentUser } from '@/lib/acting-user'
 import { accessibleTeams } from '@/lib/team-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { issueVisibility } from '@/lib/issue-visibility'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
 import { issues, issueVersions, issueMembers, linearIssueLinks, users } from '@/lib/db/schema'
@@ -18,13 +19,12 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
 import { ensureIssueNumbers } from '@/lib/issue-numbering'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
-import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
+import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
-import { wakeCoordinator } from '@/lib/coordinator/wake'
-import { after } from 'next/server'
-import { judgeIssueScope } from '@/lib/issue-scope-judge'
 import { TASK_SCOPES } from '@/lib/task-identifier'
+import { enrichActivityActors } from '@/lib/activity-actor-server'
+import { activityActor } from '@/lib/activity-actor'
 
 type IssueRow = typeof issues.$inferSelect
 type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null }
@@ -58,11 +58,10 @@ export async function listIssues() {
   const userId = await getUserId()
   const context = await loadWorkspaceContext()
   const teams = await accessibleTeams(userId, context.workspace.id)
-  const publicLinks = await issueTeamScope(userId)
-  const publicIds = publicLinks.map(link => link.issueId)
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(or(eq(issues.userId, userId), eq(issueMembers.memberId, userId), publicIds.length ? inArray(issues.id, publicIds) : undefined), sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
+  const visibility = await issueVisibility(userId)
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
   const links = await issueTeamScope(userId, rows.map(row => row.id))
-  const visibleRows = rows.filter(row => { const link = links.find(item => item.issueId === row.id); return !link || teams.some(team => team.id === link.teamId) })
+  const visibleRows = rows.filter(row => { const link = links.find(item => item.issueId === row.id); return row.scope === 'personal' || !link || teams.some(team => team.id === link.teamId) })
   const ownersWithoutNumbers = [...new Set(visibleRows.filter(row => !readIssueMetadata(row.content).number).map(row => row.ownerId))]
   if (ownersWithoutNumbers.length) {
     for (const ownerId of ownersWithoutNumbers) await ensureIssueNumbers(ownerId)
@@ -99,7 +98,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     try {
       const result = await db.transaction(async tx => {
         if (!id) {
-          const issue = await createIssueForUserInTransaction(tx, userId, parsed.data)
+          const issue = await createIssueForUserInTransaction(tx, userId, parsed.data, activityActor(userId))
           return issue ? { issue } : { error: 'issueCreateFailed' }
         }
         let issue
@@ -112,12 +111,12 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
           doneEvent = true
         }
         if (!issue) return { error: 'issueStale' }
-        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority })
+        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
         return { issue: await issueView(issue, tx) }
       })
-      if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
-      if (!id && 'issue' in result && result.issue) { const created = result.issue.id; after(() => judgeIssueScope(created, 'the Mikka app')) }
-      if (doneEvent && 'issue' in result) after(() => wakeCoordinator(ownerId))
+      if ('issue' in result && result.issue) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
+      if (!id && 'issue' in result && result.issue) scheduleIssueEffect({ kind: 'scope', issueId: result.issue.id })
+      if (doneEvent && 'issue' in result) scheduleIssueEffect({ kind: 'wake', userId: ownerId })
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
@@ -152,7 +151,8 @@ export async function changeIssuePriority(input: { id: string; priority: string;
 export async function listIssueVersions(id: string) {
   const { issue } = await requireIssueAccess(id)
   const userId = issue.userId
-  return db.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
+  const versions = await db.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
+  return enrichActivityActors(versions, userId)
 }
 
 /**
@@ -175,9 +175,10 @@ export async function setIssueScope(input: { id: string; revision: number; scope
       const [saved] = await tx.update(issues).set({ scope: parsed.data.scope, scopeSetBy: 'user', scopeConfidence: null, revision: parsed.data.revision + 1, updatedAt: new Date() })
         .where(and(eq(issues.id, issue.id), eq(issues.userId, userId), eq(issues.revision, parsed.data.revision))).returning()
       if (!saved) return { error: 'issueStale' as const }
+      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })
       return { issue: await issueView(saved, tx) }
     })
-    if ('issue' in result && parsed.data.scope === 'workspace') dispatchLinearIssueSync(issue.id)
+    if ('issue' in result && parsed.data.scope === 'workspace') scheduleIssueEffect({ kind: 'sync', issueId: issue.id })
     return result
   })
 }

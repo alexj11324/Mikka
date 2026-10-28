@@ -25,13 +25,17 @@ import {
 import { jsonlConnection } from "../agents/jsonl-rpc"
 import {
   MCP_SERVER_NAME,
+  COMPUTER_MCP_SERVER_NAME,
   RESUME_MESSAGE,
   RunContext,
   runPaths,
+  type McpServerSpec,
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
+import { buildChildEnv } from "../env"
+import { mailboxToolResult } from '../run-mailbox'
 import type {
   DeltaNotification,
   ErrorNotification,
@@ -42,6 +46,7 @@ import type {
   TokenUsageNotification,
   TurnNotification,
   UserInput,
+  ChatGPTAuthTokens
 } from "./codex-protocol"
 import type {
   AgentAdapter,
@@ -55,8 +60,49 @@ export interface CodexAdapterOptions {
   /** The daemon's adapter state dir (per-run dirs and homes live under it). */
   stateDir: string
   binary?: string
+  /** Trusted hosted transport, retaining the existing app-server adapter. */
+  spawnCli?: typeof spawnCli
+  /** Persist an owner-bound session before any prompt can execute. */
+  onHostedSession?(sessionId:string):Promise<void>
+  /** Supplied only by trusted hosted infrastructure for this run. */
+  computerMcp?: McpServerSpec
   /** The user's own `CODEX_HOME` (for the auth link); `~/.codex` by default. */
   userHome?: string
+  /** Trusted, owner-bound broker only; never a task/model-supplied credential. */
+  subscriptionAuth?: {
+    accountId: string
+    verify?(): Promise<void>
+    /** `true` handles the official app-server's explicit token-refresh request. */
+    token(forceRefresh: boolean): Promise<ChatGPTAuthTokens>
+  }
+}
+
+const SUBSCRIPTION_AUTH_ERROR = "Codex subscription authentication unavailable"
+const SUBSCRIPTION_EXECUTION_ERROR = "Codex subscription execution failed"
+
+function subscriptionTokens(
+  value: ChatGPTAuthTokens,
+  accountId: string
+): ChatGPTAuthTokens {
+  if (
+    !value ||
+    value.chatgptAccountId !== accountId ||
+    !/^[A-Za-z0-9_-]{1,128}$/.test(accountId) ||
+    typeof value.accessToken !== "string" ||
+    value.accessToken.length < 1 ||
+    value.accessToken.length > 32768 ||
+    /[\r\n\0]/.test(value.accessToken) ||
+    (value.chatgptPlanType !== undefined &&
+      (typeof value.chatgptPlanType !== "string" ||
+        !/^[A-Za-z0-9 _-]{1,40}$/.test(value.chatgptPlanType)))
+  )
+    throw new Error(SUBSCRIPTION_AUTH_ERROR)
+  // Select fields explicitly: refresh/ID tokens and arbitrary metadata never cross.
+  return {
+    accessToken: value.accessToken,
+    chatgptAccountId: accountId,
+    ...(value.chatgptPlanType ? { chatgptPlanType: value.chatgptPlanType } : {})
+  }
 }
 
 /** What a follow-up run copies from the earlier run's `CODEX_HOME`. */
@@ -212,8 +258,23 @@ export class CodexAdapter implements AgentAdapter {
       Partial<Pick<StartOptions, "prompt" | "continueSession">>
   ): Promise<AgentSession> {
     const log = options.log.child({ harness: "codex" })
+    if (options.mailbox && mode !== 'new') throw new Error('Run mailbox requires a fresh Codex thread; resume capability is unverified')
     const paths = runPaths(this.options.stateDir, options.runId)
     const runDir = await claimRunDir(paths)
+    const externalAuth = this.options.subscriptionAuth
+    if (externalAuth) {
+      const clean = buildChildEnv({
+        host: options.env,
+        runId:
+          options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId
+      })
+      if (
+        Object.entries(options.env).some(
+          ([name, value]) => clean[name] !== value
+        )
+      )
+        throw new Error(SUBSCRIPTION_AUTH_ERROR)
+    }
     if (mode === "continue" && options.continueSession) {
       try {
         const earlier = runPaths(
@@ -233,9 +294,11 @@ export class CodexAdapter implements AgentAdapter {
     const codexHome = prepareCodexHome(
       join(runDir, "codex-home"),
       log,
-      this.options.userHome
+      this.options.userHome,
+      !externalAuth
     )
     const ctx = new RunContext({
+      mailboxEnabled: Boolean(options.mailbox),
       harness: "codex",
       kind: options.kind,
       worktree: options.cwd,
@@ -262,6 +325,11 @@ export class CodexAdapter implements AgentAdapter {
         "-c",
         `mcp_servers.${MCP_SERVER_NAME}.env.${key}=${toml(value)}`,
       ]),
+      ...(this.options.computerMcp ? [
+        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.command=${toml(this.options.computerMcp.command)}`,
+        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.args=${toml(this.options.computerMcp.args)}`,
+        ...Object.entries(this.options.computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
+      ] : []),
       // Its shells get a filtered env; give them writable temp dirs.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
         "-c",
@@ -269,7 +337,7 @@ export class CodexAdapter implements AgentAdapter {
       ]),
     ]
     const checkAuth = guardCodexAuth(codexHome.authFile, log)
-    const child = await spawnCli(this.options.sandbox, argv, {
+    const child = await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, {
       cwd: ctx.worktree,
       env: { ...options.env, ...ctx.tempEnv(), CODEX_HOME: codexHome.home },
       policy: ctx.policy(),
@@ -286,6 +354,7 @@ export class CodexAdapter implements AgentAdapter {
     const streamed = new Set<string>()
     const pending: string[] = []
     let activeTurn: string | null = null
+    let pendingTurnStart: Promise<void> | null = null
     let ending = false
     let lastError: string | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
@@ -307,13 +376,42 @@ export class CodexAdapter implements AgentAdapter {
     }
 
     // Mikka's sandbox decides; inside it every action is allowed.
-    rpc.onRequest((method) => {
+    rpc.onRequest(async (method, params: unknown) => {
+      if (method === 'item/tool/call') {
+        if (pendingTurnStart) await pendingTurnStart
+        const call = params as { threadId?: unknown; turnId?: unknown; namespace?: unknown; tool?: unknown; arguments?: unknown }
+        const valid = options.mailbox && !ending && call.threadId === sessionId && call.turnId === activeTurn && activeTurn !== null && call.namespace === null && typeof call.tool === 'string'
+        const result = valid ? mailboxToolResult(await options.mailbox!.request({ operation: 'call', name: call.tool, arguments: call.arguments })) : { isError: true, content: [{ type: 'text' as const, text: 'Run mailbox scope unavailable' }] }
+        return { contentItems: result.content.map(part => ({ type: 'inputText', text: part.text })), success: !result.isError }
+      }
+      if (method === "account/chatgptAuthTokens/refresh") {
+        const previous =
+          params && typeof params === "object" && "previousAccountId" in params
+            ? params.previousAccountId
+            : undefined
+        if (!externalAuth || previous !== externalAuth.accountId) {
+          void finish({ outcome: "failed", error: SUBSCRIPTION_AUTH_ERROR })
+          throw new Error(SUBSCRIPTION_AUTH_ERROR)
+        }
+        try {
+          return subscriptionTokens(
+            await externalAuth.token(true),
+            externalAuth.accountId
+          )
+        } catch {
+          void finish({ outcome: "failed", error: SUBSCRIPTION_AUTH_ERROR })
+          throw new Error(SUBSCRIPTION_AUTH_ERROR)
+        }
+      }
       if (method.endsWith("requestApproval") || method.endsWith("Approval"))
         return { decision: "accept" }
       log.warn({ method }, "unhandled codex request; declining")
       return { decision: "decline" }
     })
     rpc.onNotification((method: string, params: unknown) => {
+      // A subagent/late foreign thread cannot rewrite the authority of this
+      // host-bound run. Turn authority comes from our turn/start response.
+      if (options.mailbox && (method.startsWith('item/') || method.startsWith('turn/') || method === 'thread/tokenUsage/updated') && (params as { threadId?: unknown } | null)?.threadId !== sessionId) return
       switch (method) {
         case "item/agentMessage/delta": {
           const { itemId, delta } = params as DeltaNotification
@@ -347,7 +445,7 @@ export class CodexAdapter implements AgentAdapter {
           return
         }
         case "turn/started":
-          activeTurn = (params as TurnNotification).turn.id
+          if (!options.mailbox) activeTurn = (params as TurnNotification).turn.id
           return
         case "thread/tokenUsage/updated": {
           const { total } = (params as TokenUsageNotification).tokenUsage
@@ -359,10 +457,21 @@ export class CodexAdapter implements AgentAdapter {
         }
         case "error": {
           const { error, willRetry } = params as ErrorNotification
-          if (!willRetry) lastError = `Codex: ${error.message}`
+          if (!willRetry)
+            lastError = externalAuth
+              ? SUBSCRIPTION_EXECUTION_ERROR
+              : `Codex: ${error.message}`
           return
         }
         case "turn/completed":
+          if (options.mailbox && pendingTurnStart) {
+            const completed = (params as TurnNotification).turn
+            void pendingTurnStart.then(() => {
+              if (!ending && completed.id === activeTurn) { activeTurn = null; return turnCompleted(completed) }
+            }).catch(() => undefined)
+            return
+          }
+          if (options.mailbox && (params as TurnNotification).turn.id !== activeTurn) return
           activeTurn = null
           void turnCompleted((params as TurnNotification).turn)
           return
@@ -388,16 +497,23 @@ export class CodexAdapter implements AgentAdapter {
       const next = pending.shift()
       if (next) {
         await startTurn(next).catch((error: unknown) =>
-          finish({ outcome: "failed", error: `Codex: ${errorMessage(error)}` })
+          finish({
+            outcome: "failed",
+            error: externalAuth
+              ? SUBSCRIPTION_EXECUTION_ERROR
+              : `Codex: ${errorMessage(error)}`
+          })
         )
         return
       }
       if (turn.status === "failed" || lastError) {
         return finish({
           outcome: "failed",
-          error: turn.error?.message
-            ? `Codex: ${turn.error.message}`
-            : lastError,
+          error: externalAuth
+            ? SUBSCRIPTION_EXECUTION_ERROR
+            : turn.error?.message
+              ? `Codex: ${turn.error.message}`
+              : lastError
         })
       }
       return finish({ outcome: "succeeded" })
@@ -406,11 +522,22 @@ export class CodexAdapter implements AgentAdapter {
     let sessionId = threadId ?? ""
     const startTurn = async (message: string) => {
       lastError = undefined
-      const { turn } = await rpc.sendRequest<{ turn: { id: string } }>(
-        "turn/start",
-        { threadId: sessionId, input: text(message) }
-      )
-      activeTurn ??= turn.id
+      if (externalAuth?.verify) {
+        try { await externalAuth.verify() } catch { throw new Error(SUBSCRIPTION_AUTH_ERROR) }
+      }
+      const result = rpc.sendRequest<{ turn: { id: string } }>("turn/start", {
+        threadId: sessionId,
+        input: text(message)
+      })
+      const response = (externalAuth
+        ? result.catch(() => {
+            throw new Error(SUBSCRIPTION_EXECUTION_ERROR)
+          })
+        : result)
+      if (options.mailbox) {
+        pendingTurnStart = response.then(({ turn }) => { if (!ending) activeTurn = turn.id })
+        try { await pendingTurnStart } finally { pendingTurnStart = null }
+      } else { const { turn } = await response; activeTurn ??= turn.id }
     }
 
     void child.exited.then(({ code, signal }) => {
@@ -421,30 +548,55 @@ export class CodexAdapter implements AgentAdapter {
       if (handoff) return queue.exit(handoff)
       queue.exit({
         outcome: "failed",
-        error: `codex app-server exited (${signal ?? code}): ${child.stderrTail() || "no output"}`,
+        error: externalAuth
+          ? SUBSCRIPTION_EXECUTION_ERROR
+          : `codex app-server exited (${signal ?? code}): ${child.stderrTail() || "no output"}`
       })
     })
 
     const ready = <T>(step: Promise<T>, label: string) =>
       untilReady(child, step, `codex ${label}`)
     try {
-      await ready(
-        rpc.sendRequest("initialize", {
+      const initialized = await ready(
+        rpc.sendRequest<{ userAgent?: string }>("initialize", {
           clientInfo: {
             name: "mikka",
             title: "Mikka",
             version: DAEMON_VERSION,
           },
-          capabilities: null,
+          capabilities: externalAuth || options.mailbox ? { experimentalApi: true } : null
         }),
         "initialize"
       )
+      // Public schemas omit the experimental dynamicTools field. Support only
+      // the exact pinned CLI whose Rust protocol and response were audited.
+      if (options.mailbox && !/(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(initialized.userAgent ?? '')) throw new Error('Run mailbox requires the audited Codex0.163.0 dynamic-tools interface')
       await rpc.sendNotification("initialized")
+      if (externalAuth) {
+        try {
+          const auth = subscriptionTokens(
+            await externalAuth.token(false),
+            externalAuth.accountId
+          )
+          const loggedIn = await ready(
+            rpc.sendRequest<{ type: string }>("account/login/start", {
+              type: "chatgptAuthTokens",
+              ...auth
+            }),
+            "subscription login"
+          )
+          if (loggedIn.type !== "chatgptAuthTokens")
+            throw new Error(SUBSCRIPTION_AUTH_ERROR)
+        } catch {
+          throw new Error(SUBSCRIPTION_AUTH_ERROR)
+        }
+      }
       const thread: ThreadStartParams = {
         cwd: ctx.worktree,
         approvalPolicy: "never",
         sandbox: "danger-full-access",
         developerInstructions: ctx.instructions(),
+        ...(options.mailbox ? { dynamicTools: options.mailbox.tools.map(tool => ({ type: 'function' as const, ...tool })) } : {}),
         ...(options.model ? { model: options.model } : {}),
       }
       const newThread = () =>
@@ -464,7 +616,7 @@ export class CodexAdapter implements AgentAdapter {
             "thread/resume"
           )
         } catch (error) {
-          if (mode !== "continue" || ending) throw error
+          if (externalAuth || mode !== "continue" || ending) throw error
           log.info(
             { err: error, thread_id: threadId },
             "could not continue the earlier codex thread; starting a new one"
@@ -475,9 +627,11 @@ export class CodexAdapter implements AgentAdapter {
         }
       }
       sessionId = response.thread.id
+      if(externalAuth)await this.options.onHostedSession?.(sessionId)
       await ready(startTurn(firstMessage), "turn/start")
     } catch (error) {
       await finish(null)
+      if (externalAuth) throw new Error(SUBSCRIPTION_AUTH_ERROR)
       throw new Error(
         `Could not start codex app-server: ${errorMessage(error)}. ${child.stderrTail()}`.trim(),
         { cause: error }

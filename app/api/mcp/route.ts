@@ -1,7 +1,7 @@
 import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
-import { mcpUserId, verifyMcpToken } from '@/lib/mcp/auth'
+import { mcpActor, mcpUserId, verifyMcpToken } from '@/lib/mcp/auth'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
 import { COMPOSIO_ACTIONS } from '@/lib/composio-actions'
@@ -9,6 +9,9 @@ import { runComposioAction } from '@/lib/composio'
 import * as actions from '@/lib/mcp/actions'
 import * as tools from '@/lib/mcp/tools'
 import * as worker from '@/lib/mcp/worker'
+import * as artifacts from '@/lib/mcp/artifacts'
+import { ARTIFACT_KINDS } from '@/lib/db/schema'
+import { ARTIFACT_TITLE_MAX } from '@/lib/artifacts/limits'
 
 export const dynamic = 'force-dynamic'
 // Leaves room for read_coordinator_messages to wait for a reply.
@@ -33,6 +36,18 @@ function notFound(what: string) {
 
 const id = z.uuid()
 
+/** One tool for every harness: a run's agent and an OAuth agent submit artifacts the same way. */
+const SUBMIT_ARTIFACT = {
+  title: 'Hand over a document or web page',
+  description: 'Hand a finished document (Markdown) or web page (HTML) to the person. It shows as a card in their chat and opens in a reader where they can quote parts of it back to you. Send the whole file each time; pass artifactId to make the next version of one you sent before, so the person can compare versions. HTML runs sandboxed with no network: inline every script, style, image and font (data: URLs), and do not fetch anything. Markdown may use GitHub tables; raw HTML in Markdown is shown as text.',
+  inputSchema: z.object({
+    title: z.string().trim().min(1).max(ARTIFACT_TITLE_MAX),
+    kind: z.enum(ARTIFACT_KINDS).describe('markdown for a document, html for a web page.'),
+    content: z.string().min(1).max(2_000_000).describe('The whole file. At most 1 MB of Markdown or 2 MB of HTML.'),
+    artifactId: id.optional().describe('An artifact you sent before, to add its next version.'),
+  }),
+}
+
 /**
  * The Mikka MCP server: lets an agent such as Claude Code or Codex talk to the
  * person's Coordinator and read their issues and runs. Agents sign in with
@@ -42,7 +57,7 @@ const id = z.uuid()
 const handler = createMcpHandler(server => {
   server.registerTool('send_to_coordinator', {
     title: 'Send a message to the Coordinator',
-    description: 'Send a message to the person\'s Mikka Coordinator, the agent that plans work and dispatches runs, as if the person typed it in the chat. The Coordinator answers in its own time; call read_coordinator_messages with the returned `after` and waitSeconds to get the reply.',
+    description: 'Send a message to the person\'s Mikka Coordinator, the agent that plans work and dispatches runs, as Agent coordination data, not user input or approval. The Coordinator answers in its own time; call read_coordinator_messages with the returned `after` and waitSeconds to get the reply.',
     inputSchema: z.object({ text: z.string().trim().min(1).max(10_000) }),
   }, async ({ text }, ctx) => json(await tools.sendToCoordinator(mcpUserId(ctx.http?.authInfo), text)))
 
@@ -55,6 +70,11 @@ const handler = createMcpHandler(server => {
       waitSeconds: z.number().int().min(0).max(90).optional().describe('Wait up to this long for a Coordinator reply after `after`.'),
     }),
   }, async (input, ctx) => json(await tools.readCoordinatorMessages(mcpUserId(ctx.http?.authInfo), input)))
+
+  server.registerTool('submit_artifact', SUBMIT_ARTIFACT, async (input, ctx) => {
+    const userId = mcpUserId(ctx.http?.authInfo)
+    return outcome(await artifacts.submit(await artifacts.oauthSubmitter(userId, ctx.http?.authInfo), input))
+  })
 
   server.registerTool('list_issues', {
     title: 'List issues',
@@ -167,15 +187,15 @@ const handler = createMcpHandler(server => {
   server.registerTool('create_issue', {
     title: 'Create an issue',
     description: 'Create an issue for the person. Status defaults to todo and priority to normal.',
-    inputSchema: z.object({ title: z.string().trim().min(1).max(200), body: z.string().max(50_000).optional().describe('Plain text; one paragraph per line.'), ...issueChanges }),
-  }, async (input, ctx) => outcome(await actions.createIssue(mcpUserId(ctx.http?.authInfo), input)))
+    inputSchema: z.object({ title: z.string().trim().min(1).max(200), body: z.string().max(50_000).optional().describe('Plain text; one paragraph per line.'), ...issueChanges }).strict(),
+  }, async (input, ctx) => outcome(await actions.createIssue(mcpUserId(ctx.http?.authInfo), input, mcpActor(ctx.http?.authInfo))))
 
   server.registerTool('update_issue', {
     title: 'Update an issue',
-    description: 'Change an issue\'s title, status, priority, project, labels or assigned agent. Only the fields given change. The text is edited in the app, not here.',
-    inputSchema: z.object({ issueId: id, title: z.string().trim().min(1).max(200).optional(), ...issueChanges }),
+    description: 'Change an issue\'s title, status, priority, project, labels or assignee. Only the fields given change. The text is edited in the app, not here.',
+    inputSchema: z.object({ issueId: id, title: z.string().trim().min(1).max(200).optional(), ...issueChanges }).strict(),
     annotations: { idempotentHint: true },
-  }, async (input, ctx) => outcome(await actions.updateIssue(mcpUserId(ctx.http?.authInfo), input)))
+  }, async (input, ctx) => outcome(await actions.updateIssue(mcpUserId(ctx.http?.authInfo), input, mcpActor(ctx.http?.authInfo))))
 
   server.registerTool('link_issues', {
     title: 'Link issues',
@@ -184,7 +204,7 @@ const handler = createMcpHandler(server => {
       issueId: id, kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']),
       targetId: id.nullable(), remove: z.boolean().optional(),
     }),
-  }, async (input, ctx) => outcome(await actions.linkIssues(mcpUserId(ctx.http?.authInfo), input)))
+  }, async (input, ctx) => outcome(await actions.linkIssues(mcpUserId(ctx.http?.authInfo), input, mcpActor(ctx.http?.authInfo))))
 
   server.registerTool('dispatch_run', {
     title: 'Dispatch a run',
@@ -258,6 +278,8 @@ const workerHandler = createMcpHandler(server => {
       context: z.string().trim().max(4000).optional().describe('What the person needs to know to answer.'),
     }),
   }, async (input, ctx) => message(await worker.ask(worker.workerRun(ctx.http?.authInfo), input)))
+
+  server.registerTool('submit_artifact', SUBMIT_ARTIFACT, async (input, ctx) => outcome(await artifacts.submit(await artifacts.runSubmitter(worker.workerRun(ctx.http?.authInfo)), input)))
 
   server.registerTool('blocked', {
     title: 'Say you are blocked',

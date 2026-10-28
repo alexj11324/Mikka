@@ -53,7 +53,7 @@ export function InviteMembersDialog({
 }: {
   workspaceId: string;
   workspaceName: string;
-  currentUser: { email: string; image?: string | null };
+  currentUser: { name?: string | null; email: string; image?: string | null };
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => Promise<unknown>;

@@ -19,6 +19,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { IssueAssigneeMenu } from './issue-assignee-menu'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { cn } from '@/lib/utils'
+import { ROW_VALUE } from './issue-property-row'
 
 export type MetadataSavedIssue = Extract<Awaited<ReturnType<typeof updateIssueMetadata>>, { issue: unknown }>['issue']
 type Target = 'project' | 'labels' | 'pullRequests' | 'invite'
@@ -112,10 +113,12 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   return <>
     {(section === 'all' || section === 'assignee') && <IssueAssigneeMenu request={request} id={task.id} assignee={metadata.assignee} compact={compact} disabled={busy} onChange={assignee => persist({ assignee })} onInvite={() => open('invite')} />}
     {section !== 'assignee' && <>
-      {(section === 'all' || section === 'properties' || section === 'project') && <Button variant={section === 'project' ? 'ghost' : 'outline'} size={section === 'project' ? 'sm' : 'xs'} type="button" className={cn('h-auto max-w-full justify-start whitespace-normal text-left', section !== 'project' && 'rounded-full')} disabled={busy} onClick={() => open('project')} title={metadata.project ?? tProperty('setProject')} aria-label={tProperty('projectAria', { name: metadata.project ?? tProperty('unset') })}><Box data-icon="inline-start" className="shrink-0" /><span>{metadata.project ?? tProperty('addToProject')}</span></Button>}
+      {(section === 'all' || section === 'properties' || section === 'project') && <Button variant={section === 'project' ? 'ghost' : 'outline'} size={section === 'project' ? 'sm' : 'xs'} type="button" className={cn(section === 'project' ? ROW_VALUE : 'h-auto max-w-full justify-start whitespace-normal rounded-full text-left')} disabled={busy} onClick={() => open('project')} title={metadata.project ?? tProperty('setProject')} aria-label={tProperty('projectAria', { name: metadata.project ?? tProperty('unset') })}><Box data-icon="inline-start" className="shrink-0" /><span className={cn(section === 'project' && 'truncate', !metadata.project && 'text-muted-foreground')}>{metadata.project ?? tProperty('addToProject')}</span></Button>}
       {(section === 'all' || section === 'properties' || section === 'labels') && <>
       {metadata.labels.map(label => <Button key={label.name} variant="outline" size="xs" type="button" className="max-w-full rounded-full" disabled={busy} onClick={() => open('labels')} aria-label={tProperty('editLabelAria', { name: label.name })}><LabelDot color={label.color} /><span className="truncate">{label.name}</span></Button>)}
-      {!metadata.labels.length && <Button variant="outline" size="xs" type="button" className="rounded-full" disabled={busy} onClick={() => open('labels')}><Tag data-icon="inline-start" />{tProperty('labels')}</Button>}
+      {!metadata.labels.length && (section === 'labels'
+        ? <Button variant="ghost" size="sm" type="button" className={ROW_VALUE} disabled={busy} onClick={() => open('labels')}><Tag data-icon="inline-start" /><span className="text-muted-foreground">{tProperty('addLabels')}</span></Button>
+        : <Button variant="outline" size="xs" type="button" className="rounded-full" disabled={busy} onClick={() => open('labels')}><Tag data-icon="inline-start" />{tProperty('labels')}</Button>)}
       </>}
       {(section === 'all' || section === 'properties' || section === 'pullRequests') && <>
       {metadata.pullRequests.map(pr => {

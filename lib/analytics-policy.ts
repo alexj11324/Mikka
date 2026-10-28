@@ -1,4 +1,4 @@
-const allowedEvents = new Set(['$pageview', '$identify', '$feature_flag_called', 'orvilo_team_created', 'orvilo_team_updated'])
+const allowedEvents = new Set(['$pageview', '$identify', '$feature_flag_called', 'mikka_team_created', 'mikka_team_updated'])
 const allowedProperties = new Set([
   'token', 'distinct_id', '$device_id', '$user_id', '$session_id', '$window_id',
   '$lib', '$lib_version', '$browser', '$browser_version', '$os', '$os_version', '$device_type',

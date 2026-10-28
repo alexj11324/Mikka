@@ -1,3 +1,4 @@
+import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type NativeCoordinatorCommand } from "@mikka/protocol/coordinator"
 // HTTP transport for `ServerLink`: the routes apps/server serves for the
 // daemon (ADR 0016). Paths and payloads come from packages/protocol
 // (`devicePaths`, `runCompletePath` and their zod schemas); responses are
@@ -13,6 +14,8 @@
 // `RunNotPinnedHereError`; any other 4xx is a refusal (`DaemonError`) that
 // retrying cannot fix.
 import type { z } from "zod"
+import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
+import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
 
 import {
   CLIENT_VERSION_HEADER,
@@ -31,6 +34,7 @@ import {
   runEventsAccepted,
   type HeartbeatResult,
   type RunCommand,
+  type RunCheckpoint,
   type RunCompletion,
   type RunPatch,
 } from "@mikka/protocol"
@@ -42,6 +46,7 @@ import {
   ServerUnreachableError,
 } from "./errors"
 import { DAEMON_VERSION } from "./paths"
+import { createRunMailbox } from './run-mailbox'
 import type {
   ChunkBatch,
   DeviceInfo,
@@ -92,14 +97,40 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
+  async prepareRunMailbox(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
+    return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: this.fetchImpl,
+      headers: { [CLIENT_VERSION_HEADER]: this.clientVersion, ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) } })
+  }
+  async claimCoordinator(deviceId: string, signal: AbortSignal) {
+    const response = await this.send("POST",`/v1/devices/${seg(deviceId)}/coordinator`,{ operation: "claim" },this.credential,{ signal })
+    if (response.status === 404) return null // Optional rollout / older server.
+    if (response.status === 401) throw new SessionRejectedError()
+    if (!response.ok) throw new ServerUnreachableError(response.status)
+    return nativeCoordinatorClaimSchema.parse(await response.json()).job
+  }
+
+  async coordinatorCommand(deviceId: string, turnId: string, command: NativeCoordinatorCommand, signal: AbortSignal): Promise<void> {
+    await this.call("POST",`/v1/devices/${seg(deviceId)}/coordinator`,{ body: { operation: "submit",turnId,command },signal })
+  }
+
+  async coordinatorToolResult(deviceId: string, turnId: string, callId: string, signal: AbortSignal) {
+    return this.call("POST",`/v1/devices/${seg(deviceId)}/coordinator`,{ body: { operation: "result",turnId,callId },signal,schema: nativeCoordinatorToolResultSchema })
+  }
+
   /** Device session, set by `registerDevice`. */
   private credential: string | null = null
 
   constructor(
     private readonly baseUrl: string,
     private readonly fetchImpl: typeof fetch = fetch,
-    private readonly clientVersion: string = DAEMON_VERSION
-  ) {}
+    private readonly clientVersion: string = DAEMON_VERSION,
+    private readonly protectionBypass?: string
+  ) {
+    if (protectionBypass) {
+      const url = new URL(baseUrl)
+      if (url.protocol !== 'https:' || !url.hostname.endsWith('.vercel.app') || url.username || url.password || url.search || url.hash || !/^[A-Za-z0-9_-]{20,256}$/.test(protectionBypass)) throw new Error('Invalid preview transport')
+    }
+  }
 
   private async send(
     method: string,
@@ -118,7 +149,9 @@ export class HttpServerLink implements ServerLink {
           "content-type": "application/json",
           [CLIENT_VERSION_HEADER]: this.clientVersion,
           ...(token ? { authorization: `Bearer ${token}` } : {}),
+          ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
         },
+        ...(this.protectionBypass ? { redirect: 'error' as const } : {}),
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: signal
           ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
@@ -221,11 +254,33 @@ export class HttpServerLink implements ServerLink {
       { schema: runAssignmentSchema, claimOf: runId }
     )
   }
+  async syncComputerReviews(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal) {
+    const result = await this.call("POST", computerSyncPath(checkId(deviceId)), { body: { requests }, schema: computerSyncResponse, signal })
+    return result.decisions
+  }
+  async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
+    return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
+  }
+  async nativeRequest(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal) {
+    const response=await this.send('POST',`${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`,{action:'request',payload},this.credential,{signal,timeoutMs:275_000})
+    const contentType=response.headers.get('content-type')?.split(';')[0]
+    if(!response.ok || !response.body || (contentType!=='text/event-stream' && contentType!=='application/json')) {
+      await response.body?.cancel()
+      throw new Error('subscription_native_unavailable')
+    }
+    return {contentType,body:response.body}
+  }
 
   async appendRunChunks(runId: string, batch: ChunkBatch) {
     return this.call("POST", devicePaths.runEvents(checkId(runId)), {
       body: batch,
       schema: runEventsAccepted,
+    })
+  }
+
+  async checkpointRun(runId: string, checkpoint: RunCheckpoint) {
+    await this.call("POST", devicePaths.runCheckpoint(checkId(runId)), {
+      body: checkpoint,
     })
   }
 

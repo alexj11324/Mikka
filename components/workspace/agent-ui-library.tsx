@@ -9,6 +9,7 @@ import { AgentImage } from './agent-image'
 import { AgentFollowUps } from './agent-follow-ups'
 import { AgentImageCard } from './agent-image-card'
 import { CitationChip, WebCitation } from './agent-citations'
+import { ComputerCard } from '@/components/computer/computer-card'
 import { Button as BeButton } from '@/components/motion/button/base'
 import { AnimatedBadge } from '@/components/motion/animated-badge'
 import { AnimatedNumber } from '@/components/motion/animated-number'
@@ -24,6 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert as ReuiAlert, AlertDescription as ReuiAlertDescription, AlertTitle as ReuiAlertTitle } from '@/components/reui/alert'
 import { Badge as ReuiBadge } from '@/components/reui/badge'
+import { AgentTextBubble, InsideBlock } from './agent-text-bubble'
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '@/components/reui/frame'
 
 const renderers = {
@@ -62,10 +64,11 @@ const renderers = {
   BeQuestions: AgentQuestions,
   BeTodoList: AgentTasks,
   AgentIcon: AgentStatusIcon,
-  InlineText: ({ props, renderNode }) => <p className="min-w-0 break-words text-sm leading-7">{renderNode(props.parts)}</p>,
+  InlineText: ({ props, renderNode }) => <AgentTextBubble><p className="min-w-0 break-words text-sm leading-7">{renderNode(props.parts)}</p></AgentTextBubble>,
   TaskChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="issue" />,
   RunChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="run" />,
   SourceChip: ({ props }) => <WebCitation url={props.url} label={props.label ?? null} />,
+  ComputerCard: ({ props }) => <ComputerCard {...props} />,
   ShadcnCard: ({ props, renderNode }) => <Card size="sm" className="min-w-0">
     <CardHeader><CardTitle>{props.title}</CardTitle>{props.description && <CardDescription>{props.description}</CardDescription>}</CardHeader>
     <CardContent className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</CardContent>
@@ -101,4 +104,9 @@ const renderers = {
   </Frame>,
 } satisfies AgentComponentRenderers
 
-export const agentUILibrary = createAgentLibrary(renderers)
+// Replies flow through these; every other component is a block, and text inside it gets no bubble.
+const FLOW = new Set<string>(['TextContent', 'InlineText', 'BeResponse', 'TaskChip', 'RunChip', 'SourceChip'])
+const blocks = Object.fromEntries(Object.entries(renderers).map(([name, Render]) => [name, FLOW.has(name) ? Render
+  : (input: object) => { const Block = Render as (props: object) => React.ReactNode; return <InsideBlock value><Block {...input} /></InsideBlock> }])) as typeof renderers
+
+export const agentUILibrary = createAgentLibrary(blocks)

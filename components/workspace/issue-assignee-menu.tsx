@@ -8,27 +8,25 @@ import { Check, CircleUserRound, Send, UserRound } from 'lucide-react'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
 import type { IssueMetadata } from '@/lib/issue-metadata'
 import { Button } from '@/components/ui/button'
-import { toneFor, type AvatarTone } from '@/components/nav/letter-avatar'
+import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
-import { SPHERE_TONES } from '@/lib/status-appearance'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { avatarImageSrc } from '@/lib/default-avatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from '@/components/ui/command'
+import { ROW_VALUE } from './issue-property-row'
 
 
-/** An agent's mark: a gradient sphere with a soft highlight, tinted by name. */
+/** An agent's mark: the bloub blob, still, in a colour taken from its name. Boards show many, so none of them move. */
 export function AgentSphere({ name, compact = false }: { name: string; compact?: boolean }) {
-  const tone: keyof typeof SPHERE_TONES = /coordinator/i.test(name) ? 'coordinator' : `t${toneFor(name) as Exclude<AvatarTone, 'coordinator'>}`
-  return <span aria-hidden="true" className={cn('relative inline-flex shrink-0 overflow-hidden rounded-full bg-linear-135 shadow-inner', SPHERE_TONES[tone], compact && 'size-4.5', !compact && 'size-6')}>
-    <span className="absolute top-[12%] left-[18%] size-[45%] rounded-full bg-avatar-foreground/70 blur-[2px]" />
-  </span>
+  return <BotAvatar color={colorFor(name)} size={compact ? 'row' : 'pill'} still />
 }
 
 export function AssigneeAvatar({ assignee, compact = false }: { assignee: IssueMetadata['assignee']; compact?: boolean }) {
   if (!assignee) return <CircleUserRound data-icon="inline-start" />
-  // Agents are glossy spheres (Figma 77:2), people are photos or initials.
+  // Agents are blobs, people are photos or initials.
   if (assignee.kind === 'agent') return <AgentSphere name={assignee.name} compact={compact} />
-  return <Avatar size={compact ? 'xs' : 'sm'}><AvatarImage src={assignee.image ?? undefined} alt="" draggable={false} /><AvatarFallback>{assignee.name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+  return <Avatar size={compact ? 'xs' : 'sm'}><AvatarImage src={avatarImageSrc(assignee.image)} alt="" draggable={false} /><AvatarFallback>{assignee.name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
 }
 
 export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, onInvite, request }: {
@@ -45,8 +43,8 @@ export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, o
     if (await onChange(value)) { setOpen(false); setQuery('') }
   }
   return <Popover open={open} onOpenChange={value => { setOpen(value); setQuery('') }}>
-    <PopoverTrigger render={<Button data-assignee-trigger type="button" variant="ghost" size={compact ? 'icon-compact' : 'sm'} disabled={disabled} aria-label={t('aria', { name: assignee?.name ?? t('unassigned') })} title={t('ariaShortcut', { name: assignee?.name ?? t('unassigned') })} />}>
-      <AssigneeAvatar assignee={assignee} compact={compact} />{!compact && (assignee?.name ?? t('unassignedLabel'))}
+    <PopoverTrigger render={<Button data-assignee-trigger type="button" variant="ghost" size={compact ? 'icon-compact' : 'sm'} className={cn(!compact && ROW_VALUE)} disabled={disabled} aria-label={t('aria', { name: assignee?.name ?? t('unassigned') })} title={t('ariaShortcut', { name: assignee?.name ?? t('unassigned') })} />}>
+      <AssigneeAvatar assignee={assignee} compact={compact} />{!compact && <span className={cn('truncate', !assignee && 'text-muted-foreground')}>{assignee?.name ?? t('unassignedLabel')}</span>}
     </PopoverTrigger>
     <PopoverContent align="end" className="w-72 p-0">
       <Command onKeyDownCapture={event => {

@@ -1,3 +1,4 @@
+import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { getVercelOidcToken } from '@vercel/oidc'
 
 import { skillsSearchResponseSchema } from '@/lib/skills-search'
@@ -5,8 +6,9 @@ import { auth } from '@/lib/auth'
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' }
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
+  noteLogUser(session?.user?.id)
   if (!session?.user) {
     return Response.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE })
   }
@@ -55,3 +57,5 @@ export async function GET(request: Request) {
     return Response.json({ error: 'skills_search_unavailable' }, { status: 503, headers: NO_STORE })
   }
 }
+
+export const GET = withRequestLog('/api/skills/search', handleGET)

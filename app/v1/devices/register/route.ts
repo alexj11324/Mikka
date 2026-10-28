@@ -26,9 +26,10 @@ export async function POST(request: Request) {
   }
   if (info.deviceId && await ownedDevice(info.deviceId, caller.userId)) {
     await db.update(devices).set(fields).where(eq(devices.id, info.deviceId))
-    return NextResponse.json({ deviceId: info.deviceId, workspaceId: WORKSPACE_ID })
+    return NextResponse.json({ deviceId: info.deviceId, workspaceId: caller.scopeWorkspaceId ?? WORKSPACE_ID })
   }
+  if (caller.scopeDeviceId) return NextResponse.json({ error: 'Cloud device is unavailable.' }, { status: 403 })
   const deviceId = crypto.randomUUID()
   await db.insert(devices).values({ id: deviceId, ownerId: caller.userId, ...fields })
-  return NextResponse.json({ deviceId, workspaceId: WORKSPACE_ID })
+  return NextResponse.json({ deviceId, workspaceId: caller.scopeWorkspaceId ?? WORKSPACE_ID })
 }

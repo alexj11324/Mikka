@@ -1,0 +1,96 @@
+import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
+import test from 'node:test'
+import { Pool } from 'pg'
+
+// Explicitly refuse business databases. This executes the real server action and real SQL.
+const target = new URL(process.env.E2E_DATABASE_URL ?? 'http://invalid')
+if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pathname.endsWith('_e2e') || process.env.MIKKA_DATABASE_URL !== target.href || process.env.DATABASE_URL !== target.href) throw new Error('Thread integration requires the same isolated loopback *_e2e database for both stores')
+const pool = new Pool({ connectionString: target.href, max: 1 })
+const owner = randomUUID(), viewer = randomUUID(), outsider = randomUUID(), removed = randomUUID()
+const issue = randomUUID(), other = randomUUID(), workspace = randomUUID(), team = randomUUID(), agent = randomUUID()
+const run = randomUUID(), removedRun = randomUUID(), otherRun = randomUUID()
+const bot = randomUUID()
+const excessRuns = Array.from({ length: 21 }, () => randomUUID())
+test('real actions keep thread content with its owner; current members see only whose threads exist and their status', async () => {
+  const { listIssueThreads, getIssueThread, sendIssueThreadMessage } = await import('../app/actions/agents')
+  const { actAs } = await import('../lib/acting-user')
+  const { requestRunStop } = await import('../lib/agent-runs')
+  try {
+    for (const id of [owner, viewer, outsider, removed]) await pool.query('INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES ($1,$2,$3,false,now(),now())', [id, id === viewer ? 'Lin' : 'Isolated run test', `${id}@example.com`])
+    for (const id of [issue, other]) await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,$3,'{"type":"doc","content":[]}','todo','normal')`, [id, owner, 'Isolated thread'])
+    await pool.query('INSERT INTO issue_members ("issueId","userId","memberId") VALUES ($1,$2,$3),($1,$2,$4)', [issue, owner, viewer, removed])
+    await pool.query('INSERT INTO agents (id,"userId",harness,name,instructions) VALUES ($1,$2,$3,$4,$5)', [agent,owner,'codex','Mikka Backend','PRIVATE INSTRUCTIONS'])
+    for (const [id, userId, issueId, status] of [[run,owner,issue,'running'],[removedRun,removed,issue,'succeeded'],[otherRun,owner,other,'succeeded']]) await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt,report,error) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id,userId,issueId,agent,status,'Route group replies',JSON.stringify({summary:'Routed'}),null])
+    await pool.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)', [bot, workspace, owner, 'Owned Bot'])
+    await pool.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [run, bot, workspace, owner])
+    await pool.query('INSERT INTO run_chunks (id,"runId",seq,chunk) VALUES ($1,$2,1,$3)', [randomUUID(),run,JSON.stringify({type:'text-delta',id:'a',delta:'Reproduced it'})])
+    await assert.rejects(actAs(outsider, () => listIssueThreads(issue)))
+    await assert.rejects(actAs(viewer, () => listIssueThreads(other)))
+    await assert.rejects(actAs(viewer, () => listIssueThreads('invalid')))
+
+    // A personal issue is the owner's alone (R-26): a legacy invitation grants nothing.
+    await assert.rejects(actAs(viewer, () => listIssueThreads(issue)))
+    await assert.rejects(actAs(viewer, () => getIssueThread(issue, run)))
+    await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Must not reach the agent' })))
+    const own = await actAs(owner, () => getIssueThread(issue, run))
+    assert.equal(own.thread.detail?.name, 'Route group replies')
+    assert.equal(own.thread.detail?.agentName, 'Owned Bot', 'a computer thread displays its owning Bot, not the internal executor')
+    await assert.rejects(actAs(owner, () => getIssueThread(other, run)))
+
+    // A workspace issue: current members read and join every collaborator's thread.
+    await pool.query('UPDATE issues SET scope=$2 WHERE id=$1', [issue, 'workspace'])
+    await pool.query('INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$2,$3)',[workspace,owner,'Isolated run workspace'])
+    await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,$4,$5)',[team,workspace,owner,'Run test','RUNTEST'])
+    await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)',[issue,team,workspace,owner])
+    for (const id of [owner,viewer,removed]) await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$3,$4,$5,$6)',[workspace,id,'Member',`${id}@example.com`,'member','active'])
+    // A workspace issue: teammates see whose threads exist and their status, never their content.
+    const listed = await actAs(viewer, () => listIssueThreads(issue))
+    assert.deepEqual(listed.map(row => [row.detail, row.ownerName, row.ownedByCurrentUser]).sort(), [[null, 'Isolated run test', false], [null, 'Isolated run test', false]])
+    assert.ok(!/Route|Mikka Backend|Owned Bot|Routed|PRIVATE/.test(JSON.stringify(listed)))
+    await assert.rejects(actAs(viewer, () => getIssueThread(issue, run)))
+    await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' })))
+    // The owner still reads and talks in their own thread.
+    await actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' }))
+    const after = await actAs(owner, () => getIssueThread(issue, run))
+    assert.equal(after.chunks.length, 1)
+    assert.deepEqual(after.messages.map(message => [message.text, message.mine]), [['Check the fallback', true]])
+    await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: otherRun, text: 'Wrong issue' })))
+    await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: '   ' })))
+    // Stopping stays with the owner.
+    await assert.rejects(requestRunStop(viewer, run), /runNotFound/)
+    const {rows:[unchanged]} = await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1',[run])
+    assert.equal(unchanged.stopRequestedAt,null)
+    await requestRunStop(owner, run)
+    const {rows:[stopped]} = await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1',[run])
+    assert.ok(stopped.stopRequestedAt instanceof Date)
+    await requestRunStop(owner, run)
+    const {rows:[repeated]} = await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1',[run])
+    assert.equal(repeated.stopRequestedAt.getTime(),stopped.stopRequestedAt.getTime())
+    // Suspension or removal from the workspace ends access, even with stale direct membership.
+    await pool.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2',[workspace,removed,'suspended'])
+    assert.deepEqual((await actAs(viewer,()=>listIssueThreads(issue))).map(row=>row.id),[run])
+    await assert.rejects(actAs(removed,()=>listIssueThreads(issue)))
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2',[workspace,viewer])
+    await assert.rejects(actAs(viewer,()=>listIssueThreads(issue)))
+    await assert.rejects(actAs(viewer,()=>getIssueThread(issue, run)))
+    for (const id of excessRuns) await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId",status) VALUES ($1,$2,$3,$4,$5)', [id,owner,issue,agent,'succeeded'])
+    const bounded = await actAs(owner, () => listIssueThreads(issue))
+    assert.equal(bounded.length, 20)
+    assert.ok(bounded.every(row => row.ownedByCurrentUser && row.id !== otherRun && row.id !== removedRun))
+  } finally {
+    await pool.query('DELETE FROM run_messages WHERE "runId"=ANY($1::uuid[])',[[run,removedRun,otherRun]])
+    await pool.query('DELETE FROM run_chunks WHERE "runId"=ANY($1::uuid[])',[[run,removedRun,otherRun,...excessRuns]])
+    await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])',[[run,removedRun,otherRun,...excessRuns]])
+    await pool.query('DELETE FROM bots WHERE id=$1',[bot])
+    await pool.query('DELETE FROM agents WHERE id=$1',[agent])
+    await pool.query('DELETE FROM issue_members WHERE "issueId"=ANY($1::uuid[])',[[issue,other]])
+    await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1',[issue])
+    await pool.query('DELETE FROM mikka_teams WHERE id=$1',[team])
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1',[workspace])
+    await pool.query('DELETE FROM mikka_workspaces WHERE id=$1',[workspace])
+    await pool.query('DELETE FROM issues WHERE id=ANY($1::uuid[])',[[issue,other]])
+    await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])',[[owner,viewer,outsider,removed]])
+    await pool.end()
+  }
+})

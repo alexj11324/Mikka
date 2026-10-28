@@ -9,6 +9,13 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingIncludes: {
+    '/api/bots/*/computer/*': ['./scripts/e2b/start-desktop.sh', './scripts/e2b/viewer-gateway.py', './scripts/e2b/lease-driver.py', './scripts/e2b/start-container-runtime.sh'],
+    '/api/workspaces/**': ['./scripts/e2b/lease-driver.py'],
+    '/api/subscriptions/**': ['./packages/subscription-worker/bin/mikka-subscription-worker', './packages/subscription-worker/bin/mikka-subscription-enrollment'],
+    '/api/cron/subscriptions': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
+    '/v1/devices/**/subscription': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
+  },
   turbopack: {
     resolveAlias: {
       'react-syntax-highlighter': './components/workspace/agent-syntax-highlighter.tsx',
@@ -23,7 +30,7 @@ const nextConfig = {
     pagesBufferLength: 8,
   },
   basePath,
-  env: { MIKKA_BASE_PATH: basePath },
+  env: { MIKKA_BASE_PATH: basePath, NEXT_PUBLIC_COMPUTER_DEPLOYMENT: process.env.VERCEL_ENV ?? '', MIKKA_TEST_BUILD_SHA: process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '' },
   async redirects() {
     return [
       // The app's previous address; keep its links working.
@@ -38,7 +45,9 @@ const nextConfig = {
     ]
   },
   transpilePackages: ['@mikka/protocol'],
-  serverExternalPackages: ['ai', 'better-auth', 'drizzle-orm'],
+  // better-auth/react must share Next's SSR React dispatcher with client components.
+  // Externalizing the whole package loads native React and crashes enabled analytics.
+  serverExternalPackages: ['ai', 'drizzle-orm'],
   async headers() {
     return [{ source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -46,7 +55,14 @@ const nextConfig = {
       { key: 'Strict-Transport-Security', value: 'max-age=63072000' },
       { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
       { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-    ] }]
+    ] }, // next-intl can land the reset link on a locale-prefixed page; it carries the token too.
+      ...['/api/auth/verify-email', '/verify-email', '/:locale(en|zh-CN)/verify-email', '/api/auth/reset-password/:path*', '/reset-password/:path*', '/:locale(en|zh-CN)/reset-password/:path*'].map(source => ({
+      source,
+      headers: [
+        { key: 'Referrer-Policy', value: 'no-referrer' },
+        { key: 'Cache-Control', value: 'no-store' },
+      ],
+    }))]
   },
   experimental: {
     globalNotFound: true,

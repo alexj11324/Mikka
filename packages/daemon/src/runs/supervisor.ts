@@ -39,17 +39,25 @@ import {
   type HandoffReport,
   type HeartbeatRun,
   type Harness,
+  type RunCheckpoint,
   type RunPublish,
   type RunState,
   type RunSummary,
   type StopReason,
 } from "@mikka/protocol"
 
+import {
+  applyCheckpoint,
+  hasCommit,
+  headCommit,
+  takeCheckpoint,
+} from "../agents/checkpoint"
 import type {
   AgentAdapter,
   AgentEvent,
   AgentReport,
   AgentSession,
+  StartOptions,
   ExitEvent,
 } from "../adapters/types"
 import { runStateChunk, type RunChunk } from "../chunks"
@@ -72,12 +80,17 @@ import {
 } from "../server-link"
 import type { WorktreeManager } from "../worktrees"
 import type { JournalEntry, RunJournal } from "./journal"
+import { assertMailboxRunAuthority, type RunMailbox } from '../run-mailbox'
 
 export interface SupervisorDeps {
   journal: RunJournal
   outbox: Outbox
   worktrees: WorktreeManager
   adapters: ReadonlyMap<Harness, AgentAdapter>
+  /** Hosted subscription runs never fall back to local CLI authentication. */
+  startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
+  prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
+  bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
   /** The device's current allow-list (`device_repo`). */
   repos: () => DeviceRepo[]
   log: Logger
@@ -142,6 +155,8 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface ActiveRun {
+  mailbox?: RunMailbox
+  mailboxClosing?: Promise<void>
   session: AgentSession | null
   cancelRequested: boolean
   /** Set when the watchdog or the lease stopped the run. */
@@ -151,7 +166,18 @@ interface ActiveRun {
   /** Aborted by `stop()`, or when a cancelled session does not exit. */
   abort: AbortController
   cancelTimer?: NodeJS.Timeout
+  /** The repo checkout the run's worktree belongs to. */
+  repoPath: string
+  /** A tool call finished since the last checkpoint. */
+  checkpointDue?: boolean
+  checkpointing?: boolean
+  lastCheckpointAt?: number
+  /** Tree of the last checkpoint taken; unchanged trees are not sent. */
+  lastCheckpointTree?: string
 }
+
+/** A run with no tool call in this long still gets a checkpoint when it changed. */
+export const CHECKPOINT_EVERY_MS = 2 * 60_000
 
 export class RunSupervisor {
   private active = new Map<string, ActiveRun>()
@@ -224,6 +250,42 @@ export class RunSupervisor {
     }
   }
 
+  /**
+   * Saves the work in progress of runs that had a tool call since their last
+   * checkpoint, or none for `CHECKPOINT_EVERY_MS`, through `save`. The
+   * daemon calls it after each heartbeat; a failed save is tried again on
+   * the next one.
+   */
+  async saveCheckpoints(
+    save: (runId: string, checkpoint: RunCheckpoint) => Promise<void>,
+    now = Date.now()
+  ) {
+    for (const [runId, run] of this.active) {
+      const entry = this.deps.journal.get(runId)
+      if (!entry?.worktree || !entry.baseCommit || run.checkpointing) continue
+      if (run.forcedStop || run.cancelRequested) continue
+      const since = run.lastCheckpointAt ?? run.lastProgressAt
+      if (!run.checkpointDue && now - since < CHECKPOINT_EVERY_MS) continue
+      run.checkpointing = true
+      try {
+        const taken = await takeCheckpoint({
+          repoPath: run.repoPath,
+          worktree: entry.worktree,
+          baseCommit: entry.baseCommit,
+          lastTree: run.lastCheckpointTree,
+        })
+        if (taken?.checkpoint) await save(runId, taken.checkpoint)
+        if (taken) run.lastCheckpointTree = taken.tree
+        run.checkpointDue = false
+        run.lastCheckpointAt = now
+      } catch (error) {
+        this.deps.log.warn({ run_id: runId, err: error }, "checkpoint failed")
+      } finally {
+        run.checkpointing = false
+      }
+    }
+  }
+
   /** Lease and watchdog pass; the daemon calls it on every tick. */
   check(now = Date.now()) {
     const stallMs = this.deps.stallMs ?? DEFAULT_STALL_MS
@@ -244,9 +306,21 @@ export class RunSupervisor {
     this.requestCancel(run)
   }
 
+  private closeMailbox(run: ActiveRun): Promise<void> {
+    if (!run.mailbox) return Promise.resolve()
+    if (!run.mailboxClosing) {
+      try { run.mailboxClosing = run.mailbox.close() }
+      catch (error) { run.mailboxClosing = Promise.reject(error) }
+    }
+    return run.mailboxClosing
+  }
+
   /** Asks the session to stop; detaches it if it does not within the grace. */
   private requestCancel(run: ActiveRun): Promise<void> {
     run.cancelRequested = true
+    // Fence new calls and abort outstanding transport immediately; do not
+    // leave a mailbox usable during the CLI's cancellation grace period.
+    void this.closeMailbox(run).catch(() => this.deps.log.warn('Run mailbox shutdown failed'))
     if (!run.cancelTimer) {
       run.cancelTimer = setTimeout(
         () => run.abort.abort(),
@@ -347,6 +421,13 @@ export class RunSupervisor {
     return [...this.active.keys()]
   }
 
+  /** Computer operations require a live run and a current server lease. */
+  computerRunAllowed(runId: string): boolean {
+    const run = this.active.get(runId)
+    const lease = this.leases.get(runId)
+    return !this.stopping && Boolean(run && !run.cancelRequested && lease !== undefined && lease > Date.now())
+  }
+
   /**
    * Starts a claimed run. The allow-list is checked before any worktree or
    * process exists; a refused run is reported failed with the reason.
@@ -378,6 +459,10 @@ export class RunSupervisor {
       error: null,
       updatedAt: new Date().toISOString(),
     })
+    if (assignment.computer) {
+      const task = assignment.prompt.split('\n')[0].replace(/^#\s*/, '').trim().slice(0, 200) || 'Task'
+      this.emit(assignment.runId, { type: 'data-computer', data: { botId: assignment.computer.botId, runId: assignment.runId, task, state: 'working' } })
+    }
     if (assignment.leaseExpiresAt)
       this.leases.set(assignment.runId, Date.parse(assignment.leaseExpiresAt))
     this.launch(assignment.runId, repo)
@@ -615,6 +700,8 @@ export class RunSupervisor {
       kind: "complete",
       completion: { stopReason, report },
     })
+    const run = this.active.get(runId)
+    if (run) void this.closeMailbox(run).catch(() => this.deps.log.warn('Run mailbox shutdown failed'))
     this.leases.delete(runId)
     this.deps.outbox.compact(runId).catch((err: unknown) => {
       this.deps.log.error({ run_id: runId, err }, "outbox compaction failed")
@@ -738,6 +825,9 @@ export class RunSupervisor {
     repo: DeviceRepo,
     assignment: RunAssignment
   ): Promise<string> {
+    // Taking over a run from another machine: start where it started.
+    const resume = assignment.resumeFrom?.baseCommit
+    if (resume && (await hasCommit(repo.path, resume))) return resume
     const branch = assignment.pushBranch
     if (!branch || repo.push?.approved !== true) return assignment.baseBranch
     try {
@@ -798,12 +888,14 @@ export class RunSupervisor {
 
   private launch(runId: string, repo: DeviceRepo) {
     const run: ActiveRun = {
+      repoPath: repo.path,
       session: null,
       cancelRequested: false,
       lastProgressAt: Date.now(),
       done: Promise.resolve(),
       abort: new AbortController(),
     }
+    this.active.set(runId, run)
     run.done = this.drive(runId, repo, run)
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error)
@@ -818,11 +910,11 @@ export class RunSupervisor {
           )
         }
       })
-      .finally(() => {
-        clearTimeout(run.cancelTimer)
-        this.active.delete(runId)
+      .finally(async () => {
+        try { await this.closeMailbox(run) }
+        catch { this.deps.log.warn('Run mailbox shutdown failed') }
+        finally { clearTimeout(run.cancelTimer); this.active.delete(runId) }
       })
-    this.active.set(runId, run)
   }
 
   private async drive(runId: string, repo: DeviceRepo, run: ActiveRun) {
@@ -835,6 +927,14 @@ export class RunSupervisor {
       this.setState(runId, "preparing")
       entry = this.deps.journal.get(runId) as JournalEntry
     }
+
+    // A retry after a lost lease can arrive while the earlier attempt is
+    // still stopping here; let it stop before working on in its worktree.
+    const earlier = assignment.continuesRunId
+      ? this.active.get(assignment.continuesRunId)
+      : undefined
+    if (!entry.worktree && earlier) await earlier.done
+    if (this.stopping) return
 
     // A follow-up run continues the earlier run's worktree (ADR 0023);
     // otherwise one per run, reused when resuming after a restart.
@@ -857,14 +957,45 @@ export class RunSupervisor {
       ))
     if (!entry.worktree) {
       // A continued worktree was bootstrapped by the run that made it.
+      // The commit checkpoints diff against: a continued worktree keeps the
+      // earlier run's, so its checkpoints still carry everything since.
+      const baseCommit =
+        (continued && assignment.continuesRunId
+          ? this.deps.journal.get(assignment.continuesRunId)?.baseCommit
+          : undefined) ?? (await headCommit(repo.path, worktree))
+      // Taking over from a machine that went offline: its saved work goes
+      // on as uncommitted changes, before setup sees the tree.
+      if (!continued && assignment.resumeFrom) {
+        const applied = await applyCheckpoint({
+          repoPath: repo.path,
+          worktree,
+          checkpoint: assignment.resumeFrom,
+        })
+        log.info(
+          { files: assignment.resumeFrom.files, applied },
+          "checkpoint from the earlier attempt"
+        )
+      }
       const setup = continued
         ? "continued"
-        : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
+        : this.deps.bootstrap ? await this.deps.bootstrap(worktree,repo) : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
       log.info({ worktree, setup }, "worktree ready")
-      this.deps.journal.update(runId, { worktree })
+      this.deps.journal.update(runId, { worktree, baseCommit })
     }
     if (this.stopping) return
 
+    const checkMailbox = () => {
+      const lease = this.leases.get(runId)
+      const current = this.deps.journal.get(runId)
+      assertMailboxRunAuthority({ held: this.active.get(runId) === run, state: current?.state, stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted, lease })
+    }
+    const mailbox = await this.deps.prepareRunMailbox?.(assignment, run.abort.signal, checkMailbox)
+    run.mailbox = mailbox
+    // A STOP/lease transition may win the handshake's final Promise handoff.
+    // Own the returned callback before refusing; never start a CLI first.
+    if (this.stopping) return
+    if (run.cancelRequested) { this.finish(runId, run.forcedStop ?? 'cancelled'); return }
+    if (mailbox) checkMailbox()
     const options = {
       runId,
       kind: assignment.kind,
@@ -879,6 +1010,7 @@ export class RunSupervisor {
       skills: assignment.skills,
       fixture: assignment.fixture,
       model: assignment.model,
+      mailbox,
     }
     const resuming =
       entry.sessionId !== null && adapter.capabilities.supportsResume
@@ -903,7 +1035,11 @@ export class RunSupervisor {
             message: assignment.followUp ?? assignment.prompt,
           }
         : undefined
-    const session = resuming
+    const session = assignment.subscriptionBinding
+      ? this.deps.startSubscription
+        ? await this.deps.startSubscription(assignment,{...options,prompt:assignment.prompt})
+        : (()=>{throw new Error('subscription_hosted_runtime_unavailable')})()
+      : resuming
       ? await adapter.resume(entry.sessionId as string, options)
       : await adapter.start({
           ...options,
@@ -954,9 +1090,15 @@ export class RunSupervisor {
           // Streamed text is not progress; tool calls, steps and files are.
           if (!event.chunk.type.endsWith("-delta"))
             run.lastProgressAt = Date.now()
+          if (
+            event.chunk.type === "tool-output-available" ||
+            event.chunk.type === "tool-output-error"
+          )
+            run.checkpointDue = true
           this.emit(runId, event.chunk)
           continue
         }
+        await this.closeMailbox(run)
         const stopReason = stopReasonOf(event, run)
         const error =
           event.error ??
