@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { isDocsOnly } from './ci-docs-only.mjs'
+import { hasUnsafeModes, isDocsOnly } from './ci-docs-only.mjs'
 
 test('root documents, docs assets and the diagram generator are documentation-only', () => {
   const files = [
@@ -40,4 +40,31 @@ test('one code file makes a mixed change run the full suites', () => {
 
 test('an empty change set is never treated as documentation-only', () => {
   assert.equal(isDocsOnly([]), false)
+})
+
+test('a docs path with a non-regular mode is not documentation-only', () => {
+  assert.equal(isDocsOnly(['docs/link'], true), false)
+})
+
+test('regular file modes including added and deleted files are safe', () => {
+  for (const line of [
+    ':100644 100644 aaaa bbbb M\tREADME.md',
+    ':100755 100755 aaaa bbbb M\tscripts/tool.mjs',
+    ':000000 100644 0000 bbbb A\tdocs/new.md',
+    ':100644 000000 aaaa 0000 D\tdocs/old.md',
+    ':100644 100644 aaaa bbbb R100\tdocs/a.md\tdocs/b.md',
+  ]) {
+    assert.equal(hasUnsafeModes(line), false, line)
+  }
+  assert.equal(hasUnsafeModes(''), false)
+})
+
+test('symlinks, gitlinks and unmerged entries fail closed', () => {
+  for (const line of [
+    ':100644 120000 aaaa bbbb T\tdocs/link',
+    ':000000 160000 0000 1234 A\tsubmodule',
+    ':000000 000000 0000 0000 U\tdocs/conflict.md',
+  ]) {
+    assert.equal(hasUnsafeModes(line), true, line)
+  }
 })

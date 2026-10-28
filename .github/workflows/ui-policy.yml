@@ -36,8 +36,23 @@ jobs:
         with:
           fetch-depth: 0
       - id: docs
-        run: node scripts/ci-docs-only.mjs
-      - run: node --test scripts/ci-docs-only.test.mjs
+        # Run the classifier from main, never from this checkout: a pull
+        # request must not be able to rewrite the script that skips its own
+        # required checks.
+        run: |
+          git fetch origin main --no-tags
+          trusted="$(mktemp)"
+          if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
+            echo "docs_only=false (classifier is not on main yet)"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git diff --quiet origin/main -- scripts/ci-docs-only.mjs; then
+            echo "docs_only=false (classifier differs from main)"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node "$trusted"
 
   cloud-secret-access:
     name: Cloud credential access (OIDC)
@@ -95,6 +110,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: node --test scripts/ci-docs-only.test.mjs
       - run: pnpm test:ui-policy
       - run: pnpm test:motion
       - run: pnpm test:i18n
