@@ -502,6 +502,8 @@ export async function createHostedBotRunner(host: {
         "-v",
         `${MCP_SERVER_SCRIPT}:${MCP_SERVER_SCRIPT}:ro`,
         "-v",
+        `${join(dirname(MCP_SERVER_SCRIPT), "capture-copy.mjs")}:${join(dirname(MCP_SERVER_SCRIPT), "capture-copy.mjs")}:ro`,
+        "-v",
         `${broker.socket}:/run/mikka-native.sock:ro`,
         ...(computerGrant ? [
           "-v", `${computerGrant.socketPath}:/run/mikka-computer.sock:ro`,

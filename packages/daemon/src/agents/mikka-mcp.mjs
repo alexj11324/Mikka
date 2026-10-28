@@ -14,9 +14,10 @@
 //
 // Protocol: MCP over stdio, newline-delimited JSON-RPC 2.0.
 import { randomUUID } from "node:crypto"
-import { closeSync, copyFileSync, fstatSync, openSync, readSync, readdirSync, realpathSync, renameSync, writeFileSync, constants } from "node:fs"
+import { closeSync, fstatSync, openSync, readSync, readdirSync, realpathSync, renameSync, writeFileSync, constants } from "node:fs"
 import { join, sep } from "node:path"
 import { createInterface } from "node:readline"
+import { copyCaptureFd } from "./capture-copy.mjs"
 
 const handoffIndex = process.argv.indexOf("--handoff")
 const handoffFile = handoffIndex > 0 ? process.argv[handoffIndex + 1] : null
@@ -229,7 +230,7 @@ function queueCapture(args) {
   if (!captureRoots.some((root) => real === root || real.startsWith(root + sep)))
     throw new Error("The file must be inside the worktree or your temp directory.")
   const fd = openSync(real, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
-  let ext
+  let ext, id
   try {
     const stat = fstatSync(fd)
     if (!stat.isFile()) throw new Error("Not a regular file.")
@@ -237,13 +238,13 @@ function queueCapture(args) {
     ext = sniff(head.subarray(0, readSync(fd, head, 0, 64, 0)))
     if (!ext) throw new Error("Not a PNG, JPEG or WebP image, or an MP4 or WebM video.")
     if (stat.size === 0 || stat.size > CAPTURE_LIMITS[ext]) throw new Error(`At most ${CAPTURE_LIMITS[ext]} bytes for a .${ext} file.`)
+    if (readdirSync(capturesDir).filter((name) => name.endsWith(".json")).length >= MAX_QUEUED_CAPTURES)
+      throw new Error("Too many captures waiting to upload; try again shortly.")
+    id = randomUUID()
+    copyCaptureFd(fd, join(capturesDir, `${id}.${ext}`), stat.size)
   } finally {
     closeSync(fd)
   }
-  if (readdirSync(capturesDir).filter((name) => name.endsWith(".json")).length >= MAX_QUEUED_CAPTURES)
-    throw new Error("Too many captures waiting to upload; try again shortly.")
-  const id = randomUUID()
-  copyFileSync(real, join(capturesDir, `${id}.${ext}`), constants.COPYFILE_EXCL)
   // The metadata lands last: the daemon only takes files that have one.
   const meta = join(capturesDir, `${id}.json`)
   writeFileSync(`${meta}.tmp`, JSON.stringify({ title, at: new Date().toISOString() }))
