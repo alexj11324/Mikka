@@ -23,7 +23,14 @@ async function handleGET(request: Request) {
   const token = url.searchParams.get('token')
   if (!token) return NextResponse.redirect(new URL(withBasePath(target), url.origin), { status: 303, headers: safeHeaders })
   try {
-    const { headers, response: session } = await auth.api.verifyOneTimeToken({ body: { token }, headers: request.headers, returnHeaders: true })
+    // HTTP router mode prevents nextCookies() from mutating the ambient Next
+    // response before the person confirms. Direct auth.api calls run that hook.
+    const exchanged = await auth.handler(new Request(new URL(withBasePath('/api/auth/one-time-token/verify'), url.origin), {
+      method: 'POST', headers: { 'content-type': 'application/json', origin: url.origin }, body: JSON.stringify({ token }),
+    }))
+    if (!exchanged.ok) throw new Error('Mobile handoff token unavailable')
+    const session = await exchanged.json() as { user: { email: string } }
+    const headers = exchanged.headers
     const csrf = randomBytes(32).toString('base64url')
     const state = sealHandoff({ cookies: headers.getSetCookie(), target, origin: url.origin, csrf, expires: Date.now() + 60_000 }, (await auth.$context).secret)
     if (state.length > 3500) throw new Error('Mobile handoff cookie exceeds browser limit')

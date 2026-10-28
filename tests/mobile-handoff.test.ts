@@ -3,14 +3,18 @@ import { mock, test } from 'node:test'
 import { betterAuth } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
 import { oneTimeToken } from 'better-auth/plugins'
+import { nextCookies } from 'better-auth/next-js'
 import { openHandoff, sealHandoff } from '../lib/mobile-handoff'
+
+const ambientCookies: string[] = []
+mock.module('next/headers.js', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ set: (name: string) => { ambientCookies.push(name) } }) } })
 
 // Real Better Auth with isolated in-memory storage; no accounts or provider calls leave this process.
 const data: Record<string, any[]> = { user: [], session: [], account: [], verification: [] }
 const auth = betterAuth({
   baseURL: 'https://handoff.test', secret: 'isolated-test-secret-123456789012345678901234',
   database: memoryAdapter(data), emailAndPassword: { enabled: true },
-  plugins: [oneTimeToken({ expiresIn: 1, storeToken: 'hashed' })],
+  plugins: [oneTimeToken({ expiresIn: 1, storeToken: 'hashed' }), nextCookies()],
 })
 mock.module(new URL('../lib/auth.ts', import.meta.url).href, { namedExports: { auth } })
 mock.module(new URL('../lib/mcp/resource.ts', import.meta.url).href, { namedExports: { appOrigin: 'https://handoff.test' } })
@@ -26,6 +30,7 @@ async function issue(cookie: string) {
 }
 async function open(token: string, cookie?: string) {
   const { GET } = await route
+  ambientCookies.length = 0
   return GET(new Request(`https://handoff.test/api/mobile/open?${new URLSearchParams({ token, to: '/?section=coordinator' })}`, { headers: cookie ? { cookie } : {} }))
 }
 async function session(cookie: string) {
@@ -40,6 +45,7 @@ test('handoff binds browser to issuing account, consumes token and rejects expir
   assert.ok(!JSON.stringify(data.verification).includes(token), 'stored token must be hashed')
   const response = await open(token)
   assert.equal(response.status, 200)
+  assert.equal(ambientCookies.length, 0, 'nextCookies must not sign in before confirmation')
   assert.equal((await session(cookieHeader(response.headers))), null)
   const confirmed = await confirm(response)
   assert.equal(confirmed.status, 303)
@@ -73,6 +79,7 @@ test('induced GET does not switch accounts; confirmation requires same origin an
   const bob = await signUp('bob2')
   const response = await open(await issue(alice.cookie), bob.cookie)
   assert.equal(response.status, 200)
+  assert.equal(ambientCookies.length, 0, 'nextCookies must not sign in before confirmation')
   assert.equal((await session(bob.cookie))?.user.id, bob.id)
   assert.equal((await session(cookieHeader(response.headers))), null)
   assert.match(await response.clone().text(), /alice2@example.test/)
