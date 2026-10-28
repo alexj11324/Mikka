@@ -3,7 +3,7 @@ import { mock, test } from 'node:test'
 let effects=0
 const forbidden=()=>{effects++;throw new Error('Unexpected authority, database or provider access')}
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
-stub('./service.ts',{agentKitEnabled:()=>false,agentScope:forbidden,agentKitStore:new Proxy({},{get:()=>forbidden})})
+stub('./service.ts',{agentKitEnabled:()=>false,agentKitDefaults:forbidden,agentScope:forbidden,agentKitStore:new Proxy({},{get:()=>forbidden})})
 stub('../subscription-runtime.ts',{authorizeSubscriptionWorkspace:forbidden,subscriptionRuntime:forbidden})
 stub('../coordinator/bot-instructions.ts',{botInstructions:forbidden})
 stub('../coordinator/instructions.ts',{COORDINATOR_INSTRUCTIONS:'synthetic host'})

@@ -8,6 +8,7 @@
     "search_slack_messages",
     "read_slack_thread",
     "search_gmail",
+    "read_gmail_message",
     "list_calendar_events",
     "get_calendar_event",
     "send_email",
