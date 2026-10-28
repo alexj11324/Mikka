@@ -10,7 +10,7 @@ import { db } from '@/lib/db'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
-import { eventsForInbox } from '@/lib/coordinator/triage'
+import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
@@ -95,10 +95,12 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
       .where(and(sessionOf(userId, botId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
     if (!taken) return { held: false, ...NO_TAKE }
-    const due = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
+    const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+    const due = isolateTaskRequest(candidates)
     if (!due.length) return { held: true, ...NO_TAKE }
-    const backgroundLimit = INBOX_BATCH - due.length
+    const isolatedTask = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined
+    const backgroundLimit = isolatedTask ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
