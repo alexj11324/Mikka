@@ -1143,6 +1143,7 @@ export class Daemon {
       await this.supervisor?.stop()
     } finally {
       try {
+        await this.localComputerBroker?.close()
         await this.cloudComputerBroker?.close()
       } finally {
         const sandbox = this.ownedSandbox

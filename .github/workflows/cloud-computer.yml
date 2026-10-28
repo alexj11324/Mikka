@@ -45,7 +45,7 @@ jobs:
         env:
           COMPUTER_TEST_DATABASE_URL: postgresql://postgres:isolated-ci@localhost:5432/computer_test
       - run: node --test packages/daemon/src/computer/local-grant.test.mjs
-      - run: cd packages/daemon && node --import tsx --test test/local-computer-adapters.node-test.ts
+      - run: cd packages/daemon && node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts
   local-driver-linux:
     name: Local driver (Linux Xvfb)
     runs-on: ubuntu-latest
