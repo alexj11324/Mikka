@@ -16,6 +16,9 @@ import { APPLICATION_BASELINE } from '../scripts/migration-order.mjs'
 const run = promisify(execFile)
 const directory = new URL('../drizzle/', import.meta.url)
 const enabled = process.env.MIGRATION_BOOTSTRAP_CI === '1'
+// Historical migrations contain destructive statements. Keep the full test
+// body intact, but fail before opening a database until the SQL is reviewed.
+const RETAIN_SAFE_MIGRATION_BOOTSTRAP_AVAILABLE = false
 
 // Never default to DATABASE_URL or a developer/production service. The workflow
 // opts in only against its disposable postgres:17 service, before E2E setup.
@@ -70,18 +73,24 @@ for (const separateTargets of [false, true]) {
   test(`pnpm migrate bootstraps empty ${separateTargets ? 'separate targets' : 'shared target'} and safely reruns`, {
     skip: !enabled, timeout: 180000,
   }, async () => {
+    if (!RETAIN_SAFE_MIGRATION_BOOTSTRAP_AVAILABLE) throw new Error('MIGRATION_BOOTSTRAP_RETENTION_BLOCKED')
     const target = ciTarget()
     const admin = new Pool({ connectionString: target.toString(), max: 1 })
     const applicationSchema = `bootstrap_app_${randomUUID().replaceAll('-', '')}`
     const workspaceSchemaName = separateTargets ? `bootstrap_ws_${randomUUID().replaceAll('-', '')}` : applicationSchema
     const schemas = [...new Set([applicationSchema, workspaceSchemaName])]
+    const createdSchemas = []
     const applicationURL = schemaURL(target, applicationSchema)
     const workspaceURL = schemaURL(target, workspaceSchemaName)
     const app = new Pool({ connectionString: applicationURL, max: 1 })
     const workspace = new Pool({ connectionString: workspaceURL, max: 1 })
     try {
       assert.equal((await admin.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
-      for (const schema of schemas) await admin.query(`create schema "${schema}"`)
+      for (const schema of schemas) {
+        await admin.query(`create schema "${schema}"`)
+        createdSchemas.push(schema)
+        console.error(`Created migration test schema: ${schema}`)
+      }
       // No setup-e2e-db, Better Auth migrator or schema push is called here.
       assert.deepEqual((await app.query(`select tablename from pg_tables where schemaname = current_schema()`)).rows, [])
       assert.match(await migrate(applicationURL, workspaceURL), new RegExp(`applied ${APPLICATION_BASELINE}`))
@@ -121,7 +130,8 @@ for (const separateTargets of [false, true]) {
     } finally {
       await app.end()
       await workspace.end()
-      for (const schema of schemas) await admin.query(`drop schema if exists "${schema}" cascade`)
+      // Preserve both schemas and their data for inspection, including on failure.
+      if (createdSchemas.length) console.error(`Retained migration test schemas: ${createdSchemas.join(', ')}`)
       await admin.end()
     }
   })

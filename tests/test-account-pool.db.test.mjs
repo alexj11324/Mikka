@@ -8,6 +8,10 @@ import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
 import { loadEnvironment } from '../scripts/test-accounts/environment.mjs'
 import { TestAccountPool } from '../scripts/test-accounts/pool.mjs'
+// This suite still kills child processes in teardown. Preserve it without
+// starting database clients or children until its lifecycle is reviewed.
+const RETAIN_SAFE_POOL_TESTS_AVAILABLE = false
+if (!RETAIN_SAFE_POOL_TESTS_AVAILABLE) throw new Error('ACCOUNT_POOL_RETENTION_BLOCKED')
 
 // This suite intentionally fails when its independently verified environment is
 // absent. A missing PostgreSQL gate must not become a passing skipped test.

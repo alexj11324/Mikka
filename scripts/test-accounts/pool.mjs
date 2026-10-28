@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { assertDatabaseIdentity, validateEnvironment, EnvironmentError } from './environment.mjs'
+import { retainedSessionUpdate, assertOneRetainedSessionUpdated } from './retained-session-plan.mjs'
 
 const LABEL = /^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$/
 const UUID = /^[a-f0-9-]{36}$/
@@ -31,6 +32,10 @@ export class TestAccountPool {
   }
 
   async transaction(work, { readOnly = false } = {}) {
+    // Read-only inspection remains available. No pool writes may run until
+    // the shared environment and complete retention lifecycle are verified.
+    const retainSafePoolWritesAvailable = false
+    if (!readOnly && !retainSafePoolWritesAvailable) fail('ACCOUNT_POOL_RETENTION_BLOCKED')
     const client = await this.database.connect()
     try {
       await client.query(readOnly ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY' : 'BEGIN')
@@ -321,7 +326,7 @@ export class TestAccountPool {
     for (const account of bound) {
       const user = (await client.query('SELECT email FROM public."user" WHERE id=$1', [account.user_id])).rows[0]
       if (!user || user.email !== account.email || !account.credential_ref || !account.baseline) return 'ACCOUNT_IDENTITY_UNVERIFIED'
-      if ((await client.query('SELECT 1 FROM public.session WHERE "userId"=$1 LIMIT 1', [account.user_id])).rowCount) return 'ACCOUNT_SESSION_STILL_ACTIVE'
+      if ((await client.query('SELECT 1 FROM public.session WHERE "userId"=$1 AND "expiresAt">clock_timestamp() LIMIT 1', [account.user_id])).rowCount) return 'ACCOUNT_SESSION_STILL_ACTIVE'
       if (await this.fingerprint(client, account.user_id) !== account.baseline) return 'ACCOUNT_DIRTY'
     }
     return null
@@ -364,18 +369,26 @@ export class TestAccountPool {
     })
   }
 
-  /** Explicit isolated-fixture session cleanup. Does not delete users or data. */
+  /** Retain tracked session rows while invalidating their issued tokens. */
   async revokeSessions(lease) {
+    // Keep every caller blocked until the complete retained lifecycle is verified.
+    const retainedSessionRevocationAvailable = false
+    if (!retainedSessionRevocationAvailable) fail('TEST_ACCOUNT_SESSION_RETENTION_BLOCKED')
     if (!this.environment.capabilities.reset) fail('SESSION_REVOCATION_NOT_AUTHORIZED')
     return this.transaction(async client => {
       await this.current(client, lease)
-      const accounts = (await client.query('SELECT user_id,email FROM mikka_test_accounts.accounts WHERE pair_id=$1 AND user_id IS NOT NULL', [lease.pairId])).rows
+      const sessions = (await client.query(`SELECT r.id, r.owner_id
+        FROM mikka_test_accounts.resources r
+        WHERE r.lease_id=$1 AND r.type='session' AND r.state='created'
+        ORDER BY r.id FOR UPDATE`, [lease.id])).rows
       let revoked = 0
-      for (const account of accounts) {
-        const owned = (await client.query('SELECT 1 FROM public."user" WHERE id=$1 AND email=$2', [account.user_id, account.email])).rowCount
-        if (!owned) fail('ACCOUNT_IDENTITY_MISMATCH')
-        revoked += (await client.query('DELETE FROM public.session WHERE "userId"=$1', [account.user_id])).rowCount
-        await client.query("UPDATE mikka_test_accounts.resources SET state='cleaned' WHERE lease_id=$1 AND type='session' AND owner_id=$2", [lease.id, account.user_id])
+      for (const session of sessions) {
+        const plan = retainedSessionUpdate({ sessionId: session.id, ownerId: session.owner_id, leaseId: lease.id, generation: lease.generation })
+        const result = await client.query(plan.text, plan.values)
+        assertOneRetainedSessionUpdated(result)
+        revoked += result.rowCount
+        const marked = await client.query("UPDATE mikka_test_accounts.resources SET state='retained' WHERE lease_id=$1 AND type='session' AND id=$2 AND owner_id=$3 AND state='created'", [lease.id, session.id, session.owner_id])
+        if (marked.rowCount !== 1) fail('RESOURCE_NOT_OWNED')
       }
       await this.current(client, lease)
       return { revoked }

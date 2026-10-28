@@ -1,5 +1,5 @@
 import { constants } from 'node:fs'
-import { lstat, mkdir, open, readdir, readFile, rm } from 'node:fs/promises'
+import { lstat, mkdir, open, readdir, readFile } from 'node:fs/promises'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { resolve, join } from 'node:path'
 import { performance } from 'node:perf_hooks'
@@ -11,6 +11,8 @@ import { readBoundedBody } from './http-body.mjs'
 
 const fail = code => { throw new TestAccountError(code) }
 const safeError = error => error instanceof TestAccountError ? error : new TestAccountError('TEST_ACCOUNT_SESSION_FAILED')
+// Do not enable until session revocation can preserve rows and invalidate tokens.
+const RETAINED_SESSION_REVOCATION_AVAILABLE = false
 
 async function privateDirectory(path) {
   await mkdir(path, { recursive: true, mode: 0o700 })
@@ -50,6 +52,10 @@ function scopedURL(environment, path) {
 
 /** A real HTTP-authenticated scope. Credentials never appear in its public shape. */
 export async function acquireTestAccounts({ database, environment, runId, workerId, requestId, ttlMs = 90_000, stateDirectory } = {}) {
+  // Session revocation currently deletes database rows. Until an approved
+  // non-deleting revocation exists, do not create a session we cannot safely
+  // close; quarantine alone does not invalidate the bearer credential.
+  if (!RETAINED_SESSION_REVOCATION_AVAILABLE) fail('TEST_ACCOUNT_SESSION_RETENTION_BLOCKED')
   environment ??= await loadEnvironment()
   // Verify the built application and actual database before even taking a slot.
   await assertDeploymentIdentity(environment)
@@ -73,7 +79,6 @@ export async function acquireTestAccounts({ database, environment, runId, worker
   const credentialsDirectory = join(directory, 'credentials')
   const statesDirectory = join(directory, 'sessions')
   const auditFile = join(directory, 'secret-audit.jsonl')
-  const stateFiles = []
   const listeners = new Set()
   const pendingRequests = new Set()
   const abort = new AbortController()
@@ -83,17 +88,6 @@ export async function acquireTestAccounts({ database, environment, runId, worker
   let tainted = false
   let releasing
   let renewal
-  async function removeSessionStates() {
-    let removed = true
-    for (const path of stateFiles) {
-      try {
-        await rm(path, { force: true })
-        try { await lstat(path); removed = false }
-        catch (error) { if (error.code !== 'ENOENT') removed = false }
-      } catch { removed = false }
-    }
-    return removed
-  }
   // A monotonic client budget complements authoritative PG time. It is anchored
   // BEFORE every renew RPC, so network latency never grants extra authority.
   let deadline = acquireStarted + Math.min(ttlMs, lease.remainingMs)
@@ -134,30 +128,22 @@ export async function acquireTestAccounts({ database, environment, runId, worker
     closing = true
     clearInterval(timer)
     const pending = [...pendingRequests]
-    const releaseOutcome = (pending.length || tainted) && outcome === 'clean' ? 'dirty' : outcome
     abort.abort()
     releasing = (async () => {
       await Promise.allSettled(pending)
       if (renewal) await renewal.catch(() => {})
-      let result
-      let statesChecked = false
       try {
         if (lost || performance.now() >= deadline) { lose(); fail('LEASE_LOST') }
-        // Callers first close their browsers. Revoke only the pool-bound owned
-        // test users; expired or transferred holders cannot invoke this reset.
+        // Revoke tracked bearer credentials without removing rows or evidence.
+        // Pending requests remain dirty: revocation cannot cancel authenticated work.
         await pool.revokeSessions(lease)
-        statesChecked = true
-        const removed = await removeSessionStates()
-        result = await pool.release(lease, { outcome: removed ? releaseOutcome : 'dirty' })
-        if (!removed) fail('SESSION_STATE_CLEANUP_FAILED')
+        const releaseOutcome = (pending.length || tainted) && outcome === 'clean' ? 'dirty' : outcome
+        const result = await pool.release(lease, { outcome: releaseOutcome })
         if (outcome === 'clean' && result.state !== 'released') fail('ACCOUNT_DIRTY')
         return result
       } finally {
         closed = true
         abort.abort()
-        // A stale/failed holder may remove only its recorded generation's files;
-        // it never force-releases a lease after reset/fencing has failed.
-        if (!statesChecked) await removeSessionStates()
         if (ownDatabase) await database.end()
       }
     })()
@@ -280,7 +266,6 @@ export async function acquireTestAccounts({ database, environment, runId, worker
       if (provision) await pool.sealAccount(lease, slot.slotId)
       const storageStatePath = join(statesDirectory, `${lease.id}-${lease.generation}-${slot.role}.json`)
       await writePrivate(storageStatePath, { cookies: [...cookies.values()], origins: [] })
-      stateFiles.push(storageStatePath)
       scope[slot.role] = { userId, slotId: slot.slotId, namespace: slot.namespace, role: slot.role, storageStatePath, request }
     }
     return scope

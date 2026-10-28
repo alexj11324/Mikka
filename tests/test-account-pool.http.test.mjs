@@ -8,6 +8,9 @@ import { Pool } from 'pg'
 import { loadEnvironment, assertDeploymentIdentity } from '../scripts/test-accounts/environment.mjs'
 import { TestAccountPool } from '../scripts/test-accounts/pool.mjs'
 import { acquireTestAccounts } from '../scripts/test-accounts/session.mjs'
+// Direct node --test invocation must not bypass the shared runner's hold.
+const RETAIN_SAFE_HTTP_TESTS_AVAILABLE = false
+if (!RETAIN_SAFE_HTTP_TESTS_AVAILABLE) throw new Error('HTTP_ACCEPTANCE_RETENTION_BLOCKED')
 
 // Real Next HTTP routes, Better Auth sessions and PostgreSQL. There is no auth
 // mock, cookie minting, provider API, model invocation or manually inserted user.
@@ -243,6 +246,30 @@ acceptance('prepare/acquire/real owner-peer HTTP/clean release safely reuses the
     if (active.has(first)) await release(first, fixturesClean ? 'clean' : 'dirty')
     if (active.has(other)) await release(other)
   }
+})
+
+// Unrun: the shared runner and acquisition remain blocked pending retention review.
+acceptance('retained session revocation preserves rows and denies old bearer credentials', async () => {
+  const scope = await acquire('retained-auth-lifecycle')
+  try {
+    const path = '/api/conversations/coordinator/read'
+    assert.equal((await scope.owner.request(path)).status, 200)
+    assert.equal((await scope.peer.request(path)).status, 200)
+    const tracked = (await database.query("select id,owner_id from mikka_test_accounts.resources where lease_id=$1 and type='session' and state='created' order by id", [scope.lease.id])).rows
+    assert.equal(tracked.length, 2)
+    const ids = tracked.map(row => row.id)
+    const before = (await database.query('select id,token,"userId" from public.session where id=any($1::text[]) order by id', [ids])).rows
+    assert.equal(before.length, 2)
+    assert.equal((await scope.pool.revokeSessions(scope.lease)).revoked, 2)
+    const after = (await database.query('select id,token,"userId",("expiresAt"<clock_timestamp()) as expired from public.session where id=any($1::text[]) order by id', [ids])).rows
+    assert.equal(after.length, before.length, 'revocation retains every tracked session row')
+    assert.deepEqual(after.map(row => [row.id, row.userId]), before.map(row => [row.id, row.userId]))
+    assert.ok(after.every((row, index) => row.expired && row.token !== before[index].token), 'tokens rotate and expire without exposing values')
+    assert.equal((await scope.owner.request(path)).status, 401)
+    assert.equal((await scope.peer.request(path)).status, 401)
+    assert.equal((await database.query('select count(*)::int as count from public.session where id=any($1::text[])', [ids])).rows[0].count, 2, 'rejected old cookies must not delete retained rows')
+    assert.equal((await release(scope)).state, 'released')
+  } finally { if (active.has(scope)) await release(scope, 'dirty') }
 })
 
 acceptance('actual expired session, sign-out and revocation deny subsequent HTTP reads', async () => {

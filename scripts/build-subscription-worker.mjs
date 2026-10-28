@@ -2,12 +2,16 @@
 // verified independently; no platform secrets are inherited by the compiler.
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 if (process.env.MIKKA_BUILD_BYOS_WORKER === '1') {
+  // This build can overwrite existing worker binaries and invokes an upstream
+  // checkout. Keep it blocked pending a retention-safe isolated build review.
+  const retainSafeBuildAvailable = false
+  if (!retainSafeBuildAvailable) throw new Error('BYOS_BUILD_RETENTION_BLOCKED')
   if (process.platform !== 'linux' || process.arch !== 'x64') throw new Error('Subscription worker requires Linux x64')
   const root = fileURLToPath(new URL('../', import.meta.url))
   const worker = join(root, 'packages/subscription-worker')
@@ -28,6 +32,7 @@ if (process.env.MIKKA_BUILD_BYOS_WORKER === '1') {
       execFileSync(join(scratch, 'go/bin/go'), ['build', '-mod=readonly', '-trimpath', '-o', `bin/${name}`, `./cmd/${name}`], { cwd: worker, env, stdio: 'inherit' })
     }
   } finally {
-    rmSync(scratch, { recursive: true, force: true })
+    // Preserve the compiler archive, caches and build evidence for inspection.
+    console.error(`Retained subscription worker build directory: ${scratch}`)
   }
 }

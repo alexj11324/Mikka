@@ -6,6 +6,12 @@ import { createServer } from "node:net"
 import { fileURLToPath } from "node:url"
 import { Pool } from "pg"
 
+// The downstream suites still contain destructive cases and Actions removes
+// service containers. Block the whole entry point until independently reviewed.
+const RETAIN_SAFE_BYOS_SUITE_AVAILABLE = false
+if (!RETAIN_SAFE_BYOS_SUITE_AVAILABLE)
+  throw new Error("BYOS_TEST_RETENTION_BLOCKED")
+
 if (process.platform !== "linux")
   throw new Error("Run BYOS acceptance on the cloud Agent's Linux environment")
 const root = fileURLToPath(new URL("../", import.meta.url))
@@ -53,7 +59,6 @@ const pool = new Pool({
   max: 1,
   connectionTimeoutMillis: 500
 })
-let started = false
 try {
   await run(
     process.execPath,
@@ -63,7 +68,6 @@ try {
   await run("docker", [
     "run",
     "-d",
-    "--rm",
     "--name",
     name,
     "--memory=256m",
@@ -78,7 +82,6 @@ try {
     `POSTGRES_DB=${database}`,
     "postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb"
   ])
-  started = true
   let ready = false
   for (let attempt = 0; attempt < 40; attempt++) {
     try {
@@ -102,7 +105,6 @@ try {
   const ca = "/etc/ssl/certs/ca-certificates.crt"
   const dockerArgs = [
     "run",
-    "--rm",
     "--memory=6g",
     "--cpus=4",
     "--user",
@@ -151,5 +153,6 @@ try {
   )
 } finally {
   await pool.end()
-  if (started) await run("docker", ["stop", "--timeout", "2", name])
+  // Preserve the Postgres and build containers, including after a failed test.
+  console.error(`Retained BYOS Postgres container if created: ${name}`)
 }

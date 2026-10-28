@@ -7,6 +7,10 @@ import { validateTarget } from '../scripts/run-db-tests.mjs'
 
 // Fail closed even when accidentally invoked locally, before importing/connecting pg.
 validateTarget(process.env)
+// The test exercises a destructive recovery and cleanup path. Preserve its
+// assertions but refuse to connect until a retention-safe design is reviewed.
+const RETAIN_SAFE_MIGRATION_STEPS_AVAILABLE = false
+if (!RETAIN_SAFE_MIGRATION_STEPS_AVAILABLE) throw new Error('MIGRATION_STEPS_RETENTION_BLOCKED')
 const { Client } = await import('pg')
 const NOTX = '-- migrate: no-transaction\n'
 
