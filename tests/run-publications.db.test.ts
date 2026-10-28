@@ -48,7 +48,7 @@ test('run result publication commits one owner-scoped result through retries and
   const fixtures: Fixture[] = []
   let githubId = 800_000
 
-  const assignment = (fixture: Fixture) => ({ id: fixture.runId, userId: fixture.userId, issueId: fixture.issueId, baseBranch: null, repositoryAdmission: fixture.repositoryAdmission })
+  const assignment = (fixture: Fixture) => ({ id: fixture.runId, userId: fixture.userId, issueId: fixture.issueId, deviceId: fixture.deviceId, agentId: fixture.agentId, baseBranch: null, repositoryAdmission: fixture.repositoryAdmission })
   const prFor = (fixture: Fixture, number = 77): PublishedPullRequest => ({ url: `https://${fixture.remoteKey.slice(3)}/pull/${number}`, state: 'open' })
   const counts = async (fixture: Fixture) => {
     const result = await pool.query<{ versions: string; events: string }>(`select
@@ -261,6 +261,24 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await publishRunResult(f.runId, async () => { writes++; return prFor(f) }), { done: true })
       assert.equal(writes, 1)
       assert.equal((await receipt(f)).status, 'published')
+    })
+
+    await t.test('queue admission commits the target and rejects a new task after revocation', async () => {
+      const { queueRun } = await import('../lib/agent-runs')
+      const { writeRepositoryPushApproval } = await import('../lib/repository-approval-write')
+      const f = await fixture({ approved: true })
+      const accepted = await queueRun(f.userId, { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl, note: 'before revocation' })
+      const stored = (await pool.query('select "repositoryAdmission" from agent_runs where id=$1', [accepted.runId])).rows[0].repositoryAdmission
+      assert.equal(stored.userId, f.userId)
+      assert.equal(stored.issueId, f.issueId)
+      assert.equal(stored.deviceId, f.deviceId)
+      assert.equal(stored.agentId, f.agentId)
+      assert.equal(stored.remoteKey, f.remoteKey)
+      assert.equal(stored.targetBranch, f.branch)
+      assert.equal((await pool.query('select branch from run_publications where "runId"=$1', [accepted.runId])).rows[0].branch, f.branch)
+      await writeRepositoryPushApproval(f.userId, f.remoteKey, false)
+      await assert.rejects(queueRun(f.userId, { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl, note: 'after revocation' }))
+      assert.equal((await pool.query('select "repositoryAdmission" from agent_runs where id=$1', [accepted.runId])).rows[0].repositoryAdmission.targetBranch, f.branch)
     })
 
     await t.test('new messages serialize with revocation and STOP remains independent', async () => {

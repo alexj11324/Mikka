@@ -11,7 +11,7 @@ export type RunControlDatabase = Pick<typeof db, 'transaction'>
 /** Lock the owned run before checking its state so completion and messages serialize. */
 export async function sendOwnedRunMessage(database: RunControlDatabase, userId: string, input: { runId: string; text: string }, origin: 'user' | 'peer' = 'user') {
   await database.transaction(async tx => {
-    const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt, deviceId: agentRuns.deviceId, issueId: agentRuns.issueId, repositoryAdmission: agentRuns.repositoryAdmission })
+    const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt, deviceId: agentRuns.deviceId, agentId: agentRuns.agentId, issueId: agentRuns.issueId, repositoryAdmission: agentRuns.repositoryAdmission })
       .from(agentRuns).where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId))).limit(1).for('update')
     if (!run || run.stopRequestedAt || !UNFINISHED_RUN_STATUSES.some(status => status === run.status)) throw new ActionFailureError('runNotFound')
     let admission = run.repositoryAdmission
@@ -20,7 +20,7 @@ export async function sendOwnedRunMessage(database: RunControlDatabase, userId: 
       if (device?.kind === 'local') throw new ActionFailureError('runInvalid')
     }
     if (admission) {
-      if (!run.issueId || !matchesRepositoryAdmission(admission, { ...admission, issueId: run.issueId, userId })) throw new ActionFailureError('runInvalid')
+      if (!run.issueId || !run.deviceId || !matchesRepositoryAdmission(admission, { ...admission, issueId: run.issueId, deviceId: run.deviceId, agentId: run.agentId, userId })) throw new ActionFailureError('runInvalid')
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['repository-approval', userId, admission.remoteKey])}, 0))`)
       const [settings] = await tx.select().from(repositorySettings).where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, admission.remoteKey))).limit(1)
       admission = admitRepositoryTask({ ...admission, push: settings?.push, now: new Date() })

@@ -89,7 +89,7 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
     const identifier = previous?.identifier ?? identifiers.get(issue.id) ?? null
     const branch = previous?.branch ?? publicationBranch(identifier)
     if (!branch || !repo.remoteUrl) throw new ActionFailureError('runInvalid')
-    const admission = admitRepositoryTask({ userId, issueId: issue.id, remoteKey: repo.repoPath, remoteUrl: repo.remoteUrl, targetBranch: branch, push: setting?.push, now: new Date() })
+    const admission = admitRepositoryTask({ userId, issueId: issue.id, deviceId: agent.deviceId!, agentId: agent.id, remoteKey: repo.repoPath, remoteUrl: repo.remoteUrl, targetBranch: branch, push: setting?.push, now: new Date() })
     if (!admission) throw new ActionFailureError('runInvalid')
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'repository-branch:' + repo.repoPath + ':' + branch}, 0))`)
     const [collision] = await tx.select({ runId: runPublications.runId }).from(runPublications).where(and(eq(runPublications.remoteKey, repo.repoPath), eq(runPublications.branch, branch), sql`${runPublications.issueId} <> ${issue.id}`)).limit(1)
