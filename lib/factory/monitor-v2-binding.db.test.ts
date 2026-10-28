@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createVercelPublicationAdapter, MIKKA_VERCEL } from "./vercel-publication";
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { readFactoryPublicationReceiptV2 } from "./publication-receipt";
+import { consumeMonitorObservation } from "./monitor-incidents";
 import { validateMonitorV2Observation } from "./monitor-v2-binding";
 const db = process.env.E2E_DATABASE_URL;
 test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/provider", { skip: !db, timeout: 120000 }, async () => {
@@ -25,6 +26,12 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
       const at = new Date().toISOString();
       const o = { startedAt: at, finishedAt: at, target: { ...r.verifiedTarget, observedAt: at }, health: { immutableStatus: 200, immutableBodyValid: true, aliasStatus: 200, aliasBodyValid: true }, alias: { origin: "https://app.example.com", before: r.verifiedTarget.operationId, after: r.verifiedTarget.operationId } };
       assert.equal(validateMonitorV2Observation(r, o, "https://app.example.com"), "healthy");
+      // Invokes the actual v2 ancestry predicate: an unbound monitor run must not
+      // gain provenance from an otherwise valid publication and health result.
+      await assert.rejects(() => consumeMonitorObservation(tx,
+        { id: x.task.id, userId: f.actor.userId, issueId: r.issueId, sourceEventId: "synthetic-source", stage: "monitor", status: "running", attemptId: "unbound-attempt", candidateId: r.candidateId },
+        { ownerId: f.actor.userId, workspaceKey: "synthetic-workspace", fingerprint: "f", checkKey: "c", issueId: r.issueId, eventId: "e", outcome: "healthy", publicationId: r.publicationId, candidateId: r.candidateId, runId: "unbound-run" }, o, "https://app.example.com"), /factoryMonitorIndependentRequired/);
+
       assert.equal(validateMonitorV2Observation(r, { ...o, startedAt: "2000-01-01T00:00:00Z" }, "https://app.example.com"), "blocked");
       const mutations = [
         `UPDATE factory_publications SET status='uncertain'`,

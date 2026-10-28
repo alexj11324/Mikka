@@ -58,3 +58,30 @@ PR base is codex/194-approval-main-20261028; only #195 additions are its diff.
 The earlier missing-type-dependency limitation is resolved. Required CI now runs
 monitor pure tests and actual V2 reader/consumer PG tests using #194 fixtures,
 plus normal full types/lint/build. This does not register runtime monitor gates.
+
+Current dependency base: 5ff814aa0c4cb85d1134444e32d0f4007ac360e2 combines
+#194 a75380459717140f6b0fc3dba17cc09eab39e458 and #193
+4440eed4d7a1440c76ad779dc896c44b0c846847. Receipt reader bytes are unchanged;
+ancestry v2 is now imported and called by consumeMonitorObservation for both
+healthy/unhealthy paths. No unsupported-stage bypass is present.
+
+#192 required entry: invoke consumeMonitorObservation(tx, currentLockedTask,
+incidentInput, verifiedObservation, configuredProductionOrigin) only after current
+owner/Bot/workspace/issue authorization, cancellation/revocation, binding revision,
+attempt/candidate/run/session and frozen assignment checks. The same transaction
+must claim the event and perform route/apply/cycle CAS. Return value is an incident
+ID/replay flag, never an instruction to advance or close. Fingerprint/checkKey and
+workspaceKey must be derived from trusted current assignment; original issue comes
+from that task. Recovery needs the original incident fingerprint, independently
+verified new candidate plus its approved publication, and the same configured
+check/target. This callback has no dispatcher or alternative phase state.
+
+Schema proposal docs/factory/schema-proposals/195-incidents.sql is NOT a tracked
+production migration. It creates two new tables and indexes, without altering old
+migration history. Its incident unique key scopes owner/workspace/fingerprint;
+observation owner/event key prevents echo/replay count inflation. Event locks are
+acquired before incident locks. Transactions roll back both records atomically.
+Recovery evidence only sets recovery_observed; later failure reopens the internal
+incident. Neither state writes/automatically closes any external or internal issue.
+A future registered migration requires coordination against then-current main and
+approval for actual database application. No #192 migration alias is imported here.
