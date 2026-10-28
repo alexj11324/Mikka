@@ -33,6 +33,7 @@ describe("permission policy (ADR 0009)", () => {
     ["write_outside_repo", "ask"],
     ["git_push", "ask"],
     ["network", "ask"],
+    ["computer_use", "ask"],
   ] as const)("%s -> %s", (action, expected) => {
     expect(PERMISSION_DEFAULTS[action]).toBe(expected)
     expect(decide(action)).toBe(expected)
@@ -96,6 +97,18 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(decide("network", { policy: p })).toBe("ask")
     expect(decide("write_in_worktree", { policy: p })).toBe("allow")
     expect(decide("run_setup_recipe", { policy: p })).toBe("ask")
+  })
+
+  it("uses only the run computer permission and makes read-only take precedence", () => {
+    for (const decision of ["allow", "ask", "deny"] as const) {
+      const p = policy({ computer_use: decision })
+      expect(decide("computer_use", { policy: p })).toBe(decision)
+      expect(decide("computer_use", { policy: { ...p, readOnly: true } })).toBe("deny")
+    }
+    const legacy = policy({})
+    delete legacy.permissions.computer_use
+    expect(decide("computer_use", { policy: legacy })).toBe("ask")
+    expect(decide("computer_use", { policy: { ...legacy, readOnly: true } })).toBe("deny")
   })
 
   it("builds the run's domain list from network and install choices", () => {

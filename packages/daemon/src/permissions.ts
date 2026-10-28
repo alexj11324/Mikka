@@ -33,7 +33,7 @@ export type { PermissionAction, PermissionDecision, RunPolicy }
 export interface PermissionContext {
   /** Whether the user approved this repo's setup recipe. */
   setupRecipeApproved?: boolean
-  /** The workspace's choices; the ADR 0009 defaults when absent. */
+  /** Trusted host assignment only, never model-supplied. Defaults when absent. */
   policy?: RunPolicy
 }
 
