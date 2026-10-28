@@ -98,7 +98,7 @@ export class Cdp {
     try {
       const tree = await this.call('Page.getFrameTree')
       const document = await this.call('DOM.getDocument', { depth: -1, pierce: true })
-      if (!tree.frameTree || typeof tree.frameTree !== 'object' || Array.isArray(tree.frameTree) || tree.frameTree.childFrames?.length || !document.root || typeof document.root !== 'object' || Array.isArray(document.root)) return false
+      if (!tree.frameTree || typeof tree.frameTree !== 'object' || Array.isArray(tree.frameTree) || (tree.frameTree.childFrames != null && (!Array.isArray(tree.frameTree.childFrames) || tree.frameTree.childFrames.length > 0)) || !document.root || typeof document.root !== 'object' || Array.isArray(document.root)) return false
       const unsafe = (value: unknown): boolean => {
         if (Array.isArray(value)) return value.some(unsafe)
         if (!value || typeof value !== 'object') return false

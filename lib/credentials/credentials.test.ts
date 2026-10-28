@@ -110,6 +110,7 @@ test('viewer stays locked when nested documents or author shadow roots cannot be
   for (const [tree, root, expected] of [
     [{ frameTree: {} }, { nodeName: '#document' }, true],
     [{ frameTree: { childFrames: [{}] } }, { nodeName: '#document' }, false],
+    [{ frameTree: { childFrames: {} } }, { nodeName: '#document' }, false],
     [{ frameTree: {} }, { nodeName: '#document', children: [{ nodeName: 'IFRAME' }] }, false],
     [{ frameTree: {} }, { nodeName: '#document', children: [{ shadowRoots: [{ shadowRootType: 'open' }] }] }, false],
     [{ frameTree: {} }, { nodeName: '#document', children: [{ shadowRoots: [{ shadowRootType: 'closed' }] }] }, false],
