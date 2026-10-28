@@ -130,8 +130,9 @@ Session files are removed on release. Reusable credentials and the private
 secret-scanning material remain only for the owning disposable environment's
 lifetime, then leave with that resource. Never upload the `.cache/e2e` directory
 or its private account/session files. CI may upload only its explicitly allowlisted
-sanitized summaries: `.cache/e2e/http-acceptance-summary.json` and
-`.cache/e2e/account-http-evidence.json`, after the evidence scan passes.
+summaries and logs: `.cache/e2e/http-acceptance-summary.json`,
+`.cache/e2e/account-http-evidence.json`, `.cache/e2e/playwright-performance.log`
+and `.cache/e2e/playwright-browser.log`, after the evidence scan passes.
 
 Account cleanliness includes ordinary owned rows and their descendants through
 actual PostgreSQL foreign keys, plus reviewed logical links for legacy E2E
@@ -180,6 +181,11 @@ timestamp, run/lease IDs, non-sensitive account IDs and expected/actual results.
 Do not place credentials, cookies, tokens, raw authentication responses or
 unfiltered driver errors in logs, PRs, screenshots, traces or public artifacts.
 Secret scans must include the generated logs and exported browser evidence.
+Both CI Playwright commands first capture stdout and stderr in mode 0600 logs.
+Each log is scanned before any of its content is printed to Actions; a blocked
+scan never prints the log. The workflow preserves the test command's failure
+exit code and fails a successful test command if its log scan fails. The final
+artifact scan and upload use the same explicit log paths alongside the reports.
 The scanner also decodes the ZIP payload embedded inside Playwright HTML reports,
 with bounded entry count, depth and decompressed size. It rejects malformed,
 encrypted, unsupported and raw nested archives. The regular registration fixture

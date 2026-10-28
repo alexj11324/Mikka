@@ -91,12 +91,38 @@ jobs:
       - name: Real HTTP authentication, account reuse and isolation
         run: node scripts/test-accounts/run-http.mjs
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
-        run: pnpm test:performance --output=performance-results
+        run: |
+          umask 077
+          mkdir -p .cache/e2e
+          log_file=.cache/e2e/playwright-performance.log
+          : > "$log_file"
+          chmod 600 "$log_file"
+          test_status=0
+          pnpm test:performance --output=performance-results > "$log_file" 2>&1 || test_status=$?
+          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
+            if [ "$test_status" -eq 0 ]; then test_status=1; fi
+            exit "$test_status"
+          fi
+          cat "$log_file"
+          exit "$test_status"
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
       - name: Browser functionality regression
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: pnpm test:e2e --grep-invert @performance
+        run: |
+          umask 077
+          mkdir -p .cache/e2e
+          log_file=.cache/e2e/playwright-browser.log
+          : > "$log_file"
+          chmod 600 "$log_file"
+          test_status=0
+          pnpm test:e2e --grep-invert @performance > "$log_file" 2>&1 || test_status=$?
+          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
+            if [ "$test_status" -eq 0 ]; then test_status=1; fi
+            exit "$test_status"
+          fi
+          cat "$log_file"
+          exit "$test_status"
       - name: Scan account evidence before artifact upload
         id: account-evidence-audit
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -113,5 +139,9 @@ jobs:
             performance-results/
             .cache/e2e/http-acceptance-summary.json
             .cache/e2e/account-http-evidence.json
+            .cache/e2e/playwright-performance.log
+            .cache/e2e/playwright-browser.log
+          # Only the explicit scanned paths above; never the private account directory.
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7

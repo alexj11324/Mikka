@@ -6,7 +6,11 @@ import { auditEvidence } from './session.mjs'
 // Playwright traces contain cookies even when the screenshots look harmless.
 try {
   const paths = []
-  for (const path of ['playwright-report', 'test-results', 'playwright-performance-report', 'performance-results', '.cache/e2e/http-acceptance-summary.json', '.cache/e2e/account-http-evidence.json']) {
+  for (const path of [
+    'playwright-report', 'test-results', 'playwright-performance-report', 'performance-results',
+    '.cache/e2e/http-acceptance-summary.json', '.cache/e2e/account-http-evidence.json',
+    '.cache/e2e/playwright-performance.log', '.cache/e2e/playwright-browser.log',
+  ]) {
     try { await stat(path); paths.push(path) } catch (error) { if (error.code !== 'ENOENT') throw error }
   }
   if (!paths.length) throw new Error('EVIDENCE_MISSING')
