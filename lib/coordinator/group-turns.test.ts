@@ -299,6 +299,12 @@ test('decision adapter retains host receipt and refuses missing, inconsistent or
   const invalid = createGroupJudgment(async () => ({answers:new Map([['responder_0',{type:'choice',name:'responder_0',choice:outsider}]]),execution:receipt}))
   await assert.rejects(invalid.route(message,members,a,[]),GroupJudgmentPendingError)
   assert.deepEqual(await invalid.correction(input), {kind:'uncertain'})
+  // An uncertain later slot cannot silently become a completed partial route.
+  const uncertain = createGroupJudgment(async () => ({answers:new Map<string, Exclude<DecisionAnswer,{type:'refusal'}>>([
+    ['responder_0',{type:'choice',name:'responder_0',choice:b}],
+    ['responder_1',{type:'choice',name:'responder_1',choice:'uncertain'}],
+  ]),execution:receipt}))
+  await assert.rejects(uncertain.route(message,members,a,[]),GroupJudgmentPendingError)
   const unavailable = createGroupJudgment(async () => null)
   await assert.rejects(unavailable.route(message,members,a,[]),GroupJudgmentPendingError)
   assert.deepEqual(await unavailable.correction(input), {kind:'uncertain'})
