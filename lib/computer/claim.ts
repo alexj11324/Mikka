@@ -8,7 +8,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    const run = (await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND status=$3 FOR UPDATE', [runId, deviceId, 'queued'])).rows[0]
+    const run = (await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND status=$3 AND "stopRequestedAt" IS NULL FOR UPDATE', [runId, deviceId, 'queued'])).rows[0]
     if (!run) { await client.query('COMMIT'); return 'unavailable' }
     const bound = (await client.query('SELECT 1 FROM computer_run_bindings WHERE "runId"=$1', [runId])).rowCount
     if (bound) { await client.query('COMMIT'); return 'cloud-required' }

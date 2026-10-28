@@ -4,6 +4,7 @@ import test from 'node:test'
 import type { RunCompleteRequest } from '@mikka/protocol/run'
 import type { PublishedPullRequest } from '../lib/run-publication-result'
 import type { openRunPullRequest } from '../lib/github/run-pull-request'
+import type { RepositoryAdmission } from '../lib/repository-admission'
 import { remoteKey as repositoryKey } from '@mikka/protocol/repository'
 
 const connection = process.env.E2E_DATABASE_URL
@@ -18,7 +19,7 @@ if (process.env.REQUIRE_DB === '1' && !enabled) throw new Error('Run publication
 
 type Fixture = {
   userId: string; deviceId: string; agentId: string; repoId: string; issueId: string; runId: string
-  remoteUrl: string; remoteKey: string; identifier: string; branch: string; githubAccountId: string
+  remoteUrl: string; remoteKey: string; identifier: string; branch: string; githubAccountId: string; repositoryAdmission: RepositoryAdmission | null
 }
 type OpenPullRequest = typeof openRunPullRequest
 
@@ -47,7 +48,7 @@ test('run result publication commits one owner-scoped result through retries and
   const fixtures: Fixture[] = []
   let githubId = 800_000
 
-  const assignment = (fixture: Fixture) => ({ id: fixture.runId, userId: fixture.userId, issueId: fixture.issueId, baseBranch: null })
+  const assignment = (fixture: Fixture) => ({ id: fixture.runId, userId: fixture.userId, issueId: fixture.issueId, baseBranch: null, repositoryAdmission: fixture.repositoryAdmission })
   const prFor = (fixture: Fixture, number = 77): PublishedPullRequest => ({ url: `https://${fixture.remoteKey.slice(3)}/pull/${number}`, state: 'open' })
   const counts = async (fixture: Fixture) => {
     const result = await pool.query<{ versions: string; events: string }>(`select
@@ -70,7 +71,7 @@ test('run result publication commits one owner-scoped result through retries and
     const remoteKey = options.remoteUrl ? repositoryKey(options.remoteUrl) : options.remoteKey ?? `v2/github.com/mikka-ci/repo-${seed}`
     const row: Fixture = {
       userId: `publication-${seed}`, deviceId: randomUUID(), agentId: randomUUID(), repoId: randomUUID(), issueId: randomUUID(), runId: randomUUID(),
-      remoteUrl: options.remoteUrl ?? `https://${remoteKey.slice(3)}.git`, remoteKey, identifier: `${prefix}-${number}`, branch: `mikka/${prefix.toLowerCase()}-${number}`, githubAccountId: String(++githubId),
+      remoteUrl: options.remoteUrl ?? `https://${remoteKey.slice(3)}.git`, remoteKey, identifier: `${prefix}-${number}`, branch: `mikka/${prefix.toLowerCase()}-${number}`, githubAccountId: String(++githubId), repositoryAdmission: null,
     }
     fixtures.push(row)
     await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$1,$2,true,now(),now())', [row.userId, `${row.userId}@example.invalid`])
@@ -82,7 +83,14 @@ test('run result publication commits one owner-scoped result through retries and
     await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Fix redirect\',$3,\'todo\',\'normal\',\'personal\')', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] })])
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt) values ($1,$2,$3,$4,$5,$6,\'running\',\'implement\',null,\'Fix redirect\')', [row.runId, row.userId, row.issueId, row.agentId, row.deviceId, row.repoId])
     await pool.query('insert into run_tokens (id,"runId","userId","tokenHash","expiresAt") values ($1,$2,$3,$4,now()+interval \'1 hour\')', [randomUUID(), row.runId, row.userId, `synthetic-${randomUUID()}`])
-    if (options.approved) await approval(row, true)
+    if (options.approved) {
+      await approval(row, true)
+      const { admitRepositoryTask } = await import('../lib/repository-admission')
+      const stored = (await pool.query('select push from repository_settings where "userId"=$1 and "remoteKey"=$2', [row.userId, row.remoteKey])).rows[0].push
+      row.repositoryAdmission = admitRepositoryTask({ ...row, targetBranch: row.branch, push: stored, now: new Date() })
+      assert.ok(row.repositoryAdmission)
+      await pool.query('update agent_runs set "repositoryAdmission"=$2 where id=$1', [row.runId, JSON.stringify(row.repositoryAdmission)])
+    }
     return row
   }
 
@@ -175,6 +183,11 @@ test('run result publication commits one owner-scoped result through retries and
     await t.test('unverified work without an approved matching push cannot succeed or advance the task', async () => {
       for (const mode of ['unapproved', 'not-pushed', 'wrong-branch'] as const) {
         const f = await fixture({ approved: mode !== 'unapproved' })
+        if (mode === 'unapproved') {
+          await assert.rejects(prepareRunPublication(assignment(f), f.remoteUrl), { code: 'push_not_approved' })
+          assert.equal(await receipt(f), undefined)
+          continue
+        }
         await prepareRunPublication(assignment(f), f.remoteUrl)
         const submitted = completion(f, 'Unverified submission')
         submitted.report!.verify = { status: 'not_run' }
@@ -210,7 +223,7 @@ test('run result publication commits one owner-scoped result through retries and
       const stranger = await fixture({ approved: true })
       assert.equal(await persistRunCompletion(stranger.userId, owner.runId, completion(owner)), null)
       assert.equal(await persistRunCompletion(owner.userId, owner.runId, completion(owner), stranger.deviceId), null)
-      await assert.rejects(prepareRunPublication({ ...assignment(owner), userId: stranger.userId }, owner.remoteUrl), { code: 'issue_unavailable' })
+      await assert.rejects(prepareRunPublication({ ...assignment(owner), userId: stranger.userId }, owner.remoteUrl), { code: 'push_not_approved' })
       assert.equal(await receipt(owner), undefined)
       assert.equal((await pool.query('select status from agent_runs where id=$1', [owner.runId])).rows[0].status, 'running')
       assert.deepEqual(await counts(owner), { versions: 0, events: 0 })
@@ -232,55 +245,56 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await counts(b), { versions: 0, events: 0 })
     })
 
-    await t.test('different endpoints and legacy keys cannot lend an owner approval to another repository', async () => {
-      const f = await fixture({ remoteUrl: 'https://git.example.com:9443/team/repo.git' })
-      const aKey = repositoryKey('https://git.example.com:8443/Team/Repo.git')
-      await approval({ ...f, remoteKey: aKey }, true)
-      await approval({ ...f, remoteKey: 'git.example.com/team/repo' }, true)
-      assert.equal((await prepareRunPublication(assignment(f), f.remoteUrl)).policy.permissions.git_push, 'ask')
-      assert.equal((await receipt(f)).remoteKey, f.remoteKey)
-      const github = await fixture()
-      await approval({ ...github, remoteKey: github.remoteKey.slice(3) }, true)
-      assert.equal((await prepareRunPublication(assignment(github), github.remoteUrl)).policy.permissions.git_push, 'ask', 'old GitHub keys also require explicit reapproval')
-      await approval(github, true)
-      assert.equal((await prepareRunPublication(assignment(github), github.remoteUrl)).policy.permissions.git_push, 'allow')
-      await pool.query('UPDATE run_publications SET "remoteKey"=$2 WHERE "runId"=$1', [github.runId, github.remoteKey.slice(3)])
-      await assert.rejects(prepareRunPublication(assignment(github), github.remoteUrl), { code: 'publication_mismatch' })
-      await persistRunCompletion(github.userId, github.runId, completion(github))
-      let opened = 0
-      assert.deepEqual(await publishRunResult(github.runId, async () => { opened++; throw new Error('Legacy publication must not contact GitHub') }), { done: true })
-      assert.equal(opened, 0)
-      assert.equal((await receipt(github)).errorCode, 'publication_mismatch')
+    await t.test('legacy and foreign repository receipts fail closed', async () => {
+      const f = await fixture({ approved: true })
+      await assert.rejects(prepareRunPublication({ ...assignment(f), userId: 'foreign' }, f.remoteUrl), { code: 'push_not_approved' })
+      await assert.rejects(prepareRunPublication(assignment(f), 'https://github.com/other/repo.git'), { code: 'push_not_approved' })
+      await assert.rejects(prepareRunPublication({ ...assignment(f), repositoryAdmission: null }, f.remoteUrl), { code: 'push_not_approved' })
     })
 
-    await t.test('missing human approval and revoked approval cannot open a PR', async () => {
-      let opened = 0
-      const neverOpen: OpenPullRequest = async () => { opened++; throw new Error('GitHub must not be called without owner approval') }
-      const unapproved = await fixture()
-      // A naked boolean has no authenticated human approval receipt.
-      await approval(unapproved, true, false)
-      assert.equal((await prepareRunPublication(assignment(unapproved), unapproved.remoteUrl)).policy.permissions.git_push, 'ask')
-      assert.equal((await persistRunCompletion(unapproved.userId, unapproved.runId, completion(unapproved)))?.publicationPending, false)
-      await publishRunResult(unapproved.runId, neverOpen)
-      assert.equal((await receipt(unapproved)).errorCode, 'push_not_approved')
-      assert.equal((await event(unapproved)).payload.publication.errorCode, 'push_not_approved')
+    await t.test('revocation after acceptance does not cancel the frozen publication', async () => {
+      const f = await fixture({ approved: true })
+      assert.equal((await prepareRunPublication(assignment(f), f.remoteUrl)).policy.permissions.git_push, 'allow')
+      await persistRunCompletion(f.userId, f.runId, completion(f))
+      await approval(f, false)
+      let writes = 0
+      assert.deepEqual(await publishRunResult(f.runId, async () => { writes++; return prFor(f) }), { done: true })
+      assert.equal(writes, 1)
+      assert.equal((await receipt(f)).status, 'published')
+    })
 
-      const revoked = await fixture({ approved: true })
-      assert.equal((await prepareRunPublication(assignment(revoked), revoked.remoteUrl)).policy.permissions.git_push, 'allow')
-      assert.equal((await persistRunCompletion(revoked.userId, revoked.runId, completion(revoked)))?.publicationPending, true)
-      await approval(revoked, false)
-      assert.deepEqual(await publishRunResult(revoked.runId, neverOpen), { done: true })
-      assert.equal((await receipt(revoked)).status, 'blocked')
-      assert.equal((await receipt(revoked)).errorCode, 'push_not_approved')
-      assert.equal((await event(revoked)).payload.publication.errorCode, 'push_not_approved')
+    await t.test('new messages serialize with revocation and STOP remains independent', async () => {
+      const { sendOwnedRunMessage, stopOwnedRun } = await import('../lib/run-control')
+      const { writeRepositoryPushApproval } = await import('../lib/repository-approval-write')
+      const { db } = await import('../lib/db')
+      const f = await fixture({ approved: true })
+      await sendOwnedRunMessage(db, f.userId, { runId: f.runId, text: 'accepted before revocation' })
+      const saved = (await pool.query('select "repositoryAdmission" from run_messages where "runId"=$1', [f.runId])).rows
+      assert.equal(saved.length, 1)
+      assert.equal(saved[0].repositoryAdmission.targetBranch, f.branch)
+      await writeRepositoryPushApproval(f.userId, f.remoteKey, false)
+      await assert.rejects(sendOwnedRunMessage(db, f.userId, { runId: f.runId, text: 'after revocation' }))
+      assert.equal(Number((await pool.query('select count(*) from run_messages where "runId"=$1', [f.runId])).rows[0].count), 1)
+      await stopOwnedRun(db, f.userId, f.runId)
+      assert.ok((await pool.query('select "stopRequestedAt" from agent_runs where id=$1', [f.runId])).rows[0].stopRequestedAt)
+      await assert.rejects(sendOwnedRunMessage(db, f.userId, { runId: f.runId, text: 'after stop' }))
+    })
 
-      // A pre-claim retry refreshes its still-assigned approval snapshot too.
-      const refreshed = await fixture({ approved: true })
-      await prepareRunPublication(assignment(refreshed), refreshed.remoteUrl)
-      await approval(refreshed, false)
-      assert.equal((await prepareRunPublication(assignment(refreshed), refreshed.remoteUrl)).policy.permissions.git_push, 'ask')
-      assert.equal((await receipt(refreshed)).pushApproved, false)
-      assert.equal(opened, 0)
+    await t.test('revocation holds the same lock as message acceptance', async () => {
+      const { sendOwnedRunMessage } = await import('../lib/run-control')
+      const { db } = await import('../lib/db')
+      const f = await fixture({ approved: true })
+      const client = await pool.connect()
+      try {
+        await client.query('begin')
+        await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['repository-approval', f.userId, f.remoteKey])])
+        await client.query('update repository_settings set push=$3 where "userId"=$1 and "remoteKey"=$2', [f.userId, f.remoteKey, JSON.stringify({ approved: false, remote: 'origin', approvedByUserId: f.userId, approvedAt: new Date().toISOString() })])
+        const message = sendOwnedRunMessage(db, f.userId, { runId: f.runId, text: 'contended' })
+        await new Promise(resolve => setImmediate(resolve))
+        await client.query('commit')
+        await assert.rejects(message)
+        assert.equal(Number((await pool.query('select count(*) from run_messages where "runId"=$1', [f.runId])).rows[0].count), 0)
+      } finally { await client.query('rollback').catch(() => {}); client.release() }
     })
 
     await t.test('a created PR remains in receipt and chat if task metadata fills during the GitHub call', async () => {
