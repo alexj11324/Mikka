@@ -4,10 +4,14 @@ import { db, pool } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
+import { builtinAgentDefinition } from './builtin'
 import { AgentKitError, AgentKitStore, type AgentScope } from './store'
 
 /** Opt-in deployment; migration must be applied first. No runtime/vendor change is implied. */
 export function agentKitEnabled() { return process.env.MIKKA_AGENT_KIT === '1' }
+export function agentKitDefaults() {
+  return builtinAgentDefinition({ computerEnabled: process.env.MIKKA_CLOUD_COMPUTER_TASKS === '1' && process.env.MIKKA_BYOS_ENABLED === '1' })
+}
 export const agentKitStore = new AgentKitStore(pool)
 
 /** Identity is derived from the host, never tool input or imported configuration. */
