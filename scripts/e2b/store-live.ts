@@ -124,10 +124,13 @@ async function main() {
     assert.equal(privilege.exitCode, 0)
     console.log(JSON.stringify({ provision: true, persistentBot: true, viewer: true, publicIngressProtected: true, unixVncPixels: true, takeover: true, handback: true, ownerDenial: true, sleepResume: true, diskPreserved: true, keyIsolated: true }))
   } finally {
-    // Recover the ID from the ledger even when acceptance failed mid-provision.
+    // Preserve resources and report their identifiers for audit.
     const ids = await pool.query('SELECT "sandboxId" FROM cloud_machines WHERE "sandboxId" IS NOT NULL').catch(() => ({ rows: [] }))
-    for (const { sandboxId } of ids.rows) await Sandbox.kill(sandboxId, connection)
-    await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
+    console.log(JSON.stringify({ retainedSchema: schema, retainedSandboxIds: ids.rows.map(({ sandboxId }) => sandboxId) }))
+    await pool.end(); await admin.end()
   }
 }
-void main().catch(error => { console.error(error instanceof assert.AssertionError ? error.message : error instanceof Error ? error.name : "Acceptance failed"); process.exitCode = 1 })
+// HOLD: this acceptance creates resources and pauses/resumes existing state.
+// Do not start it until the retention and resource-creation constraints change.
+console.error('E2B store acceptance held: resource retention required')
+process.exitCode = 1

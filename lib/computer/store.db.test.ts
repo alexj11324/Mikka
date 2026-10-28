@@ -367,6 +367,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await store.setPolicy(actor.workspaceId, 'ask')
     assert.equal(computerPolicyVersion, 4, 'the driver guard fences grants from the previous policy version')
   } finally {
-    await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
+    console.log(`Retained computer test schema: ${schema}`)
+    await pool.end(); await admin.end()
   }
 })

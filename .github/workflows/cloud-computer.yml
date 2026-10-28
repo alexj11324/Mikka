@@ -7,6 +7,8 @@ permissions:
   contents: read
 jobs:
   backend:
+    # HOLD: hosted runner service/container teardown is not retention-safe.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:

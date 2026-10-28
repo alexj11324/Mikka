@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile, chmod } from "node:fs/promises";
+import { mkdtemp, writeFile, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -24,10 +24,7 @@ async function fixture(t, overrides = {}) {
     }),
     ...overrides,
   });
-  t.after(async () => {
-    await broker.close();
-    await rm(dir, { recursive: true, force: true });
-  });
+  t.after(() => { console.log(`Retained broker test directory: ${dir}`); });
   return broker;
 }
 test("revoking a run grant promptly rejects pending work without revoking another run", async (t) => {
@@ -63,7 +60,7 @@ test("each broker action has its own trusted id and ask reuses the review id", a
 });
 test("only pinned driver detected; missing/unexpected version absent", async (t) => {
   const dir = await mkdtemp(join(tmpdir(), "driver-detect-"));
-  t.after(() => rm(dir, { recursive: true, force: true }));
+  t.after(() => { console.log(`Retained driver test directory: ${dir}`); });
   const file = join(dir, "driver");
   await writeFile(file, "#!/bin/sh\necho cua-driver 0.38.0\n");
   await chmod(file, 0o700);
@@ -247,7 +244,6 @@ test("real stdio MCP proxy holds call until trusted broker approval; cannot deci
     grant.socketPath,
     grant.token,
   ]);
-  t.after(() => child.kill());
   const replies = [];
   const lines = createInterface({ input: child.stdout });
   lines.on("line", (l) => replies.push(JSON.parse(l)));
@@ -280,7 +276,6 @@ test("allow returns actual PNG bytes through the request-only MCP proxy to the s
   await b.listen();
   const grant = b.spec("run", "allow");
   const child = spawn(process.execPath, [new URL("./proxy.mjs", import.meta.url).pathname, grant.socketPath, grant.token]);
-  t.after(() => child.kill());
   const lines = createInterface({ input: child.stdout });
   t.after(() => lines.close());
   const reply = new Promise(resolve => lines.once("line", line => resolve(JSON.parse(line))));
