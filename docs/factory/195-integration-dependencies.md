@@ -52,3 +52,9 @@ and production alias before/after. A stable bound 5xx/invalid health body is
 unhealthy; moved identity, unauthorized status or missing health blocks. READY
 alone never proves health. No transport is registered, no real GET is performed,
 and authorized transaction/ancestry validation remain mandatory caller duties.
+
+Coordinated stack now includes the full unchanged #194 commit 2ff475c.
+PR base is codex/194-approval-main-20261028; only #195 additions are its diff.
+The earlier missing-type-dependency limitation is resolved. Required CI now runs
+monitor pure tests and actual V2 reader/consumer PG tests using #194 fixtures,
+plus normal full types/lint/build. This does not register runtime monitor gates.
