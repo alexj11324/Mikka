@@ -13,6 +13,15 @@ fails, fix it first; do not show work with known failures.
       线程 / PR / 电脑; no screen caption (R-02, R-17, R-50).
 - [ ] Switching bots switches chat, threads and computer together (R-03).
 - [ ] No 新建云端电脑, no per-bot computer list (R-04).
+- [ ] The right panel has no action button; besides navigation the only
+      control is 「展开」 (R-51).
+- [ ] Thread lists group 等待回复 → 进行中 → 空闲 → 已解决, 已解决 collapsed,
+      no 「今天」 group (R-52).
+- [ ] A thread row's second line quotes the last reply verbatim; no generated
+      summary, status word or bot name (R-53).
+- [ ] The Artifact rail item uses Mikka's stacked-cards icon, not lucide Copy
+      or Library (R-56).
+- [ ] The browser toggle is an icon-only globe with no 「浏览器」 label (R-57).
 
 ### Leftovers from old components
 

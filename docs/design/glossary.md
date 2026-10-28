@@ -20,10 +20,9 @@ stays with the bot: one of its sub-agents (分身) does it in its own browser,
 it shows only as a card in the chat, never in the thread list, and the bot
 reports the result itself (R-72). Every thread belongs to exactly one bot but
 is never drawn with the bot's avatar; it shows a status icon (decisions
-2026-10-27). The one exception is the right panel's 全部线程, where each row
-carries a 16px avatar of its bot so threads from different bots can be told
-apart (R-50, decisions 2026-10-28). A cloud thread runs on its own thread machine, not on its bot's
-machine (`cloud-computer-backend.md` § 2).
+2026-10-27), except in the right panel's 全部线程, where each row carries
+its bot's 16px avatar (R-50). A cloud thread runs on its own thread machine,
+not on its bot's machine (`cloud-computer-backend.md` § 2).
 
 ## Rules for designs
 
@@ -47,7 +46,7 @@ Decided by Alex, 2026-10-28.
 
 | Word | 中文 | What it is |
 | --- | --- | --- |
-| **Artifact** | Artifact | Something a thread or bot produces for the person to look at or accept: an acceptance (验收), a document, a web page, an image, slides, a video. The word is never translated (not 产物, 工件 or 成果). Lives on the Artifact rail page (R-56). |
+| **Artifact** | Artifact | Something a thread produces for the person to look at or accept, such as an acceptance (验收), a document or a web page. The word is never translated (not 产物, 工件 or 成果). Lives on the Artifact rail page (R-56). |
 | **Library** | 资料库 | A bot's files, listed read-only under 概览 › 详情 (R-51). Files are added with the composer's 「+」. |
 | **Thread** | 线程 | As above. The right panel's tab is 线程, never 任务 (R-43). |
 | **Browser** | 浏览器 | The person's own local browser, one for the whole app, opened from the globe in the top bar (R-57). |
