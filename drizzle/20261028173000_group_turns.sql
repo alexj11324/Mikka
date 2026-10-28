@@ -1,7 +1,7 @@
 -- target: MIKKA_DATABASE_URL
 -- Additive group routing queue/corrections and nullable explicit lead metadata.
--- Existing groups default to no lead; explicit mentions/high-confidence model routes
--- still work. Fallback returns group_lead_required until the owner configures one.
+-- Existing groups default to no lead; explicit mentions and model-selected routes
+-- still work. Unavailable model judgment stays pending without a Lead fallback.
 -- No backfill or implicit first-joined/name-based designation.
 -- Rollback after disabling group generation: DROP TABLE group_routing_corrections;
 -- DROP TABLE group_turns; ALTER TABLE conversations DROP COLUMN "leadAgentId";

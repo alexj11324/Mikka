@@ -209,6 +209,16 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.equal((await scoped.query('SELECT error,"agentId" FROM group_turns WHERE "messageId"=$1',[interrupted])).rows[0].error,'interrupted_generation_not_replayed')
     // An unavailable or uncertain route never silently selects a lead.
     const unavailableRuntime: GroupRuntime = {...runtime, async route() { throw new GroupJudgmentPendingError() }}
+    const emptyGroup = await handleGroup(scoped,directory,{...base,body:JSON.stringify({workspaceId,title:'No available agents',members:[]})},true)
+    assert.equal(emptyGroup.status,201)
+    const emptyId = (emptyGroup.body as {id:string}).id
+    const emptyRoot = await send(emptyId,'help')
+    await assert.rejects(processGroupTurn(scoped,emptyId,unavailableRuntime),GroupJudgmentPendingError)
+    assert.equal((await scoped.query('SELECT error FROM group_turns WHERE "messageId"=$1',[emptyRoot])).rows[0].error,'group_judgment_pending')
+    // Old persisted failures must not instruct owners to configure an artificial fallback.
+    await scoped.query('UPDATE group_turns SET error=$2 WHERE "messageId"=$1',[emptyRoot,'group_lead_required'])
+    const emptyHistory = await handleGroup(scoped,directory,{...base,method:'GET',resource:'messages',id:emptyId},true)
+    assert.deepEqual((emptyHistory.body as {routingError:unknown}).routingError,{code:'group_judgment_pending'})
     await config(id,null)
     const missing = await send(id,'ambiguous')
     await assert.rejects(processGroupTurn(scoped,id,unavailableRuntime),GroupJudgmentPendingError)

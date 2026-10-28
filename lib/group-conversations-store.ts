@@ -96,7 +96,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const active = queueAgents ? await q(`SELECT "agentId",status,"updatedAt" FROM group_turns WHERE "conversationId"=$1 AND status IN ('queued','running') ORDER BY "createdAt" LIMIT 1`, [req.id]) : { rows: [] }
         const failed = queueAgents ? await q(`SELECT error FROM group_turns WHERE "conversationId"=$1 ORDER BY "createdAt" DESC,"messageId" DESC LIMIT 1`, [req.id]) : { rows: [] }
         result = { messages, nextBefore: more ? messages.at(-1)?.position : null, agentStatus: active.rows[0] ?? null,
-          ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, routingError: failed.rows[0]?.error === 'group_judgment_pending' ? { code: 'group_judgment_pending' } : failed.rows[0]?.error === 'group_lead_required' ? { code: 'group_lead_required', action: 'Ask the group owner to PATCH /api/conversations/:id with an eligible leadAgentId, then send a new message.' } : null } : {}) }
+          ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, routingError: ['group_judgment_pending','group_lead_required'].includes(failed.rows[0]?.error) ? { code: 'group_judgment_pending' } : null } : {}) }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)
         // Group-selected agents belong to the creator, not necessarily this sender.

@@ -38,6 +38,27 @@ test('group consumer uses actual host receipt from synthetic REST response, not 
     if (correction.kind !== 'correction') throw Error('expected correction')
     assert.equal(correction.execution?.providerGenerationId,'synthetic-2')
     assert.equal(correction.execution?.requestDigest,createHash('sha256').update(requestBody).digest('hex'))
+    const envelope = (answers: unknown[]) => ({model:DECISION_MODEL,provider_metadata:{gateway:{generationId:'synthetic-validation'}},answers})
+    const validAnswers = [{type:'choice',name:'responder_0',choice:b,confidence:0.05}, {type:'choice',name:'responder_1',choice:'end'}]
+    globalThis.fetch = async () => Response.json(envelope(validAnswers))
+    const lowConfidence = await judge.route({text:'hello',mentions:[]},members,a,[])
+    assert.deepEqual(lowConfidence.responders,[b])
+    assert.equal(lowConfidence.by,'model')
+    assert.equal(lowConfidence.by === 'model' ? lowConfidence.confidence : undefined,0.05)
+    // Validated host evidence must exist for every route. These are synthetic
+    // provider responses, including refusal and uncertainty, not live acceptance.
+    for (const payload of [
+      {...envelope(validAnswers),model:'unrelated-model'},
+      {...envelope(validAnswers),provider_metadata:{}},
+      envelope([{type:'refusal',name:'responder_0'}, validAnswers[1]]),
+      envelope([validAnswers[0]]),
+      envelope([validAnswers[0],validAnswers[0],validAnswers[1]]),
+      envelope([{...validAnswers[0],choice:'not-a-member'},validAnswers[1]]),
+      envelope([validAnswers[0],{...validAnswers[1],choice:'uncertain'}]),
+    ]) {
+      globalThis.fetch = async () => Response.json(payload)
+      await assert.rejects(judge.route({text:'hello',mentions:[]},members,a,[]),GroupJudgmentPendingError)
+    }
     globalThis.fetch = async () => new Response(null,{status:503})
     await assert.rejects(judge.route({text:'hello',mentions:[]},members,null,[]),GroupJudgmentPendingError)
     assert.deepEqual(await judge.correction({previous:{message:'hello',responderId:a},current:{text:'x',mentions:[]},members}),{kind:'uncertain'})
