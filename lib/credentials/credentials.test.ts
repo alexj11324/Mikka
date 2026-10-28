@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { randomBytes } from 'node:crypto'
+import { runInNewContext } from 'node:vm'
 import { canonicalOrigin, assertSameOrigin, submitSchema, otpSchema, CredentialError, type EncryptionContext } from './contracts'
 import { seal, open, sealSession, type Kms } from './kms'
 import { checkCredentialRequest, credentialBody, credentialFailure } from './http'
@@ -80,6 +81,22 @@ test('pushState/hash changes cannot resume screenshots while fields remain popul
   assert.equal(await cdp.safeToResume('https://example.com/login'), false)
   cdp.evaluate = async () => true
   assert.equal(await cdp.safeToResume('https://example.com/login'), true)
+})
+
+test('viewer stays locked for every supported nonempty OTP input', async () => {
+  const cdp = Object.create(Cdp.prototype) as Cdp
+  for (const field of [
+    { type: 'password', autocomplete: '', name: 'password' },
+    { type: 'text', autocomplete: 'one-time-code', name: 'verification' },
+    { type: 'text', autocomplete: '', name: 'code' },
+    { type: 'text', autocomplete: '', name: 'otp' },
+  ]) {
+    for (const value of ['123456', '']) {
+      const input = { ...field, value }
+      cdp.evaluate = async expression => runInNewContext(expression, { document: { querySelectorAll: () => [input] } })
+      assert.equal(await cdp.safeToResume('https://example.com/login'), value === '', JSON.stringify(field))
+    }
+  }
 })
 
 test('HMAC scanner rejects nested chat/tool secret copies without retaining values', () => {

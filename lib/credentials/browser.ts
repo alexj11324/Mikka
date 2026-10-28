@@ -93,7 +93,7 @@ export class Cdp {
   async safeToResume(_initialUrl: string) {
     // A URL change can be pushState/hash rather than navigation. Check every
     // time, including after redirects, before allowing any image or DOM read.
-    return await this.evaluate(`![...document.querySelectorAll('input')].some(e=>e.value && (e.type==='password'||e.autocomplete==='one-time-code'))`) === true
+    return await this.evaluate(`![...document.querySelectorAll('input')].some(e=>e.value && (e.type==='password'||e.autocomplete==='one-time-code'||e.name==='code'||e.name==='otp'))`) === true
   }
   async fillOtp(origin: string, code: string) {
     await this.origin(origin)
