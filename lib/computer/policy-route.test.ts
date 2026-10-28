@@ -21,13 +21,17 @@ test('only workspace admins may change policy, using an exact same-origin reques
   assert.equal((await handler(new Request(endpoint), workspace)).status, 403)
   role = 'admin'
   assert.equal((await handler(request('{"permission":"deny"}', 'https://other.example'), workspace)).status, 403)
-  assert.equal((await handler(request('{"permission":"allow"}'), workspace)).status, 400)
+  assert.equal((await handler(request('{"permission":"unknown"}'), workspace)).status, 400)
   assert.equal((await handler(request(JSON.stringify({ permission: 'deny', extra: 'x'.repeat(250) })), workspace)).status, 400)
   assert.equal(writes, 0)
   response = await handler(request('{"permission":"deny"}'), workspace)
   assert.equal(response.status, 200)
   assert.deepEqual(await response.json(), { permission: 'deny' })
   assert.equal(writes, 1)
+  response = await handler(request('{"permission":"allow"}'), workspace)
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { permission: 'allow' })
+  assert.equal(writes, 2)
 })
 
 test('disabled and failed backends cannot expose details or change settings', async () => {
