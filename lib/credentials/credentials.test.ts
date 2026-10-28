@@ -7,6 +7,7 @@ import { seal, open, sealSession, type Kms } from './kms'
 import { checkCredentialRequest, credentialBody, credentialFailure } from './http'
 import { Cdp } from './browser'
 import { fillCredential } from './broker'
+import { CredentialStore } from './store'
 import { assertNoSecret, fingerprint } from './fingerprint'
 
 function fixtureKms(): Kms {
@@ -177,4 +178,26 @@ test('broker reports mechanical session application or submission without judgin
     assert.equal(calls.includes('Page.reload'), !forcePassword)
     assert(!calls.some(call => /readyState|one-time-code|input\[type/.test(call)))
   }
+})
+
+test('password retry is bound to the server-authorized caller and its one-use target', async () => {
+  const caller = { userId: 'owner-a', workspaceId: 'workspace-a', botId: 'bot-a', runId: 'run-a' }
+  const captured: { values?: unknown[] } = {}
+  const pool = { async query(sql: string, values: unknown[]) {
+    if (sql.includes('FROM bots ')) return { rows: values[1] === caller.userId && values[2] === caller.workspaceId ? [{ id: caller.botId }] : [] }
+    if (sql.includes('FROM agent_runs ')) return { rows: values[1] === caller.userId && values[2] === caller.botId ? [{ id: caller.runId }] : [] }
+    if (sql.includes('FROM credentials ')) return { rows: [{ id: 'credential-fixture' }] }
+    if (sql.includes('INSERT INTO credential_fill_leases')) { captured.values = values; return { rows: [] } }
+    throw new Error('unexpected query')
+  } }
+  const store = new CredentialStore(pool as never, fixtureKms())
+  const target = { targetId: 'target', origin: owner.origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000 }
+  const result = await store.lease(caller, owner.origin, target, undefined, true)
+  assert.equal(result.status, 'ready')
+  assert.ok(captured.values)
+  assert.equal((captured.values[8] as { credentialMode?: string }).credentialMode, 'password')
+  assert.deepEqual(captured.values.slice(2, 7), [caller.userId, caller.workspaceId, caller.botId, null, caller.runId])
+  captured.values = undefined
+  await assert.rejects(store.lease({ ...caller, workspaceId: 'other' }, owner.origin, target, undefined, true), CredentialError)
+  assert.equal(captured.values, undefined)
 })
