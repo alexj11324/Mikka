@@ -13,7 +13,7 @@
     "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && pnpm lint && next build",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
-    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs",
+    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-targets.test.mjs",
     "dev": "node scripts/dev-preview.mjs",
     "test:preview": "node --test tests/preview-ready.test.mjs",
     "format": "prettier --write \"**/*.{ts,tsx}\"",

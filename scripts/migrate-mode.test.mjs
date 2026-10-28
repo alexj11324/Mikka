@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, rmSync, readFileSync, chmodSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -14,6 +14,8 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
       .replace("'pg'", "'./pg.mjs'")
       .replace("from './migration-order.mjs'", "from './order.mjs'")
     writeFileSync(join(dir, 'migrate.mjs'), source)
+    writeFileSync(join(dir, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
+    writeFileSync(join(dir, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
     writeFileSync(join(dir, 'pg.mjs'), 'export class Pool { constructor() { throw new Error("DATABASE_ACCESS") } }')
     writeFileSync(join(dir, 'order.mjs'), 'export const orderMigrations = x => x; export const alreadyApplied = (name, applied) => applied.has(name)')
     for (const environment of ['production', 'preview']) {
@@ -26,12 +28,47 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
     // Default production and explicit opt-in must not silently skip migration.
     for (const [environment, mode] of [['production', ''], ['preview', '1']]) {
       const result = spawnSync(process.execPath, [join(dir, 'migrate.mjs')], {
-        env: { ...process.env, MIGRATE: mode, VERCEL_ENV: environment }, encoding: 'utf8',
+        env: { ...process.env, DATABASE_URL: 'postgres://user@preview-fixture:5432/testdb', MIGRATE: mode, VERCEL_ENV: environment }, encoding: 'utf8',
       })
       assert.notEqual(result.status, 0)
       assert.doesNotMatch(result.stdout, /migrate: skipped/)
       assert.match(result.stderr, /ENOENT/)
     }
+    const missing = spawnSync(process.execPath, [join(dir, 'migrate.mjs')], {
+      env: { ...process.env, MIGRATE: '1', VERCEL_ENV: 'preview', DATABASE_URL: '', MIKKA_DATABASE_URL: 'postgres://production-fixture' }, encoding: 'utf8',
+    })
+    assert.notEqual(missing.status, 0)
+    assert.match(missing.stderr, /PREVIEW_DATABASE_URL_REQUIRED/)
+    assert.doesNotMatch(missing.stderr, /DATABASE_ACCESS|ENOENT/)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('explicit Preview migration never connects to the global application target', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'migration-preview-target-'))
+  try {
+    const scripts = join(dir, 'scripts'), migrations = join(dir, 'drizzle')
+    mkdirSync(scripts); mkdirSync(migrations)
+    const source = readFileSync(new URL('./migrate.mjs', import.meta.url), 'utf8')
+      .replace("'pg'", "'./pg.mjs'")
+      .replace("from './migration-order.mjs'", "from './order.mjs'")
+    writeFileSync(join(scripts, 'migrate.mjs'), source)
+    writeFileSync(join(scripts, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
+    writeFileSync(join(scripts, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
+    writeFileSync(join(scripts, 'order.mjs'), 'export const orderMigrations = x => x; export const alreadyApplied = () => false')
+    writeFileSync(join(scripts, 'pg.mjs'), `export class Pool {
+      constructor({connectionString}) { if (connectionString !== 'postgres://user@preview-fixture:5432/testdb') throw Error('WRONG_DATABASE'); }
+      async query() { return {rows: []} }
+      async connect() { return {query: async () => ({}), release() {}} }
+      async end() {}
+    }`)
+    writeFileSync(join(migrations, '0001_application.sql'), '-- target: MIKKA_DATABASE_URL\nSELECT 1;')
+    writeFileSync(join(migrations, '0002_workspace.sql'), '-- target: DATABASE_URL\nSELECT 1;')
+    const result = spawnSync(process.execPath, [join(scripts, 'migrate.mjs')], {
+      env: { ...process.env, MIGRATE: '1', VERCEL_ENV: 'preview', DATABASE_URL: 'postgres://user@preview-fixture/testdb', MIKKA_DATABASE_URL: 'postgres://production-fixture' }, encoding: 'utf8',
+    })
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /0001_application.sql/)
+    assert.match(result.stdout, /0002_workspace.sql/)
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
