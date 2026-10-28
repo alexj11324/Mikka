@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { assertDatabaseIdentity, databaseTarget, deploymentAttestation, environmentFingerprint, loadEnvironment, validateEnvironment } from './environment.mjs'
+import { readBoundedBody } from './http-body.mjs'
 
 function withSyntheticCredentials(value) {
   const target = new URL(value)
@@ -90,4 +91,18 @@ test('challenge proof cannot be replayed across origin, build, database, environ
   ]) assert.notEqual(deploymentAttestation({ ...descriptor, ...change }, challenge, key), proof)
   assert.notEqual(deploymentAttestation(descriptor, '3'.repeat(64), key), proof)
   assert.throws(() => deploymentAttestation(descriptor, 'invalid', key), /ATTESTATION_CHALLENGE_INVALID/)
+})
+
+test('HTTP body bounds cancel an oversized or endless stream before consuming it', async () => {
+  let reads = 0, cancelled = false
+  const stream = new ReadableStream({
+    pull(controller) { reads++; controller.enqueue(new Uint8Array(32)) },
+    cancel() { cancelled = true },
+  })
+  await assert.rejects(readBoundedBody(new Response(stream), 64), /RESPONSE_BODY_TOO_LARGE/)
+  assert.equal(cancelled, true)
+  assert.ok(reads <= 4, 'must stop pulling instead of draining an endless response')
+  const value = new TextEncoder().encode('bounded UTF-8: 修')
+  assert.deepEqual(await readBoundedBody(new Response(value), value.byteLength), value)
+  await assert.rejects(readBoundedBody(new Response('x', { headers: { 'content-length': '4097' } }), 4096), /RESPONSE_BODY_TOO_LARGE/)
 })

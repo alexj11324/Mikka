@@ -1,12 +1,16 @@
 /** Registered capabilities, not grants. Every implementation retains its own host authorization. */
+export const COMPUTER_TOOL_IDS = [
+  'list_computer_workspaces', 'create_computer_bot', 'list_computer_bots', 'wake_bot_computer',
+  'list_bot_subscriptions', 'bind_bot_subscription', 'dispatch_bot_computer',
+] as const
+
 export const AGENT_TOOL_IDS = [
   'search_notion_pages', 'read_notion_page_blocks', 'search_slack_messages', 'read_slack_thread',
-  'search_gmail', 'list_calendar_events', 'get_calendar_event', 'send_email',
+  'search_gmail', 'read_gmail_message', 'list_calendar_events', 'get_calendar_event', 'send_email',
   'create_calendar_event', 'update_calendar_event', 'web_search', 'list_issues', 'get_issue',
   'list_agents', 'dispatch_run', 'list_runs', 'get_run', 'send_to_run', 'remember', 'forget',
   'stop_run', 'load_skill', 'record_attention',
-  'list_computer_workspaces', 'create_computer_bot', 'list_computer_bots', 'wake_bot_computer',
-  'list_bot_subscriptions', 'bind_bot_subscription', 'dispatch_bot_computer',
+  ...COMPUTER_TOOL_IDS,
 ] as const
 export type AgentToolId = typeof AGENT_TOOL_IDS[number]
 export const AGENT_HOOK_IDS = ['audit', 'failure_cases'] as const

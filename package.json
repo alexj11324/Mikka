@@ -81,7 +81,7 @@
     "test:agent-kit-db": "node --import tsx --test lib/agent-kit/store.db.test.ts",
     "check:agent-definitions": "tsx scripts/agent-kit.mts validate agents/default && tsx scripts/agent-kit.mts validate agents/research-example",
     "test:agent-kit-compat": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-kit/main-compat.test.ts lib/agent-kit/registry-compat.test.ts && pnpm test:agent-kit-model",
-    "test:agent-kit-model": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-execution-model.test.ts lib/subscription-model-snapshot.test.ts lib/subscription-workflow-model.test.ts lib/subscription-workflow-turn.test.ts lib/agent-kit/hosted-replay.test.ts lib/agent-kit/live-eval-disabled.test.ts lib/agent-kit/core-entry.test.ts lib/agent-kit/disabled-entry.test.ts lib/agent-kit/message-safety-compat.test.ts"
+    "test:agent-kit-model": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-execution-model.test.ts lib/subscription-model-snapshot.test.ts lib/subscription-workflow-model.test.ts lib/subscription-workflow-turn.test.ts lib/agent-kit/hosted-replay.test.ts lib/agent-kit/live-eval-disabled.test.ts lib/agent-kit/core-entry.test.ts lib/agent-kit/disabled-entry.test.ts lib/agent-kit/message-safety-compat.test.ts lib/agent-kit/tool-defaults-compat.test.ts lib/agent-kit/defaults-consumers.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

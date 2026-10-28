@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { deflateRawSync } from 'node:zlib'
-import { createEvidenceScanBudget, scanEvidenceContent } from './evidence-content.mjs'
+import { createEvidenceScanBudget, forbiddenRecordingPath, scanEvidenceContent } from './evidence-content.mjs'
 import { formatEvidenceFailure } from './evidence.mjs'
 
 const canary = 'synthetic-report-credential-349'
@@ -50,6 +50,14 @@ function zip(entries) {
 }
 const html = data => Buffer.from(`<template id="playwrightReportBase64">data:application/zip;base64,${data.toString('base64')}</template>`)
 const scan = (data, options) => scanEvidenceContent(data, [Buffer.from(canary)], options)
+
+test('recording path prohibition is shared across outer artifacts and embedded report members', () => {
+  for (const name of ['capture.zip', 'capture.HAR', 'video.webm', 'video.mp4', 'trace.trace', 'capture.network', 'capture.stacks', 'nested/trace', 'nested/trace-resource.json']) {
+    assert.equal(forbiddenRecordingPath(name), true, name)
+    assert.throws(() => scan(html(zip([{ name }]))), /UNREVIEWED_SECRET_BEARING_EVIDENCE/)
+  }
+  for (const name of ['report.json', 'index.html', 'screenshots/masked.png', 'playwright-browser.log']) assert.equal(forbiddenRecordingPath(name), false, name)
+})
 
 test('detects a known credential hidden inside the actual Playwright embedded ZIP format', () => {
   const report = html(zip([{ data: JSON.stringify({ error: canary }) }]))

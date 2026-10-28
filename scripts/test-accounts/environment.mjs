@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import { lstat, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Pool } from 'pg'
+import { readBoundedBody } from './http-body.mjs'
 
 const IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/
 const LABEL = /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,159}$/
@@ -112,8 +113,9 @@ export async function assertDeploymentIdentity(descriptor, fetchImpl = fetch) {
     const url = `${descriptor.origin}${descriptor.basePath}/api/test-environment?challenge=${challenge}`
     const response = await fetchImpl(url, { method: 'GET', redirect: 'error', credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(10_000) })
     if (!response.ok || response.headers.has('set-cookie')) fail('DEPLOYMENT_ATTESTATION_REJECTED')
-    const body = await response.text()
-    if (body.length > 4096) fail('DEPLOYMENT_ATTESTATION_REJECTED')
+    let body
+    try { body = new TextDecoder().decode(await readBoundedBody(response, 4096)) }
+    catch { fail('DEPLOYMENT_ATTESTATION_REJECTED') }
     let result
     try { result = JSON.parse(body) } catch { fail('DEPLOYMENT_ATTESTATION_REJECTED') }
     if (result.environmentId !== descriptor.id || result.instanceId !== descriptor.instanceId || result.deploymentSha !== descriptor.deploymentSha || result.origin !== descriptor.origin || result.fingerprint !== environmentFingerprint(descriptor) || !/^[a-f0-9]{64}$/.test(result.proof ?? '') || !timingSafeEqual(Buffer.from(result.proof), Buffer.from(expected))) fail('DEPLOYMENT_IDENTITY_MISMATCH')

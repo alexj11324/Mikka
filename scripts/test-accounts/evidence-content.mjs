@@ -16,6 +16,11 @@ function crc32(data) {
 }
 export function createEvidenceScanBudget() { return { entries: 0, decodedBytes: 0, archives: 0 } }
 
+/** Apply identically to outer artifact files and decoded report member paths. */
+export function forbiddenRecordingPath(name) {
+  return /\.(zip|har|webm|mp4|trace|network|stacks)$/i.test(name) || /(?:^|\/)trace(?:[./-]|$)/i.test(name)
+}
+
 /** Scan Playwright's embedded report ZIPs in memory; never extract archive paths. */
 export function scanEvidenceContent(input, secretVariants, { budget = createEvidenceScanBudget() } = {}) {
   const variants = secretVariants.map(value => Buffer.isBuffer(value) ? value : Buffer.from(value)).filter(value => value.length)
@@ -60,7 +65,7 @@ export function scanEvidenceContent(input, secretVariants, { budget = createEvid
       const nameBytes = data.subarray(at + 46, at + 46 + nameLength)
       const name = nameBytes.toString('utf8')
       if (!name || !Buffer.from(name).equals(nameBytes) || [...name].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127 || char === '\\') || name.startsWith('/') || /^[a-z]:/i.test(name) || name.split('/').includes('..') || names.has(name)) fail('EVIDENCE_ARCHIVE_PATH_INVALID')
-      if (/\.(zip|har|webm|mp4|trace|network|stacks)$/i.test(name) || /(?:^|\/)trace(?:[./-]|$)/i.test(name)) fail('UNREVIEWED_SECRET_BEARING_EVIDENCE')
+      if (forbiddenRecordingPath(name)) fail('UNREVIEWED_SECRET_BEARING_EVIDENCE')
       names.add(name)
       scanSecrets(nameBytes)
       extras(data.subarray(at + 46 + nameLength, at + 46 + nameLength + extraLength))

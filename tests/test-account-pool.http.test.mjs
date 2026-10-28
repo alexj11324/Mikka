@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
-import { mkdir, stat, writeFile } from 'node:fs/promises'
+import { mkdir, stat, writeFile, rm } from 'node:fs/promises'
 import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
 import { loadEnvironment, assertDeploymentIdentity } from '../scripts/test-accounts/environment.mjs'
@@ -29,7 +29,9 @@ before(async () => {
   pool = new TestAccountPool(database, environment)
   // The process suite intentionally quarantines five pairs. This is explicit
   // new capacity; it never recycles an account with an unproved prior executor.
-  await pool.prepare({ pairs: 7 })
+  // One additional pair covers an independent state-file cleanup failure;
+  // both failed executors stay quarantined without consuming browser capacity.
+  await pool.prepare({ pairs: 8 })
 })
 
 after(async () => {
@@ -312,4 +314,27 @@ acceptance('cancelling an outstanding request closes the client immediately and 
       await release(replacement)
     } finally { if (active.has(replacement)) await release(replacement, 'dirty') }
   } finally { if (active.has(scope)) { await release(scope, 'dirty').catch(() => {}); active.delete(scope) } }
+})
+
+acceptance('failed state removal revokes sessions and quarantines instead of reporting clean reuse', async () => {
+  const scope = await acquire('state-cleanup-failure')
+  const ownedPath = scope.owner.storageStatePath
+  try {
+    // Deterministic filesystem failure even for uid0: non-recursive rm cannot
+    // remove this test-owned nonempty directory replacing its own state file.
+    await rm(ownedPath)
+    await mkdir(ownedPath, { mode: 0o700 })
+    await writeFile(`${ownedPath}/owned-canary`, 'synthetic state-cleanup canary', { mode: 0o600 })
+    await assert.rejects(scope.release({ outcome: 'clean' }), { code: 'SESSION_STATE_CLEANUP_FAILED' })
+    active.delete(scope)
+    const inspection = await pool.inspect()
+    assert.equal(inspection.pairs.find(pair => pair.id === scope.lease.pairId).state, 'quarantined')
+    assert.equal((await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[])', [[scope.owner.userId, scope.peer.userId]])).rows[0].n, 0)
+    await assert.rejects(stat(scope.peer.storageStatePath), { code: 'ENOENT' })
+    await assert.rejects(scope.owner.request('/api/auth/get-session'), { code: 'LEASE_CLOSED' })
+  } finally {
+    if (active.has(scope)) await scope.release({ outcome: 'dirty' }).catch(() => {})
+    active.delete(scope)
+    await rm(ownedPath, { recursive: true, force: true })
+  }
 })

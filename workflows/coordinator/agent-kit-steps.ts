@@ -1,8 +1,7 @@
 import { freezeHostedModelSelection } from '@/lib/subscription-model-snapshot'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
 import type { CoordinatorRuntime } from '@mikka/protocol/coordinator'
-import { agentKitEnabled, agentKitStore, agentScope } from '@/lib/agent-kit/service'
-import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
+import { agentKitEnabled, agentKitStore, agentScope, agentKitDefaults } from '@/lib/agent-kit/service'
 import { AgentKitError, type AgentExecution } from '@/lib/agent-kit/store'
 import type { ToolOutcome } from '@/lib/agent-kit/instrument'
 import type { FailureCode } from '@/lib/agent-kit/improvement'
@@ -18,7 +17,7 @@ export async function beginAgentExecution(userId: string, botId: string | null, 
   const scope = await agentScope(userId,botId)
   const instructions = await botInstructions(userId,botId,runtime.harness === 'ai_sdk' ? COORDINATOR_INSTRUCTIONS : personalCoordinatorInstructions())
   const configured = { harness:runtime.harness,model:runtime.harness === 'ai_sdk' ? COORDINATOR_MODEL : ('model' in runtime ? runtime.model ?? null : null) }
-  return agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,definition => freezeHostedModelSelection(scope,configured,definition.modelSelection,{ service:() => subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace }),DEFAULT_AGENT_DEFINITION)
+  return agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,definition => freezeHostedModelSelection(scope,configured,definition.modelSelection,{ service:() => subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace }),agentKitDefaults())
 }
 export async function beforeAgentTool(userId: string, botId: string | null, executionId: string, callId: string, name: string, nativeScope?: NativeToolScope) {
   'use step'
@@ -48,7 +47,7 @@ export async function finishAgentExecution(userId: string, botId: string | null,
   if (!execution.snapshot.definition.hooks.includes('failure_cases')) return
   // A stable revision key yields at most one automatic guidance candidate, never activation.
   try {
-    await agentKitStore.propose(scope,execution.snapshot.revision,execution.snapshot.revisionId,DEFAULT_AGENT_DEFINITION)
+    await agentKitStore.propose(scope,execution.snapshot.revision,execution.snapshot.revisionId,agentKitDefaults())
   } catch (error) {
     if (error instanceof AgentKitError && ['agentImprovementInsufficientEvidence','agentImprovementNoChange','agentVersionConflict'].includes(error.code)) return
     console.error('Agent improvement proposal unavailable; existing definition remains active')

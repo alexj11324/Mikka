@@ -52,11 +52,15 @@ test('evidence scanner rejects exact credentials, cookies and common encoded for
 
 test('evidence scanner refuses archives, request recordings, video and symlinks', async () => {
   await fixture(async ({ audit, evidence }) => {
-    for (const suffix of ['zip', 'har', 'webm', 'mp4']) {
+    for (const suffix of ['zip', 'har', 'webm', 'mp4', 'trace', 'network', 'stacks']) {
       const file = join(evidence, `unreviewed.${suffix}`)
       await writeFile(file, '')
       await assert.rejects(audit([file]), { code: 'UNREVIEWED_SECRET_BEARING_EVIDENCE' })
     }
+    const rawTraceDirectory = join(evidence, 'trace')
+    await mkdir(rawTraceDirectory)
+    await writeFile(join(rawTraceDirectory, 'plain.txt'), 'no known secret, still a raw recording')
+    await assert.rejects(audit([rawTraceDirectory]), { code: 'UNREVIEWED_SECRET_BEARING_EVIDENCE' })
     const file = join(evidence, 'safe.txt')
     const link = join(evidence, 'link.txt')
     await writeFile(file, 'no secret')

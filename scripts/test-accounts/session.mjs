@@ -5,8 +5,9 @@ import { resolve, join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { Pool } from 'pg'
 import { assertDeploymentIdentity, environmentFingerprint, loadEnvironment, validateEnvironment } from './environment.mjs'
-import { createEvidenceScanBudget, scanEvidenceContent } from './evidence-content.mjs'
+import { createEvidenceScanBudget, forbiddenRecordingPath, scanEvidenceContent } from './evidence-content.mjs'
 import { TestAccountPool, TestAccountError } from './pool.mjs'
+import { readBoundedBody } from './http-body.mjs'
 
 const fail = code => { throw new TestAccountError(code) }
 const safeError = error => error instanceof TestAccountError ? error : new TestAccountError('TEST_ACCOUNT_SESSION_FAILED')
@@ -82,6 +83,17 @@ export async function acquireTestAccounts({ database, environment, runId, worker
   let tainted = false
   let releasing
   let renewal
+  async function removeSessionStates() {
+    let removed = true
+    for (const path of stateFiles) {
+      try {
+        await rm(path, { force: true })
+        try { await lstat(path); removed = false }
+        catch (error) { if (error.code !== 'ENOENT') removed = false }
+      } catch { removed = false }
+    }
+    return removed
+  }
   // A monotonic client budget complements authoritative PG time. It is anchored
   // BEFORE every renew RPC, so network latency never grants extra authority.
   let deadline = acquireStarted + Math.min(ttlMs, lease.remainingMs)
@@ -128,18 +140,24 @@ export async function acquireTestAccounts({ database, environment, runId, worker
       await Promise.allSettled(pending)
       if (renewal) await renewal.catch(() => {})
       let result
+      let statesChecked = false
       try {
         if (lost || performance.now() >= deadline) { lose(); fail('LEASE_LOST') }
         // Callers first close their browsers. Revoke only the pool-bound owned
         // test users; expired or transferred holders cannot invoke this reset.
         await pool.revokeSessions(lease)
-        result = await pool.release(lease, { outcome: releaseOutcome })
+        statesChecked = true
+        const removed = await removeSessionStates()
+        result = await pool.release(lease, { outcome: removed ? releaseOutcome : 'dirty' })
+        if (!removed) fail('SESSION_STATE_CLEANUP_FAILED')
         if (outcome === 'clean' && result.state !== 'released') fail('ACCOUNT_DIRTY')
         return result
       } finally {
         closed = true
         abort.abort()
-        for (const path of stateFiles) await rm(path, { force: true }).catch(() => {})
+        // A stale/failed holder may remove only its recorded generation's files;
+        // it never force-releases a lease after reset/fencing has failed.
+        if (!statesChecked) await removeSessionStates()
         if (ownDatabase) await database.end()
       }
     })()
@@ -203,9 +221,11 @@ export async function acquireTestAccounts({ database, environment, runId, worker
           // in-flight guard: headers alone do not prove the handler finished.
           let bytes
           try {
-            bytes = await response.arrayBuffer()
-            if (bytes.byteLength > 8 * 1024 * 1024) fail('TEST_ACCOUNT_RESPONSE_TOO_LARGE')
-          } catch { tainted = true; fail('TEST_ACCOUNT_RESPONSE_INCOMPLETE') }
+            bytes = await readBoundedBody(response, 8 * 1024 * 1024)
+          } catch (error) {
+            tainted = true
+            fail(error.message === 'RESPONSE_BODY_TOO_LARGE' ? 'TEST_ACCOUNT_RESPONSE_TOO_LARGE' : 'TEST_ACCOUNT_RESPONSE_INCOMPLETE')
+          }
           for (const header of response.headers.getSetCookie()) {
             const parts = header.split(';').map(item => item.trim())
             const separator = parts[0].indexOf('=')
@@ -329,8 +349,8 @@ export async function auditEvidence(paths, { environment, stateDirectory } = {})
   async function scan(path) {
     const stat = await lstat(path)
     if (stat.isSymbolicLink()) fail('EVIDENCE_SYMLINK_FORBIDDEN')
+    if (forbiddenRecordingPath(path)) fail('UNREVIEWED_SECRET_BEARING_EVIDENCE')
     if (stat.isDirectory()) { for (const name of await readdir(path)) await scan(join(path, name)); return }
-    if (/\.(zip|har|webm|mp4)$/i.test(path)) fail('UNREVIEWED_SECRET_BEARING_EVIDENCE')
     if (!stat.isFile() || stat.size > 64 * 1024 * 1024) fail('EVIDENCE_FILE_UNSAFE')
     const data = await readFile(path)
     files++

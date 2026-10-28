@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
-import { DEFAULT_AGENT_DEFINITION } from './builtin'
+import { DEFAULT_AGENT_DEFINITION, builtinAgentDefinition } from './builtin'
 import { digest } from './definition'
 import { AgentKitStore, type AgentScope } from './store'
 import { CORE_EVAL_CASES, EVAL_RUNNER_VERSION, type EvalReport } from './evals'
@@ -101,14 +101,22 @@ test('definition reads, histories and snapshots cannot cross owners or bot scope
 })
 test('an execution pins exact definitions and host policy across edits and replay',async()=>{
   const scope=await owner()
-  const initial=await store.beginExecution(scope,'turn-1','HOST ONE',{harness:'codex',model:null},defaults)
+  const legacy={...defaults,tools:defaults.tools.filter(name=>name!=='read_gmail_message')}
+  const initial=await store.beginExecution(scope,'turn-1','HOST ONE',{harness:'codex',model:null},legacy)
   await store.save(scope,{...defaults,instructions:'new behavior'},1,randomUUID(),defaults)
+  const hostDefaults=builtinAgentDefinition({computerEnabled:true})
+  const stored=await store.active(scope,hostDefaults)
+  assert.deepEqual(stored.definition,{...defaults,instructions:'new behavior'})
+  assert.equal(stored.definition.tools.includes('list_computer_bots'),false)
   const replay=await store.beginExecution(scope,'turn-1','HOST TWO',{harness:'ai_sdk',model:'different'},defaults)
   assert.deepEqual(replay.snapshot,initial.snapshot)
   assert.equal(replay.snapshot.hostInstructions,'HOST ONE')
   assert.equal(replay.snapshot.revision,1)
-  const next=await store.beginExecution(scope,'turn-2','HOST TWO',{harness:'ai_sdk',model:'different'},defaults)
+  assert.equal(replay.snapshot.effectiveTools.includes('read_gmail_message'),false)
+  const next=await store.beginExecution(scope,'turn-2','HOST TWO',{harness:'ai_sdk',model:'different'},hostDefaults)
   assert.equal(next.snapshot.revision,2)
+  assert.equal(next.snapshot.effectiveTools.includes('read_gmail_message'),true)
+  assert.equal(next.snapshot.effectiveTools.includes('list_computer_bots'),false)
   await assert.rejects(pool.query('update agent_kit_executions set snapshot=$2 where id=$1',[initial.id,'{}']),/agentKitImmutableSnapshot/)
 })
 test('audit events are idempotent, immutable, redacted and closed to unassigned tools',async()=>{

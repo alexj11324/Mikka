@@ -4,6 +4,7 @@ import { test as base, expect, type APIRequestContext, type BrowserContext, type
 import { acquireTestAccounts } from '../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../scripts/test-accounts/environment.mjs'
 import { app, browserClientHeaders } from './fixtures'
+import { installAccountOriginFence } from './test-account-network'
 
 type StorageState = Exclude<BrowserContextOptions['storageState'], string | undefined>
 type AccountScope = Awaited<ReturnType<typeof acquireTestAccounts>>
@@ -96,17 +97,8 @@ export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page 
         })
         contexts.push(context)
         guardContextRequests(context, scope, origin)
-        // Cookies do not distinguish ports. Enforce the full origin as well as
-        // the state-file environment binding, before any browser request.
-        await context.route('**/*', async route => {
-          try { await scope.assertActive() } catch { await route.abort('blockedbyclient'); return }
-          if (new URL(route.request().url()).origin !== origin) {
-            blockedOrigins++
-            await route.abort('blockedbyclient')
-            return
-          }
-          await route.continue()
-        })
+        const fence = await installAccountOriginFence(context, scope, origin,
+          () => { blockedOrigins++ }, () => { runtimeFailures.push('BROWSER_ORIGIN_FENCE_FAILED') })
         context.on('page', page => {
           // Never attach raw browser errors, responses or request URLs: those
           // may carry a credential in a query, response or diagnostic message.
@@ -121,6 +113,7 @@ export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page 
           })
         })
         const page = await context.newPage()
+        await fence.protectPage(page)
         // The settings test begins in the ordinary projects shell. The home
         // context panel intentionally writes briefing/timezone preferences on
         // read; those workflows require their own tracked mutable fixtures.

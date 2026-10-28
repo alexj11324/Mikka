@@ -122,7 +122,10 @@ close, dirty data, invalid session or incomplete provisioning keeps the pair
 quarantined.
 
 A normal release closes the consumer contexts, revokes the owned issued sessions
-and checks the release conditions before returning a clean pair. Reusing the user
+and verifies removal of that lease generation's private state files before
+returning a clean pair. A removal failure quarantines the pair and reports a
+fixed error code; it never reports an available account with leftover state.
+Reusing the user
 on a later run uses the normal sign-in endpoint and verifies the returned
 identity. Credentials and cookie material remain inside the test runner's private
 files/memory; public CLI output contains non-sensitive IDs and blocked codes.
@@ -156,8 +159,12 @@ verified lifecycle action.
 
 The existing settings-surface browser test now acquires its two accounts through
 `tests/e2e/test-account-fixtures.ts`. Cookie storage is bound to an environment,
-account and origin, and browser interception enforces the full origin, including
-port; browser cookies themselves do not distinguish ports. Browser traffic stops
+account and origin. The first adapter uses Chromium: initial request routing and
+a response-header CDP gate enforce the full origin, including port, before every
+redirect hop. Popup requests receive the same gate before their first response.
+Browser cookies themselves do not distinguish ports. WebSockets are not supported
+by this adapter and are closed locally without opening an upstream connection.
+Browser traffic stops
 when a lease is lost. Traces, HAR, automatic screenshots and video are disabled
 for leased sessions because they can capture credentials. Tests attach only
 explicitly masked screenshots and non-sensitive lease metadata.
@@ -173,6 +180,9 @@ It exposes named TAP results and counts, while discarding raw server output and
 arbitrary test diagnostics that could serialize credentials. HTTP acceptance
 uses the normal Next server and PostgreSQL and exercises unauthenticated, owner
 and peer access to existing product routes without invoking a real model or external provider.
+Attestation and authenticated HTTP responses enforce their decoded byte budgets
+while reading (4 KiB and 8 MiB respectively), cancelling an oversized stream
+before allocating an unbounded response. The HTTP client remains non-streaming.
 
 ## Evidence and limits
 
