@@ -154,14 +154,6 @@ export function createFactoryReconciler(
           recovered++;
           continue;
         }
-        if (task.stage === "review" || task.stage === "verify" || task.stage === "monitor") {
-          const consumer = consumers[task.stage];
-          if (!consumer) throw new FactoryError("factoryDispatchAdapterRequired");
-          await consumer(tx, store, task, run);
-          await tx.query("COMMIT");
-          recovered++;
-          continue;
-        }
         if (
           run.stopRequestedAt ||
           run.status === "cancelled" || run.stopReason === "cancelled"
@@ -176,6 +168,13 @@ export function createFactoryReconciler(
             },
             tx,
           );
+        } else if (task.stage === "review" || task.stage === "verify" || task.stage === "monitor") {
+          const consumer = consumers[task.stage];
+          if (!consumer) throw new FactoryError("factoryDispatchAdapterRequired");
+          await consumer(tx, store, task, run);
+          await tx.query("COMMIT");
+          recovered++;
+          continue;
         } else if (run.status === "stopped") {
           await store.apply(userId,binding(task),eventId,{action:"finish",status:"blocked",reason:"Run ended without completed submission",evidence:[],output:{runId:run.id}},tx);
         } else if (run.status === "failed") {

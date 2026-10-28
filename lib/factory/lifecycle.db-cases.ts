@@ -212,6 +212,19 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
       assert.equal(result.attempts[1].sessionId,'monitor-question-session');
     }
   });
+  await t.test('cancelled check runs never reach a phase consumer',async()=>{
+    let consumed=0;
+    for(const stage of ['review','verify','monitor'] as const) {
+      const r=await store.route('owner',await fixture());
+      const d=await dispatch('owner',{binding:factoryBinding(r.task),agentId,deviceRepoId:repoId});
+      await pool.query('UPDATE factory_tasks SET stage=$2 WHERE id=$1',[r.task.id,stage]);
+      await pool.query('UPDATE factory_attempts SET stage=$2 WHERE id=$1',[r.task.attemptId,stage]);
+      await pool.query(`UPDATE agent_runs SET status='cancelled',"stopReason"='cancelled',"sessionId"='cancelled-check' WHERE id=$1`,[d.runId]);
+      await createFactoryReconciler(pool,store,questions,{[stage]:async()=>{consumed++;}})('owner');
+      assert.equal((await store.read('owner',r.task.id)).task.status,'cancelled');
+    }
+    assert.equal(consumed,0);
+  });
   await t.test('missing consumer blocks only its task and does not stall another question',async()=>{
     const r=await store.route('owner',await fixture());
     const d=await dispatch('owner',{binding:factoryBinding(r.task),agentId,deviceRepoId:repoId});
