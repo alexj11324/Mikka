@@ -8,6 +8,23 @@
 // and `agent_run.report` stores exactly this shape.
 import { z } from "zod"
 
+export const RUN_QUESTION_KINDS = [
+  "context",
+  "decision",
+  "permission",
+  "external",
+] as const
+export const runQuestion = z
+  .object({
+    questionId: z.uuid(),
+    kind: z.enum(RUN_QUESTION_KINDS).default("decision"),
+    question: z.string().trim().min(1).max(4000),
+    context: z.string().trim().max(4000).optional(),
+    options: z.array(z.string().trim().min(1).max(4000)).max(20).default([]),
+  })
+  .strict()
+export type RunQuestion = z.infer<typeof runQuestion>
+
 import { planHandoff } from "./plan"
 
 /** Why a run stopped. Must match `agent_run.stop_reason` in packages/db. */
@@ -77,6 +94,7 @@ export const runReport = z.object({
   }),
   openQuestions: z.array(z.string().max(2_000)).max(50),
   /** What should happen next, from the agent's point of view. */
+  question: runQuestion.optional(),
   nextStep: z.string().max(2_000).nullable(),
   /** For `blocked`: the external condition, e.g. `quota_exhausted`. */
   blockedOn: z.string().max(500).optional(),

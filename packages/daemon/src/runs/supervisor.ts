@@ -27,6 +27,7 @@
 // The handoff report's verify result is always the daemon's own: only the
 // agent's summary, open questions, next step and blocker are taken from the
 // agent. A submission is `succeeded` only when verify passed.
+import { runQuestion } from "@mikka/protocol/run"
 import { fixedCheckSnapshot } from "./check"
 import { randomUUID } from "node:crypto"
 import { resolve } from "node:path"
@@ -366,6 +367,7 @@ export class RunSupervisor {
       if (e.assignment.runId === cancelledRunId) return true
       // A verified hand-in is under review; its work is published.
       if (e.state === "succeeded") return false
+      if (e.assignment.preserveQuestionWorktree && e.stopReason === "blocked") return false
       return !e.stopReason || !KEEP_WORKTREE.includes(e.stopReason)
     })
     if (!discardable) return false
@@ -1048,6 +1050,11 @@ export class RunSupervisor {
             message: assignment.followUp ?? assignment.prompt,
           }
         : undefined
+    if (assignment.requireSessionResume &&
+        (assignment.subscriptionBinding || !assignment.resumeSessionId || !assignment.continuesRunId ||
+          !adapter.capabilities.supportsResume || (!resuming && !continueSession) ||
+          (resuming && entry.sessionId !== assignment.resumeSessionId)))
+      throw new Error("factory_question_session_resume_required")
     const session = assignment.subscriptionBinding
       ? this.deps.startSubscription
         ? await this.deps.startSubscription(assignment,{...options,prompt:assignment.prompt})
@@ -1059,6 +1066,10 @@ export class RunSupervisor {
           prompt: assignment.prompt,
           continueSession,
         })
+    if (assignment.requireSessionResume && session.sessionId !== assignment.resumeSessionId) {
+      await session.cancel()
+      throw new Error("factory_question_session_mismatch")
+    }
     run.session = session
     log.info(
       {
@@ -1218,6 +1229,8 @@ function abortPromise(signal: AbortSignal): Promise<typeof ABORTED> {
 function pickAgentReport(agent: AgentReport | undefined): AgentReport {
   if (!agent) return {}
   const picked: AgentReport = {}
+  const question = runQuestion.safeParse(agent.question)
+  if (question.success) picked.question = question.data
   if (typeof agent.summary === "string")
     picked.summary = agent.summary.slice(0, 10_000)
   if (

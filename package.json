@@ -87,7 +87,7 @@
     "test:agent-kit-compat": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-kit/main-compat.test.ts lib/agent-kit/registry-compat.test.ts && pnpm test:agent-kit-model",
     "test:agent-kit-model": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-execution-model.test.ts lib/subscription-model-snapshot.test.ts lib/subscription-workflow-model.test.ts lib/subscription-workflow-turn.test.ts lib/agent-kit/hosted-replay.test.ts lib/agent-kit/live-eval-disabled.test.ts lib/agent-kit/core-entry.test.ts lib/agent-kit/disabled-entry.test.ts lib/agent-kit/message-safety-compat.test.ts lib/agent-kit/tool-defaults-compat.test.ts lib/agent-kit/defaults-consumers.test.ts",
     "test:migration-steps-db": "node --test tests/migration-steps.db.test.mjs",
-    "test:coordinator-issue-tools": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/issue-tools.test.ts lib/mcp/issue-mutation.test.ts",
+    "test:coordinator-issue-tools": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/issue-tools.test.ts lib/mcp/issue-mutation.test.ts && pnpm test:factory-routing",
     "test:coordinator-issue-tools-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/issue-tool-calls.db.test.ts",
     "test:write-transactions": "node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-transaction.test.ts",
     "test:approved-writes": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-preparation.test.ts lib/operations/write-discovery.test.ts lib/operations/write-http.test.ts lib/operations/write-provider.test.ts lib/operations/write-route.test.ts lib/operations/write-view.test.ts",
@@ -96,6 +96,10 @@
     "test:factory-approval-db": "node --import tsx --test lib/factory/approval.db.test.ts",
     "test:factory-monitor": "node --import tsx --test lib/factory/monitor-fingerprint.test.ts lib/factory/monitor-issue-plan.test.ts lib/factory/monitor-v2-binding.test.ts",
     "test:factory-monitor-db": "node --import tsx --test lib/factory/monitor-v2-binding.db.test.ts lib/factory/monitor-incidents.db.test.ts"
+    "test:factory-approval-db": "node --import tsx --test lib/factory/approval.db.test.ts"
+    "test:factory-routing": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/intake.test.ts lib/factory/tools.test.ts",
+    "test:factory-routing-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/routing.db.test.ts",
+    "test:write-transactions": "node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-transaction.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",
