@@ -66,6 +66,22 @@ async function runTurn(text) {
     threadId,
     turn: { id: open, status: "inProgress", error: null },
   })
+  if (text === 'APPROVAL_TEST') {
+    const request = (id, foreign = false) => new Promise(resolve => {
+      const wireId = `approval-${randomUUID()}`
+      hostReplies.set(wireId, resolve)
+      send({ id: wireId, method: 'item/commandExecution/requestApproval', params: { threadId: foreign ? 'other-thread' : threadId, turnId: open, itemId: id, command: 'synthetic' } })
+    })
+    const first = await request('same')
+    const replay = await request('same')
+    const foreign = await request('foreign', true)
+    const output = JSON.stringify({ first, replay, foreign })
+    item('started', { type: 'agentMessage', id: 'approval-output', text: '' })
+    notify('item/agentMessage/delta', { threadId, turnId: open, itemId: 'approval-output', delta: output })
+    item('completed', { type: 'agentMessage', id: 'approval-output', text: output })
+    complete()
+    return
+  }
   if (text.startsWith('MAILBOX_TEST ')) {
     const results = []
     for (const call of JSON.parse(text.slice('MAILBOX_TEST '.length))) {

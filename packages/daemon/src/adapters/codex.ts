@@ -365,6 +365,7 @@ export class CodexAdapter implements AgentAdapter {
       (ended ??= close(event))
     const close = async (event: Parameters<EventQueue["exit"]>[0] | null) => {
       ending = true
+      options.toolApproval?.revoke()
       if (pending.length > 0)
         log.warn(
           { dropped: pending.length },
@@ -403,8 +404,15 @@ export class CodexAdapter implements AgentAdapter {
           throw new Error(SUBSCRIPTION_AUTH_ERROR)
         }
       }
-      if (method.endsWith("requestApproval") || method.endsWith("Approval"))
-        return { decision: "accept" }
+      if (method === "item/commandExecution/requestApproval" || method === "item/fileChange/requestApproval") {
+        if (!options.toolApproval) return { decision: "decline" }
+        if (pendingTurnStart) await pendingTurnStart
+        const call = params as { threadId?: unknown; turnId?: unknown; itemId?: unknown } | null
+        if (!call || ending || call.threadId !== sessionId || call.turnId !== activeTurn || typeof call.itemId !== 'string' || !activeTurn) return { decision: "decline" }
+        const decision = await options.toolApproval.request({ runId: options.runId, harness: 'codex', requestId: `${activeTurn}/${call.itemId}`, method, input: params })
+        return { decision: decision === 'allow' ? 'accept' : 'decline' }
+      }
+      if (method === "item/permissions/requestApproval") return { permissions: {}, scope: "turn" }
       log.warn({ method }, "unhandled codex request; declining")
       return { decision: "decline" }
     })
@@ -593,7 +601,7 @@ export class CodexAdapter implements AgentAdapter {
       }
       const thread: ThreadStartParams = {
         cwd: ctx.worktree,
-        approvalPolicy: "never",
+        approvalPolicy: options.toolApproval ? "on-request" : "never",
         sandbox: "danger-full-access",
         developerInstructions: ctx.instructions(),
         ...(options.mailbox ? { dynamicTools: options.mailbox.tools.map(tool => ({ type: 'function' as const, ...tool })) } : {}),

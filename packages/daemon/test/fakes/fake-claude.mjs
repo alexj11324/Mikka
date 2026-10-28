@@ -83,6 +83,18 @@ lines.on("line", async (line) => {
   const asked = JSON.parse(line)?.message?.content?.[0]?.text
   if (typeof asked !== "string") return
   const message = asked
+  if (message === 'APPROVAL_TEST') {
+    const approval = (toolUseId) => new Promise(resolve => {
+      const request_id = `approval-${++sdkId}`
+      sdkReplies.set(request_id, resolve)
+      out({ type: 'control_request', request_id, request: { subtype: 'can_use_tool', tool_name: 'Bash', input: { command: 'synthetic' }, tool_use_id: toolUseId } })
+    })
+    const first = await approval('same')
+    const replay = await approval('same')
+    text(JSON.stringify({ first, replay }))
+    result()
+    return
+  }
   if (message.startsWith('MAILBOX_TEST ')) {
     const results = []
     const enabled = mcpServers.mikka_mailbox?.type === 'sdk' || sdkInitialization?.sdkMcpServers?.includes('mikka_mailbox')

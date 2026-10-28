@@ -14,6 +14,7 @@ import type {
   StopReason,
 } from "@mikka/protocol"
 
+import type { ToolApprovalGate } from "../agents/tool-approval"
 import type { RunChunk } from "../chunks"
 import type { Logger } from "../log"
 import type { RunMailbox } from '../run-mailbox'
@@ -55,6 +56,8 @@ export interface AgentCapabilities {
 }
 
 export interface SessionOptions {
+  /** Trusted, run-bound host gate. Never populated from model input. */
+  toolApproval?: ToolApprovalGate
   /** Host-created run-bound control callbacks; no serialized token/URL/model input. */
   mailbox?: RunMailbox
   runId: string
