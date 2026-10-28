@@ -36,7 +36,7 @@ test('the real events API projects the latest reply into owner-scoped thread lis
 
     await page.goto(app('/?section=coordinator'))
     const panel = page.getByRole('complementary', { name: '右栏', exact: true })
-    if (!await panel.isVisible()) await page.getByRole('button', { name: '打开右栏', exact: true }).click()
+    await expect(panel).toBeVisible()
     await expect(panel.getByText('Actual route reply', { exact: true })).toBeVisible()
     await expect(panel.getByText(`MCP dispatch ${marker}`, { exact: true })).toHaveCount(0)
     await expect(panel.getByText(`Foreign private ${marker}`, { exact: true })).toHaveCount(0)
