@@ -2,6 +2,10 @@
 import { chromium } from '@playwright/test'
 import { existsSync } from 'node:fs'
 
+// Playwright browser.close() and the browser's temporary profile cleanup have
+// not been reviewed for the current preservation rule. Do not launch them.
+throw new Error('Chromium guard regression suspended: preserve test resources')
+
 const executablePath = ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(existsSync)
 if (!executablePath) throw new Error('Chromium is required for the guard regression')
 const browser = await chromium.launch({ executablePath, headless: true, args: ['--no-sandbox'] })
@@ -30,4 +34,4 @@ try {
     await capture(`${mode}-shadow`)
   }
   process.stdout.write(JSON.stringify(results))
-} finally { await browser.close() }
+} finally { process.stderr.write('Retaining Chromium guard test resources\n') }

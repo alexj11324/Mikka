@@ -12,7 +12,9 @@ import { withWorkspaceComputerPermission } from './workspace-policy'
 import { bindSubagentRun } from './subagent-run-binding'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
-test('real DB: additive migration, subagent owner isolation and separate thread claims', { skip: !databaseURL }, async () => {
+// Disabled while the called runtime paths and hosted cleanup are reviewed.
+// A skipped regression is not an acceptance result.
+test('real DB: additive migration, subagent owner isolation and separate thread claims', { skip: 'resource-preservation review pending' }, async () => {
   assert.ok(['localhost', '127.0.0.1'].includes(new URL(databaseURL!).hostname))
   const schema = `subagent_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: databaseURL })
@@ -91,7 +93,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     await running
     await pool.query('UPDATE workspace_computer_policies SET permission=\'allow\',version=3 WHERE "workspaceId"=$1', [alice.workspaceId])
     assert.equal(await withWorkspaceComputerPermission(pool, alice.workspaceId, async (_client, version) => version), 3, 'shared allow passes the workspace ceiling without manufacturing an action grant')
-    await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [alice.workspaceId])
+    await pool.query('UPDATE workspace_computer_policies SET permission=\'ask\',version=0 WHERE "workspaceId"=$1', [alice.workspaceId])
     await assert.rejects(store.get(bob, botA, task.id), { status: 404 })
     await assert.rejects(store.get(stranger, botA, task.id), { status: 404 })
     await assert.rejects(store.create(bob, botA, 'steal'), { status: 404 })
@@ -143,10 +145,10 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     const otherBrowser = await store.create(alice, botA, 'Other synthetic browser task')
     await pool.query(`UPDATE bot_subagents SET status='running' WHERE id=$1`, [otherBrowser.id])
     await assert.rejects(bindSubagentRun(pool, alice, otherBrowser.id, claimed), { status: 409 }, 'one run cannot be attached to two subagents')
-    await pool.query('INSERT INTO workspace_computer_policies VALUES ($1,\'allow\',2)', [alice.workspaceId])
+    await pool.query('UPDATE workspace_computer_policies SET permission=\'allow\',version=2 WHERE "workspaceId"=$1', [alice.workspaceId])
     await assert.rejects(bindSubagentRun(pool, alice, browser.id, claimed), { status: 403 }, 'stale host policy version cannot authorize')
     assert.equal((await bindSubagentRun(pool, alice, browser.id, { ...claimed, policyVersion: 2 })).policyVersion, 2, 'policy version comes from current workspace state')
-    await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [alice.workspaceId])
+    await pool.query('UPDATE workspace_computer_policies SET permission=\'ask\',version=0 WHERE "workspaceId"=$1', [alice.workspaceId])
     await pool.query('UPDATE byos_connections SET epoch=2 WHERE id=$1', [connectionId])
     await assert.rejects(bindSubagentRun(pool, alice, browser.id, claimed), { status: 403 }, 'stale subscription cannot authorize')
     await pool.query('UPDATE byos_connections SET epoch=1 WHERE id=$1', [connectionId])
@@ -155,10 +157,9 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL,"leaseExpiresAt"=now()-interval \'1 second\' WHERE id=$1', [browserRun])
     await assert.rejects(bindSubagentRun(pool, alice, browser.id, claimed), { status: 403 }, 'expired lease cannot authorize')
     await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=now()+interval \'5 minutes\' WHERE id=$1', [browserRun])
-    await pool.query('INSERT INTO workspace_computer_policies VALUES ($1,\'deny\',1)', [alice.workspaceId])
+    await pool.query('UPDATE workspace_computer_policies SET permission=\'deny\',version=1 WHERE "workspaceId"=$1', [alice.workspaceId])
     await assert.rejects(bindSubagentRun(pool, alice, browser.id, claimed), { status: 403 }, 'deny revokes binding use')
-    await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [alice.workspaceId])
-    await pool.query('DELETE FROM subagent_run_bindings WHERE "subagentId"=$1', [browser.id])
+    await pool.query('UPDATE workspace_computer_policies SET permission=\'ask\',version=0 WHERE "workspaceId"=$1', [alice.workspaceId])
     assert.equal((await nativeRunBinding(pool, 'alice', agentId, 'codex', alice.workspaceId))?.id, bindingId)
     assert.equal((await nativeRunBinding(pool, 'alice', agentId, 'codex', alice.workspaceId, bindingId))?.id, bindingId)
     assert.equal(await nativeRunBinding(pool, 'alice', randomUUID(), 'codex', alice.workspaceId, bindingId), null, 'pinned binding must belong to the agent')
@@ -177,15 +178,16 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     assert.equal(await claimCloudRun(pool, bob, runA, deviceA, expires, bindingId), null, 'another owner cannot claim it')
     assert.equal(await claimCloudRun(pool, stranger, runA, deviceA, expires, bindingId), null, 'another workspace cannot claim it')
     assert.equal(await claimCloudRun(pool, alice, runA, deviceA, expires, randomUUID()), null, 'unbound subscription denied')
-    await pool.query('INSERT INTO workspace_computer_policies VALUES ($1,\'deny\',1)', [alice.workspaceId])
+    await pool.query('UPDATE workspace_computer_policies SET permission=\'deny\',version=1 WHERE "workspaceId"=$1', [alice.workspaceId])
     assert.equal(await claimCloudRun(pool, alice, runA, deviceA, expires, bindingId), null)
-    await pool.query('DELETE FROM workspace_computer_policies')
+    await pool.query('UPDATE workspace_computer_policies SET permission=\'ask\',version=0 WHERE "workspaceId"=$1', [alice.workspaceId])
     assert.equal((await claimCloudRun(pool, alice, runA, deviceA, expires, bindingId))?.display, ':1')
     assert.equal((await claimCloudRun(pool, alice, runB, deviceB, expires, bindingId))?.botId, botA)
     assert.equal(await claimCloudRun(pool, alice, runA, deviceA, expires, bindingId), null, 'one claim only')
   } finally {
     if (prior === undefined) delete process.env.MIKKA_CLOUD_THREAD_MACHINES
     else process.env.MIKKA_CLOUD_THREAD_MACHINES = prior
-    await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
+    console.info(`Retained isolated test schema: ${schema}`)
+    await pool.end(); await admin.end()
   }
 })

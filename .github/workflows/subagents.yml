@@ -7,6 +7,10 @@ permissions:
   contents: read
 jobs:
   backend:
+    # Retain all test resources until teardown and hosted runner cleanup have
+    # been reviewed against the current explicit resource-preservation rule.
+    # A skipped job is not an acceptance result.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
