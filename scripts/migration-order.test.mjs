@@ -47,3 +47,13 @@ test('local repository defaults only accepts the exact SQL under its historical 
   assert.equal(alreadyApplied(name, new Set([name]), sql), true)
   assert.throws(() => alreadyApplied(name, new Set([old]), sql + '\n-- modified'), /content changed/)
 })
+
+test('device authorization recognizes its historical name only for identical SQL', () => {
+  const name = '20261028202036_device_authorization.sql'
+  const old = '20261028022909_device_authorization.sql'
+  const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
+  assert.equal(alreadyApplied(name, new Set(), sql), false)
+  assert.equal(alreadyApplied(name, new Set([old]), sql), true)
+  assert.equal(alreadyApplied(name, new Set([name]), sql), true)
+  assert.throws(() => alreadyApplied(name, new Set([old]), sql + '\n-- modified'), /content changed/)
+})
