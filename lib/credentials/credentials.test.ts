@@ -145,6 +145,7 @@ test('verification codes use a separate authenticated envelope purpose', async (
 })
 
 function bindFixtureAction(claimed: any) {
+  claimed.target.sandboxId = 'synthetic-sandbox'
   const input = claimed.target.observedInput
   const action = { kind: 'browser_credential', actionId: '11111111-1111-4111-8111-111111111111', admission: 'ask', digest: 'a'.repeat(64), summary: 'synthetic', userId: claimed.user_id, workspaceId: claimed.workspace_id, botId: claimed.bot_id, subagentId: claimed.subagent_id, runId: claimed.subagent_id, epoch: input?.epoch ?? 1, policyVersion: input?.permissionVersion ?? 0, targetId: claimed.target.targetId, origin: claimed.origin, loaderId: input?.loaderId ?? 'loader', backendNodeId: input?.backendNodeId ?? 7, role: input?.credentialRole ?? 'password', expiresAt: Date.now() + 60000 }
   claimed.target.credentialAction = action
@@ -165,7 +166,7 @@ test('broker reports mechanical session application or submission without judgin
     const client = {
       async query(sql: string) {
         if (sql.includes('FROM bots ') || sql.includes('FROM agent_runs ')) return { rows: [{ id: 'ok' }] }
-        if (sql.includes('FROM bot_subagents s LEFT JOIN')) return { rows: [{ targetId: 'target', epoch: 1, permissionVersion: 0, permission: 'ask', runPolicy: defaultRunPolicy() }] }
+        if (sql.includes('FROM bot_subagents s JOIN')) return { rows: [{ targetId: 'target', epoch: 1, permissionVersion: 0, permission: 'ask', sandboxId: 'synthetic-sandbox', runPolicy: defaultRunPolicy() }] }
         if (sql.includes('FROM bot_subagents ')) return { rows: [{ id: 'ok' }] }
         if (sql.includes('JOIN credential_secrets')) return { rows: [credential] }
         if (sql.includes('FROM pending_actions')) return { rows: [{ id: 'synthetic' }], rowCount: 1 }
@@ -238,9 +239,9 @@ test('broker rejects changed epoch, policy, target, origin and loader before dec
     const target = { targetId: 'target', origin: failure === 'origin' ? 'https://other.example' : origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, observedInput }
     const claimed = { user_id: 'owner', workspace_id: 'workspace', bot_id: 'bot', subagent_id: 'subagent', run_id: null, credential_id: 'credential', origin, target }
     bindFixtureAction(claimed)
-    const bound = { targetId: failure === 'target' ? 'other' : 'target', epoch: failure === 'epoch' ? 2 : 1, permissionVersion: failure === 'policy' ? 2 : 1, permission: failure === 'deny' ? 'deny' : 'ask', runPolicy: defaultRunPolicy() }
+    const bound = { sandboxId: 'synthetic-sandbox', targetId: failure === 'target' ? 'other' : 'target', epoch: failure === 'epoch' ? 2 : 1, permissionVersion: failure === 'policy' ? 2 : 1, permission: failure === 'deny' ? 'deny' : 'ask', runPolicy: defaultRunPolicy() }
     const client = { async query(sql: string) {
-      if (sql.includes('FROM bot_subagents s LEFT JOIN')) return { rows: [bound] }
+      if (sql.includes('FROM bot_subagents s JOIN')) return { rows: [bound] }
       if (sql.includes('FROM pending_actions')) return { rows: [{ id: 'synthetic' }], rowCount: 1 }
       if (sql.includes('SELECT id FROM')) return { rows: [{ id: 'ok' }] }
       if (sql.includes('JOIN credential_secrets')) return { rows: [{ wrapped_dek: 'synthetic' }] }

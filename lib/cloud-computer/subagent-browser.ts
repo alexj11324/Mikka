@@ -19,7 +19,7 @@ export async function resolveRecordedCredentialTarget(action: CredentialAction) 
   if (current.targetId !== action.targetId || Object.entries(observed).some(([key, value]) => current[key] !== value)) throw new Error('Credential target changed')
   const observedInput = { loaderId: action.loaderId, backendNodeId: action.backendNodeId, credentialRole: action.role, epoch: action.epoch, permissionVersion: action.policyVersion }
   const capability = await grant(await connectComputer(row.sandboxId), row, 'broker', { ...observedInput, origin: action.origin })
-  return { targetId: action.targetId, origin: action.origin, ...capability, observedInput, credentialAction: action }
+  return { targetId: action.targetId, origin: action.origin, sandboxId: row.sandboxId as string, ...capability, observedInput, credentialAction: action }
 }
 
 /** Broker contract. This binding is resolved exclusively from authenticated

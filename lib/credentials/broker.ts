@@ -39,11 +39,11 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     // gateway capability must additionally be issued by the trusted host
     // after its existing computer_use decision; this query is not approval.
     if (!caller.subagentId || caller.runId || !target.observedInput) throw new CredentialError('credential_denied', 404)
-    const bound = (await client.query(`SELECT s."targetId",s.epoch,s."runPolicy",COALESCE(p.version,0) AS "permissionVersion",p.permission
-      FROM bot_subagents s LEFT JOIN workspace_computer_policies p ON p."workspaceId"=s."workspaceId"
+    const bound = (await client.query(`SELECT s."targetId",s.epoch,s."runPolicy",m."sandboxId",COALESCE(p.version,0) AS "permissionVersion",p.permission
+      FROM bot_subagents s JOIN cloud_machines m ON m."workspaceId"=s."workspaceId" AND m."ownerId"=s."ownerId" AND m.state='running' LEFT JOIN workspace_computer_policies p ON p."workspaceId"=s."workspaceId"
       WHERE s.id=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3 AND s."botId"=$4 AND s.status IN ('running','needs_you') FOR UPDATE OF s`,
     [caller.subagentId, caller.userId, caller.workspaceId, caller.botId])).rows[0]
-    if (!bound || bound.permission === 'deny') throw new CredentialError('credential_denied', 404)
+    if (!bound || !target.sandboxId || bound.sandboxId !== target.sandboxId || !['allow', 'ask'].includes(bound.permission ?? 'ask')) throw new CredentialError('credential_denied', 404)
     const policy = runPolicySchema.safeParse(bound.runPolicy)
     if (!policy.success || policy.data.readOnly || policy.data.permissions.computer_use === 'deny' || (action.admission === 'allow' && (bound.permission !== 'allow' || policy.data.permissions.computer_use !== 'allow'))) throw new CredentialError('credential_denied', 404)
     if (action.policyVersion !== Number(bound.permissionVersion) || action.epoch !== bound.epoch || action.targetId !== bound.targetId || action.expiresAt <= Date.now()) throw new CredentialError('credential_denied', 404)

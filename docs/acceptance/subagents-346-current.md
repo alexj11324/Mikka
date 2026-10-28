@@ -10,7 +10,7 @@ column leaves existing runs null and fails closed rather than inventing policy.
 The credential consumer now invokes the existing credential lease and broker
 service. Its signed gateway capability includes the observed node and document.
 The broker durably consumes the same persisted host action, then verifies the
-current policy, run, owner, target and input before opening a secret. It owns
+current policy, run, owner, active machine, target and input before opening a secret. It owns
 the policy-to-credentials lock order; the app does not hold that lock across the
 service request. Native replacement of prefilled text is restricted to the
 observed, focused node. No secret is supplied to the model.
@@ -36,7 +36,7 @@ All of the following ran in the cloud Linux workspace, using synthetic data.
 - The actual gateway WebSocket and Chromium regression passed. Its service
   subprocess exercised real PostgreSQL, AES-GCM, CredentialStore,
   fillCredential and Cdp.insertAtObservedInput. Replay, pending approval,
-  stale policy and STOP were rejected before decryption. KMS was synthetic.
+  stale policy, STOP, read-only, invalid policy and a replaced machine were rejected before decryption. KMS was synthetic.
 - Typecheck, focused oxlint, 72-file migration validation, standalone broker
   bundling and native Node imports passed.
 
@@ -45,8 +45,8 @@ remains running. New fixture schemas and Chromium profile directories were
 retained. Only Chromium processes created by the new test invocations were
 closed at their own test completion; no historical process or resource was
 removed. The final passing gateway fixture retained
-/tmp/pr346-broker-1o_kv836 and schema
-broker_d108eb098e024862a4b50a286ff34397. The backend schema was
+/tmp/pr346-broker-hs7i7u9w and schema
+broker_20f4663fc5d44ff783479ce3545811b3. The backend schema was
 subagent_de72684f178f47f883d1d74680ff854b. Earlier failing fixture schemas and
 profiles were also retained. Logs are in /workspace/pr346-*-current.log and
 /workspace/pr346-final-*.log.

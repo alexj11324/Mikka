@@ -19,6 +19,7 @@ const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=
 try {
   await pool.query(`CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
     CREATE TABLE bot_subagents(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"botId" uuid,status text,epoch int,"targetId" text,"runPolicy" jsonb);
+    CREATE TABLE cloud_machines("workspaceId" uuid,"ownerId" text,state text,"sandboxId" text);
     CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text,version int);
     CREATE TABLE pending_actions(id uuid PRIMARY KEY,"userId" text,action text,input jsonb,status text,context jsonb,"createdAt" timestamptz DEFAULT now());
     CREATE TABLE credentials(id uuid PRIMARY KEY,user_id text,origin text,username text,revoked_at timestamptz,unattended_allowed boolean DEFAULT true,last_used_at timestamptz,created_at timestamptz DEFAULT now());
@@ -33,6 +34,7 @@ try {
   const policy = { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use:'allow' } }
   await pool.query('INSERT INTO bots VALUES ($1,$2,$3)',[caller.botId,caller.userId,caller.workspaceId])
   await pool.query('INSERT INTO bot_subagents VALUES ($1,$2,$3,$4,\'running\',1,$5,$6)',[caller.subagentId,caller.userId,caller.workspaceId,caller.botId,targetId,policy])
+  await pool.query('INSERT INTO cloud_machines VALUES ($1,$2,\'running\',\'synthetic-sandbox\')',[caller.workspaceId,caller.userId])
   await pool.query('INSERT INTO workspace_computer_policies VALUES ($1,\'allow\',1)',[caller.workspaceId])
   await pool.query('INSERT INTO credentials(id,user_id,origin,username) VALUES ($1,$2,$3,\'synthetic-user\')',[credentialId,caller.userId,origin])
   const encrypted = await seal(kms,{userId:caller.userId,credentialId,origin},Buffer.from(JSON.stringify({username:'synthetic-user',password:'synthetic-password'})))
@@ -42,7 +44,7 @@ try {
   const guard = { async begin(){ return {cdpUrl:url,targetId,guardToken:'synthetic-receipt'} }, async end(){ throw Error('Inserted input must remain guarded') } }
   async function leaseFor(decision='allow') {
     const {action} = await recordCredentialAction(pool,binding,decision,false,randomUUID())
-    const target = {targetId,origin,endpoint:'https://synthetic.e2b.app/',expiresAt:Date.now()+60000,observedInput:{loaderId,backendNodeId:Number(node),credentialRole:'username',epoch:1,permissionVersion:1},credentialAction:action}
+    const target = {targetId,origin,sandboxId:'synthetic-sandbox',endpoint:'https://synthetic.e2b.app/',expiresAt:Date.now()+60000,observedInput:{loaderId,backendNodeId:Number(node),credentialRole:'username',epoch:1,permissionVersion:1},credentialAction:action}
     const lease = await store.lease(caller,origin,target)
     assert.equal(lease.status,'ready')
     return lease.lease
@@ -63,6 +65,21 @@ try {
   await pool.query('UPDATE bot_subagents SET status=\'stopped\' WHERE id=$1',[caller.subagentId])
   await assert.rejects(fillCredential(pool,stopped,{kms,guard}))
   assert.equal(decrypts,1,'STOP must not decrypt')
+  await pool.query('UPDATE bot_subagents SET status=\'running\' WHERE id=$1',[caller.subagentId])
+  const readonly = await leaseFor()
+  await pool.query('UPDATE bot_subagents SET "runPolicy"=$2 WHERE id=$1',[caller.subagentId,{...policy,readOnly:true}])
+  await assert.rejects(fillCredential(pool,readonly,{kms,guard}))
+  assert.equal(decrypts,1,'read-only snapshot must not decrypt')
+  await pool.query('UPDATE bot_subagents SET "runPolicy"=$2 WHERE id=$1',[caller.subagentId,policy])
+  const replaced = await leaseFor()
+  await pool.query('UPDATE cloud_machines SET "sandboxId"=\'replacement\'')
+  await assert.rejects(fillCredential(pool,replaced,{kms,guard}))
+  assert.equal(decrypts,1,'replaced machine must not decrypt')
+  await pool.query('UPDATE cloud_machines SET "sandboxId"=\'synthetic-sandbox\'')
+  const unknownPolicy = await leaseFor()
+  await pool.query('UPDATE workspace_computer_policies SET permission=\'unknown\'')
+  await assert.rejects(fillCredential(pool,unknownPolicy,{kms,guard}))
+  assert.equal(decrypts,1,'invalid policy must not decrypt')
   console.log(`PASS: real PG and broker service + actual CDP insertion; replay/pending/stale-policy/STOP denied; retained schema ${schema}; KMS synthetic`)
   key.fill(0)
 } finally {
