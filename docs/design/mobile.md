@@ -185,7 +185,9 @@ mobile drawer.
   (`components/OpenUI.tsx`: text, choice and question cards, approval,
   follow-ups, buttons); a card the app cannot draw shows its words and
   「在网页上打开」, which opens the same chat on the web signed in
-  (`app/api/mobile/open`, a one-minute single-use token). Proposals from
+  (`app/api/mobile/open`, a one-minute single-use token). The browser first
+  shows the target account and requires a same-origin, browser-bound confirmation;
+  following the link alone never changes its signed-in account. Proposals from
   `/api/pending-actions` sit at the end of every chat with 不要 and
   发送/保存到日历 (`POST /api/mobile/pending-actions/:id`).
 - **Lost session:** a 401 signs the app out locally and shows sign-in with

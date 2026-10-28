@@ -9,7 +9,8 @@ export const webChatPath = (botId: string | null) => botId ? `/?section=coordina
 /**
  * Opens a page of the web app signed in as the person, for what the app cannot
  * draw. The in-app browser does not share the keychain cookie, so a one-minute,
- * single-use token goes with it (app/api/mobile/open on the server). Without a
+ * single-use token goes with it (app/api/mobile/open on the server). The browser
+ * shows the target account for confirmation before setting its session. Without a
  * token the page still opens and asks to sign in.
  */
 export async function openOnWeb(path: string): Promise<void> {

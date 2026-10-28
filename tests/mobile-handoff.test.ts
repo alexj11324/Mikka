@@ -3,6 +3,7 @@ import { mock, test } from 'node:test'
 import { betterAuth } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
 import { oneTimeToken } from 'better-auth/plugins'
+import { openHandoff, sealHandoff } from '../lib/mobile-handoff'
 
 // Real Better Auth with isolated in-memory storage; no accounts or provider calls leave this process.
 const data: Record<string, any[]> = { user: [], session: [], account: [], verification: [] }
@@ -38,11 +39,14 @@ test('handoff binds browser to issuing account, consumes token and rejects expir
   const token = await issue(alice.cookie)
   assert.ok(!JSON.stringify(data.verification).includes(token), 'stored token must be hashed')
   const response = await open(token)
-  assert.equal(response.status, 303)
-  assert.equal(response.headers.get('location'), 'https://handoff.test/?section=coordinator')
+  assert.equal(response.status, 200)
+  assert.equal((await session(cookieHeader(response.headers))), null)
+  const confirmed = await confirm(response)
+  assert.equal(confirmed.status, 303)
+  assert.equal(confirmed.headers.get('location'), 'https://handoff.test/?section=coordinator')
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
   assert.equal(response.headers.get('referrer-policy'), 'no-referrer')
-  assert.equal((await session(cookieHeader(response.headers)))?.user.id, alice.id)
+  assert.equal((await session(cookieHeader(confirmed.headers)))?.user.id, alice.id)
   const invalid = await open('invalid', bob.cookie)
   assert.equal(invalid.headers.getSetCookie().length, 0)
   const replay = await open(token, bob.cookie)
@@ -55,10 +59,40 @@ test('handoff binds browser to issuing account, consumes token and rejects expir
   assert.equal((await session(bob.cookie))?.user.id, bob.id)
 })
 
-test('current GET contract: a valid induced link replaces an existing browser session (login CSRF)', async () => {
+async function confirm(response: Response, origin = 'https://handoff.test', cookie?: string, csrf?: string) {
+  const { POST } = await route
+  const html = await response.clone().text()
+  return POST(new Request('https://handoff.test/api/mobile/open', {
+    method: 'POST', headers: { origin, cookie: cookie ?? cookieHeader(response.headers) },
+    body: new URLSearchParams({ csrf: csrf ?? /name="csrf" value="([^"]+)"/.exec(html)?.[1] ?? '' }),
+  }))
+}
+
+test('induced GET does not switch accounts; confirmation requires same origin and browser cookie', async () => {
   const alice = await signUp('alice2')
   const bob = await signUp('bob2')
   const response = await open(await issue(alice.cookie), bob.cookie)
-  assert.equal((await session(cookieHeader(response.headers)))?.user.id, alice.id)
-  assert.notEqual(alice.id, bob.id)
+  assert.equal(response.status, 200)
+  assert.equal((await session(bob.cookie))?.user.id, bob.id)
+  assert.equal((await session(cookieHeader(response.headers))), null)
+  assert.match(await response.clone().text(), /alice2@example.test/)
+  assert.equal((await confirm(response, 'https://evil.test')).status, 403)
+  assert.equal((await confirm(response, 'https://handoff.test', bob.cookie)).status, 403)
+  assert.equal((await confirm(response, 'https://handoff.test', undefined, 'wrong')).status, 403)
+  const confirmed = await confirm(response)
+  assert.equal((await session(cookieHeader(confirmed.headers)))?.user.id, alice.id)
+})
+
+test('confirmation rejects expired, tampered state and a revoked underlying session', async () => {
+  const alice = await signUp('alice3')
+  const response = await open(await issue(alice.cookie))
+  const secret = (await auth.$context).secret
+  const cookie = cookieHeader(response.headers)
+  const encoded = cookie.slice(cookie.indexOf('=') + 1)
+  const state = openHandoff(encoded, secret)!
+  const expired = sealHandoff({ ...state, expires: Date.now() - 1 }, secret)
+  assert.equal((await confirm(response, 'https://handoff.test', `mikka-mobile-handoff=${expired}`)).status, 403)
+  assert.equal(openHandoff(encoded + 'x', secret), null)
+  await auth.api.signOut({ headers: new Headers({ cookie: alice.cookie }) })
+  assert.equal((await confirm(response)).status, 403)
 })
