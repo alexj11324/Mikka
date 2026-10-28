@@ -369,6 +369,11 @@ test('run result publication commits one owner-scoped result through retries and
       await pool.query('update pending_actions set input = jsonb_set(input, \'{remoteKey}\', to_jsonb($2::text)) where id=$1', [tampered.actionId, 'github.com/team/repo'])
       await assert.rejects(decidePendingAction(owner.userId, tampered.actionId, true))
       assert.equal((await pool.query('select status from pending_actions where id=$1', [tampered.actionId])).rows[0].status, 'pending')
+      const expired = await proposeRepositoryPush(owner.userId, { repo: 'expired/repository' })
+      assert.ok('actionId' in expired && expired.actionId)
+      await pool.query('update pending_actions set "createdAt"=now()-interval \'8 days\' where id=$1', [expired.actionId])
+      await assert.rejects(decidePendingAction(owner.userId, expired.actionId, true), 'expired confirmations cannot authorize a push')
+      assert.equal((await pool.query('select count(*)::int as n from repository_settings where "userId"=$1 and "remoteKey"=$2', [owner.userId, repositoryKey('expired/repository')])).rows[0].n, 0)
     })
   } finally {
     const users = fixtures.map(fixture => fixture.userId)

@@ -10,6 +10,7 @@ import type { Page, Route, TestInfo } from '@playwright/test'
 import { test, expect, register, openCreateIssue } from '../e2e/fixtures'
 import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 import { assertMvpEnvironment, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from './isolated-env.mjs'
+import { RepositoryCache } from '../../packages/daemon/src/repositories'
 
 const execute = promisify(execFile)
 type Device = { id: string; name: string; protocolVersion: number }
@@ -141,7 +142,7 @@ async function setup(page: Page, testInfo: TestInfo) {
     const thread = page.getByRole('region', { name: threadTitle, exact: true })
     await expect(thread.getByRole('list', { name: '线程对话' })).toContainText('正在检查仓库', { timeout: 60_000 })
     expect((await run()).status).toBe('running')
-    const cachePath = join(dataDir, 'repos', 'github.com', 'mikka-e2e', 'core-loop')
+    const cachePath = new RepositoryCache(join(dataDir, 'repos')).pathFor(REPOSITORY)
     const worktreePath = (await run()).worktreePath
     expect(worktreePath).toBe(join(dataDir, 'worktrees', runId!))
     expect((await readFile(join(worktreePath!, '.git'), 'utf8')).trim()).toContain(`${cachePath}/.git/worktrees/`)

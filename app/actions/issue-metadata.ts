@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
-import { issues, issueMembers, issueVersions, users } from '@/lib/db/schema'
+import { agents, issues, issueMembers, issueVersions, users } from '@/lib/db/schema'
 import { issuePropertyChoices } from '@/lib/issue-property-choices'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { listProjects } from '@/app/actions/projects'
@@ -14,8 +14,8 @@ import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { activityActor } from '@/lib/activity-actor'
 
 const patchSchema = z.object({
-  // R-60: execution identities remain readable in old metadata, but cannot be assigned again.
-  assignee: assigneeSchema.pick({ kind: true, id: true }).extend({ kind: z.literal('member') }).nullable().optional(),
+  // R-60 keeps the UI human-only; the verified legacy MCP contract remains supported.
+  assignee: assigneeSchema.pick({ kind: true, id: true }).nullable().optional(),
   project: z.string().trim().min(1).max(100).nullable().optional(),
   labels: z.array(labelSchema).max(12).optional(),
   pullRequests: z.array(pullRequestSchema).max(10).optional(),
@@ -45,6 +45,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
     const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), patch: patchSchema, inviteEmail: z.email().max(254).optional() }).safeParse(input)
     if (!parsed.success) return { error: 'issueMetadataInvalid' }
     const { issue, user } = await requireIssueAccess(parsed.data.id)
+    if (parsed.data.patch.assignee?.kind === 'agent' && activityActor(user.id).actorType !== 'agent') return { error: 'issueMetadataInvalid' }
     try {
       const result = await db.transaction(async tx => {
         const [latest] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
@@ -64,13 +65,19 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
           assignee = { ...member, kind: 'member' }
         } else if (patch.assignee === null) assignee = null
         else if (patch.assignee) {
-          const [member] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, patch.assignee.id))
-          if (!member) return { error: 'memberNotFound' }
-          if (member.id !== issue.userId) {
-            const [membership] = await tx.select({ id: issueMembers.memberId }).from(issueMembers).where(and(eq(issueMembers.issueId, issue.id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, member.id)))
-            if (!membership) return { error: 'memberNotJoined' }
+          if (patch.assignee.kind === 'agent') {
+            const [agent] = await tx.select({ id: agents.id, name: agents.name }).from(agents).where(and(eq(agents.id, z.uuid().parse(patch.assignee.id)), eq(agents.userId, issue.userId)))
+            if (!agent) return { error: 'agentNotFound' }
+            assignee = { ...agent, kind: 'agent', image: null }
+          } else {
+            const [member] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, patch.assignee.id))
+            if (!member) return { error: 'memberNotFound' }
+            if (member.id !== issue.userId) {
+              const [membership] = await tx.select({ id: issueMembers.memberId }).from(issueMembers).where(and(eq(issueMembers.issueId, issue.id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, member.id)))
+              if (!membership) return { error: 'memberNotJoined' }
+            }
+            assignee = { ...member, kind: 'member' }
           }
-          assignee = { ...member, kind: 'member' }
         }
         const next = { ...metadata, ...patch, assignee }
         next.labels = [...new Map(next.labels.map(label => [label.name.toLowerCase(), label])).values()]
