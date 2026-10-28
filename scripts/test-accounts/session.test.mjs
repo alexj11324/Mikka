@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
-import { mkdtemp, mkdir, writeFile, rm, chmod, symlink } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, chmod, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -20,7 +20,7 @@ async function fixture(use) {
     await writeFile(join(stateDirectory, 'secret-audit.jsonl'), `${JSON.stringify({ values: [cookie] })}\n`, { mode: 0o600 })
     const audit = paths => auditEvidence(paths, { environment: { instanceId: 'synthetic' }, stateDirectory })
     await use({ audit, evidence, password, cookie, credentialFile, root })
-  } finally { await rm(root, { recursive: true, force: true }) }
+  } finally { console.error(`Retained test fixture directory: ${root}`) }
 }
 
 test('evidence scanner accepts an explicit secret-free report and binary file', async () => {

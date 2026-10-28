@@ -44,9 +44,9 @@ export async function personalWriteFromRun(ownerId:string, botId:string | null, 
   return service.proposeFromRun(call.input,callIntent(runId,call.toolCallId))
 }
 
-/** Reuses the application's personal-account auth and shared pool. No new
- * approval table, connection selector, user-supplied owner or worker authority.
- * No verified Slack contract or atomic Calendar transport is configured here. */
+/** Reuses personal-account auth and the shared pool. Slack reads and
+ * conditional Calendar writes use the account-pinned transport adapters below;
+ * their real-provider behavior still requires acceptance testing. */
 export function personalWriteRuntime() {
   return {
     auth,

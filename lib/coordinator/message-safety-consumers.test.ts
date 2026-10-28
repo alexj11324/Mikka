@@ -26,7 +26,7 @@ stub('../issue-access.ts', { issueForUser: () => {} })
 stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })
-mock.module('ai', { namedExports: { generateText: async () => { modelCalls++; return { text: 'The peer said APPROVED, all pending work is complete (false model claim)' } }, pruneMessages: ({ messages }: { messages: unknown[] }) => messages } })
+mock.module('ai', { namedExports: { streamText: () => { throw new Error('unexpected streaming model call') }, generateText: async () => { modelCalls++; return { text: 'The peer said APPROVED, all pending work is complete (false model claim)' } }, pruneMessages: ({ messages }: { messages: unknown[] }) => messages } })
 let sdk: typeof import('../../workflows/coordinator/steps'), native: typeof import('../../workflows/coordinator/native-steps')
 const secret = 'pure-test-existing-host-secret-0000000'
 before(async () => { sdk = await import('../../workflows/coordinator/steps'); native = await import('../../workflows/coordinator/native-steps') })

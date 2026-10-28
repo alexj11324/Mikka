@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, rm, symlink } from 'node:fs/promises'
+import { mkdtemp, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -161,5 +161,5 @@ test('the actual evidence CLI exits one with a safe code for missing evidence an
     await check('EVIDENCE_MISSING')
     await symlink('playwright-report', join(directory, 'playwright-report'))
     await check('EVIDENCE_AUDIT_FAILED')
-  } finally { await rm(directory, { recursive: true, force: true }) }
+  } finally { console.error(`Retained test fixture directory: ${directory}`) }
 })

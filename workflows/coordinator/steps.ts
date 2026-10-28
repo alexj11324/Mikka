@@ -1,4 +1,5 @@
 import { preserveMessageSources } from '@/lib/coordinator/message-safety'
+import { compactWithFrozenModel } from '@/lib/coordinator/compaction-model'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { personalMailboxInstructions } from '@/lib/personal-mailbox-instructions'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
@@ -147,12 +148,14 @@ export async function preparePrompt(userId: string, botId: string | null = null,
   if (cut !== null) {
     if (summaryTrust.key.length < 32) throw new Error('Existing host auth secret required for summary provenance')
     const folded = messages.filter(row => row.position <= cut)
-    const { text } = await generateText({
-      model: COORDINATOR_MODEL,
-      instructions: SUMMARY_INSTRUCTIONS,
-      maxOutputTokens: 4096,
-      messages: [...promptMessages(summary, folded, summaryTrust), { role: 'user', content: 'Write the summary now.' }],
-    })
+    const messagesToCompact: ModelMessage[] = [...promptMessages(summary, folded, summaryTrust), { role: 'user', content: 'Write the summary now.' }]
+    // A missing execution snapshot cannot establish a visual model selection.
+    const hasImages = messagesToCompact.some(message => message.role === 'user' && Array.isArray(message.content) && message.content.some(part => part.type === 'image' || (part.type === 'file' && part.mediaType.startsWith('image/'))))
+    if (hasImages && !snapshot) throw new Error('compactionModelUnavailable')
+    const dependencies = snapshot ? await Promise.all([import('@/lib/agent-kit/service'), import('@/lib/subscription-runtime')]) : null
+    const text = snapshot && dependencies
+      ? await compactWithFrozenModel(await dependencies[0].agentScope(userId, botId), snapshot.runtime, messagesToCompact, { service: () => dependencies[1].subscriptionRuntime(), workspace: dependencies[1].authorizeSubscriptionWorkspace })
+      : (await generateText({ model: COORDINATOR_MODEL, instructions: SUMMARY_INSTRUCTIONS, maxOutputTokens: 4096, messages: messagesToCompact })).text
     summary = preserveMessageSources(text, folded, summary, summaryTrust)
     await store.saveSummary(userId, summary, cut, botId)
     messages = messages.filter(row => row.position > cut)

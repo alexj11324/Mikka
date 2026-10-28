@@ -321,7 +321,7 @@ export class TestAccountPool {
     for (const account of bound) {
       const user = (await client.query('SELECT email FROM public."user" WHERE id=$1', [account.user_id])).rows[0]
       if (!user || user.email !== account.email || !account.credential_ref || !account.baseline) return 'ACCOUNT_IDENTITY_UNVERIFIED'
-      if ((await client.query('SELECT 1 FROM public.session WHERE "userId"=$1 LIMIT 1', [account.user_id])).rowCount) return 'ACCOUNT_SESSION_STILL_ACTIVE'
+      if ((await client.query('SELECT 1 FROM public.session WHERE "userId"=$1 AND "expiresAt">clock_timestamp() LIMIT 1', [account.user_id])).rowCount) return 'ACCOUNT_SESSION_STILL_ACTIVE'
       if (await this.fingerprint(client, account.user_id) !== account.baseline) return 'ACCOUNT_DIRTY'
     }
     return null
@@ -364,7 +364,7 @@ export class TestAccountPool {
     })
   }
 
-  /** Explicit isolated-fixture session cleanup. Does not delete users or data. */
+  /** Expire owned test sessions while preserving their audit rows. */
   async revokeSessions(lease) {
     if (!this.environment.capabilities.reset) fail('SESSION_REVOCATION_NOT_AUTHORIZED')
     return this.transaction(async client => {
@@ -374,13 +374,14 @@ export class TestAccountPool {
       for (const account of accounts) {
         const owned = (await client.query('SELECT 1 FROM public."user" WHERE id=$1 AND email=$2', [account.user_id, account.email])).rowCount
         if (!owned) fail('ACCOUNT_IDENTITY_MISMATCH')
-        revoked += (await client.query('DELETE FROM public.session WHERE "userId"=$1', [account.user_id])).rowCount
+        revoked += (await client.query('UPDATE public.session SET "expiresAt"=LEAST("expiresAt",clock_timestamp()) WHERE "userId"=$1', [account.user_id])).rowCount
         await client.query("UPDATE mikka_test_accounts.resources SET state='cleaned' WHERE lease_id=$1 AND type='session' AND owner_id=$2", [lease.id, account.user_id])
       }
       await this.current(client, lease)
       return { revoked }
     })
   }
+
 
   async release(lease, { outcome = 'clean' } = {}) {
     if (!['clean', 'dirty', 'cancelled'].includes(outcome)) fail('INVALID_REQUEST')

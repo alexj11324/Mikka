@@ -1,5 +1,5 @@
 import { constants } from 'node:fs'
-import { lstat, mkdir, open, readdir, readFile, rm } from 'node:fs/promises'
+import { lstat, mkdir, open, readdir, readFile } from 'node:fs/promises'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { resolve, join } from 'node:path'
 import { performance } from 'node:perf_hooks'
@@ -83,17 +83,6 @@ export async function acquireTestAccounts({ database, environment, runId, worker
   let tainted = false
   let releasing
   let renewal
-  async function removeSessionStates() {
-    let removed = true
-    for (const path of stateFiles) {
-      try {
-        await rm(path, { force: true })
-        try { await lstat(path); removed = false }
-        catch (error) { if (error.code !== 'ENOENT') removed = false }
-      } catch { removed = false }
-    }
-    return removed
-  }
   // A monotonic client budget complements authoritative PG time. It is anchored
   // BEFORE every renew RPC, so network latency never grants extra authority.
   let deadline = acquireStarted + Math.min(ttlMs, lease.remainingMs)
@@ -128,9 +117,6 @@ export async function acquireTestAccounts({ database, environment, runId, worker
 
   async function release({ outcome = 'clean' } = {}) {
     if (releasing) return releasing
-    // Close the request gate synchronously, before the first cleanup await.
-    // Aborting the client does not prove that an application mutation stopped,
-    // so any outstanding request makes this release unclean even if it settles.
     closing = true
     clearInterval(timer)
     const pending = [...pendingRequests]
@@ -139,25 +125,16 @@ export async function acquireTestAccounts({ database, environment, runId, worker
     releasing = (async () => {
       await Promise.allSettled(pending)
       if (renewal) await renewal.catch(() => {})
-      let result
-      let statesChecked = false
       try {
         if (lost || performance.now() >= deadline) { lose(); fail('LEASE_LOST') }
-        // Callers first close their browsers. Revoke only the pool-bound owned
-        // test users; expired or transferred holders cannot invoke this reset.
         await pool.revokeSessions(lease)
-        statesChecked = true
-        const removed = await removeSessionStates()
-        result = await pool.release(lease, { outcome: removed ? releaseOutcome : 'dirty' })
-        if (!removed) fail('SESSION_STATE_CLEANUP_FAILED')
+        // Expired sessions and their private state files remain for audit.
+        const result = await pool.release(lease, { outcome: releaseOutcome })
         if (outcome === 'clean' && result.state !== 'released') fail('ACCOUNT_DIRTY')
         return result
       } finally {
         closed = true
         abort.abort()
-        // A stale/failed holder may remove only its recorded generation's files;
-        // it never force-releases a lease after reset/fencing has failed.
-        if (!statesChecked) await removeSessionStates()
         if (ownDatabase) await database.end()
       }
     })()

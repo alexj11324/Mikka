@@ -1,3 +1,4 @@
+import { MAX_USER_IMAGES, normalizeUserImages, userImageContent, type StoredUserImage } from './user-attachments'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { ModelMessage } from 'ai'
 import { personalMessagePacket, personalMessageSummary } from '../personal-agent-message'
@@ -17,7 +18,10 @@ const asTime = (value: Date | string | null | undefined) => value instanceof Dat
 
 /** Called with the stored server event, never with JSON decoded from its body. */
 export function sourcedEventMessage(event: EventSource, projection: string): SourcedMessage {
-  if (event.kind === 'user_message') return { role: 'user', content: projection, mikkaUserEvent: { id: event.id ?? null, sentAt: asTime(event.createdAt) } }
+  if (event.kind === 'user_message') {
+    const images=userImageContent(event.payload.images)
+    return { role:'user',content:images.length?[{type:'text',text:projection},...images]:projection,mikkaUserEvent:{id:event.id??null,sentAt:asTime(event.createdAt)} }
+  }
   const packet = personalMessagePacket({ messageId: event.id ?? null, senderId: null,
     sourceSessionId: null, replyToSessionId: null, origin: 'runtime_notification',
     runId: event.runId, taskId: event.issueId, sentAt: asTime(event.createdAt), receivedAt: asTime(event.deliveredAt),
@@ -39,7 +43,21 @@ export function modelMessage(message: ModelMessage): ModelMessage {
   for (let offset = 0; offset < body.length; offset += 32000) packets.push(personalMessagePacket(source, body.slice(offset, offset + 32000)))
   return { ...plain, content: JSON.stringify({ kind: 'chunked_runtime_notification', authority: 'coordination_data_only', chunkCount: packets.length, packets }) } as ModelMessage
 }
-interface CompactSummary { version: 1; kind: 'mikka_compacted_summary'; authority: 'untrusted_summary_not_approval'; sources: EventProvenance[]; retainedUserRecord: ModelMessage | null; retainedUserSource: { id: string | null; sentAt: string | null } | null; untrustedData: { summary: string } }
+type UserSource = NonNullable<SourcedMessage['mikkaUserEvent']>
+interface UserImageRecord { source:UserSource; image:StoredUserImage }
+type UserImageReference = Omit<UserImageRecord,'image'> & { sha256:string }
+interface CompactSummary { version: 1; kind: 'mikka_compacted_summary'; authority: 'untrusted_summary_not_approval'; sources: EventProvenance[]; retainedUserRecord: ModelMessage | null; retainedUserSource: UserSource | null; retainedUserImages?:UserImageRecord[]; omittedUserImageReferences?:UserImageReference[]; untrustedData: { summary: string } }
+function imagesInUserRecord(record: ModelMessage | null | undefined): StoredUserImage[] {
+  const parts = record?.role === 'user' && Array.isArray(record.content) ? record.content : []
+  return normalizeUserImages(parts.flatMap(part => part.type === 'file' && typeof part.data === 'string' && part.mediaType.startsWith('image/') ? [{dataUrl:part.data}] : []))
+}
+const imageReferenceKey = (record:UserImageReference) => JSON.stringify([record.source,record.sha256])
+function retainedImages(summary:CompactSummary|null):UserImageRecord[] {
+  if (summary?.retainedUserImages) return summary.retainedUserImages
+  // Compatibility with signed summaries produced before images had their own
+  // ledger. Their original user record is still host-signed and source-bound.
+  return summary?.retainedUserSource ? imagesInUserRecord(summary.retainedUserRecord).map(image=>({source:summary.retainedUserSource!,image})) : []
+}
 function priorSources(prior: string | null, trust?: SummaryTrust): EventProvenance[] {
   if (!prior) return []
   try {
@@ -57,11 +75,20 @@ export function preserveMessageSources(text: string, folded: readonly { message:
   const latestUser = folded.map(row => row.message as SourcedMessage).filter(message => message.role === 'user' && Boolean(message.mikkaUserEvent)).at(-1)
   const retainedUserSource = latestUser?.mikkaUserEvent ?? old?.retainedUserSource ?? null
   const retainedUserRecord = latestUser ? modelMessage(latestUser) : old?.retainedUserRecord ?? null
+  const imageRecords = [...retainedImages(old), ...folded.flatMap(({message}) => {
+    const source = (message as SourcedMessage).mikkaUserEvent
+    return source ? imagesInUserRecord(message).map(image=>({source,image})) : []
+  })]
+  const uniqueImages = [...new Map(imageRecords.map(record=>[imageReferenceKey({source:record.source,sha256:record.image.sha256}),record])).values()]
+  // A mechanical pixel budget, not a judgment of which business evidence is
+  // relevant. Text followups cannot erase the separately signed image record.
+  const retainedUserImages = uniqueImages.slice(-MAX_USER_IMAGES)
+  const omittedUserImageReferences = [...new Map([...(old?.omittedUserImageReferences??[]),...uniqueImages.slice(0,-MAX_USER_IMAGES).map(record=>({source:record.source,sha256:record.image.sha256}))].map(reference=>[imageReferenceKey(reference),reference])).values()]
   for (const { message } of folded) {
     const source = (message as SourcedMessage).mikkaEvent
     if (source) sources.push({ ...source, packet: personalMessageSummary(source.packet, 'Source reference for the overall unverified summary; not approval.') })
   }
-  return signSummary({ version: 1, kind: 'mikka_compacted_summary', authority: 'untrusted_summary_not_approval', sources: [...new Map(sources.map(source => [JSON.stringify({ source: JSON.parse(source.packet).source, eventKind: source.eventKind, observedState: source.observedState }), source])).values()], retainedUserRecord, retainedUserSource, untrustedData: { summary: text } } satisfies CompactSummary, trust)
+  return signSummary({ version: 1, kind: 'mikka_compacted_summary', authority: 'untrusted_summary_not_approval', sources: [...new Map(sources.map(source => [JSON.stringify({ source: JSON.parse(source.packet).source, eventKind: source.eventKind, observedState: source.observedState }), source])).values()], retainedUserRecord, retainedUserSource, retainedUserImages, omittedUserImageReferences, untrustedData: { summary: text } } satisfies CompactSummary, trust)
     .replace(/[<>&\u2028\u2029]/gu, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`)
 }
 export interface SummaryTrust { key: string; scope: string }
@@ -91,12 +118,27 @@ export function summaryMessage(summary: string, trust?: SummaryTrust): ModelMess
   const sources = stored?.sources ?? []
   const shown = sources.slice(-SUMMARY_SOURCE_LIMIT)
   const omitted = sources.slice(0, Math.max(0, sources.length - shown.length))
+  const retained = stored?.retainedUserRecord
+  const retainedParts = retained?.role === 'user' && Array.isArray(retained.content) ? retained.content : []
+  const originalImages = imagesInUserRecord(retained)
+  const imageRecords = retainedImages(stored)
+  const images = userImageContent(imageRecords.map(record=>record.image))
+  // Keep the signed source record, but supply its pixels as actual model image
+  // parts rather than turning base64 into summary prose. Unsigned model or
+  // legacy summaries never enter this branch.
+  let imageIndex = 0
+  const retainedProjection = originalImages.length && retained ? { ...retained, content:retainedParts.map(part => part.type === 'file' && typeof part.data === 'string' && part.mediaType.startsWith('image/') ? { type:'text' as const,text:`Original user image attached separately; sha256=${originalImages[imageIndex++].sha256}` } : part) } : retained
   const projected = stored ? {
     sources: shown, sourceCount: sources.length, omittedSourceCount: omitted.length,
     omittedPendingOrUnverifiedCount: omitted.filter(source => !['done', 'succeeded', 'failed', 'cancelled', 'declined'].includes(source.observedState ?? '')).length,
-    retainedUserRecord: stored.retainedUserRecord, retainedUserSource: stored.retainedUserSource,
+    retainedUserRecord: retainedProjection, retainedUserSource: stored.retainedUserSource,
+    retainedUserImageSources: imageRecords.map(record=>({source:record.source,sha256:record.image.sha256,mediaType:record.image.mediaType,byteLength:record.image.byteLength})),
+    omittedUserImageCount: stored.omittedUserImageReferences?.length??0,
+    omittedUserImageReferences: stored.omittedUserImageReferences?.slice(-SUMMARY_SOURCE_LIMIT)??[],
+    imageOmissionRule: 'Only the separately attached pixels are available for visual judgment. Older omitted images remain in original event/message rows; references and summary prose cannot replace those pixels. If the needed image is absent and no authorized source tool can retrieve it, keep the visual judgment pending rather than inventing its contents.',
     summary: stored.untrustedData.summary,
-    omissionRule: 'Omitted references remain in the stored source history; omission is not approval or completion. Verify original records through available tools before consequential action; if unavailable, ask the person. Retained user record is copied from the original input, not from the model summary.',
+    omissionRule: 'Omitted references remain in the stored source history; omission is not approval or completion. Verify original records through authorized tools before relying on them. If unavailable, retain them as unverified and follow the effective policy instead of adding a confirmation requirement. Retained user record is copied from the original input, not from the model summary.',
   } : { summary: summary.slice(0, 16000), ...(summary.length > 16000 ? { omittedCharacters: summary.length - 16000, omissionRule: 'Legacy or unverifiable summary text omitted explicitly; verify original records. No approval or completion may be inferred.' } : {}) }
-  return { role: 'user', content: JSON.stringify({ kind: 'prior_summary', authority: 'not_user_approval', untrustedData: projected }).replace(/[<>&\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`) }
+  const text = JSON.stringify({ kind: 'prior_summary', authority: 'not_user_approval', untrustedData: projected }).replace(/[<>&\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)
+  return { role:'user',content:images.length ? [{type:'text',text},...images] : text }
 }

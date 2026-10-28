@@ -14,6 +14,7 @@ test('isolated PG and HTTP follow external-write policy and preserve one effect'
 validateTarget(process.env)
 assert.equal(process.env.REQUIRE_DB,'1')
 const schema='write374_chain_'+randomUUID().replaceAll('-','')
+console.log(`Retained isolated write-policy fixture schema: ${schema}`)
 const admin=new pg.Pool({connectionString:process.env.E2E_DATABASE_URL,max:1})
 let pool:pg.Pool | undefined
 try {
