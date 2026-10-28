@@ -7,11 +7,11 @@
 
 # Mikka
 
-### The AI lead for ambitious work.
+### From request to result.
 
-Every agent, from laptop to cloud, working as one team.
+Tell Mikka the goal. Agents and devices collaborate behind the scenes.
 
-[![CI](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml/badge.svg?branch=main)](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml)
+[![UI policy](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml/badge.svg?branch=main)](https://github.com/alexj11324/Mikka/actions/workflows/ui-policy.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![LINUX DO](https://img.shields.io/badge/LINUX%20DO-Community-FFB003)](https://linux.do)
 
@@ -21,107 +21,71 @@ Every agent, from laptop to cloud, working as one team.
 
 </div>
 
-Mikka coordinates the coding agents you already use as a single team. Describe
-what you need to a bot in natural language. The bot breaks the request into
-tasks and assigns each one to Claude Code, Codex or Cursor. Tasks run on your
-own machines today; cloud computers are coming soon.
+Mikka is an open-source AI assistant for personal and professional work.
+Describe the result you want, clarify requirements when necessary and review
+what is delivered. Mikka coordinates tasks, agents and devices so you do not
+have to micromanage separate agent sessions.
 
-You can follow each task in real time, step in when a decision is needed, and
-review the results.
+**Status:** Early access. Core conversations, tasks, integrations and local
+execution infrastructure exist in the repository. The complete self-service
+request-to-PR workflow is still being integrated ([#357](https://github.com/alexj11324/Mikka/issues/357));
+cloud computers and everyday browser-based assistance are in development.
 
-## How Mikka works
+## From request to result
 
-- **Bots coordinate. Threads execute.**
-  - A bot chats with you, plans the work and hands it out. It does not do the
-    work directly.
-  - Each piece of work runs in a **thread**: one work run with its own name,
-    usually tied to a task. One bot can run many threads at once.
-  - The full definitions are in the [glossary](docs/design/glossary.md).
-  - A **harness** is the execution layer, not another bot. The Coordinator uses Mikka's AI SDK / Workflow harness for chat and tools; dispatched coding work uses the daemon's Claude Code, Codex or Cursor CLI harness. The retired standalone Agent chat is available only as read-only history.
+You describe **what** you want to achieve. Mikka takes care of **how** the work is organized and carried through, instead of asking you to manage a collection of AI sessions.
 
-- **One Coordinator, multiple execution harnesses.**
-  - The Coordinator is a long-running bot. It wakes when a run ends, a task
-    changes state, or a worker asks a question, decides the next step, and
-    notifies you only when your input is required.
-  - The Coordinator is the current built-in Bot. Its orchestration harness is
-    separate from the CLI harnesses that execute dispatched coding threads.
+1. **Describe the outcome.** Talk to a Bot, including the built-in Coordinator. It can clarify missing requirements before work starts.
+2. **Delegate the work.** Mikka represents work as tasks (issues). For coding, a Bot dispatches a **thread** to an execution harness on a connected device.
+3. **Intervene when needed.** Threads report progress, questions and blockers. You can inspect them, reply and stop a run; approvals remain under your control.
+4. **Review what was delivered.** Results and artifacts return to Mikka. The complete repository push → GitHub PR → chat handoff path is still being integrated under [#357](https://github.com/alexj11324/Mikka/issues/357).
 
-- **Asks before it guesses.**
-  - When a request is unclear, the Coordinator asks you for the missing details
-    in chat before it dispatches a run.
-  - While a run works, its agent can ask a question or report that it is
-    blocked. The Coordinator puts the question to you with its options, never
-    answers for you, and sends your answer back to the run.
+### The product model
 
-- **Runs on your own machines.**
-  - The Mikka daemon connects your Mac, Linux machine or server.
-  - It starts work through the CLI harnesses you have already installed and signed in
-    to, so your existing plans and settings apply.
+| Concept | Meaning |
+| --- | --- |
+| **Bot** | The assistant you chat with. The Coordinator is the built-in Bot. Browser-based web work through a Bot's isolated sub-agents is under development. |
+| **Chat** | Your conversation with a Bot or a group; it has no separate task identity. |
+| **Task / issue** | A unit of work, personal or workspace-scoped, that may have multiple threads over time. |
+| **Thread** | One named work run dispatched by a Bot, usually for a coding task. It is not another Bot. |
+| **Device** | The local or remote machine that executes a thread. Managed Mikka Cloud computers are planned. |
+| **Harness** | The execution engine: Mikka's AI SDK / Workflow for Bot conversation and orchestration, and CLI coding agents for dispatched threads. |
 
-- **Recovers from failures.**
-  - Each run holds a lease. If a machine goes offline mid-run, Mikka retries
-    the run in the same worktree and session instead of starting over.
+This follows the [product glossary](docs/design/glossary.md). The old standalone Agent chat runtime is retired; its historical conversations remain read-only.
 
-- **Fits into your existing tools.**
-  - Tasks sync both ways with Linear, other agents can operate Mikka through
-    MCP, and a Telegram message can create a task.
-
-### How a task moves
+### Task flow
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/task-flow-dark.svg">
-  <img src="docs/assets/task-flow-light.svg" alt="How a task moves through Mikka: a request is triaged, clarified with you in chat when unclear, and dispatched; the agent can ask you questions while it works; planned Factory stages add review, verification, release approval and monitoring.">
+  <img src="docs/assets/task-flow-light.svg" alt="Proposed request-to-result flow: clarification, task dispatch, execution, review, verification and release. The later Factory stages are planned.">
 </picture>
 
-The solid path ships today. A finished run reports its result in chat. The
-dashed loop is the planned Factory process: independent review and verification
-([#193](https://github.com/alexj11324/Mikka/issues/193)), a fix run when a check fails, release approval by a person
-([#194](https://github.com/alexj11324/Mikka/issues/194)), and monitoring that turns incidents into issues
-([#195](https://github.com/alexj11324/Mikka/issues/195)). Systematic routing of ambiguous requests is tracked in
-[#192](https://github.com/alexj11324/Mikka/issues/192).
+This diagram describes the intended delivery process, **not a claim that every stage is available**. The stop control ([#336](https://github.com/alexj11324/Mikka/pull/336)) and checkpoint-based cross-device handoff ([#201](https://github.com/alexj11324/Mikka/pull/201)) are merged. The remaining self-service device onboarding, issue-tool, local-runtime, PR-publication and end-to-end acceptance work is tracked in [#357](https://github.com/alexj11324/Mikka/issues/357). Independent review, verification, release approval and monitoring remain planned ([#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195)).
 
-## What Mikka does today
+## Available on main
 
-- **Turns requests into tasks.** The Coordinator breaks a request into tasks,
-  dispatches runs, and decides whether each task belongs to the workspace or to
-  you. You can change the assignment in one click.
-- **Makes progress visible.** Every thread shows what its agent
-  is doing. Workers report progress, ask questions and flag blocks through
-  Mikka's MCP tools, and the Coordinator triages each one.
-- **Cites its sources.** Replies show the tasks, runs and web pages they draw
-  on as chips you can open.
-- **Keeps tasks in one place.** Tasks show on a board and a list, with
-  relations, activity history and per-person task numbers. They sync both ways
-  with Linear.
-- **Filters notifications.** Mikka collects notifications from GitHub, Linear,
-  Notion, Slack and Gmail, surfaces only those that need your attention, and
-  writes a daily briefing.
-- **Works from other tools.** Operate Mikka from Claude Code or Codex through its
-  [MCP server](https://aspectlylabs.com/mikka/docs/mcp), or create tasks from
-  Telegram.
-- **Supports teams.** Workspaces, members, invitations and teams, with Google
-  and GitHub sign-in.
-- **Bilingual interface.** The app is available in English and Simplified Chinese.
+- **Coordinator and Bot conversations.** Event-driven coordination, clarification, source citations and follow-up messages.
+- **Task management.** Board and list views, task relations and activity, personal/workspace scoping, and two-way Linear synchronization.
+- **Coding execution infrastructure.** A daemon for connected machines, isolated git worktrees, thread progress and questions, stop controls, leases and periodic checkpoints. Interrupted runs can be handed to a compatible online device; this is not a guarantee that every external side effect is replay-safe.
+- **Integrations.** An OAuth 2.1 / Streamable HTTP [MCP server](docs/mcp.md), worker tools for reporting and artifacts, GitHub and Linear integration, Telegram, and connected-app hooks where configured.
+- **Access and interface.** Google and GitHub login, English and Simplified Chinese, and existing workspace collaboration primitives.
 
-## What we're building
+These are repository capabilities, not a guarantee of a fully deployed self-service onboarding experience. Features behind configuration, rollout flags or unfinished integrations may not be available to every early-access user.
 
-Work in progress is tracked in
-[GitHub issues](https://github.com/alexj11324/Mikka/issues), mirrored from
-Linear (`MIK-xx`).
+## In progress
 
-| Area | Planned | Tracking |
+| Focus | Direction | Tracking |
 | --- | --- | --- |
-| **Cloud computer** | Each bot gets its own desktop, which you can watch live, take control of, and hand back. It sleeps when idle and keeps its disk. Your own machines can also be connected. | [#172](https://github.com/alexj11324/Mikka/issues/172), [#147](https://github.com/alexj11324/Mikka/issues/147) |
-| **Approvals in chat** | When an agent needs authorization, you respond in the chat: allow once, deny, or allow for the rest of the task. | [#147](https://github.com/alexj11324/Mikka/issues/147), [#177](https://github.com/alexj11324/Mikka/issues/177) |
-| **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
-| **Factory** | An end-to-end delivery process: one run per task at a time, durable stage state, independent review and verification threads, and human release approval based on recorded evidence. | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
-| **Cross-machine handoff** | Save work in progress and resume interrupted runs on another machine. | [PR #201](https://github.com/alexj11324/Mikka/pull/201) |
-| **Scheduled tasks** | Bots run tasks at a set time or on a recurring schedule and report the results in chat. | [#179](https://github.com/alexj11324/Mikka/issues/179) |
-| **Connected apps** | Workflows for mail, calendar, documents and Slack that can take actions, not only read, subject to your approval. | [#177](https://github.com/alexj11324/Mikka/issues/177) |
-| **Secure credentials** | Agents request credentials through a secure form. A vault holds them, and a controlled browser uses them only for approved actions. | [#180](https://github.com/alexj11324/Mikka/issues/180) |
-| **Usability** | Onboarding, ⌘K search, a knowledge base, web search for agents, and team visibility settings. | [#129](https://github.com/alexj11324/Mikka/issues/129), [#131](https://github.com/alexj11324/Mikka/issues/131), [#134](https://github.com/alexj11324/Mikka/issues/134), [#100](https://github.com/alexj11324/Mikka/issues/100), [#127](https://github.com/alexj11324/Mikka/issues/127) |
+| **Complete local MVP** | Connect a device, create a task from chat, run Claude Code or Codex, and return a verified result with an approved PR. | [#357](https://github.com/alexj11324/Mikka/issues/357) |
+| **Cloud execution and web tasks** | E2B-powered infrastructure: shared Bot desktops and isolated browser sub-agents, with a separate machine for each cloud coding thread. | [#172](https://github.com/alexj11324/Mikka/issues/172), [#342](https://github.com/alexj11324/Mikka/issues/342) |
+| **Proactive personal help** | Prioritized connected-app events, personal memory, contextual suggestions and recurring work. | [Design](docs/design/proactive.md), [#179](https://github.com/alexj11324/Mikka/issues/179) |
+| **Delivery verification** | Automated review and test loops, recorded evidence and human approval for release. | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
+| **Approved external actions** | Connected-app writes with explicit authorization and an account-scoped credential vault. | [#177](https://github.com/alexj11324/Mikka/issues/177), [#180](https://github.com/alexj11324/Mikka/issues/180) |
+| **Mobile** | Native iOS-first app built with Expo / React Native. | [`apps/mobile`](apps/mobile) |
 
-## Connect your agents
+Development is tracked in [GitHub issues](https://github.com/alexj11324/Mikka/issues). Enterprise-specific expansion is paused while the personal assistant and end-to-end delivery loop take priority.
+
+## Connect coding agents
 
 ### Operate Mikka through MCP
 
@@ -137,8 +101,9 @@ full tool list are in the [MCP docs](https://aspectlylabs.com/mikka/docs/mcp).
 
 ### Run coding harnesses on your own machine
 
-The daemon in [`packages/daemon`](packages/daemon) detects the coding harness CLIs on
-the machine and runs threads through them:
+The daemon in [`packages/daemon`](packages/daemon) detects installed coding CLIs
+and can execute threads through them. Self-service device authorization and
+packaging are part of the [local MVP work](https://github.com/alexj11324/Mikka/issues/357):
 
 | Execution harness | CLI it looks for |
 | --- | --- |
@@ -146,7 +111,8 @@ the machine and runs threads through them:
 | Codex | `codex` |
 | Cursor | `cursor-agent` or `agent` |
 
-Each run uses its own git worktree, so parallel threads stay isolated.
+Each run uses an isolated git worktree. You can use an existing signed-in CLI;
+Mikka does not require a separate user-managed model-provider dashboard.
 
 ## Architecture
 
@@ -160,19 +126,16 @@ Vercel. Events such as a finished run or a worker question go to the
 Coordinator, a durable workflow that triages each event and decides the next
 step.
 
-Runs execute on your machines. The daemon registers the device, claims runs
-through the device API, and starts the agent CLI in a dedicated git worktree.
-The agent reports progress, questions and blocks through Mikka's MCP worker
-tools.
+Runs execute on connected devices. The daemon registers a device, claims runs
+through the device API, and starts a CLI in a dedicated git worktree. The agent
+reports progress, questions and blocks through Mikka's MCP worker tools.
+Run leases and checkpoints support recovery on a compatible online device;
+managed cloud computers and browser sub-agents are not generally available yet.
 
 Linear sync runs in a Cloudflare Worker that exchanges changes with Postgres
 through a durable inbox and outbox.
 
-Dashed boxes and lines are on the roadmap: the Scheduler
-([#179](https://github.com/alexj11324/Mikka/issues/179)), Factory stages ([#191](https://github.com/alexj11324/Mikka/issues/191)–[#194](https://github.com/alexj11324/Mikka/issues/194)), Monitoring
-([#195](https://github.com/alexj11324/Mikka/issues/195)), the cloud computer ([#172](https://github.com/alexj11324/Mikka/issues/172)), handoff between machines
-([PR #201](https://github.com/alexj11324/Mikka/pull/201)), local computer use ([#147](https://github.com/alexj11324/Mikka/issues/147)), connected-app actions
-([#177](https://github.com/alexj11324/Mikka/issues/177)) and the credential vault ([#180](https://github.com/alexj11324/Mikka/issues/180)).
+Some dashed portions of the diagram remain planned: scheduling ([#179](https://github.com/alexj11324/Mikka/issues/179)), Factory review and release stages ([#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195)), managed cloud computers ([#172](https://github.com/alexj11324/Mikka/issues/172)), browser computer use ([#147](https://github.com/alexj11324/Mikka/issues/147)), and approved connected-app actions and credentials ([#177](https://github.com/alexj11324/Mikka/issues/177), [#180](https://github.com/alexj11324/Mikka/issues/180)). Cross-device handoff ([#201](https://github.com/alexj11324/Mikka/pull/201)) has already merged.
 
 ## Built with
 
@@ -184,7 +147,8 @@ Dashed boxes and lines are on the roadmap: the Scheduler
 | Data | Postgres on Neon, Drizzle migrations in [`drizzle/`](drizzle) |
 | Auth | Better Auth, with Google and GitHub sign-in and an OAuth 2.1 server for MCP |
 | Integrations | GitHub and Linear webhooks; Composio for Gmail, Google Calendar, Notion and Slack; a Cloudflare Worker for Linear sync; Vercel Chat SDK for Telegram |
-| Execution harnesses | The Mikka daemon selects a Claude Code, Codex or Cursor CLI adapter for each work thread |
+| Execution harnesses | The Mikka daemon detects Claude Code, Codex and the existing Cursor CLI adapter for coding threads |
+| Mobile (in development) | Expo / React Native; iOS first, in [`apps/mobile`](apps/mobile) |
 
 ## Repository layout
 
