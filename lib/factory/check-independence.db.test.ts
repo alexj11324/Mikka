@@ -261,7 +261,7 @@ test(
           }
           const row = (
             await tx.query(
-              `SELECT a.*,r.id AS "boundRunId",r."userId" AS "runOwner",r."issueId" AS "runIssue",r."baseBranch",r.kind,r.status AS "runStatus",r."stopRequestedAt",r."retryOf",r."deviceId",r."deviceRepoId",c.sha,c.repository,c.environment
+              `SELECT a.*,r.id AS "boundRunId",r."userId" AS "runOwner",r."issueId" AS "runIssue",r."baseBranch",r.kind,r.status AS "runStatus",r."stopReason",r."stopRequestedAt",r."retryOf",r."deviceId",r."deviceRepoId",c.sha,c.repository,c.environment
           FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" JOIN factory_candidates c ON c.id=a."candidateId" AND c."taskId"=a."taskId"
           WHERE a.id=$1 AND a."taskId"=$2 FOR UPDATE OF r`,
               [task.attemptId, task.id],
@@ -277,6 +277,7 @@ test(
             row.stage !== task.stage ||
             row.candidateId !== task.candidateId ||
             row.stopRequestedAt ||
+            row.stopReason !== "submitted" ||
             row.retryOf ||
             row.kind !== "acceptance" ||
             !["succeeded", "failed"].includes(row.runStatus) ||
@@ -390,6 +391,10 @@ test(
           sql: `UPDATE agent_runs SET "userId"='foreign' WHERE id=$1`,
           args: (f) => [f.attempts[0].runId],
         },
+        "current cancelled stop reason": {
+          sql: `UPDATE agent_runs SET "stopReason"='cancelled' WHERE id=$1`,
+          args: (f) => [f.runId],
+        },
         "origin session": {
           sql: `UPDATE agent_runs SET "sessionId"='foreign' WHERE id=$1`,
           args: (f) => [f.attempts[0].runId],
@@ -501,11 +506,19 @@ test(
           const f = fresh("monitor", false);
           await seed(f);
           const before = calls;
+          const child = randomUUID();
+          if (denied === "unbound retry run") {
+            await pool.query(
+              `INSERT INTO agent_runs (id,"userId","issueId","sessionId",kind,"retryOf",status,"stopReason","stopRequestedAt","agentId","deviceId","deviceRepoId","baseBranch","questionContinuation")
+               SELECT $1,"userId","issueId",NULL,kind,id,'queued',NULL,NULL,"agentId","deviceId","deviceRepoId","baseBranch",NULL FROM agent_runs WHERE id=$2`,
+              [child, f.runId],
+            );
+          }
           const override =
             denied === "stale candidate"
               ? { binding: { ...binding(f), candidateId: randomUUID() } }
               : denied === "unbound retry run"
-                ? { runId: randomUUID() }
+                ? { runId: child }
                 : {};
           const response = await request(
             f,
