@@ -194,7 +194,7 @@
 --rule: oklch(0.922 0 0);
 --input: oklch(0.922 0 0);
 /* R-31: secondary buttons are a grey fill with no stroke (Claude desktop's 「Add folder…」).
-   A translucent overlay, so the button still reads on grey cards and sidebars (R-38). */
+   A neutral translucent overlay (R-30), so the button still reads on grey cards and sidebars. */
 --control: oklch(0 0 0 / 6%);
 --control-hover: oklch(0 0 0 / 10%);
 --ring: oklch(0.708 0 0);

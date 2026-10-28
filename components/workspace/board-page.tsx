@@ -185,8 +185,8 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
           </DropdownMenuGroup></DropdownMenuContent>
         </DropdownMenu>
         {activeFilters.map(([field, values]) => <ButtonGroup key={field} aria-label={t(`filterField.${field}`)}>
-          <ButtonGroupText className="h-6 border-transparent px-2 text-xs text-muted-foreground">{t(`filterField.${field}`)}</ButtonGroupText>
-          <ButtonGroupText className="h-6 max-w-48 truncate border-transparent px-2 text-xs">{values.map(value => options[field].find(option => option.value === value)?.label ?? value).join(', ')}</ButtonGroupText>
+          <ButtonGroupText className="h-6 px-2 text-xs text-muted-foreground">{t(`filterField.${field}`)}</ButtonGroupText>
+          <ButtonGroupText className="h-6 max-w-48 truncate px-2 text-xs">{values.map(value => options[field].find(option => option.value === value)?.label ?? value).join(', ')}</ButtonGroupText>
           <Button variant="outline" size="icon-xs" aria-label={t('removeFilter', { field: t(`filterField.${field}`) })} onClick={() => update({ filters: { ...filters, [field]: [] } })}><X data-icon="inline-start" /></Button>
         </ButtonGroup>)}
         <div className="ml-auto flex items-center gap-1">

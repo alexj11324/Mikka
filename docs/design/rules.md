@@ -242,9 +242,13 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   `outline` Toggle, the motion `secondary`/`outline` buttons) use the
   `--control` / `--control-hover` tokens, a translucent black (light) or
   white (dark) overlay, so the button still reads on grey cards and
-  sidebars. Do not add `bg-background`/`bg-card` plus a border to a Button;
-  ui-policy fails it as `style/secondary-button-fill`. Status-tone buttons
-  keep their tinted fill and drop the tinted stroke.
+  sidebars. Grouped buttons (`ButtonGroup`) keep a 2px gap so each one
+  stays distinct, and `ButtonGroupText` is the same grey with no border.
+  The top-bar search pill is grey too. Do not give a Button
+  `bg-background`/`bg-card` with a border, or turn an outline Button back
+  to white; ui-policy fails both as `style/secondary-button-fill`. Status
+  tones (`statusTones`, used by status and priority pickers and status
+  badges) are a tinted fill with no stroke; neutral uses `--control`.
 - **R-32** Font Geist, Chinese falls back to the system font. Only these text
   styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
   (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium

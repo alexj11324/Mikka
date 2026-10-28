@@ -238,9 +238,12 @@ export function auditSource(file, text, policy) {
           if (drawnRule) add(classAttr, 'style/no-horizontal-rule', '禁止用 h-px/0.5 + bg-* 手画水平细线；用间距或背景分组。')
           // R-31: a secondary button is a grey fill with no stroke (Claude desktop's 「Add folder…」).
           // A white fill plus a border brings back the old outline button at the call site.
+          // Only unprefixed tokens count: hover:/focus-visible: states and border-0 are not a resting stroke.
           const whiteFill = tokens.some(token => /^(?:bg-background|bg-card)(?:\/|$)/.test(token))
-          const stroke = bases.some(base => /^border(?:-(?:\d+|border|input)(?:\/.*)?)?$/.test(base))
-          if (name === 'Button' && whiteFill && stroke) add(classAttr, 'style/secondary-button-fill', '次级按钮用灰色填充、无描边（R-31）；不要给 Button 加白底 + 描边，用 variant="outline"。')
+          const stroke = tokens.some(token => /^border(?:-(?:[1-9]\d*|border|input)(?:\/.*)?)?$/.test(token))
+          const variantAttr = attr(node, 'variant')?.initializer
+          const outline = !!variantAttr && ts.isStringLiteral(variantAttr) && variantAttr.text === 'outline'
+          if (name === 'Button' && whiteFill && (stroke || outline)) add(classAttr, 'style/secondary-button-fill', '次级按钮用灰色填充、无描边（R-31）；不要给 Button 加白底 + 描边，也不要把 outline 按钮改回白底。')
           for (const token of tokens) {
             const base = utilityBase(token)
             // 组件调用处的视觉 class 不做限制。Mikka 的规则集里没有这一条，

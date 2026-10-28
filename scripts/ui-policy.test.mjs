@@ -247,8 +247,14 @@ test('lint permits imported components but fails handwritten business UI without
 test('R-31: a Button may not bring back a white fill with a border', () => {
   has(`${prefix} const ui = <Button variant="outline" className="border-border bg-background" />`, 'style/secondary-button-fill')
   has(`${prefix} const ui = <Button className={cn('border bg-card')} />`, 'style/secondary-button-fill')
-  assert.ok(!rules(`${prefix} const ui = <Button variant="outline" className="rounded-full bg-background" />`).includes('style/secondary-button-fill'))
-  assert.ok(!rules(`${prefix} const ui = <Button variant="ghost" className="border-transparent hover:bg-background" />`).includes('style/secondary-button-fill'))
+  has(`${prefix} const ui = <Button variant="outline" className="rounded-full bg-background" />`, 'style/secondary-button-fill')
+  const clean = source => assert.ok(!rules(`${prefix} const ui = ${source}`).includes('style/secondary-button-fill'), source)
+  clean('<Button variant="outline" className="rounded-full" />')
+  clean('<Button variant="ghost" className="border-transparent hover:bg-background" />')
+  clean('<Button variant="secondary" className="bg-background hover:bg-background/80" />')
+  clean('<Button className="border-0 bg-background" />')
+  clean('<Button className="focus-visible:border-input bg-card" />')
+  clean('<Button className="hover:border bg-card" />')
 })
 
 test('utility parser respects bracket expressions and variants', () => {

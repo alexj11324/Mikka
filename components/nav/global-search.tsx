@@ -24,7 +24,7 @@ const STATUS_BADGES = { neutral: 'outline', warning: 'warning-light', info: 'inf
 /** The search pill centered in the window bar (Comma's shell); it opens the results below it. */
 export function SearchPill({ onSearch }: { onSearch: () => void }) {
   const t = useTranslations('Shell')
-  return <Button variant="outline" size="sm" aria-label={t('searchLabel')} aria-keyshortcuts="Control+k Meta+k" onClick={onSearch} className="h-7 w-full min-w-0 justify-center gap-2 rounded-full bg-background px-3 text-xs font-normal text-muted-foreground shadow-xs hover:text-foreground">
+  return <Button variant="outline" size="sm" aria-label={t('searchLabel')} aria-keyshortcuts="Control+k Meta+k" onClick={onSearch} className="h-7 w-full min-w-0 justify-center gap-2 rounded-full px-3 text-xs font-normal text-muted-foreground hover:text-foreground">
     <Search data-icon="inline-start" />
     <span className="truncate">{t('searchPlaceholder')}</span>
     <ShortcutKeys keys={['mod', 'K']} />
