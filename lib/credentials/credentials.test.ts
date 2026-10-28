@@ -1,3 +1,4 @@
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { randomBytes } from 'node:crypto'
@@ -143,6 +144,13 @@ test('verification codes use a separate authenticated envelope purpose', async (
   assert(!otpSchema.safeParse({ nonce: 'a'.repeat(43), origin: owner.origin, code: '123456', credentialId: 'forged' }).success)
 })
 
+function bindFixtureAction(claimed: any) {
+  const input = claimed.target.observedInput
+  const action = { kind: 'browser_credential', actionId: '11111111-1111-4111-8111-111111111111', admission: 'ask', digest: 'a'.repeat(64), summary: 'synthetic', userId: claimed.user_id, workspaceId: claimed.workspace_id, botId: claimed.bot_id, subagentId: claimed.subagent_id, runId: claimed.subagent_id, epoch: input?.epoch ?? 1, policyVersion: input?.permissionVersion ?? 0, targetId: claimed.target.targetId, origin: claimed.origin, loaderId: input?.loaderId ?? 'loader', backendNodeId: input?.backendNodeId ?? 7, role: input?.credentialRole ?? 'password', expiresAt: Date.now() + 60000 }
+  claimed.target.credentialAction = action
+  return action
+}
+
 test('broker reports mechanical session application or submission without judging login state', async () => {
   const kms = fixtureKms()
   const password = await seal(kms, owner, Buffer.from(JSON.stringify({ username: 'fixture-user', password: 'fixture-password' })))
@@ -151,19 +159,21 @@ test('broker reports mechanical session application or submission without judgin
     const calls: string[] = []
     let guardEnded = false
     const claimed = { user_id: owner.userId, workspace_id: 'workspace', bot_id: 'bot', run_id: null, subagent_id: 'subagent', credential_id: owner.credentialId, origin: owner.origin, input_kind: 'password', target: { targetId: 'target', origin: owner.origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, credentialMode: forcePassword ? 'password' : 'session-first', observedInput: { loaderId: 'loader', backendNodeId: 7, credentialRole: 'password', epoch: 1, permissionVersion: 0 } } }
+    bindFixtureAction(claimed)
     const credential = { wrapped_dek: password.wrappedDek, nonce: password.nonce, ciphertext: password.ciphertext, username: 'fixture-user' }
     const session = { wrapped_dek: snapshot.wrappedDek, nonce: snapshot.nonce, ciphertext: snapshot.ciphertext }
     const client = {
       async query(sql: string) {
         if (sql.includes('FROM bots ') || sql.includes('FROM agent_runs ')) return { rows: [{ id: 'ok' }] }
-        if (sql.includes('FROM bot_subagents s LEFT JOIN')) return { rows: [{ targetId: 'target', epoch: 1, permissionVersion: 0, permission: 'ask' }] }
+        if (sql.includes('FROM bot_subagents s LEFT JOIN')) return { rows: [{ targetId: 'target', epoch: 1, permissionVersion: 0, permission: 'ask', runPolicy: defaultRunPolicy() }] }
         if (sql.includes('FROM bot_subagents ')) return { rows: [{ id: 'ok' }] }
         if (sql.includes('JOIN credential_secrets')) return { rows: [credential] }
+        if (sql.includes('FROM pending_actions')) return { rows: [{ id: 'synthetic' }], rowCount: 1 }
         if (sql.includes('FROM browser_sessions')) return { rows: [session] }
         return { rows: [] }
       }, release() {},
     }
-    const pool = { async query() { return { rows: [claimed] } }, async connect() { return client } }
+    const pool = { async query() { return { rows: [claimed], rowCount: 1 } }, async connect() { return client } }
     const cdp = {
       async attach() {}, async origin() {}, async safeToResume() { return true }, close() {},
       async insertAtObservedInput(origin: string, loader: string, node: number, role: string, value: string) {
@@ -215,7 +225,7 @@ test('broker rejects a lease without a trusted observed target before opening cr
   const claimed = { user_id: 'owner', workspace_id: 'workspace', bot_id: 'bot', subagent_id: 'subagent', run_id: null, credential_id: 'credential', origin: 'https://example.com', target: { targetId: 'target', origin: 'https://example.com', endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000 } }
   let began = false
   const client = { async query(sql: string) { return { rows: sql.includes('SELECT id FROM') ? [{ id: 'ok' }] : [] } }, release() {} }
-  const pool = { async query() { return { rows: [claimed] } }, async connect() { return client } }
+  const pool = { async query() { return { rows: [claimed], rowCount: 1 } }, async connect() { return client } }
   const kms: Kms = { async generate() { throw new Error('unexpected') }, async decrypt() { throw new Error('unexpected') } }
   await assert.rejects(fillCredential(pool as never, 'a'.repeat(43), { kms, guard: { begin: async () => { began = true; throw new Error('unexpected') }, end: async () => {} } }), CredentialError)
   assert.equal(began, false)
@@ -227,14 +237,16 @@ test('broker rejects changed epoch, policy, target, origin and loader before dec
     const observedInput = { loaderId: 'loader', backendNodeId: 7, credentialRole: 'password', epoch: 1, permissionVersion: 1 }
     const target = { targetId: 'target', origin: failure === 'origin' ? 'https://other.example' : origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, observedInput }
     const claimed = { user_id: 'owner', workspace_id: 'workspace', bot_id: 'bot', subagent_id: 'subagent', run_id: null, credential_id: 'credential', origin, target }
-    const bound = { targetId: failure === 'target' ? 'other' : 'target', epoch: failure === 'epoch' ? 2 : 1, permissionVersion: failure === 'policy' ? 2 : 1, permission: failure === 'deny' ? 'deny' : 'ask' }
+    bindFixtureAction(claimed)
+    const bound = { targetId: failure === 'target' ? 'other' : 'target', epoch: failure === 'epoch' ? 2 : 1, permissionVersion: failure === 'policy' ? 2 : 1, permission: failure === 'deny' ? 'deny' : 'ask', runPolicy: defaultRunPolicy() }
     const client = { async query(sql: string) {
       if (sql.includes('FROM bot_subagents s LEFT JOIN')) return { rows: [bound] }
+      if (sql.includes('FROM pending_actions')) return { rows: [{ id: 'synthetic' }], rowCount: 1 }
       if (sql.includes('SELECT id FROM')) return { rows: [{ id: 'ok' }] }
       if (sql.includes('JOIN credential_secrets')) return { rows: [{ wrapped_dek: 'synthetic' }] }
       return { rows: [] }
     }, release() {} }
-    const pool = { async query() { return { rows: [claimed] } }, async connect() { return client } }
+    const pool = { async query() { return { rows: [claimed], rowCount: 1 } }, async connect() { return client } }
     let decrypted = false
     const kms: Kms = { async generate() { throw new Error('unexpected') }, async decrypt() { decrypted = true; throw new Error('unexpected') } }
     const cdp = { async attach() {}, async origin() {}, async call() { return { frameTree: { frame: { url: origin, loaderId: 'stale' } } } }, close() {} }
@@ -269,7 +281,7 @@ test('observed input focus uses a top-document CDP node with a matching type', a
     return { params }
   }
   await cdp.focusObservedInput(7, 'password')
-  assert.deepEqual(calls, ['DOM.getDocument', 'DOM.focus', 'Runtime.evaluate', 'DOM.describeNode'])
+  assert.deepEqual(calls, ['DOM.getDocument', 'DOM.focus', 'Runtime.evaluate', 'DOM.describeNode', 'Input.dispatchKeyEvent', 'Input.dispatchKeyEvent'])
   focusedNode = 8
   await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
   focusedNode = 7

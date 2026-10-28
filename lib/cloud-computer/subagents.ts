@@ -120,6 +120,9 @@ export class SubagentStore {
     return this.update(actor, botId, id, 'stopped', 'stopped')
   }
   async action(actor: Actor, botId: string, id: string, action: Record<string, unknown>) {
+    // Mutating I/O must pass through the exact-action ledger, not this read
+    // helper. Internal callers cannot accidentally treat workspace ask as allow.
+    if (!['observe', 'inspectMutation', 'inspectCredentialTarget'].includes(String(action.action))) throw new ComputerError(403, 'Browser action receipt required')
     return withWorkspaceComputerPermission(this.pool, actor.workspaceId, async client => {
       const { row, sandboxId } = await this.machine(actor, botId, id, client)
       if (row.status !== 'running') throw new ComputerError(409, 'Subagent is waiting or stopped')

@@ -81,7 +81,11 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
     if (next.action === 'navigate') {
       if (!next.url) throw new Error('Navigation target unavailable')
       const { executeAuthorizedBrowserNavigation } = await import('@/lib/cloud-computer/browser-authority')
-      await executeAuthorizedBrowserNavigation({ permissionAction: 'computer_use', actor, botId, subagentId: id, epoch: row.epoch, url: next.url })
+      const result = await executeAuthorizedBrowserNavigation({ permissionAction: 'computer_use', actor, botId, subagentId: id, epoch: row.epoch, url: next.url })
+      if (result.state === 'needs_you') {
+        await report(actor.userId, botId, id, `A browser action needs approval: ${result.summary}. Existing pending action ${result.actionId}.`, `approval:${result.actionId}`)
+        return 'waiting'
+      }
     }
     return 'running'
   } catch {

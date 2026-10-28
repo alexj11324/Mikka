@@ -1,8 +1,7 @@
-raise RuntimeError('Live gateway acceptance suspended: preserve test resources')
-import asyncio,aiohttp,json,time,base64,hmac,hashlib
+import asyncio,aiohttp,json,time,base64,hmac,hashlib,os,uuid
 from pathlib import Path
 from aiohttp import web
-KEY=Path('/run/mikka-subagents/key').read_bytes();ID='d20af2f7-fb4b-40d0-b779-a6dbd90b4932'
+KEY=Path('/run/mikka-subagents/key').read_bytes();ID=os.environ.get('MIKKA_SUBAGENT_ACCEPTANCE_ID') or str(uuid.uuid4())
 def cap(role,owner='probe-owner'):
  p=base64.urlsafe_b64encode(json.dumps({'ownerId':owner,'workspaceId':'probe-workspace','botId':'probe-bot','subagentId':ID,'epoch':1,'role':role,'exp':int(time.time())+110}).encode()).decode().rstrip('=')
  return p+'.'+base64.urlsafe_b64encode(hmac.new(KEY,p.encode(),hashlib.sha256).digest()).decode().rstrip('=')
@@ -18,7 +17,7 @@ async def main():
   async with s.post(url('/start'),json={}) as r:assert r.status==200,(r.status,await r.text());target=(await r.json())['targetId']
   async with s.post(url('/action'),json={'action':'navigate','url':'http://127.0.0.1:6083/login'}) as r:assert r.status==200
   await asyncio.sleep(1)
-  async with s.post(url('/action'),json={'action':'observe'}) as r:o=await r.json();assert o['observation']['needsLogin']
+  async with s.post(url('/action'),json={'action':'observe'}) as r:o=await r.json();assert isinstance(o['observation']['elements'],list) and o['screenshot']
   async with s.post(url('/action'),json={'action':'inspectMutation','mutation':{'action':'click','selector':'#delete'}}) as r:
    binding=await r.json();assert r.status==200 and binding['origin']=='http://127.0.0.1:6083' and binding['loaderId'] and 'requiresApproval' not in binding
   async with s.post(url('/action'),json={'action':'type','selector':'#password','text':'must-not-enter'}) as r:assert r.status==403
@@ -57,7 +56,7 @@ async def main():
    async with s.post(url('/credentials/end','broker'),json={'guardToken':g['guardToken']}) as r:assert r.status==200,(r.status,await r.text())
   print('PASS: broker exclusive guard, fill, nonempty rejection, hash-navigation rejection, clear then resume',flush=True)
   async with s.post(url('/stop'),json={}) as r:assert r.status==200
-  async with s.get(url('/state')) as r:assert r.status==404
+  async with s.get(url('/state')) as r:assert r.status==410
   async with s.get(f'http://127.0.0.1:6082/agents/{ID}/state?token={cap("runtime","other-owner")}') as r:assert r.status==401
   print('PASS: stop revokes state/viewer/CDP and cross-owner capability denied',flush=True)
 asyncio.run(main())

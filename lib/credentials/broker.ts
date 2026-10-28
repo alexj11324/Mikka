@@ -4,6 +4,7 @@ import { awsKms, open, type Kms } from './kms'
 import { CredentialStore, hashNonce, rowEnvelope, type BrowserTarget } from './store'
 import { Cdp, gatewayGuard, type BrowserGuard } from './browser'
 import { assertCredentialPageBinding } from './page-binding'
+import { runPolicySchema } from '@mikka/protocol/agent-policy'
 
 /** Imported only by services/credential-broker, which runs under the broker
  * project identity. No endpoint returns plaintext or arbitrary browser output. */
@@ -20,24 +21,36 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
   const caller = { userId: claimed.user_id, workspaceId: claimed.workspace_id, botId: claimed.bot_id, subagentId: claimed.subagent_id, runId: claimed.run_id }
   const context = { userId: caller.userId, credentialId: claimed.credential_id, origin: claimed.origin }
   const target = claimed.target as BrowserTarget & { credentialMode?: 'password' | 'session-first' }
+  // Consume the exact host receipt durably before obtaining any I/O locks.
+  // Unknown outcomes remain consumed even if the transaction below rolls back.
+  const action = target.credentialAction
+  if (!action || action.kind !== 'browser_credential' || action.userId !== caller.userId || action.workspaceId !== caller.workspaceId || action.botId !== caller.botId || action.subagentId !== caller.subagentId || action.runId !== caller.subagentId || action.targetId !== target.targetId || action.origin !== context.origin || !['allow', 'ask'].includes(action.admission) || action.expiresAt <= Date.now()) throw new CredentialError('credential_denied', 404)
+  const started = await pool.query(`UPDATE pending_actions SET context='{"credentialExecuting":true}'::jsonb WHERE id=$1 AND "userId"=$2 AND action='browser_operation' AND status='running' AND context IS NULL AND input=$3::jsonb AND "createdAt">clock_timestamp()-interval '5 minutes' RETURNING id`, [action.actionId, caller.userId, JSON.stringify(action)])
+  if (!started.rowCount) throw new CredentialError('credential_denied', 404)
   const client = await pool.connect()
   let cdp: Cdp | undefined, guardToken: string | undefined, completed = false
   let plaintext: Buffer | undefined
   try {
     await client.query('BEGIN')
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${caller.workspaceId}`])
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${caller.userId}:${context.origin}`])
     await new CredentialStore(pool, kms).authorize(caller, client)
     // Policy changes take the same lock in the computer host. The signed
     // gateway capability must additionally be issued by the trusted host
     // after its existing computer_use decision; this query is not approval.
     if (!caller.subagentId || caller.runId || !target.observedInput) throw new CredentialError('credential_denied', 404)
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${caller.workspaceId}`])
-    const bound = (await client.query(`SELECT s."targetId",s.epoch,COALESCE(p.version,0) AS "permissionVersion",p.permission
+    const bound = (await client.query(`SELECT s."targetId",s.epoch,s."runPolicy",COALESCE(p.version,0) AS "permissionVersion",p.permission
       FROM bot_subagents s LEFT JOIN workspace_computer_policies p ON p."workspaceId"=s."workspaceId"
-      WHERE s.id=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3 AND s."botId"=$4 AND s.status IN ('running','needs_you')`,
+      WHERE s.id=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3 AND s."botId"=$4 AND s.status IN ('running','needs_you') FOR UPDATE OF s`,
     [caller.subagentId, caller.userId, caller.workspaceId, caller.botId])).rows[0]
     if (!bound || bound.permission === 'deny') throw new CredentialError('credential_denied', 404)
+    const policy = runPolicySchema.safeParse(bound.runPolicy)
+    if (!policy.success || policy.data.readOnly || policy.data.permissions.computer_use === 'deny' || (action.admission === 'allow' && (bound.permission !== 'allow' || policy.data.permissions.computer_use !== 'allow'))) throw new CredentialError('credential_denied', 404)
+    if (action.policyVersion !== Number(bound.permissionVersion) || action.epoch !== bound.epoch || action.targetId !== bound.targetId || action.expiresAt <= Date.now()) throw new CredentialError('credential_denied', 404)
+    const receipt = await client.query(`SELECT id FROM pending_actions WHERE id=$1 AND "userId"=$2 AND action='browser_operation' AND status='running' AND context='{"credentialExecuting":true}'::jsonb AND input=$3::jsonb`, [action.actionId, caller.userId, JSON.stringify(action)])
+    if (!receipt.rowCount) throw new CredentialError('credential_denied', 404)
     const observed = target.observedInput
+    if (observed.loaderId !== action.loaderId || observed.backendNodeId !== action.backendNodeId || observed.credentialRole !== action.role || observed.epoch !== action.epoch || observed.permissionVersion !== action.policyVersion) throw new CredentialError('credential_denied', 404)
     if (!Number.isSafeInteger(observed.backendNodeId) || observed.backendNodeId < 1 || !['username','password'].includes(observed.credentialRole)) throw new CredentialError('credential_denied', 404)
     const common = { userId: caller.userId, workspaceId: caller.workspaceId, botId: caller.botId, subagentId: caller.subagentId, origin: context.origin, loaderId: observed.loaderId, permissionAction: 'computer_use' as const }
     assertCredentialPageBinding({ ...common, targetId: target.targetId, epoch: observed.epoch, permissionVersion: observed.permissionVersion, expiresAt: target.expiresAt }, { ...common, targetId: bound.targetId, epoch: bound.epoch, permissionVersion: bound.permissionVersion })

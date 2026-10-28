@@ -2,6 +2,25 @@ import 'server-only'
 import { pool } from '@/lib/db'
 import { connectComputer } from '@/lib/computer/e2b-provider'
 import { grant, runtimeRequest } from './runtime'
+import { parseCredentialAction, type CredentialAction } from './credential-action-ledger'
+
+/** Build the broker grant from the persisted host action and the live document.
+ * The service independently consumes this same receipt before opening a secret. */
+export async function resolveRecordedCredentialTarget(action: CredentialAction) {
+  parseCredentialAction(action)
+  const row = (await pool.query(`SELECT s.*,m."sandboxId" FROM bot_subagents s
+    JOIN bots b ON b.id=s."botId" AND b."ownerId"=s."ownerId" AND b."workspaceId"=s."workspaceId"
+    JOIN cloud_machines m ON m."workspaceId"=s."workspaceId" AND m."ownerId"=s."ownerId" AND m.state='running'
+    WHERE s.id=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3 AND s."botId"=$4
+      AND s.status IN ('running','needs_you') AND s.epoch=$5 AND s."targetId"=$6`, [action.subagentId, action.userId, action.workspaceId, action.botId, action.epoch, action.targetId])).rows[0]
+  if (!row?.sandboxId) throw new Error('Credential target unavailable')
+  const observed = { loaderId: action.loaderId, origin: action.origin, backendNodeId: action.backendNodeId, role: action.role }
+  const current = await runtimeRequest(row.sandboxId, row, '/action', { action: 'inspectCredentialTarget', ...observed })
+  if (current.targetId !== action.targetId || Object.entries(observed).some(([key, value]) => current[key] !== value)) throw new Error('Credential target changed')
+  const observedInput = { loaderId: action.loaderId, backendNodeId: action.backendNodeId, credentialRole: action.role, epoch: action.epoch, permissionVersion: action.policyVersion }
+  const capability = await grant(await connectComputer(row.sandboxId), row, 'broker', { ...observedInput, origin: action.origin })
+  return { targetId: action.targetId, origin: action.origin, ...capability, observedInput, credentialAction: action }
+}
 
 /** Broker contract. This binding is resolved exclusively from authenticated
  * owner/workspace/bot/subagent state; endpoints never enter model or UI data. */

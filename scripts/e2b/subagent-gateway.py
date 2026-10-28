@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 from aiohttp import web, WSMsgType
 ROOT = Path('/run/mikka-subagents')
 AGENTS = {}
-BROKER_METHODS = frozenset(('Page.getFrameTree', 'DOM.getDocument', 'DOM.focus', 'DOM.describeNode', 'Runtime.evaluate', 'Runtime.callFunctionOn', 'Input.insertText', 'Network.setCookies', 'Network.getCookies', 'Page.reload'))
+BROKER_METHODS = frozenset(('Page.getFrameTree', 'DOM.getDocument', 'DOM.focus', 'DOM.describeNode', 'Runtime.evaluate', 'Runtime.callFunctionOn', 'Input.insertText', 'Input.dispatchKeyEvent', 'Network.setCookies', 'Network.getCookies', 'Page.reload'))
 BROKER_STORAGE_FUNCTION = 'function(entries){localStorage.clear();for(const [k,v] of entries)localStorage.setItem(k,v)}'
 BROKER_OTP_SELECTOR = 'input[autocomplete="one-time-code"],input[name="code"],input[name="otp"]'
 BROKER_FOCUS_SELECTORS = ('input[autocomplete="username"],input[type="email"],input[name="username"]', 'input[type="password"]')
@@ -156,9 +156,10 @@ def broker_command_allowed(data, target, sessions, objects=None, origin=None, ob
     if set(data)!={'id','method','params','sessionId'} or not isinstance(method,str) or method not in BROKER_METHODS or not isinstance(data.get('sessionId'),str) or data['sessionId'] not in sessions:return False
     params=data['params']
     if observed_node is not None:
-        if method not in ('Page.getFrameTree','DOM.getDocument','DOM.focus','DOM.describeNode','Runtime.evaluate','Input.insertText'):return False
-        if method=='Runtime.evaluate':return params=={'expression':'document.activeElement','returnByValue':False}
-        if method=='DOM.getDocument':return params=={'depth':-1,'pierce':False}
+        if method=='Runtime.evaluate':
+            if params=={'expression':'document.activeElement','returnByValue':False}:return True
+            if params.get('expression') not in ('globalThis', "![...document.querySelectorAll('input,textarea')].some(e=>e.value && (e.tagName==='TEXTAREA'||!['hidden','checkbox','radio','button','submit','reset','image','file','range','color'].includes(e.type)))"):return False
+        if method=='DOM.getDocument':return params in ({'depth':-1,'pierce':False},{'depth':-1,'pierce':True})
     if method in ('Page.getFrameTree','Page.reload'):return params=={}
     if method=='DOM.getDocument':return params=={'depth':-1,'pierce':True}
     if method=='DOM.focus':return observed_node is not None and type(params.get('backendNodeId')) is int and params=={'backendNodeId':observed_node}
@@ -168,6 +169,7 @@ def broker_command_allowed(data, target, sessions, objects=None, origin=None, ob
     if method=='Runtime.callFunctionOn':
         args=params.get('arguments')
         return set(params)=={'objectId','functionDeclaration','arguments','returnByValue'} and isinstance(params['objectId'],str) and bool(params['objectId']) and params['objectId']==objects.get(data['sessionId']) and params['functionDeclaration']==BROKER_STORAGE_FUNCTION and params['returnByValue'] is True and isinstance(args,list) and len(args)==1 and isinstance(args[0],dict) and set(args[0])=={'value'} and isinstance(args[0]['value'],list) and all(isinstance(item,list) and len(item)==2 and all(isinstance(part,str) for part in item) for item in args[0]['value'])
+    if method=='Input.dispatchKeyEvent':return observed_node is not None and params in ({'type':'keyDown','key':'a','code':'KeyA','modifiers':2,'windowsVirtualKeyCode':65,'commands':['selectAll']},{'type':'keyUp','key':'a','code':'KeyA','modifiers':2})
     if method=='Input.insertText':return set(params)=={'text'} and isinstance(params['text'],str) and 0<len(params['text'])<=4096 and not any(char in params['text'] for char in '\r\n\0')
     if method=='Network.getCookies':return bool(origin) and set(params)=={'urls'} and params['urls']==[origin]
     if method=='Network.setCookies':
@@ -424,6 +426,7 @@ async def broker_cdp_session(request,b,grant,raw,guard):
                     # timer cannot retarget the subsequent native CDP input.
                     b.credential_scripts_disabled=True
                     await b.rpc('Emulation.setScriptExecutionDisabled',{'value':True},b.session)
+            if data['method']=='Input.dispatchKeyEvent' and (not focused.get(data['sessionId']) or not getattr(b,'credential_scripts_disabled',False)):break
             if data['method']=='Input.insertText':
                 selector=focused.pop(data['sessionId'],None)
                 if not selector or not getattr(b,'credential_scripts_disabled',False):break
@@ -535,7 +538,6 @@ async def action(request):
         if b.guard:raise web.HTTPConflict()
         name=data.get('action')
         if data.get('expectedLoaderId'):
-            from urllib.parse import urlsplit
             tree=await b.rpc('Page.getFrameTree',session=b.session)
             frame=tree['frameTree']['frame'];u=urlsplit(frame['url'])
             if frame['loaderId']!=data['expectedLoaderId'] or f'{u.scheme}://{u.netloc}'!=data.get('expectedOrigin'):raise web.HTTPConflict()

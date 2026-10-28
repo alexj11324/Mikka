@@ -4,9 +4,9 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
-// Disabled while the called runtime paths and hosted cleanup are reviewed.
-// A skipped regression is not an acceptance result.
-test('real DB: additive migration, subagent owner isolation and separate thread claims', { skip: 'resource-preservation review pending' }, async () => {
+// Every run uses a new schema in the isolated local test database. The schema
+// and its evidence are retained; closing connections does not destroy it.
+test('real DB: additive migration, subagent owner isolation and separate thread claims', { skip: !databaseURL }, async () => {
   // Deferred until the disabled test is explicitly reviewed and enabled.
   const { Pool } = await import('pg')
   const { SubagentStore } = await import('./subagents')
@@ -42,6 +42,8 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     await pool.query('ALTER TABLE cloud_machines ADD COLUMN "deviceId" uuid')
     const migration = await readFile(new URL('../../drizzle/20261028183208_subagents_thread_machines.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
+    const runPolicyMigration = await readFile(new URL('../../drizzle/20261028230000_subagent_run_policy.sql', import.meta.url), 'utf8')
+    await pool.query(runPolicyMigration); await pool.query(runPolicyMigration)
     const bindingMigration = await readFile(new URL('../../drizzle/20261028204000_subagent_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
     await pool.query(`ALTER TABLE suggestions ADD COLUMN "userId" text, ADD COLUMN shown boolean DEFAULT true, ADD COLUMN "dismissedAt" timestamptz, ADD COLUMN source text, ADD COLUMN actor text, ADD COLUMN url text, ADD COLUMN title text, ADD COLUMN action text, ADD COLUMN "actionTitle" text;

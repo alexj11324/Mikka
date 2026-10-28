@@ -110,6 +110,10 @@ export class Cdp {
     if (attributes.has('disabled') || attributes.has('readonly') || !allowed.includes(type)) throw new CredentialError('credential_denied', 404)
     await this.call('DOM.focus', { backendNodeId })
     await this.assertObservedFocus(backendNodeId)
+    // Replace a prefilled value through native input while the exact focused
+    // node is fenced. No page JavaScript receives the secret as an argument.
+    await this.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65, commands: ['selectAll'] })
+    await this.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 2 })
   }
   private async assertObservedFocus(backendNodeId: number) {
     // DOM.focus can be a no-op (for example inside a disabled fieldset).

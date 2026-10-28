@@ -1,0 +1,70 @@
+// Real PostgreSQL, AES-GCM, broker service and CDP; only KMS is synthetic.
+// Runs only against the explicit loopback test DB and synthetic HTTPS page.
+import assert from 'node:assert/strict'
+import { randomBytes, randomUUID } from 'node:crypto'
+import { Pool } from 'pg'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
+import { fillCredential } from '../../lib/credentials/broker.ts'
+import { CredentialStore } from '../../lib/credentials/store.ts'
+import { seal } from '../../lib/credentials/kms.ts'
+import { recordCredentialAction } from '../../lib/cloud-computer/credential-action-ledger.ts'
+const [url, targetId, origin, loaderId, node] = process.argv.slice(2)
+const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL
+assert(['127.0.0.1','localhost'].includes(new URL(databaseURL).hostname))
+assert.equal(new URL(origin).hostname, '127.0.0.1')
+const schema = `broker_${randomUUID().replaceAll('-', '')}`
+const admin = new Pool({ connectionString: databaseURL })
+await admin.query(`CREATE SCHEMA ${schema}`)
+const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
+try {
+  await pool.query(`CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
+    CREATE TABLE bot_subagents(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"botId" uuid,status text,epoch int,"targetId" text,"runPolicy" jsonb);
+    CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text,version int);
+    CREATE TABLE pending_actions(id uuid PRIMARY KEY,"userId" text,action text,input jsonb,status text,context jsonb,"createdAt" timestamptz DEFAULT now());
+    CREATE TABLE credentials(id uuid PRIMARY KEY,user_id text,origin text,username text,revoked_at timestamptz,unattended_allowed boolean DEFAULT true,last_used_at timestamptz,created_at timestamptz DEFAULT now());
+    CREATE TABLE credential_secrets(credential_id uuid,wrapped_dek text,nonce text,ciphertext text);
+    CREATE TABLE browser_sessions(credential_id uuid,wrapped_dek text,nonce text,ciphertext text,expires_at timestamptz);
+    CREATE TABLE credential_fill_leases(nonce_hash text PRIMARY KEY,credential_id uuid,user_id text,workspace_id uuid,bot_id uuid,subagent_id uuid,run_id uuid,origin text,target jsonb,expires_at timestamptz,consumed_at timestamptz,input_kind text DEFAULT 'password',input_envelope jsonb);
+    CREATE TABLE credential_access_events(credential_id uuid,user_id text,bot_id uuid,run_id uuid,subagent_id uuid,origin_seen text,decision text)`)
+  const caller = { userId:'synthetic-owner', workspaceId:randomUUID(), botId:randomUUID(), subagentId:randomUUID() }
+  const credentialId = randomUUID(), key = randomBytes(32)
+  let decrypts = 0
+  const kms = { async generate(){ return { plaintext: Buffer.from(key), wrapped:'synthetic-only' } }, async decrypt(){ decrypts++; return Buffer.from(key) } }
+  const policy = { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use:'allow' } }
+  await pool.query('INSERT INTO bots VALUES ($1,$2,$3)',[caller.botId,caller.userId,caller.workspaceId])
+  await pool.query('INSERT INTO bot_subagents VALUES ($1,$2,$3,$4,\'running\',1,$5,$6)',[caller.subagentId,caller.userId,caller.workspaceId,caller.botId,targetId,policy])
+  await pool.query('INSERT INTO workspace_computer_policies VALUES ($1,\'allow\',1)',[caller.workspaceId])
+  await pool.query('INSERT INTO credentials(id,user_id,origin,username) VALUES ($1,$2,$3,\'synthetic-user\')',[credentialId,caller.userId,origin])
+  const encrypted = await seal(kms,{userId:caller.userId,credentialId,origin},Buffer.from(JSON.stringify({username:'synthetic-user',password:'synthetic-password'})))
+  await pool.query('INSERT INTO credential_secrets VALUES ($1,$2,$3,$4)',[credentialId,encrypted.wrappedDek,encrypted.nonce,encrypted.ciphertext])
+  const binding = { ...caller,runId:caller.subagentId,epoch:1,policyVersion:1,targetId,origin,loaderId,backendNodeId:Number(node),role:'username',expiresAt:Date.now()+60000 }
+  const store = new CredentialStore(pool,kms)
+  const guard = { async begin(){ return {cdpUrl:url,targetId,guardToken:'synthetic-receipt'} }, async end(){ throw Error('Inserted input must remain guarded') } }
+  async function leaseFor(decision='allow') {
+    const {action} = await recordCredentialAction(pool,binding,decision,false,randomUUID())
+    const target = {targetId,origin,endpoint:'https://synthetic.e2b.app/',expiresAt:Date.now()+60000,observedInput:{loaderId,backendNodeId:Number(node),credentialRole:'username',epoch:1,permissionVersion:1},credentialAction:action}
+    const lease = await store.lease(caller,origin,target)
+    assert.equal(lease.status,'ready')
+    return lease.lease
+  }
+  const lease = await leaseFor()
+  assert.deepEqual(await fillCredential(pool,lease,{kms,guard}),{status:'guarded',origin})
+  assert.equal(decrypts,1)
+  await assert.rejects(fillCredential(pool,lease,{kms,guard}))
+  const pending = await leaseFor('ask')
+  await assert.rejects(fillCredential(pool,pending,{kms,guard}))
+  assert.equal(decrypts,1,'pending approval must not decrypt')
+  const stale = await leaseFor()
+  await pool.query('UPDATE workspace_computer_policies SET version=2 WHERE "workspaceId"=$1',[caller.workspaceId])
+  await assert.rejects(fillCredential(pool,stale,{kms,guard}))
+  assert.equal(decrypts,1,'policy version change must not decrypt')
+  const stopped = await leaseFor()
+  await pool.query('UPDATE workspace_computer_policies SET version=1 WHERE "workspaceId"=$1',[caller.workspaceId])
+  await pool.query('UPDATE bot_subagents SET status=\'stopped\' WHERE id=$1',[caller.subagentId])
+  await assert.rejects(fillCredential(pool,stopped,{kms,guard}))
+  assert.equal(decrypts,1,'STOP must not decrypt')
+  console.log(`PASS: real PG and broker service + actual CDP insertion; replay/pending/stale-policy/STOP denied; retained schema ${schema}; KMS synthetic`)
+  key.fill(0)
+} finally {
+  await pool.end();await admin.end()
+}

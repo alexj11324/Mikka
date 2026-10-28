@@ -1,14 +1,13 @@
-// Playwright browser.close() and the browser's temporary profile cleanup have
-// not been reviewed for the current preservation rule. Do not launch them.
-throw new Error('Chromium guard regression suspended: preserve test resources')
-
 // Synthetic local Chromium only: inspect the exact CDP snapshots used by the gateway.
 const { chromium } = await import('@playwright/test')
-const { existsSync } = await import('node:fs')
+const { existsSync, mkdtempSync } = await import('node:fs')
+const { tmpdir } = await import('node:os')
+const { join } = await import('node:path')
 
 const executablePath = ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(existsSync)
 if (!executablePath) throw new Error('Chromium is required for the guard regression')
-const browser = await chromium.launch({ executablePath, headless: true, args: ['--no-sandbox'] })
+const profile = mkdtempSync(join(tmpdir(), 'pr346-guard-'))
+const browser = await chromium.launchPersistentContext(profile, { executablePath, headless: true, args: ['--no-sandbox'] })
 try {
   const page = await browser.newPage()
   const cdp = await page.context().newCDPSession(page)
@@ -34,4 +33,7 @@ try {
     await capture(`${mode}-shadow`)
   }
   process.stdout.write(JSON.stringify(results))
-} finally { process.stderr.write('Retaining Chromium guard test resources\n') }
+} finally {
+  await browser.close()
+  process.stderr.write(`Retained Chromium profile: ${profile}\n`)
+}

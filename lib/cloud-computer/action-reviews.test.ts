@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
+import { browserActionDigest } from './browser-action-receipt'
 import { before, beforeEach, mock, test } from 'node:test'
 
 const actor = { userId: 'owner', workspaceId: 'workspace' }
@@ -38,7 +39,7 @@ test('model-selected ordinary action executes without a metadata business classi
   const result = await browserAction(pool, actor, 'bot', 'subagent', mutation, 'Continue')
   assert.equal(result.state, 'running')
   assert.deepEqual(calls, [{ action: 'inspectMutation', mutation }])
-  assert.deepEqual(executed[0], { actor, botId: 'bot', subagentId: 'subagent', epoch: 7, policyVersion: 2, expiresAt: authority!.expiresAt, loaderId: 'document', origin: 'https://example.test', mutation })
+  assert.deepEqual(executed[0], { actor, botId: 'bot', subagentId: 'subagent', epoch: 7, actionId: authority!.review!.actionId, digest: authority!.review!.digest, policyVersion: 2, expiresAt: authority!.expiresAt, loaderId: 'document', origin: 'https://example.test', mutation })
   assert.equal(queries.length, 0)
 })
 
@@ -91,12 +92,12 @@ for (const condition of ['deny', 'expired', 'readonly', 'unavailable', 'stopped'
 test('approved replay fails closed without live authority and cannot execute after expiry or stop', async () => {
   pendingId = randomUUID(); status = 'needs_you'
   const signed = { actionId: pendingId, workspaceId: randomUUID(), botId: randomUUID(), subagentId: randomUUID(), epoch: 7, policyVersion: 2, expiresAt: Date.now() + 60_000, loaderId: 'document', origin: 'https://example.test', mutation: { action: 'click' as const, selector: '#submit' }, summary: 'Submit' }
-  const bind = (input: typeof signed) => ({ ...input, digest: createHash('sha256').update(JSON.stringify(['owner', input])).digest('hex') })
-  assert.deepEqual(await executeApprovedBrowserAction(pool, 'owner', bind(signed), true), { error: 'browserActionOutcomeUnknown' })
+  const bind = (input: typeof signed) => ({ ...input, digest: browserActionDigest('owner', input) })
+  assert.deepEqual(await executeApprovedBrowserAction(pool, 'owner', bind(signed), true, pendingId), { error: 'browserActionOutcomeUnknown' })
   assert.equal(approvalChecks, 1)
-  assert.deepEqual(await executeApprovedBrowserAction(pool, 'owner', bind({ ...signed, expiresAt: Date.now() - 1 }), true), { error: 'browserActionExpired' })
+  assert.deepEqual(await executeApprovedBrowserAction(pool, 'owner', bind({ ...signed, expiresAt: Date.now() - 1 }), true, pendingId), { error: 'browserActionExpired' })
   status = 'stopped'
-  assert.deepEqual(await executeApprovedBrowserAction(pool, 'owner', bind(signed), true), { error: 'browserActionExpired' })
+  assert.deepEqual(await executeApprovedBrowserAction(pool, 'owner', bind(signed), true, pendingId), { error: 'browserActionExpired' })
   assert.equal(approvalChecks, 1)
   assert.equal(calls.length, 0)
 })

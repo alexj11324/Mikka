@@ -1,7 +1,4 @@
 """Real local Chromium and WebSocket regression; all data is synthetic."""
-# Stop before imports: loading the gateway or test dependencies has not been
-# reviewed for resource-preserving execution.
-raise RuntimeError('Broker regression suspended: preserve test resources')
 import asyncio, contextlib, importlib.util, json, shutil, ssl, subprocess, tempfile
 from pathlib import Path
 from aiohttp import ClientSession, WSMsgType, WSServerHandshakeError, web
@@ -182,8 +179,17 @@ async def main():
                     stdout,stderr=await asyncio.wait_for(node.communicate(),30)
                     if node.returncode:raise RuntimeError('Actual broker client failed: '+stderr.decode())
                     assert stdout.decode().startswith('PASS: actual broker client')
+                    if __import__('os').environ.get('COMPUTER_TEST_DATABASE_URL'):
+                        for _ in range(100):
+                            if not browser.broker_active:break
+                            await asyncio.sleep(.01)
+                        service=await asyncio.create_subprocess_exec('node','--import',str(Path(__file__).parents[1]/'server-test.mjs'),'--import','tsx',str(Path(__file__).with_name('broker-service-real-client.test.mjs')),observed_url,target,origin,grant['loaderId'],str(grant['backendNodeId']),stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
+                        service_out,service_err=await asyncio.wait_for(service.communicate(),45)
+                        if service.returncode:raise RuntimeError('Real service regression failed: '+service_err.decode())
+                        assert service_out.decode().startswith('PASS: real PG and broker service')
+                        print(service_out.decode().strip(),flush=True)
                     result=await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value','returnByValue':True})
-                    assert result['result']['value']=='synthetic-user'
+                    assert result['result']['value']=='synthetic-user', repr(result['result']['value'])
                     for _ in range(100):
                         if not browser.broker_active:break
                         await asyncio.sleep(.01)
@@ -241,7 +247,7 @@ async def main():
                             assert guarded_end.status==409, 'cannot release guard while scripts are frozen'
                         await ws.send_json({'id':6,'method':'Input.insertText','params':{'text':'synthetic-user'},'sessionId':session});await response(ws,6)
                         result=await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value','returnByValue':True})
-                        assert result['result']['value']=='synthetic-user'
+                        assert result['result']['value']=='synthetic-user', repr(result['result']['value'])
                         events=await browser.rpc('Runtime.evaluate',{'expression':'({focusHijacked:window.focusHijacked,inputEvents:window.inputEvents})','returnByValue':True})
                         assert events['result']['value']=={'focusHijacked':False,'inputEvents':1}, 'focus callbacks stay frozen; one input event reaches the page after resume'
                         for ident,selector,value in [(10,gateway.BROKER_FOCUS_SELECTORS[1],'synthetic-password'),(20,gateway.BROKER_OTP_SELECTOR,'123456')]:
@@ -336,5 +342,11 @@ async def main():
             print('PASS: real Chromium through local broker WebSocket: fixed templates and session storage; wrong target/session/origin, scripts and extra parameters rejected')
         finally:
             print(f'Retained broker test directory: {path}; Chromium PID: {process.pid}', flush=True)
+            # This is the Chromium created by this invocation, never a retained
+            # historical process. Keep its profile and all fixture evidence.
+            if process.returncode is None:
+                process.terminate()
+                await asyncio.wait_for(process.wait(),15)
+            await fixture_runner.cleanup()
 
 asyncio.run(main())
