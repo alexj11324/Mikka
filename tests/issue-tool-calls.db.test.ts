@@ -133,6 +133,8 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     assert.deepEqual(await createIssue(owner, taskInput, actor, `replay-${randomUUID()}`, request), bound)
     assert.deepEqual(await createIssue(owner, { title: 'Changed task' }, actor, `changed-${randomUUID()}`, request), { error: 'issueToolCallConflict' })
     assert.deepEqual(await createIssue(stranger, taskInput, actor, `foreign-${randomUUID()}`, request), { error: 'issueToolCallConflict' })
+    await pool.query('update coordinator_events set payload=jsonb_set(payload,\'{text}\',to_jsonb($2::text)) where id=$1', [eventId, 'Changed original request'])
+    assert.deepEqual(await createIssue(owner, taskInput, actor, `changed-event-${randomUUID()}`, request), { error: 'issueToolCallConflict' })
     await pool.query('update coordinator_events set payload=jsonb_set(payload,\'{taskDestination,deviceId}\',to_jsonb($2::text)) where id=$1', [eventId, foreignDevice])
     assert.deepEqual(await createIssue(owner, taskInput, actor, `retarget-${randomUUID()}`, request), { error: 'issueToolCallConflict' })
     await pool.query('delete from task_request_bindings where "eventId"=$1', [eventId])

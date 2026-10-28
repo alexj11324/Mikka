@@ -30,16 +30,19 @@ export async function idempotentIssueMutation<T extends { id: string } & Record<
   const key = and(eq(issueToolCalls.userId, userId), eq(issueToolCalls.toolCallId, toolCallId))
   const committed = await db.transaction(async tx => withDatabaseTransaction(tx, async () => {
     let deviceId: string | null = null
+    let sourceEventHash: string | null = null
     if (request) {
       if (operation !== 'create_issue') throw new IssueToolCallConflict()
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'task-request:' + request.eventId}, 0))`)
-      const [event] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, request.eventId), eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.kind, 'user_message'))).limit(1)
+      const [event] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, request.eventId), eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.kind, 'user_message'))).limit(1).for('update')
       const destination = taskDestinationSchema.safeParse(event?.payload.taskDestination)
       if (!event || event.botId !== request.botId || !event.deliveredAt || !destination.success || destination.data.kind !== 'device') throw new IssueToolCallConflict()
       deviceId = destination.data.deviceId
+      const eventHash = createHash('sha256').update(JSON.stringify(canonical(event.payload))).digest('hex')
+      sourceEventHash = eventHash
       const [binding] = await tx.select().from(taskRequestBindings).where(eq(taskRequestBindings.eventId, event.id)).limit(1)
       if (binding) {
-        if (binding.userId !== userId || binding.botId !== request.botId || binding.deviceId !== deviceId || binding.inputHash !== inputHash) throw new IssueToolCallConflict()
+        if (binding.userId !== userId || binding.botId !== request.botId || binding.deviceId !== deviceId || binding.inputHash !== inputHash || binding.eventHash !== eventHash) throw new IssueToolCallConflict()
         const [prior] = await tx.select().from(issueToolCalls).where(and(eq(issueToolCalls.userId, userId), eq(issueToolCalls.toolCallId, binding.toolCallId))).limit(1)
         if (!prior || prior.issueId !== binding.issueId || prior.operation !== operation || prior.inputHash !== inputHash) throw new IssueToolCallConflict()
         await requireIssueAccess(prior.issueId)
@@ -59,7 +62,7 @@ export async function idempotentIssueMutation<T extends { id: string } & Record<
     const effects: IssueEffect[] = []
     const result = await collectIssueEffects(effects, mutate)
     await tx.insert(issueToolCalls).values({ userId, operation, toolCallId, inputHash, issueId: result.id, result, effects })
-    if (request && deviceId) await tx.insert(taskRequestBindings).values({ eventId: request.eventId, userId, botId: request.botId, deviceId, issueId: result.id, toolCallId, inputHash })
+    if (request && deviceId && sourceEventHash) await tx.insert(taskRequestBindings).values({ eventId: request.eventId, userId, botId: request.botId, deviceId, issueId: result.id, toolCallId, inputHash, eventHash: sourceEventHash })
     return { result, effects, receiptToolCallId: toolCallId }
   }))
   // These effects are already safe to retry (outbox delivery, scope judgment and

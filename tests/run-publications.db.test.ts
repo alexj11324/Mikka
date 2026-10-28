@@ -278,7 +278,7 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal((await pool.query('select branch from run_publications where "runId"=$1', [accepted.runId])).rows[0].branch, f.branch)
       const eventId = randomUUID(), otherDevice = randomUUID(), otherAgent = randomUUID()
       await pool.query('insert into coordinator_events (id,"userId",kind,"dedupeKey",payload,"deliveredAt") values ($1,$2,\'user_message\',$3,$4,now())', [eventId, f.userId, `task-request-${eventId}`, JSON.stringify({ text: 'selected device', taskDestination: { kind: 'device', deviceId: f.deviceId } })])
-      await pool.query('insert into task_request_bindings ("eventId","userId","deviceId","issueId","toolCallId","inputHash") values ($1,$2,$3,$4,$5,$6)', [eventId, f.userId, f.deviceId, f.issueId, 'fixture', 'fixture'])
+      await pool.query('insert into task_request_bindings ("eventId","userId","deviceId","issueId","toolCallId","inputHash","eventHash") values ($1,$2,$3,$4,$5,$6,$7)', [eventId, f.userId, f.deviceId, f.issueId, 'fixture', 'fixture', 'fixture'])
       await pool.query('insert into devices (id,"ownerId",name,kind,harnesses) values ($1,$2,\'Other device\',\'local\',$3)', [otherDevice, f.userId, JSON.stringify([{ harness: 'codex', installed: true }])])
       await pool.query('insert into agents (id,"userId","deviceId",harness,name) values ($1,$2,$3,\'codex\',$4)', [otherAgent, f.userId, otherDevice, `codex ${otherDevice}`])
       await assert.rejects(queueRun(f.userId, { issueId: f.issueId, agentId: otherAgent, repo: f.remoteUrl }))

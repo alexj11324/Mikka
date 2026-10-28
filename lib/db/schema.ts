@@ -57,7 +57,7 @@ export const issueToolCalls = pgTable('issue_tool_calls', {
 export const taskRequestBindings = pgTable('task_request_bindings', {
   eventId: uuid('eventId').primaryKey(), userId: text('userId').notNull(), botId: uuid('botId'),
   deviceId: uuid('deviceId').notNull(), issueId: uuid('issueId').notNull(),
-  toolCallId: text('toolCallId').notNull(), inputHash: text('inputHash').notNull(),
+  toolCallId: text('toolCallId').notNull(), inputHash: text('inputHash').notNull(), eventHash: text('eventHash').notNull(),
 }, table => [uniqueIndex('task_request_bindings_issue_key').on(table.issueId)])
 /**
  * A bot: what a person chats with in the left column. It runs only on Mikka's
