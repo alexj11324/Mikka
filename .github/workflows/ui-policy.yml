@@ -13,7 +13,6 @@ on:
     branches-ignore: ['gh-readonly-queue/**']
   pull_request:
   merge_group:
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,9 +25,8 @@ concurrency:
 jobs:
   cloud-secret-access:
     name: Cloud credential access (OIDC)
-    # Live Staging credential health is an explicit operation, separate from
-    # source acceptance. A normal push must not fetch a provider credential.
-    if: github.event_name == 'workflow_dispatch' && github.repository == 'alexj11324/Mikka'
+    # This migration-only candidate must not retrieve live provider credentials.
+    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
