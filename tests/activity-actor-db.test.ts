@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import test from 'node:test'
 import { Pool } from 'pg'
+import { withActivitySession } from './fixtures/activity-runtime.mjs'
 
 // Do not connect on developers' machines, even to a local database. In CI this
 // command is required, and only the job's disposable PG17 service is admissible.
@@ -56,7 +57,7 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
   const { users, issues, issueVersions, issueMembers, linearTeamSyncs, linearIssueLinks, issueDocuments, telegramLinks, telegramConversations } = tables
   const { actAs } = await import('../lib/acting-user')
   const { agentActor } = await import('../lib/activity-actor')
-  const { saveIssue, listIssueVersions, setIssueScope, previewIssuePersonalScope, confirmIssuePersonalScope } = await import('../app/actions/issues')
+  const { saveIssue, listIssueVersions, setIssueScope, promoteIssueToTeam, previewIssuePersonalScope, confirmIssuePersonalScope } = await import('../app/actions/issues')
   const { updateIssueMetadata } = await import('../app/actions/issue-metadata')
   const { createLinkedIssue, updateIssueRelation } = await import('../app/actions/issue-operations')
   const { removeMember } = await import('../app/actions/collaboration')
@@ -88,13 +89,20 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     await pool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,$3)', [workspace, owner, `Actor ${workspace}`])
     for (const user of [owner, member]) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [workspace, user, `${user}@example.invalid`])
     await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Actor\',\'ACX\')', [workspaceTeam, workspace, owner])
-    // Share a task the way the product does: owner flips it to workspace scope,
-    // it is linked to the team, and the legacy invitation the write actions
-    // still require for nonowners is present.
+    // A human session explicitly selects the authorized team through the public
+    // promotion action; an actAs context alone cannot grant this choice.
+    // Keep the legacy invitation still required by nonowner write actions.
     const share = async (id: string) => {
-      expectIssue(await actAs(owner, async () => setIssueScope({ id, revision: (await latest(id)).revision, scope: 'workspace' })))
+      const revision = (await latest(id)).revision
+      assert.deepEqual(await actAs(owner, () => setIssueScope({ id, revision, scope: 'workspace' })), { error: 'issueScopeTeamRequired' })
+      const result = await withActivitySession(owner, () => promoteIssueToTeam({ requestId: randomUUID(), issueId: id, revision, teamId: workspaceTeam, expectedTeamId: null }))
+      const promoted = expectIssue(result)
+      assert.equal(promoted.scope, 'workspace')
+      assert.equal(promoted.linearSyncBlocked, true)
+      assert.ok('linearSync' in result)
+      assert.deepEqual(result.linearSync, { enabled: false, reason: 'no_explicit_target' })
       await history(id, 'user', owner)
-      await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [id, workspaceTeam, workspace, owner])
+      assert.deepEqual((await pool.query('select "teamId","workspaceId","userId" from mikka_team_issues where "issueId"=$1', [id])).rows, [{ teamId: workspaceTeam, workspaceId: workspace, userId: owner }])
       await db.insert(issueMembers).values({ issueId: id, userId: owner, memberId: member })
       return (await latest(id)).revision
     }
