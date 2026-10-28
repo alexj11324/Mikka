@@ -5,6 +5,7 @@ import { issues } from '../lib/db/schema'
 import { idempotentIssueMutation } from '../lib/mcp/issue-mutation'
 import { actAs } from '../lib/acting-user'
 import { createCoordinatorRegistry } from '../workflows/coordinator/tools'
+import { takeInbox } from '../lib/coordinator/store'
 async function main() {
 const target = new URL(process.env.MIKKA_DATABASE_URL ?? '')
 assert.equal(target.hostname, '127.0.0.1')
@@ -32,8 +33,11 @@ await assert.rejects(idempotentIssueMutation(owner,'create_issue','disabled',inp
 // Exercise the actual registered tool, durable step, app action and issue writer.
 // A fresh owner has no Linear team or outbox jobs; no model/provider is invoked.
 const toolEvent=randomUUID()
-await pool.query('insert into coordinator_events (id,"userId",kind,"dedupeKey",payload,"deliveredAt") values ($1,$2,$3,$4,$5,now())',[toolEvent,owner,'user_message',`pr358-${toolEvent}`,JSON.stringify({text:'real tool fixture',taskDestination:{kind:'cloud'}})])
-const tools=createCoordinatorRegistry(owner,null,undefined,{taskEventId:toolEvent})
+await pool.query('insert into coordinator_events (id,"userId",kind,"dedupeKey",payload,tier) values ($1,$2,$3,$4,$5,$6)',[toolEvent,owner,'user_message',`pr358-${toolEvent}`,JSON.stringify({text:'real tool fixture',taskDestination:{kind:'cloud'}}),'attention'])
+const inbox=await takeInbox(owner,`binding-${toolEvent}`)
+assert.equal(inbox.taskEventId,toolEvent)
+assert.equal(inbox.added,1)
+const tools=createCoordinatorRegistry(owner,null,undefined,{taskEventId:inbox.taskEventId})
 const toolInput={title:'Real registered task binding'}
 const toolContext={toolCallId:`registered-${toolEvent}`,messages:[],context:{}}
 const created=await actAs(owner,async()=>await tools.create_issue!.execute!(toolInput,toolContext)) as {id?:string;error?:string}
@@ -42,6 +46,20 @@ const repeated=await actAs(owner,async()=>await tools.create_issue!.execute!(too
 assert.deepEqual(repeated,created)
 assert.equal((await pool.query('select "issueId" from coordinator_events where id=$1',[toolEvent])).rows[0].issueId,created.id)
 assert.equal((await pool.query('select count(*)::int as n from issue_versions where "issueId"=$1',[created.id])).rows[0].n,1)
+const nextEvent=randomUUID()
+await pool.query('update devices set enabled=true where id=$1',[device])
+await pool.query('insert into coordinator_events (id,"userId",kind,"dedupeKey",payload,tier) values ($1,$2,$3,$4,$5,$6)',[nextEvent,owner,'user_message',`pr358-${nextEvent}`,JSON.stringify({text:'second real request',taskDestination:{kind:'device',deviceId:device}}),'attention'])
+const nextInbox=await takeInbox(owner,`binding-${toolEvent}`)
+assert.equal(nextInbox.taskEventId,nextEvent)
+const nextTools=createCoordinatorRegistry(owner,null,undefined,{taskEventId:nextInbox.taskEventId})
+const nextCreated=await actAs(owner,async()=>await nextTools.create_issue!.execute!({title:'Second machine-selected task'},{...toolContext,toolCallId:`registered-${nextEvent}`})) as {id?:string;error?:string}
+assert.ok(nextCreated.id,JSON.stringify(nextCreated))
+assert.notEqual(nextCreated.id,created.id)
+const stored=(await pool.query('select id,"issueId",payload from coordinator_events where id=any($1::uuid[]) order by id',[[toolEvent,nextEvent]])).rows
+assert.equal(stored.find(row=>row.id===toolEvent).issueId,created.id)
+assert.equal(stored.find(row=>row.id===toolEvent).payload.taskDestination.kind,'cloud')
+assert.equal(stored.find(row=>row.id===nextEvent).issueId,nextCreated.id)
+assert.equal(stored.find(row=>row.id===nextEvent).payload.taskDestination.deviceId,device)
 console.log(JSON.stringify({status:'passed',owner,event,issue,failed,toolEvent,toolIssue:created.id,checks:['concurrent replay','owner rejection','second call rejection','failure rollback','registered tool creates bound task','registered tool replay preserves one version']}))
 await pool.end()
 }
