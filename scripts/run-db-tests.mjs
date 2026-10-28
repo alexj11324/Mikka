@@ -9,6 +9,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/factory/store.ts', file: 'lib/factory/routing.db.test.ts', script: 'test:factory-routing-db' },
   { marker: 'lib/agent-kit/store.ts', file: 'lib/agent-kit/store.db.test.ts', script: 'test:agent-kit-db' },
   { marker: 'lib/computer/store.ts', file: 'lib/computer/store.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-conversations.test.ts', script: 'test:groups' },

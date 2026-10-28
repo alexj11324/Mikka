@@ -118,7 +118,26 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     assert.deepEqual(await updateIssue(stranger, { issueId: id, title: 'Unauthorized' }, actor, `foreign-${randomUUID()}`), { error: 'issueNotFound' })
     assert.ok('id' in await createIssue(stranger, { title: 'Separate owner' }, actor, callId), 'same tool call id is scoped to owner')
     assert.equal((await pool.query('select count(*) from issue_versions where "userId"=$1 and actor_type=\'system\' and actor_id=\'coordinator\'', [owner])).rows[0].count, String(await count('issue_versions')))
+    // Exercise the actual Factory tool -> scoped Workflow step -> existing issue
+    // actions -> durable receipt -> Factory store, without a model/provider.
+    process.env.MIKKA_FACTORY_ROUTING_ENABLED = '1'
+    const sourceId=randomUUID()
+    await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES($1,$2,'user_message',$3,'{"text":"Create a task to keep the API compatible"}')`,[sourceId,owner,sourceId])
+    const factoryTools=createCoordinatorRegistry(owner,null)
+    const request={sourceEventId:sourceId,title:'Factory intake fixture',body:'Keep the API compatible',rationale:'Actual personal source fixture',missingInformation:[],missingPermissions:[],needsSpec:false}
+    type Snapshot=import('../lib/factory/store').FactorySnapshot
+    const invoke=factoryTools.intake_factory_request!.execute! as unknown as (input:unknown,options:{toolCallId:string;messages:never[];context:object})=>Promise<Snapshot|{error:string}>
+    const issueCount=await count('issues')
+    const routed=await Promise.all(Array.from({length:10},(_,n)=>invoke({...request,sourceEventId:n%2?sourceId.toUpperCase():sourceId},{toolCallId:`attempt-${n}`,messages:[],context:{}})))
+    for(const result of routed){assert.ok('task' in result,JSON.stringify(result));assert.equal(result.task.stage,'execute');assert.equal(result.task.status,'pending')}
+    assert.equal(new Set(routed.map(result=>'task' in result?result.task.id:null)).size,1)
+    assert.equal(await count('issues'),issueCount+1)
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM issue_tool_calls WHERE "userId"=$1 AND "toolCallId"=$2',[owner,`factory-intake:${sourceId}`])).rows[0].n,1)
+    assert.deepEqual(await invoke({...request,title:'Conflicting retry'},{toolCallId:'changed',messages:[],context:{}}),{error:'issueToolCallConflict'})
+    assert.equal(await count('issues'),issueCount+1)
+    process.env.MIKKA_FACTORY_ROUTING_ENABLED = '0'
   } finally {
+    await pool.query('DELETE FROM coordinator_events WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM issue_members WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM mikka_team_issues WHERE "workspaceId"=$1', [workspace])
     await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspace])
