@@ -12,6 +12,8 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/factory/store.ts', file: 'lib/factory/routing.db.test.ts', script: 'test:factory-routing-db' },
   { marker: 'scripts/migration-steps.mjs', file: 'tests/migration-steps.db.test.mjs', script: 'test:migration-steps-db' },
   { marker: 'lib/factory/check-independence.ts', file: 'lib/factory/check-independence.db.test.ts', script: 'test:factory-check-independence-db' },
+  { marker: 'lib/factory/monitor-v2-binding.ts', file: 'lib/factory/monitor-v2-binding.db.test.ts', script: 'test:factory-monitor-db' },
+  { marker: 'lib/operations/approved-writes.ts', file: 'lib/operations/write-legacy-schema.db.test.ts', script: 'test:approved-writes-db' },
   { marker: 'lib/agent-kit/store.ts', file: 'lib/agent-kit/store.db.test.ts', script: 'test:agent-kit-db' },
   { marker: 'lib/computer/store.ts', file: 'lib/computer/store.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-conversations.test.ts', script: 'test:groups' },
