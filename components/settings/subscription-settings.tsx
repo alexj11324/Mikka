@@ -51,13 +51,13 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   }, [workspaceId])
 
   useEffect(() => { void refresh().catch(() => { setState(null); setLoadFailed(true) }) }, [refresh])
-  const loadUsage = useCallback(async () => {
+  const loadUsage = useCallback(async (force = false) => {
     usageAbort.current?.abort()
     const abort = new AbortController()
     usageAbort.current = abort
     setUsageLoading(true)
     try {
-      const response = await fetch(`${path}/usage?workspace=${encodeURIComponent(workspaceId)}`, { cache: 'no-store', credentials: 'same-origin', signal: abort.signal })
+      const response = await fetch(`${path}/usage?workspace=${encodeURIComponent(workspaceId)}${force ? '&refresh=1' : ''}`, { cache: 'no-store', credentials: 'same-origin', signal: abort.signal })
       if (!response.ok) throw new Error('Subscription usage unavailable')
       const result = subscriptionUsageSchema.parse(await response.json())
       if (!abort.signal.aborted) setUsage(new Map(result.connections.map(item => [item.id, item])))
@@ -68,7 +68,9 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     void loadUsage()
     const read = setInterval(() => { if (document.visibilityState === 'visible') void loadUsage() }, USAGE_EVERY_MS)
     const tick = setInterval(() => setNow(Date.now()), 30_000)
-    return () => { clearInterval(read); clearInterval(tick); usageAbort.current?.abort() }
+    const visible = () => { if (document.visibilityState === 'visible') void loadUsage() }
+    document.addEventListener('visibilitychange', visible)
+    return () => { clearInterval(read); clearInterval(tick); document.removeEventListener('visibilitychange', visible); usageAbort.current?.abort() }
   }, [connectedKey, loadUsage])
   useEffect(() => {
     if (!attempt || attempt.flow !== 'device' || !attempt.interval) return
@@ -115,6 +117,11 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     try { await post({ action: 'disconnect', connectionId: connection.id, revision: connection.revision }); await refresh(); setNotice(t('disconnectedNotice')) }
     catch { setError(t('disconnectFailed')) } finally { setPending(false) }
   }
+  async function remove(connection: { id: string; revision: number }) {
+    setPending(true); setError(''); setNotice('')
+    try { await post({ action: 'remove', connectionId: connection.id, revision: connection.revision }); await refresh() }
+    catch { setError(t('removeFailed')) } finally { setPending(false) }
+  }
 
   if (loadFailed) return <p role="alert" className="px-1 text-sm text-destructive">{t('loadFailed')}</p>
   if (!state?.enabled) return null
@@ -129,14 +136,17 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
             <Button type="button" variant="secondary" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider) }}>{connections.some(item => item.state === 'connected') ? t('connectAnother') : t('connect')}</Button>
           </SettingRow>
           {connections.map(connection => {
-            const read = connection.state === 'connected' && usage ? usage === 'failed' ? undefined : usage.get(connection.id) : undefined
-            const failed = connection.state === 'connected' && (usage === 'failed' || read?.status === 'unavailable')
+            const live = connection.state === 'connected'
+            const read = live && usage && usage !== 'failed' ? usage.get(connection.id) : undefined
+            const failed = live && (usage === 'failed' || read?.status === 'unavailable')
+            // reauth: the runtime's own reconnect_required, or the provider refused this read.
             const reauth = connection.state === 'reconnect_required' || read?.status === 'reauth'
-            const connected = connection.state === 'connected' && !reauth
+            const refused = read?.status === 'extra_usage' || read?.status === 'unverified'
+            const healthy = live && !reauth && !refused
             const account = read?.account ?? connection.account ?? null
             const plan = read?.plan ? t('codexPlan', { plan: read.plan }) : null
             const product = provider === 'codex' ? plan ?? t('codexProduct') : t('claudeProduct')
-            const updated = read?.status === 'ok' ? Math.max(0, Math.floor((now - Date.parse(read.observedAt)) / 60_000)) : null
+            const updated = read && read.status !== 'unavailable' && read.status !== 'reauth' ? Math.max(0, Math.floor((now - Date.parse(read.observedAt)) / 60_000)) : null
             const bots = connection.bots ?? []
             return <div key={connection.id} className="flex flex-col gap-3 px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -149,20 +159,23 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span aria-hidden="true" className={cn('size-2 rounded-full', connected ? 'bg-success' : reauth ? 'bg-warning' : 'bg-muted-foreground')} />
-                    {connected ? t('connected') : reauth ? t('reauth') : t('notConnected')}
+                    <span aria-hidden="true" className={cn('size-2 rounded-full', healthy ? 'bg-success' : reauth || refused ? 'bg-warning' : 'bg-muted-foreground')} />
+                    {reauth ? t('reauth') : refused ? t('notInUse') : live ? t('connected') : t('notConnected')}
                   </span>
                   <span className="flex items-center gap-2">
-                    {(reauth || connection.state !== 'connected') && <Button type="button" variant="secondary" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider, connection) }}>{t('reconnect')}</Button>}
-                    <Button type="button" variant={connection.state === 'connected' && !reauth ? 'secondary' : 'ghost'} size="sm" disabled={pending || !!attempt} onClick={() => { void disconnect(connection) }}>{connection.state === 'connected' ? t('disconnect') : t('remove')}</Button>
+                    {(reauth || !live) && <Button type="button" variant="secondary" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider, connection) }}>{t('reconnect')}</Button>}
+                    {live
+                      ? <Button type="button" variant={reauth ? 'ghost' : 'secondary'} size="sm" disabled={pending || !!attempt} onClick={() => { void disconnect(connection) }}>{t('disconnect')}</Button>
+                      : <Button type="button" variant="ghost" size="sm" disabled={pending || !!attempt} onClick={() => { void remove(connection) }}>{t('remove')}</Button>}
                   </span>
                 </div>
               </div>
-              {connection.state === 'connected' && !reauth && <div className="flex flex-col gap-2 sm:pl-8">
+              {(live || reauth) && <div className="flex flex-col gap-2 sm:pl-8">
+                {refused && <p className="text-xs text-foreground">{read?.status === 'unverified' ? t('extraUsageUnverified') : provider === 'claude' ? `${t('extraUsageOn')} · ${t('extraUsageClaudeFix')}` : t('extraUsageOn')}</p>}
                 {failed
-                  ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={() => { void loadUsage() }}>{t('retry')}</Button></span>
-                  : read && <QuotaMeters windows={read.windows} now={now} />}
-                {read?.status === 'ok' && <p className="text-xs text-muted-foreground">{[updated !== null && (updated < 1 ? t('updatedJustNow') : t('updatedAgo', { minutes: updated })), t('whenExhausted')].filter(Boolean).join(' · ')}</p>}
+                  ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={() => { void loadUsage(true) }}>{t('retry')}</Button></span>
+                  : read && read.windows.length > 0 && <QuotaMeters windows={read.windows} now={now} />}
+                {updated !== null && <p className="text-xs text-muted-foreground">{updated < 1 ? t('updatedJustNow') : t('updatedAgo', { minutes: updated })}</p>}
                 {bots.length > 0 && <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   {t('usedBy')}
                   {bots.map(bot => <span key={bot.id} className="flex items-center gap-1 text-foreground"><BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} />{bot.name}</span>)}
@@ -173,6 +186,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
         </div>
       })}
     </SettingsSection>
+    {state.connections.some(item => item.state === 'connected') && <p className="px-1 text-xs text-muted-foreground">{t('whenExhausted')}</p>}
     {attempt && <div className="flex flex-col gap-2 px-1 text-sm">
       <p>{attempt.flow === 'device' ? t('deviceInstructions') : t('callbackInstructions')}</p>
       {attempt.userCode && <p className="font-mono font-semibold select-all">{attempt.userCode}</p>}
@@ -199,13 +213,13 @@ function QuotaMeters({ windows, now }: { windows: SubscriptionUsageView['windows
       const label = window.model ? t('quotaWeeklyModel', { model: window.model }) : window.kind === 'five_hour' ? t('quotaFiveHour') : t('quotaWeekly')
       const at = window.resetsAt ? Date.parse(window.resetsAt) : NaN
       // Within a day the hour is enough; further out, the date.
-      const reset = Number.isFinite(at) ? t('quotaReset', { time: at - now < 86_400_000 ? format.dateTime(at, { hour: '2-digit', minute: '2-digit' }) : format.dateTime(at, { month: 'short', day: 'numeric' }) }) : null
+      const reset = Number.isFinite(at) ? t('quotaReset', { time: at - now < 86_400_000 ? format.dateTime(at, { hour: '2-digit', minute: '2-digit' }) : format.dateTime(at, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }) : null
       const left = t('quotaLeft', { percent: window.remaining })
-      return <span key={`${window.kind}-${window.model ?? ''}`} className="flex items-center gap-2 text-xs">
-        <span className="min-w-10 text-muted-foreground">{label}</span>
+      return <span key={`${window.kind}-${window.model ?? ''}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+        <span className="min-w-10 whitespace-nowrap text-muted-foreground">{label}</span>
         <Progress value={window.remaining} aria-label={[label, left, reset].filter(Boolean).join(' · ')} className={cn('w-12', window.remaining < 10 && '[&_[data-slot=progress-indicator]]:bg-destructive')} />
-        <span className={cn('tabular-nums', window.remaining < 10 ? 'text-destructive' : 'text-foreground')}>{left}</span>
-        {reset && <span className="text-muted-foreground">· {reset}</span>}
+        <span className={cn('whitespace-nowrap tabular-nums', window.remaining < 10 ? 'text-destructive' : 'text-foreground')}>{left}</span>
+        {reset && <span className="whitespace-nowrap text-muted-foreground">· {reset}</span>}
       </span>
     })}
   </span>

@@ -31,7 +31,7 @@ export function parseSubscriptionStart(value: unknown, provider: 'codex' | 'clau
 export const subscriptionUsageSchema = z.object({
   connections: z.array(z.object({
     id: z.uuid(),
-    status: z.enum(['ok', 'reauth', 'unavailable']),
+    status: z.enum(['ok', 'extra_usage', 'unverified', 'reauth', 'unavailable']),
     account: z.string().max(256).nullable(),
     plan: z.string().max(40).nullable(),
     windows: z.array(z.object({ kind: z.enum(['five_hour', 'weekly']), remaining: z.number().min(0).max(100), resetsAt: z.string().nullable(), model: z.string().max(40).optional() })).max(3),

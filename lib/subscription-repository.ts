@@ -38,6 +38,11 @@ export class SubscriptionRepository {
   async saveAccountLabel(row: ConnectionRow, label: string) {
     await this.pool.query('update byos_connections set "accountLabel"=$3 where id=$1 and "ownerId"=$2 and epoch=$4', [row.id, row.ownerId, label, row.epoch])
   }
+  /** 移除: hide a disconnected connection from the owner's list. */
+  async remove(ownerId: string, id: string) {
+    const { rowCount } = await this.pool.query('update byos_connections set "removedAt"=now() where id=$1 and "ownerId"=$2 and state=\'disconnected\'', [id, ownerId])
+    if (!rowCount) throw new SubscriptionRefusal('account_unavailable')
+  }
   /** Bots whose current binding uses each connection revision (Settings 「使用中」). */
   async connectionBots(ownerId: string, workspaceId: string) {
     const { rows } = await this.pool.query<{ connectionId: string; id: string; name: string; color: string; shape: string }>(`select u."connectionId",u.id,u.name,u.color,u.shape from (

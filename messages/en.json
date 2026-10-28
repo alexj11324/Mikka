@@ -1646,7 +1646,12 @@
       "updatedAgo": "Updated {minutes} min ago",
       "whenExhausted": "When it runs out, Bots using it stop until it resets",
       "usedBy": "Used by",
-      "quotaWeeklyModel": "Weekly · {model}"
+      "quotaWeeklyModel": "Weekly · {model}",
+      "notInUse": "Not in use",
+      "extraUsageOn": "Extra usage is on, so Bots won’t use this subscription",
+      "extraUsageClaudeFix": "Turn it off in claude.ai Settings › Usage",
+      "extraUsageUnverified": "Couldn’t confirm extra usage is off, so Bots won’t use this subscription for now",
+      "removeFailed": "The connection could not be removed."
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",

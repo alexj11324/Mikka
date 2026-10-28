@@ -556,54 +556,34 @@ func TestUsageReadsOwnConnectionWithoutBindingOrToken(t *testing.T) {
 	}
 }
 
-func TestUsageRefreshesOnceOn401AndReportsAPersistent401(t *testing.T) {
-	w, _, issuer := fixtureWorker(t, "claude")
-	initial := mustAcquire(t, w)
-	w.Use = nil
-	ctx := context.Background()
-	// The acquired token is refused; the renewed one is accepted.
-	w.QuotaClient = usageAnswer("claude", func(secret string) bool { return strings.Contains(secret, "-access-a") })
-	result, err := w.Usage(ctx, initial.Revision)
-	if err != nil || result.Status != 200 || issuer.refreshes.Load() != 1 || result.Account == "" {
-		t.Fatalf("401 was not renewed and retried: %+v %v", result, err)
-	}
-	raw, _ := json.Marshal(result)
-	if bytes.Contains(raw, []byte("Bearer")) {
-		t.Fatal("refused answer leaked a credential")
-	}
-	// Refused even after renewal: one refresh, then the 401 stands, with the email kept.
-	w.QuotaClient = usageAnswer("claude", func(string) bool { return true })
-	result, err = w.Usage(ctx, initial.Revision)
-	if err != nil || result.Status != 401 || issuer.refreshes.Load() != 2 || result.Account != "fixture@example.invalid" {
-		t.Fatalf("persistent 401 not reported: %+v %v", result, err)
-	}
-	if len(result.Body) != 0 {
-		t.Fatal("refused answer body crossed IPC")
-	}
-}
-
-func TestConcurrentUsage401sSpendTheRotatingRefreshTokenOnce(t *testing.T) {
-	w, _, issuer := fixtureWorker(t, "codex")
-	initial := mustAcquire(t, w)
-	w.Use = nil
-	issuer.refreshEntered, issuer.refreshRelease = make(chan struct{}), make(chan struct{})
-	w.QuotaClient = usageAnswer("codex", func(secret string) bool { return strings.Contains(secret, "-access-a") })
-	results := make(chan UsageResult, 2)
-	run := func() {
-		// A read during the other's refresh is refused (temporary), never a second refresh.
-		result, _ := w.Usage(context.Background(), initial.Revision)
-		results <- result
-	}
-	go run()
-	<-issuer.refreshEntered // the first read holds the refresh claim at the provider
-	go run()
-	second := <-results // the second cannot claim the same version and does not refresh
-	close(issuer.refreshRelease)
-	first := <-results
-	if issuer.refreshes.Load() != 1 {
-		t.Fatalf("rotating refresh token spent %d times", issuer.refreshes.Load())
-	}
-	if first.Status != 200 || second.Status == 401 {
-		t.Fatalf("unexpected outcomes: first %d second %d", first.Status, second.Status)
+func TestPersistentUsage401NeverRefreshesOrStopsTheConnection(t *testing.T) {
+	for _, status := range []int{401, 403} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			w, _, issuer := fixtureWorker(t, "claude")
+			initial := mustAcquire(t, w)
+			w.Use = nil
+			ctx := context.Background()
+			w.QuotaClient = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(`{"error":"` + request.Header.Get("Authorization") + `"}`)), Header: make(http.Header)}, nil
+			})}
+			for i := 0; i < 3; i++ {
+				result, err := w.Usage(ctx, initial.Revision)
+				if err != nil || result.Status != status || result.Account != "fixture@example.invalid" || len(result.Body) != 0 {
+					t.Fatalf("refused read not reported for itself: %+v %v", result, err)
+				}
+			}
+			if issuer.refreshes.Load() != 0 {
+				t.Fatal("a Settings read spent the refresh token")
+			}
+			record, err := w.Repo.Lookup(ctx, w.Scope)
+			if err != nil || record.State != "connected" || record.Epoch != initial.Revision || record.Version != initial.CredentialVersion {
+				t.Fatalf("a Settings read changed the connection: %+v %v", record, err)
+			}
+			// The runtime path still works afterwards.
+			bindFixture(t, w, initial.Revision, "claude_cpa")
+			if _, err := w.Execute(ctx, initial.Revision, "fixture-model", nil); err != nil {
+				t.Fatal("bots stopped after a Settings 401:", err)
+			}
+		})
 	}
 }

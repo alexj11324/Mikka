@@ -129,16 +129,15 @@ export class SubscriptionService {
    * keeping the last known email. */
   async usage(ownerId: string, id: string, signal?: AbortSignal): Promise<SubscriptionUsage> {
     const row = await this.repository.connection(ownerId, id)
-    if (row.state !== 'connected') return failedUsage(row.id, row.state === 'reconnect_required' ? 'reauth' : 'unavailable', row.accountLabel)
+    if (row.state !== 'connected') return failedUsage(row.id, 'unavailable', row.accountLabel)
     try {
       const result = await this.worker(this.repository.scope(row)).call<WorkerUsage>('usage', { revision: Number(row.epoch) }, signal)
       const usage = parseSubscriptionUsage(row.id, row.provider, result)
       if (usage.account && usage.account !== row.accountLabel) await this.repository.saveAccountLabel(row, usage.account).catch(() => undefined)
       return { ...usage, account: usage.account ?? accountLabel(row.accountLabel) }
     } catch {
-      // A failed refresh moves the connection to reconnect_required: that is a sign-in problem.
-      const current = await this.repository.connection(ownerId, id).catch(() => row)
-      return failedUsage(row.id, current.state === 'reconnect_required' ? 'reauth' : 'unavailable', current.accountLabel ?? row.accountLabel)
+      // The list shows a connection the runtime itself moved to reconnect_required.
+      return failedUsage(row.id, 'unavailable', row.accountLabel)
     }
   }
   async status(ownerId: string, id: string, signal?: AbortSignal) {

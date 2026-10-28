@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { SubscriptionRepository, type ConnectionRow } from './subscription-repository'
 import { SubscriptionService } from './subscription-service'
-import { failedUsage, parseSubscriptionUsage, usageCache, type SubscriptionUsage } from './subscription-usage'
+import { readSubscriptionQuota } from '../packages/daemon/src/subscription-quota'
+import { failedUsage, parseSubscriptionUsage, USAGE_FORCE_MS, usageCache, type SubscriptionUsage } from './subscription-usage'
 
 const id = '00000000-0000-4000-8000-000000000001'
 const at = new Date('2026-10-28T08:00:00Z')
@@ -12,7 +13,7 @@ test('codex usage shows what is left of the 5-hour and weekly windows, with the 
   // The worker's projection of chatgpt.com/backend-api/wham/usage.
   const body = {
     plan_type: 'plus',
-    credits: { has_credits: true, unlimited: false },
+    credits: { has_credits: false, unlimited: false },
     rate_limit: {
       primary_window: { used_percent: 25, limit_window_seconds: 18000, reset_at: 1793000000 },
       secondary_window: { used_percent: 92.4, limit_window_seconds: 604800, reset_at: 1793400000 },
@@ -56,12 +57,38 @@ test('a one-model week below the overall week is the third line', () => {
 })
 
 test('only windows the provider returned are shown', () => {
-  const result = parseSubscriptionUsage(id, 'codex', { status: 200, body: { plan_type: 'pro', rate_limit: { secondary_window: { used_percent: 40, limit_window_seconds: 604800 } } } })
+  const result = parseSubscriptionUsage(id, 'codex', { status: 200, body: { plan_type: 'pro', credits: { has_credits: false, unlimited: false }, rate_limit: { secondary_window: { used_percent: 40, limit_window_seconds: 604800 } } } })
   assert.equal(result.status, 'ok')
   assert.equal(result.plan, 'Pro')
   assert.deepEqual(result.windows, [{ kind: 'weekly', remaining: 60, resetsAt: null }])
   const empty = parseSubscriptionUsage(id, 'claude', { status: 200, body: { five_hour: { utilization: 'x' } } })
   assert.deepEqual(empty.windows, [])
+})
+
+test('extra usage on means the runtime will not use it; unstated is unverified, as the runtime guard', () => {
+  const windows = { rate_limit: { primary_window: { used_percent: 10, limit_window_seconds: 18000 } } }
+  for (const credits of [{ has_credits: true, unlimited: false }, { has_credits: false, unlimited: true }]) assert.equal(parseSubscriptionUsage(id, 'codex', { status: 200, body: { ...windows, credits } }).status, 'extra_usage')
+  assert.equal(parseSubscriptionUsage(id, 'codex', { status: 200, body: windows }).status, 'unverified')
+  assert.equal(parseSubscriptionUsage(id, 'codex', { status: 200, body: { ...windows, credits: { has_credits: false } } }).status, 'unverified')
+  const five = { five_hour: { utilization: 10 } }
+  const on = parseSubscriptionUsage(id, 'claude', { status: 200, body: { ...five, extra_usage: { is_enabled: true } } })
+  assert.equal(on.status, 'extra_usage')
+  assert.deepEqual(on.windows, [{ kind: 'five_hour', remaining: 90, resetsAt: null }], 'the windows still show')
+  assert.equal(parseSubscriptionUsage(id, 'claude', { status: 200, body: five }).status, 'unverified')
+  assert.equal(parseSubscriptionUsage(id, 'claude', { status: 200, body: { ...five, extra_usage: { is_enabled: false } } }).status, 'ok')
+})
+
+test('the page and the runtime agree on when a subscription is usable', () => {
+  // readSubscriptionQuota is the runtime's guard; 'ok' here exactly when it says ok.
+  const cases: [('codex' | 'claude'), Record<string, unknown>][] = [
+    ['codex', { credits: { has_credits: false, unlimited: false }, rate_limit: { primary_window: { used_percent: 5, limit_window_seconds: 18000 } } }],
+    ['codex', { credits: { has_credits: true, unlimited: false }, rate_limit: { primary_window: { used_percent: 5, limit_window_seconds: 18000 } } }],
+    ['codex', { rate_limit: { primary_window: { used_percent: 5, limit_window_seconds: 18000 } } }],
+    ['claude', { extra_usage: { is_enabled: false }, five_hour: { utilization: 5 } }],
+    ['claude', { extra_usage: { is_enabled: true }, five_hour: { utilization: 5 } }],
+    ['claude', { five_hour: { utilization: 5 } }],
+  ]
+  for (const [provider, body] of cases) assert.equal(parseSubscriptionUsage(id, provider, { status: 200, body }).status === 'ok', readSubscriptionQuota(provider, { status: 200, body }).status === 'ok', JSON.stringify(body))
 })
 
 test('401/403 asks for a new sign-in; other failures are temporary; the email survives both', () => {
@@ -71,29 +98,40 @@ test('401/403 asks for a new sign-in; other failures are temporary; the email su
   for (const account of ['Bearer abc', 'no-at-sign', '<a@b>', 42]) assert.equal(parseSubscriptionUsage(id, 'codex', { status: 200, body: {}, account }).account, null)
 })
 
-test('a good read is kept a minute; a failed one is read again at once', async () => {
+test('kept per status: ok a minute, a refused sign-in ten minutes, a failure not at all; 重试 skips once a minute', async () => {
   let clock = 0
   let reads = 0
   let next: SubscriptionUsage['status'] = 'unavailable'
-  const cache = usageCache(60_000, () => clock)
+  const cache = usageCache(() => clock)
   const read = async (): Promise<SubscriptionUsage> => { reads++; return { ...failedUsage(id, 'unavailable'), status: next } }
   await cache('a', read); await cache('a', read)
-  assert.equal(reads, 2, 'failure was cached')
+  assert.equal(reads, 2, 'a temporary failure was kept')
   next = 'reauth'
-  await cache('a', read); await cache('a', read)
-  assert.equal(reads, 4, 'reauth was cached')
+  await cache('a', read)
+  assert.equal(reads, 3)
+  clock = 9 * 60_000; await cache('a', read)
+  assert.equal(reads, 3, 'reauth must be kept ten minutes')
+  clock = 10 * 60_000; await cache('a', read)
+  assert.equal(reads, 4)
+  // 重试 may skip the kept answer, at most once a minute.
+  clock += 30_000; await cache('a', read, true)
+  assert.equal(reads, 4, 'forced within a minute')
+  clock += USAGE_FORCE_MS - 30_000; await cache('a', read, true)
+  assert.equal(reads, 5)
+  await cache('a', read, true)
+  assert.equal(reads, 5, 'second force in the same minute')
   next = 'ok'
-  await cache('a', read); await cache('a', read)
-  assert.equal(reads, 5)
-  clock = 59_999; await cache('a', read)
-  assert.equal(reads, 5)
-  clock = 60_000; await cache('a', read)
+  clock += USAGE_FORCE_MS; await cache('a', read, true)
   assert.equal(reads, 6)
-  await cache('b', read)
+  clock += 59_999; await cache('a', read)
+  assert.equal(reads, 6)
+  clock += 1; await cache('a', read)
   assert.equal(reads, 7)
+  await cache('b', read)
+  assert.equal(reads, 8)
 })
 
-function serviceWith(row: Partial<ConnectionRow>, call: () => Promise<unknown>, after?: Partial<ConnectionRow>) {
+function serviceWith(row: Partial<ConnectionRow>, call: (...args: unknown[]) => Promise<unknown>, after?: Partial<ConnectionRow>) {
   const base: ConnectionRow = { id, ownerId: 'alex', workspaceId: 'w', provider: 'claude', state: 'connected', epoch: '3', quota: null, accountLabel: null, ...row }
   const saved: string[] = []
   let lookups = 0
@@ -112,14 +150,15 @@ test('a worker failure keeps the last known email and is temporary', async () =>
   assert.equal(usage.account, 'alex@example.com')
 })
 
-test('a refresh that failed into reconnect_required is a sign-in problem', async () => {
-  const { service } = serviceWith({ accountLabel: 'alex@example.com' }, async () => { throw new Error('operation_failed') }, { state: 'reconnect_required' })
-  const usage = await service.usage('alex', id)
-  assert.deepEqual([usage.status, usage.account], ['reauth', 'alex@example.com'])
+test('a usage read never refreshes, reconnects or disconnects: it only asks for usage', async () => {
+  const methods: string[] = []
+  const { service } = serviceWith({ accountLabel: 'alex@example.com' }, async (...args: unknown[]) => { methods.push(String(args[0])); return { status: 401, body: {} } })
+  for (let i = 0; i < 3; i++) assert.equal((await service.usage('alex', id)).status, 'reauth')
+  assert.deepEqual(methods, ['usage', 'usage', 'usage'])
 })
 
 test('a good read stores the email for later failures; a 401 keeps it', async () => {
-  const ok = serviceWith({}, async () => ({ status: 200, body: { five_hour: { utilization: 10 } }, account: 'alex@example.com' }))
+  const ok = serviceWith({}, async () => ({ status: 200, body: { extra_usage: { is_enabled: false }, five_hour: { utilization: 10 } }, account: 'alex@example.com' }))
   assert.equal((await ok.service.usage('alex', id)).account, 'alex@example.com')
   assert.deepEqual(ok.saved, ['alex@example.com'])
   const refused = serviceWith({ accountLabel: 'alex@example.com' }, async () => ({ status: 401, body: {} }))

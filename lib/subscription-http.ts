@@ -10,6 +10,7 @@ const input = z.discriminatedUnion('action', [
   z.object({ action: z.literal('poll'), connectionId: id, state: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict(),
   z.object({ action: z.literal('callback'), connectionId: id, state: z.string().regex(/^[A-Za-z0-9_-]{43}$/), callbackUrl: z.string().min(1).max(8192) }).strict(),
   z.object({ action: z.enum(['status', 'disconnect', 'recover']), connectionId: id, revision: z.number().int().positive().optional() }).strict(),
+  z.object({ action: z.literal('remove'), connectionId: id, revision: z.number().int().positive() }).strict(),
   z.object({ action: z.literal('bind'), connectionId: id, revision: z.number().int().positive(), consumerId: z.string().min(1).max(128), route: subscriptionRouteSchema.exclude(['openai_siwc']), modelId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/) }).strict()
 ])
 const headers = { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' }
@@ -33,7 +34,7 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
       const parsed = input.safeParse(JSON.parse(new TextDecoder().decode(bytes)))
       if (!parsed.success) throw new Error('invalid_request')
       const body = parsed.data
-      const service = deps.service(['status', 'disconnect', 'recover'].includes(body.action))
+      const service = deps.service(['status', 'disconnect', 'recover', 'remove'].includes(body.action))
       if (body.action === 'connect') {
         await deps.workspace(session.userId, body.workspaceId)
         if (!service.capabilities.oauth?.[body.provider]) throw new SubscriptionRefusal('backend_unavailable')
@@ -52,6 +53,12 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
       else if (body.action === 'poll') result = await worker.call('oauthPoll', { sessionId: session.sessionId, state: body.state }, request.signal)
       else if (body.action === 'callback') { await worker.call('oauthHandoff', { sessionId: session.sessionId, state: body.state, callbackUrl: body.callbackUrl }, request.signal); result = await service.status(session.userId, row.id, request.signal) }
       else if (body.action === 'reconnect') result = await worker.call('oauthStart', { revision: body.revision, sessionId: session.sessionId }, request.signal)
+      else if (body.action === 'remove') {
+        // 移除: fence and clean up like 断开连接 first, then hide the row for good.
+        if (row.state !== 'disconnected') await worker.call('disconnect', { revision: body.revision }, request.signal)
+        await service.repository.remove(session.userId, row.id)
+        result = { id: row.id, removed: true }
+      }
       else { await worker.call(body.action, { revision: body.revision }, request.signal); result = await service.status(session.userId, row.id, request.signal) }
       return Response.json(result, { headers })
     } catch (error) {
@@ -68,7 +75,7 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
     const service = deps.service(true)
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
     await deps.workspace(session.userId, workspaceId)
-    const { rows } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel" from byos_connections where "ownerId"=$1 and "workspaceId"=$2 order by "createdAt" desc limit 50', [session.userId, workspaceId])
+    const { rows } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel" from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and "removedAt" is null order by "createdAt" desc limit 50', [session.userId, workspaceId])
     // Which Bots use each connection is a nicety: the list still loads without it.
     const bots = await service.repository.connectionBots(session.userId, workspaceId).catch(() => [])
     return Response.json({ enabled: true, providers: ['codex', 'claude'].map(provider => ({ provider, available: Boolean(service.capabilities.oauth?.[provider as 'codex' | 'claude']) })), connections: rows.map(row => ({ id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch), account: accountLabel(row.accountLabel), bots: bots.filter(bot => bot.connectionId === row.id).map(({ id, name, color, shape }) => ({ id, name, color, shape })) })) }, { headers })
@@ -80,8 +87,9 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
 
 const cachedUsage = usageCache()
 /** Remaining 5-hour and weekly allowance of the owner's connected subscriptions.
- * A successful read is cached a minute; a failed one is not, so 重试 reads
- * again. Failures degrade to `reauth` / `unavailable`; tokens stay in the worker. */
+ * Reads are kept per status (USAGE_TTL_MS: a refused sign-in 10 minutes, a
+ * temporary failure not at all); `?refresh=1` (重试) skips a kept read at most
+ * once a minute. Tokens stay in the worker; a read never changes a connection. */
 export async function subscriptionUsage(request: Request, deps: SubscriptionHTTPDependencies) {
   const session = await deps.session(request)
   if (!session) return Response.json({ error: 'auth_required' }, { status: 401, headers })
@@ -90,8 +98,9 @@ export async function subscriptionUsage(request: Request, deps: SubscriptionHTTP
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
     await deps.workspace(session.userId, workspaceId)
     const { rows } = await service.repository.pool.query('select id,epoch from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and state=\'connected\' order by "createdAt" desc limit 20', [session.userId, workspaceId])
+    const force = new URL(request.url).searchParams.get('refresh') === '1'
     const connections = await Promise.all(rows.map(row => cachedUsage(`${session.userId}:${row.id}:${row.epoch}`, () =>
-      service.usage(session.userId, row.id, AbortSignal.timeout(15_000)).catch(() => failedUsage(row.id, 'unavailable')))))
+      service.usage(session.userId, row.id, AbortSignal.timeout(15_000)).catch(() => failedUsage(row.id, 'unavailable')), force)))
     return Response.json({ connections }, { headers })
   } catch (error) {
     if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable') return Response.json({ connections: [] }, { headers })

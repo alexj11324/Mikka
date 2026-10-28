@@ -49,50 +49,26 @@ var emailPattern = regexp.MustCompile(`^[^\s@<>"\x00-\x1f\x7f]{1,64}@[^\s@<>"\x0
 
 // Usage reads the connection's own allowance for its owner's Settings page. It
 // needs no model binding: the custody scope (owner, workspace, connection) and
-// the connected epoch are the authorization, as for status. A provider 401 is
-// answered once with a refresh from the version this read used, then a retry.
-// Status 0 means the provider could not be reached; the email still returns.
+// the connected epoch are the authorization, as for status. It never forces a
+// refresh and never changes the connection: a provider 401/403 is reported for
+// this read only. (readyAuth renews only a token about to expire, as every
+// runtime read does.) Status 0 means the provider could not be reached.
 func (w *Worker) Usage(ctx context.Context, epoch int64) (UsageResult, error) {
 	if w.ExecutionOnly || w.Use != nil {
 		return UsageResult{}, ErrUnsupported
 	}
-	r, auth, err := w.readyAuth(ctx, epoch)
+	_, auth, err := w.readyAuth(ctx, epoch)
 	if err != nil {
 		return UsageResult{}, err
 	}
 	result := UsageResult{Body: map[string]any{}, Account: accountEmail(auth)}
-	quota, err := w.fetchQuota(ctx, auth)
-	if err == nil && quota.Status == http.StatusUnauthorized {
-		_, refreshErr := w.refreshFrom(ctx, epoch, r.Version)
-		switch {
-		case refreshErr == nil || refreshErr == ErrStale || refreshErr == ErrBusy:
-			// Renewed here or by another process: read once more with what is stored now.
-			_, again, loadErr := w.readyAuth(ctx, epoch)
-			if loadErr != nil || accessToken(again) == accessToken(auth) {
-				quota = QuotaResult{}
-			} else {
-				quota, err = w.fetchQuota(ctx, again)
-			}
-		case refreshErr == ErrUnsupported:
-			quota = QuotaResult{}
-		}
-		// Any other refresh failure leaves the provider's 401: the owner signs in again.
-	}
-	if err == nil {
+	if quota, err := w.fetchQuota(ctx, auth); err == nil {
 		result.Status, result.Body = quota.Status, quota.Body
-		if result.Body == nil {
-			result.Body = map[string]any{}
-		}
 	}
-	if current, err := w.Repo.Lookup(ctx, w.Scope); err != nil || current.Epoch != epoch || (current.State != "connected" && current.State != "reconnect_required") {
+	if current, err := w.Repo.Lookup(ctx, w.Scope); err != nil || current.Epoch != epoch || current.State != "connected" {
 		return UsageResult{}, ErrUnavailable
 	}
 	return result, nil
-}
-
-func accessToken(auth *core.Auth) string {
-	token, _ := auth.Metadata["access_token"].(string)
-	return token
 }
 
 func accountEmail(auth *core.Auth) string {

@@ -121,14 +121,6 @@ func (e safeExecutor) HttpRequest(context.Context, *core.Auth, *http.Request) (*
 	return nil, ErrUnsupported
 }
 func (w *Worker) Refresh(ctx context.Context, expectedEpoch int64) (Metadata, error) {
-	return w.refreshFrom(ctx, expectedEpoch, -1)
-}
-
-// refreshFrom renews only from credential version `from` (any, when negative).
-// The claim is a compare-and-set on epoch, version and a free operation slot,
-// so a rotating refresh token is spent by one process only; a caller whose
-// version is already superseded gets ErrStale and reloads instead.
-func (w *Worker) refreshFrom(ctx context.Context, expectedEpoch, from int64) (Metadata, error) {
 	if w.ExecutionOnly || w.Secrets == nil || w.Executor == nil || w.Executor.Identifier() != w.Scope.Provider {
 		return Metadata{}, ErrUnsupported
 	}
@@ -138,9 +130,6 @@ func (w *Worker) refreshFrom(ctx context.Context, expectedEpoch, from int64) (Me
 	}
 	if r.Epoch != expectedEpoch || r.State != "connected" {
 		return Metadata{}, ErrUnavailable
-	}
-	if from >= 0 && r.Version != from {
-		return Metadata{}, ErrStale
 	}
 	o, err := w.Repo.ClaimRefresh(ctx, w.Scope, r.Epoch, r.Version)
 	if err != nil {

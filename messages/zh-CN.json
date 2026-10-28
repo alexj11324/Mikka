@@ -1646,7 +1646,12 @@
       "updatedAgo": "{minutes} 分钟前更新",
       "whenExhausted": "用完后，用它的 Bot 会停下，等额度重置",
       "usedBy": "使用中：",
-      "quotaWeeklyModel": "每周 · {model}"
+      "quotaWeeklyModel": "每周 · {model}",
+      "notInUse": "未在使用",
+      "extraUsageOn": "开启了额外用量，Bot 不会使用这个订阅",
+      "extraUsageClaudeFix": "在 claude.ai 的 设置 › 用量 关闭",
+      "extraUsageUnverified": "没确认额外用量已关闭，Bot 暂不会使用这个订阅",
+      "removeFailed": "无法移除这个连接。"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",

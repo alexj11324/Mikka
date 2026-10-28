@@ -292,8 +292,10 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       if (provider === 'codex') assert.equal((await post({ action: 'disconnect', connectionId, revision })).status, 200)
       await assert.rejects(service.model(use), { code: 'disconnected' })
       const stateAfter = await repository.connection('alice', connectionId)
+      assert.equal(stateAfter.accountLabel, 'fixture@example.invalid', 'a disconnected row keeps its email')
       const reconnect = await post({ action: 'reconnect', connectionId, revision: Number(stateAfter.epoch) })
       assert.equal(reconnect.status, 200)
+      assert.equal((await repository.connection('alice', connectionId)).accountLabel, null, 'a new sign-in must not show the old email')
       assert.equal((await finishAttempt(connectionId, reconnect.body)).status, 200)
       await assert.rejects(service.model(use), { code: 'stale_binding' })
       assert.ok(!(await repository.connection('alice', connectionId)).quota, 'reconnect must clear old account quota')
@@ -329,6 +331,17 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
     assert.ok(!secrets.has(fairness[2]), 'two failed connections starved later cleanup')
     for(const name of fairness) blockedDeletes.delete(name)
     for(let pass=0;pass<4;pass++) await service.cleanupBatch()
+    // 移除: a pending (never finished) connection is fenced, then gone from the list for good.
+    const abandoned = await post({ action: 'connect', workspaceId, provider: 'claude' })
+    assert.equal(abandoned.status, 200)
+    const listedIds = async () => (await (await subscriptionList(new Request(`http://localhost/api/subscriptions?workspace=${workspaceId}`, { headers: { cookie: 'fixture=alice' } }), dependencies)).json()).connections.map(item => item.id)
+    assert.ok((await listedIds()).includes(abandoned.body.connectionId))
+    assert.equal((await post({ action: 'remove', connectionId: abandoned.body.connectionId, revision: abandoned.body.revision }, 'bob')).status, 409, 'another owner cannot remove it')
+    const removed = await post({ action: 'remove', connectionId: abandoned.body.connectionId, revision: abandoned.body.revision })
+    assert.equal(removed.status, 200)
+    assert.ok(!(await listedIds()).includes(abandoned.body.connectionId), '移除 left the row listed')
+    const gone = await pool.query('select state,"removedAt" from byos_connections where id=$1', [abandoned.body.connectionId])
+    assert.equal(gone.rows[0].state, 'disconnected'); assert.ok(gone.rows[0].removedAt)
     if (process.env.MIKKA_BYOS_BACKEND_ONLY === '1') { console.log('Backend-only acceptance complete; browser acceptance intentionally not run'); return }
     // Actual Settings component in Chromium, synthetic session/provider only.
     const require = createRequire(import.meta.url)

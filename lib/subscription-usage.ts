@@ -6,11 +6,15 @@ export interface UsageWindow { kind: 'five_hour' | 'weekly'; remaining: number; 
 
 /** One connected subscription as its owner's Settings row shows it. Numbers,
  * a plan label and the sign-in email only; never a token or account id.
- * `reauth`: the provider refused the sign-in (401/403, still refused after one
- * refresh). `unavailable`: the read failed for now; try again. */
+ * - `extra_usage`: the provider would bill past the plan (Codex credits, Claude
+ *   extra usage), so the runtime refuses it (`quota_unknown`, fail closed).
+ * - `unverified`: the answer did not say whether that is off; refused too.
+ * - `reauth`: the provider refused this read (401/403). Reported for this read
+ *   only; the connection itself is untouched.
+ * - `unavailable`: the read failed for now; try again. */
 export interface SubscriptionUsage {
   id: string
-  status: 'ok' | 'reauth' | 'unavailable'
+  status: 'ok' | 'extra_usage' | 'unverified' | 'reauth' | 'unavailable'
   account: string | null
   plan: string | null
   /** 5-hour, weekly, then a one-model week only when it is lower than the weekly. */
@@ -27,6 +31,19 @@ export const accountLabel = (value: unknown) => typeof value === 'string' && val
 
 export function failedUsage(id: string, status: 'reauth' | 'unavailable', account: unknown = null, now = new Date()): SubscriptionUsage {
   return { id, status, account: accountLabel(account), plan: null, windows: [], observedAt: now.toISOString() }
+}
+
+/** Mirrors readSubscriptionQuota's spend guard (packages/daemon/src/subscription-quota.ts):
+ * only an explicit "off" lets the runtime use the subscription. */
+export function extraUsage(provider: 'codex' | 'claude', body: Record<string, unknown>): 'off' | 'on' | 'unknown' {
+  const controls = body[provider === 'codex' ? 'credits' : 'extra_usage']
+  if (!controls || typeof controls !== 'object') return 'unknown'
+  const c = controls as Record<string, unknown>
+  if (provider === 'codex') {
+    if (c.has_credits === false && c.unlimited === false) return 'off'
+    return c.has_credits === true || c.unlimited === true ? 'on' : 'unknown'
+  }
+  return c.is_enabled === false ? 'off' : c.is_enabled === true ? 'on' : 'unknown'
 }
 
 const remaining = (window: QuotaWindow) => Math.max(0, Math.min(100, Math.round(100 - window.used * 100)))
@@ -53,22 +70,31 @@ export function parseSubscriptionUsage(id: string, provider: 'codex' | 'claude',
     if (tightest && (!weekly || tightest.remaining < weekly.remaining)) windows.push(tightest)
   }
   // Claude's usage answer has no plan; the decoder's fallback label is not one.
-  const plan = provider === 'codex' ? decoded?.plan ?? codexPlanLabel((result.body as Record<string, unknown>).plan_type) : null
-  return { id, status: 'ok', account, plan, windows, observedAt: now.toISOString() }
+  const body = result.body as Record<string, unknown>
+  const plan = provider === 'codex' ? decoded?.plan ?? codexPlanLabel(body.plan_type) : null
+  const guard = extraUsage(provider, body)
+  return { id, status: guard === 'off' ? 'ok' : guard === 'on' ? 'extra_usage' : 'unverified', account, plan, windows, observedAt: now.toISOString() }
 }
 
-/** A short per-instance cache: one provider read per connection revision a
- * minute. Only successful reads are kept, so 重试 really reads again. */
-export function usageCache(ttlMs = 60_000, now = () => Date.now()) {
-  const entries = new Map<string, { at: number; value: Promise<SubscriptionUsage> }>()
-  return (key: string, read: () => Promise<SubscriptionUsage>) => {
+/** How long a read is kept: a refused sign-in 10 minutes (so Settings does not
+ * keep asking a provider that said no), a temporary failure not at all. */
+export const USAGE_TTL_MS: Record<SubscriptionUsage['status'], number> = { ok: 60_000, extra_usage: 60_000, unverified: 60_000, reauth: 600_000, unavailable: 0 }
+/** 重试 may skip a kept read, at most once a minute per connection. */
+export const USAGE_FORCE_MS = 60_000
+
+/** A short per-instance cache of reads per connection revision; in-flight
+ * reads are shared. */
+export function usageCache(now = () => Date.now()) {
+  const entries = new Map<string, { at: number; ttl: number; value: Promise<SubscriptionUsage> }>()
+  return (key: string, read: () => Promise<SubscriptionUsage>, force = false) => {
     const hit = entries.get(key)
-    if (hit && now() - hit.at < ttlMs) return hit.value
-    for (const [name, entry] of entries) if (now() - entry.at >= ttlMs) entries.delete(name)
+    if (hit && now() - hit.at < hit.ttl && !(force && now() - hit.at >= USAGE_FORCE_MS)) return hit.value
+    for (const [name, entry] of entries) if (now() - entry.at >= entry.ttl) entries.delete(name)
     if (entries.size >= 500) entries.delete(entries.keys().next().value!)
-    const entry = { at: now(), value: read() }
+    // Kept while in flight; then for its status' time.
+    const entry = { at: now(), ttl: Number.POSITIVE_INFINITY, value: read() }
     entries.set(key, entry)
-    void entry.value.then(result => { if (result.status !== 'ok' && entries.get(key) === entry) entries.delete(key) }, () => { if (entries.get(key) === entry) entries.delete(key) })
+    void entry.value.then(result => { entry.ttl = USAGE_TTL_MS[result.status] ?? 0; if (!entry.ttl && entries.get(key) === entry) entries.delete(key) }, () => { if (entries.get(key) === entry) entries.delete(key) })
     return entry.value
   }
 }
