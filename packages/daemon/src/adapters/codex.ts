@@ -35,6 +35,7 @@ import type { AgentSandbox } from "../agents/sandbox"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
+import { mailboxToolResult } from '../run-mailbox'
 import type {
   DeltaNotification,
   ErrorNotification,
@@ -257,6 +258,7 @@ export class CodexAdapter implements AgentAdapter {
       Partial<Pick<StartOptions, "prompt" | "continueSession">>
   ): Promise<AgentSession> {
     const log = options.log.child({ harness: "codex" })
+    if (options.mailbox && mode !== 'new') throw new Error('Run mailbox requires a fresh Codex thread; resume capability is unverified')
     const paths = runPaths(this.options.stateDir, options.runId)
     const runDir = await claimRunDir(paths)
     const externalAuth = this.options.subscriptionAuth
@@ -296,6 +298,7 @@ export class CodexAdapter implements AgentAdapter {
       !externalAuth
     )
     const ctx = new RunContext({
+      mailboxEnabled: Boolean(options.mailbox),
       harness: "codex",
       kind: options.kind,
       worktree: options.cwd,
@@ -352,6 +355,7 @@ export class CodexAdapter implements AgentAdapter {
     const streamed = new Set<string>()
     const pending: string[] = []
     let activeTurn: string | null = null
+    let pendingTurnStart: Promise<void> | null = null
     let ending = false
     let lastError: string | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
@@ -374,6 +378,13 @@ export class CodexAdapter implements AgentAdapter {
 
     // Mikka's sandbox decides; inside it every action is allowed.
     rpc.onRequest(async (method, params: unknown) => {
+      if (method === 'item/tool/call') {
+        if (pendingTurnStart) await pendingTurnStart
+        const call = params as { threadId?: unknown; turnId?: unknown; namespace?: unknown; tool?: unknown; arguments?: unknown }
+        const valid = options.mailbox && !ending && call.threadId === sessionId && call.turnId === activeTurn && activeTurn !== null && call.namespace === null && typeof call.tool === 'string'
+        const result = valid ? mailboxToolResult(await options.mailbox!.request({ operation: 'call', name: call.tool, arguments: call.arguments })) : { isError: true, content: [{ type: 'text' as const, text: 'Run mailbox scope unavailable' }] }
+        return { contentItems: result.content.map(part => ({ type: 'inputText', text: part.text })), success: !result.isError }
+      }
       if (method === "account/chatgptAuthTokens/refresh") {
         const previous =
           params && typeof params === "object" && "previousAccountId" in params
@@ -399,6 +410,9 @@ export class CodexAdapter implements AgentAdapter {
       return { decision: "decline" }
     })
     rpc.onNotification((method: string, params: unknown) => {
+      // A subagent/late foreign thread cannot rewrite the authority of this
+      // host-bound run. Turn authority comes from our turn/start response.
+      if (options.mailbox && (method.startsWith('item/') || method.startsWith('turn/') || method === 'thread/tokenUsage/updated') && (params as { threadId?: unknown } | null)?.threadId !== sessionId) return
       switch (method) {
         case "item/agentMessage/delta": {
           const { itemId, delta } = params as DeltaNotification
@@ -432,7 +446,7 @@ export class CodexAdapter implements AgentAdapter {
           return
         }
         case "turn/started":
-          activeTurn = (params as TurnNotification).turn.id
+          if (!options.mailbox) activeTurn = (params as TurnNotification).turn.id
           return
         case "thread/tokenUsage/updated": {
           const { total } = (params as TokenUsageNotification).tokenUsage
@@ -451,6 +465,14 @@ export class CodexAdapter implements AgentAdapter {
           return
         }
         case "turn/completed":
+          if (options.mailbox && pendingTurnStart) {
+            const completed = (params as TurnNotification).turn
+            void pendingTurnStart.then(() => {
+              if (!ending && completed.id === activeTurn) { activeTurn = null; return turnCompleted(completed) }
+            }).catch(() => undefined)
+            return
+          }
+          if (options.mailbox && (params as TurnNotification).turn.id !== activeTurn) return
           activeTurn = null
           void turnCompleted((params as TurnNotification).turn)
           return
@@ -508,12 +530,15 @@ export class CodexAdapter implements AgentAdapter {
         threadId: sessionId,
         input: text(message)
       })
-      const { turn } = await (externalAuth
+      const response = (externalAuth
         ? result.catch(() => {
             throw new Error(SUBSCRIPTION_EXECUTION_ERROR)
           })
         : result)
-      activeTurn ??= turn.id
+      if (options.mailbox) {
+        pendingTurnStart = response.then(({ turn }) => { if (!ending) activeTurn = turn.id })
+        try { await pendingTurnStart } finally { pendingTurnStart = null }
+      } else { const { turn } = await response; activeTurn ??= turn.id }
     }
 
     void child.exited.then(({ code, signal }) => {
@@ -533,17 +558,20 @@ export class CodexAdapter implements AgentAdapter {
     const ready = <T>(step: Promise<T>, label: string) =>
       untilReady(child, step, `codex ${label}`)
     try {
-      await ready(
-        rpc.sendRequest("initialize", {
+      const initialized = await ready(
+        rpc.sendRequest<{ userAgent?: string }>("initialize", {
           clientInfo: {
             name: "mikka",
             title: "Mikka",
             version: DAEMON_VERSION,
           },
-          capabilities: externalAuth ? { experimentalApi: true } : null
+          capabilities: externalAuth || options.mailbox ? { experimentalApi: true } : null
         }),
         "initialize"
       )
+      // Public schemas omit the experimental dynamicTools field. Support only
+      // the exact pinned CLI whose Rust protocol and response were audited.
+      if (options.mailbox && !/(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(initialized.userAgent ?? '')) throw new Error('Run mailbox requires the audited Codex0.163.0 dynamic-tools interface')
       await rpc.sendNotification("initialized")
       if (externalAuth) {
         try {
@@ -569,6 +597,7 @@ export class CodexAdapter implements AgentAdapter {
         approvalPolicy: "never",
         sandbox: "danger-full-access",
         developerInstructions: ctx.instructions(),
+        ...(options.mailbox ? { dynamicTools: options.mailbox.tools.map(tool => ({ type: 'function' as const, ...tool })) } : {}),
         ...(options.model ? { model: options.model } : {}),
       }
       const newThread = () =>

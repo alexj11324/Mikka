@@ -8,18 +8,21 @@ import * as kit from './agent-kit-steps'
 import type { NativeToolScope } from './tool-scope'
 import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
+import { personalMailboxTools } from '@/lib/mailbox-tools'
+import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
 
-export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean }
+export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; taskEventId?: string; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[] }
 
 export function createCoordinatorRegistry(userId: string, botId: string | null, scope?: NativeToolScope, options: CoordinatorToolOptions = {}) {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
-  const { execution,computerEnabled = false } = options
+  const { execution,computerEnabled = false,mailboxEnabled = false } = options
   const id = z.uuid()
   // A named Bot always controls its own computer. The built-in Coordinator
   // may select any authorized Bot on the person's explicit instruction.
   const botInput = botId ? id.optional() : id
   const targetBot = (requested?: string) => botId ? (!requested || requested === botId ? botId : null) : requested ?? null
   return {
+    ...personalMailboxTools(mailboxEnabled && Boolean(execution), request => steps.personalMailbox(userId, botId, request, scope, execution?.id)),
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input, scope)),
     ...createGoogleAITools((action, input) => steps.composioAction(userId, action, input, scope), (action, input) => steps.proposeAccountAction(userId, action, input, scope)),
     web_search: tool({
@@ -40,7 +43,9 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
     ...(issueMutationsEnabled() ? { create_issue: tool({
       description: 'Create the task the person asked for, including requests from the new-task dialog. Write a short title and put details in body. The assignee can only be a person; dispatching a thread is a separate action. Defaults to todo and normal priority.',
       inputSchema: createIssueInput,
-      execute: (input, options) => steps.createIssue(userId, input, options.toolCallId, scope, botId),
+      execute: (input, toolOptions) => options.taskEventId
+        ? steps.createIssue(userId, input, toolOptions.toolCallId, scope, botId, options.taskEventId)
+        : steps.createIssue(userId, input, toolOptions.toolCallId, scope, botId),
     }),
     update_issue: tool({
       description: 'Update an existing task the person asked to change. Only supplied fields change; labels replaces the full label set. Read the task first. The assignee can only be a person.',
@@ -149,8 +154,9 @@ export function coordinatorTools(userId: string, botId: string | null, scope?: N
   if (!execution) return Object.fromEntries(Object.entries(registry).filter(([name]) => name !== 'load_skill'))
   // A rollout gate can narrow a frozen grant; enabling it never adds tool IDs
   // absent from this execution's immutable effectiveTools.
-  const requested = issueMutationsEnabled() ? execution.snapshot.effectiveTools
-    : execution.snapshot.effectiveTools.filter(name => name !== 'create_issue' && name !== 'update_issue')
+  const requested = execution.snapshot.effectiveTools.filter(name =>
+    (issueMutationsEnabled() || (name !== 'create_issue' && name !== 'update_issue')) &&
+    (!Object.hasOwn(mailboxInputs, name) || (options.mailboxEnabled && options.mailboxTools?.includes(name as MailboxToolName))))
   return instrumentTools(registry,requested,{
     before:(callId,name) => kit.beforeAgentTool(userId,botId,execution.id,callId,name,scope),
     after:(callId,name,outcome) => kit.afterAgentTool(userId,botId,execution.id,callId,name,outcome,scope),

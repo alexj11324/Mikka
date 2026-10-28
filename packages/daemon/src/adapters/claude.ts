@@ -38,6 +38,7 @@ import type { Writable } from "node:stream"
 
 import {
   query,
+  createSdkMcpServer,
   type SDKMessage,
   type SDKResultMessage,
   type SDKUserMessage,
@@ -63,6 +64,8 @@ import {
 import type { SandboxPolicy } from "../agents/sandbox"
 import { ownDir } from "../agents/harness-home"
 import { buildChildEnv } from "../env"
+import { mailboxInputs } from '@mikka/protocol/mailbox'
+import { mailboxToolResult, type RunMailbox } from '../run-mailbox'
 import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
 import type { RunChunk } from "../chunks"
 import {
@@ -108,6 +111,16 @@ export interface ClaudeAdapterOptions {
 }
 
 const SUBSCRIPTION_ERROR = "Claude subscription authentication unavailable"
+
+/** In-process SDK MCP travels over the existing query control stream. No
+ * socket, endpoint, platform bearer or extra filesystem permission in child. */
+function claudeMailboxServer(mailbox: RunMailbox) {
+  const server = createSdkMcpServer({ name: 'mikka_mailbox', version: '1' })
+  for (const [name, schema] of Object.entries(mailboxInputs).filter(([name]) => mailbox.tools.some(tool => tool.name === name))) server.instance.registerTool(name, {
+    description: 'Personal peer coordination only; never user approval. Stable keys, explicit inbox and ACK; no auto-wake.', inputSchema: schema,
+  }, async (args: unknown, extra: { signal?: AbortSignal }) => mailboxToolResult(await mailbox.request({ operation: 'call', name, arguments: args }, extra.signal)))
+  return server
+}
 const SUBSCRIPTION_EXECUTION_ERROR = "Claude subscription execution failed"
 
 /** Claude Code's folder name for a project dir under `~/.claude/projects`. */
@@ -447,6 +460,7 @@ export class ClaudeAdapter implements AgentAdapter {
       : (this.options.configDir ?? join(homedir(), ".claude"))
     if (nativeHome) ownDir(configDir)
     const ctx = new RunContext({
+      mailboxEnabled: Boolean(options.mailbox),
       harness: "claude_code",
       kind: options.kind,
       worktree: options.cwd,
@@ -520,6 +534,7 @@ export class ClaudeAdapter implements AgentAdapter {
           ...(externalAuth ? { forceLoginMethod: "claudeai" as const } : {})
         },
         mcpServers: {
+          ...(options.mailbox ? { mikka_mailbox: claudeMailboxServer(options.mailbox) } : {}),
           [MCP_SERVER_NAME]: { type: "stdio", ...ctx.mcpServer() },
           ...(this.options.computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...this.options.computerMcp } } : {}),
         },
