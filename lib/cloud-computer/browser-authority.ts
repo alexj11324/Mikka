@@ -5,7 +5,9 @@ import type { BrowserMutation } from './action-reviews'
 
 /** Consumer boundary for the trusted host policy. The authoritative host
  * assignment and its atomic grant consumption have not been delivered here.
- * Do not substitute a model flag or workspace access for this decision. */
+ * Do not substitute a model flag or workspace access for this decision.
+ * For ask, expose the same broker request through the existing pending_actions
+ * UI and forward its one decision to the broker; never mint a second approval. */
 export type BrowserAuthority = { decision: 'allow' | 'ask' | 'deny'; policyVersion: number; expiresAt: number; readOnly: boolean; review?: { actionId: string; digest: string; summary: string } }
 export async function authorizeBrowserAction(_input: { permissionAction: 'computer_use'; actor: Actor; botId: string; subagentId: string; epoch: number; loaderId: string; origin: string; mutation: BrowserMutation; summary: string }): Promise<BrowserAuthority> {
   throw new ComputerError(503, 'Browser action authority unavailable')
