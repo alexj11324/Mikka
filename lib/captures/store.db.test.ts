@@ -53,7 +53,7 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.equal(artifactStorage(), 'inline', 'the test database keeps files in rows, never in a bucket')
     // The E2E schema comes from the Drizzle tables; the migration adds its
     // indexes and constraints, and must be safe to run again over them.
-    const migration = await readFile(new URL('../../drizzle/20261028040000_run_captures.sql', import.meta.url), 'utf8')
+    const migration = await readFile(new URL('../../drizzle/20261028183500_run_captures.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
     for (const id of [alice, bob]) await pool.query(`INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [id, `${id}@example.com`])
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'cloud','cloud'),($3,$2,'mac','local'),($4,$5,'bob','local')`, [cloudDevice, alice, localDevice, bobDevice, bob])
@@ -86,10 +86,56 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.deepEqual(begun.upload, { target: 'server' })
     assert.equal(('error' in await store.receiveUpload(local, begun.captureId, PNG.slice(1))), true, 'a short file is refused')
     assert.equal(('error' in await store.receiveUpload({ ...local, runId: bobRun, userId: bob }, begun.captureId, PNG)), true, 'another run cannot send it')
+    assert.ok('error' in await store.resumeUpload({ ...local, runId: bobRun, userId: bob }, begun.captureId), 'another owner cannot resume it')
+    assert.deepEqual(await store.resumeUpload(local, begun.captureId), begun)
     assert.deepEqual(await store.receiveUpload(local, begun.captureId, PNG), { ok: true })
     const completed = await store.completeUpload(local, begun.captureId)
     assert.ok(!('error' in completed))
     assert.equal(completed.title, 'Checkout')
+    assert.deepEqual(await store.completeUpload(local, begun.captureId), completed, 'a lost completion response is safe to retry')
+    assert.ok('error' in await store.resumeUpload(local, begun.captureId), 'a completed reservation cannot be reused')
+    const simultaneous = await store.beginUpload(local, { title: 'Two completions', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
+    assert.ok(!('error' in simultaneous))
+    await store.receiveUpload(local, simultaneous.captureId, PNG)
+    const completions = await Promise.all([store.completeUpload(local, simultaneous.captureId), store.completeUpload(local, simultaneous.captureId)])
+    assert.ok(completions.every(result => !('error' in result)), 'simultaneous completion requests observe the same result')
+    await pool.query('DELETE FROM run_captures WHERE id=$1', [simultaneous.captureId])
+
+    // Exercise the actual device routes after the run ends, including token revocation.
+    const { hashDeviceToken } = await import('../device-link')
+    const { POST: beginRoute } = await import('../../app/v1/runs/[runId]/captures/route')
+    const { POST: resumeRoute, PUT: uploadRoute } = await import('../../app/v1/runs/[runId]/captures/[captureId]/route')
+    const { POST: completeRoute } = await import('../../app/v1/runs/[runId]/captures/[captureId]/complete/route')
+    const token = `fixture-${randomUUID()}`, tokenId = randomUUID()
+    await pool.query('INSERT INTO device_tokens (id,"userId",name,"tokenHash") VALUES ($1,$2,$3,$4)', [tokenId, alice, 'test', hashDeviceToken(token)])
+    try {
+      const pending = await store.beginUpload(local, { title: 'After end', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
+      assert.ok(!('error' in pending))
+      const url = `http://localhost/v1/runs/${localRun}/captures/${pending.captureId}`
+      const params = Promise.resolve({ runId: localRun, captureId: pending.captureId })
+      const headers = { authorization: `Bearer ${token}` }
+      const ending = await pool.connect()
+      await ending.query('BEGIN')
+      await ending.query("UPDATE agent_runs SET status='succeeded', \"finishedAt\"=now() WHERE id=$1", [localRun])
+      const racingBegin = store.beginUpload(local, { title: 'Too late', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
+      await ending.query('COMMIT')
+      ending.release()
+      assert.ok('error' in await racingBegin, 'a reservation racing run termination cannot start after it ends')
+      assert.equal((await beginRoute(new Request(url, { method: 'POST', headers }), { params: Promise.resolve({ runId: localRun }) })).status, 404, 'ending a run forbids new reservations')
+      assert.equal((await resumeRoute(new Request(url, { method: 'POST', headers }), { params })).status, 200)
+      assert.equal((await uploadRoute(new Request(url, { method: 'PUT', headers, body: PNG }), { params })).status, 204)
+      assert.equal((await completeRoute(new Request(`${url}/complete`, { method: 'POST', headers }), { params })).status, 200)
+      assert.equal((await completeRoute(new Request(`${url}/complete`, { method: 'POST', headers }), { params })).status, 200, 'completion is idempotent')
+      await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [localRun])
+      assert.equal((await completeRoute(new Request(`${url}/complete`, { method: 'POST', headers }), { params })).status, 404, 'a stopped run does not regain capture authority')
+      await pool.query('UPDATE agent_runs SET "stopRequestedAt"=null WHERE id=$1', [localRun])
+      await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [tokenId])
+      assert.equal((await completeRoute(new Request(`${url}/complete`, { method: 'POST', headers }), { params })).status, 401, 'revoked credentials stay revoked')
+      await pool.query('DELETE FROM run_captures WHERE id=$1', [pending.captureId])
+    } finally {
+      await pool.query('DELETE FROM device_tokens WHERE id=$1', [tokenId])
+      await pool.query("UPDATE agent_runs SET status='running', \"finishedAt\"=null WHERE id=$1", [localRun])
+    }
 
     const swapped = new Uint8Array(PNG); swapped[PNG.length - 1] ^= 1
     assert.ok('error' in await store.receiveUpload(local, begun.captureId, swapped), 'a completed upload cannot be overwritten')

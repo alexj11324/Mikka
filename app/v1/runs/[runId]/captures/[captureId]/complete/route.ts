@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request: Request, { params }: { params: Promise<{ runId: string; captureId: string }> }) {
   const { runId, captureId } = await params
-  const found = await deviceRun(request, runId)
+  const found = await deviceRun(request, runId, true)
   if (found instanceof Response) return found
   if (!z.uuid().safeParse(captureId).success) return captureJson({ error: 'Unknown capture.' }, 404)
   const result = await completeUpload(found.owner, captureId)

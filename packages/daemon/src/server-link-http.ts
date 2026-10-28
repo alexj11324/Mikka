@@ -276,6 +276,10 @@ export class HttpServerLink implements ServerLink {
     return this.call("POST", capturePaths.begin(checkId(runId)), { body: request, schema: captureUploadResponse })
   }
 
+  async resumeCapture(runId: string, captureId: string) {
+    return this.call("POST", capturePaths.upload(checkId(runId), checkId(captureId)), { schema: captureUploadResponse })
+  }
+
   /** Straight to object storage with the signed headers, or to the server when it has no bucket. */
   async sendCapture(runId: string, captureId: string, upload: CaptureUploadResponse["upload"], bytes: Uint8Array, contentType: string) {
     const server = upload.target === "server"

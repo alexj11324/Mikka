@@ -81,6 +81,8 @@ const title = z.string().trim().min(1).max(CAPTURE_TITLE_MAX)
 
 /** `POST /v1/runs/:runId/captures`: announce one file the daemon will send. */
 export const captureUploadRequest = z.object({
+  /** Stable client id, persisted before the first network attempt. */
+  captureId: z.uuid().optional(),
   title,
   contentType: z.enum(CAPTURE_CONTENT_TYPES),
   size: z.number().int().min(1).max(CAPTURE_MAX_BYTES.video),

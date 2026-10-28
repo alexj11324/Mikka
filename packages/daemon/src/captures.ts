@@ -4,21 +4,23 @@
 // and limits are checked again here and once more by the server, which binds
 // the file to the run.
 import { createHash } from "node:crypto"
-import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readdirSync, rmSync } from "node:fs"
+import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync } from "node:fs"
 import { join } from "node:path"
 
 import { CAPTURE_MAX_BYTES, captureProblem, cleanCaptureTitle, sniffCaptureType } from "@mikka/protocol/capture"
+import { DAEMON_RPC_ERRORS } from "@mikka/protocol"
 
 import { DaemonError, ServerUnreachableError } from "./errors"
 import type { Logger } from "./log"
 import type { ServerLink } from "./server-link"
+import { writeJsonAtomic } from "./fs-util"
 
 /** Name of the captures dir inside a run dir. */
 export const CAPTURES_DIR = "captures"
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const EXTENSIONS = ["png", "jpg", "webp", "mp4", "webm"]
 
-type Link = Pick<ServerLink, "beginCapture" | "sendCapture" | "completeCapture">
+type Link = Pick<ServerLink, "beginCapture" | "resumeCapture" | "sendCapture" | "completeCapture">
 
 /** A regular file's bytes, read without following a link; null otherwise. */
 function readPlain(path: string, max: number): Uint8Array | null {
@@ -46,7 +48,7 @@ const drop = (dir: string, id: string) => {
  * dropped; when the server cannot be reached the rest stay for next time.
  * Returns how many went up.
  */
-export async function uploadCaptures(dir: string, runId: string, link: Link, log: Logger): Promise<number> {
+export async function uploadCaptures(dir: string, runId: string, link: Link, log: Logger, pendingDir?: string, existingOnly = false): Promise<number> {
   if (!link.beginCapture || !link.sendCapture || !link.completeCapture) return 0
   if (!lstatSync(dir, { throwIfNoEntry: false })?.isDirectory()) return 0
   let sent = 0
@@ -67,18 +69,63 @@ export async function uploadCaptures(dir: string, runId: string, link: Link, log
     }
     try {
       const sha256 = createHash("sha256").update(bytes).digest("hex")
-      const { captureId, upload } = await link.beginCapture(runId, { title, contentType, size: bytes.length, sha256 })
+      const pendingPath = pendingDir ? join(pendingDir, `${id}.json`) : null
+      let pending: { captureId: string; sha256: string } | undefined
+      if (pendingPath) {
+        try {
+          const value = JSON.parse(readFileSync(pendingPath, "utf8"))
+          if (typeof value.captureId === "string" && ID.test(value.captureId) && value.sha256 === sha256) pending = value
+        } catch { /* absent or invalid reservation */ }
+      }
+      if (existingOnly && !pending) continue
+      let target
+      if (pending) {
+        // Completion may have succeeded before the connection was lost.
+        try {
+          await link.completeCapture(runId, pending.captureId)
+          drop(dir, id)
+          if (pendingPath) rmSync(pendingPath, { force: true })
+          sent += 1
+          continue
+        } catch (error) {
+          if (!(error instanceof DaemonError) || error instanceof ServerUnreachableError || error.code !== 404) throw error
+        }
+        if (!link.resumeCapture) return sent
+        try {
+          target = await link.resumeCapture(runId, pending.captureId)
+        } catch (error) {
+          if (existingOnly || !(error instanceof DaemonError) || error instanceof ServerUnreachableError || error.code !== 404) throw error
+          target = await link.beginCapture(runId, { captureId: pending.captureId, title, contentType, size: bytes.length, sha256 })
+        }
+      } else {
+        // The stable id is durable before the network call, so a lost begin
+        // response can be recovered without creating another reservation.
+        if (pendingPath) {
+          mkdirSync(pendingDir!, { recursive: true, mode: 0o700 })
+          writeJsonAtomic(pendingPath, { captureId: id, sha256 })
+        }
+        target = await link.beginCapture(runId, { ...(pendingPath ? { captureId: id } : {}), title, contentType, size: bytes.length, sha256 })
+        if (pendingPath && target.captureId !== id) throw new Error("Capture reservation id changed")
+      }
+      const { captureId, upload } = target
       await link.sendCapture(runId, captureId, upload, bytes, contentType)
       await link.completeCapture(runId, captureId)
       drop(dir, id)
+      if (pendingPath) rmSync(pendingPath, { force: true })
       sent += 1
     } catch (error) {
       if (error instanceof ServerUnreachableError) {
         log.warn({ run_id: runId, capture: id }, "capture upload deferred")
         return sent
       }
+      if (error instanceof DaemonError && (error.code === 401 || error.code === 403 || error.code === 404 || error.code === 409 || error.code === DAEMON_RPC_ERRORS.unauthorized)) {
+        log.warn({ run_id: runId, capture: id, status: error.code }, "capture reservation unavailable; retry stopped")
+        if (pendingDir) { mkdirSync(pendingDir, { recursive: true, mode: 0o700 }); writeJsonAtomic(join(pendingDir, "blocked.json"), { status: error.code }) }
+        return sent
+      }
       log.warn({ run_id: runId, capture: id, status: error instanceof DaemonError ? error.code : undefined }, "capture refused")
       drop(dir, id)
+      if (pendingDir) rmSync(join(pendingDir, `${id}.json`), { force: true })
     }
   }
   return sent
@@ -88,12 +135,15 @@ export async function uploadCaptures(dir: string, runId: string, link: Link, log
 export class CaptureUploader {
   private passes = new Map<string, Promise<void>>()
 
-  constructor(private readonly dirFor: (runId: string) => string, private readonly link: Link, private readonly log: Logger) {}
+  constructor(private readonly dirFor: (runId: string) => string, private readonly link: Link, private readonly log: Logger, private readonly pendingRoot?: string) {}
 
-  flush(runId: string): Promise<void> {
+  flush(runId: string, existingOnly = false): Promise<void> {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(runId)) return Promise.resolve()
+    const pendingDir = this.pendingRoot ? join(this.pendingRoot, runId) : undefined
+    if (pendingDir && lstatSync(join(pendingDir, "blocked.json"), { throwIfNoEntry: false })) return Promise.resolve()
     const previous = this.passes.get(runId) ?? Promise.resolve()
     const next = previous
-      .then(() => uploadCaptures(this.dirFor(runId), runId, this.link, this.log))
+      .then(() => uploadCaptures(this.dirFor(runId), runId, this.link, this.log, pendingDir, existingOnly))
       .then(() => undefined, (error) => this.log.warn({ run_id: runId, err: error instanceof Error ? error.message : String(error) }, "capture upload failed"))
       .finally(() => { if (this.passes.get(runId) === next) this.passes.delete(runId) })
     this.passes.set(runId, next)

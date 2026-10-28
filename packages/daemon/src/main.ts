@@ -175,6 +175,7 @@ export class Daemon {
   private rpc: RpcServer | null = null
   private outbox!: Outbox
   private journal!: RunJournal
+  private captureUploader!: CaptureUploader
   private worktrees!: WorktreeManager
   supervisor!: RunSupervisor
   private device: DeviceFile = {}
@@ -247,6 +248,7 @@ export class Daemon {
       this.saveDevice({ credential: this.options.credential })
 
     this.journal = new RunJournal(paths.journal)
+    this.captureUploader = new CaptureUploader((runId) => join(runPaths(paths.adapterState, runId).runDir, CAPTURES_DIR), this.options.link, this.log, join(paths.dataDir, "capture-pending"))
     this.outbox = new Outbox(
       paths.outbox,
       this.options.link,
@@ -367,7 +369,7 @@ export class Daemon {
         : undefined,
       repos: () => this.device.repos ?? [],
       log: this.log,
-      captures: new CaptureUploader((runId) => join(runPaths(paths.adapterState, runId).runDir, CAPTURES_DIR), this.options.link, this.log),
+      captures: this.captureUploader,
       stallMs: this.options.stallMs,
       verify: hosted
         ? (run) =>
@@ -802,6 +804,9 @@ export class Daemon {
       this.saveDevice({ repos: await link.listRepos(deviceId) })
       this.server = "online"
       await this.outbox.flushAll()
+      // Resume only reservations already made while a run was live. Do not
+      // hold the heartbeat or recreate uploads after a run has ended.
+      for (const entry of this.journal.all()) if (isTerminalRunState(entry.state)) void this.captureUploader.flush(entry.assignment.runId, true)
       if (!this.draining) {
         this.startCoordinatorPass(deviceId)
         for (const runId of await link.pendingRuns(deviceId)) {

@@ -144,6 +144,111 @@ describe("capture upload", () => {
     expect(readdirSync(dir)).toEqual([])
   })
 
+  it("persists a reservation and resumes it after a restart without beginning a new upload", async () => {
+    const dir = tempDir("capture-queue-")
+    const pending = tempDir("capture-pending-")
+    queue(dir, ids[0], "png", PNG)
+    let begins = 0, sends = 0, completes = 0, resumes = 0
+    const captureId = ids[0]
+    const link: Link = {
+      beginCapture: async () => { begins++; return { captureId, upload: { target: "server" } } },
+      resumeCapture: async () => { resumes++; return { captureId, upload: { target: "server" } } },
+      sendCapture: async () => { sends++; if (sends === 1) throw new ServerUnreachableError() },
+      completeCapture: async () => { completes++; if (completes === 1) throw new DaemonError(404, "not arrived"); return {} as never },
+    }
+    expect(await uploadCaptures(dir, "run-1", link, log, pending)).toBe(0)
+    expect(readdirSync(pending)).toEqual([`${ids[0]}.json`])
+    expect(await uploadCaptures(dir, "run-1", link, log, pending, true)).toBe(1)
+    expect({ begins, sends, completes, resumes }).toEqual({ begins: 1, sends: 2, completes: 2, resumes: 1 })
+    expect(readdirSync(dir)).toEqual([])
+    expect(readdirSync(pending)).toEqual([])
+  })
+
+  it("recovers a lost begin response using the id saved before the request", async () => {
+    const dir = tempDir("capture-queue-")
+    const pending = tempDir("capture-pending-")
+    queue(dir, ids[0], "png", PNG)
+    let begins = 0, resumed = "", sends = 0
+    const link: Link = {
+      beginCapture: async (_run, request) => { begins++; expect(request.captureId).toBe(ids[0]); throw new ServerUnreachableError() },
+      resumeCapture: async (_run, captureId) => { resumed = captureId; return { captureId, upload: { target: "server" } } },
+      sendCapture: async () => { sends++ },
+      completeCapture: async () => { if (!sends) throw new DaemonError(404, "not arrived"); return {} as never },
+    }
+    expect(await uploadCaptures(dir, "run-1", link, log, pending)).toBe(0)
+    expect(await uploadCaptures(dir, "run-1", link, log, pending, true)).toBe(1)
+    expect({ begins, resumed, sends }).toEqual({ begins: 1, resumed: ids[0], sends: 1 })
+  })
+
+  it("does not create a new reservation after the run ends", async () => {
+    const dir = tempDir("capture-queue-")
+    const pending = tempDir("capture-pending-")
+    queue(dir, ids[0], "png", PNG)
+    const { link, sent } = fakeLink()
+    expect(await uploadCaptures(dir, "run-1", link, log, pending, true)).toBe(0)
+    expect(sent).toEqual([])
+    expect(readdirSync(dir)).toHaveLength(2)
+  })
+
+  it("recognizes a completion whose response was lost without uploading again", async () => {
+    const dir = tempDir("capture-queue-")
+    const pending = tempDir("capture-pending-")
+    queue(dir, ids[0], "png", PNG)
+    let sends = 0, completes = 0
+    const link: Link = {
+      beginCapture: async () => ({ captureId: ids[0], upload: { target: "server" } }),
+      resumeCapture: async () => { throw new Error("must not resume a completed upload") },
+      sendCapture: async () => { sends++ },
+      completeCapture: async () => { completes++; if (completes === 1) throw new ServerUnreachableError(); return {} as never },
+    }
+    expect(await uploadCaptures(dir, "run-1", link, log, pending)).toBe(0)
+    expect(await uploadCaptures(dir, "run-1", link, log, pending, true)).toBe(1)
+    expect(sends).toBe(1)
+    expect(completes).toBe(2)
+  })
+
+  it("does not duplicate an upload still running when terminal retry starts", async () => {
+    const dir = tempDir("capture-queue-")
+    const pending = tempDir("capture-pending-")
+    queue(dir, ids[0], "png", PNG)
+    let release!: () => void
+    let started!: () => void
+    const startedPromise = new Promise<void>(resolve => { started = resolve })
+    const gate = new Promise<void>(resolve => { release = resolve })
+    let begins = 0, sends = 0, completes = 0
+    const link: Link = {
+      beginCapture: async () => { begins++; return { captureId: ids[0], upload: { target: "server" } } },
+      sendCapture: async () => { sends++; started(); await gate },
+      completeCapture: async () => { completes++; return {} as never },
+    }
+    const uploader = new CaptureUploader(() => dir, link, log, pending)
+    const first = uploader.flush("run-1")
+    await startedPromise
+    const afterEnd = uploader.flush("run-1", true)
+    release()
+    await Promise.all([first, afterEnd])
+    expect({ begins, sends, completes }).toEqual({ begins: 1, sends: 1, completes: 1 })
+    expect(readdirSync(dir)).toEqual([])
+  })
+
+  it("retains the file and stops retries when authorization is denied", async () => {
+    const dir = tempDir("capture-queue-")
+    const pending = tempDir("capture-pending-")
+    queue(dir, ids[0], "png", PNG)
+    let attempts = 0
+    const link: Link = {
+      beginCapture: async () => { attempts++; throw new DaemonError(403, "denied") },
+      sendCapture: async () => undefined,
+      completeCapture: async () => ({} as never),
+    }
+    const uploader = new CaptureUploader(() => dir, link, log, pending)
+    await uploader.flush("run-1")
+    await uploader.flush("run-1", true)
+    expect(attempts).toBe(1)
+    expect(readdirSync(dir)).toHaveLength(2)
+    expect(readdirSync(join(pending, "run-1")).sort()).toEqual([`${ids[0]}.json`, "blocked.json"])
+  })
+
   it("runs one pass at a time per run", async () => {
     const dir = tempDir("orvu-")
     queue(dir, ids[0], "png", PNG)
@@ -168,9 +273,9 @@ describe("a run's captures", () => {
     const base = server.link()
     const link = {
       ...base,
-      beginCapture: async (id: string, request: { title: string }) => {
+      beginCapture: async (id: string, request: { title: string; captureId?: string }) => {
         uploads.push({ runId: id, title: request.title, completedBeforeEnd: false })
-        return { captureId: "6f1d8c0e-1b2a-4c3d-8e9f-0a1b2c3d4e5f", upload: { target: "server" as const } }
+        return { captureId: request.captureId!, upload: { target: "server" as const } }
       },
       sendCapture: async () => undefined,
       completeCapture: async () => {

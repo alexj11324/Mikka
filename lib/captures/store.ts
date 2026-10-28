@@ -79,18 +79,30 @@ export async function beginUpload(owner: CaptureOwner, input: CaptureUploadReque
   const title = cleanCaptureTitle(input.title)
   if (!title) return { error: 'invalid', message: 'A title is required.' }
   await dropStaleUploads(owner)
-  const [{ open }] = await db.select({ open: sql<number>`count(*)::int` }).from(runCaptures)
-    .where(and(eq(runCaptures.runId, owner.runId), eq(runCaptures.status, 'uploading')))
-  if (open >= MAX_OPEN_UPLOADS) return { error: 'conflict', message: 'Too many uploads in progress for this run.' }
-  const id = crypto.randomUUID()
+  const id = input.captureId ?? crypto.randomUUID()
   // Keep untrusted uploads separate from the immutable evidence namespace so
   // a bucket lifecycle rule can expire even a replayed presigned upload.
   const key = `capture-uploads/${storageKey(owner, id, input.contentType)}`
-  await db.insert(runCaptures).values({
-    id, userId: owner.userId, runId: owner.runId, issueId: owner.issueId, botId: owner.botId,
-    kind, contentType: input.contentType, source: 'local', status: 'uploading', title,
-    storageKey: key, size: input.size, sha256: input.sha256, expiresAt: new Date(Date.now() + UPLOAD_TTL_MS),
+  const reserved = await db.transaction(async tx => {
+    // Serialize reservation with the run's terminal transition. The route's
+    // initial authentication alone cannot prevent a begin/end race.
+    const [run] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(
+      eq(agentRuns.id, owner.runId), eq(agentRuns.userId, owner.userId),
+      inArray(agentRuns.status, ['preparing', 'running', 'waiting_input', 'finishing']), isNull(agentRuns.stopRequestedAt),
+    )).for('update')
+    if (!run) return 'not_found' as const
+    const [{ open }] = await tx.select({ open: sql<number>`count(*)::int` }).from(runCaptures)
+      .where(and(eq(runCaptures.runId, owner.runId), eq(runCaptures.status, 'uploading')))
+    if (open >= MAX_OPEN_UPLOADS) return 'conflict' as const
+    const inserted = await tx.insert(runCaptures).values({
+      id, userId: owner.userId, runId: owner.runId, issueId: owner.issueId, botId: owner.botId,
+      kind, contentType: input.contentType, source: 'local', status: 'uploading', title,
+      storageKey: key, size: input.size, sha256: input.sha256, expiresAt: new Date(Date.now() + UPLOAD_TTL_MS),
+    }).onConflictDoNothing().returning({ id: runCaptures.id })
+    if (!inserted.length) return 'conflict' as const
+    return null
   })
+  if (reserved) return { error: reserved, message: reserved === 'conflict' ? 'Too many uploads in progress for this run.' : 'Run is no longer accepting uploads.' }
   if (storage === 'inline') return { captureId: id, upload: { target: 'server' } }
   const signed = await presignArtifactPut(key, input.contentType, UPLOAD_TTL_MS / 1000)
   return { captureId: id, upload: { target: 'storage', ...signed } }
@@ -101,6 +113,16 @@ async function openUpload(owner: CaptureOwner, captureId: string) {
     eq(runCaptures.id, captureId), eq(runCaptures.runId, owner.runId), eq(runCaptures.userId, owner.userId), eq(runCaptures.status, 'uploading'),
   )).limit(1)
   return row && row.expiresAt && row.expiresAt.getTime() > Date.now() ? row : null
+}
+
+/** Reissue a target only for the same already-reserved, unexpired upload. */
+export async function resumeUpload(owner: CaptureOwner, captureId: string): Promise<CaptureUploadResponse | CaptureError> {
+  const row = await openUpload(owner, captureId)
+  if (!row || row.source !== 'local' || !row.storageKey || !row.expiresAt) return { error: 'not_found', message: 'No open upload with that id for this run.' }
+  if (artifactStorage() === 'inline') return { captureId, upload: { target: 'server' } }
+  const seconds = Math.floor((row.expiresAt.getTime() - Date.now()) / 1000)
+  if (seconds < 1) return { error: 'not_found', message: 'Upload expired.' }
+  return { captureId, upload: { target: 'storage', ...await presignArtifactPut(row.storageKey, row.contentType, seconds) } }
 }
 
 /** The bytes of an upload sent to the server (no bucket configured). */
@@ -120,8 +142,18 @@ export async function receiveUpload(owner: CaptureOwner, captureId: string, byte
  * is deleted.
  */
 export async function completeUpload(owner: CaptureOwner, captureId: string): Promise<CaptureView | CaptureError> {
+  // A lost success response is safe to retry for the original upload window.
+  const readyUpload = async () => (await db.select().from(runCaptures).where(and(
+    eq(runCaptures.id, captureId), eq(runCaptures.runId, owner.runId), eq(runCaptures.userId, owner.userId),
+    eq(runCaptures.source, 'local'), eq(runCaptures.status, 'ready'), sql`${runCaptures.expiresAt} > now()`,
+  )).limit(1))[0]
+  const completed = await readyUpload()
+  if (completed) return captureView(completed)
   const row = await openUpload(owner, captureId)
-  if (!row || !row.storageKey) return { error: 'not_found', message: 'No open upload with that id for this run.' }
+  if (!row || !row.storageKey) {
+    const winner = await readyUpload()
+    return winner ? captureView(winner) : { error: 'not_found', message: 'No open upload with that id for this run.' }
+  }
   const storage = artifactStorage()
   const bytes = row.inlineContent ? new Uint8Array(row.inlineContent)
     : storage === 'r2' ? await getArtifactObjectBytes(row.storageKey).catch(() => null) : null
@@ -133,6 +165,10 @@ export async function completeUpload(owner: CaptureOwner, captureId: string): Pr
     const failed = await db.update(runCaptures).set({ status: 'failed', error: problem, inlineContent: null, updatedAt: new Date() })
       .where(and(eq(runCaptures.id, row.id), eq(runCaptures.status, 'uploading'))).returning({ id: runCaptures.id })
     if (storage === 'r2' && failed.length) await deleteArtifactObject(row.storageKey).catch(() => undefined)
+    if (!failed.length) {
+      const winner = await readyUpload()
+      if (winner) return captureView(winner)
+    }
     return { error: 'invalid', message: problem }
   }
   // A presigned PUT remains usable until expiry. Publish the verified bytes
@@ -140,14 +176,16 @@ export async function completeUpload(owner: CaptureOwner, captureId: string): Pr
   // checked bytes for inline uploads in case a second PUT races completion.
   const verifiedKey = storage === 'r2' ? storageKey(owner, crypto.randomUUID(), row.contentType) : row.storageKey
   if (storage === 'r2') await putArtifactObject(verifiedKey, new Uint8Array(bytes), row.contentType)
-  const [ready] = await db.update(runCaptures).set({ status: 'ready', storageKey: verifiedKey, inlineContent: storage === 'inline' ? Buffer.from(bytes) : null, expiresAt: null, updatedAt: new Date() })
+  const [ready] = await db.update(runCaptures).set({ status: 'ready', storageKey: verifiedKey, inlineContent: storage === 'inline' ? Buffer.from(bytes) : null, updatedAt: new Date() })
     .where(and(eq(runCaptures.id, row.id), eq(runCaptures.status, 'uploading'))).returning()
   if (storage === 'r2') {
     // The upload URL may still recreate its staging object until it expires.
     // Its eventual cleanup requires an object-storage lifecycle rule.
     await deleteArtifactObject(ready ? row.storageKey : verifiedKey).catch(() => undefined)
   }
-  return ready ? captureView(ready) : { error: 'conflict', message: 'The upload already ended.' }
+  if (ready) return captureView(ready)
+  const winner = await readyUpload()
+  return winner ? captureView(winner) : { error: 'conflict', message: 'The upload already ended.' }
 }
 
 // --- Cloud computer recordings --------------------------------------------------

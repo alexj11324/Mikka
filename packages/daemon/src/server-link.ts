@@ -96,6 +96,7 @@ export interface ServerLink {
    * Optional: links without them keep the files on this machine.
    */
   beginCapture?(runId: string, request: CaptureUploadRequest): Promise<CaptureUploadResponse>
+  resumeCapture?(runId: string, captureId: string): Promise<CaptureUploadResponse>
   sendCapture?(runId: string, captureId: string, upload: CaptureUploadResponse["upload"], bytes: Uint8Array, contentType: string): Promise<void>
   completeCapture?(runId: string, captureId: string): Promise<CaptureView>
   /** The cloud computer's capture tools for a run on this cloud worker. */
