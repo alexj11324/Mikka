@@ -19,6 +19,8 @@ export type ComposioEmailDeps = {
   readEmail: (toolkit: ComposioAppId, accountId: string) => Promise<string | null>
   saveEmail: (toolkit: ComposioAppId, accountId: string, email: string | null) => Promise<void>
   rename: (accountId: string, alias: string) => Promise<void>
+  /** A try without a final answer, kept for the cooldown. */
+  noteAttempt: (toolkit: ComposioAppId, accountId: string) => Promise<void>
 }
 
 export type ComposioConnectDeps = ComposioEmailDeps & {
@@ -48,9 +50,11 @@ export function reconnectHandover(items: ComposioListedAccount[], records: Compo
   const old = items.find(item => item.id === oldId)
   if (!old) return { alias: null, isDefault: false }
   const alias = old.alias?.trim() || null
-  const email = records.find(record => record.accountId === oldId)?.email ?? null
-  const custom = alias && alias.toLowerCase() !== email?.toLowerCase() ? alias : null
-  return { alias: custom, isDefault: effectiveDefault(items, records, old.toolkit.slug) === oldId }
+  const record = records.find(item => item.accountId === oldId)
+  const custom = alias && alias.toLowerCase() !== record?.email?.toLowerCase() ? alias : null
+  // The person's choice counts even while the old account is expired (and so
+  // not usable, which is why it is being reconnected).
+  return { alias: custom, isDefault: Boolean(record?.isDefault) || effectiveDefault(items, records, old.toolkit.slug) === oldId }
 }
 
 /** Reads, keeps and (when it has no name) names the account after its email. Never throws. */
@@ -60,6 +64,7 @@ async function fillEmail(deps: ComposioEmailDeps & { log?: ComposioConnectDeps['
     email = await deps.readEmail(toolkit, account.id)
   } catch (error) {
     deps.log?.('readEmail', error)
+    await deps.noteAttempt(toolkit, account.id).catch(noteError => deps.log?.('noteAttempt', noteError))
     return { found: false as const }
   }
   try {
@@ -102,28 +107,37 @@ export async function followUpComposioConnect(
 }
 
 export const EMAIL_BACKFILL_LIMIT = 5
+/** A lookup that got no final answer waits this long before the next try. */
+export const EMAIL_RETRY_AFTER_MS = 60 * 60 * 1000
 
 /**
  * Accounts connected before Mikka read emails: asks the provider for up to
  * `limit` working accounts that were never asked, in parallel, and keeps each
  * answer (null too, so it is asked once). An account whose provider could not
- * be reached is left for the next load. Returns the records with the answers.
+ * be reached waits about an hour (`lastAttemptAt`) before it is asked again. Returns the records with the answers.
  */
 export async function backfillComposioEmails(
-  input: { items: ComposioListedAccount[]; records: ComposioAccountRecord[]; limit?: number },
+  input: { items: ComposioListedAccount[]; records: ComposioAccountRecord[]; limit?: number; now?: Date },
   deps: ComposioEmailDeps,
 ): Promise<ComposioAccountRecord[]> {
   const byId = new Map(input.records.map(record => [record.accountId, record]))
+  const now = (input.now ?? new Date()).getTime()
   const pending = input.items
     .filter(item => appOf(item) && item.status === 'ACTIVE' && !item.isDisabled)
-    .filter(item => { const record = byId.get(item.id); return !record || (!record.email && !record.emailChecked) })
+    .filter(item => {
+      const record = byId.get(item.id)
+      if (!record) return true
+      if (record.email || record.emailChecked) return false
+      return !record.lastAttemptAt || now - record.lastAttemptAt.getTime() >= EMAIL_RETRY_AFTER_MS
+    })
     .slice(0, input.limit ?? EMAIL_BACKFILL_LIMIT)
   const answers = await Promise.all(pending.map(async item => ({ id: item.id, ...await fillEmail(deps, item, appOf(item)!, false) })))
   const records = new Map(byId)
   for (const answer of answers) {
-    if (!answer.found) continue
     const record = records.get(answer.id)
-    records.set(answer.id, { accountId: answer.id, isDefault: record?.isDefault ?? false, email: answer.email, emailChecked: true })
+    records.set(answer.id, answer.found
+      ? { accountId: answer.id, isDefault: record?.isDefault ?? false, email: answer.email, emailChecked: true, lastAttemptAt: new Date(now) }
+      : { accountId: answer.id, isDefault: record?.isDefault ?? false, email: null, emailChecked: false, lastAttemptAt: new Date(now) })
   }
   return [...records.values()]
 }

@@ -13,6 +13,7 @@ export async function listComposioAccountRecords(userId: string): Promise<Compos
     accountId: composioAccounts.accountId,
     email: composioAccounts.email,
     emailChecked: sql<boolean>`${composioAccounts.emailCheckedAt} is not null`,
+    lastAttemptAt: composioAccounts.lastAttemptAt,
     isDefault: composioAccounts.isDefault,
   })
     .from(composioAccounts).where(eq(composioAccounts.userId, userId))
@@ -37,8 +38,15 @@ export async function chooseComposioDefault(userId: string, toolkit: string, acc
 /** What the provider said: the email, or null when it gave none (kept too, so it is not asked again). */
 export async function saveComposioAccountEmail(userId: string, toolkit: string, accountId: string, email: string | null) {
   const now = new Date()
-  await db.insert(composioAccounts).values({ accountId, userId, toolkit, email, emailCheckedAt: now })
-    .onConflictDoUpdate({ target: composioAccounts.accountId, set: { email, emailCheckedAt: now, updatedAt: now }, setWhere: sql`${composioAccounts.userId} = ${userId}` })
+  await db.insert(composioAccounts).values({ accountId, userId, toolkit, email, emailCheckedAt: now, lastAttemptAt: now })
+    .onConflictDoUpdate({ target: composioAccounts.accountId, set: { email, emailCheckedAt: now, lastAttemptAt: now, updatedAt: now }, setWhere: sql`${composioAccounts.userId} = ${userId}` })
+}
+
+/** A try that got no final answer (rate limit, server error, timeout): only the time, for the cooldown. */
+export async function noteComposioEmailAttempt(userId: string, toolkit: string, accountId: string) {
+  const now = new Date()
+  await db.insert(composioAccounts).values({ accountId, userId, toolkit, lastAttemptAt: now })
+    .onConflictDoUpdate({ target: composioAccounts.accountId, set: { lastAttemptAt: now, updatedAt: now }, setWhere: sql`${composioAccounts.userId} = ${userId}` })
 }
 
 export async function forgetComposioAccount(userId: string, accountId: string) {

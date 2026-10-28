@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH } from '@/lib/base-path'
 import { COMPOSIO_TOOLKITS, getComposio, isComposioToolkit, readComposioAccountEmail, renameComposioAccount, retireComposioAccount } from '@/lib/composio'
-import { chooseComposioDefault, listComposioAccountRecords, saveComposioAccountEmail } from '@/lib/composio-account-store'
+import { chooseComposioDefault, listComposioAccountRecords, noteComposioEmailAttempt, saveComposioAccountEmail } from '@/lib/composio-account-store'
 import { backfillComposioEmails } from '@/lib/composio-connect'
 import { accountUpdateSchema, isDuplicateAliasError, safeReturnPath, toConnectedAccountView, withAccountRecords } from '@/lib/composio-accounts'
 import { isComposioCallbackVerifierConfigured } from '@/lib/composio-config'
@@ -55,6 +55,7 @@ async function handleGET(request: Request) {
     const filled = await backfillComposioEmails({ items, records }, {
       readEmail: (toolkit, accountId) => readComposioAccountEmail(composio, userId, toolkit, accountId, EMAIL_BACKFILL_TIMEOUT_MS),
       saveEmail: (toolkit, accountId, email) => saveComposioAccountEmail(userId, toolkit, accountId, email),
+      noteAttempt: (toolkit, accountId) => noteComposioEmailAttempt(userId, toolkit, accountId),
       rename: (accountId, alias) => renameComposioAccount(composio, accountId, alias),
     })
     const accounts = withAccountRecords(items.flatMap(account => toConnectedAccountView(account) ?? []), filled)

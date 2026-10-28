@@ -3,7 +3,7 @@ import { after, NextRequest, NextResponse } from 'next/server'
 import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { getComposio, readComposioAccountEmail, renameComposioAccount, retireComposioAccount } from '@/lib/composio'
-import { chooseComposioDefault, listComposioAccountRecords, saveComposioAccountEmail } from '@/lib/composio-account-store'
+import { chooseComposioDefault, listComposioAccountRecords, noteComposioEmailAttempt, saveComposioAccountEmail } from '@/lib/composio-account-store'
 import { followUpComposioConnect } from '@/lib/composio-connect'
 import { COMPOSIO_FLOW_COOKIE, composioFlowCookieOptions, decodeComposioFlow } from '@/lib/composio-flow'
 import { listComposioPages } from '@/lib/composio-pagination'
@@ -78,6 +78,7 @@ async function handleGET(request: NextRequest) {
       }, {
         readEmail: (toolkit, accountId) => readComposioAccountEmail(composio, userId, toolkit, accountId),
         saveEmail: (toolkit, accountId, email) => saveComposioAccountEmail(userId, toolkit, accountId, email),
+        noteAttempt: (toolkit, accountId) => noteComposioEmailAttempt(userId, toolkit, accountId),
         rename: (accountId, alias) => renameComposioAccount(composio, accountId, alias),
         retire: accountId => retireComposioAccount(composio, userId, accountId),
         chooseDefault: (toolkit, accountId) => chooseComposioDefault(userId, toolkit, accountId),

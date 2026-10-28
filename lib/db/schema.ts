@@ -511,8 +511,10 @@ export const composioAccounts = pgTable('composio_accounts', {
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
   toolkit: text('toolkit').notNull(),
   email: text('email'),
-  /** When the provider was asked for the email, found or not, so it is asked once. */
+  /** When the provider gave a final answer on the email (found or not), so it is asked once. */
   emailCheckedAt: timestamp('emailCheckedAt', { withTimezone: true }),
+  /** The last try, final or not; a failed try waits about an hour before the next. */
+  lastAttemptAt: timestamp('lastAttemptAt', { withTimezone: true }),
   isDefault: boolean('isDefault').notNull().default(false),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [

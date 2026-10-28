@@ -70,6 +70,8 @@ export type ComposioAccountRecord = {
   email: string | null
   /** The provider was asked for the email (found or not), so it is not asked again. */
   emailChecked: boolean
+  /** The last time the provider was asked, final answer or not; null when never. */
+  lastAttemptAt: Date | null
   isDefault: boolean
 }
 
@@ -128,6 +130,25 @@ export const PROVIDER_IDENTITY: Record<ComposioAppId, { endpoint: string; header
   googlecalendar: { endpoint: 'https://www.googleapis.com/calendar/v3/calendars/primary', email: data => field(data, 'id') },
   notion: { endpoint: 'https://api.notion.com/v1/users/me', headers: { 'Notion-Version': '2022-06-28' }, email: data => field(data, 'bot', 'owner', 'user', 'person', 'email') },
   slack: { endpoint: 'https://slack.com/api/auth.test', email: data => field(data, 'user_id') },
+}
+
+/** The provider could not give a final answer (429, 5xx, 401…); ask again later. */
+export class ComposioEmailLookupError extends Error {
+  constructor(readonly status: number) {
+    super(`Provider answered ${status}`)
+    this.name = 'ComposioEmailLookupError'
+  }
+}
+
+/**
+ * A provider response as a final answer: the body of a 2xx, or null for a
+ * 403 (refused for good, e.g. a missing scope). Throws for anything else so
+ * the lookup is tried again later.
+ */
+export function providerAnswer(status: number, data: unknown): unknown {
+  if (status >= 200 && status < 300) return data
+  if (status === 403) return null
+  throw new ComposioEmailLookupError(status)
 }
 
 export const SLACK_USER_INFO = 'https://slack.com/api/users.info'
