@@ -57,3 +57,12 @@ test('device authorization recognizes its historical name only for identical SQL
   assert.equal(alreadyApplied(name, new Set([name]), sql), true)
   assert.throws(() => alreadyApplied(name, new Set([old]), sql + '\n-- modified'), /content changed/)
 })
+
+test('publication migration keeps the exact historical SQL receipt', () => {
+  const name = '20261028224429_run_publications.sql'
+  const old = '20261028030036_run_publications.sql'
+  const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
+  assert.equal(alreadyApplied(name, new Set([old]), sql), true)
+  assert.equal(alreadyApplied(name, new Set(), sql), false)
+  assert.throws(() => alreadyApplied(name, new Set([old]), sql + ' '), /content changed/)
+})
