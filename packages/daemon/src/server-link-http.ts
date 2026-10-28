@@ -47,6 +47,7 @@ import {
   ServerUnreachableError,
 } from "./errors"
 import { DAEMON_VERSION } from "./paths"
+import { createRunMailbox } from './run-mailbox'
 import type {
   ChunkBatch,
   DeviceInfo,
@@ -97,6 +98,10 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
+  async prepareRunMailbox(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
+    return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: this.fetchImpl,
+      headers: { [CLIENT_VERSION_HEADER]: this.clientVersion, ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) } })
+  }
   async claimCoordinator(deviceId: string, signal: AbortSignal) {
     const response = await this.send("POST",`/v1/devices/${seg(deviceId)}/coordinator`,{ operation: "claim" },this.credential,{ signal })
     if (response.status === 404) return null // Optional rollout / older server.

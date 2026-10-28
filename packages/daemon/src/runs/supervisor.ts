@@ -80,6 +80,7 @@ import {
 } from "../server-link"
 import type { WorktreeManager } from "../worktrees"
 import type { JournalEntry, RunJournal } from "./journal"
+import { assertMailboxRunAuthority, type RunMailbox } from '../run-mailbox'
 
 export interface SupervisorDeps {
   journal: RunJournal
@@ -88,6 +89,7 @@ export interface SupervisorDeps {
   adapters: ReadonlyMap<Harness, AgentAdapter>
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
+  prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
   /** The device's current allow-list (`device_repo`). */
   repos: () => DeviceRepo[]
@@ -155,6 +157,8 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface ActiveRun {
+  mailbox?: RunMailbox
+  mailboxClosing?: Promise<void>
   session: AgentSession | null
   cancelRequested: boolean
   /** Set when the watchdog or the lease stopped the run. */
@@ -304,9 +308,21 @@ export class RunSupervisor {
     this.requestCancel(run)
   }
 
+  private closeMailbox(run: ActiveRun): Promise<void> {
+    if (!run.mailbox) return Promise.resolve()
+    if (!run.mailboxClosing) {
+      try { run.mailboxClosing = run.mailbox.close() }
+      catch (error) { run.mailboxClosing = Promise.reject(error) }
+    }
+    return run.mailboxClosing
+  }
+
   /** Asks the session to stop; detaches it if it does not within the grace. */
   private requestCancel(run: ActiveRun): Promise<void> {
     run.cancelRequested = true
+    // Fence new calls and abort outstanding transport immediately; do not
+    // leave a mailbox usable during the CLI's cancellation grace period.
+    void this.closeMailbox(run).catch(() => this.deps.log.warn('Run mailbox shutdown failed'))
     if (!run.cancelTimer) {
       run.cancelTimer = setTimeout(
         () => run.abort.abort(),
@@ -686,6 +702,8 @@ export class RunSupervisor {
       kind: "complete",
       completion: { stopReason, report },
     })
+    const run = this.active.get(runId)
+    if (run) void this.closeMailbox(run).catch(() => this.deps.log.warn('Run mailbox shutdown failed'))
     this.leases.delete(runId)
     this.deps.outbox.compact(runId).catch((err: unknown) => {
       this.deps.log.error({ run_id: runId, err }, "outbox compaction failed")
@@ -889,6 +907,7 @@ export class RunSupervisor {
       done: Promise.resolve(),
       abort: new AbortController(),
     }
+    this.active.set(runId, run)
     run.done = this.drive(runId, repo, run)
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error)
@@ -903,11 +922,11 @@ export class RunSupervisor {
           )
         }
       })
-      .finally(() => {
-        clearTimeout(run.cancelTimer)
-        this.active.delete(runId)
+      .finally(async () => {
+        try { await this.closeMailbox(run) }
+        catch { this.deps.log.warn('Run mailbox shutdown failed') }
+        finally { clearTimeout(run.cancelTimer); this.active.delete(runId) }
       })
-    this.active.set(runId, run)
   }
 
   private async drive(runId: string, repo: DeviceRepo, run: ActiveRun) {
@@ -977,6 +996,18 @@ export class RunSupervisor {
     }
     if (this.stopping) return
 
+    const checkMailbox = () => {
+      const lease = this.leases.get(runId)
+      const current = this.deps.journal.get(runId)
+      assertMailboxRunAuthority({ held: this.active.get(runId) === run, state: current?.state, stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted, lease })
+    }
+    const mailbox = await this.deps.prepareRunMailbox?.(assignment, run.abort.signal, checkMailbox)
+    run.mailbox = mailbox
+    // A STOP/lease transition may win the handshake's final Promise handoff.
+    // Own the returned callback before refusing; never start a CLI first.
+    if (this.stopping) return
+    if (run.cancelRequested) { this.finish(runId, run.forcedStop ?? 'cancelled'); return }
+    if (mailbox) checkMailbox()
     const options = {
       runId,
       kind: assignment.kind,
@@ -991,6 +1022,7 @@ export class RunSupervisor {
       skills: assignment.skills,
       fixture: assignment.fixture,
       model: assignment.model,
+      mailbox,
     }
     const resuming =
       entry.sessionId !== null && adapter.capabilities.supportsResume
@@ -1081,6 +1113,7 @@ export class RunSupervisor {
           this.emit(runId, event.chunk)
           continue
         }
+        await this.closeMailbox(run)
         const stopReason = stopReasonOf(event, run)
         const error =
           event.error ??

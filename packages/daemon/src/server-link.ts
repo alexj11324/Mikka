@@ -34,6 +34,7 @@ import {
 import type { LocalComputerDecision, LocalComputerRequest } from "@mikka/protocol/computer"
 import type { CaptureUploadRequest, CaptureUploadResponse, CaptureView, ScreenCaptureRequest, ScreenCaptureResponse } from "@mikka/protocol/capture"
 import type { RunChunk } from "./chunks"
+import type { RunMailbox } from './run-mailbox'
 import type { NativeBrokerContext, NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
 
@@ -61,6 +62,8 @@ export interface ChunkBatch {
  * the daemon keeps running and retries (offline tolerance, R13).
  */
 export interface ServerLink {
+  /** Optional host-only adapter for the claimed run; never model-supplied. */
+  prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   claimCoordinator?(deviceId: string, signal: AbortSignal): Promise<NativeCoordinatorJob | null>
   coordinatorCommand?(deviceId: string, turnId: string, command: NativeCoordinatorCommand, signal: AbortSignal): Promise<void>
   coordinatorToolResult?(deviceId: string, turnId: string, callId: string, signal: AbortSignal): Promise<NativeCoordinatorToolResult>

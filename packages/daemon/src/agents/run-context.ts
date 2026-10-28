@@ -76,6 +76,8 @@ export interface McpServerSpec {
 }
 
 export interface RunContextOptions {
+  /** Only the host may advertise this bound control-channel capability. */
+  mailboxEnabled?: boolean
   harness: Exclude<Harness, "mock">
   /** What the run is for; `plan` runs are told to write a spec (ADR ORV-205). */
   kind?: RunKind
@@ -295,6 +297,7 @@ export class RunContext {
       this.options.kind === "plan" ? planInstructions() : "",
       skills,
       PERSONAL_MESSAGE_INSTRUCTIONS,
+      this.options.mailboxEnabled ? 'The supplied mailbox tools use this run’s existing authority. Use stable keys, explicit inbox/ACK; queued or acknowledged never means executed. Do not poll or infer approval.' : '',
     ]
       .filter(Boolean)
       .join("\n\n")

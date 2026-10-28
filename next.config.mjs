@@ -31,7 +31,7 @@ const nextConfig = {
     pagesBufferLength: 8,
   },
   basePath,
-  env: { MIKKA_BASE_PATH: basePath, NEXT_PUBLIC_COMPUTER_DEPLOYMENT: process.env.VERCEL_ENV ?? '' },
+  env: { MIKKA_BASE_PATH: basePath, NEXT_PUBLIC_COMPUTER_DEPLOYMENT: process.env.VERCEL_ENV ?? '', MIKKA_TEST_BUILD_SHA: process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '' },
   async redirects() {
     return [
       // The app's previous address; keep its links working.

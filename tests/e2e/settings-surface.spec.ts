@@ -1,4 +1,4 @@
-import { expect, register, test } from './fixtures'
+import { expect, test } from './test-account-fixtures'
 
 const sections = ['偏好设置', '个人资料', '工作区']
 
@@ -9,9 +9,8 @@ const sections = ['偏好设置', '个人资料', '工作区']
  * section wrapper shortens every divider by that padding, which is invisible
  * to static lint. Measuring the rendered boxes is the only reliable signal.
  */
-test('settings row dividers span the grouped card edges', async ({ page }) => {
+test('settings row dividers span the grouped card edges', async ({ page }, testInfo) => {
   // /preview/settings redirects outside development, so open the real view.
-  await register(page)
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
 
@@ -38,4 +37,8 @@ test('settings row dividers span the grouped card edges', async ({ page }) => {
 
     expect(mismatches, `dividers must reach the card edges on ${section}`).toEqual([])
   }
+  await testInfo.attach('settings-account-pool', {
+    body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }),
+    contentType: 'image/png',
+  })
 })
