@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import test from 'node:test'
+import { validateTarget } from '../scripts/run-db-tests.mjs'
+import { workspacePool } from '../lib/workspace-db'
 import { db, pool } from '../lib/db'
 import { issues } from '../lib/db/schema'
 import { idempotentIssueMutation } from '../lib/mcp/issue-mutation'
@@ -7,11 +10,7 @@ import { actAs } from '../lib/acting-user'
 import { createCoordinatorRegistry } from '../workflows/coordinator/tools'
 import { takeInbox } from '../lib/coordinator/store'
 async function main() {
-const target = new URL(process.env.MIKKA_DATABASE_URL ?? '')
-assert.equal(target.hostname, '127.0.0.1')
-assert.equal(target.pathname, '/mikka_358_e2e')
-assert.equal(process.env.DATABASE_URL, process.env.MIKKA_DATABASE_URL)
-assert.equal(process.env.MIKKA_TASK_BINDING_TEST, '1')
+validateTarget(process.env)
 process.env.MIKKA_ISSUE_TOOLS_ENABLED='1'
 const owner = `pr358-${randomUUID()}`, other = `pr358-${randomUUID()}`
 const event = randomUUID(), device = randomUUID(), issue = randomUUID(), failed = randomUUID(), partial = randomUUID()
@@ -61,6 +60,12 @@ assert.equal(stored.find(row=>row.id===toolEvent).payload.taskDestination.kind,'
 assert.equal(stored.find(row=>row.id===nextEvent).issueId,nextCreated.id)
 assert.equal(stored.find(row=>row.id===nextEvent).payload.taskDestination.deviceId,device)
 console.log(JSON.stringify({status:'passed',owner,event,issue,failed,toolEvent,toolIssue:created.id,checks:['concurrent replay','owner rejection','second call rejection','failure rollback','registered tool creates bound task','registered tool replay preserves one version']}))
-await pool.end()
 }
-void main().then(() => process.exit(0), error => { console.error(error); process.exit(1) })
+test('real registered tasks retain owner, replay and inbox-event bindings', { timeout: 60000 }, async () => {
+  const original = process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  try { await main() } finally {
+    if (original === undefined) delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+    else process.env.MIKKA_ISSUE_TOOLS_ENABLED = original
+    await Promise.all([pool.end(), workspacePool.end()])
+  }
+})

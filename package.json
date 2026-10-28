@@ -65,6 +65,7 @@
     "test:legacy-reads": "node --import tsx --experimental-test-module-mocks --test lib/agent-image-loader.test.ts tests/legacy-read-routes.test.ts",
     "test:conversation-reads": "node --import tsx --experimental-test-module-mocks --test lib/conversation-reads-store.test.ts lib/conversation-reads-route.test.ts",
     "test:db": "node scripts/run-db-tests.mjs",
+    "test:coordinator-task-binding-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/coordinator-task-binding.db.ts",
     "test:db-runner": "node --test scripts/run-db-tests.test.mjs",
     "test:local-repository-migration-db": "node --test tests/local-repository-migration.db.test.mjs",
     "test:workspace-migration-db": "node --test tests/workspace-migration.test.mjs",
