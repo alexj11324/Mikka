@@ -12,14 +12,15 @@ export type CredentialPageBinding = {
   origin: string
   loaderId: string
   action: 'restore_session' | 'fill_login' | 'submit_login'
-  permissionVersion: string
+  permissionVersion: number
 }
 
 /** A sealed, single-use lease binds an authorized operation to its document. */
 export function assertCredentialPageBinding(lease: CredentialPageBinding & { expiresAt: number }, current: CredentialPageBinding, now = Date.now()) {
   const denied = () => new CredentialError('credential_denied', 404)
-  const keys = ['userId', 'workspaceId', 'botId', 'subagentId', 'targetId', 'loaderId', 'permissionVersion'] as const
+  const keys = ['userId', 'workspaceId', 'botId', 'subagentId', 'targetId', 'loaderId'] as const
   if (!Number.isSafeInteger(lease.expiresAt) || lease.expiresAt <= now || !Number.isSafeInteger(lease.epoch) || lease.epoch < 0 || lease.epoch !== current.epoch) throw denied()
+  if (!Number.isSafeInteger(lease.permissionVersion) || lease.permissionVersion < 0 || lease.permissionVersion !== current.permissionVersion) throw denied()
   if (keys.some(key => typeof lease[key] !== 'string' || !lease[key] || lease[key] !== current[key])) throw denied()
   if (!['restore_session', 'fill_login', 'submit_login'].includes(lease.action) || lease.action !== current.action) throw denied()
   try {

@@ -204,13 +204,13 @@ test('password retry is bound to the server-authorized caller and its one-use ta
 })
 
 test('credential action fails closed when the trusted page binding changes', () => {
-  const page: CredentialPageBinding = { userId: 'owner', workspaceId: 'workspace', botId: 'bot', subagentId: 'subagent', epoch: 7, targetId: 'target', origin: 'https://example.com', loaderId: 'loader', action: 'fill_login', permissionVersion: 'v1' }
+  const page: CredentialPageBinding = { userId: 'owner', workspaceId: 'workspace', botId: 'bot', subagentId: 'subagent', epoch: 7, targetId: 'target', origin: 'https://example.com', loaderId: 'loader', action: 'fill_login', permissionVersion: 1 }
   const lease = { ...page, expiresAt: 2000 }
   assert.doesNotThrow(() => assertCredentialPageBinding(lease, page, 1000))
   for (const changed of [
     { userId: 'other' }, { workspaceId: 'other' }, { botId: 'other' }, { subagentId: 'other' },
     { epoch: 8 }, { targetId: 'other' }, { origin: 'https://other.example' }, { loaderId: 'other' },
-    { action: 'submit_login' as const }, { permissionVersion: 'v2' },
+    { action: 'submit_login' as const }, { permissionVersion: 2 },
   ]) assert.throws(() => assertCredentialPageBinding(lease, { ...page, ...changed }, 1000), CredentialError)
   assert.throws(() => assertCredentialPageBinding(lease, page, 2000), CredentialError)
   assert.throws(() => assertCredentialPageBinding({ ...lease, origin: 'https://user@example.com' }, page, 1000), CredentialError)
@@ -241,4 +241,27 @@ test('observed input focus uses a top-document CDP node with a matching type', a
   await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
   root = { nodeName: '#document', children: [{ nodeName: 'DIV', shadowRoots: [{ children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password'] }] }] }] }
   await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
+})
+
+test('insertion uses only the observed node on the bound origin and document', async () => {
+  const cdp = Object.create(Cdp.prototype) as Cdp
+  let actualLoader = 'loader', actualOrigin = 'https://example.com', focused = 7
+  const calls: string[] = []
+  cdp.call = async method => {
+    calls.push(method)
+    if (method === 'Page.getFrameTree') return { frameTree: { frame: { loaderId: actualLoader, url: actualOrigin } } }
+    if (method === 'DOM.getDocument') return { root: { nodeName: '#document', children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password'] }] } }
+    if (method === 'Runtime.evaluate') return { result: { objectId: 'fixture' } }
+    if (method === 'DOM.describeNode') return { node: { backendNodeId: focused } }
+    return {}
+  }
+  await cdp.insertAtObservedInput('https://example.com', 'loader', 7, 'password', 'synthetic')
+  assert.equal(calls.filter(method => method === 'Input.insertText').length, 1)
+  for (const [loader, origin, node] of [['other', 'https://example.com', 7], ['loader', 'https://other.example', 7], ['loader', 'https://example.com', 8]] as const) {
+    actualLoader = loader; actualOrigin = origin; focused = node; calls.length = 0
+    await assert.rejects(cdp.insertAtObservedInput('https://example.com', 'loader', 7, 'password', 'synthetic'), CredentialError)
+    assert(!calls.includes('Input.insertText'))
+  }
+  await assert.rejects(cdp.fill('https://example.com', 'synthetic', 'synthetic'), CredentialError)
+  await assert.rejects(cdp.fillOtp('https://example.com', '123456'), CredentialError)
 })

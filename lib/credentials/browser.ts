@@ -109,6 +109,9 @@ export class Cdp {
     const allowed = role === 'password' ? ['password'] : role === 'username' ? ['text', 'email', 'tel'] : ['text', 'tel', 'number']
     if (attributes.has('disabled') || attributes.has('readonly') || !allowed.includes(type)) throw new CredentialError('credential_denied', 404)
     await this.call('DOM.focus', { backendNodeId })
+    await this.assertObservedFocus(backendNodeId)
+  }
+  private async assertObservedFocus(backendNodeId: number) {
     // DOM.focus can be a no-op (for example inside a disabled fieldset).
     // Verify actual focus before the caller attempts Input.insertText.
     const active = await this.call('Runtime.evaluate', { expression: 'document.activeElement', returnByValue: false })
@@ -116,16 +119,25 @@ export class Cdp {
     const focused = await this.call('DOM.describeNode', { objectId: active.result.objectId })
     if (focused.node?.backendNodeId !== backendNodeId) throw new CredentialError('credential_denied', 404)
   }
-  async fill(origin: string, username: string, password: string) {
-    await this.origin(origin)
-    // Focus only top-frame inputs. No cross-origin iframe or model-selected JS.
-    const focus = (selector: string) => this.evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e||e.disabled||e.readOnly)return false;e.focus();e.value='';return document.activeElement===e})()`)
-    if (!await focus('input[autocomplete="username"],input[type="email"],input[name="username"]')) throw new CredentialError()
-    await this.origin(origin); await this.call('Input.insertText', { text: username })
-    if (!await focus('input[type="password"]')) throw new CredentialError()
-    await this.origin(origin); await this.call('Input.insertText', { text: password })
-    await this.origin(origin)
-    await this.evaluate(`(()=>{const e=document.querySelector('input[type="password"]');if(!e?.form)return false;e.form.requestSubmit();return true})()`)
+  /** Use only under an active viewer guard, after the host has consumed the
+   * existing computer_use permission for this exact document and action. */
+  async insertAtObservedInput(origin: string, loaderId: string, backendNodeId: number, role: 'username' | 'password' | 'code', value: string) {
+    const check = async () => {
+      const tree = await this.call('Page.getFrameTree')
+      const frame = tree.frameTree?.frame
+      if (!frame || typeof loaderId !== 'string' || !loaderId || frame.loaderId !== loaderId) throw new CredentialError('credential_denied', 404)
+      assertSameOrigin(frame.url, origin)
+    }
+    await check()
+    await this.focusObservedInput(backendNodeId, role)
+    await check()
+    await this.assertObservedFocus(backendNodeId)
+    await this.call('Input.insertText', { text: value })
+  }
+  async fill(_origin: string, _username: string, _password: string) {
+    // The legacy API has no observed nodes or consumed host permission.
+    // Fail closed until the single guarded plan is connected.
+    throw new CredentialError('credential_target_required', 409)
   }
   async safeToResume(_initialUrl: string) {
     // A URL change can be pushState/hash rather than navigation. Check every
@@ -149,12 +161,7 @@ export class Cdp {
       return await this.evaluate(`![...document.querySelectorAll('input,textarea')].some(e=>e.value && (e.tagName==='TEXTAREA'||!['hidden','checkbox','radio','button','submit','reset','image','file','range','color'].includes(e.type)))`) === true
     } catch { return false }
   }
-  async fillOtp(origin: string, code: string) {
-    await this.origin(origin)
-    const focused = await this.evaluate(`(()=>{const e=document.querySelector('input[autocomplete="one-time-code"],input[name="code"],input[name="otp"]');if(!e||e.disabled||e.readOnly)return false;e.focus();e.value='';return document.activeElement===e})()`)
-    if (!focused) throw new CredentialError()
-    await this.origin(origin); await this.call('Input.insertText', { text: code })
-    await this.origin(origin)
-    await this.evaluate(`(()=>{const e=document.querySelector('input[autocomplete="one-time-code"],input[name="code"],input[name="otp"]');if(!e?.form)return false;e.form.requestSubmit();return true})()`)
+  async fillOtp(_origin: string, _code: string) {
+    throw new CredentialError('credential_target_required', 409)
   }
 }
