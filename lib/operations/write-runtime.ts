@@ -4,6 +4,7 @@ import { pool } from '@/lib/db'
 import { getComposio } from '@/lib/composio'
 import { createApprovedWrites } from './approved-writes'
 import { composioWriteProvider } from './write-provider'
+import { composioConditionalCalendarDelete } from './calendar-conditional'
 import type { WriteRequestContext } from './write-transaction'
 import type { WriteActionName } from './write-contract'
 import { createApprovedWriteDiscovery } from './write-discovery'
@@ -49,6 +50,9 @@ export function personalWriteRuntime() {
   return {
     auth,
     discovery: createApprovedWriteDiscovery(pool),
-    operations: (action: WriteActionName, context?: WriteRequestContext) => createApprovedWrites(pool, composioWriteProvider(getComposio(), action), action, { ...context, guardForRun }),
+    operations: (action: WriteActionName, context?: WriteRequestContext) => {
+      const client = getComposio()
+      return createApprovedWrites(pool, composioWriteProvider(client, action, composioConditionalCalendarDelete(client)), action, { ...context, guardForRun })
+    },
   }
 }
