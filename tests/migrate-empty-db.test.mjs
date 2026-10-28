@@ -29,7 +29,7 @@ function ciTarget() {
 
 function schemaURL(target, schema) {
   const url = new URL(target)
-  url.searchParams.set('options', `-c search_path=${schema}`)
+  url.searchParams.set('options', `-c search_path=${schema},public`)
   return url.toString()
 }
 
@@ -81,6 +81,10 @@ for (const separateTargets of [false, true]) {
     const workspace = new Pool({ connectionString: workspaceURL, max: 1 })
     try {
       assert.equal((await admin.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+      // Extensions are database-wide. Retained fixture schemas must not own
+      // pg_trgm: later isolated runs need its operator class on their path too.
+      await admin.query('CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public')
+      assert.equal((await admin.query("SELECT n.nspname FROM pg_extension e JOIN pg_namespace n ON n.oid=e.extnamespace WHERE e.extname='pg_trgm'")).rows[0].nspname, 'public')
       for (const schema of schemas) await admin.query(`create schema "${schema}"`)
       // No setup-e2e-db, Better Auth migrator or schema push is called here.
       assert.deepEqual((await app.query(`select tablename from pg_tables where schemaname = current_schema()`)).rows, [])
@@ -121,7 +125,7 @@ for (const separateTargets of [false, true]) {
     } finally {
       await app.end()
       await workspace.end()
-      for (const schema of schemas) await admin.query(`drop schema if exists "${schema}" cascade`)
+      console.log(`Retained migration fixture schemas: ${schemas.join(', ')}`)
       await admin.end()
     }
   })

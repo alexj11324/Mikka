@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
-import { writeTransaction, type WriteRequestContext } from './write-transaction'
+import { writeTransaction, type WriteRequestContext, type WriteTransactionOptions } from './write-transaction'
 import { OperationError } from './write-error'
 export { OperationError } from './write-error'
 
@@ -10,6 +10,10 @@ const identity = z.object({ operationId: z.uuid(), ownerId: text, workspaceId: t
 /** Trusted callers persist operationId with the logical intent, before any run attempt. */
 const intent = identity.extend({
   provider: text, accountId: text, action: text, target: text,
+  // Optional only for legacy proposals. New run-bound callers must supply the
+  // actual host run ID, not the separately generated attempt token.
+  executionRunId: z.uuid().optional(),
+  policyScope: z.object({ botId: z.uuid().nullable(), workspaceId: z.uuid().nullable(), version: z.string().regex(/^\d+(?::\d+)?$/) }).strict().optional(),
   approvalId: text, candidateSha: z.string().regex(/^[a-f0-9]{40,64}$/).optional(),
   proposalDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
@@ -18,6 +22,12 @@ const receiptSchema = z.object({ providerObjectId: z.string().min(1).max(1024), 
 export type OperationIdentity = z.infer<typeof identity>
 export type OperationIntent = z.infer<typeof intent>
 export type OperationReceipt = z.infer<typeof receiptSchema>
+
+/** Enforce immutable run binding for run-backed operations. Legacy session
+ * operations omit executionRunId and retain their existing authorization path. */
+export function assertOperationRun(binding: OperationIntent, runId: string | null) {
+  if (binding.executionRunId && binding.executionRunId !== runId) throw new OperationError('operationRunMismatch')
+}
 export interface OperationRecord extends OperationIdentity {
   binding: OperationIntent
   idempotencyKey: string
@@ -39,8 +49,8 @@ export async function lockOperation(tx: PoolClient, input: OperationIdentity) {
 }
 export function createOperationLedger(pool: Pool, authorize: OperationAuthorize, context: WriteRequestContext = {}) {
   if (typeof authorize !== 'function') throw new OperationError('operationAuthorizationRequired')
-  async function transaction<T>(input: OperationIdentity, work: (tx: PoolClient) => Promise<T>): Promise<T> {
-    return writeTransaction(pool, async tx => { await lockOperation(tx, input); return work(tx) }, { signal: context.signal })
+  async function transaction<T>(input: OperationIdentity, work: (tx: PoolClient) => Promise<T>, guardedWork?: WriteTransactionOptions<T>['guardedWork']): Promise<T> {
+    return writeTransaction(pool, async tx => { await lockOperation(tx, input); return work(tx) }, { signal: context.signal, guard: context.guard, guardedWork })
   }
 
   async function owned(tx: PoolClient, input: OperationIdentity): Promise<OperationRecord> {
@@ -62,12 +72,13 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
       })
     },
     async read(input: OperationIdentity) {
-      return transaction(input, async tx => { const row = await owned(tx, input); await authorize(tx, row.binding, row.runId, 'read'); return row })
+      return transaction(input, async tx => { const row = await owned(tx, input); if (row.runId !== null) assertOperationRun(row.binding, row.runId); await authorize(tx, row.binding, row.runId, 'read'); return row })
     },
     async claim(input: OperationIdentity, runId: string) {
       z.uuid().parse(runId)
       return transaction(input, async tx => {
         const row = await owned(tx, input)
+        assertOperationRun(row.binding, runId)
         await authorize(tx, row.binding, runId, 'claim')
         if (row.status !== 'reserved') throw new OperationError('operationAlreadyClaimed')
         const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=\'executing\',"attemptToken"=$2,"runId"=$3,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, randomUUID(), runId])
@@ -78,10 +89,11 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
      * bounded provider call. A crash after the gate commits requires reconciliation.
      * Callers never receive an authority to invoke again after an unknown result.
      */
-    async invoke(input: OperationIdentity, attemptToken: string, execute: (record: Readonly<OperationRecord>, beforeSend: () => Promise<void>) => Promise<OperationReceipt>) {
+    async invoke(input: OperationIdentity, attemptToken: string, execute: (record: Readonly<OperationRecord>, beforeSend: () => Promise<void>, signal: AbortSignal) => Promise<OperationReceipt>) {
       z.uuid().parse(attemptToken)
       await transaction(input, async tx => {
         const row = await owned(tx, input)
+        assertOperationRun(row.binding, row.runId)
         await authorize(tx, row.binding, row.runId, 'invoke')
         if (row.attemptToken !== attemptToken || row.status !== 'executing') throw new OperationError('operationStaleAttempt')
         const result = await tx.query('UPDATE operation_ledger SET "invokedAt"=clock_timestamp() WHERE "operationId"=$1 AND "invokedAt" IS NULL', [row.operationId])
@@ -90,8 +102,12 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
       return transaction(input, async tx => {
         const row = await owned(tx, input)
         if (row.attemptToken !== attemptToken || row.status !== 'executing') throw new OperationError('operationStaleAttempt')
+        assertOperationRun(row.binding, row.runId)
         await authorize(tx, row.binding, row.runId, 'invoke')
-        const receipt = receiptSchema.parse(await execute(row, () => authorize(tx, row.binding, row.runId, 'invoke')))
+        return row
+      }, async (tx, row, lease, signal) => {
+        const beforeSend = async () => { await lease?.check(); await authorize(tx, row.binding, row.runId, 'invoke'); await lease?.check() }
+        const receipt = receiptSchema.parse(await execute(row, beforeSend, signal))
         const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=\'succeeded\',receipt=$2,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, receipt])
         return rows[0]
       })
@@ -106,6 +122,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
       z.enum(['succeeded', 'failed', 'uncertain']).parse(outcome.status)
       return transaction(input, async tx => {
         const row = await owned(tx, input)
+        assertOperationRun(row.binding, row.runId)
         await authorize(tx, row.binding, row.runId, 'settle')
         if (row.attemptToken !== attemptToken || row.status !== 'executing') throw new OperationError('operationStaleAttempt')
         const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=$2,receipt=$3,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, outcome.status, receipt])
@@ -118,6 +135,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
     async reconcile(input: OperationIdentity, lookup: (record: Readonly<OperationRecord>) => Promise<OperationReceipt | null>) {
       return transaction(input, async tx => {
         const row = await owned(tx, input)
+        assertOperationRun(row.binding, row.runId)
         await authorize(tx, row.binding, row.runId, 'reconcile')
         if (!['executing', 'uncertain'].includes(row.status)) return row
         const evidence = await lookup(row)

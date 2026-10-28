@@ -5,8 +5,8 @@ export const WRITE_ACTIONS = ['append_notion_paragraph', 'send_slack_message', '
 export type WriteActionName = typeof WRITE_ACTIONS[number]
 export const writeSchemas = {
   append_notion_paragraph: z.object({ page_id: z.uuid(), text: z.string().trim().min(1).max(2000) }).strict(),
-  send_slack_message: z.object({ channel: z.string().regex(/^[CG][A-Z0-9]{8,30}$/), text: z.string().trim().min(1).max(3000) }).strict(),
-  cancel_calendar_event: z.object({ event_id: z.string().trim().min(1).max(1024), send_updates: z.enum(['none', 'all']) }).strict(),
+  send_slack_message: z.object({ channel: z.string().regex(/^[CGD][A-Z0-9]{8,30}$/), text: z.string().trim().min(1).max(3000) }).strict(),
+  cancel_calendar_event: z.object({ event_id: z.string().trim().min(1).max(1024), send_updates: z.enum(['none', 'all', 'externalOnly']) }).strict(),
 }
 export const writeBatchSchema = z.object({ actions: z.array(z.discriminatedUnion('action',[
   z.object({action:z.literal('append_notion_paragraph'),input:writeSchemas.append_notion_paragraph}).strict(),

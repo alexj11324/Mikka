@@ -10,8 +10,12 @@ import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-inpu
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { personalMailboxTools } from '@/lib/mailbox-tools'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
+import { modelWriteTools, type ModelWriteCall, type ModelWriteTool } from '@/lib/operations/model-write-tools'
+import { PERSONAL_WRITE_TOOL_IDS } from '@/lib/agent-kit/registry'
+import { writeSchemas } from '@/lib/operations/write-schema'
+import { supportsWritePlanning } from '@/lib/operations/write-planning-model'
 
-export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[] }
+export interface CoordinatorToolOptions { execution?: AgentExecution | null; writeEnabled?: boolean; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
 
 export function createCoordinatorRegistry(userId: string, botId: string | null, scope?: NativeToolScope, options: CoordinatorToolOptions = {}) {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
@@ -21,7 +25,14 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
   // may select any authorized Bot on the person's explicit instruction.
   const botInput = botId ? id.optional() : id
   const targetBot = (requested?: string) => botId ? (!requested || requested === botId ? botId : null) : requested ?? null
+  const writeTools = options.writeTools ?? (execution ? { catalog: [
+    { name:'append_notion_paragraph', description:'Append text to a Notion page.', inputSchema:writeSchemas.append_notion_paragraph },
+    { name:'send_slack_message', description:'Send a Slack message.', inputSchema:writeSchemas.send_slack_message },
+    { name:'cancel_calendar_event', description:'Cancel a calendar event.', inputSchema:writeSchemas.cancel_calendar_event },
+  ], submit:(call:ModelWriteCall) => steps.personalWrite(userId,botId,execution.id,call,scope) } : undefined)
+  if (writeTools && writeTools.catalog.some(entry => !(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(entry.name))) throw new Error('invalidWriteToolCatalog')
   return {
+    ...modelWriteTools((options.writeEnabled === true) && Boolean(execution && supportsWritePlanning(execution.snapshot.runtime)) && Boolean(writeTools), writeTools?.catalog ?? [], call => writeTools!.submit(call)),
     ...personalMailboxTools(mailboxEnabled && Boolean(execution), request => steps.personalMailbox(userId, botId, request, scope, execution?.id)),
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input, scope)),
     ...createGoogleAITools((action, input) => steps.composioAction(userId, action, input, scope), (action, input) => steps.proposeAccountAction(userId, action, input, scope)),
@@ -154,7 +165,8 @@ export function coordinatorTools(userId: string, botId: string | null, scope?: N
   // absent from this execution's immutable effectiveTools.
   const requested = execution.snapshot.effectiveTools.filter(name =>
     (issueMutationsEnabled() || (name !== 'create_issue' && name !== 'update_issue')) &&
-    (!Object.hasOwn(mailboxInputs, name) || (options.mailboxEnabled && options.mailboxTools?.includes(name as MailboxToolName))))
+    (!Object.hasOwn(mailboxInputs, name) || (options.mailboxEnabled && options.mailboxTools?.includes(name as MailboxToolName))) &&
+    (!(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(name) || ((options.writeEnabled === true) && Boolean(execution && supportsWritePlanning(execution.snapshot.runtime)) && (!options.writeTools || options.writeTools.catalog.some(entry => entry.name === name)))))
   return instrumentTools(registry,requested,{
     before:(callId,name) => kit.beforeAgentTool(userId,botId,execution.id,callId,name,scope),
     after:(callId,name,outcome) => kit.afterAgentTool(userId,botId,execution.id,callId,name,outcome,scope),

@@ -147,10 +147,13 @@ export async function preparePrompt(userId: string, botId: string | null = null,
   if (cut !== null) {
     if (summaryTrust.key.length < 32) throw new Error('Existing host auth secret required for summary provenance')
     const folded = messages.filter(row => row.position <= cut)
+    const messagesToCompact: ModelMessage[] = [...promptMessages(summary, folded, summaryTrust), { role: 'user', content: 'Write the summary now.' }]
+    const hasImages = messagesToCompact.some(message => message.role === 'user' && Array.isArray(message.content) && message.content.some(part => part.type === 'image' || (part.type === 'file' && part.mediaType.startsWith('image/'))))
+    if (hasImages && !snapshot) throw new Error('compactionModelUnavailable')
     const { text } = await summarizeConversation(userId, botId, snapshot, {
       instructions: SUMMARY_INSTRUCTIONS,
       maxOutputTokens: 4096,
-      messages: [...promptMessages(summary, folded, summaryTrust), { role: 'user', content: 'Write the summary now.' }],
+      messages: messagesToCompact,
     })
     summary = preserveMessageSources(text, folded, summary, summaryTrust)
     await store.saveSummary(userId, summary, cut, botId)
@@ -160,6 +163,8 @@ export async function preparePrompt(userId: string, botId: string | null = null,
   const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
   return { instructions: instructionsWithMemory(instructions, memory), messages: promptMessages(summary, messages, summaryTrust) }
 }
+
+export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
 
 export async function mailboxToolsEnabled() { 'use step'; return personalMailboxEnabled() }
 export async function mailboxCatalogue(userId: string, botId: string | null, executionId?: string) {
@@ -407,4 +412,12 @@ export async function webSearchStep(userId: string, input: { query: string; limi
   'use step'
   await assertNativeToolScope(userId,scope)
   return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
+}
+
+/** Host-owned identity and native fence are not model arguments. */
+export async function personalWrite(userId:string, botId:string | null, executionId:string, call:import('@/lib/operations/model-write-tools').ModelWriteCall, scope?:NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  const { personalWriteFromRun } = await import('@/lib/operations/write-runtime')
+  return personalWriteFromRun(userId,botId,executionId,call,scope)
 }

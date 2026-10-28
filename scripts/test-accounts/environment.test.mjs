@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, chmod, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, chmod, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -61,7 +61,7 @@ test('descriptor files must be private regular files; reading does not modify th
     await symlink(file, alias)
     await assert.rejects(loadEnvironment({ ...env, MIKKA_TEST_ENVIRONMENT_FILE: alias }), /ENVIRONMENT_FILE_UNSAFE/)
     await assert.rejects(loadEnvironment(env), /ENVIRONMENT_FILE_REQUIRED/)
-  } finally { await rm(directory, { recursive: true, force: true }) }
+  } finally { console.error(`Retained test fixture directory: ${directory}`) }
 })
 
 test('database check is SELECT-only and rejects actual identity, missing marker and copied binding', async () => {

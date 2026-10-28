@@ -63,7 +63,6 @@ try {
   await run("docker", [
     "run",
     "-d",
-    "--rm",
     "--name",
     name,
     "--memory=256m",
@@ -102,7 +101,6 @@ try {
   const ca = "/etc/ssl/certs/ca-certificates.crt"
   const dockerArgs = [
     "run",
-    "--rm",
     "--memory=6g",
     "--cpus=4",
     "--user",
@@ -151,5 +149,5 @@ try {
   )
 } finally {
   await pool.end()
-  if (started) await run("docker", ["stop", "--timeout", "2", name])
+  if (started) console.error(`Retained subscription test container: ${name}`)
 }

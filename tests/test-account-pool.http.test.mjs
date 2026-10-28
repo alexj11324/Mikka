@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
-import { mkdir, stat, writeFile, rm } from 'node:fs/promises'
+import { mkdir, stat, writeFile, rename, symlink } from 'node:fs/promises'
 import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
 import { loadEnvironment, assertDeploymentIdentity } from '../scripts/test-accounts/environment.mjs'
@@ -67,7 +67,9 @@ async function release(scope, outcome = 'clean') {
   const result = await scope.release({ outcome })
   active.delete(scope)
   for (const account of [scope.owner, scope.peer]) {
-    await assert.rejects(stat(account.storageStatePath), { code: 'ENOENT' })
+    const retained = await stat(account.storageStatePath)
+    assert.equal(retained.isFile(), true)
+    assert.equal(retained.mode & 0o077, 0)
   }
   return result
 }
@@ -210,9 +212,11 @@ acceptance('prepare/acquire/real owner-peer HTTP/clean release safely reuses the
     fixturesClean = true
 
     const ids = [first.owner.userId, first.peer.userId]
+    const sessionRowsBeforeRelease = (await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[])', [ids])).rows[0].n
     const before = (await database.query('select count(*)::int as n from public."user"')).rows[0].n
     assert.equal((await release(first)).state, 'released')
-    assert.equal((await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[])', [ids])).rows[0].n, 0)
+    assert.equal((await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[]) and "expiresAt">clock_timestamp()', [ids])).rows[0].n, 0)
+    assert.equal((await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[])', [ids])).rows[0].n, sessionRowsBeforeRelease)
     assert.equal((await other.owner.request('/api/auth/get-session')).status, 200)
 
     const next = await acquire('lifecycle-next')
@@ -305,7 +309,7 @@ acceptance('cancelling an outstanding request closes the client immediately and 
     active.delete(scope)
     const inspected = await pool.inspect()
     assert.equal(inspected.pairs.find(item => item.id === scope.lease.pairId).state, 'quarantined')
-    assert.equal((await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[])', [[scope.owner.userId, scope.peer.userId]])).rows[0].n, 0)
+    assert.equal((await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[]) and "expiresAt">clock_timestamp()', [[scope.owner.userId, scope.peer.userId]])).rows[0].n, 0)
     const replacement = await acquire('after-cancel')
     try {
       assert.notEqual(replacement.lease.pairId, scope.lease.pairId)
@@ -316,25 +320,23 @@ acceptance('cancelling an outstanding request closes the client immediately and 
   } finally { if (active.has(scope)) { await release(scope, 'dirty').catch(() => {}); active.delete(scope) } }
 })
 
-acceptance('failed state removal revokes sessions and quarantines instead of reporting clean reuse', async () => {
+acceptance('unsafe retained state revokes sessions and quarantines instead of reporting clean reuse', async () => {
   const scope = await acquire('state-cleanup-failure')
   const ownedPath = scope.owner.storageStatePath
   try {
-    // Deterministic filesystem failure even for uid0: non-recursive rm cannot
-    // remove this test-owned nonempty directory replacing its own state file.
-    await rm(ownedPath)
-    await mkdir(ownedPath, { mode: 0o700 })
-    await writeFile(`${ownedPath}/owned-canary`, 'synthetic state-cleanup canary', { mode: 0o600 })
-    await assert.rejects(scope.release({ outcome: 'clean' }), { code: 'SESSION_STATE_CLEANUP_FAILED' })
+    // Preserve the original private file, but reject a substituted symlink.
+    await rename(ownedPath, `${ownedPath}.retained`)
+    await symlink(`${ownedPath}.retained`, ownedPath)
+    await assert.rejects(scope.release({ outcome: 'clean' }), { code: 'SESSION_STATE_PRESERVATION_FAILED' })
     active.delete(scope)
     const inspection = await pool.inspect()
     assert.equal(inspection.pairs.find(pair => pair.id === scope.lease.pairId).state, 'quarantined')
-    assert.equal((await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[])', [[scope.owner.userId, scope.peer.userId]])).rows[0].n, 0)
-    await assert.rejects(stat(scope.peer.storageStatePath), { code: 'ENOENT' })
+    assert.equal((await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[]) and "expiresAt">clock_timestamp()', [[scope.owner.userId, scope.peer.userId]])).rows[0].n, 0)
+    assert.equal((await stat(scope.peer.storageStatePath)).isFile(), true)
     await assert.rejects(scope.owner.request('/api/auth/get-session'), { code: 'LEASE_CLOSED' })
   } finally {
     if (active.has(scope)) await scope.release({ outcome: 'dirty' }).catch(() => {})
     active.delete(scope)
-    await rm(ownedPath, { recursive: true, force: true })
+    console.error('Retained substituted session state fixture')
   }
 })

@@ -22,6 +22,7 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
   const holder = getWorkflowMetadata().workflowRunId
   const computerEnabled = await steps.computerToolsEnabled()
   const mailboxEnabled = await steps.mailboxToolsEnabled()
+  const writeEnabled = await steps.personalWriteToolsEnabled()
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const inbox = await steps.takeInbox(userId,holder,botId)
     if (!inbox.held) return
@@ -36,8 +37,8 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
       if (execution && execution.snapshot.runtime.harness !== selected.harness) throw new Error('agent_runtime_changed')
       const mailboxTools = mailboxEnabled ? await steps.mailboxCatalogue(userId,botId,execution?.id) : []
       const result = selected.harness === 'ai_sdk'
-        ? await runHostedWorkflowTurn(execution?.snapshot.runtime ?? { harness:'ai_sdk',model:COORDINATOR_MODEL },coordinatorTools(userId,botId,undefined,{ execution,computerEnabled,mailboxEnabled,mailboxTools }),{ ...(await steps.preparePrompt(userId,botId,execution?.snapshot,mailboxTools)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep })
-        : await nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scope,{ execution,computerEnabled,mailboxEnabled,mailboxTools }),botId,execution?.snapshot)
+        ? await runHostedWorkflowTurn(execution?.snapshot.runtime ?? { harness:'ai_sdk',model:COORDINATOR_MODEL },coordinatorTools(userId,botId,undefined,{ execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools }),{ ...(await steps.preparePrompt(userId,botId,execution?.snapshot,mailboxTools)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep })
+        : await nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scope,{ execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools }),botId,execution?.snapshot)
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       await steps.appendMessages(userId,holder,result.responseMessages,quiet ? null : turnWarning(result.finishReason,result.text),botId)
       if (inbox.handoffMatterIds.length) await steps.settleAttention(userId,inbox.handoffMatterIds,inbox.handoffOnly && !quiet)

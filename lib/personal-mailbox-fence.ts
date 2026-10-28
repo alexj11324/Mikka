@@ -45,7 +45,7 @@ export function workerMailboxFence(identity: {
  * The optional Bot is locked first, matching its FK deletion cascade direction.
  * No scheduler, runtime selection or native lifecycle writer is changed. */
 export function nativeMailboxFence(identity: {
-  userId: string; botId: string | null; workspaceId: string; scope: PersonalNativeScope; action: string
+  userId: string; botId: string | null; workspaceId: string; scope: PersonalNativeScope; action: string; toolName?: string
 }, enabled: () => boolean): MailboxFence {
   return async client => {
     const denied = () => new MailboxError('Native mailbox authority expired or revoked', 409)
@@ -64,7 +64,7 @@ export function nativeMailboxFence(identity: {
     if (!(await client.query(`SELECT 1 FROM coordinator_sessions WHERE "userId"=$1
       AND "botId" IS NOT DISTINCT FROM $2::uuid AND "leaseHolder"=$3 FOR SHARE`, [identity.userId, identity.botId, identity.scope.holder])).rows.length) throw denied()
     if (!(await client.query(`SELECT 1 FROM native_coordinator_tools WHERE "turnId"=$1
-      AND "callId"=$2 AND name=$3 AND status='pending' FOR SHARE`, [identity.scope.turnId, identity.scope.callId, `mailbox_${identity.action}`])).rows.length) throw denied()
+      AND "callId"=$2 AND name=$3 AND status='pending' FOR SHARE`, [identity.scope.turnId, identity.scope.callId, (identity.toolName ?? `mailbox_${identity.action}`)])).rows.length) throw denied()
     // New statement after ALL row-lock waits: clock_timestamp, not the BEGIN
     // timestamp, is the authorization linearization point for expiring leases.
     const { rows } = await client.query(`SELECT 1 FROM native_coordinator_turns j
@@ -76,7 +76,7 @@ export function nativeMailboxFence(identity: {
         AND s."leaseUntil">clock_timestamp() AND j."expiresAt">clock_timestamp()
         AND d."ownerId"=j."userId" AND d.enabled
         AND t."callId"=$4 AND t.name=$6 AND t.status='pending'`, [identity.scope.turnId, identity.userId,
-      identity.scope.holder, identity.scope.callId, identity.botId, `mailbox_${identity.action}`])
+      identity.scope.holder, identity.scope.callId, identity.botId, (identity.toolName ?? `mailbox_${identity.action}`)])
     if (!rows.length) throw denied()
   }
 }

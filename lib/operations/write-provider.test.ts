@@ -21,20 +21,20 @@ for (const action of WRITE_ACTIONS) test(action+' pins owner/account/target/vers
  revoked=true;await assert.rejects(provider.execute(args),/revoked/);assert.equal(writes,1)
  wrongTarget=true;await assert.rejects(provider.prepare('owner',input),/integrationTargetUnavailable/)
  assert.equal(await provider.lookup({ownerId:'owner',accountId:'bound',idempotencyKey:'stable'}),null)
- if(action==='send_slack_message')assert.equal(writeArguments(action,input).text,'&lt;!channel&gt; &amp; literal')
+ if(action==='send_slack_message')assert.equal(writeArguments(action,input).text,'<!channel> & literal')
 })
 
 import { channelSnapshot, calendarSnapshot } from './write-target'
 const channel = { id:'G024BE91L',is_member:true,is_archived:false,is_im:false,is_mpim:false,is_channel:false,is_group:true,is_private:true }
 const single = { id:'event-one',etag:'"v1"',eventType:'default',status:'confirmed',organizer:{self:true,email:'synthetic@example.invalid'},start:{date:'2027-01-01'},end:{date:'2027-01-02'},attendees:[{email:'guest@example.invalid'}] }
-test('Slack rejects documented G-prefix MPIM, DM, missing and malformed classification',()=>{
- assert.equal(channelSnapshot(channel,channel.id).targetId,channel.id)
- for(const patch of [{is_mpim:true},{is_im:true},{is_mpim:undefined},{is_im:null},{is_archived:undefined},{is_member:'true'},{is_channel:undefined},{is_group:'false'},{is_private:undefined},{is_channel:true,is_group:true}])assert.throws(()=>channelSnapshot({...channel,...patch},channel.id),/integrationTargetUnavailable/)
+test('Slack snapshots preserve supported conversation facts without deciding their meaning',()=>{
+ for(const patch of [{},{is_mpim:true},{is_im:true},{is_member:false},{is_archived:true},{is_private:false}]) assert.equal(channelSnapshot({...channel,...patch},channel.id).targetId,channel.id)
+ assert.throws(()=>channelSnapshot({...channel,id:'different'},channel.id),/integrationTargetUnavailable/)
+ assert.throws(()=>channelSnapshot({...channel,is_im:'invalid'},channel.id),/integrationTargetUnavailable/)
 })
-test('Calendar requires ordinary standalone complete version/target metadata',()=>{
- assert.equal(calendarSnapshot(single,'event-one','none').etag,'"v1"')
- for(const patch of [{recurrence:['RRULE:FREQ=DAILY']},{recurrence:[]},{recurringEventId:'master'},{originalStartTime:{date:'2027-01-01'}},{etag:undefined},{etag:'*'},{attendeesOmitted:true},{attendees:null},{attendees:[{}]},{attendees:[{email:'guest@example.invalid',additionalGuests:1}]},{eventType:'focusTime'},{organizer:{email:'other@example.invalid'}},{start:undefined}])assert.throws(()=>calendarSnapshot({...single,...patch},'event-one','none'),/integrationTargetUnavailable/)
- assert.throws(()=>calendarSnapshot(single,'eventone','none'),/integrationTargetUnavailable/)
+test('Calendar snapshots pin ID and ETag while retaining event facts',()=>{
+ for(const patch of [{},{recurrence:['RRULE:FREQ=DAILY']},{recurringEventId:'master'},{eventType:'focusTime'},{organizer:{email:'other@example.invalid'}}]) assert.equal(calendarSnapshot({...single,...patch},'event-one','externalOnly').etag,'"v1"')
+ for(const patch of [{etag:undefined},{etag:'*'},{id:'wrong'}]) assert.throws(()=>calendarSnapshot({...single,...patch},'event-one','none'),/integrationTargetUnavailable/)
 })
 test('native cancellation and Slack metadata read default closed without verified transports/contracts',async()=>{
  const client={connectedAccounts:{list:async()=>({items:[{id:'bound',toolkit:{slug:'slack'},status:'ACTIVE',isDisabled:false}]})},tools:{getRawComposioToolBySlug:async()=>({version:'fixed-v1'}),execute:async()=>{throw Error('read/write forbidden')}}} as unknown as ComposioActionClient
