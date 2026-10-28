@@ -1,3 +1,5 @@
+import { FACTORY_QUESTION_INSTRUCTIONS } from '@/lib/factory/instructions'
+import { FactoryError } from '@/lib/factory/contract'
 import { preserveMessageSources } from '@/lib/coordinator/message-safety'
 import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
 import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
@@ -49,7 +51,7 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError) return { error: error.code }
+    if (error instanceof ActionFailureError || error instanceof FactoryError) return { error: error.code }
     throw error
   }
 }
@@ -136,6 +138,11 @@ export async function pushToPhones(userId: string, botId: string | null, text: s
  */
 export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
+  if (process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1') {
+    const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
+    await factoryRuntimeForBot(botId).reconcile(userId)
+  }
+
   let { summary, memory, messages } = await store.loadConversation(userId, botId)
   const summaryTrust = { key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) }
   const cut = compactionCut(summary, messages, summaryTrust)
@@ -152,7 +159,8 @@ export async function preparePrompt(userId: string, botId: string | null = null,
     await store.saveSummary(userId, summary, cut, botId)
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages, summaryTrust) }
+  const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS : ''
+  return { instructions: instructionsWithMemory(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory) + factoryPolicy, messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope, botId: string | null = null) {
@@ -197,7 +205,7 @@ export async function listIssues(userId: string, input: { status?: string }, sco
   }))
 }
 
-export async function getIssue(userId: string, input: { issueId: string }, scope?: NativeToolScope) {
+export async function getIssue(userId: string, input: { issueId: string }, scope?: NativeToolScope, botId: string | null = null) {
   'use step'
   await assertNativeToolScope(userId,scope)
   const issue = await issueForUser(userId, input.issueId)
@@ -207,6 +215,7 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
     id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
+    ...(process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listForIssue(userId,issue.id) } : {}),
   }
 }
 
@@ -385,4 +394,62 @@ export async function webSearchStep(userId: string, input: { query: string; limi
   'use step'
   await assertNativeToolScope(userId,scope)
   return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
+}
+
+/** Durable personal intake; existing issue receipts recover a crash before routing. */
+export async function intakeFactoryRequest(userId: string, input: import('@/lib/factory/intake').IntakeInput, scope?: NativeToolScope, botId: string | null = null) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  return asToolResult(async () => {
+    const { factoryForBot, factoryRequestSource } = await import('@/lib/factory/server')
+    const { intakeRequest } = await import('@/lib/factory/intake')
+    const store=factoryForBot(botId)
+    return intakeRequest(input, {
+      source:id=>factoryRequestSource(userId,botId,id),
+      create:async(body,key)=>(await import('@/lib/mcp/actions')).createIssue(userId,body,systemActor(botId ?? 'coordinator'),key),
+      route:route=>store.route(userId,route),
+    })
+  })
+}
+export async function listFactoryRequests(userId:string,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryRequestSource(userId,botId))
+}
+export async function readFactoryTask(userId:string,taskId:string,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryForBot(botId).read(userId,taskId))
+}
+export async function resolveFactoryTask(userId:string,input: import('@/lib/factory/intake').ResolveInput,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryForBot(botId).apply(userId,input.binding,input.eventId,input.change))
+}
+
+export async function stopFactoryTask(userId:string,input:import('@/lib/factory/intake').StopInput,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryForBot(botId).apply(userId,input.binding,input.eventId,{action:input.action,reason:input.reason}))
+}
+
+export async function dispatchFactoryTask(userId:string,input:import('@/lib/factory/dispatch').FactoryDispatchInput,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).dispatch(userId,input))
+}
+export async function listFactoryQuestions(userId:string,taskId:string,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).questions.list(userId,taskId))
+}
+export async function answerFactoryContext(userId:string,input:import('@/lib/factory/questions/contract').ContextQuestionAnswer,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).questions.answer({source:'orchestrator',userId},input))
+}
+export async function escalateFactoryQuestion(userId:string,input:import('zod').z.infer<typeof import('@/lib/factory/questions/contract').questionEscalationSchema>,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).questions.escalate(userId,input))
 }

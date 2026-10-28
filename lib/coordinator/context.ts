@@ -110,6 +110,10 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
     case 'run_report':
       return [event.runId ? `[Event] The agent in run ${event.runId} reports progress: ${payload.text}` : `[Event] An Agent reports coordination data: ${payload.text}`, event.issueId ? `Issue: ${event.issueId}.` : null, note].filter(Boolean).join('\n')
     case 'run_question':
+      if (typeof payload.taskId === 'string' && typeof payload.questionId === 'string') return [
+        `[Event] Execution question ${payload.questionId} for task ${payload.taskId}, run ${event.runId}: ${String(payload.question ?? '')}`,
+        payload.needsUser === true ? 'The unresolved question has been escalated to its owner.' : 'Inspect the persisted question and existing facts before escalating to the person.',
+      ].join('\n')
       return [
         `[Event] The agent in run ${event.runId} asks the person: ${payload.question}`,
         Array.isArray(payload.options) ? `Options: ${payload.options.join(' / ')}` : null,
