@@ -85,3 +85,17 @@ Recovery evidence only sets recovery_observed; later failure reopens the interna
 incident. Neither state writes/automatically closes any external or internal issue.
 A future registered migration requires coordination against then-current main and
 approval for actual database application. No #192 migration alias is imported here.
+
+Lifecycle integration now consumes #192 12c7c50 source. createFactoryMonitorConsumers
+exports configure, validateCheck, gate, reconcile matching actual owner callbacks.
+readProbe is a required trusted persisted-artifact reader; missing proof blocks.
+No model handoff field supplies a probe. These exports do not enable flags.
+
+Exact remaining host seam: guardFactoryClaim and ordinary runtime callers currently
+call factoryRuntimeForBot(botId) without these consumers. The #192 owner must install
+configure.monitor, validateCheck delegation, lifecycle.gates.monitor and
+consumers.monitor together; third store arg remains botId, lifecycle is fourth.
+Store invokes stage gate for passed only; monitor reconcile therefore validates
+receipt/probe for both passed and failed before applying finish in the same tx.
+The trusted readProbe implementation must verify report-body/run-chunk authenticity;
+a reference digest alone is insufficient. No real probe transport is registered.

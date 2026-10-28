@@ -41,5 +41,9 @@ export async function consumeMonitorObservation(tx: PoolClient, task: FactoryChe
  if (receipt.publicationId !== input.publicationId) throw Error("factoryMonitorPublicationMismatch");
  const result = validateMonitorV2Observation(receipt,observation,productionOrigin);
  if (result === "blocked" || result !== input.outcome) throw Error("factoryMonitorObservationBlocked");
+ if(result === "healthy") {
+  const existing=await tx.query('SELECT id FROM factory_monitor_incidents WHERE owner_id=$1 AND workspace_key=$2 AND fingerprint=$3',[input.ownerId,input.workspaceKey,input.fingerprint]);
+  if(!existing.rowCount) return {incidentId:null,replayed:false};
+ }
  return recordMonitorIncident(tx,{ ...input, evidenceDigest: digest({ receipt, observation, artifact: `run-report:${input.runId}` }) });
 }

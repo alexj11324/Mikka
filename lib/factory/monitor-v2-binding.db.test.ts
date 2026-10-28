@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 import { createVercelPublicationAdapter, MIKKA_VERCEL } from "./vercel-publication";
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { readFactoryPublicationReceiptV2 } from "./publication-receipt";
+import { createFactoryMonitorConsumers } from "./monitor-lifecycle";
+import type { FactoryTask, FactoryAttempt } from "./store";
 import { consumeMonitorObservation } from "./monitor-incidents";
 import { validateMonitorV2Observation } from "./monitor-v2-binding";
 const db = process.env.E2E_DATABASE_URL;
@@ -64,6 +66,20 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
       assert.equal(failed.incidentId,recovered.incidentId);
       const audit = (await tx.query("SELECT identity FROM factory_monitor_observations WHERE event_id='recovery-evidence'")).rows[0].identity;
       assert.match(audit.evidenceDigest,/^[a-f0-9]{64}$/); assert.equal(audit.publicationId,r.publicationId); assert.equal(audit.runId,monitorRun); assert.equal(audit.candidateId,r.candidateId);
+      await tx.query('ALTER TABLE agent_runs ADD COLUMN kind text, ADD COLUMN "baseBranch" text');
+      const lifecycleTask:FactoryTask={...task,stage:"monitor",status:"running",botId:null,revision:1,reason:"fixture",route:{issueId:r.issueId,eventId:randomUUID(),sourceEventId:randomUUID(),rationale:"fixture",missingInformation:[],missingPermissions:[],needsSpec:false}};
+      const proof={observation:o,incident:input,artifact:`run-report:${monitorRun}`,sessionId:"synthetic-monitor",recordedAt:at};
+      const adapters=createFactoryMonitorConsumers({productionOrigin:"https://app.example.com",readProbe:async()=>proof});
+      await tx.query("UPDATE agent_runs SET status='queued' WHERE id=$1",[monitorRun]);
+      await adapters.configure(tx,{...lifecycleTask,status:"pending"},monitorRun);
+      assert.deepEqual(await adapters.validateCheck(tx,lifecycleTask,monitorRun),{readOnly:true});
+      const attempt=(await tx.query('SELECT * FROM factory_attempts WHERE id=$1',[monitorAttempt])).rows[0] as FactoryAttempt;
+      const evidence={artifact:proof.artifact,kind:"report" as const,runId:monitorRun,sessionId:proof.sessionId,candidateId:r.candidateId,sha:r.candidate.sha,environment:r.candidate.environment,recordedAt:at};
+      assert.equal(await adapters.gate(tx,lifecycleTask,attempt,{action:"finish",status:"passed",reason:"test",evidence:[evidence],output:{}}),true);
+      const absent=createFactoryMonitorConsumers({productionOrigin:"https://app.example.com",readProbe:async()=>null});
+      await assert.rejects(()=>absent.gate(tx,lifecycleTask,attempt,{action:"finish",status:"passed",reason:"test",evidence:[evidence],output:{}}),/factoryMonitorProofRequired/);
+      await tx.query('UPDATE agent_runs SET "baseBranch"=$2 WHERE id=$1',[monitorRun,"b".repeat(40)]);
+      await assert.rejects(()=>adapters.validateCheck(tx,lifecycleTask,monitorRun),/factoryMonitorAssignmentRequired/);
       await tx.query("ROLLBACK");
     } finally { tx.release(); }
   } finally { await f.close(); }
