@@ -6,15 +6,25 @@ worked in Preview. Production acceptance requires Alex's permission.
 
 ## Current execution status
 
-The test implementation is committed; the integrated PR6 revision has not yet
-completed the real browser CI gate. The steps below describe coverage and
-expected behavior, not a successful acceptance run. Replace pending entries
-only with evidence from the exact reviewed commit.
+The deterministic real-daemon loop has passed on a historical PR6 revision.
+[Browser run 40628462076](https://github.com/alexj11324/Mikka/actions/runs/40628462076)
+tested PR head `49cdb9b387613a46878188d0751a0b6e7e760525` at actual checkout
+`b60ccdb04a4696bbf8e9195049f642fce22c97db` from **2026-10-28 03:50:36 to
+03:52:19 UTC**. Both completion/publication and stop scenarios passed, with no
+retries or skipped cases. The full browser job was subsequently cancelled when
+a newer revision was published; it is not a complete green gate for the final
+commit. Its screenshots exposed an internal completion prompt rendered in chat,
+which PR5 fixes and the final MVP test explicitly guards against.
+
+Final exact-head CI status and the complete screenshot artifact belong to
+[PR #362](https://github.com/alexj11324/Mikka/pull/362). Record their actual checkout
+SHA and workflow results before accepting the final revision. These CI results
+do not complete the separate frozen-Preview acceptance gate below.
 
 | Gate | Actual result | Evidence |
 | --- | --- | --- |
-| Integrated migration, source and browser CI | Pending on the integrated PR6 commit | Pending workflow URL, checkout SHA and job results |
-| Real-daemon MVP browser loop | Pending; not yet accepted | Pending Playwright report, screenshots and `mvp-acceptance-evidence.json` |
+| Integrated migration, source and browser CI | Final exact-head result pending; see PR #362 | Record final workflow URL, checkout SHA and all job results |
+| Real-daemon MVP browser loop | Historical revision: both scenarios passed; final revision still requires its own evidence | Run 40628462076, `browser-test-report`, Playwright report, screenshots and `mvp-acceptance-evidence.json`; actual checkout SHA above |
 | Frozen Preview | Blocked; not executed | Matching schema and authorized configuration delivery required; record below |
 | Production | Not requested or executed | Requires Alex's prior permission |
 

@@ -139,6 +139,11 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
   await composer.fill('')
   await expect(stop).toBeVisible()
   await testInfo.attach(`thread-stop-running-${view.name}-light`, { body: await page.screenshot(), contentType: 'image/png' })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await testInfo.attach(`thread-stop-running-${view.name}-dark`, { body: await page.screenshot(), contentType: 'image/png' })
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(page.locator('html')).not.toHaveClass(/dark/)
 
   await page.clock.install()
   await stop.click()
@@ -153,6 +158,11 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
     await expect.poll(async () => (await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt).not.toBeNull()
     const originalStop = (await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt
     await testInfo.attach(`thread-stop-stopping-${view.name}-light`, { body: await page.screenshot(), contentType: 'image/png' })
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await expect(page.locator('html')).toHaveClass(/dark/)
+    await testInfo.attach(`thread-stop-stopping-${view.name}-dark`, { body: await page.screenshot(), contentType: 'image/png' })
+    await page.emulateMedia({ colorScheme: 'light' })
+    await expect(page.locator('html')).not.toHaveClass(/dark/)
     // An offline daemon never acknowledges. The timeout unlocks retry, not the draft.
     await page.clock.fastForward(30_100)
     await expect(panel.getByRole('alert')).toContainText('没停下来，再试一次')
