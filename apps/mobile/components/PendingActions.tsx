@@ -89,7 +89,7 @@ export function PendingActions({ items, focus, reload, onFocusLayout }: { items:
                   </>
                 )}
               </View>
-              {body ? <View style={styles.body}><Text style={cardText.body} numberOfLines={12}>{body}</Text></View> : null}
+              {body ? <View style={styles.body}><Text style={cardText.body}>{body}</Text></View> : null}
               <View style={styles.actions}>
                 <CardButton label="不要" disabled={busy !== null} onPress={() => void decide(item, false)} />
                 <CardButton primary label={email ? '发送' : '保存到日历'} disabled={busy !== null && busy !== item.id} busy={busy === item.id} onPress={() => void decide(item, true)} />

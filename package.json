@@ -86,7 +86,7 @@
     "test:agent-kit-model": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-execution-model.test.ts lib/subscription-model-snapshot.test.ts lib/subscription-workflow-model.test.ts lib/subscription-workflow-turn.test.ts lib/agent-kit/hosted-replay.test.ts lib/agent-kit/live-eval-disabled.test.ts lib/agent-kit/core-entry.test.ts lib/agent-kit/disabled-entry.test.ts lib/agent-kit/message-safety-compat.test.ts lib/agent-kit/tool-defaults-compat.test.ts lib/agent-kit/defaults-consumers.test.ts",
     "test:coordinator-issue-tools": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/issue-tools.test.ts lib/mcp/issue-mutation.test.ts",
     "test:coordinator-issue-tools-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/issue-tool-calls.db.test.ts",
-    "test:mobile": "node --import tsx --test lib/openui-lang.test.ts lib/mobile-web-target.test.ts tests/mobile-app.test.ts"
+    "test:mobile": "node --import tsx --test lib/openui-lang.test.ts lib/mobile-web-target.test.ts tests/mobile-app.test.ts && node --experimental-test-module-mocks --import tsx --test tests/mobile-handoff.test.ts && TSX_TSCONFIG_PATH=apps/mobile/tsconfig.json node --experimental-test-module-mocks --import tsx --test apps/mobile/tests/approval-body.test.mts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",
