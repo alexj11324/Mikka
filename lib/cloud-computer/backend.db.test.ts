@@ -8,7 +8,7 @@ import { startSuggestion } from './suggestions'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { claimCloudRun } from '@/lib/computer/claim'
 import { recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
-import { withWorkspaceComputerPermission } from './workspace-policy'
+import { resolveWorkspaceComputerPolicy, withWorkspaceComputerPermission } from './workspace-policy'
 import { bindSubagentRun } from './subagent-run-binding'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
@@ -94,6 +94,11 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     await pool.query('UPDATE workspace_computer_policies SET permission=\'allow\',version=3 WHERE "workspaceId"=$1', [alice.workspaceId])
     assert.equal(await withWorkspaceComputerPermission(pool, alice.workspaceId, async (_client, version) => version), 3, 'shared allow passes the workspace ceiling without manufacturing an action grant')
     await pool.query('UPDATE workspace_computer_policies SET permission=\'ask\',version=0 WHERE "workspaceId"=$1', [alice.workspaceId])
+    // Keep the missing-row coverage without deleting a retained policy row.
+    // This independent workspace has never had a computer policy inserted.
+    const noPolicyWorkspace = randomUUID()
+    assert.equal((await pool.query('SELECT 1 FROM workspace_computer_policies WHERE "workspaceId"=$1', [noPolicyWorkspace])).rowCount, 0)
+    assert.deepEqual(await withWorkspaceComputerPermission(pool, noPolicyWorkspace, async client => resolveWorkspaceComputerPolicy(client, noPolicyWorkspace)), { permission: 'ask', version: 0 })
     await assert.rejects(store.get(bob, botA, task.id), { status: 404 })
     await assert.rejects(store.get(stranger, botA, task.id), { status: 404 })
     await assert.rejects(store.create(bob, botA, 'steal'), { status: 404 })
