@@ -29,3 +29,21 @@ Candidate intake migration: `20261028182316_factory_192_routing.sql` creates fou
 Candidate migration: `20261028182317_factory_192_questions.sql` creates Factory questions/indexes and adds nullable JSONB `agent_runs.questionContinuation`. ALTER TABLE requires an ACCESS EXCLUSIVE lock even though there is no backfill/default. The new column is accessed only in explicit Factory raw SQL; it is deliberately absent from ordinary Drizzle all-column projections, so default-off ordinary reads/writes do not require it. Historical event references do not block Bot deletion. Existing issue cascades also delete the new Factory state when an issue is deleted; no deletion operation is performed by these migrations.
 
 Both `MIKKA_FACTORY_ROUTING_ENABLED=1` and `MIKKA_FACTORY_LIFECYCLE_ENABLED=1` are necessary for runtime entry. Off returns before Factory SQL in claim, question HTTP and Coordinator preparation. Tool registration does not expand existing frozen grants. No environment flags, credentials, external DB, provider permission or paid operation has been changed. Production approval must name target database, exact two-file manifest/checksums, lock window, backup/recovery expectations and the intended flag/grant rollout separately. Only disposable isolated PostgreSQL was used here.
+
+## Consumed owner stack checkpoint
+
+The candidate now includes #195 df8af4d54b42944028a69011378ee3aabb3988bb
+with its actual #194 reader/gates and newer #193 v2 predicate. Owner modules are
+unchanged. Runtime installs the actual approvalGate and publishGate; this does
+not register a publication adapter, route, provider permission or schema.
+
+Exact remaining boundary: consumeMonitorObservation takes a *verified*
+MonitorV2Observation and caller-derived workspaceKey/checkKey/fingerprint. It
+provides no observation collector, artifact authentication, expiration policy or
+frozen-assignment configurator. The default runtime therefore does not synthesize
+these from a run report, install an always-true gate, or call the incident writer
+with untrusted input. Its SQL remains docs/factory/schema-proposals/195-incidents.sql,
+not a registered migration. Application monitor dispatch/claim/consume still
+requires those host-installed implementations; the owner source handoff itself is
+complete. Before phase callbacks, reconcile now handles cancelled/stop-requested
+runs so consumer callbacks cannot interpret cancelled completion as health.
