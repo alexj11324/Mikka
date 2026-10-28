@@ -35,6 +35,12 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Pure semantic and text-collector regressions (no model or database)
+        run: node --import tsx --test lib/self-improvement/comparison-collector.test.ts lib/self-improvement/evaluation.test.ts lib/self-improvement/scorer.test.ts scripts/test-retention.test.mjs
+      - name: Retained read-contract projection (no historical SQL or cleanup)
+        run: node --import tsx --test lib/self-improvement/comparison-collector-postgres.test.ts
+        env:
+          SKILL_COMPARISON_TEST_URL: postgresql://improvement:disposable-local-only@127.0.0.1:5432/mikka_improvement
       - name: Fetch pinned main migration history for isolated compatibility tests
         run: git fetch --depth=1 origin dd6d8d4febbfe56bba5671cc5302c20f8e0e533d
       - run: node --import tsx --test tests/migration-history-postgres.test.mjs lib/self-improvement/scorer.test.ts lib/self-improvement/evaluation.test.ts lib/self-improvement/assignments.test.ts lib/self-improvement/postgres.test.ts lib/self-improvement/wiring-postgres.test.ts

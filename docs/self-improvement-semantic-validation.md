@@ -53,10 +53,11 @@ visual understanding. Refusal, malformed/mismatched responses, unavailable
 model/collector and insufficient evidence remain unknown/pending. Model output
 never authorizes execution, activation, approval or publication.
 
-The server wires the actual `invokeDecision` interface but has no trusted
-comparison collector in this frozen baseline. It therefore returns pending
-before any provider invocation. A production collector and authorized live
-acceptance are explicit remaining integration dependencies.
+That original checkpoint wired `invokeDecision` without a collector. The later
+[registered collector candidate](self-improvement-collector-validation.md)
+now reads existing case/arm/mount/version/artifact records through the actual
+server dependency. Live evaluation remains OFF; collection does not count as
+real model quality or production acceptance.
 
 The append-only proposal ledger stores pending mechanical results. `propose`
 returns a separate fresh `assessment`; reads also replace historical keyword
