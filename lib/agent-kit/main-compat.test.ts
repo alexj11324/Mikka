@@ -18,7 +18,7 @@ const claimed=mock.fn(async(_pool:unknown,_run:string,_device:string,lease:Date)
 const cloudClaimed=mock.fn(async(_pool:unknown,_owner:unknown,_run:string,_device:string,lease:Date)=>{currentRun.status='preparing';currentRun.leaseExpiresAt=lease;return {botId,ownerId:owner,display:':3',policyVersion:1}})
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
 let selectIndex=0
-let currentRun: {id:string;userId:string;agentId:string;deviceId:string;deviceRepoId:string;issueId:string;kind:string;prompt:string;agentDefinition:typeof definition;status:string;stopRequestedAt:Date|null;leaseExpiresAt:Date|null}
+let currentRun: {id:string;userId:string;agentId:string;deviceId:string;deviceRepoId:string;issueId:string;kind:string;prompt:string;agentDefinition:ReturnType<typeof frozen>|null;status:string;stopRequestedAt:Date|null;leaseExpiresAt:Date|null}
 let stopDuringToken=false
 const lockOrder:string[]=[]
 const tx={select(){let table='';const query={from(value:Record<symbol,unknown>){table=String(value[Object.getOwnPropertySymbols(value).find(key=>key.description==='drizzle:Name')!]);return query},innerJoin(){return query},where(){return query},async for(){lockOrder.push(table);return table==='issues'?[{id:issueId,userId:owner,scope:'personal',content:{type:'doc'}}]:[{run:{...currentRun},enabled:true}]}};return query}}
