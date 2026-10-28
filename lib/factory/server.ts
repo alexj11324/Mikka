@@ -1,6 +1,5 @@
 import "server-only";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { pool } from "@/lib/db";
+import { pool, withDatabaseClient } from "@/lib/db";
 import { issueForUser } from "@/lib/issue-access";
 import { createFactoryStore } from "./store";
 import { FactoryError } from "./contract";
@@ -14,7 +13,7 @@ export function factoryForBot(botId: string | null) {
   return createFactoryStore(
     pool,
     async (owner, issue, tx) =>
-      Boolean(await issueForUser(owner, issue, false, drizzle(tx))),
+      withDatabaseClient(tx, async () => Boolean(await issueForUser(owner, issue))),
     botId,
   );
 }
