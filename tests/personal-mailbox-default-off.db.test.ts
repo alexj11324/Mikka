@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
+import { normalizeRepository } from '@mikka/protocol/repository'
 import { revokeSyntheticMailboxCredentials } from '../scripts/personal-mailbox-ci-cleanup.mjs'
 import { assertPersonalMailboxCITarget } from '../scripts/personal-mailbox-ci-target.mjs'
 import { loadEnvironment, assertDatabaseIdentity } from '../scripts/test-accounts/environment.mjs'
@@ -20,6 +22,7 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
   const { freezeWorkerDefinition } = await import('../lib/agent-kit/worker')
   const owner = `mailbox-off-ci-${process.env.GITHUB_RUN_ID}-${randomUUID()}`
   const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), issueId = randomUUID(), runId = randomUUID(), deviceTokenId = randomUUID()
+  const repository = normalizeRepository(`https://github.com/mikka-fixtures/repo-${runId}.git`)
   const deviceToken = `mkd_${randomBytes(32).toString('base64url')}`
   let runToken: string | undefined
   let deviceTokenCreated = false
@@ -36,9 +39,9 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
     // Seven nonce-owned synthetic fixture rows. The only generated credential
     // is a CI-only device token hash; claim issues its normal short-lived run token.
     await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [owner, `${owner}@example.invalid`])
-    await pool.query('insert into devices(id,"ownerId",name,kind,enabled,harnesses) values($1,$2,$3,\'local\',true,\'[]\')', [deviceId, owner, 'Mailbox default-off CI'])
+    await pool.query('insert into devices(id,"ownerId",name,kind,enabled,"protocolVersion",harnesses) values($1,$2,$3,\'local\',true,$4,$5::jsonb)', [deviceId, owner, 'Mailbox default-off CI', DAEMON_PROTOCOL_VERSION, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents(id,"userId",harness,name,"deviceId") values($1,$2,\'codex\',$3,$4)', [agentId, owner, 'Mailbox default-off CI', deviceId])
-    await pool.query('insert into device_repos(id,"deviceId","userId","repoPath") values($1,$2,$3,$4)', [repoId, deviceId, owner, `/synthetic/${runId}`])
+    await pool.query('insert into device_repos(id,"deviceId","userId","repoPath","remoteUrl") values($1,$2,$3,$4,$5)', [repoId, deviceId, owner, repository.key, repository.remoteUrl])
     await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,\'{"type":"doc","content":[]}\',\'todo\',\'normal\',\'personal\')', [issueId, owner, 'Mailbox default-off CI'])
     const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'No model runs in this test', prompt: 'Fixture', parent: null, executionId: null })
     await pool.query('insert into agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"agentDefinition") values($1,$2,$3,$4,$5,$6,\'queued\',$7)', [runId, owner, issueId, agentId, deviceId, repoId, JSON.stringify(definition)])
@@ -46,9 +49,10 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
     deviceTokenCreated = true
     await t.test('actual device-authenticated claim keeps ordinary MCP and omits mailbox capability', async () => {
       const response = await claim(request(`/v1/devices/${deviceId}/runs/${runId}/claim`, deviceToken), { params: Promise.resolve({ deviceId, runId }) })
-      assert.equal(response.status, 200)
+      assert.equal(response.status, 200, response.status === 200 ? undefined : await response.text())
       const assignment = await response.json()
       assert.equal(assignment.runId, runId)
+      assert.equal(assignment.remoteUrl, repository.remoteUrl)
       assert.ok(assignment.mcp && typeof assignment.mcp.token === 'string')
       assert.equal(Object.hasOwn(assignment.mcp, 'mailbox'), false)
       runToken = assignment.mcp.token
@@ -75,6 +79,7 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
       assert.deepEqual(await personalMailbox(owner, null, { action: 'inbox' }), { error: 'personal_mailbox_unavailable' })
     })
     await t.test('actual revoked-run bearer fails authentication without querying new schema', async () => {
+      assert.ok(runToken)
       const revoked = await pool.query('update run_tokens set "revokedAt"=now() where "runId"=$1 and "userId"=$2 and "tokenHash"=$3 and "revokedAt" is null', [runId, owner, tokenHash(runToken!)])
       assert.equal(revoked.rowCount, 1)
       assert.equal((await mcp(request('/api/mcp', runToken, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }))).status, 401)
