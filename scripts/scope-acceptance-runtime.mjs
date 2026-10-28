@@ -54,6 +54,7 @@ export function scopeNativeRuntime(pg, rpc, phase, mode) {
         }
         const values = typeof config === 'object' ? config.values : args[1]
         const permit = await rpc('query', { bucket, url, text, ledgerName: text === 'insert into schema_migrations (name) values ($1)' ? values?.[0] : undefined })
+        if(stopped){await rpc('query-result',{id:permit.id,ok:false,code:'CANCELLED_BEFORE_SUBMIT',rowCount:0});throw Error('scope cancelled before native submission')}
         try {
           const answer = await original(...args), results = Array.isArray(answer) ? answer : [answer]
           await rpc('query-result', { id: permit.id, ok: true, rowCount: results.reduce((n, result) => n + (result?.rowCount ?? 0), 0), commands: results.map(result => result?.command ?? null) })
@@ -74,6 +75,7 @@ export function scopeNativeRuntime(pg, rpc, phase, mode) {
       const work = (async () => {
         if (stopped) throw Error('scope acceptance stopped')
         await rpc('connect', { bucket, url: this.scopeInput.connectionString })
+        if(stopped)throw Error('scope cancelled before connect')
         const client = await new Promise((resolve, reject) => super.connect((error, value) => error ? reject(error) : resolve(value)))
         try { return await instrument(client, this.scopeInput) }
         catch (error) { client.release(true);throw error }
@@ -85,7 +87,7 @@ export function scopeNativeRuntime(pg, rpc, phase, mode) {
   class Client extends pg.Client {
     constructor(input) { super(options(input));this.scopeInput = options(input) }
     connect(callback) {
-      const work = (async () => { await rpc('connect', { bucket, url: this.scopeInput.connectionString });await super.connect();await instrument(this, this.scopeInput) })()
+      const work = (async () => { await rpc('connect', { bucket, url: this.scopeInput.connectionString });if(stopped)throw Error('scope cancelled before connect');await super.connect();await instrument(this, this.scopeInput) })()
       if (callback) { work.then(() => callback(null), callback);return }
       return work
     }
@@ -147,6 +149,7 @@ export function scopeNativeRuntime(pg, rpc, phase, mode) {
       work.then(result => callback(null, result.stdout, result.stderr), error => callback(error))
       return { kill() { abort(Error('migration child cancelled'));return true } }
     }
+    for(const name of ['spawn','spawnSync','fork','exec','execSync','execFileSync'])childProcess[name]=()=>{throw Error('unbudgeted scope subprocess denied')}
     const deny = () => { throw Error('scope filesystem cleanup denied') }
     for (const name of ['unlink','unlinkSync','rm','rmSync','rmdir','rmdirSync','rename','renameSync']) if (name in fs) fs[name] = deny
     for (const name of ['unlink','rm','rmdir','rename']) if (name in fsp) fsp[name] = deny

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Frozen three-DB scope acceptance. --plan never imports pg, runs a child or SQL.
-import { readFileSync, mkdirSync, openSync, writeSync, closeSync } from 'node:fs'
+import { readFileSync, mkdirSync, openSync, writeSync, closeSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { execFileSync, fork } from 'node:child_process'
@@ -19,6 +19,7 @@ export function scopeWorkerMode(mode) {
 }
 export async function scopePhases(run) { for(const phase of ['scope','team'])await run(phase) }
 async function execute(manifest, manifestPath, manifestHash, output, approvalReference) {
+  if(approvalReference&&Buffer.byteLength(approvalReference)>256)throw Error('scope approval reference too long')
   if (!approvalReference) throw Error('scope execution needs separately granted approval reference; this flag is not approval')
   if(resolve(output)!==manifest.evidenceDirectory)throw Error('scope evidence directory mismatch')
   if (Object.keys(process.env).some(key => key.startsWith('PG') && process.env[key])) throw Error('ambient PG configuration is not permitted')
@@ -30,11 +31,12 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
   const claim = openSync(resolve(output,'execution.claim'), 'wx', 0o600)
   writeSync(claim, JSON.stringify({ candidate: manifest.candidate, manifestHash, approvalReference, started: new Date().toISOString() }));closeSync(claim)
   const journal = openSync(resolve(output,'journal.jsonl'),'wx',0o600)
-  let journalBytes = 0, rootQueries = 0
+  let journalBytes = 0, rootQueries = 0, journalFull = false
   function record(entry) {
+    if(journalFull)return
     const line = JSON.stringify({ at: new Date().toISOString(), ...entry }) + '\n'
     journalBytes += Buffer.byteLength(line)
-    if (journalBytes > SCOPE_LIMITS.journalBytes) throw Error('scope journal budget exhausted')
+    if(journalBytes>SCOPE_LIMITS.journalBytes-4096){journalFull=true;writeSync(journal,'{"event":"journal-budget-exhausted"}\n');throw Error('scope journal budget exhausted')}
     writeSync(journal,line)
   }
   const executionDeadline=Date.now()+SCOPE_LIMITS.totalMs
@@ -155,14 +157,15 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
     abort(error)
     readDeadline=Date.now()+15000
     record({event:'failure',reason:error.message,pendingQueries:[...policy.state.pending.keys()],created:[...policy.state.created]})
-    for(const database of policy.state.created.keys()) {try{await snapshot(database,'failure-readback')}catch(readError){record({event:'readback-failed',database,reason:readError.message})}}
+    for(const database of journalFull?[]:policy.state.created.keys()) {try{await snapshot(database,'failure-readback')}catch(readError){record({event:'readback-failed',database,reason:readError.message})}}
     // CREATE response loss permits metadata readback only, never inferred DB ownership.
-    try{record({event:'attempted-db-catalog',rows:await read(admin,'select datname,oid::text,pg_get_userbyid(datdba) as owner from pg_database where datname=any($1::text[])',[[...policy.state.createAttempts]])})}catch{record({event:'catalog-readback-unavailable'})}
+    try{if(!journalFull)record({event:'attempted-db-catalog',rows:await read(admin,'select datname,oid::text,pg_get_userbyid(datdba) as owner from pg_database where datname=any($1::text[])',[[...policy.state.createAttempts]])})}catch{record({event:'catalog-readback-unavailable'})}
     throw error
   } finally {
     clearTimeout(timer);controller.abort()
     for(const worker of all)worker.kill('SIGTERM')
-    await admin.end();record({event:'stopped',failed:Boolean(failed),rootQueries,retained:true});closeSync(journal);clearTimeout(hardStop)
+    await admin.end();record({event:'stopped',failed:Boolean(failed),rootQueries,retained:true});
+    writeFileSync(resolve(output,'result.json'),JSON.stringify({candidate:manifest.candidate,manifestHash,failed:Boolean(failed),reason:failed?.message,queryCounts:policy.state.counts,rootQueries,created:[...policy.state.created],pendingCount:policy.state.pending.size,pendingIds:[...policy.state.pending.keys()].slice(0,64),journalFull,retained:true,outcomesMayBeUnknown:Boolean(failed)})+'\n',{flag:'wx',mode:0o600});closeSync(journal);clearTimeout(hardStop)
   }
 }
 export async function main(args=process.argv.slice(2)) {

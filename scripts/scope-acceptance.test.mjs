@@ -183,3 +183,21 @@ test('application and migration native adapters do not submit SQL after a denied
     await runtime.close()
   }
 })
+
+
+test('cancellation while awaiting a granted query is rechecked before native submission',async()=>{
+  let nativeQueries=0,runtime
+  const results=[]
+  class NativeClient {async query(){nativeQueries++;return {rows:[{database:names.scope,role:'postgres',oid:'1'}],rowCount:1}} async end(){this._ending=true}}
+  class NativePool {connect(callback){const client=new NativeClient();client.release=()=>{};callback(null,client)} async end(){this.ending=true}}
+  const rpc=async(kind,input)=>{
+    if(kind==='query'){if(!input.handshake)runtime.cancel();return {id:input.handshake?'identity':'cancelled'}}
+    if(kind==='query-result')results.push(input)
+  }
+  runtime=scopeNativeRuntime({Pool:NativePool,Client:NativeClient},rpc,'scope','suite')
+  const client=await new runtime.Pool({connectionString:phaseUrl}).connect()
+  await assert.rejects(client.query('update synthetic set value=1'),/cancelled before native/)
+  assert.equal(nativeQueries,1)
+  assert.ok(results.some(result=>result.id==='cancelled'&&result.code==='CANCELLED_BEFORE_SUBMIT'))
+  await runtime.close()
+})
