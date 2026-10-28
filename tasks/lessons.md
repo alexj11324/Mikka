@@ -197,3 +197,6 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
    （邮件/日历审批），另一部分仍未上线（文档、Slack 操作）。
 6. 改 README 图表前先找生成脚本（`scripts/generate-diagrams.mjs`），
    不要手改 SVG；改完渲染明暗、中英四种组合抽查。
+7. 区分「没开发」和「开发了但没合入」：查 open PR 和相关分支
+   （`gh pr list --state open`、`git branch -r | grep`）。Plan 里的虚线
+   只代表没上线，不代表没有实现。

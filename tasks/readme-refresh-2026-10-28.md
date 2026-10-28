@@ -17,6 +17,21 @@
 | iOS App | 未上线 | PR #340 已合并，但 `docs/design/mobile.md` 仍是 draft，TestFlight 验收未完成 |
 | Factory / 定时任务 / 凭据库 / 群聊 | 未上线 | issue #191–#195、#179、#180、#105 均 OPEN |
 
+## 剩余「规划中」项核查（2026-10-28）
+
+| 功能 | main 里的实现 | 生产开关 | 未合入的工作 | 结论 |
+| --- | --- | --- | --- | --- |
+| Factory（#191–#195） | 无 | 无 | `codex/factory-*` 分支，无 open PR | 未上线，虚线正确 |
+| Monitoring（#195） | 无 | 无 | `codex/issue-192-monitor-*` 分支 | 未上线，虚线正确 |
+| 定时任务（#179） | 无 | 无 | `codex/179-conversation-schedules` 分支 | 未上线，虚线正确 |
+| 群聊（#105） | 无 | 无 | PR #318（draft，只读群聊）、#166 | 未上线，路线图正确 |
+| 凭据保管库（#180） | 无用户路由/UI | 无应用代码读取 `CREDENTIAL_*`（仅 AWS 操作文档） | PR #345（draft） | 未上线，虚线正确 |
+| 本机 computer use（#147） | 无 cua-driver 代码 | 无 | PR #157（draft） | 未上线，虚线正确 |
+| iOS App | `apps/mobile` 已合入（#340） | 无 EAS 构建/TestFlight | PR #381 | 未发布，路线图正确 |
+| 原生 Coordinator | 已合入（#314），`MIKKA_NATIVE_COORDINATOR` 未设置 | 关闭 | PR #341 计划废弃 | 不算上线 |
+| Connected apps 剩余 | Notion/Slack 只读；Gmail/Calendar 可写 | 审批写已上线 | 无 Notion/Slack 写 | 部分上线，路线图已按剩余范围改写 |
+| ⌘K 搜索 | 已合入，覆盖 bot、对话、任务、项目 | 无开关 | 站点级搜索在 PR #318（draft） | ⌘K 已上线，README 已补；全站搜索仍规划 |
+
 ## 待办
 
 - [x] 拉取 origin/main 到 main

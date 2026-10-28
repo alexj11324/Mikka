@@ -106,6 +106,8 @@ dashed loop is the planned Factory process: independent review and verification
 - **Keeps tasks in one place.** Tasks show on a board and a list, with
   relations, activity history and per-person task numbers. They sync both ways
   with Linear.
+- **Finds anything with ⌘K.** Search bots, chats, tasks and projects from the
+  keyboard.
 - **Filters notifications.** Mikka collects notifications from GitHub, Linear,
   Notion, Slack and Gmail, surfaces only those that need your attention, and
   writes a daily briefing.
@@ -132,7 +134,7 @@ Linear (`MIK-xx`).
 | **Scheduled tasks** | Bots run tasks at a set time or on a recurring schedule and report the results in chat. | [#179](https://github.com/alexj11324/Mikka/issues/179) |
 | **Connected apps** | Documents and Slack actions, and workflows beyond mail and calendar, subject to the same per-action approval. | [#177](https://github.com/alexj11324/Mikka/issues/177) |
 | **Secure credentials** | Agents request credentials through a secure form. A vault holds them, and a controlled browser uses them only for approved actions. | [#180](https://github.com/alexj11324/Mikka/issues/180) |
-| **Usability** | Onboarding, ⌘K search, a knowledge base, web search for agents, and team visibility settings. | [#129](https://github.com/alexj11324/Mikka/issues/129), [#131](https://github.com/alexj11324/Mikka/issues/131), [#134](https://github.com/alexj11324/Mikka/issues/134), [#100](https://github.com/alexj11324/Mikka/issues/100), [#127](https://github.com/alexj11324/Mikka/issues/127) |
+| **Usability** | Onboarding, site-wide search across pages and content, a knowledge base, web search for agents, and team visibility settings. | [#129](https://github.com/alexj11324/Mikka/issues/129), [#131](https://github.com/alexj11324/Mikka/issues/131), [#134](https://github.com/alexj11324/Mikka/issues/134), [#100](https://github.com/alexj11324/Mikka/issues/100), [#127](https://github.com/alexj11324/Mikka/issues/127) |
 
 ## Connect your agents
 

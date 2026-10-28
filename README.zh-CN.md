@@ -70,6 +70,7 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 - **完整呈现执行过程。** 每个线程都会展示其 agent 当前的操作。Worker 通过 Mikka 的 MCP 工具汇报进度、提出问题或报告阻塞，由 Coordinator 逐一处理。
 - **注明信息来源。** 回复中引用的任务、运行记录和网页以可点击的标签形式展示。
 - **统一管理任务。** 任务支持看板和列表两种视图，包含关联关系、活动记录和个人任务编号，并与 Linear 双向同步。
+- **用 ⌘K 快速查找。** 可从键盘搜索 bot、对话、任务和项目。
 - **筛选重要通知。** Mikka 汇总来自 GitHub、Linear、Notion、Slack 和 Gmail 的通知，仅保留需要你关注的内容，并生成每日简报。
 - **在你批准后执行操作。** Coordinator 可以发送邮件，以及创建或修改 Google 日历日程。发送或保存前，操作会显示在输入框上方，等待你批准或拒绝。
 - **支持从其他工具调用。** 可在 Claude Code 或 Codex 中通过 [MCP server](https://aspectlylabs.com/mikka/docs/mcp) 操作 Mikka。
@@ -88,7 +89,7 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 | **定时任务** | Bot 可在指定时间或按周期执行任务，并将结果返回至对话。 | [#179](https://github.com/alexj11324/Mikka/issues/179) |
 | **Connected apps** | 文档与 Slack 操作，以及邮件和日历之外的更多工作流，同样遵循逐次审批。 | [#177](https://github.com/alexj11324/Mikka/issues/177) |
 | **安全凭据** | Agent 通过安全表单请求凭据。凭据由保管库存放，受控浏览器仅在获批操作中使用。 | [#180](https://github.com/alexj11324/Mikka/issues/180) |
-| **体验优化** | 新用户引导、⌘K 搜索、知识库、agent 网页搜索，以及团队可见范围设置。 | [#129](https://github.com/alexj11324/Mikka/issues/129)、[#131](https://github.com/alexj11324/Mikka/issues/131)、[#134](https://github.com/alexj11324/Mikka/issues/134)、[#100](https://github.com/alexj11324/Mikka/issues/100)、[#127](https://github.com/alexj11324/Mikka/issues/127) |
+| **体验优化** | 新用户引导、跨页面与内容的全站搜索、知识库、agent 网页搜索，以及团队可见范围设置。 | [#129](https://github.com/alexj11324/Mikka/issues/129)、[#131](https://github.com/alexj11324/Mikka/issues/131)、[#134](https://github.com/alexj11324/Mikka/issues/134)、[#100](https://github.com/alexj11324/Mikka/issues/100)、[#127](https://github.com/alexj11324/Mikka/issues/127) |
 
 ## 接入 agent
 
