@@ -86,10 +86,12 @@ test('pushState/hash changes cannot resume screenshots while fields remain popul
 test('viewer stays locked for every supported nonempty OTP input', async () => {
   const cdp = Object.create(Cdp.prototype) as Cdp
   for (const field of [
-    { type: 'password', autocomplete: '', name: 'password' },
-    { type: 'text', autocomplete: 'one-time-code', name: 'verification' },
-    { type: 'text', autocomplete: '', name: 'code' },
-    { type: 'text', autocomplete: '', name: 'otp' },
+    { tagName: 'INPUT', type: 'password', autocomplete: '', name: 'password' },
+    { tagName: 'INPUT', type: 'text', autocomplete: 'one-time-code', name: 'verification' },
+    { tagName: 'INPUT', type: 'text', autocomplete: '', name: 'code' },
+    { tagName: 'INPUT', type: 'text', autocomplete: '', name: 'otp' },
+    { tagName: 'INPUT', type: 'text', autocomplete: '', name: 'arbitrary' },
+    { tagName: 'TEXTAREA', type: 'textarea', autocomplete: '', name: 'arbitrary' },
   ]) {
     for (const value of ['123456', '']) {
       const input = { ...field, value }
@@ -97,6 +99,8 @@ test('viewer stays locked for every supported nonempty OTP input', async () => {
       assert.equal(await cdp.safeToResume('https://example.com/login'), value === '', JSON.stringify(field))
     }
   }
+  cdp.evaluate = async expression => runInNewContext(expression, { document: { querySelectorAll: () => [{ tagName: 'INPUT', type: 'hidden', value: 'fixed' }] } })
+  assert.equal(await cdp.safeToResume('https://example.com/login'), true)
 })
 
 test('HMAC scanner rejects nested chat/tool secret copies without retaining values', () => {

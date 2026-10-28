@@ -93,7 +93,9 @@ export class Cdp {
   async safeToResume(_initialUrl: string) {
     // A URL change can be pushState/hash rather than navigation. Check every
     // time, including after redirects, before allowing any image or DOM read.
-    return await this.evaluate(`![...document.querySelectorAll('input')].some(e=>e.value && (e.type==='password'||e.autocomplete==='one-time-code'||e.name==='code'||e.name==='otp'))`) === true
+    // Match the gateway's conservative guard: an OTP may have any name.
+    // Hidden and non-text controls often contain ordinary fixed values.
+    return await this.evaluate(`![...document.querySelectorAll('input,textarea')].some(e=>e.value && (e.tagName==='TEXTAREA'||!['hidden','checkbox','radio','button','submit','reset','image','file','range','color'].includes(e.type)))`) === true
   }
   async fillOtp(origin: string, code: string) {
     await this.origin(origin)
