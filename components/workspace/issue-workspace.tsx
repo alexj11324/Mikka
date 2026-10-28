@@ -352,7 +352,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       onProject={id => { void leave(() => { applySelection(null, 'replace'); changeSection('projects'); setTeamId(null); setProjectId(id) }) }} />}
   </>
   if (settingsOpen) return <SignOutBoundary pending={signingOut}><AppShell>
-    <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} googleEnabled={googleEnabled} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
+    <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
     {dialogs}
   </AppShell></SignOutBoundary>
   return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><AppFrame

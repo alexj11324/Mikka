@@ -143,7 +143,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
 }
 
 export async function sendToRun(userId: string, input: { runId: string; text: string }) {
-  return attempt(async () => { await addRunMessage(userId, input); return { sent: true } })
+  return attempt(async () => { await addRunMessage(userId, input, 'peer'); return { sent: true } })
 }
 
 export async function stopRun(userId: string, runId: string) {

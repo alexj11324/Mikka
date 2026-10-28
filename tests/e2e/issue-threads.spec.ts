@@ -135,16 +135,35 @@ test('The owner stops a live thread from its composer; it reads 正在停止… 
   await expect(stop).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('thread-stop-running.png') })
 
+  await page.clock.install()
   await stop.click()
   await expect(panel.getByText('正在停止…', { exact: true })).toBeVisible()
+  await expect(threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true })).toContainText('正在停止…')
   await expect(stop).toHaveCount(0)
+  await expect(composer).toBeEditable()
+  await composer.fill('Keep this draft while stopping')
+  await expect(panel.getByRole('button', { name: '发送', exact: true })).toBeDisabled()
   const check = isolatedPool()
   try {
     await expect.poll(async () => (await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt).not.toBeNull()
+    const originalStop = (await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt
     await page.screenshot({ path: testInfo.outputPath('thread-stop-stopping.png') })
+    // An offline daemon never acknowledges. The timeout unlocks retry, not the draft.
+    await page.clock.fastForward(30_100)
+    await expect(panel.getByRole('alert')).toContainText('没停下来，再试一次')
+    await expect(composer).toHaveValue('Keep this draft while stopping')
+    await expect(composer).toBeEditable()
+    await page.screenshot({ path: testInfo.outputPath('thread-stop-timeout.png') })
+    await panel.getByRole('button', { name: '重试', exact: true }).click()
+    await expect(panel.getByRole('alert')).toHaveCount(0)
+    await expect(composer).toHaveValue('Keep this draft while stopping')
+    await expect(panel.getByText('正在停止…', { exact: true })).toBeVisible()
+    expect((await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt).toEqual(originalStop)
     // The daemon ends the run: the thread shows it stopped and the composer goes away.
     await check.query('UPDATE agent_runs SET status = $2, "finishedAt" = now() WHERE id = $1', [runs.running, 'stopped'])
+    await page.clock.fastForward(2_100)
   } finally { await check.end() }
   await expect(panel.getByText('已停止', { exact: true })).toBeVisible()
+  await expect(threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true })).toContainText('已停止')
   await expect(panel.getByRole('textbox')).toHaveCount(0)
 })

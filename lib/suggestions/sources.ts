@@ -98,7 +98,7 @@ async function currentLinear(userId: string): Promise<ExternalNotification[]> {
     } }
   }`)
   return data.viewer.assignedIssues.nodes.map(issue => ({
-    userId, source: 'linear', externalId: `issue:${issue.id}:assigned`, action: 'handle', title: issue.title, url: issue.url, actor: null,
+    userId, source: 'linear', externalId: `issue:${issue.id}:assigned`, matterKey: `linear:${issue.id}`, action: 'handle', title: issue.title, url: issue.url, actor: null,
     occurredAt: new Date(issue.updatedAt), required: true, direct: true, fromSelf: false, automated: false,
     excerpt: `${issue.identifier} ${issue.title}\n${issue.description ?? ''}`.slice(0, 2000),
   }))
@@ -106,8 +106,9 @@ async function currentLinear(userId: string): Promise<ExternalNotification[]> {
 
 /**
  * Runs right after the person connects an app: subscribes its triggers, reads
- * what is there now, judges it like any webhook, and writes the first
- * briefing, which the Coordinator then delivers in its chat. Never throws; a source that fails just adds nothing.
+ * what is there now, rates it like any webhook (without handing it to the
+ * Coordinator one by one), and writes the first briefing, which the
+ * Coordinator then delivers in its chat. Never throws; a source that fails just adds nothing.
  */
 export async function bootstrapSuggestions(userId: string, app: 'composio' | 'linear', timeZone: string | null) {
   const read = async <T,>(label: string, load: () => Promise<T[]>): Promise<T[]> => {
@@ -122,7 +123,8 @@ export async function bootstrapSuggestions(userId: string, app: 'composio' | 'li
     const notifications = app === 'linear'
       ? await read('Linear', () => currentLinear(userId))
       : (await read('Composio', () => ensureComposioTriggers(userId, { force: true }))).includes('gmail') ? await read('Gmail', () => currentGmail(userId)) : []
-    await ingestNotifications(notifications)
+    // What was already there goes into the first briefing, not to the Coordinator one by one.
+    await ingestNotifications(notifications, { route: false })
     // Loaded here so the webhook routes that import this module do not pull in the Coordinator workflow.
     if (await writeFirstBriefing(userId, timeZone)) await (await import('@/lib/coordinator/wake')).wakeCoordinator(userId)
   } catch (error) {

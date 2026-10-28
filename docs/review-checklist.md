@@ -48,6 +48,10 @@ more than once.
 ### Copy
 
 - [ ] No filler or explanatory copy (R-40); empty states follow R-41.
+      Read every string aloud and delete it; if the screen still says the
+      same thing, it was filler. Sheets have no subtitle; reassurance is a
+      mark (🔒 Secured by Mikka), not a sentence. Reviewers fail any frame
+      with such a sentence, even when the brief asked for it.
 - [ ] The Coordinator looks like every other bot: no star, badge or special copy (R-06).
 - [ ] All strings in `messages/*.json`; `pnpm i18n:check` passes (R-42).
 - [ ] Glossary words only (R-43).

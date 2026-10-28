@@ -1,0 +1,9 @@
+// Mikka-owned constructor glue: use CPA OAuth logic with a bounded ordinary
+// HTTP client. No CLI identity or fingerprint transport is introduced.
+package codex
+
+import "net/http"
+
+func NewMikkaAuth(client *http.Client) *CodexAuth {
+	return &CodexAuth{httpClient: client}
+}

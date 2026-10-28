@@ -1,3 +1,4 @@
+import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../../../../lib/personal-agent-message'
 // What every real harness adapter needs about one run: the sandbox policy,
 // the Mikka MCP server (hand-in tools) and the handoff file it writes, and
 // the instructions that tell the agent how a run ends.
@@ -65,6 +66,7 @@ export const MCP_SERVER_SCRIPT = resolve(import.meta.dirname, "mikka-mcp.mjs")
 
 /** Name of the MCP server in every harness's config (`mcp__mikka__submit`). */
 export const MCP_SERVER_NAME = "mikka"
+export const COMPUTER_MCP_SERVER_NAME = "mikka_computer"
 
 export interface McpServerSpec {
   command: string
@@ -287,6 +289,7 @@ export class RunContext {
       runInstructions(this.worktree, this.options.policy),
       this.options.kind === "plan" ? planInstructions() : "",
       skills,
+      PERSONAL_MESSAGE_INSTRUCTIONS,
     ]
       .filter(Boolean)
       .join("\n\n")
