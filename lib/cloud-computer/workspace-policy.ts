@@ -9,7 +9,7 @@ export async function requireWorkspaceComputerPolicy(client: PoolClient, workspa
   await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${workspaceId}`])
   const row = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]
   if (row?.permission === 'deny') throw new ComputerError(403, 'Computer use denied')
-  if (row && row.permission !== 'ask') throw new ComputerError(503, 'Computer policy unavailable')
+  if (row && row.permission !== 'ask' && row.permission !== 'allow') throw new ComputerError(503, 'Computer policy unavailable')
   return Number(row?.version ?? 0)
 }
 

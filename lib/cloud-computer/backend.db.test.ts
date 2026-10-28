@@ -86,6 +86,8 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
       await contender.query('ROLLBACK')
     } finally { contender.release(); release() }
     await running
+    await pool.query('UPDATE workspace_computer_policies SET permission=\'allow\',version=3 WHERE "workspaceId"=$1', [alice.workspaceId])
+    assert.equal(await withWorkspaceComputerPermission(pool, alice.workspaceId, async (_client, version) => version), 3, 'shared allow passes the workspace ceiling without manufacturing an action grant')
     await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [alice.workspaceId])
     await assert.rejects(store.get(bob, botA, task.id), { status: 404 })
     await assert.rejects(store.get(stranger, botA, task.id), { status: 404 })
