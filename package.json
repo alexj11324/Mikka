@@ -53,7 +53,7 @@
     "typecheck": "tsgo --noEmit",
     "daemon": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon --server http://localhost:3000",
     "daemon:login": "pnpm --filter @mikka/daemon exec tsx bin/mikka.ts daemon login --server http://localhost:3000",
-    "test:group-turns": "node --import tsx --test lib/coordinator/group-turns.test.ts",
+    "test:group-turns": "node --import tsx --test lib/coordinator/group-turns.test.ts && node --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/group-decision-consumer.test.ts",
     "test:groups": "node --import tsx --test lib/group-conversations.test.ts",
     "test:issue-search": "node --import ./scripts/server-test.mjs --import tsx --test lib/issue-search.test.ts",
     "test:issue-search-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/issue-search.db.test.ts",
