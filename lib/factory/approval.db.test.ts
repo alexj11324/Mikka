@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { factory194Fixture } from "../../tests/helpers/factory194";
+import { factoryRunAuthorityCases } from "../../tests/helpers/factory194-run-authority";
 import { FactoryError } from "./approval-contract";
 import { handleFactoryApproval } from "./approval-http";
 import {
@@ -40,6 +41,7 @@ test(
     const f = await factory194Fixture(db!);
     try {
       const { actor, pool, provider } = f;
+      await factoryRunAuthorityCases(t, f);
       await t.test(
         "policy allow publishes for authenticated backend owner without any human session prerequisite",
         async () => {

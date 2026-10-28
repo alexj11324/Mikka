@@ -47,6 +47,18 @@ export const verifiedFactoryDecision = z
       .object({
         receiptId: identifier,
         signatureDigest: hash,
+        runBinding: z
+          .object({
+            runId: z.uuid(),
+            sessionId: identifier,
+            assignmentDigest: hash,
+            checkReceiptsDigest: hash,
+            reviewDigest: hash,
+            keyId: identifier,
+            keyFingerprint: hash,
+          })
+          .strict()
+          .optional(),
       })
       .strict(),
     // Recorded by the host from an actual vision-capable model invocation, never
@@ -115,7 +127,20 @@ export async function authorizeFactoryDecision(
   let raw: unknown;
   try {
     raw = await authority.verify(tx, credentialId, expected);
-  } catch {
+  } catch (error) {
+    if (
+      error instanceof FactoryError &&
+      [
+        "factoryPolicyDenied",
+        "factoryPolicyDecisionRevoked",
+        "factoryPolicyDecisionMismatch",
+        "factoryPolicyDecisionExpired",
+        "factoryPolicyDecisionInvalid",
+        "factoryPolicyCheckReceiptRequired",
+        "factoryPolicyDecisionUnavailable",
+      ].includes(error.code)
+    )
+      throw error;
     // Do not expose credential values or private upstream errors.
     throw new FactoryError("factoryPolicyDecisionUnavailable");
   }

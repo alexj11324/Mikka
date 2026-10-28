@@ -50,12 +50,15 @@ export async function factory194Fixture(connectionString: string) {
   await pool.query(`
     CREATE TABLE "session" (id text PRIMARY KEY,"userId" text,"expiresAt" timestamptz);
     CREATE TABLE account (id text,"userId" text,"providerId" text);
-    CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"attemptId" uuid,"candidateId" uuid,revision integer,stage text,status text);
+    CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"attemptId" uuid,"candidateId" uuid,revision integer,stage text,status text,"botId" uuid,"sourceEventId" uuid);
     CREATE TABLE factory_candidates (id uuid PRIMARY KEY,"taskId" uuid,sha text,repository text,environment text,scope text,UNIQUE("taskId",id));
     CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid,"candidateId" uuid,stage text,position integer,"runId" uuid,"sessionId" text,status text,evidence jsonb,output jsonb,"finishedAt" timestamptz,UNIQUE("taskId",id));
-    CREATE TABLE factory_events ("taskId" uuid,"eventId" uuid,PRIMARY KEY("taskId","eventId"));
+    CREATE TABLE factory_events ("taskId" uuid,"eventId" uuid,request jsonb NOT NULL DEFAULT '{}',result jsonb NOT NULL DEFAULT '{}',PRIMARY KEY("taskId","eventId"));
     CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"sessionId" text,status text,"stopRequestedAt" timestamptz,report jsonb,"startedAt" timestamptz,"finishedAt" timestamptz,"stopReason" text);
-    CREATE TABLE run_chunks (id uuid,"runId" uuid,chunk jsonb,"createdAt" timestamptz);
+    ALTER TABLE agent_runs ADD COLUMN "deviceId" uuid, ADD COLUMN "agentDefinition" jsonb, ADD COLUMN "leaseExpiresAt" timestamptz, ADD COLUMN kind text NOT NULL DEFAULT 'implement', ADD COLUMN "botId" uuid;
+    CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean);
+    CREATE TABLE run_tokens (id uuid PRIMARY KEY,"runId" uuid,"userId" text,"tokenHash" text,"revokedAt" timestamptz,"expiresAt" timestamptz);
+    CREATE TABLE run_chunks (id uuid PRIMARY KEY,"runId" uuid,chunk jsonb,"createdAt" timestamptz,seq integer NOT NULL DEFAULT 1);
   `);
   await pool.query(
     await readFile(
@@ -139,68 +142,74 @@ export async function factory194Fixture(connectionString: string) {
     return req;
   }
   const gates = createFactoryApprovalGates(authority);
-  const store: FactoryApprovalStore = {
-    async lockTask(tx, userId, taskId) {
-      const {
-        rows: [task],
-      } = await tx.query<FactoryTask>(
-        'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
-        [taskId, userId],
-      );
-      if (
-        !task ||
-        !source.allowed ||
-        !(await authorize(userId, task.issueId, tx))
-      )
-        throw new FactoryError("factoryNotFound");
-      return task;
-    },
-    async apply(userId, b, eventId, change, tx) {
-      const {
-        rows: [task],
-      } = await tx.query<FactoryTask>(
-        'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
-        [b.taskId, userId],
-      );
-      if (!task || digest(binding(task)) !== digest(b))
-        throw new FactoryError("factoryStale");
-      await tx.query("INSERT INTO factory_events VALUES ($1,$2)", [
-        task.id,
-        eventId,
-      ]);
-      if (change.action === "finish") {
-        const gate = task.stage === "approval" ? gates.approval : gates.publish;
-        assert.equal(await gate(tx, task, {}, change), true);
+  function makeStore(installedGates = gates): FactoryApprovalStore {
+    return {
+      async lockTask(tx, userId, taskId) {
+        const {
+          rows: [task],
+        } = await tx.query<FactoryTask>(
+          'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
+          [taskId, userId],
+        );
+        if (
+          !task ||
+          !source.allowed ||
+          !(await authorize(userId, task.issueId, tx))
+        )
+          throw new FactoryError("factoryNotFound");
+        return task;
+      },
+      async apply(userId, b, eventId, change, tx) {
+        const {
+          rows: [task],
+        } = await tx.query<FactoryTask>(
+          'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
+          [b.taskId, userId],
+        );
+        if (!task || digest(binding(task)) !== digest(b))
+          throw new FactoryError("factoryStale");
         await tx.query(
-          "UPDATE factory_attempts SET status='passed',output=$2,\"finishedAt\"=clock_timestamp() WHERE id=$1",
-          [task.attemptId, JSON.stringify(change.output)],
+          'INSERT INTO factory_events ("taskId","eventId") VALUES ($1,$2)',
+          [task.id, eventId],
+        );
+        if (change.action === "finish") {
+          const gate =
+            task.stage === "approval"
+              ? installedGates.approval
+              : installedGates.publish;
+          assert.equal(await gate(tx, task, {}, change), true);
+          await tx.query(
+            "UPDATE factory_attempts SET status='passed',output=$2,\"finishedAt\"=clock_timestamp() WHERE id=$1",
+            [task.attemptId, JSON.stringify(change.output)],
+          );
+          return {
+            task: (
+              await tx.query<FactoryTask>(
+                "UPDATE factory_tasks SET status='passed',revision=revision+1 WHERE id=$1 RETURNING *",
+                [task.id],
+              )
+            ).rows[0],
+          };
+        }
+        assert.equal(task.stage, "approval");
+        assert.equal(task.status, "passed");
+        const attempt = randomUUID();
+        await tx.query(
+          `INSERT INTO factory_attempts (id,"taskId","candidateId",stage,position,status,evidence,output) VALUES ($1,$2,$3,'publish',4,'pending','[]','{}')`,
+          [attempt, task.id, task.candidateId],
         );
         return {
           task: (
             await tx.query<FactoryTask>(
-              "UPDATE factory_tasks SET status='passed',revision=revision+1 WHERE id=$1 RETURNING *",
-              [task.id],
+              "UPDATE factory_tasks SET stage='publish',status='pending',revision=revision+1,\"attemptId\"=$2 WHERE id=$1 RETURNING *",
+              [task.id, attempt],
             )
           ).rows[0],
         };
-      }
-      assert.equal(task.stage, "approval");
-      assert.equal(task.status, "passed");
-      const attempt = randomUUID();
-      await tx.query(
-        `INSERT INTO factory_attempts (id,"taskId","candidateId",stage,position,status,evidence,output) VALUES ($1,$2,$3,'publish',4,'pending','[]','{}')`,
-        [attempt, task.id, task.candidateId],
-      );
-      return {
-        task: (
-          await tx.query<FactoryTask>(
-            "UPDATE factory_tasks SET stage='publish',status='pending',revision=revision+1,\"attemptId\"=$2 WHERE id=$1 RETURNING *",
-            [task.id, attempt],
-          )
-        ).rows[0],
-      };
-    },
-  };
+      },
+    };
+  }
+  const store = makeStore();
   const provider = await vercelProtocolFixture(),
     adapter = createVercelPublicationAdapter(
       { ...MIKKA_VERCEL, environment: "preview" },
@@ -235,7 +244,7 @@ export async function factory194Fixture(connectionString: string) {
       scope: "synthetic upstream approval contract",
     };
     await pool.query(
-      "INSERT INTO factory_tasks VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+      'INSERT INTO factory_tasks (id,"userId","issueId","attemptId","candidateId",revision,stage,status,"sourceEventId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
       [
         task.id,
         task.userId,
@@ -245,6 +254,7 @@ export async function factory194Fixture(connectionString: string) {
         task.revision,
         task.stage,
         task.status,
+        randomUUID(),
       ],
     );
     await pool.query(
@@ -273,7 +283,7 @@ export async function factory194Fixture(connectionString: string) {
         recordedAt,
       };
       await pool.query(
-        `INSERT INTO agent_runs VALUES ($1,$2,$3,$4,'succeeded',NULL,$5,$6,$6,'submitted')`,
+        `INSERT INTO agent_runs (id,"userId","issueId","sessionId",status,"stopRequestedAt",report,"startedAt","finishedAt","stopReason") VALUES ($1,$2,$3,$4,'succeeded',NULL,$5,$6,$6,'submitted')`,
         [
           runId,
           task.userId,
@@ -333,6 +343,9 @@ export async function factory194Fixture(connectionString: string) {
   return {
     permission,
     source,
+    store,
+    makeStore,
+    authorize,
     decisions,
     authority,
     issuePolicyDecision,

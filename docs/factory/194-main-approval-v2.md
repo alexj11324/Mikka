@@ -16,10 +16,11 @@ reviews, and `lib/cua/local-review.ts` validates their digest. These are not
 Factory deploy signatures. `lib/coordinator/decide.ts` is a model-answer transport,
 not an execution-permission issuer; its text response cannot grant authority.
 
-No current Factory deploy credential issuer/verifier was found in these actual
-call paths. #161's reported local implementation has not been delivered or
+No pre-existing Factory deploy credential issuer/verifier was found in these
+call paths. This batch now implements a concrete run-bound verifier and worker
+backend composition, described below; it configures no live issuer or trust key. #161's reported local implementation has not been delivered or
 consumed here; it must not be described as a working generic credential service.
-No signing key, identity, credential or permission action is created by this batch.
+No production signing key, identity, credential or permission action is created by this batch. Synthetic keys are generated only in isolated tests.
 
 ## Policy and semantic decision seam
 
@@ -80,6 +81,72 @@ prevents POST. Pending/uncertain or post-effect SQL failure permits only GET/lis
 reconciliation, never another creation attempt. Preflight failure retains the
 reservation; no automatic reset/rearm operation exists.
 
+## Concrete worker backend and run verifier
+
+`factoryPublicationForWorker(request, deps)` in `worker-publication.ts` is the
+backend call point. It uses the actual existing `verifyRunToken`/`workerRun`, then
+derives owner/run/Bot/token hash on the server. No model JSON chooses that identity.
+It wraps the existing issue authorizer with a current token/run/device/STOP/lease
+check under the same task transaction, including evidence and ledger reads.
+It registers no HTTP route or worker tool and expands no frozen tool grants.
+
+`createFactoryPublicationHost(pool, authorize, createStore, host, adapters)` composes
+one canonical #192 store, configured gates and the publication service. The
+`createStore(gates)` callback must retain #193 and all other owners' lifecycle
+gates; it is not a second store or orchestrator. Its concrete
+`createFactoryRunDecisionAuthority` verifies data on existing application tables:
+
+1. Lock the authorized current task through #192, preserving Bot/source/issue
+   access, candidate and current grant/publish fences.
+2. Recheck the authenticated existing run token, owned enabled device, run owner,
+   issue, STOP, lease, session and frozen assignment. Acceptance runs remain
+   mechanically read-only regardless of a policy callback's answer.
+3. Read the signed nonce from the existing run's event stream. The current
+   `runEventBatchSchema` already accepts the exact chunk shape below; the existing
+   events route assigns the row UUID and deduplicates `(runId, seq)`. The signed
+   nonce is independent of that server-generated UUID. Exact repeated chunks do
+   not create another grant/effect.
+4. Verify Ed25519 using only the host's trusted public-key lookup, domain-separated
+   payload plus issuer/keyId, current assignment/session and full publication scope.
+   This module has no signer, private-key loader or credential-issuance endpoint.
+5. Consume #192's committed review/verify `finish:passed` event snapshots, matching
+   the current latest attempts, run/session, candidate, owner/Bot/source, revisions,
+   output and evidence. It does not fabricate running projections to call #193's
+   running-only predicate. The producer must actually install #193 and the stage owner's real semantic
+   validators before writing these server-owned receipts. Its independence
+   result alone is not semantic pass; test callbacks cannot substitute at runtime.
+6. Read/lock the actual current explicitly registered publication policy. The host
+   resolver must return `id/revision/ownerId/runId/assignmentDigest/scopeDigest`,
+   explicit `permissionAction`, `readOnly` and `decision`. Both its version and full
+   scope digest must match the signed review. A connection version, desktop/network
+   permission or unknown-action ask fallback is insufficient. Missing source rejects.
+7. Only a registered ask reads the existing exact live confirmation. Grant
+   revocation, token/key/policy changes and current fences are checked again at
+   the final effect boundary. A failed reservation never becomes another POST.
+
+The stream shape is `{type:"data-factory-publication-review", data:{issuer,keyId,
+payload,signature}}`. The payload is `factoryRunReview`: signed nonce, owner,
+executor run/session, assignment digest, policy id/revision, explicit chosen action,
+full scope digest, issued/expiry times, the two canonical check receipt references
+and host-attested model judgment/input provenance. It contains no allow/ask/deny
+permission. Current policy supplies that decision. Signatures include the
+issuer/keyId as well as payload; the key lookup never comes from model JSON.
+
+Verified evidence persists the actual server chunk row ID, signature digest and
+run/session/assignment/check-receipt/review/key-fingerprint bindings in the existing
+grant. It stores no private key or raw token. V2 hashes bind this evidence.
+
+The concrete verifier is executable with injected trusted sources. Main still
+has no registered Factory publication policy-version source or authenticated
+attestation producer/public-key binding for this purpose. Production must not
+substitute the test resolver or synthetic signature material. Source tests use an
+authentication transport substitute; isolated PG tests exercise actual token/run/
+lease/device/check-event SQL, real Ed25519 and a disposable local artifact.
+The joint fixture consumes actual #192 source `60e6b2...` and actual #193 v2
+predicate for committed check passes; semantic validators, model invocation and
+current policy data remain explicitly synthetic. No real deployment authorization
+is signed and no real provider is called.
+
 ## #192 integration
 
 The intake-only `283a64232fe444505a59fed15d8364214512f26a` lacks lifecycle
@@ -97,8 +164,8 @@ Third argument is Bot identity, fourth is `{gates?, independent?}`. Install
 same authority as the fifth argument of
 `createFactoryApprovals(pool, authorize, store, adapters, authority)`. Bare exported
 `approvalGate`/`publishGate` have no configured authority and reject new grants;
-they do not fall back to human approval. The current upstream runtime's bare-gate
-installation therefore still needs this explicit host integration.
+they do not fall back to human approval. The upstream bare-gate runtime therefore still needs this explicit host
+integration with real registered policy and attestation sources.
 
 All consumer reads/grants/publication/reconciliation use producer `lockTask`,
 retaining task/issue lock ordering, live owner/Bot/source access and current fences.
