@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { ClaudeAdapter } from '../src/adapters/claude'
@@ -12,7 +12,7 @@ import { createLogger } from '../src/log'
 
 for (const kind of ['claude_code', 'codex', 'cursor'] as const) test(`${kind} receives only the per-run proxy supplied by the trusted host`, async t => {
   const root = await mkdtemp(join(tmpdir(), 'mikka-local-adapter-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
+  t.after(() => { console.log(`Retained local adapter test directory: ${root}`) })
   const home = join(root, 'home')
   await mkdir(home)
   const expected = { command: '/synthetic/node', args: ['/synthetic/proxy', '/synthetic/socket', 'synthetic-token'], env: {} }

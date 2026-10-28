@@ -48,7 +48,7 @@ test('local decisions bind owner, device, live run and exact digest, and cannot 
     assert.equal(await decideLocalComputerReview(pool, 'owner', id, digest, true), false)
   } finally {
     await pool.end()
-    await admin.query(`DROP SCHEMA ${schema} CASCADE`)
+    console.log(`Retained local review test schema: ${schema}`)
     await admin.end()
   }
 })
