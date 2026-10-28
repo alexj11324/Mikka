@@ -134,7 +134,10 @@ export async function acquireTestAccounts({ database, environment, runId, worker
         await pool.revokeSessions(lease)
         let statesValid = true
         for (const path of stateFiles) {
-          try { await readPrivate(path) } catch { statesValid = false }
+          try {
+            const state = await readPrivate(path)
+            if (!state || !Array.isArray(state.cookies) || !Array.isArray(state.origins)) statesValid = false
+          } catch { statesValid = false }
         }
         const releaseOutcome = (pending.length || tainted || !statesValid) && outcome === 'clean' ? 'dirty' : outcome
         const result = await pool.release(lease, { outcome: releaseOutcome })

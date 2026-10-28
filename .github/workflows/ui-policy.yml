@@ -13,6 +13,13 @@ on:
     branches-ignore: ['gh-readonly-queue/**']
   pull_request:
   merge_group:
+  workflow_dispatch:
+    inputs:
+      verify_cloud_credential:
+        description: 'Explicitly verify the existing staging credential against its issuer'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -25,8 +32,8 @@ concurrency:
 jobs:
   cloud-secret-access:
     name: Cloud credential access (OIDC)
-    # Migration/retention candidates must not retrieve live provider credentials.
-    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite' && github.ref != 'refs/heads/codex/shared-test-retention-20261028'
+    # Credential access is an explicit operation, separate from isolated CI.
+    if: github.event_name == 'workflow_dispatch' && inputs.verify_cloud_credential && github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:

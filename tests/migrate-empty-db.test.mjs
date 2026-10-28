@@ -29,7 +29,9 @@ function ciTarget() {
 
 function schemaURL(target, schema) {
   const url = new URL(target)
-  url.searchParams.set('options', `-c search_path=${schema}`)
+  // pg_trgm is shared by retained schemas and lives in public. The test below
+  // first proves public has no application tables, so it cannot mask omissions.
+  url.searchParams.set('options', `-c search_path=${schema},public`)
   return url.toString()
 }
 
@@ -82,6 +84,8 @@ for (const separateTargets of [false, true]) {
     const workspace = new Pool({ connectionString: workspaceURL, max: 1 })
     try {
       assert.equal((await admin.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+      assert.deepEqual((await admin.query("select tablename from pg_tables where schemaname='public'")).rows, [], 'bootstrap must precede all public application fixtures')
+      await admin.query('create extension if not exists pg_trgm with schema public')
       for (const schema of schemas) {
         await admin.query(`create schema "${schema}"`)
         createdSchemas.push(schema)
