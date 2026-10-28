@@ -42,7 +42,7 @@ test('deny, read-only, changed binding and expiry cannot create or claim a recei
   await assert.rejects(recordCredentialAction(pool, binding, 'allow', true, randomUUID()), { status: 403 })
   await assert.rejects(recordCredentialAction(pool, { ...binding, expiresAt: Date.now() - 1 }, 'allow', false, randomUUID()), { status: 403 })
   const { action } = await recordCredentialAction(pool, binding, 'allow', false, randomUUID())
-  for (const changed of [{ userId: 'other' }, { targetId: 'other' }, { policyVersion: 3 }, { role: 'username' as const }, { runId: randomUUID() }]) await assert.rejects(consumeCredentialAction(pool, { ...action, ...changed }), { status: 403 })
+  for (const changed of [{ userId: 'other' }, { targetId: 'other' }, { policyVersion: 3 }, { role: 'username' as const }, { runId: randomUUID() }, { admission: 'ask' as const }]) await assert.rejects(consumeCredentialAction(pool, { ...action, ...changed }), { status: 403 })
   assert.equal(rows.get(action.actionId)?.status, 'running')
 })
 

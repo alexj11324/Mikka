@@ -18,7 +18,7 @@ export async function executeCredentialIntent(_input: { permissionAction: 'compu
 export async function executeApprovedCredentialAction(pool: Pool, userId: string, raw: unknown, approved: boolean, receiptId?: string): Promise<{ data: Record<string, unknown> } | { error: string }> {
   try {
     const action = parseCredentialAction(raw as CredentialAction)
-    if (action.userId !== userId || action.actionId !== receiptId) return { error: 'browserActionChanged' }
+    if (action.userId !== userId || action.actionId !== receiptId || action.admission !== 'ask') return { error: 'browserActionChanged' }
     const { authorizeSubscriptionWorkspace } = await import('@/lib/subscription-runtime')
     await authorizeSubscriptionWorkspace(userId, action.workspaceId)
     const { SubagentStore } = await import('./subagents')

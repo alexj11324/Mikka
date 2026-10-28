@@ -14,9 +14,9 @@ const bindingSchema = z.object({
   expiresAt: z.number().int().positive(),
 }).strict()
 export type CredentialActionBinding = z.infer<typeof bindingSchema>
-export type CredentialAction = CredentialActionBinding & { kind: 'browser_credential'; actionId: string; digest: string; summary: string }
-function digest(binding: CredentialActionBinding, actionId: string) {
-  return createHash('sha256').update(JSON.stringify([actionId, binding.userId, binding.workspaceId, binding.botId, binding.subagentId, binding.runId, binding.epoch, binding.policyVersion, binding.targetId, binding.origin, binding.loaderId, binding.backendNodeId, binding.role, binding.expiresAt])).digest('hex')
+export type CredentialAction = CredentialActionBinding & { kind: 'browser_credential'; actionId: string; admission: 'allow' | 'ask'; digest: string; summary: string }
+function digest(binding: CredentialActionBinding, actionId: string, admission: 'allow' | 'ask') {
+  return createHash('sha256').update(JSON.stringify([actionId, admission, binding.userId, binding.workspaceId, binding.botId, binding.subagentId, binding.runId, binding.epoch, binding.policyVersion, binding.targetId, binding.origin, binding.loaderId, binding.backendNodeId, binding.role, binding.expiresAt])).digest('hex')
 }
 
 /** The host persists this id with its workflow step before attempting I/O. */
@@ -33,7 +33,7 @@ export async function recordCredentialAction(pool: Pool, raw: CredentialActionBi
   if (binding.runId !== binding.subagentId) throw new ComputerError(403, 'Credential action unavailable')
   if (!z.uuid().safeParse(actionId).success) throw new ComputerError(403, 'Credential action unavailable')
   const summary = `Fill ${binding.role} on ${origin.hostname}`
-  const action: CredentialAction = { ...binding, kind: 'browser_credential', actionId, digest: digest(binding, actionId), summary }
+  const action: CredentialAction = { ...binding, kind: 'browser_credential', actionId, admission: decision, digest: digest(binding, actionId, decision), summary }
   // The regular decision handler consumes pending -> running for ask. Allow
   // starts at running; both paths must atomically claim it before any I/O.
   const inserted = await pool.query('INSERT INTO pending_actions (id,"userId",action,input,status) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO NOTHING RETURNING id', [actionId, binding.userId, 'browser_operation', JSON.stringify(action), decision === 'ask' ? 'pending' : 'running'])
@@ -47,9 +47,9 @@ export async function recordCredentialAction(pool: Pool, raw: CredentialActionBi
 /** Claim durably before I/O. Current policy, run and target must be rechecked
  * while holding their existing fence before invoking the credential service. */
 export function parseCredentialAction(raw: CredentialAction) {
-  const { kind, actionId, digest: expected, summary, ...rawBinding } = raw
+  const { kind, actionId, admission, digest: expected, summary, ...rawBinding } = raw
   const binding = bindingSchema.parse(rawBinding)
-  if (kind !== 'browser_credential' || !z.uuid().safeParse(actionId).success || summary !== `Fill ${binding.role} on ${new URL(binding.origin).hostname}` || digest(binding, actionId) !== expected || binding.expiresAt <= Date.now()) throw new ComputerError(403, 'Credential action unavailable')
+  if (kind !== 'browser_credential' || !z.uuid().safeParse(actionId).success || !['allow', 'ask'].includes(admission) || summary !== `Fill ${binding.role} on ${new URL(binding.origin).hostname}` || digest(binding, actionId, admission) !== expected || binding.expiresAt <= Date.now()) throw new ComputerError(403, 'Credential action unavailable')
   return raw
 }
 
