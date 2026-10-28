@@ -12,7 +12,7 @@ type Stored = { id: string; userId: string; botId: string | null; kind: string; 
 function fixture() {
   const rows = new Map<string, Stored>()
   const botRows = new Map<string, { id: string; name: string; ownerId: string }>()
-  const deviceRows = new Map<string, { id: string; ownerId: string; kind: string }>()
+  const deviceRows = new Map<string, { id: string; ownerId: string; kind: string; enabled: boolean }>()
   const trace: string[] = []
   const state: { insertError?: Error; selectError?: Error; arbitrate?: (event: Stored) => Promise<void>; missingRead?: boolean } = {}
   const executor = {
@@ -36,7 +36,7 @@ function fixture() {
         const query = dialect.sqlToQuery(condition)
         if (table === coordinatorEvents) assert.match(query.sql, /"coordinator_events"\."dedupeKey"/)
         else if (table === bots) { assert.match(query.sql, /"bots"\."id"/); assert.match(query.sql, /"bots"\."ownerId"/) }
-        else { assert.match(query.sql, /"devices"\."id"/); assert.match(query.sql, /"devices"\."ownerId"/); assert.match(query.sql, /"devices"\."kind"/) }
+        else { assert.match(query.sql, /"devices"\."id"/); assert.match(query.sql, /"devices"\."ownerId"/); assert.match(query.sql, /"devices"\."kind"/); assert.match(query.sql, /"devices"\."enabled"/) }
         return { async limit(count: number) {
           assert.equal(count, 1)
           if (table === coordinatorEvents) trace.push('read')
@@ -44,7 +44,7 @@ function fixture() {
           if (state.missingRead) return []
           const row = table === coordinatorEvents ? rows.get(query.params[0] as string)
             : table === bots ? [...botRows.values()].find(bot => query.params.includes(bot.id) && query.params.includes(bot.ownerId))
-              : [...deviceRows.values()].find(device => query.params.includes(device.id) && query.params.includes(device.ownerId) && query.params.includes(device.kind))
+              : [...deviceRows.values()].find(device => query.params.includes(device.id) && query.params.includes(device.ownerId) && query.params.includes(device.kind) && query.params.includes(device.enabled))
           return row ? [structuredClone(row)] : []
         } }
       } }
@@ -239,13 +239,18 @@ test('actual action freezes serialized quotes across retries and rejects quote c
 })
 
 test('new-task machine choice is owner-checked, preserved separately from copy and frozen across retries', async () => {
+  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
   current = fixture(); callbacks.length = 0; userId = 'owner'
   const deviceId = 'b4000000-0000-4000-8000-000000000004'
   const destination = { kind: 'device' as const, deviceId }
-  current.deviceRows.set(deviceId, { id: deviceId, ownerId: 'foreign', kind: 'local' })
+  current.deviceRows.set(deviceId, { id: deviceId, ownerId: 'foreign', kind: 'local', enabled: true })
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { error: 'deviceNotFound', params: undefined })
   assert.equal(current.rows.size, 0)
   current.deviceRows.get(deviceId)!.ownerId = 'owner'
+  current.deviceRows.get(deviceId)!.enabled = false
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { error: 'deviceNotFound', params: undefined })
+  current.deviceRows.get(deviceId)!.enabled = true
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, undefined, destination), { error: 'validationGeneric', params: undefined })
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { queued: true })
   assert.equal([...current.rows.values()][0].payload.text, 'do the task')
   assert.deepEqual([...current.rows.values()][0].payload.taskDestination, destination)
@@ -253,4 +258,13 @@ test('new-task machine choice is owner-checked, preserved separately from copy a
   current.deviceRows.get(deviceId)!.ownerId = 'foreign'
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { error: 'deviceNotFound', params: undefined })
   assert.equal(current.rows.size, 1)
+  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+})
+
+test('new-task submission fails closed when issue tools are disabled', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { error: 'issueToolsDisabled', params: undefined })
+  assert.equal(current.rows.size, 0)
+  assert.equal(callbacks.length, 0)
 })
