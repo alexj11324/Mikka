@@ -29,7 +29,7 @@ export async function recordMonitorIncident(tx: PoolClient, input: MonitorIncide
   if (input.outcome === "healthy") throw Error("factoryMonitorIncidentRequired");
   row = (await tx.query("INSERT INTO factory_monitor_incidents(id,owner_id,workspace_key,fingerprint,check_key,issue_id,status) VALUES($1,$2,$3,$4,$5,$6,'open') RETURNING *",[randomUUID(),input.ownerId,input.workspaceKey,input.fingerprint,input.checkKey,input.issueId])).rows[0];
  }
- await tx.query('INSERT INTO factory_monitor_observations(owner_id,event_id,payload_hash,incident_id,outcome) VALUES($1,$2,$3,$4,$5)',[input.ownerId,input.eventId,hash,row.id,input.outcome]);
+ await tx.query('INSERT INTO factory_monitor_observations(owner_id,event_id,payload_hash,incident_id,outcome,identity) VALUES($1,$2,$3,$4,$5,$6)',[input.ownerId,input.eventId,hash,row.id,input.outcome,JSON.stringify(input)]);
  await tx.query("UPDATE factory_monitor_incidents SET occurrences=occurrences+$2,status=$3 WHERE id=$1",[row.id,input.outcome === "unhealthy" ? 1 : 0,input.outcome === "healthy" ? "recovery_observed" : "open"]);
  return { incidentId: row.id as string, replayed: false };
 }

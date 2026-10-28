@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { createVercelPublicationAdapter, MIKKA_VERCEL } from "./vercel-publication";
 import { factory194Fixture } from "../../tests/helpers/factory194";
@@ -49,6 +50,20 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
         await assert.rejects(read, /factoryPublicationReceipt/);
         await tx.query("ROLLBACK TO SAVEPOINT negative_case");
       }
+      // Synthetic current monitor assignment; actual ancestry predicate and
+      // publication reader are both executed. No #192 runtime is substituted.
+      await tx.query(await readFile(new URL("../../docs/factory/schema-proposals/195-incidents.sql", import.meta.url), "utf8"));
+      await tx.query('CREATE TABLE factory_questions ("continuationRunId" uuid)');
+      const monitorRun = randomUUID(), monitorAttempt = randomUUID();
+      await tx.query(`INSERT INTO agent_runs(id,"userId","issueId","sessionId",status) VALUES($1,$2,$3,$4,'succeeded')`, [monitorRun,f.actor.userId,r.issueId,"synthetic-monitor"]);
+      await tx.query(`INSERT INTO factory_attempts(id,"taskId","candidateId",stage,position,"runId","sessionId",status) VALUES($1,$2,$3,'monitor',5,$4,$5,'running')`, [monitorAttempt,x.task.id,r.candidateId,monitorRun,"synthetic-monitor"]);
+      const task = { id:x.task.id,userId:f.actor.userId,issueId:r.issueId,sourceEventId:"synthetic-source",stage:"monitor",status:"running",attemptId:monitorAttempt,candidateId:r.candidateId };
+      const input = {ownerId:f.actor.userId,workspaceKey:"synthetic",fingerprint:"f",checkKey:"c",issueId:r.issueId,eventId:"failure",outcome:"unhealthy" as const,publicationId:r.publicationId,candidateId:r.candidateId,runId:monitorRun};
+      const failed = await consumeMonitorObservation(tx,task,input,{...o,health:{...o.health,immutableStatus:503}},"https://app.example.com");
+      const recovered = await consumeMonitorObservation(tx,task,{...input,eventId:"recovery-evidence",outcome:"healthy"},o,"https://app.example.com");
+      assert.equal(failed.incidentId,recovered.incidentId);
+      const audit = (await tx.query("SELECT identity FROM factory_monitor_observations WHERE event_id='recovery-evidence'")).rows[0].identity;
+      assert.equal(audit.publicationId,r.publicationId); assert.equal(audit.runId,monitorRun); assert.equal(audit.candidateId,r.candidateId);
       await tx.query("ROLLBACK");
     } finally { tx.release(); }
   } finally { await f.close(); }

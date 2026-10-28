@@ -9,6 +9,7 @@ CREATE TABLE factory_monitor_incidents (
 CREATE TABLE factory_monitor_observations (
  owner_id text NOT NULL, event_id text NOT NULL, payload_hash text NOT NULL,
  incident_id uuid NOT NULL REFERENCES factory_monitor_incidents(id),
+ identity jsonb NOT NULL,
  outcome text NOT NULL CHECK(outcome IN ('unhealthy','healthy')),
  PRIMARY KEY(owner_id,event_id)
 );
