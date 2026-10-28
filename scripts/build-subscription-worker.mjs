@@ -28,6 +28,7 @@ if (process.env.MIKKA_BUILD_BYOS_WORKER === '1') {
       execFileSync(join(scratch, 'go/bin/go'), ['build', '-mod=readonly', '-trimpath', '-o', `bin/${name}`, `./cmd/${name}`], { cwd: worker, env, stdio: 'inherit' })
     }
   } finally {
-    console.error(`Retained subscription worker build files: ${scratch}`)
+    // Preserve the compiler archive, caches and build evidence for inspection.
+    console.error(`Retained subscription worker build directory: ${scratch}`)
   }
 }
