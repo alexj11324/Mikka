@@ -743,7 +743,7 @@
     "footer": "A passing check means the most recent availability check succeeded; it does not mean the agent process is still running. Wait for a new result after a check expires.",
     "connect": {
       "trigger": "Connect device",
-      "title": "Connect a remote host",
+      "title": "Connect a computer",
       "description": "A machine you can reach over SSH. Mikka installs and starts the daemon there, then brings back the harnesses it detected.",
       "host": "Host",
       "hostPlaceholder": "SSH host, hostname, or IP[:port]",
@@ -788,7 +788,14 @@
       "startExitCode": "Failed to start; exit code {code}",
       "daemonRunning": "The daemon is running in the background",
       "heartbeatTimeout": "Timed out waiting for a heartbeat. Check ~/.mikka/daemon.log",
-      "connectionError": "The connection failed"
+      "connectionError": "The connection failed",
+      "commands": {
+        "install": "1 Install",
+        "login": "2 Sign in",
+        "start": "3 Start"
+      },
+      "requirements": "Node.js 24+ · Git",
+      "configurationFailed": "Installation commands are unavailable"
     }
   },
   "Workspace": {
@@ -2406,7 +2413,13 @@
       "handbackFailed": "Couldn't hand back. Try again."
     },
     "approval": {
-      "action": { "click": "Click the screen", "type": "Type text", "key": "Press a key", "scroll": "Scroll", "screenshot": "View the screen" },
+      "action": {
+        "click": "Click the screen",
+        "type": "Type text",
+        "key": "Press a key",
+        "scroll": "Scroll",
+        "screenshot": "View the screen"
+      },
       "allowRun": "Allow for this task",
       "deny": "Deny",
       "allow": "Allow",
@@ -2733,5 +2746,23 @@
   },
   "MobilePush": {
     "verificationCode": "A verification code arrived"
+  },
+  "DeviceAuthorization": {
+    "title": "Connect this computer",
+    "code": "Terminal verification code",
+    "continue": "Continue",
+    "loading": "Loading…",
+    "scope": "Run your threads",
+    "allow": "Allow",
+    "deny": "Deny",
+    "approving": "Approving…",
+    "approved": "Approved",
+    "denied": "Denied",
+    "returnToTerminal": "Return to your terminal to start the daemon",
+    "done": "Done",
+    "invalid": "This code is invalid or expired",
+    "failed": "Connection failed. Try again",
+    "enterAgain": "Enter another code",
+    "retry": "Retry"
   }
 }

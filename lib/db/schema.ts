@@ -167,6 +167,16 @@ export const devices = pgTable('devices', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('devices_owner_idx').on(table.ownerId)])
 
+/** Better Auth 1.7.12 owns the device authorization lifecycle. */
+export const deviceCodes = pgTable('deviceCode', {
+  id: text('id').primaryKey(), deviceCode: text('deviceCode').notNull(),
+  userCode: text('userCode').notNull(), userId: text('userId'),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  status: text('status').notNull(),
+  lastPolledAt: timestamp('lastPolledAt', { withTimezone: true }),
+  pollingInterval: integer('pollingInterval'), clientId: text('clientId'), scope: text('scope'),
+}, table => [uniqueIndex('device_code_key').on(table.deviceCode), uniqueIndex('device_user_code_key').on(table.userCode)])
+
 /** A daemon credential. Only the SHA-256 hash is stored. */
 export const deviceTokens = pgTable('device_tokens', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),

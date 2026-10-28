@@ -102,6 +102,8 @@ jobs:
         env:
           MIKKA_SANDBOX_ACCEPTANCE: '1'
       - run: pnpm --filter @mikka/daemon typecheck
+      - run: pnpm --filter @mikka/daemon build
+      - run: pnpm --filter @mikka/daemon test:package
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm --filter @mikka/mobile typecheck
       - run: pnpm test:active-agents

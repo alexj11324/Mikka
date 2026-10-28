@@ -28,6 +28,15 @@ export function hashDeviceToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
+/** Used by both the manual token action and the browser device grant. */
+export async function issueDeviceToken(userId: string, name = ''): Promise<string> {
+  const token = newDeviceToken()
+  await db.insert(deviceTokens).values({
+    id: crypto.randomUUID(), userId, name, tokenHash: hashDeviceToken(token),
+  })
+  return token
+}
+
 export interface DeviceCaller {
   userId: string
   tokenId: string

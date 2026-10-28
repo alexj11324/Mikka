@@ -45,3 +45,4 @@ next-env.d.ts
 /packages/subscription-worker/.upstream/
 /packages/subscription-worker/.cache/
 /packages/subscription-worker/bin/
+/packages/daemon/dist/

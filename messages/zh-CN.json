@@ -743,7 +743,7 @@
     "footer": "检查通过表示最近一次可用性检查成功，不代表 Agent 进程持续运行。检查过期后需等待新的检查结果。",
     "connect": {
       "trigger": "连接设备",
-      "title": "连接远程主机",
+      "title": "连接电脑",
       "description": "一台你能 ssh 进去的机器。Mikka 会在上面安装并启动 daemon，然后把它检测到的 harness 带回来。",
       "host": "主机",
       "hostPlaceholder": "ssh 主机、主机名或 IP[:端口]",
@@ -788,7 +788,14 @@
       "startExitCode": "启动失败，退出码 {code}",
       "daemonRunning": "daemon 已在后台运行",
       "heartbeatTimeout": "等待心跳超时，请查看 ~/.mikka/daemon.log",
-      "connectionError": "连接过程出错"
+      "connectionError": "连接过程出错",
+      "commands": {
+        "install": "1 安装",
+        "login": "2 登录",
+        "start": "3 上线"
+      },
+      "requirements": "Node.js 24+ · Git",
+      "configurationFailed": "安装命令暂不可用"
     }
   },
   "Workspace": {
@@ -2406,7 +2413,13 @@
       "handbackFailed": "没能交还，请重试。"
     },
     "approval": {
-      "action": { "click": "点击屏幕", "type": "输入文字", "key": "按键", "scroll": "滚动", "screenshot": "查看屏幕" },
+      "action": {
+        "click": "点击屏幕",
+        "type": "输入文字",
+        "key": "按键",
+        "scroll": "滚动",
+        "screenshot": "查看屏幕"
+      },
       "allowRun": "本任务内都允许",
       "deny": "拒绝",
       "allow": "允许",
@@ -2733,5 +2746,23 @@
   },
   "MobilePush": {
     "verificationCode": "收到一条验证码"
+  },
+  "DeviceAuthorization": {
+    "title": "连接这台电脑",
+    "code": "终端验证码",
+    "continue": "继续",
+    "loading": "正在读取…",
+    "scope": "执行你的线程",
+    "allow": "允许",
+    "deny": "拒绝",
+    "approving": "正在批准…",
+    "approved": "已批准",
+    "denied": "已拒绝",
+    "returnToTerminal": "回到终端启动 daemon",
+    "done": "完成",
+    "invalid": "验证码无效或已过期",
+    "failed": "连接失败，请重试",
+    "enterAgain": "重新输入",
+    "retry": "重试"
   }
 }

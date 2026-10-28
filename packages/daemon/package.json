@@ -6,7 +6,7 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "bin": {
-    "mikka": "./bin/mikka.ts"
+    "mikka": "./dist/mikka.js"
   },
   "exports": {
     ".": "./src/main.ts",
@@ -21,6 +21,8 @@
     "./coordinator": "./src/coordinator/index.ts"
   },
   "scripts": {
+    "build": "node scripts/build.mjs",
+    "test:package": "node --test test/package.test.mjs",
     "daemon": "tsx bin/mikka.ts daemon",
     "dev": "tsx watch bin/mikka.ts daemon --dev --server memory",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
@@ -48,6 +50,7 @@
     "@types/node": "24.19.2",
     "@types/proper-lockfile": "4.1.4",
     "tsx": "4.23.15",
+    "esbuild": "0.28.2",
     "vitest": "5.0.5"
   }
 }

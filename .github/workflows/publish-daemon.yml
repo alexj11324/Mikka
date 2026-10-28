@@ -1,0 +1,43 @@
+name: Publish daemon (manual)
+
+# Proposed release method; Alex must choose the public package name and
+# configure its npm trusted publisher before dispatching this workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      package_name:
+        description: Approved public npm package name
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MIKKA_DAEMON_PACKAGE_NAME: ${{ inputs.package_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mikka/daemon typecheck
+      - run: pnpm --filter @mikka/daemon test
+      - run: pnpm --filter @mikka/daemon build
+      - run: pnpm --filter @mikka/daemon test:package
+      - name: Publish with npm trusted publishing and provenance
+        working-directory: packages/daemon/dist
+        run: npm publish --access public --provenance

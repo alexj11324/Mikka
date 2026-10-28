@@ -1,18 +1,20 @@
 import { betterAuth } from 'better-auth'
 import { createAuthMiddleware } from 'better-auth/api'
-import { multiSession } from 'better-auth/plugins'
+import { deviceAuthorization, multiSession } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { expo } from '@better-auth/expo'
 import { oAuthProxy } from 'better-auth/plugins'
 import { pool } from '@/lib/db'
-import { withBasePath } from '@/lib/base-path'
+import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
 import { authOAuthProxyOptions, authTrustedOrigins } from '@/lib/auth-config'
 import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
 import { after } from 'next/server'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
 import { newUserAvatar } from '@/lib/default-avatar'
+import { daemonAuthorizationOptions, exchangeDaemonSession } from '@/lib/daemon-authorization'
+import { issueDeviceToken } from '@/lib/device-link'
 
 /** The iOS app's URL scheme: OAuth returns here, and its requests carry it as their origin. */
 export const MOBILE_APP_ORIGIN = 'mikka://'
@@ -84,6 +86,7 @@ export const auth = betterAuth({
     // The iOS app signs in through the system browser and keeps its session cookie in the keychain.
     expo(),
     multiSession(),
+    deviceAuthorization(daemonAuthorizationOptions(BASE_PATH)),
     oauthProvider({
       loginPage: withBasePath('/sign-in'),
       consentPage: withBasePath('/oauth/consent'),
@@ -102,6 +105,19 @@ export const auth = betterAuth({
   hooks: {
     before: createAuthMiddleware(async ctx => email.before(ctx)),
     after: createAuthMiddleware(async ctx => {
+      const deviceToken = await exchangeDaemonSession({
+        path: ctx.path, clientId: ctx.body?.client_id,
+        returned: ctx.context.returned, newSession: ctx.context.newSession,
+      }, {
+        issueToken: userId => issueDeviceToken(userId),
+        revokeSession: token => ctx.context.internalAdapter.deleteSession(token),
+      })
+      if (deviceToken) {
+        ctx.context.newSession = null
+        ctx.setHeader('cache-control', 'no-store')
+        ctx.setHeader('pragma', 'no-cache')
+        return ctx.json(deviceToken)
+      }
       if (ctx.path === '/verify-email' || ctx.path?.startsWith('/reset-password')) {
         ctx.setHeader('referrer-policy', 'no-referrer')
         ctx.setHeader('cache-control', 'no-store')

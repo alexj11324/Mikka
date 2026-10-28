@@ -16,7 +16,7 @@ import { HttpServerLink } from "./server-link-http"
 
 const USAGE = `Usage:
   mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>] [--hosted-subscriptions]
-  mikka daemon login [--server <url>] [--workspace <id>] [--token <session>] [--dev] [--data-dir <dir>]
+  mikka daemon login [--server <url>] [--workspace <id>] [--token <device-token>] [--dev] [--data-dir <dir>]
   mikka daemon status [--dev] [--data-dir <dir>]`
 
 const SERVER_URLS: Record<Flavor, string> = {
@@ -85,7 +85,7 @@ export async function runCli(
 
   if (sub === "login") {
     // Better Auth device authorization (RFC 8628), like `gh auth login`.
-    // `--token` takes a session obtained elsewhere (tests, the desktop).
+    // `--token` takes an existing device token (manual setup or tests).
     let credential = values.token
     if (!credential) {
       const serverUrl =
@@ -96,7 +96,7 @@ export async function runCli(
           prompt: (code) => {
             io.out(`Your code: ${code.user_code}`)
             io.out(
-              `Approve it in the Mikka app: ${code.verification_uri_complete ?? code.verification_uri}`
+              `Approve it in your browser: ${code.verification_uri_complete ?? code.verification_uri}`
             )
             io.out("Waiting for approval...")
           },

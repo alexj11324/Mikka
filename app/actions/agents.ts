@@ -8,10 +8,10 @@ import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import {
-  agents, agentRuns, deviceRepos, deviceTokens, devices, issueMembers, runChunks, runMessages, users,
+  agents, agentRuns, deviceRepos, devices, issueMembers, runChunks, runMessages, users,
   type SupportedHarness,
 } from '@/lib/db/schema'
-import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/device-link'
+import { DEVICE_ONLINE_WINDOW_MS, issueDeviceToken } from '@/lib/device-link'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
 import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
@@ -84,10 +84,7 @@ export async function createDeviceToken(input: { name: string }): Promise<Action
     const userId = await getUserId()
     const parsed = z.object({ name: z.string().trim().max(60) }).safeParse(input)
     if (!parsed.success) return { error: 'deviceNameTooLong' }
-    const token = newDeviceToken()
-    await db.insert(deviceTokens).values({
-      id: crypto.randomUUID(), userId, name: parsed.data.name, tokenHash: hashDeviceToken(token),
-    })
+    const token = await issueDeviceToken(userId, parsed.data.name)
     return { token }
   })
 }

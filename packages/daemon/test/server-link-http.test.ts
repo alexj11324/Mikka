@@ -186,17 +186,17 @@ describe("mikka daemon login (device authorization)", () => {
   const grant = {
     device_code: "dc-1",
     user_code: "ABCD-EFGH",
-    verification_uri: "mikka-dev://device",
-    verification_uri_complete: "mikka-dev://device?user_code=ABCD-EFGH",
+    verification_uri: "https://server.test/mikka/device",
+    verification_uri_complete: "https://server.test/mikka/device?user_code=ABCD-EFGH",
     expires_in: 600,
     interval: 5,
   }
 
-  it("shows the code, polls until approved and returns the session", async () => {
+  it("shows the code, polls until approved and returns only a device token", async () => {
     const answers = [
       json({ error: "authorization_pending" }, 400),
       json({ error: "slow_down" }, 400),
-      json({ access_token: "session-xyz", token_type: "Bearer" }),
+      json({ access_token: `orv_${'d'.repeat(43)}`, token_type: "Bearer" }),
     ]
     const { fetch, calls } = scripted((call) =>
       call.path === "/api/auth/device/code" ? json(grant) : answers.shift()!
@@ -211,7 +211,7 @@ describe("mikka daemon login (device authorization)", () => {
         waits.push(ms)
       },
     })
-    expect(token).toBe("session-xyz")
+    expect(token).toBe(`orv_${'d'.repeat(43)}`)
     expect(shown).toEqual(["ABCD-EFGH"])
     expect(calls[0]?.body).toEqual({ client_id: "mikka-daemon" })
     expect(calls[1]?.body).toEqual({
@@ -239,5 +239,12 @@ describe("mikka daemon login (device authorization)", () => {
       expect(failure).toBeInstanceOf(LoginError)
       expect((failure as LoginError).reason).toBe(error)
     }
+  })
+
+  it("never persists a web session from an unupgraded server", async () => {
+    const { fetch } = scripted(call => call.path === '/mikka/api/auth/device/code'
+      ? json(grant) : json({ access_token: 'browser-session-token' }))
+    await expect(deviceLogin({ serverUrl: 'https://server.test/mikka', fetchImpl: fetch, prompt: () => undefined, sleep: async () => undefined }))
+      .rejects.toThrow('Device login failed')
   })
 })
