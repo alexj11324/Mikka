@@ -94,6 +94,7 @@ function ViewerIntegrationsSettings({ showWebhookDetails, userId, isPending }: {
   }
 
   const refresh = useCallback(async () => {
+    if (!userId) return
     setError('')
     try {
       const response = await fetch(integrationPath, { cache: 'no-store' })
@@ -102,7 +103,7 @@ function ViewerIntegrationsSettings({ showWebhookDetails, userId, isPending }: {
     } catch {
       setError(t('loadFailed'))
     }
-  }, [t])
+  }, [t, userId])
 
   useEffect(() => { void refresh() }, [refresh])
 

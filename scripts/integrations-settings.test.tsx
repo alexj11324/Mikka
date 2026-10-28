@@ -17,6 +17,7 @@ mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { name
 const browser = new Window({ url: 'https://mikka.example/en?settings=integrations' })
 const originalFetch = globalThis.fetch
 const requests: { resolve: (response: Response) => void }[] = []
+let composioRequests = 0
 let container: HTMLDivElement
 let root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -31,14 +32,14 @@ before(async () => {
 })
 
 beforeEach(() => {
-  userId = 'viewer-a'; pending = false; requests.length = 0
+  userId = 'viewer-a'; pending = false; requests.length = 0; composioRequests = 0
   browser.history.replaceState({}, '', '?settings=integrations')
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
   globalThis.fetch = input => String(input).endsWith('/github')
     ? new Promise<Response>(resolve => { requests.push({ resolve }) })
-    : Promise.resolve(Response.json({ configured: false, accounts: [] }))
+    : (composioRequests++, Promise.resolve(Response.json({ configured: false, accounts: [] })))
 })
 
 afterEach(async () => {
@@ -58,12 +59,22 @@ test('unconfirmed and signed-out sessions neither request nor display GitHub rep
   pending = true
   await render()
   assert.equal(requests.length, 0)
+  assert.equal(composioRequests, 0)
   assert.ok(container.textContent?.includes('githubLoading'))
   pending = false; userId = null
   await render()
   assert.equal(requests.length, 0)
+  assert.equal(composioRequests, 0)
   assert.ok(container.textContent?.includes('githubSignInRequired'))
   assert.ok([...container.querySelectorAll('button')].find(button => button.textContent === 'githubRefresh')?.disabled)
+})
+
+test('sign-out does not start another Composio request', async () => {
+  await render()
+  assert.equal(composioRequests, 1)
+  userId = null
+  await render()
+  assert.equal(composioRequests, 1)
 })
 
 test('a switched cookie cannot expose B repositories while the session hook still identifies A', async () => {
