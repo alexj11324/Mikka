@@ -2,7 +2,7 @@
 // verified independently; no platform secrets are inherited by the compiler.
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,7 +12,6 @@ if (process.env.MIKKA_BUILD_BYOS_WORKER === '1') {
   const root = fileURLToPath(new URL('../', import.meta.url))
   const worker = join(root, 'packages/subscription-worker')
   const scratch = mkdtempSync(join(tmpdir(), 'mikka-byos-build-'))
-  console.info(JSON.stringify({event:'subscription_worker_scratch_created',directory:scratch,createdAt:new Date().toISOString(),retention:'retain'}))
   const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', CGO_ENABLED: '0', GOTOOLCHAIN: 'local', GOCACHE: join(scratch, 'build-cache'), GOPATH: join(scratch, 'gopath') }
   for (const key of ['HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'NO_PROXY', 'SSL_CERT_FILE', 'SSL_CERT_DIR']) if (process.env[key]) env[key] = process.env[key]
   try {
@@ -29,6 +28,6 @@ if (process.env.MIKKA_BUILD_BYOS_WORKER === '1') {
       execFileSync(join(scratch, 'go/bin/go'), ['build', '-mod=readonly', '-trimpath', '-o', `bin/${name}`, `./cmd/${name}`], { cwd: worker, env, stdio: 'inherit' })
     }
   } finally {
-    console.info(JSON.stringify({event:'subscription_worker_scratch_retained',directory:scratch}))
+    rmSync(scratch, { recursive: true, force: true })
   }
 }

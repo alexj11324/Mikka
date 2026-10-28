@@ -46,7 +46,7 @@ test('an artifact with no reply yet shows on its own, and quotes show on the per
   assert.equal(items[1].quote?.text, '核对首页')
 })
 
-test('artifact events are results', () => {
+test('artifact events stay untriaged until a model chooses their handling', () => {
   assert.equal(ruleTier({ kind: 'artifact_submitted', payload: {} }), null)
 })
 

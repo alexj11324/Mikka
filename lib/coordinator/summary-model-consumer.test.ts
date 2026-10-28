@@ -26,7 +26,7 @@ stub('../issue-access.ts', { issueForUser: () => {} })
 stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })
-stub('../subscription-model-snapshot.ts', { resolveFrozenHostedModel: async (...args:unknown[])=>{resolved.push(args);if(deny)throw new Error('binding_mismatch');return model} })
+stub('../subscription-model-snapshot.ts', { resolveFrozenHostedModel: async (...args:unknown[])=>{resolved.push(args);if(deny)throw new Error('binding_mismatch');const runtime=args[1] as {model:string;modelSelection?:unknown};return runtime.modelSelection?model:runtime.model} })
 stub('../subscription-runtime.ts', { subscriptionRuntime:()=>{throw new Error('No real custody')}, authorizeSubscriptionWorkspace:()=>{throw new Error('No real workspace') } })
 import * as actualAI from 'ai'
 mock.module('ai', { namedExports: { ...actualAI,

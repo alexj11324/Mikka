@@ -193,8 +193,12 @@ restarted merely because its repository teardown was edited. Source/type work
 that does not invoke those paths continues. Production and Staging are not part
 of this audit.
 
-Current source retains migration-test fixture directories, worker build scratch,
-and Coordinator database fixtures. Agent Kit database setup checks existing
+This batch retains Coordinator database fixtures. Shared migration-test/worker
+retain changes were handed to their sole owner #364 and are excluded from this
+batch's final diff; they must not be overwritten by another owner. Fresh test
+execution isolates every writable fixture/cache under its new root, including
+the normal temporary cleanup allowed by the newer user instruction. Agent Kit
+database setup checks existing
 schema metadata instead of automatically replaying migrations against its target.
 After the user's newer authorization for this run's new managed CI resources,
 the replay assertion uses an exclusively created per-test database on the owned

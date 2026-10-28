@@ -1,20 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-function retainedFixtureDirectory(prefix) {
-  const directory = mkdtempSync(join(tmpdir(), prefix))
-  const receipt = { event:'migration_test_fixture_created', directory, createdAt:new Date().toISOString(), pid:process.pid, retention:'retain' }
-  console.info(JSON.stringify(receipt))
-  writeFileSync(join(directory, 'fixture-retention.json'), JSON.stringify(receipt, null, 2)+'\n', { flag:'wx', mode:0o600 })
-  return directory
-}
-
 test('explicit MIGRATE=0 exits before filesystem or database work in production', () => {
-  const dir = retainedFixtureDirectory('migration-mode-')
+  const dir = mkdtempSync(join(tmpdir(), 'migration-mode-'))
   try {
     // Real entrypoint in an isolated directory: absent drizzle and an instrumented
     // pg module make any file scan or Pool construction fail this regression.
@@ -49,11 +41,11 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
     assert.notEqual(missing.status, 0)
     assert.match(missing.stderr, /PREVIEW_DATABASE_URL_REQUIRED/)
     assert.doesNotMatch(missing.stderr, /DATABASE_ACCESS|ENOENT/)
-  } finally { console.info(JSON.stringify({event:'migration_test_fixture_retained',directory:dir})) }
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
 test('explicit Preview migration never connects to the global application target', () => {
-  const dir = retainedFixtureDirectory('migration-preview-target-')
+  const dir = mkdtempSync(join(tmpdir(), 'migration-preview-target-'))
   try {
     const scripts = join(dir, 'scripts'), migrations = join(dir, 'drizzle')
     mkdirSync(scripts); mkdirSync(migrations)
@@ -79,7 +71,7 @@ test('explicit Preview migration never connects to the global application target
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /0001_application.sql/)
     assert.match(result.stdout, /0002_workspace.sql/)
-  } finally { console.info(JSON.stringify({event:'migration_test_fixture_retained',directory:dir})) }
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
 
@@ -88,7 +80,7 @@ test('default production build never dispatches migration even with MIGRATE=1', 
   assert.equal(manifest.scripts.migrate, 'node scripts/migrate.mjs')
   assert.equal(manifest.scripts.prebuild, undefined)
   assert.equal(manifest.scripts.postbuild, undefined)
-  const dir = retainedFixtureDirectory('code-only-build-')
+  const dir = mkdtempSync(join(tmpdir(), 'code-only-build-'))
   try {
     const trace = join(dir, 'trace')
     for (const name of ['node', 'pnpm', 'next']) {
@@ -106,11 +98,11 @@ esac
     })
     assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'pnpm lint', 'next build'])
-  } finally { console.info(JSON.stringify({event:'migration_test_fixture_retained',directory:dir})) }
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
 test('all files preflight before a database connection, even if an earlier file is valid', () => {
-  const dir = retainedFixtureDirectory('migration-preflight-')
+  const dir = mkdtempSync(join(tmpdir(), 'migration-preflight-'))
   try {
     // A scripts sibling directory preserves the real entrypoint's ../drizzle resolution.
     const scripts = join(dir, 'scripts')
@@ -133,5 +125,5 @@ test('all files preflight before a database connection, even if an earlier file 
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /20261028000002_invalid.sql.*exactly one statement/)
     assert.doesNotMatch(result.stderr, /DATABASE_ACCESS/)
-  } finally { console.info(JSON.stringify({event:'migration_test_fixture_retained',directory:dir})) }
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })
