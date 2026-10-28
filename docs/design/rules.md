@@ -236,6 +236,15 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the app-wide sweep is open in `decisions.md`. Exception: a comment card
   and the comment box (R-63) carry a 1px `--border` line, which must be a
   dark grey in dark mode, never white at low opacity.
+  Secondary buttons follow the same rule: a grey fill and no stroke, like
+  the 「Add folder…」 button in Claude desktop's settings (a light grey pill
+  on a white panel, no outline). `Button variant="outline"` (and the
+  `outline` Toggle, the motion `secondary`/`outline` buttons) use the
+  `--control` / `--control-hover` tokens, a translucent black (light) or
+  white (dark) overlay, so the button still reads on grey cards and
+  sidebars. Do not add `bg-background`/`bg-card` plus a border to a Button;
+  ui-policy fails it as `style/secondary-button-fill`. Status-tone buttons
+  keep their tinted fill and drop the tinted stroke.
 - **R-32** Font Geist, Chinese falls back to the system font. Only these text
   styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
   (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium

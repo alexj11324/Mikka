@@ -150,8 +150,9 @@ const ICON_VARIANTS: Record<CoreAnimation, Variants> = {
 
 const VARIANT_CLASS: Record<ActionSwapButtonVariant, string> = {
   primary: "bg-primary text-primary-foreground hover:bg-primary/90",
-  secondary: "border border-border bg-card text-foreground hover:border-border",
-  outline: "border border-border bg-transparent text-foreground hover:bg-muted/60",
+  // R-31: secondary buttons are a grey fill with no stroke.
+  secondary: "bg-control text-foreground hover:bg-control-hover",
+  outline: "bg-control text-foreground hover:bg-control-hover",
   ghost: "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
 };
 

@@ -244,6 +244,13 @@ test('lint permits imported components but fails handwritten business UI without
   }
 })
 
+test('R-31: a Button may not bring back a white fill with a border', () => {
+  has(`${prefix} const ui = <Button variant="outline" className="border-border bg-background" />`, 'style/secondary-button-fill')
+  has(`${prefix} const ui = <Button className={cn('border bg-card')} />`, 'style/secondary-button-fill')
+  assert.ok(!rules(`${prefix} const ui = <Button variant="outline" className="rounded-full bg-background" />`).includes('style/secondary-button-fill'))
+  assert.ok(!rules(`${prefix} const ui = <Button variant="ghost" className="border-transparent hover:bg-background" />`).includes('style/secondary-button-fill'))
+})
+
 test('utility parser respects bracket expressions and variants', () => {
   assert.deepEqual(splitUtilities('flex [&_svg]:size-4 text-[length:var(--size)]'), ['flex', '[&_svg]:size-4', 'text-[length:var(--size)]'])
   assert.equal(utilityBase('dark:hover:text-[length:var(--size)]'), 'text-[length:var(--size)]')

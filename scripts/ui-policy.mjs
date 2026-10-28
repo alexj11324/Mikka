@@ -236,6 +236,11 @@ export function auditSource(file, text, policy) {
           if (['FieldLabel', 'FieldTitle'].includes(name) && bases.some(base => base === 'font-normal' || /^text-(?:muted-foreground|secondary-foreground)(?:\/|$)/.test(base))) add(classAttr, 'forms/label-hierarchy', '字段主标题使用 FieldLabel / FieldTitle 默认的 foreground + medium；辅助说明使用 FieldDescription，不降低标题层级。')
           const drawnRule = bases.some(base => /^h-(?:px|0\.5)$/.test(base)) && bases.some(base => /^bg-(?!transparent|none$|clip-|origin-|cover|contain|center|left|right|top|bottom|repeat|no-repeat|fixed|local|scroll|auto|blend-)/.test(base))
           if (drawnRule) add(classAttr, 'style/no-horizontal-rule', '禁止用 h-px/0.5 + bg-* 手画水平细线；用间距或背景分组。')
+          // R-31: a secondary button is a grey fill with no stroke (Claude desktop's 「Add folder…」).
+          // A white fill plus a border brings back the old outline button at the call site.
+          const whiteFill = tokens.some(token => /^(?:bg-background|bg-card)(?:\/|$)/.test(token))
+          const stroke = bases.some(base => /^border(?:-(?:\d+|border|input)(?:\/.*)?)?$/.test(base))
+          if (name === 'Button' && whiteFill && stroke) add(classAttr, 'style/secondary-button-fill', '次级按钮用灰色填充、无描边（R-31）；不要给 Button 加白底 + 描边，用 variant="outline"。')
           for (const token of tokens) {
             const base = utilityBase(token)
             // 组件调用处的视觉 class 不做限制。Mikka 的规则集里没有这一条，
