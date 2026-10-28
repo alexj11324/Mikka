@@ -1,5 +1,4 @@
 import { preserveMessageSources } from '@/lib/coordinator/message-safety'
-import { compactWithFrozenModel } from '@/lib/coordinator/compaction-model'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { personalMailboxInstructions } from '@/lib/personal-mailbox-instructions'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
@@ -11,14 +10,14 @@ import type { AgentExecution } from '@/lib/agent-kit/store'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { createHash } from 'node:crypto'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
-import { generateText, type ModelMessage } from 'ai'
+import type { ModelMessage } from 'ai'
+import { summarizeConversation } from '@/lib/coordinator/summary-model'
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
-import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
@@ -149,13 +148,13 @@ export async function preparePrompt(userId: string, botId: string | null = null,
     if (summaryTrust.key.length < 32) throw new Error('Existing host auth secret required for summary provenance')
     const folded = messages.filter(row => row.position <= cut)
     const messagesToCompact: ModelMessage[] = [...promptMessages(summary, folded, summaryTrust), { role: 'user', content: 'Write the summary now.' }]
-    // A missing execution snapshot cannot establish a visual model selection.
     const hasImages = messagesToCompact.some(message => message.role === 'user' && Array.isArray(message.content) && message.content.some(part => part.type === 'image' || (part.type === 'file' && part.mediaType.startsWith('image/'))))
     if (hasImages && !snapshot) throw new Error('compactionModelUnavailable')
-    const dependencies = snapshot ? await Promise.all([import('@/lib/agent-kit/service'), import('@/lib/subscription-runtime')]) : null
-    const text = snapshot && dependencies
-      ? await compactWithFrozenModel(await dependencies[0].agentScope(userId, botId), snapshot.runtime, messagesToCompact, { service: () => dependencies[1].subscriptionRuntime(), workspace: dependencies[1].authorizeSubscriptionWorkspace })
-      : (await generateText({ model: COORDINATOR_MODEL, instructions: SUMMARY_INSTRUCTIONS, maxOutputTokens: 4096, messages: messagesToCompact })).text
+    const { text } = await summarizeConversation(userId, botId, snapshot, {
+      instructions: SUMMARY_INSTRUCTIONS,
+      maxOutputTokens: 4096,
+      messages: messagesToCompact,
+    })
     summary = preserveMessageSources(text, folded, summary, summaryTrust)
     await store.saveSummary(userId, summary, cut, botId)
     messages = messages.filter(row => row.position > cut)
