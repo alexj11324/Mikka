@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ToolApprovalGate, type ToolApprovalRequest } from './tool-approval'
+import { requireRunToolApproval, ToolApprovalGate, type ToolApprovalRequest } from './tool-approval'
 
 const request = (id = 'call-1', runId = 'run-1'): ToolApprovalRequest => ({ runId, requestId: id, harness: 'codex', method: 'item/commandExecution/requestApproval', input: { command: 'synthetic' } })
 const deferred = () => { let resolve!: (value: 'allow' | 'deny') => void; const promise = new Promise<'allow' | 'deny'>(r => { resolve = r }); return { promise, resolve } }
 
 describe('run-bound tool approval', () => {
+  it('requires a gate bound to the exact run', () => {
+    const gate = new ToolApprovalGate('run-1', { permission: () => 'deny', ask: async () => 'deny', isLive: () => true })
+    expect(requireRunToolApproval('run-1', gate)).toBe(gate)
+    expect(() => requireRunToolApproval('run-2', gate)).toThrow('unavailable')
+    expect(() => requireRunToolApproval('run-1')).toThrow('unavailable')
+  })
   it('lets trusted allow pass, rejects deny, and never asks for either', async () => {
     const ask = vi.fn(async () => 'allow' as const)
     const permission = vi.fn().mockReturnValueOnce('allow').mockReturnValueOnce('deny')

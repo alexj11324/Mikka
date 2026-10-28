@@ -32,6 +32,7 @@ import {
   type McpServerSpec,
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
+import { requireRunToolApproval } from "../agents/tool-approval"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
@@ -257,7 +258,7 @@ export class CodexAdapter implements AgentAdapter {
     options: SessionOptions &
       Partial<Pick<StartOptions, "prompt" | "continueSession">>
   ): Promise<AgentSession> {
-    if (!options.toolApproval) throw new Error("Run tool approval unavailable")
+    requireRunToolApproval(options.runId, options.toolApproval)
     const log = options.log.child({ harness: "codex" })
     if (options.mailbox && mode !== 'new') throw new Error('Run mailbox requires a fresh Codex thread; resume capability is unverified')
     const paths = runPaths(this.options.stateDir, options.runId)

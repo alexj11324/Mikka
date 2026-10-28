@@ -16,6 +16,7 @@ import type {
   StartOptions,
 } from "../src/adapters/types"
 import { NoSandbox } from "../src/agents/sandbox"
+import { ToolApprovalGate } from "../src/agents/tool-approval"
 import { buildChildEnv } from "../src/env"
 import { createLogger } from "../src/log"
 import { startSubscriptionSession } from "../src/subscription"
@@ -97,7 +98,7 @@ describe("hosted subscription seam", () => {
       for (let task = 0; task < 2; task++) {
         const session = await startSubscriptionSession(
           use,
-          { ...base, runId: `fixture-${task}` },
+          { ...base, runId: `fixture-${task}`, toolApproval: new ToolApprovalGate(`fixture-${task}`, { permission: () => 'deny', ask: async () => 'deny', isLive: () => true }) },
           backend,
           () => NOW,
         )

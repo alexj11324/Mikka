@@ -69,3 +69,8 @@ export class ToolApprovalGate {
     }
   }
 }
+
+export function requireRunToolApproval(runId: string, gate?: ToolApprovalGate): ToolApprovalGate {
+  if (!gate || gate.runId !== runId) throw new Error('Run tool approval unavailable')
+  return gate
+}

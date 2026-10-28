@@ -11,11 +11,9 @@ const files = process.argv.slice(2)
 if (files.length !== 2 || files[0] !== 'lib/agent-tool-approval/store.db.test.ts' || files[1] !== 'lib/agent-tool-approval/http.db.test.mts') throw new Error('Unexpected test scope')
 const name = `approval_e2e_${randomBytes(12).toString('hex')}`
 const client = new pg.Client({ connectionString: source })
-let created = false
 try {
   await client.connect()
   await client.query(`CREATE DATABASE "${name}"`)
-  created = true
   url.pathname = `/${name}`
   const env = { ...process.env, APPROVAL_TEST_DATABASE_URL: url.toString() }
   for (const file of files) {
@@ -23,6 +21,6 @@ try {
     if (result.status !== 0) { process.exitCode = result.status || 1; break }
   }
 } finally {
-  if (created) await client.query(`DROP DATABASE "${name}" WITH (FORCE)`)
+  // Preserve the test database; the isolated CI service owns its lifecycle.
   await client.end()
 }

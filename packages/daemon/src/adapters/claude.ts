@@ -62,6 +62,7 @@ import {
   type McpServerSpec,
 } from "../agents/run-context"
 import type { SandboxPolicy } from "../agents/sandbox"
+import { requireRunToolApproval } from "../agents/tool-approval"
 import { ownDir } from "../agents/harness-home"
 import { buildChildEnv } from "../env"
 import { mailboxInputs } from '@mikka/protocol/mailbox'
@@ -414,6 +415,7 @@ export class ClaudeAdapter implements AgentAdapter {
     firstMessage: string,
     options: SessionOptions & { prompt?: string }
   ): Promise<AgentSession> {
+    requireRunToolApproval(options.runId, options.toolApproval)
     const paths = runPaths(this.options.stateDir, options.runId)
     const runDir = await claimRunDir(paths)
     const externalAuth = this.options.subscriptionAuth
@@ -490,7 +492,6 @@ export class ClaudeAdapter implements AgentAdapter {
     if (earlier) return endedSession(sessionId, earlier)
     ctx.clearHandoff()
 
-    if (!options.toolApproval) throw new Error("Run tool approval unavailable")
     const queue = new EventQueue()
     const prompts = new PromptQueue(sessionId)
     let written = 0

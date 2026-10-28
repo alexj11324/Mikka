@@ -8,6 +8,7 @@ import { MemoryServer } from "../src/server-link";
 import { createLogger } from "../src/log";
 import { buildChildEnv } from "../src/env";
 import { ComputerBroker } from "../src/computer/broker.mjs";
+import { ToolApprovalGate } from "../src/agents/tool-approval";
 import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers";
 
 afterEach(cleanupTempDirs);
@@ -74,6 +75,7 @@ for (const harness of ["codex", "claude_code"] as const) {
     } as RunAssignment;
     const options = {
       runId,
+      toolApproval: new ToolApprovalGate(runId, { permission: () => 'deny', ask: async () => 'deny', isLive: () => true }),
       cwd: await makeRepo(),
       prompt: "PROBE_GIT",
       model: "fixture-model",
@@ -139,7 +141,7 @@ it.each(['codex', 'claude_code'] as const)('holds a hosted %s computer call unti
       computer: { botId, ownerId: 'fixture-owner', display: ':2', policyVersion: 0 },
       subscriptionBinding: { bindingId: randomUUID(), ownerId: 'fixture-owner', workspaceId, consumerId: randomUUID(), route: harness === 'codex' ? 'codex_cli' : 'claude_code_cli' },
     } as RunAssignment
-    const session = await runner.start(assignment, { runId, cwd: await makeRepo(), prompt: 'COMPUTER', model: 'fixture-model', env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }), log: createLogger({ level: 'silent' }) })
+    const session = await runner.start(assignment, { runId, toolApproval: new ToolApprovalGate(runId, { permission: () => 'deny', ask: async () => 'deny', isLive: () => true }), cwd: await makeRepo(), prompt: 'COMPUTER', model: 'fixture-model', env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }), log: createLogger({ level: 'silent' }) })
     const finished = (async () => { const events = []; for await (const event of session.events()) events.push(event); return events })()
     const review = await waitFor(() => broker.list()[0])
     expect(review).toMatchObject({ runId, display: ':2', call: { name: 'click', arguments: { x: 3, y: 4 } } })
