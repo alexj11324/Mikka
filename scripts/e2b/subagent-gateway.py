@@ -7,6 +7,9 @@ from pathlib import Path
 from aiohttp import web, WSMsgType
 ROOT = Path('/run/mikka-subagents')
 AGENTS = {}
+# Capture the loaded files at process startup, not on each request: replacing
+# files on disk does not change an already-running Python gateway.
+VERSION = hashlib.sha256(Path(__file__).read_bytes() + Path(__file__).with_name('subagent-cdp.mjs').read_bytes()).hexdigest()
 
 # A site need not label an OTP field with autocomplete. Keep the guarded
 # session closed while any text entry remains populated, including OTP fields
@@ -281,6 +284,10 @@ async def action(request):
         else:raise web.HTTPBadRequest()
         return web.json_response({'accepted':True})
 
+async def version(_request):
+    return web.Response(text=VERSION, headers={'Cache-Control':'no-store'})
+
 app=web.Application(client_max_size=16384)
+app.router.add_get('/version',version)
 for suffix,handler,method in [('/start',start,'POST'),('/state',state,'GET'),('/stop',stop,'POST'),('/viewer',viewer,'GET'),('/action',action,'POST'),('/credentials/begin',begin,'POST'),('/credentials/cdp',cdp,'GET'),('/credentials/end',end,'POST')]:app.router.add_route(method,'/agents/{id}'+suffix,handler)
 if __name__=='__main__':web.run_app(app,host='0.0.0.0',port=6082,access_log=None,print=None)

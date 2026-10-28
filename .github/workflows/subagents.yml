@@ -31,6 +31,7 @@ jobs:
       - run: pnpm exec oxlint --deny-warnings lib/cloud-computer workflows/subagent app/api/computer/events scripts/e2b/subagent-cdp.mjs
       - run: python3 -m py_compile scripts/e2b/subagent-gateway.py scripts/e2b/subagent-live-acceptance.py
       - run: python3 scripts/e2b/subagent-guard.test.py
+      - run: node --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/runtime.test.ts
       - run: node scripts/check-migrations.mjs
       - run: node --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/backend.db.test.ts
         env:
