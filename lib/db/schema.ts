@@ -1,7 +1,10 @@
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
+import type { AttentionLevel } from '@/lib/attention/judgment'
+import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
@@ -35,6 +38,18 @@ export const issuePrefixes = pgTable('issue_prefixes', {
   prefix: varchar('prefix', { length: 4 }).notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** A successful issue mutation and its Workflow retry identity commit together. */
+export const issueToolCalls = pgTable('issue_tool_calls', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  toolCallId: text('toolCallId').notNull(),
+  operation: text('operation').$type<'create_issue' | 'update_issue'>().notNull(),
+  inputHash: text('inputHash').notNull(),
+  issueId: uuid('issueId').notNull(),
+  result: jsonb('result').$type<Record<string, unknown>>().notNull(),
+  effects: jsonb('effects').$type<import('@/lib/issue-effects').IssueEffect[]>().notNull().default([]),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.toolCallId] })])
 /**
  * A bot: what a person chats with in the left column. It runs only on Mikka's
  * own harness (AI SDK), never on a coding agent, so it is not a row in `agents`.
@@ -139,6 +154,7 @@ export type SupportedHarness = (typeof SUPPORTED_HARNESSES)[number]
 export const devices = pgTable('devices', {
   id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull(),
   name: text('name').notNull(), hostname: text('hostname'),
+  kind: text('kind').$type<'local' | 'cloud'>().notNull().default('local'),
   platform: text('platform'), arch: text('arch'),
   daemonVersion: text('daemonVersion'), protocolVersion: integer('protocolVersion'),
   harnesses: jsonb('harnesses').$type<HarnessInfo[]>().notNull().default([]),
@@ -155,6 +171,9 @@ export const deviceTokens = pgTable('device_tokens', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   name: text('name').notNull().default(''),
   tokenHash: text('tokenHash').notNull(),
+  boundDeviceId: uuid('boundDeviceId').references(() => devices.id, { onDelete: 'cascade' }),
+  boundWorkspaceId: uuid('boundWorkspaceId'),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
   lastUsedAt: timestamp('lastUsedAt', { withTimezone: true }),
   revokedAt: timestamp('revokedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
@@ -184,6 +203,8 @@ export type RunStatus = (typeof RUN_STATUSES)[number]
 
 /** One execution of one agent. The daemon claims it, runs it and reports back. */
 export const agentRuns = pgTable('agent_runs', {
+  /** Immutable execution provenance; old rows remain unrecorded. */
+  agentDefinition: jsonb('agentDefinition').$type<WorkerDefinitionSnapshot | null>(),
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
   agentId: uuid('agentId').notNull().references(() => agents.id, { onDelete: 'cascade' }),
@@ -257,7 +278,12 @@ export const runTokens = pgTable('run_tokens', {
  * run, through the worker tools of the MCP server (lib/mcp/worker.ts).
  * `artifact_submitted` comes from `submit_artifact`, from a run or an OAuth agent.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing'] as const
+/**
+ * `matter_handoff` carries hidden evidence from connected apps
+ * (lib/attention): the person has not seen it, and the Coordinator alone
+ * decides whether to tell them.
+ */
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
@@ -306,10 +332,10 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
 
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //
-// External notifications from connected apps, judged by fixed rules or the
-// decision model (lib/suggestions). Only `shown` rows reach the person; hidden
-// rows stay so a repeat delivery is not judged again. The Coordinator never
-// writes here.
+// External notifications from connected apps, rated by fixed rules or the
+// decision model with the attention levels of lib/attention (R-20). Every
+// level but `low` is `shown`; hidden rows stay so a repeat delivery is not
+// judged again. The Coordinator never writes here.
 
 /** The connected apps a suggestion can come from. */
 export const SUGGESTION_SOURCES = ['gmail', 'slack', 'notion', 'github', 'linear'] as const
@@ -329,7 +355,14 @@ export const suggestions = pgTable('suggestions', {
   title: text('title').notNull(), url: text('url'), actor: text('actor'),
   shown: boolean('shown').notNull(),
   decidedBy: text('decidedBy').$type<SuggestionDecider>().notNull(),
+  /** Rows from before the attention levels; new rows leave it null. */
   probability: real('probability'),
+  /** critical, high, ask, normal or low (lib/attention/judgment.ts); null on rows from before it. */
+  level: text('level').$type<AttentionLevel>(),
+  /** The matter it belongs to (ExternalNotification.matterKey). */
+  matterKey: text('matterKey'),
+  /** The item as an action for the person (R-45), e.g. 「回复 Kevin：…」; the UI falls back to `title` without it. */
+  actionTitle: text('actionTitle'),
   /** Assigned to the person or their review is requested. */
   required: boolean('required').notNull().default(false),
   occurredAt: timestamp('occurredAt', { withTimezone: true }).notNull(),
@@ -352,6 +385,115 @@ export const briefings = pgTable('briefings', {
   total: integer('total').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.userId, table.localDate] })])
+
+/**
+ * A matter from the person's connected apps that reached a routed level
+ * (critical, high or ask), and what the Coordinator
+ * decided about it (lib/attention/store.ts). Repeated notices about one
+ * matter share the row. `state`: `waiting` for a budget or for the matter in
+ * hand, `handed` to the Coordinator, then `notified`, `quiet`, `snoozed`
+ * (until `runAt`) or `handled` once the person answered.
+ */
+export const ATTENTION_MATTER_STATES = ['waiting', 'handed', 'notified', 'quiet', 'snoozed', 'handled'] as const
+export type AttentionMatterState = (typeof ATTENTION_MATTER_STATES)[number]
+
+export const attentionMatters = pgTable('attention_matters', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  matterKey: text('matterKey').notNull(),
+  source: text('source').$type<SuggestionSource>().notNull(),
+  /** The latest notice's suggestion row. */
+  suggestionId: uuid('suggestionId').references(() => suggestions.id, { onDelete: 'set null' }),
+  title: text('title').notNull(), url: text('url'),
+  level: text('level').$type<AttentionLevel>().notNull(),
+  /** The cost, due window, reversibility and code flag the judgment gave (lib/attention/judgment.ts Assessment). */
+  assessment: jsonb('assessment').$type<Record<string, unknown>>().notNull(),
+  /** The evidence handed over: the latest notice and its earlier ones. */
+  evidence: jsonb('evidence').$type<Record<string, unknown>>().notNull(),
+  state: text('state').$type<AttentionMatterState>().notNull(),
+  /** The Coordinator's reason for its latest decision. */
+  reason: text('reason'),
+  /** When a snoozed matter is handed over again. */
+  runAt: timestamp('runAt', { withTimezone: true }),
+  /** The next handoff is a recheck of a snooze: it spends no handoff budget. */
+  recheck: boolean('recheck').notNull().default(false),
+  /** The person asked for the reminder: telling them spends no budget. */
+  personAsked: boolean('personAsked').notNull().default(false),
+  handoffs: integer('handoffs').notNull().default(0),
+  handedAt: timestamp('handedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('attention_matters_key').on(table.userId, table.matterKey), index('attention_matters_state_idx').on(table.userId, table.state, table.updatedAt)])
+
+/** One person's settings for matters from connected apps; no row means the defaults. */
+export const attentionSettings = pgTable('attention_settings', {
+  userId: text('userId').primaryKey(),
+  /** The person's switch (lib/attention). Off: nothing is handed to the Coordinator; 建议 still fills. */
+  enabled: boolean('enabled').notNull().default(true),
+  /** The language the person reads 建议 in (zh-CN or en), for the action lines of lib/suggestions/action-title.ts. */
+  locale: text('locale'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Where a fact was seen: references only, never the source text. */
+export interface UserFactEvidence { source: string; suggestionId?: string; externalId?: string; factIds?: string[]; at: string }
+
+/**
+ * One fact in one person's profile (lib/profile), drawn from what reaches them
+ * and merged nightly. Facts belong to the person, never to a workspace, and
+ * only they see them in 记忆. A fact the person corrected (`userEdited`) is
+ * never overwritten by the model. Same fact = same (userId, kind, subjectKey).
+ */
+export const userFacts = pgTable('user_facts', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  kind: text('kind').$type<UserFactKind>().notNull(),
+  /** One line, e.g. 川菜, or Verizon 套餐. */
+  subject: text('subject').notNull(),
+  /** The subject folded for dedupe (lib/profile/facts.ts subjectKey). */
+  subjectKey: text('subjectKey').notNull(),
+  /** Structured details: amount, date, time window, place, merchant, items. */
+  value: jsonb('value').$type<Record<string, unknown>>().notNull().default({}),
+  evidence: jsonb('evidence').$type<UserFactEvidence[]>().notNull().default([]),
+  confidence: real('confidence').notNull(),
+  firstSeenAt: timestamp('firstSeenAt', { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp('lastSeenAt', { withTimezone: true }).notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  state: text('state').$type<UserFactState>().notNull().default('active'),
+  userEdited: boolean('userEdited').notNull().default(false),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('user_facts_subject_key').on(table.userId, table.kind, table.subjectKey), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind)])
+
+/** The local date (YYYY-MM-DD) the nightly consolidation last ran for the person (lib/profile/store.ts). The 记忆 switch is userPreferences.memoryEnabled. */
+export const userFactConsolidations = pgTable('user_fact_consolidations', {
+  userId: text('userId').primaryKey(),
+  consolidatedOn: text('consolidatedOn').notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type ProactiveUsageKind = 'extraction'
+
+/** Proactive model calls and tokens per person, UTC day and kind, for the daily cap (lib/profile/store.ts) and cost per person. */
+export const proactiveUsage = pgTable('proactive_usage', {
+  userId: text('userId').notNull(),
+  day: date('day').notNull(),
+  kind: text('kind').$type<ProactiveUsageKind>().notNull(),
+  calls: integer('calls').notNull().default(0),
+  inputTokens: integer('inputTokens').notNull().default(0),
+  outputTokens: integer('outputTokens').notNull().default(0),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.day, table.kind] })])
+
+/** Every handoff and decision on a matter; the budgets count `handoff` and `notify` rows (lib/attention/budget.ts). */
+export const attentionLog = pgTable('attention_log', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  matterId: uuid('matterId').notNull().references(() => attentionMatters.id, { onDelete: 'cascade' }),
+  action: text('action').$type<'handoff' | 'recheck' | 'notify' | 'quiet' | 'snooze' | 'handled'>().notNull(),
+  /** Whether it counts against a budget. */
+  spends: boolean('spends').notNull(),
+  reason: text('reason'),
+  runAt: timestamp('runAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('attention_log_budget_idx').on(table.userId, table.action, table.createdAt)])
 
 /** When the person's Composio trigger subscriptions were last checked (lib/suggestions/sources.ts). */
 export const suggestionTriggerChecks = pgTable('suggestion_trigger_checks', {
@@ -535,3 +677,33 @@ export const nativeCoordinatorTools = pgTable('native_coordinator_tools', {
   status: text('status').notNull().default('pending'), output: jsonb('output'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.turnId, table.callId] })])
+
+/** One Expo push token per installed copy of the iOS app (apps/mobile); removed on sign-out. */
+export const mobilePushTokens = pgTable('mobile_push_tokens', {
+  id: uuid('id').primaryKey(),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: text('token').notNull(),
+  platform: text('platform').notNull(),
+  deviceName: text('deviceName'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('mobile_push_tokens_token_key').on(table.token), index('mobile_push_tokens_user_idx').on(table.userId)])
+
+export const PUSH_WHEN = ['always', 'away'] as const
+export type PushWhen = (typeof PUSH_WHEN)[number]
+
+/**
+ * The app's 通知 and 记忆 settings (docs/design/mobile.md). The push flags pick
+ * which of the Coordinator's own messages reach the phone; 主动消息 itself is
+ * attention_settings.enabled. No row means the defaults.
+ */
+export const userPreferences = pgTable('user_preferences', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  pushDecide: boolean('pushDecide').notNull().default(true),
+  pushReview: boolean('pushReview').notNull().default(true),
+  pushFinished: boolean('pushFinished').notNull().default(false),
+  pushBriefing: boolean('pushBriefing').notNull().default(true),
+  pushWhen: text('pushWhen').$type<PushWhen>().notNull().default('always'),
+  memoryEnabled: boolean('memoryEnabled').notNull().default(true),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})

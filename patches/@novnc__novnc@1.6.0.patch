@@ -1,0 +1,17 @@
+diff --git a/lib/util/browser.js b/lib/util/browser.js
+index 8121bc15babc99bb9483bba18e84f674e34f82d0..ccad9fe4d8bfb3fe2a95618c889838cb277758e4 100644
+--- a/lib/util/browser.js
++++ b/lib/util/browser.js
+@@ -176,7 +176,11 @@ function _checkWebCodecsH264DecodeSupport2() {
+   }));
+   return _checkWebCodecsH264DecodeSupport2.apply(this, arguments);
+ }
+-exports.supportsWebCodecsH264Decode = supportsWebCodecsH264Decode = await _checkWebCodecsH264DecodeSupport();
++// This package is CommonJS. Keep the default false until detection completes
++// instead of using top-level await, which cannot execute in a CommonJS module.
++_checkWebCodecsH264DecodeSupport().then(function (supported) {
++  exports.supportsWebCodecsH264Decode = supportsWebCodecsH264Decode = supported;
++}).catch(function () {});
+ 
+ /*
+  * The functions for detection of platforms and browsers below are exported

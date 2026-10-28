@@ -7,6 +7,13 @@ export function runListRefreshInterval(runs: readonly { status: string }[] | und
   return runs?.some(run => runIsActive(run.status)) ? 5000 : 0
 }
 
+export const RUN_STOP_TIMEOUT_MS = 30_000
+
+/** A persisted request retains its deadline across polling and reloads. */
+export function runStopTimeoutRemaining(requestedAt: number, now = Date.now()) {
+  return Math.max(0, Math.min(RUN_STOP_TIMEOUT_MS, requestedAt + RUN_STOP_TIMEOUT_MS - now))
+}
+
 export function runStatusKey(status: string) {
   switch (status) {
     case 'queued': case 'preparing': case 'running': case 'waiting_input': case 'finishing':
@@ -29,6 +36,7 @@ export type ThreadItem =
   | { kind: 'agent'; id: string; text: string; at: number }
   | { kind: 'steps'; id: string; count: number; at: number }
   | { kind: 'error'; id: string; text: string; at: number }
+  | { kind: 'computer'; id: string; botId: string; runId: string; task: string; at: number }
   | { kind: 'person'; id: string; text: string; author: string; image?: string | null; mine: boolean; at: number }
 
 /**
@@ -38,6 +46,7 @@ export type ThreadItem =
 export function threadItems(
   chunks: readonly { chunk: Record<string, unknown>; at: Date | string }[],
   messages: readonly { id: string; text: string; author: string; image?: string | null; mine: boolean; at: Date | string }[],
+  expectedRunId?: string,
 ): ThreadItem[] {
   const items: ThreadItem[] = []
   const texts = new Map<string, Extract<ThreadItem, { kind: 'agent' }>>()
@@ -52,6 +61,10 @@ export function threadItems(
     } else if (chunk.type === 'tool-input-available') {
       if (last?.kind === 'steps') last.count += 1
       else items.push({ kind: 'steps', id: `steps:${index}`, count: 1, at: time })
+    } else if (chunk.type === 'data-computer' && expectedRunId && chunk.data && typeof chunk.data === 'object') {
+      const data = chunk.data as Record<string, unknown>
+      if (data.runId === expectedRunId && typeof data.botId === 'string' && typeof data.task === 'string' && data.task.length <= 200 && !items.some(item => item.kind === 'computer' && item.runId === expectedRunId))
+        items.push({ kind: 'computer', id: `computer:${expectedRunId}`, botId: data.botId, runId: expectedRunId, task: data.task, at: time })
     } else if (chunk.type === 'error' && typeof chunk.errorText === 'string') {
       items.push({ kind: 'error', id: `error:${index}`, text: chunk.errorText, at: time })
     }

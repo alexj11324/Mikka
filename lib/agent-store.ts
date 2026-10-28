@@ -10,7 +10,7 @@ export class AgentStoreError extends Error {
 }
 
 export async function getAgentHistory(userId: string, requestedId?: string, fresh = false) {
-  const selected = db.select({ id: agentSessions.id }).from(agentSessions)
+  const selected = db.select({ id: agentSessions.id, title: agentSessions.title }).from(agentSessions)
     .where(and(eq(agentSessions.userId, userId), requestedId ? eq(agentSessions.id, requestedId) : undefined))
     .orderBy(desc(agentSessions.updatedAt), desc(agentSessions.id)).limit(1).as('selected')
   const [sessions, rows] = await Promise.all([
@@ -22,12 +22,12 @@ export async function getAgentHistory(userId: string, requestedId?: string, fres
     }).from(agentSessions).where(eq(agentSessions.userId, userId))
       .orderBy(desc(agentSessions.updatedAt), desc(agentSessions.id)).limit(100),
     fresh ? Promise.resolve([]) : db.select({
-      sessionId: selected.id,
+      sessionId: selected.id, selectedTitle: selected.title,
       turn: { id: agentTurns.id, prompt: agentTurns.prompt, completion: agentTurns.completion, status: agentTurns.status, error: agentTurns.error },
     }).from(selected).leftJoin(agentTurns, and(eq(agentTurns.sessionId, selected.id), eq(agentTurns.userId, userId)))
       .orderBy(asc(agentTurns.createdAt), asc(agentTurns.id)),
   ])
   const sessionId = rows[0]?.sessionId ?? null
   if (requestedId && !fresh && !sessionId) throw new AgentStoreError(agentCopy.conversationNotFound, 404)
-  return { sessions: sessions.map(({ lastPrompt, lastCompletion, ...session }) => ({ ...session, updatedAt: session.updatedAt.toISOString(), preview: sessionPreview(lastCompletion, lastPrompt) })), sessionId, turns: rows.flatMap(row => row.turn ? [row.turn] : []) }
+  return { sessions: sessions.map(({ lastPrompt, lastCompletion, ...session }) => ({ ...session, updatedAt: session.updatedAt.toISOString(), preview: sessionPreview(lastCompletion, lastPrompt) })), sessionId, selectedSession: sessionId ? { id: sessionId, title: rows[0].selectedTitle } : null, turns: rows.flatMap(row => row.turn ? [row.turn] : []) }
 }

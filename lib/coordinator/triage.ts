@@ -14,6 +14,8 @@ interface TriageEvent { kind: CoordinatorEventKind; payload: Record<string, unkn
 export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
   switch (event.kind) {
     case 'user_message':
+    // Hidden evidence the Coordinator must decide on (lib/attention); it was rated before it was handed over.
+    case 'matter_handoff':
       return 'attention'
     case 'issue_done':
     // A retry after the device went offline is the system handling it.
