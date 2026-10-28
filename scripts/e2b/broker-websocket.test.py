@@ -68,7 +68,7 @@ async def main():
                 grant={'subagentId':'case','ownerId':'owner','workspaceId':'workspace','botId':'bot','epoch':1,'role':'broker','exp':9999999999}
                 class Browser:
                     guard=None;guard_origin=origin;stopped=False;session=control_session
-                    def __init__(self):self.path=path;self.target=target;self.grant=grant;self.override_url=None;self.seq=100;self.lock=asyncio.Lock();self.guard_file=path/'guard';self.frame=None;self.viewer=set()
+                    def __init__(self):self.path=path;self.target=target;self.grant=grant;self.override_url=None;self.seq=100;self.lock=asyncio.Lock();self.guard_file=path/'guard';self.frame=None;self.viewer=set();self.brokers=set()
                     async def rpc(self,method,params=None,session=None):
                         self.seq+=1;ident=self.seq
                         await internal.send_json({'id':ident,'method':method,'params':params or {},'sessionId':session or self.session})

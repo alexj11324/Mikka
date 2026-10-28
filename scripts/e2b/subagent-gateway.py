@@ -224,9 +224,11 @@ def authorize(request, role=None):
 class Browser:
     def __init__(self, grant):
         self.grant=grant;self.pending={};self.seq=0;self.frame=None;self.guard=None
-        self.session=None;self.target=None;self.lock=asyncio.Lock();self.viewer=set();self.stopped=False
+        self.session=None;self.target=None;self.lock=asyncio.Lock();self.viewer=set();self.brokers=set();self.stopped=False
         self.broker_active=False;self.credential_scripts_disabled=False
         self.path=ROOT/grant['subagentId']; self.path.mkdir(mode=0o700,exist_ok=True)
+        self.revoked_file=self.path/'revoked'
+        self.stopped=self.revoked_file.exists()
         # Restart never silently unlocks a credential-bearing page.
         self.guard_file=self.path/'guard'
         if self.guard_file.exists(): self.guard='locked'
@@ -251,7 +253,7 @@ class Browser:
                     future=self.pending.pop(message['id'],None)
                     if future and not future.done():future.set_result(message)
                 elif message.get('method')=='Page.screencastFrame':
-                    if not self.guard:self.frame=message['params']['data']
+                    if not self.guard and not self.stopped:self.frame=message['params']['data']
                     await self.send('Page.screencastFrameAck',{'sessionId':message['params']['sessionId']},self.session)
         finally:
             self.stopped=True;self.frame=None
@@ -261,6 +263,9 @@ class Browser:
         self.seq+=1; n=self.seq
         self.writer.write((json.dumps({'id':n,'method':method,'params':params or {},**({'sessionId':session} if session else {})})+'\n').encode());await self.writer.drain();return n
     async def rpc(self,method,params=None,session=None):
+        if self.stopped:raise RuntimeError('Browser capability revoked')
+        return await self._rpc(method,params,session)
+    async def _rpc(self,method,params=None,session=None):
         # Register before yielding to reader.
         self.seq+=1;n=self.seq;future=asyncio.get_running_loop().create_future();self.pending[n]=future
         self.writer.write((json.dumps({'id':n,'method':method,'params':params or {},**({'sessionId':session} if session else {})})+'\n').encode());await self.writer.drain()
@@ -273,8 +278,16 @@ class Browser:
         tree=await self.rpc('Page.getFrameTree',session=self.session);return tree['frameTree']['frame']['url']
     async def stop(self):
         self.stopped=True;self.frame=None
+        # Revoke the gateway capability durably, while retaining its browser,
+        # profile, socket, logs and guard markers for audit and recovery.
+        self.revoked_file.write_text('stopped')
         for ws in list(self.viewer):await ws.close()
-        self.process.terminate();await self.process.wait();self.read_task.cancel()
+        for ws in list(self.brokers):await ws.close()
+        if self.session:
+            # Mechanical suspension is allowed after capability revocation;
+            # ordinary runtime RPC remains denied. Failure is not success.
+            await self._rpc('Emulation.setScriptExecutionDisabled',{'value':True},self.session)
+            await self._rpc('Page.stopScreencast',session=self.session)
 
 def browser(grant):
     b=AGENTS.get(grant['subagentId'])
@@ -288,10 +301,11 @@ async def start(request):
         available=int(next(line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines() if line.startswith('MemAvailable:')))
         if available<384*1024:raise web.HTTPServiceUnavailable()
         b=Browser(grant);AGENTS[grant['subagentId']]=b
+        if b.stopped:raise web.HTTPGone()
         try:await b.start()
         except Exception:
-            AGENTS.pop(grant['subagentId'],None)
-            if getattr(b,'process',None) and b.process.returncode is None:b.process.terminate();await b.process.wait()
+            # Keep the failed launch discoverable and deny its old grants.
+            await b.stop()
             raise web.HTTPServiceUnavailable()
     b=browser(grant)
     return web.json_response({'targetId':b.target,'url':await b.url(),'guarded':bool(b.guard)})
@@ -303,8 +317,9 @@ async def state(request):
 async def stop(request):
     _,grant=authorize(request,'runtime')
     b=AGENTS.get(grant['subagentId'])
-    if b and not b.stopped:
-        b=browser(grant);await b.stop()
+    if b:
+        if any(grant.get(k)!=b.grant.get(k) for k in ('ownerId','workspaceId','botId','epoch','display')):raise web.HTTPNotFound()
+        await b.stop()
     return web.json_response({'stopped':True})
 
 async def viewer(request):
@@ -373,14 +388,19 @@ async def cdp(request):
 
 async def broker_cdp_session(request,b,grant,raw,guard):
     ws=web.WebSocketResponse(max_msg_size=1024*1024);await ws.prepare(request)
-    reader,writer=await asyncio.open_unix_connection(str(b.path/'cdp.sock'),limit=4*1024*1024)
+    b.brokers.add(ws)
+    if b.stopped:
+        b.brokers.discard(ws);await ws.close();return ws
+    try:reader,writer=await asyncio.open_unix_connection(str(b.path/'cdp.sock'),limit=4*1024*1024)
+    except Exception:
+        b.brokers.discard(ws);await ws.close();raise
     sessions=set();pending={};objects={};active_objects={};focused={};origin=getattr(b,'guard_origin',None);observed_node=getattr(b,'guard_node',None);input_done=asyncio.Event()
     if not origin:
-        writer.close();await writer.wait_closed();await ws.close();return ws
+        b.brokers.discard(ws);writer.close();await writer.wait_closed();await ws.close();return ws
     async def incoming():
         async for message in ws:
             token(raw,'broker')
-            if b.guard!=guard or message.type!=WSMsgType.TEXT:break
+            if b.stopped or b.guard!=guard or message.type!=WSMsgType.TEXT:break
             data=json.loads(message.data)
             # Broker capability is scoped to this page, not a general CDP socket.
             if not broker_command_allowed(data,b.target,sessions,objects,origin,observed_node,active_objects) or data['id'] in pending:break
@@ -424,12 +444,14 @@ async def broker_cdp_session(request,b,grant,raw,guard):
                 input_done.clear()
             else:element=None
             argument=data.get('params',{}).get('backendNodeId') if data['method']=='DOM.focus' else data.get('params',{}).get('expression')
+            # No await between the last revocation check and enqueueing I/O.
+            if b.stopped:break
             pending[data['id']]=(data['method'],data.get('sessionId'),argument,element)
             writer.write((json.dumps(data)+'\n').encode());await writer.drain()
     async def outgoing():
         while line:=await reader.readline():
             token(raw,'broker')
-            if b.guard!=guard:break
+            if b.stopped or b.guard!=guard:break
             data=json.loads(line)
             if data.get('method')=='Target.detachedFromTarget':
                 detached=data.get('params',{}).get('sessionId')
@@ -462,6 +484,7 @@ async def broker_cdp_session(request,b,grant,raw,guard):
                     if emitted.get('result',{}).get('value') is not True:break
                 input_done.set()
             if call:pending.pop(data['id'],None)
+            if b.stopped:break
             await ws.send_str(line.decode().strip())
     async def expiry():
         await asyncio.sleep(max(0,grant['exp']-time.time()))
@@ -475,11 +498,12 @@ async def broker_cdp_session(request,b,grant,raw,guard):
         await asyncio.gather(*tasks,return_exceptions=True)
         # If an input outcome is unknown, leave scripts disabled and the guard
         # closed. Otherwise release the short-lived freeze on disconnect.
-        if getattr(b,'credential_scripts_disabled',False) and not any(call[0]=='Input.insertText' for call in pending.values()):
+        if not b.stopped and getattr(b,'credential_scripts_disabled',False) and not any(call[0]=='Input.insertText' for call in pending.values()):
             try:
                 await b.rpc('Emulation.setScriptExecutionDisabled',{'value':False},b.session)
                 b.credential_scripts_disabled=False
             except Exception:pass
+        b.brokers.discard(ws)
         writer.close();await writer.wait_closed();await ws.close()
     return ws
 
@@ -498,6 +522,7 @@ async def end(request):
         if not safe:raise web.HTTPConflict()
         # Clear the last frame so no buffered pre-fill frame races resumption.
         b.frame=None;await b.rpc('Page.startScreencast',{'format':'jpeg','quality':60,'maxWidth':1280,'maxHeight':800,'everyNthFrame':2},b.session)
+        if b.stopped:raise web.HTTPConflict()
         b.guard_file.unlink();b.guard=None
         if b.grant.get('display'):
             (Path('/run/mikka-viewer')/f"{b.grant['display']}.guard").unlink()
