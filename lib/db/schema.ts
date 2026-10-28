@@ -221,6 +221,8 @@ export const agentRuns = pgTable('agent_runs', {
   report: jsonb('report').$type<Record<string, unknown> | null>(),
   /** The opening of the agent's last reply (240 characters), written as its text arrives; the right column's row shows it. */
   lastReply: text('lastReply'),
+  /** The text part (chunk id) lastReply comes from: more text for it appends, another part replaces it. */
+  lastReplyPart: text('lastReplyPart'),
   lastReplyAt: timestamp('lastReplyAt', { withTimezone: true }),
   /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
   source: text('source').$type<'mcp' | null>(),

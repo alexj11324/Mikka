@@ -10,17 +10,43 @@ export function replyLine(text: string | null | undefined): string | null {
 }
 
 /**
- * What a batch of run chunks does to the stored last reply: the text of its
- * last text part that carries any, and whether that part starts in this batch
- * (replace) or continues one from an earlier batch (append). Null when no
- * delta in the batch carries text.
+ * The text a batch adds to the last reply: the deltas of its last text part
+ * that carries any. Null when no delta in the batch carries text. Pass only
+ * the chunks stored by this request, so a re-sent chunk never counts twice.
  */
-export function lastReplyUpdate(chunks: readonly Record<string, unknown>[]): { part: string; text: string; replace: boolean } | null {
+export function lastReplyUpdate(chunks: readonly Record<string, unknown>[]): { part: string; text: string } | null {
   let part: string | null = null
   for (const chunk of chunks) if (chunk.type === 'text-delta' && typeof chunk.id === 'string' && typeof chunk.delta === 'string' && chunk.delta) part = chunk.id
   if (part === null) return null
   const text = chunks.filter(chunk => chunk.type === 'text-delta' && chunk.id === part && typeof chunk.delta === 'string').map(chunk => chunk.delta as string).join('')
-  return { part, text, replace: chunks.some(chunk => chunk.type === 'text-start' && chunk.id === part) }
+  return { part, text }
+}
+
+/** The chunks of a batch starting at `fromSeq` that this request stored: a re-sent seq that was already there is left out. */
+export function freshChunks<T>(chunks: readonly T[], fromSeq: number, insertedSeqs: Iterable<number>): T[] {
+  const fresh = new Set(insertedSeqs)
+  return chunks.filter((_, index) => fresh.has(fromSeq + index))
+}
+
+export type StoredReply = { lastReply: string | null; lastReplyPart: string | null }
+
+/**
+ * The run's next stored reply after a batch, from the stored reply and its
+ * part alone (run_chunks is never read). The same part appends; another part
+ * replaces. A full reply (LAST_REPLY_CHARS) keeps its text and only its time
+ * moves. Null when nothing changes: no text in the batch, or a new part whose
+ * text is only whitespace so far.
+ */
+export function nextReply(stored: StoredReply, chunks: readonly Record<string, unknown>[]): StoredReply | null {
+  const update = lastReplyUpdate(chunks)
+  if (!update) return null
+  if (update.part === stored.lastReplyPart) {
+    const current = Array.from(stored.lastReply ?? '')
+    if (current.length >= LAST_REPLY_CHARS) return { ...stored }
+    return { lastReply: [...current, ...Array.from(update.text)].slice(0, LAST_REPLY_CHARS).join(''), lastReplyPart: update.part }
+  }
+  if (!update.text.trim()) return null
+  return { lastReply: Array.from(update.text).slice(0, LAST_REPLY_CHARS).join(''), lastReplyPart: update.part }
 }
 
 /** A thread's last activity: when its last reply was written, else its last update. */

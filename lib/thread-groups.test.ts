@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { activityLabel, groupThreads, lastActivity, lastReplyUpdate, pullRequestsOf, replyLine, threadGroup, type GroupIssue } from './thread-groups'
+import { activityLabel, freshChunks, groupThreads, LAST_REPLY_CHARS, lastActivity, lastReplyUpdate, nextReply, pullRequestsOf, replyLine, threadGroup, type GroupIssue, type StoredReply } from './thread-groups'
 
 const thread = (status: string, issueId: string | null = 'task', extra: { superseded?: boolean; createdAt?: string; id?: string } = {}) =>
   ({ id: extra.id ?? status, status, issueId, createdAt: extra.createdAt ?? '2026-10-28T10:00:00Z', superseded: extra.superseded ?? false })
@@ -90,14 +90,63 @@ test('a reply opening is one plain line', () => {
   assert.equal(replyLine(null), null)
 })
 
-test('a batch replaces the last reply when its text part starts there, else appends', () => {
-  assert.deepEqual(lastReplyUpdate([{ type: 'text-start', id: 'a' }, { type: 'text-delta', id: 'a', delta: '修好了，' }, { type: 'text-delta', id: 'a', delta: 'PR 已开' }, { type: 'text-end', id: 'a' }]),
-    { part: 'a', text: '修好了，PR 已开', replace: true })
-  assert.deepEqual(lastReplyUpdate([{ type: 'text-delta', id: 'a', delta: '，三条检查' }]), { part: 'a', text: '，三条检查', replace: false })
-  // The last part with text wins; a part with no text yet changes nothing.
-  assert.deepEqual(lastReplyUpdate([{ type: 'text-start', id: 'a' }, { type: 'text-delta', id: 'a', delta: 'one' }, { type: 'text-start', id: 'b' }, { type: 'text-delta', id: 'b', delta: '' }]),
-    { part: 'a', text: 'one', replace: true })
+test('a batch\'s reply text is the deltas of its last text part with text', () => {
+  assert.deepEqual(lastReplyUpdate([{ type: 'text-start', id: 'a' }, { type: 'text-delta', id: 'a', delta: '修好了，' }, { type: 'text-delta', id: 'a', delta: 'PR 已开' }, { type: 'text-end', id: 'a' }]), { part: 'a', text: '修好了，PR 已开' })
+  assert.deepEqual(lastReplyUpdate([{ type: 'text-delta', id: 'a', delta: 'one' }, { type: 'text-start', id: 'b' }, { type: 'text-delta', id: 'b', delta: '' }]), { part: 'a', text: 'one' })
   assert.equal(lastReplyUpdate([{ type: 'text-start', id: 'a' }, { type: 'tool-input-available' }]), null)
+})
+
+/** The events route in miniature: chunks keyed by seq (insert … on conflict do nothing), then nextReply on the fresh ones. */
+function run() {
+  const stored = new Map<number, Record<string, unknown>>()
+  let reply: StoredReply = { lastReply: null, lastReplyPart: null }
+  let writes = 0
+  return {
+    send(fromSeq: number, chunks: Record<string, unknown>[]) {
+      const inserted = chunks.flatMap((chunk, index) => stored.has(fromSeq + index) ? [] : [fromSeq + index])
+      for (const seq of inserted) stored.set(seq, chunks[seq - fromSeq])
+      const next = nextReply(reply, freshChunks(chunks, fromSeq, inserted))
+      if (next) { reply = next; writes += 1 }
+      return reply
+    },
+    get writes() { return writes },
+  }
+}
+
+test('an overlapping resend appends only its new text', () => {
+  const r = run()
+  r.send(10, [{ type: 'text-start', id: 'a' }, { type: 'text-delta', id: 'a', delta: '修好了' }])
+  // The response was lost; the device sends 10–12 again and only 12 is new.
+  const reply = r.send(10, [{ type: 'text-start', id: 'a' }, { type: 'text-delta', id: 'a', delta: '修好了' }, { type: 'text-delta', id: 'a', delta: '，PR 已开' }])
+  assert.deepEqual(reply, { lastReply: '修好了，PR 已开', lastReplyPart: 'a' })
+})
+
+test('an identical resend changes nothing', () => {
+  const r = run()
+  const batch = [{ type: 'text-start', id: 'a' }, { type: 'text-delta', id: 'a', delta: '修好了' }]
+  r.send(0, batch)
+  assert.deepEqual(r.send(0, batch), { lastReply: '修好了', lastReplyPart: 'a' })
+  assert.equal(r.writes, 1)
+})
+
+test('a new part replaces the old reply; more of the same part appends', () => {
+  const r = run()
+  r.send(0, [{ type: 'text-start', id: 'a' }, { type: 'text-delta', id: 'a', delta: '先看日志' }])
+  r.send(2, [{ type: 'text-start', id: 'b' }])
+  assert.deepEqual(r.send(3, [{ type: 'text-delta', id: 'b', delta: '日志里是 ETIMEDOUT' }]), { lastReply: '日志里是 ETIMEDOUT', lastReplyPart: 'b' })
+  assert.deepEqual(r.send(4, [{ type: 'text-delta', id: 'b', delta: '，像是 Infisical 的出站' }]), { lastReply: '日志里是 ETIMEDOUT，像是 Infisical 的出站', lastReplyPart: 'b' })
+  // A new part with only whitespace so far keeps the old reply.
+  assert.equal(nextReply({ lastReply: 'x', lastReplyPart: 'b' }, [{ type: 'text-delta', id: 'c', delta: '\n' }]), null)
+})
+
+test('the reply stops at 240 characters; once full only its time moves', () => {
+  const long = '长'.repeat(230)
+  const first = nextReply({ lastReply: null, lastReplyPart: null }, [{ type: 'text-delta', id: 'a', delta: long }])!
+  const full = nextReply(first, [{ type: 'text-delta', id: 'a', delta: 'x'.repeat(30) }])!
+  assert.equal(Array.from(full.lastReply!).length, LAST_REPLY_CHARS)
+  assert.equal(full.lastReply, long + 'x'.repeat(10))
+  assert.deepEqual(nextReply(full, [{ type: 'text-delta', id: 'a', delta: 'more' }]), full)
+  assert.equal(Array.from(nextReply({ lastReply: null, lastReplyPart: null }, [{ type: 'text-delta', id: 'a', delta: '字'.repeat(300) }])!.lastReply!).length, LAST_REPLY_CHARS)
 })
 
 test('a row\'s time: 刚刚, 昨天, else relative; the last reply\'s time first', () => {

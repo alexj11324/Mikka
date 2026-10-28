@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { and, eq, lt, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { runEventBatchSchema } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { agentRuns, devices, runChunks } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
 import { computerEventsMatch } from '@/lib/computer/events'
-import { LAST_REPLY_CHARS, lastReplyUpdate } from '@/lib/thread-groups'
+import { freshChunks, nextReply } from '@/lib/thread-groups'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,27 +20,21 @@ async function ownedRun(runId: string, userId: string): Promise<boolean> {
   return Boolean(row)
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
 /**
- * Keeps `agent_runs.lastReply` on the opening of the agent's latest text part.
- * A part whose start is in this batch replaces it; more text for a part
- * already started appends, up to LAST_REPLY_CHARS. Written only when a delta
- * carries text.
+ * Keeps `agent_runs.lastReply` on the opening of the agent's latest text part
+ * (lib/thread-groups.ts `nextReply`), in the same transaction as the insert.
+ * The row is locked so two batches of one run cannot interleave.
  */
-async function recordLastReply(runId: string, chunks: Record<string, unknown>[], fromSeq: number) {
-  const update = lastReplyUpdate(chunks)
-  if (!update) return
-  let replace = update.replace
-  if (!replace) {
-    // The part started in an earlier batch: append only if its text is already the stored reply.
-    const [earlier] = await db.select({ seq: runChunks.seq }).from(runChunks)
-      .where(and(eq(runChunks.runId, runId), lt(runChunks.seq, fromSeq), sql`${runChunks.chunk}->>'type' = 'text-delta'`, sql`${runChunks.chunk}->>'id' = ${update.part}`, sql`${runChunks.chunk}->>'delta' <> ''`))
-      .limit(1)
-    replace = !earlier
-  }
-  if (replace && !update.text.trim()) return
-  await db.update(agentRuns)
-    .set({ lastReply: replace ? sql`left(${update.text}::text, ${LAST_REPLY_CHARS}::int)` : sql`left(coalesce(${agentRuns.lastReply}, '') || ${update.text}::text, ${LAST_REPLY_CHARS}::int)`, lastReplyAt: new Date() })
-    .where(eq(agentRuns.id, runId))
+async function recordLastReply(tx: Tx, runId: string, chunks: Record<string, unknown>[]) {
+  if (!chunks.some(chunk => chunk.type === 'text-delta')) return
+  const [stored] = await tx.select({ lastReply: agentRuns.lastReply, lastReplyPart: agentRuns.lastReplyPart }).from(agentRuns)
+    .where(eq(agentRuns.id, runId)).for('update')
+  if (!stored) return
+  const next = nextReply(stored, chunks)
+  if (!next) return
+  await tx.update(agentRuns).set({ ...next, lastReplyAt: new Date() }).where(eq(agentRuns.id, runId))
 }
 
 /**
@@ -61,16 +55,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
       : undefined
     if (!computerEventsMatch(parsed.data.chunks, runId, binding?.botId ?? null)) return NextResponse.json({ error: 'Invalid computer event.' }, { status: 400 })
   }
-  const inserted = await db.insert(runChunks)
-    .values(parsed.data.chunks.map((chunk, index) => ({
-      id: crypto.randomUUID(), runId, seq: parsed.data.fromSeq + index,
-      chunk: chunk as Record<string, unknown>,
-    })))
-    .onConflictDoNothing()
-    .returning({ seq: runChunks.seq })
-  // Only chunks stored now count, so a re-sent batch never appends its text twice.
-  const fresh = new Set(inserted.map(row => row.seq))
-  await recordLastReply(runId, parsed.data.chunks.flatMap((chunk, index) => fresh.has(parsed.data.fromSeq + index) ? [chunk as Record<string, unknown>] : []), parsed.data.fromSeq)
+  await db.transaction(async tx => {
+    const inserted = await tx.insert(runChunks)
+      .values(parsed.data.chunks.map((chunk, index) => ({
+        id: crypto.randomUUID(), runId, seq: parsed.data.fromSeq + index,
+        chunk: chunk as Record<string, unknown>,
+      })))
+      .onConflictDoNothing()
+      .returning({ seq: runChunks.seq })
+    // Only chunks stored now count, so a re-sent batch never appends its text twice.
+    await recordLastReply(tx, runId, freshChunks(parsed.data.chunks as Record<string, unknown>[], parsed.data.fromSeq, inserted.map(row => row.seq)))
+  })
   await db.update(agentRuns)
     .set({ status: 'running', updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing')))
