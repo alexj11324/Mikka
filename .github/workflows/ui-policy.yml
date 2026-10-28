@@ -85,6 +85,7 @@ jobs:
       - run: pnpm test:ssh-target
       - run: pnpm test:linear-sync
       - run: pnpm check:agent-definitions
+      - run: pnpm test:mailbox-verification
       - run: pnpm test:agent-kit
       - run: pnpm test:agent-kit-compat
       - run: pnpm test:coordinator-events
