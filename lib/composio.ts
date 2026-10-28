@@ -1,7 +1,7 @@
 import 'server-only'
 import { Composio } from '@composio/core'
 import { COMPOSIO_ACTIONS, executeComposioAction, resolveComposioAccount, type ComposioActionName, type ComposioActionResult } from '@/lib/composio-actions'
-import { COMPOSIO_APP_IDS, revokeAndForgetAccount, PROVIDER_IDENTITY, providerAnswer, SLACK_USER_INFO, sanitizeEmail, slackUserEmail, slackUserId, type ComposioAppId } from '@/lib/composio-accounts'
+import { COMPOSIO_APP_IDS, revokeAndForgetAccount, PROVIDER_IDENTITY, providerAnswer, SLACK_USER_INFO, sanitizeEmail, slackAnswer, slackUserEmail, slackUserId, type ComposioAppId } from '@/lib/composio-accounts'
 import { chosenComposioDefault, forgetComposioAccount } from '@/lib/composio-account-store'
 
 export const COMPOSIO_TOOLKITS = COMPOSIO_APP_IDS
@@ -40,7 +40,7 @@ export async function renameComposioAccount(composio: ComposioClient, id: string
 /**
  * The account's email as the provider reports it, through Composio's proxy
  * with the account's own token. Null is a final answer: a 2xx without an
- * email, or a 403. Throws on anything else (429, 5xx, network, timeout) so
+ * email. Throws on HTTP or Slack API errors (including quota failures) so
  * callers try again later. Only the sanitised
  * address is returned.
  */
@@ -49,7 +49,8 @@ export async function readComposioAccountEmail(composio: ComposioClient, userId:
   const signal = AbortSignal.timeout(timeoutMs)
   const call = async (endpoint: string, parameters: { in: 'query' | 'header'; name: string; value: string }[] = []) => {
     const response = await composio.tools.proxyExecute({ endpoint, method: 'GET', connectedAccountId: accountId, userId, parameters }, { signal })
-    return providerAnswer(response.status, response.data)
+    const answer = providerAnswer(response.status, response.data)
+    return toolkit === 'slack' ? slackAnswer(answer) : answer
   }
   const data = await call(identity.endpoint, Object.entries(identity.headers ?? {}).map(([name, value]) => ({ in: 'header' as const, name, value })))
   if (toolkit !== 'slack') return sanitizeEmail(identity.email(data))

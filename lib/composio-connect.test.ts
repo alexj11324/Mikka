@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ComposioEmailLookupError, providerAnswer, toConnectedAccountView, withAccountRecords, type ComposioAccountRecord } from './composio-accounts'
+import { ComposioEmailLookupError, providerAnswer, slackAnswer, toConnectedAccountView, withAccountRecords, type ComposioAccountRecord } from './composio-accounts'
 import { backfillComposioEmails, followUpComposioConnect, reconnectHandover, type ComposioListedAccount } from './composio-connect'
 
 const gmail = (id: string, createdAt: string, extra: Partial<ComposioListedAccount> = {}): ComposioListedAccount =>
@@ -130,10 +130,17 @@ test('a disabled or missing explicit default does not label another account as t
   }
 })
 
-test('only a 2xx without an email or a 403 is a final "no email"; 429, 5xx and 401 are tried again', () => {
+test('HTTP failures including Google quota 403 never become a final "no email"', () => {
   assert.deepEqual(providerAnswer(200, { emailAddress: 'a@example.com' }), { emailAddress: 'a@example.com' })
-  assert.equal(providerAnswer(403, { error: 'insufficientPermissions' }), null)
-  for (const status of [401, 404, 429, 500, 503]) assert.throws(() => providerAnswer(status, {}), ComposioEmailLookupError)
+  for (const status of [401, 403, 404, 429, 500, 503]) assert.throws(() => providerAnswer(status, {}), ComposioEmailLookupError)
+})
+
+test('Slack errors inside HTTP 200 are retried instead of cached as missing email', () => {
+  for (const error of ['ratelimited', 'internal_error', 'invalid_auth', 'missing_scope']) {
+    assert.throws(() => slackAnswer(providerAnswer(200, { ok: false, error })), ComposioEmailLookupError)
+  }
+  const data = { ok: true, user_id: 'U123' }
+  assert.equal(slackAnswer(data), data)
 })
 
 

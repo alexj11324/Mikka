@@ -128,14 +128,19 @@ export class ComposioEmailLookupError extends Error {
 }
 
 /**
- * A provider response as a final answer: the body of a 2xx, or null for a
- * 403 (refused for good, e.g. a missing scope). Throws for anything else so
- * the lookup is tried again later.
+ * Only a successful HTTP response is a final answer. In particular, Google
+ * also uses 403 for temporary quota failures, so it cannot mean "no email".
+ * Failures are retried after the caller's cooldown.
  */
 export function providerAnswer(status: number, data: unknown): unknown {
   if (status >= 200 && status < 300) return data
-  if (status === 403) return null
   throw new ComposioEmailLookupError(status)
+}
+
+/** Slack reports API errors inside HTTP 200. Never cache one as "no email". */
+export function slackAnswer(data: unknown): unknown {
+  if (field(data, 'ok') !== true) throw new ComposioEmailLookupError(200)
+  return data
 }
 
 export const SLACK_USER_INFO = 'https://slack.com/api/users.info'
