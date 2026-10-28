@@ -1,5 +1,7 @@
 import type { GroupMessage, RoutingCorrection, RoutingMember } from './group-routing'
 
+export class GroupJudgmentPendingError extends Error { constructor() { super('group_judgment_pending') } }
+
 export type CorrectionJudgment =
   | { kind: 'correction'; rightId: string | null }
   | { kind: 'not_correction' | 'uncertain' }

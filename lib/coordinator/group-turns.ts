@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { checkedCorrection, type CorrectionInput, type CorrectionJudgment } from './group-correction'
+import { checkedCorrection, GroupJudgmentPendingError, type CorrectionInput, type CorrectionJudgment } from './group-correction'
+export { GroupJudgmentPendingError } from './group-correction'
 import { addsNothing, followUpInstructions, mentionRoute, MissingGroupLeadError, UnknownMentionError, type GroupMessage, type GroupRoute, type RoutingCorrection, type RoutingMember } from './group-routing'
 
 export const GROUP_MAX_ROUNDS = 3
-export class GroupJudgmentPendingError extends Error { constructor() { super('group_judgment_pending') } }
 export type GroupAgent = RoutingMember
 export type GroupReply = { text: string; mentions: string[] }
 export type GroupRuntime = {
