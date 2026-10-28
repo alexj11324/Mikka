@@ -1,7 +1,7 @@
 name: Subagents and thread backend
 on:
   push:
-    branches: ['codex/342-runtime']
+    branches: ['codex/342-runtime', 'candidate/pr346-acceptance']
   workflow_dispatch:
 permissions:
   contents: read
