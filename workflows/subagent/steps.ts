@@ -56,7 +56,12 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
       return 'running'
     }
     await store.update(actor, botId, id, 'running', next.step)
-    if (next.action === 'navigate') await store.action(actor, botId, id, { action: 'navigate', url: next.url })
+    if (next.action === 'navigate') {
+      if (!next.url) throw new Error('Navigation target unavailable')
+      const { authorizeBrowserNavigation } = await import('@/lib/cloud-computer/browser-authority')
+      await authorizeBrowserNavigation({ actor, botId, subagentId: id, epoch: row.epoch, url: next.url })
+      await store.action(actor, botId, id, { action: 'navigate', url: next.url })
+    }
     return 'running'
   } catch {
     // Error details may contain provider URLs; never store or report them.

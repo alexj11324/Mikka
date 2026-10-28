@@ -11,6 +11,12 @@ export async function authorizeBrowserAction(_input: { actor: Actor; botId: stri
   throw new ComputerError(503, 'Browser action authority unavailable')
 }
 
+/** Navigation can itself cause external effects. Do not bypass the shared
+ * authority while its navigation decision and one-use grant are unavailable. */
+export async function authorizeBrowserNavigation(_input: { actor: Actor; botId: string; subagentId: string; epoch: number; url: string }): Promise<void> {
+  throw new ComputerError(503, 'Browser navigation authority unavailable')
+}
+
 /** The existing ledger cannot establish that a host decision remains valid.
  * Until the shared authority supplies its replay/lease check, never execute. */
 export async function verifyBrowserApproval(_input: { actor: Actor; botId: string; subagentId: string; epoch: number; actionId: string; policyVersion: number; expiresAt: number; loaderId: string; origin: string; mutation: BrowserMutation; digest: string }): Promise<void> {
