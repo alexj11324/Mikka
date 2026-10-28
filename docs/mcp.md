@@ -88,7 +88,10 @@ issue and its Bot, and only the run's owner reads it (R-62).
   never its name or a declared type.
 - Files go to the artifacts R2 bucket under
   `<userId>/runs/<runId>/captures/<id>.<ext>`; rows live in `run_captures`,
-  share links in `run_capture_shares` (hashed `mkc_…` tokens, revocable, as
+  unverified uploads use `capture-uploads/` until copied to a separate verified
+  key. A bucket lifecycle rule for that prefix is needed to expire staging
+  objects recreated with a still-valid signed URL. Share links live in
+  `run_capture_shares` (hashed `mkc_…` tokens, revocable, as
   artifact shares). Without R2 keys the file stays in the row (previews,
   tests; uploads there are capped at 4 MB); production refuses.
 - Reads: `GET /api/runs/:runId/evidence` lists a run's captures and the
@@ -105,9 +108,16 @@ credential (cloud threads also have no network):
 | Cloud computer | `capture_screenshot { title }`, `start_screen_recording { title, maxSeconds? }`, `stop_screen_recording {}` on `mikka_computer` | The cloud worker relays the call to `POST /v1/runs/:runId/screen`; the server picks the desktop from the run's binding and runs `scripts/e2b/screen-capture.sh` (ffmpeg x11grab) in the sandbox through E2B |
 
 Cloud captures need no per-call review: the image never goes back to the
-model. They are refused while the person holds the desktop and when the
-workspace turned computers off. A recording is one per thread, 120 seconds
+model. New screenshots and recordings are refused while the person holds the
+desktop; a recording already in progress continues and can still be stopped.
+Captures are refused when the workspace turned computers off. A recording is one per thread, 120 seconds
 by default and at most 300; ffmpeg's `-t` and `timeout` end it on the machine
 even if nobody calls stop, and the run's end (completion or lease loss) stops
-and keeps whatever is still recording. Files nobody collected are deleted on
-the machine after an hour.
+and keeps whatever is still recording. A later capture operation removes
+uncollected files older than an hour; there is no independent cleanup timer.
+
+The daemon can resume an upload it registered while the run was active, even
+after that run ends, while its 15-minute reservation is valid. A stop request
+or revoked device credential still denies access. It cannot create a new
+reservation after the run ends; an unregistered or expired file remains in
+the local queue for inspection instead of being silently discarded.
