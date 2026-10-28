@@ -6,11 +6,12 @@ const invocations: Record<string, unknown>[] = []
 const updates: unknown[] = []
 let resultStatus: 'session_applied' | 'submitted' = 'submitted'
 let currentLoader = 'document'
+let targetIdentity: unknown = 42
 const oldVisionModel = process.env.MIKKA_BROWSER_VISION_MODEL
 class FakeStore {
   async start() { return { status: 'running', epoch: 7, task: 'Sign in', step: 'start' } }
   async action(_actor: unknown, _bot: string, _id: string, action: { action: string }) {
-    if (action.action === 'observe') return { loaderId: 'document', screenshot: '/9j/2Q==', observation: { url: 'https://example.test/login', elements: [{ selector: '[data-mikka-ref="1"]' }] } }
+    if (action.action === 'observe') return { loaderId: 'document', screenshot: '/9j/2Q==', targets: { '1': targetIdentity }, observation: { url: 'https://example.test/login', elements: [{ selector: '[data-mikka-ref="1"]' }] } }
     if (action.action === 'inspectMutation') return { loaderId: currentLoader, origin: 'https://example.test' }
     throw new Error('unexpected action')
   }
@@ -25,19 +26,25 @@ mock.module('ai', { namedExports: { tool: (input: unknown) => input, generateTex
 let tick: typeof import('./steps').tick
 before(async () => { process.env.MIKKA_BROWSER_VISION_MODEL = 'synthetic/test'; tick = (await import('./steps')).tick })
 after(() => { if (oldVisionModel === undefined) delete process.env.MIKKA_BROWSER_VISION_MODEL; else process.env.MIKKA_BROWSER_VISION_MODEL = oldVisionModel })
-beforeEach(() => { invocations.length = 0; updates.length = 0; currentLoader = 'document' })
+beforeEach(() => { invocations.length = 0; updates.length = 0; currentLoader = 'document'; targetIdentity = 42 })
 
 for (const status of ['session_applied', 'submitted'] as const) {
   test(`${status} preserves selected target and requires another observation`, async () => {
     resultStatus = status
     assert.equal(await tick(actor, 'bot', 'subagent'), 'running')
-    assert.deepEqual(invocations, [{ permissionAction: 'computer_use', actor, botId: 'bot', subagentId: 'subagent', epoch: 7, loaderId: 'document', origin: 'https://example.test', intent: { action: 'fill_login', targetSelector: '[data-mikka-ref="1"]' } }])
+    assert.deepEqual(invocations, [{ permissionAction: 'computer_use', actor, botId: 'bot', subagentId: 'subagent', epoch: 7, loaderId: 'document', origin: 'https://example.test', backendNodeId: 42, intent: { action: 'fill_login', targetSelector: '[data-mikka-ref="1"]' } }])
     assert.equal(updates.length, 0)
   })
 }
 
 test('a changed document never reaches the credential broker', async () => {
   currentLoader = 'different-document'
+  assert.equal(await tick(actor, 'bot', 'subagent'), 'terminal')
+  assert.equal(invocations.length, 0)
+})
+
+test('a missing or invalid node identity never reaches the credential broker', async () => {
+  targetIdentity = 0
   assert.equal(await tick(actor, 'bot', 'subagent'), 'terminal')
   assert.equal(invocations.length, 0)
 })

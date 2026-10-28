@@ -30,11 +30,15 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
       const site = new URL(page.url).origin
       const intent = credentialIntentSchema.parse(next.credentialIntent)
       if (!page.elements?.some(element => element.selector === intent.targetSelector)) throw new Error('Credential target was not observed')
+      const index = intent.targetSelector.match(/^\[data-mikka-ref="(\d+)"\]$/)?.[1]
+      const targets = observation.targets as Record<string, unknown> | undefined
+      const backendNodeId = index && targets?.[index]
+      if (typeof backendNodeId !== 'number' || !Number.isSafeInteger(backendNodeId) || backendNodeId < 1) throw new Error('Credential target identity unavailable')
       if (typeof observation.loaderId !== 'string' || !observation.loaderId) throw new Error('Observed document unavailable')
       const current = await store.action(actor, botId, id, { action: 'inspectMutation', mutation: { action: 'click', selector: intent.targetSelector } })
       if (current.loaderId !== observation.loaderId || current.origin !== site) throw new Error('Observed document changed')
       const { executeCredentialIntent } = await import('@/lib/cloud-computer/credential-consumer')
-      const login = await executeCredentialIntent({ permissionAction: 'computer_use', actor, botId, subagentId: id, epoch: row.epoch, loaderId: observation.loaderId, origin: site, intent })
+      const login = await executeCredentialIntent({ permissionAction: 'computer_use', actor, botId, subagentId: id, epoch: row.epoch, loaderId: observation.loaderId, origin: site, backendNodeId, intent })
       if (login.status === 'needs_you') {
         await store.update(actor, botId, id, 'needs_you', 'approval', { kind: 'approval', actionId: login.actionId, summary: login.summary })
         await report(actor.userId, botId, id, `A browser action needs approval: ${login.summary}. Existing pending action ${login.actionId}. Ask the person to approve or deny this exact operation.`, `approval:${login.actionId}`)

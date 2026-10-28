@@ -60,6 +60,33 @@ RESTORE_VISUAL_FIELDS = """(() => {
   }
   delete globalThis.__mikkaMasks; return true;
 })()"""
+OBSERVE_DOM = """(() => {
+  for (const e of document.querySelectorAll('[data-mikka-ref]')) e.removeAttribute('data-mikka-ref');
+  const copy=document.body.cloneNode(true);
+  copy.querySelectorAll('input,textarea,select,script,style,noscript').forEach(e=>e.remove());
+  const elements=Array.from(document.querySelectorAll('a,button,input,textarea,select')).slice(0,150).map((e,i)=>{
+    e.setAttribute('data-mikka-ref',String(i));
+    return {selector:'[data-mikka-ref="'+i+'"]',tag:e.tagName,type:e.type||null,text:['INPUT','TEXTAREA','SELECT'].includes(e.tagName)?null:e.innerText.slice(0,200),label:e.getAttribute('aria-label')||e.getAttribute('placeholder'),href:e.tagName==='A'?e.href:null};
+  });
+  return JSON.stringify({url:location.origin+location.pathname,title:document.title,text:(copy.innerText||copy.textContent||'').slice(0,16000),elements});
+})()"""
+
+def observed_targets(document, count):
+    """Bind displayed selectors to CDP node identities, not page attributes."""
+    found={}
+    def visit(node):
+        if not isinstance(node,dict):return
+        attrs=node.get('attributes',[])
+        if isinstance(attrs,list) and len(attrs)%2==0:
+            for key,value in zip(attrs[::2],attrs[1::2]):
+                if key=='data-mikka-ref' and isinstance(value,str) and value.isdecimal():
+                    index=int(value);backend=node.get('backendNodeId')
+                    if index in found or not isinstance(backend,int) or backend<=0:raise web.HTTPConflict()
+                    found[index]=backend
+        for child in node.get('children',[]):visit(child)
+    visit(document.get('root'))
+    if set(found)!=set(range(count)):raise web.HTTPConflict()
+    return {str(index):found[index] for index in range(count)}
 SENSITIVE_FIELD = "(e.type === 'password' || /(?:otp|one[\\s_-]*time|verification[\\s_-]*code|security[\\s_-]*code|auth(?:entication)?[\\s_-]*code)/i.test([e.autocomplete,e.name,e.id,e.getAttribute('aria-label'),e.getAttribute('placeholder')].join(' ')))"
 
 def safe_resume_snapshot(frames, document, evaluation):
@@ -457,6 +484,17 @@ async def action(request):
                 if 'exceptionDetails' in masked or masked.get('result',{}).get('value') is not True:raise web.HTTPConflict()
                 screenshot=await b.rpc('Page.captureScreenshot',{'format':'jpeg','quality':60},b.session)
                 if not isinstance(screenshot.get('data'),str) or not screenshot['data']:raise web.HTTPServiceUnavailable()
+                # Keep scripts frozen through element labeling and CDP node
+                # identity collection, so a model-selected target cannot be
+                # silently swapped for a different element with the same ref.
+                text=await b.rpc('Runtime.evaluate',{'expression':OBSERVE_DOM,'contextId':context,'returnByValue':True},b.session)
+                if 'exceptionDetails' in text:raise web.HTTPConflict()
+                observation=json.loads(text['result']['value'])
+                snapshot=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
+                targets=observed_targets(snapshot,len(observation['elements']))
+                current=await b.rpc('Page.getFrameTree',session=b.session)
+                before=tree['frameTree']['frame'];after=current['frameTree']['frame']
+                if before.get('id')!=after.get('id') or before.get('loaderId')!=after.get('loaderId') or before.get('url')!=after.get('url'):raise web.HTTPConflict()
             finally:
                 if context is None:restored=True
                 else:
@@ -468,12 +506,7 @@ async def action(request):
                 else:
                     b.guard='locked';b.guard_file.write_text('locked')
                     raise web.HTTPConflict()
-            # Exclude all form values, cookies, storage and raw HTML.
-            text=await b.rpc('Runtime.evaluate',{'expression':'(() => { const copy=document.body.cloneNode(true); copy.querySelectorAll(\'input,textarea,select,script,style,noscript\').forEach(e=>e.remove()); const elements=Array.from(document.querySelectorAll(\'a,button,input,textarea,select\')).slice(0,150).map((e,i)=>{e.setAttribute(\'data-mikka-ref\',String(i));return {selector:\'[data-mikka-ref=\\"\'+i+\'\\"]\',tag:e.tagName,type:e.type||null,text:[\'INPUT\',\'TEXTAREA\',\'SELECT\'].includes(e.tagName)?null:e.innerText.slice(0,200),label:e.getAttribute(\'aria-label\')||e.getAttribute(\'placeholder\'),href:e.tagName===\'A\'?e.href:null}});return JSON.stringify({url:location.origin+location.pathname,title:document.title,text:(copy.innerText||copy.textContent||\'\').slice(0,16000),elements,needsLogin:Array.from(document.querySelectorAll(\'input[type=password]\')).some(e=>e.getClientRects().length>0)})})()','returnByValue':True},b.session)
-            current=await b.rpc('Page.getFrameTree',session=b.session)
-            before=tree['frameTree']['frame'];after=current['frameTree']['frame']
-            if before.get('id')!=after.get('id') or before.get('loaderId')!=after.get('loaderId') or before.get('url')!=after.get('url'):raise web.HTTPConflict()
-            return web.json_response({'observation':json.loads(text['result']['value']),'screenshot':screenshot['data'],'loaderId':before.get('loaderId')})
+            return web.json_response({'observation':observation,'screenshot':screenshot['data'],'loaderId':before.get('loaderId'),'targets':targets})
         elif name=='type':
             selector=json.dumps(str(data.get('selector',''))[:500])
             expression=f"(() => {{ const e=document.querySelector({selector}); if (!e || {SENSITIVE_FIELD} || !['INPUT','TEXTAREA'].includes(e.tagName)) return false; e.focus(); return true; }})()"

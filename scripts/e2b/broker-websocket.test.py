@@ -86,12 +86,19 @@ async def main():
                 gateway.token=lambda raw,role:grant
                 app=web.Application();app.router.add_get('/agents/{id}/credentials/cdp',gateway.cdp);app.router.add_post('/agents/{id}/credentials/begin',gateway.begin);app.router.add_post('/agents/{id}/credentials/end',gateway.end);app.router.add_post('/agents/{id}/action',gateway.action)
                 async with TestClient(TestServer(app)) as client:
+                    await browser.rpc('Runtime.evaluate',{'expression':"(()=>{const e=document.createElement('div');e.setAttribute('data-mikka-ref','0');document.body.prepend(e)})()",'returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as observed:
                         assert observed.status==200
                         observation=await observed.json()
                         assert observation['screenshot'].startswith('/9j/'), 'real JPEG must accompany the observation'
                         assert observation['observation']['url']==origin+'/login'
                         assert isinstance(observation['loaderId'],str) and observation['loaderId'], 'visual observation is bound to a document'
+                        root=await browser.rpc('DOM.getDocument',{'depth':1})
+                        found=await browser.rpc('DOM.querySelector',{'nodeId':root['root']['nodeId'],'selector':'input[name=username]'})
+                        described=await browser.rpc('DOM.describeNode',{'nodeId':found['nodeId']})
+                        assert observation['targets']['0']==described['node']['backendNodeId'], 'target must bind the observed CDP node'
+                        refs=await browser.rpc('Runtime.evaluate',{'expression':'document.querySelectorAll(\'[data-mikka-ref="0"]\').length','returnByValue':True})
+                        assert refs['result']['value']==1, 'page-provided reference collisions are removed'
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[type=password]").value="synthetic-secret"','returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as secret:
                         assert secret.status==409, 'a populated password blocks observation'
