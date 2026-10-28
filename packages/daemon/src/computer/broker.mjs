@@ -15,12 +15,13 @@ export class ComputerBroker {
   constructor({
     driver,
     socketPath,
+    transport = "unix",
     permitted,
     execute = (driver, call, display, _runId, context) => executeDriver(driver, call, display, undefined, context.assertLive),
     now = Date.now,
     ttl = 300000,
   }) {
-    Object.assign(this, { driver, socketPath, permitted, execute, now, ttl });
+    Object.assign(this, { driver, socketPath, permitted, execute, now, ttl, transport });
   }
   spec(runId, permission, { display } = {}) {
     // A new policy or session invalidates every previous grant for this run,
@@ -73,9 +74,11 @@ export class ComputerBroker {
     });
     await new Promise((resolve, reject) => {
       this.server.once("error", reject);
-      this.server.listen(this.socketPath, resolve);
+      if (this.transport === "tcp") this.server.listen({ host: "127.0.0.1", port: 0 }, resolve);
+      else this.server.listen(this.socketPath, resolve);
     });
-    chmodSync(this.socketPath, 0o600);
+    if (this.transport === "tcp") this.socketPath = `tcp://127.0.0.1:${this.server.address().port}`;
+    else chmodSync(this.socketPath, 0o600);
   }
   request(token, value, signal) {
     const grant = this.grants.get(token);

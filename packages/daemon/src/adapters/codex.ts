@@ -1,3 +1,4 @@
+import { sandboxComputerSpec, computerSandboxPolicy } from '../computer/transport'
 // Codex adapter (ADR 0003): the user's own signed-in `codex app-server`,
 // one process per session, inside the run's sandbox, with an isolated
 // `CODEX_HOME` (see `agents/harness-home.ts`). Thread = session: `thread/start`
@@ -315,7 +316,7 @@ export class CodexAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (threadId && earlier) return endedSession(threadId, earlier)
     ctx.clearHandoff()
-    const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
+    const computerMcp = sandboxComputerSpec(this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy), this.options.sandbox.kind)
     const mcp = ctx.mcpServer()
     const argv = [
       this.options.binary ?? "codex",
@@ -331,6 +332,9 @@ export class CodexAdapter implements AgentAdapter {
       ...(computerMcp ? [
         "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.command=${toml(computerMcp.command)}`,
         "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.args=${toml(computerMcp.args)}`,
+        ...(computerMcp.env.MIKKA_COMPUTER_SANDBOX_PROXY === "1" ? [
+          "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env_vars=["HTTP_PROXY","http_proxy"]`,
+        ] : []),
         ...Object.entries(computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
       ] : []),
       // Its shells get a filtered env; give them writable temp dirs.
@@ -343,7 +347,7 @@ export class CodexAdapter implements AgentAdapter {
     const child = await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, {
       cwd: ctx.worktree,
       env: { ...options.env, ...ctx.tempEnv(), CODEX_HOME: codexHome.home },
-      policy: ctx.policy(),
+      policy: computerSandboxPolicy(ctx.policy(), computerMcp),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
     })

@@ -74,3 +74,23 @@ jobs:
           name: local-computer-linux-evidence
           path: ${{ runner.temp }}/cua/desktop*.png
           if-no-files-found: ignore
+
+  local-sandbox:
+    name: Local computer through real Linux sandbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Require actual isolated proxy transport and port denial
+        run: |
+          docker run --rm --privileged \
+            -e TEST_UID="$(id -u)" -e TEST_GID="$(id -g)" \
+            -v "$PWD:/workspace:ro" -w /workspace/packages/daemon \
+            node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a \
+            sh -c 'apt-get update -qq && apt-get install -y -qq bubblewrap socat ripgrep git >/dev/null && setpriv --reuid="$TEST_UID" --regid="$TEST_GID" --clear-groups env HOME=/tmp TSX_DISABLE_CACHE=1 node --import tsx --test test/computer-sandbox.acceptance.node.ts'

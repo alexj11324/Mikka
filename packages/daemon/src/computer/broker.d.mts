@@ -12,6 +12,7 @@ export class ComputerBroker {
   constructor(options: {
     driver: ComputerDriver | null;
     socketPath: string;
+    transport?: "unix" | "tcp";
     permitted: (runId: string) => boolean;
     execute?: (driver: ComputerDriver, input: ComputerCall, display: string | undefined, runId: string, context: { actionId: string; assertLive: () => void }) => Promise<unknown>;
     now?: () => number;

@@ -1,5 +1,6 @@
+import { connect } from 'node:net'
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync, chmodSync, existsSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, chmodSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -20,6 +21,7 @@ server.addRepo(device,{repoId,name:'fixture',path:repo})
 const authority={botId,workspaceId,ownerId:'owner',permission:'allow' as const,policyVersion:1}
 const link=Object.assign(server.link(),{syncComputerReviews:async()=>[],localComputerAuthority:async()=>authority})
 const runId=server.queueRun(device,{issueId:randomUUID(),repoId,baseBranch:'main',harness:'codex',prompt:'COMPUTER_CONFIG_TEST',localComputer:authority,policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,computer_use:'allow'}}})
+let endpoint = ''
 const daemon=await new Daemon({dataDir:join(root,'daemon'),flavor:'dev',link,credential:'synthetic',agentSandbox:new NoSandbox(),harnesses:[{harness:'codex',installed:true,version:'fixture'}],harnessBinaries:{codex:resolve('test/fakes/fake-codex.mjs')},quotaSource:null,heartbeatMs:50,commandsWaitSeconds:1,log:createLogger({level:'silent'})}).start()
 try {
  await daemon.syncWithServer()
@@ -30,12 +32,15 @@ try {
    await new Promise(r=>setTimeout(r,25))
  }
  const computer=JSON.parse(text).computer
+ endpoint=computer.args[1]
  assert.equal(computer.command,process.execPath)
  assert.equal(computer.args[0],resolve('src/computer/proxy.mjs'))
- assert.equal(computer.args[1],join(root,'daemon','local-computer.sock'))
+ assert.match(computer.args[1],/^tcp:\/\/127\.0\.0\.1:[0-9]+$/)
  assert.match(computer.args[2],/^[a-f0-9]{64}$/)
  console.log(JSON.stringify({actualDaemon:true,actualCodexAdapter:true,syntheticHarness:true,localGrantInjected:true,driverNotExposed:true,runId}))
 } finally { await daemon.stop();process.env.PATH=oldPath }
 
-assert.equal(existsSync(join(root,'daemon','local-computer.sock')),false)
+const url=new URL(endpoint)
+const refused=await new Promise<NodeJS.ErrnoException>((resolve,reject)=>{const socket=connect({host:url.hostname,port:Number(url.port)});socket.once('error',resolve);socket.once('connect',()=>{socket.destroy();reject(new Error('Local broker still listening after stop'))});socket.setTimeout(2000,()=>{socket.destroy();reject(new Error('Broker close check timed out'))})})
+assert.equal(refused.code,'ECONNREFUSED')
 })

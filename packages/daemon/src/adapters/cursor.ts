@@ -1,3 +1,4 @@
+import { sandboxComputerSpec, computerSandboxPolicy } from '../computer/transport'
 // Cursor adapter (ADR 0003): the user's own signed-in Cursor CLI as an ACP
 // agent (`agent acp`), one process per session, inside the run's sandbox,
 // with an isolated `CURSOR_CONFIG_DIR` (its login stays in the Keychain).
@@ -266,7 +267,7 @@ export class CursorAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (resumeId && earlier) return endedSession(resumeId, earlier)
     ctx.clearHandoff()
-    const computerMcp = this.options.computerProvider?.(options.runId, options.policy)
+    const computerMcp = sandboxComputerSpec(this.options.computerProvider?.(options.runId, options.policy), this.options.sandbox.kind)
     const argv = [
       this.options.binary ?? "agent",
       // Cursor's own sandbox cannot nest inside Mikka's.
@@ -284,7 +285,7 @@ export class CursorAdapter implements AgentAdapter {
         // Its per-project store (MCP approvals, chats) lives here, not in ~/.cursor.
         CURSOR_DATA_DIR: configDir,
       },
-      policy: ctx.policy(),
+      policy: computerSandboxPolicy(ctx.policy(), computerMcp),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
     })

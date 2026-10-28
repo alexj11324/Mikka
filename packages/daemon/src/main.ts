@@ -271,6 +271,7 @@ export class Daemon {
       this.localComputerBroker = new ComputerBroker({
         driver: this.localComputerDriver,
         socketPath: join(paths.dataDir, 'local-computer.sock'),
+        transport: 'tcp',
         permitted: runId => {
           const assignment = this.journal.get(runId)?.assignment
           return Boolean(!this.stopped && this.registered && assignment?.localComputer && !assignment.computer &&

@@ -85,6 +85,7 @@ app.run()
       await rm(dir, { recursive: true, force: true });
     });
     const broker = new ComputerBroker({
+      transport: "tcp",
       driver,
       socketPath: join(dir, "socket"),
       permitted: () => true,
