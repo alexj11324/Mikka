@@ -16,8 +16,8 @@ stub('../../../../../lib/composio-config.ts', { isComposioCallbackVerifierConfig
 stub('../../../../../lib/suggestions/sources.ts', { bootstrapSuggestions: () => {} })
 let GET: typeof import('./route').GET
 before(async () => { GET = (await import('./route')).GET })
-function request() {
-  const flow = Buffer.from(JSON.stringify({ link: 'new', replace: 'old', returnTo: '/?settings=integrations' })).toString('base64url')
+function request(replace: string | null = 'old') {
+  const flow = Buffer.from(JSON.stringify({ link: 'new', replace: replace ?? undefined, returnTo: '/?settings=integrations' })).toString('base64url')
   return new NextRequest('https://example.test/api/integrations/composio/callback?session_uri=synthetic', { headers: { cookie: `mikka_composio_flow=${flow}` } })
 }
 test('reconnect redirects to failure if follow-up fails or the account list cannot be read', async () => {
@@ -30,4 +30,12 @@ test('reconnect redirects to failure if follow-up fails or the account list cann
   listFails = false
   response = await GET(request())
   assert.equal(new URL(response.headers.get('location')!).searchParams.get('composio'), 'connected')
+})
+
+test('a first connection cannot report success when the owned account list is unavailable', async () => {
+  followUpResult = true; listFails = true
+  try {
+    const response = await GET(request(null))
+    assert.equal(new URL(response.headers.get('location')!).searchParams.get('composio'), 'callback-failed')
+  } finally { listFails = false }
 })

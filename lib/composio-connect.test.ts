@@ -84,6 +84,14 @@ test('a non-working replacement never retires the old connection or takes its de
   }
 })
 
+test('a new connection is successful only when its owned account is usable', async () => {
+  for (const extra of [{ status: 'INITIATED' }, { status: 'FAILED' }, { isDisabled: true }]) {
+    const { calls, deps } = fakeDeps()
+    assert.equal(await followUpComposioConnect({ items: [gmail('new', '2026-10-28T00:00:00Z', extra)], records: [], addedId: 'new' }, deps), false)
+    assert.deepEqual(calls, [])
+  }
+})
+
 test('old accounts get their email on load: at most five, in parallel, each asked once', async () => {
   const items = Array.from({ length: 7 }, (_, index) => gmail(`a${index}`, `2026-0${index + 1}-01T00:00:00Z`))
   items.push(gmail('off', '2026-01-01T00:00:00Z', { isDisabled: true }), gmail('expired', '2026-01-01T00:00:00Z', { status: 'EXPIRED' }))

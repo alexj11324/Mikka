@@ -88,7 +88,7 @@ export async function followUpComposioConnect(
 ) {
   const added = input.items.find(item => item.id === input.addedId)
   const toolkit = appOf(added)
-  if (!added || !toolkit) return false
+  if (!added || !toolkit || added.status !== 'ACTIVE' || added.isDisabled) return false
   const replaced = input.replaceId && input.replaceId !== added.id
     ? input.items.find(item => item.id === input.replaceId && item.toolkit.slug === toolkit)
     : undefined

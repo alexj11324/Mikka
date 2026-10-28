@@ -63,7 +63,7 @@ async function handleGET(request: NextRequest) {
     const userId = session.user.id
     const flow = decodeComposioFlow(request.cookies.get(COMPOSIO_FLOW_COOKIE)?.value)
     const replaceId = flow?.link === completed.connectedAccountId ? flow.replace : undefined
-    let reconnectComplete = !replaceId
+    let reconnectComplete = false
     try {
       const [items, records] = await Promise.all([
         listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], cursor })),
