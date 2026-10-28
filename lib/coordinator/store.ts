@@ -1,5 +1,6 @@
 import { sourcedEventMessage } from './message-safety'
 import { visibleRuns } from '@/lib/agent-runs'
+import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { issueForUser } from '@/lib/issue-access'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
@@ -157,6 +158,7 @@ export async function setEventTier(id: string, tier: CoordinatorEventTier): Prom
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
 export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null): Promise<void> {
+  await assertCredentialSafeChat(userId, messages)
   await db.transaction(async tx => {
     await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId" IS NOT DISTINCT FROM ${botId}::uuid FOR UPDATE`)
     if (messages.length) {
