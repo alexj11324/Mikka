@@ -18,20 +18,14 @@ if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=
 const dbTest = databaseUrl ? test : test.skip
 
 dbTest('a bot and the Coordinator keep their own conversation, inbox and memory', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { eq, inArray, sql }] = await Promise.all([
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const userId = `test-bot-chats-${randomUUID()}`
   const botId = randomUUID()
   t.after(async () => {
-    await scope.run(async () => {
-      await db.delete(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.userId, userId))
-      await db.delete(schema.coordinatorMessages).where(eq(schema.coordinatorMessages.userId, userId))
-      await db.delete(schema.coordinatorSessions).where(eq(schema.coordinatorSessions.userId, userId))
-      await db.delete(schema.bots).where(inArray(schema.bots.id, [botId]))
-      await db.delete(schema.users).where(eq(schema.users.id, userId))
-    })
+    t.diagnostic(JSON.stringify({event:'coordinator_db_fixture_retained',fixtureOwnerId:userId,botId,database:'mikka_e2e'}))
     await scope.close()
   })
   await scope.run(async () => {
@@ -76,18 +70,11 @@ dbTest('personal provenance and STOP/pending survive actual inbox persistence an
   const scope = createRequestDatabaseScope(databaseUrl!)
   const userId = `test-message-provenance-${randomUUID()}`, botId = randomUUID()
   const trust = { key: 'isolated-ci-provenance-fixture-not-a-credential-0000', scope: JSON.stringify([userId, botId]) }
-  // Only this test's newly created nonce owner/Bot rows are removed. The
-  // fixture refuses any target except this Actions job's disposable PG17.
+  // Source rows are retained even when assertions fail. Closing this local
+  // connection pool does not stop the database or delete fixtures.
   t.after(async () => {
-    try {
-      await scope.run(async () => {
-        await db.delete(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.userId, userId))
-        await db.delete(schema.coordinatorMessages).where(eq(schema.coordinatorMessages.userId, userId))
-        await db.delete(schema.coordinatorSessions).where(eq(schema.coordinatorSessions.userId, userId))
-        await db.delete(schema.bots).where(and(eq(schema.bots.id, botId), eq(schema.bots.ownerId, userId)))
-        await db.delete(schema.users).where(eq(schema.users.id, userId))
-      })
-    } finally { await scope.close() }
+    t.diagnostic(JSON.stringify({event:'coordinator_db_fixture_retained',fixtureOwnerId:userId,botId,database:'mikka_e2e'}))
+    await scope.close()
   })
   await scope.run(async () => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${userId}, 'Synthetic provenance owner', ${`${userId}@example.invalid`}, false, now(), now())`)
@@ -143,12 +130,8 @@ dbTest('unclassified runtime data stays pending while direct user input and clas
   ])
   const scope=createRequestDatabaseScope(databaseUrl!),owner=`test-judgment-inbox-${randomUUID()}`
   t.after(async()=>{
-    try{await scope.run(async()=>{
-      await db.delete(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.userId,owner))
-      await db.delete(schema.coordinatorMessages).where(eq(schema.coordinatorMessages.userId,owner))
-      await db.delete(schema.coordinatorSessions).where(eq(schema.coordinatorSessions.userId,owner))
-      await db.delete(schema.users).where(eq(schema.users.id,owner))
-    })}finally{await scope.close()}
+    t.diagnostic(JSON.stringify({event:'coordinator_db_fixture_retained',fixtureOwnerId:owner,database:'mikka_e2e'}))
+    await scope.close()
   })
   await scope.run(async()=>{
     await db.execute(sql`insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values(${owner},'Synthetic judgment owner',${`${owner}@example.invalid`},false,now(),now())`)

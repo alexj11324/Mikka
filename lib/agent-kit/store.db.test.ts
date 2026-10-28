@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
 import { DEFAULT_AGENT_DEFINITION, builtinAgentDefinition } from './builtin'
@@ -23,18 +22,13 @@ if(!loopback || (!dedicated && !actions)) throw new Error('Refusing non-isolated
 const pool=new Pool({connectionString,max:12})
 const store=new AgentKitStore(pool)
 const defaults=DEFAULT_AGENT_DEFINITION
-const migration=readFileSync(new URL('../../drizzle/20261027181000_agent_kit.sql',import.meta.url),'utf8')
-
 before(async()=>{
-  // Dedicated tests can start with only the real migration's parent contracts.
-  // Existing CI uses the complete application schema and does not recreate tables.
-  if(dedicated) await pool.query(`
-    create table if not exists "user"(id text primary key,name text not null,email text not null unique,"emailVerified" boolean not null default false,"createdAt" timestamptz not null default now(),"updatedAt" timestamptz not null default now());
-    create table if not exists bots(id uuid primary key,"ownerId" text not null references "user"(id),"workspaceId" uuid not null,name text not null,color text default 'encre',shape text default 'cercle',"createdAt" timestamptz default now(),"updatedAt" timestamptz default now(),unique(id,"workspaceId","ownerId"));
-    create table if not exists agent_runs(id uuid primary key);
-  `)
-  await pool.query(migration)
-  await pool.query(migration)
+  // Setup is metadata-only. The historical migration rebuilds triggers, so it
+  // must not be replayed automatically under the resource-retention rule.
+  for(const name of ['user','bots','agent_runs','agent_kit_heads','agent_kit_versions','agent_kit_executions','agent_kit_events','agent_kit_proposals','agent_kit_evaluations','agent_kit_activations']){
+    const {rows}=await pool.query("select to_regclass(format('%I.%I',current_schema(),$1::text)) as relation",[name])
+    assert.ok(rows[0]?.relation,`Existing isolated Agent Kit schema required: ${name}; no automatic migration or rebuild`)
+  }
 })
 after(async()=>{await pool.end()})
 async function owner(bot=true):Promise<AgentScope>{
@@ -42,6 +36,7 @@ async function owner(bot=true):Promise<AgentScope>{
   const botId=bot ? randomUUID() : null
   const workspaceId=bot ? randomUUID() : null
   await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$2,$3,false,now(),now())',[ownerId,'Synthetic Agent Kit',`${ownerId}@example.com`])
+  console.info(JSON.stringify({event:'agent_kit_fixture_owner_retained',ownerId,botId,workspaceId}))
   if(botId) await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,$4)',[botId,ownerId,workspaceId,'Synthetic bot'])
   return {ownerId,botId,workspaceId}
 }
@@ -78,7 +73,9 @@ function report(definitionDigest:string,passed:boolean,mode:'fixture'|'live'):Ev
     passed:passed?CORE_EVAL_CASES.length:0,total:CORE_EVAL_CASES.length,errors:0}
 }
 
-test('real PostgreSQL migration is rerunnable and historical runs stay unrecorded',async()=>{
+test.todo('Agent Kit migration replay remains unverified: trigger replacement is paused by resource retention; do not count this as acceptance')
+
+test('existing migrated schema leaves historical runs unrecorded',async()=>{
   const id=randomUUID();await pool.query('insert into agent_runs(id) values($1)',[id]).catch(async()=>{
     // A full app schema has required run identity; its nullable column is checked directly instead.
     const column=await pool.query("select is_nullable,column_default from information_schema.columns where table_name='agent_runs' and column_name='agentDefinition'")
@@ -86,7 +83,6 @@ test('real PostgreSQL migration is rerunnable and historical runs stay unrecorde
   })
   const rows=await pool.query('select "agentDefinition" from agent_runs where id=$1',[id])
   if(rows.rowCount) assert.equal(rows.rows[0].agentDefinition,null)
-  await pool.query(migration)
 })
 test('concurrent first reads seed exactly one immutable default version',async()=>{
   const scope=await owner()

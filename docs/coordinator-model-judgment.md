@@ -125,3 +125,29 @@ the entire generative/tool-planning path is vision-capable. No new paid default,
 provider or credential is selected by this patch. An authorized compatible model
 configuration and real acceptance remain required before treating that whole path
 as compliant. Frozen historical selections are not silently upgraded.
+
+## Resource retention hold (2026-10-28)
+
+The user's latest instruction stops automatic resource/data/directory cleanup
+and requires retained resources and audit logs. No affected test or build may be
+restarted merely because its repository teardown was edited. Source/type work
+that does not invoke those paths continues. Production and Staging are not part
+of this audit.
+
+Current source retains migration-test fixture directories, worker build scratch,
+and Coordinator database fixtures. Agent Kit database setup now checks existing
+schema metadata instead of automatically creating/replaying the migration that
+replaces triggers. Migration replay is explicitly TODO; the required database
+runner rejects TODO, so this is not a passed migration gate.
+
+The `a6bede2` isolated build started at 21:49:55 UTC and its task-exclusive process
+group 8684 was paused with SIGSTOP at 21:51:23 UTC, without TERM/KILL, cleanup or
+resume. Its log proves four migration-mode fixture cleanup callbacks had already
+completed. Random directory suffixes and deleted file counts were not logged;
+they are unknown. Do not reconstruct or restore them. Older passing runs remain
+historical execution evidence, not acceptance under the new retention rule.
+
+Installed Next, tsx and esbuild contain their own cleanup paths. The full build
+and affected test entrypoints remain HOLD; repository teardown changes do not
+prove those dependency paths are retained. No new test, SQL, provider call, CI,
+merge or deployment is justified by this source-only repair.
