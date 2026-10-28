@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { execFileSync, fork } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { SCOPE_DATABASES, SCOPE_RETAINED_DATABASE, SCOPE_RETIRED_APPROVALS, SCOPE_LIMITS, SCOPE_MIGRATION_COUNT, scopeUrl, checkedScopeUrl, scopePolicy, controlledChild } from './scope-acceptance-policy.mjs'
+import { SCOPE_DATABASES, SCOPE_RETAINED_DATABASE, SCOPE_PRESERVED_DATABASES, SCOPE_RETIRED_APPROVALS, SCOPE_LIMITS, SCOPE_MIGRATION_COUNT, scopeUrl, checkedScopeUrl, scopePolicy, controlledChild } from './scope-acceptance-policy.mjs'
 import { verifyScopeResumeEvidence,scopeResumeSchema,validateScopeResumeState,SCOPE_RESUME_QUERIES } from './scope-resume.mjs'
 import {TEAM_DATABASES,TEAM_CATALOG_QUERIES,verifyTeamResumeEvidence,verifyTeamResumeMetadata,validateTeamResumeState} from './team-resume.mjs'
 import { scopeWireOutput } from './scope-exec-file.mjs'
@@ -27,18 +27,21 @@ export function verifyFreshScopeTargets(manifest) {
   if(manifest.mode!=='fresh-exclusive-scope'||JSON.stringify(manifest.databases)!==JSON.stringify(Object.values(SCOPE_DATABASES)))throw Error('fresh exclusive scope targets mismatch')
   const old=manifest.preservedDatabase
   if(old?.name!==SCOPE_RETAINED_DATABASE||old.oid!=='65537'||old.owner!=='postgres'||old.businessSqlAuthorized!==false)throw Error('fresh exclusive scope preserved identity mismatch')
+  if(JSON.stringify(manifest.preservedDatabases)!==JSON.stringify(SCOPE_PRESERVED_DATABASES))throw Error('fresh exclusive scope preserved database inventory mismatch')
   if(JSON.stringify(manifest.retiredApprovalIds)!==JSON.stringify(SCOPE_RETIRED_APPROVALS))throw Error('fresh exclusive scope retired approval inventory mismatch')
   if(manifest.approvalTransfer!==false)throw Error('fresh exclusive scope requires a new approval')
 }
 export function verifyFreshScopePreflight(rows) {
-  const retained=rows.filter(row=>row.datname===SCOPE_RETAINED_DATABASE)
-  if(retained.length!==1||retained[0].oid!=='65537'||retained[0].owner!=='postgres')throw Error('preserved scope metadata mismatch; no writes permitted')
-  if(rows.length!==1)throw Error('fresh scope target already exists or catalog mismatch; never reuse')
+  for(const expected of SCOPE_PRESERVED_DATABASES){
+    const matches=rows.filter(row=>row.datname===expected.name)
+    if(matches.length!==1||matches[0].oid!==expected.oid||matches[0].owner!==expected.owner)throw Error('preserved scope metadata mismatch; no writes permitted')
+  }
+  if(rows.length!==SCOPE_PRESERVED_DATABASES.length)throw Error('fresh scope target already exists or catalog mismatch; never reuse')
 }
 export function scopeExecutionMode(mode,manifest,approvalReference){
   if(mode==='--plan')return
   if(SCOPE_RETIRED_APPROVALS.includes(approvalReference))throw Error('fresh exclusive scope requires a new approval reference')
-  if(mode==='--run-team'&&manifest.mode==='team-after-migrated-empty')return
+  if(mode==='--run-team')throw Error('historical team resume is retired; new exclusive targets and approval are required')
   if(mode!=='--run'||manifest.mode!=='fresh-exclusive-scope')throw Error('only fresh exclusive scope execution is enabled; legacy resume is retired')
 }
 export function scopePlanSummary(manifest,manifestHash){return {candidate:manifest.candidate,manifestHash,mode:manifest.mode,limits:manifest.limits,databases:manifest.databases,preservedDatabases:manifest.preservedDatabases??[manifest.preservedDatabase],invocation:manifest.invocation,executed:false}}
@@ -223,14 +226,14 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
   try {
     ;[adminIdentity]=await read(admin,SCOPE_IDENTITY_SQL)
     if(adminIdentity?.role!=='postgres'||adminIdentity.database!=='issue184_e2e')throw Error('original admin identity mismatch')
-    const metadataNames=isTeamResume?[...TEAM_DATABASES,...manifest.preservedDatabases.map(x=>x.name)]:[...Object.values(SCOPE_DATABASES),SCOPE_RETAINED_DATABASE]
+    const metadataNames=isTeamResume?[...TEAM_DATABASES,...manifest.preservedDatabases.map(x=>x.name)]:[...Object.values(SCOPE_DATABASES),...SCOPE_PRESERVED_DATABASES.map(x=>x.name)]
     const existing=await read(admin,'select datname,oid::text,pg_get_userbyid(datdba) as owner from pg_database where datname=any($1::text[])',[metadataNames])
     if(isTeamResume){verifyTeamResumeMetadata(existing);policy.adoptRetainedTeam(await validateRetainedTeam())}
     else verifyFreshScopePreflight(existing)
     record({event:'preflight',resource:{id:manifest.resource.id,image:manifest.resource.image,volume:manifest.resource.volume},adminIdentity,targetsAbsent:isTeamResume?[]:Object.values(SCOPE_DATABASES),teamOnlyResume:isTeamResume,preservedDatabase:isTeamResume?manifest.preservedDatabases:manifest.preservedDatabase,explicitResume:false})
     const runPhase=async phase=>{
       await child(phase,'suite',{app:scopeUrl('issue184_e2e'),workspace:scopeUrl('issue184_e2e')})
-      for(const database of phase==='scope'?[SCOPE_DATABASES.scope]:TEAM_DATABASES)await snapshot(database,'after-suite')
+      for(const database of phase==='scope'?[SCOPE_DATABASES.scope]:isTeamResume?TEAM_DATABASES:[SCOPE_DATABASES.app,SCOPE_DATABASES.workspace])await snapshot(database,'after-suite')
     }
     if(isTeamResume)await runPhase('team');else await scopePhases(runPhase)
     if(isTeamResume){

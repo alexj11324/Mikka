@@ -2,15 +2,16 @@ import './credential-diagnostics-offline.mjs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import pg from 'pg'
-import { SCOPE_DATABASES, SCOPE_RETAINED_DATABASE, SCOPE_RETIRED_APPROVALS, scopePolicy, scopeUrl } from './scope-acceptance-policy.mjs'
+import { SCOPE_DATABASES, SCOPE_RETAINED_DATABASE, SCOPE_PRESERVED_DATABASES, SCOPE_RETIRED_APPROVALS, scopePolicy, scopeUrl } from './scope-acceptance-policy.mjs'
 import { verifyFreshScopeTargets, verifyFreshScopePreflight, scopeExecutionMode } from './scope-acceptance.mjs'
 import { scopeNativeRuntime } from './scope-acceptance-runtime.mjs'
 
 const manifest = () => ({
   mode: 'fresh-exclusive-scope', retiredApprovalIds: [...SCOPE_RETIRED_APPROVALS], databases: Object.values(SCOPE_DATABASES), approvalTransfer: false,
   preservedDatabase: { name: SCOPE_RETAINED_DATABASE, oid: '65537', owner: 'postgres', businessSqlAuthorized: false },
+  preservedDatabases: structuredClone(SCOPE_PRESERVED_DATABASES),
 })
-const retained = () => [{ datname: SCOPE_RETAINED_DATABASE, oid: '65537', owner: 'postgres' }]
+const retained = () => SCOPE_PRESERVED_DATABASES.map(row=>({datname:row.name,oid:row.oid,owner:row.owner}))
 
 test('fresh manifest binds exactly three fixed targets and the separate non-writable retained identity', () => {
   verifyFreshScopeTargets(manifest())
@@ -21,6 +22,9 @@ test('fresh manifest binds exactly three fixed targets and the separate non-writ
     m => { m.databases.reverse() },
     m => { m.preservedDatabase.oid = 'other' },
     m => { m.preservedDatabase.businessSqlAuthorized = true },
+    m => { m.preservedDatabases.pop() },
+    m => { m.preservedDatabases[1].oid='other' },
+    m => { m.preservedDatabases[3].businessSqlAuthorized=true },
     m => { m.approvalTransfer = true },
     m => { m.retiredApprovalIds = [] },
     m => { m.mode = 'resume-scope-after-bootstrap' },
@@ -35,6 +39,10 @@ test('same supervisor preflight rejects every existing target or changed retaine
   let writes = 0
   const writeAfterPreflight = rows => { verifyFreshScopePreflight(rows);writes++ }
   const invalid = [[], [{ ...retained()[0], oid: 'other' }], [{ ...retained()[0], owner: 'other' }], [...retained(), ...retained()]]
+  for(let index=0;index<SCOPE_PRESERVED_DATABASES.length;index++){
+    const missing=retained();missing.splice(index,1);invalid.push(missing)
+    const changed=retained();changed[index].oid='other';invalid.push(changed)
+  }
   for (const datname of Object.values(SCOPE_DATABASES)) invalid.push([...retained(), { datname, oid: 'new', owner: 'postgres' }])
   for (const rows of invalid) {
     assert.throws(() => writeAfterPreflight(rows), /mismatch|exists/)
@@ -45,10 +53,12 @@ test('same supervisor preflight rejects every existing target or changed retaine
 
 test('retained scope is outside every application, migration and CREATE grant even when an old ownership map is supplied', () => {
   const events = [], policy = scopePolicy([], event => events.push(event))
-  policy.state.created.set(SCOPE_RETAINED_DATABASE, '65537')
+  for(const old of SCOPE_PRESERVED_DATABASES){
+  policy.state.created.set(old.name,old.oid)
   for (const bucket of ['scope','scope:migrate','team','team:migrate']) {
-    assert.throws(() => policy.connect(bucket, { url: scopeUrl(SCOPE_RETAINED_DATABASE) }), /mismatch/)
-    assert.throws(() => policy.grant(bucket, { url: scopeUrl(SCOPE_RETAINED_DATABASE), text: 'synthetic forbidden write' }), /mismatch/)
+    assert.throws(() => policy.connect(bucket, { url: scopeUrl(old.name) }), /mismatch/)
+    assert.throws(() => policy.grant(bucket, { url: scopeUrl(old.name), text: 'synthetic forbidden write' }), /mismatch/)
+  }
   }
   assert.throws(() => policy.grant('scope', { url: scopeUrl('issue184_e2e'), text: `create database "${SCOPE_RETAINED_DATABASE}"` }), /only its exact/)
   assert.equal(events.filter(event => event.event === 'query-attempt').length, 0)

@@ -1,12 +1,23 @@
 // This task's retained, three-database acceptance only. No pg or process imports.
 import { createHash } from 'node:crypto'
-export const SCOPE_RETIRED_APPROVALS = Object.freeze(['Sentinel_b406d5bab51881919f61e122434e7205','Sentinel_488b222d9c28819184f7f72938c66322','Sentinel_4afe4e3c00148191bd63e4d7953df45d'])
+export const SCOPE_RETIRED_APPROVALS = Object.freeze(['Sentinel_b406d5bab51881919f61e122434e7205','Sentinel_488b222d9c28819184f7f72938c66322','Sentinel_4afe4e3c00148191bd63e4d7953df45d','Sentinel_651a3960a0bc81919cc3d4397636b6e7'])
 export const SCOPE_RETAINED_DATABASE = 'scope184_f14235c6695547ae925d808ab35a399e_e2e'
-export const SCOPE_DATABASES = Object.freeze({
+export const SCOPE_PREVIOUS_DATABASES = Object.freeze({
   scope: 'scope184_fresh_8a7b72d9a46e4bd6b295ef2490f7ab63_e2e',
   app: 'team184_app_69649a2f38184d8b8edf1fe6a6524f31_e2e',
   workspace: 'team184_workspace_1bf3cc4e4430443c841d27f4a5115dc9_e2e',
 })
+export const SCOPE_DATABASES = Object.freeze({
+  scope: 'scope301_c6_scope_20261028_e2e',
+  app: 'scope301_c6_app_20261028_e2e',
+  workspace: 'scope301_c6_workspace_20261028_e2e',
+})
+export const SCOPE_PRESERVED_DATABASES = Object.freeze([
+  {name:SCOPE_RETAINED_DATABASE,oid:'65537',owner:'postgres',businessSqlAuthorized:false},
+  {name:SCOPE_PREVIOUS_DATABASES.scope,oid:'67104',owner:'postgres',businessSqlAuthorized:false},
+  {name:SCOPE_PREVIOUS_DATABASES.app,oid:'68678',owner:'postgres',businessSqlAuthorized:false},
+  {name:SCOPE_PREVIOUS_DATABASES.workspace,oid:'68679',owner:'postgres',businessSqlAuthorized:false},
+])
 // Current integration inventory: 64 main sources plus nine immutable scope
 // payloads. Earlier 70-source manifests remain evidence for their original SHA.
 export const SCOPE_MIGRATION_COUNT = 73
@@ -20,14 +31,17 @@ export const SCOPE_LIMITS = Object.freeze({ totalMs: 300000, phaseMs: 140000, mi
   snapshotTables: 120, snapshotLiveRows: 10000 })
 export const sqlHash = text => createHash('sha256').update(text).digest('hex')
 export function scopeUrl(database) { return `postgresql://postgres@127.0.0.1:55484/${database}` }
-export function checkedScopeUrl(value, phase) {
+export function checkedScopeUrl(value, phase, targets = SCOPE_DATABASES) {
   const url = new URL(value)
-  const allowed = phase === 'scope' ? [SCOPE_DATABASES.scope] : [SCOPE_DATABASES.app, SCOPE_DATABASES.workspace]
+  const allowed = phase === 'scope' ? [targets.scope] : [targets.app, targets.workspace]
   allowed.push('issue184_e2e')
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.hostname !== '127.0.0.1' || url.port !== '55484' || url.username !== 'postgres' || url.password || url.search || url.hash || !allowed.includes(url.pathname.slice(1))) throw Error('scope acceptance target mismatch')
   return url.pathname.slice(1)
 }
 export function scopePolicy(migrations, record = () => {}, {allowResume=false,allowTeamResume=false} = {}) {
+  // The old team policy is kept solely for historical proof models. The CLI
+  // retires that mode; current fresh execution uses only the three new names.
+  const targets=allowTeamResume?SCOPE_PREVIOUS_DATABASES:SCOPE_DATABASES
   const state = { failed: null, counts: {}, created: new Map(), resumed: new Map(), resumeCalls:0, teamResumeCalls:0, createAttempts: new Set(), migrations: new Set(), replays: new Set(), migrationCalls: new Set(), pending: new Map(), results: 0, cleanup: 0, connections: {} }
   const files = new Map(migrations.map(file => [file.sha256, file]))
   for (const file of migrations) if (file.beforeCommitSha256) files.set(file.beforeCommitSha256, file)
@@ -36,7 +50,7 @@ export function scopePolicy(migrations, record = () => {}, {allowResume=false,al
   function adoptRetainedTeam(identities){
     active()
     if(!allowTeamResume||state.created.size||state.resumed.size||identities.length!==2)throw Error('explicit empty team resume policy required')
-    for(const [i,row]of identities.entries())if(row.database!==[SCOPE_DATABASES.app,SCOPE_DATABASES.workspace][i]||row.oid!==['68678','68679'][i]||row.role!=='postgres')throw Error('retained team identity mismatch')
+    for(const [i,row]of identities.entries())if(row.database!==[targets.app,targets.workspace][i]||row.oid!==['68678','68679'][i]||row.role!=='postgres')throw Error('retained team identity mismatch')
     for(const row of identities)state.resumed.set(row.database,row.oid)
     record({event:'resume-team-adopted',identities})
   }
@@ -46,7 +60,7 @@ export function scopePolicy(migrations, record = () => {}, {allowResume=false,al
     active()
     if(allowTeamResume&&bucket!=='team')throw Error('team-only resume bucket mismatch')
     if(!(bucket in SCOPE_LIMITS.queries))throw Error('unknown connection bucket')
-    const database=checkedScopeUrl(input.url,bucket.split(':')[0])
+    const database=checkedScopeUrl(input.url,bucket.split(':')[0],targets)
     if(database!=='issue184_e2e'&&!owned(database))throw Error('unowned DB connection denied')
     state.connections[bucket]=(state.connections[bucket]??0)+1
     if(state.connections[bucket]>SCOPE_LIMITS.queries[bucket])throw Error('scope connection checkout budget exhausted')
@@ -56,7 +70,7 @@ export function scopePolicy(migrations, record = () => {}, {allowResume=false,al
     active()
     if(allowTeamResume&&bucket!=='team')throw Error('team-only resume bucket mismatch')
     if (!(bucket in SCOPE_LIMITS.queries)) throw Error('unknown scope query bucket')
-    const phase = bucket.split(':')[0], database = checkedScopeUrl(input.url, phase)
+    const phase = bucket.split(':')[0], database = checkedScopeUrl(input.url, phase,targets)
     state.counts[bucket] = (state.counts[bucket] ?? 0) + 1
     if (state.counts[bucket] > SCOPE_LIMITS.queries[bucket]) { abort('query budget exhausted'); throw Error('scope query budget exhausted') }
     const handshake = input.handshake && input.text === 'select current_database() as database, current_user as role, (select oid::text from pg_database where datname=current_database()) as oid'
@@ -101,7 +115,7 @@ export function scopePolicy(migrations, record = () => {}, {allowResume=false,al
   }
   function cleanup(bucket, input) {
     if(allowTeamResume&&bucket!=='team')throw Error('team-only resume cleanup bucket mismatch')
-    const database=checkedScopeUrl(input.url,bucket.split(':')[0])
+    const database=checkedScopeUrl(input.url,bucket.split(':')[0],targets)
     if(input.text.trim().toUpperCase()!=='ROLLBACK'||!owned(database)||++state.cleanup>64)throw Error('cleanup scope/budget mismatch')
     const id='cleanup:'+state.cleanup
     state.pending.set(id,{bucket,database})

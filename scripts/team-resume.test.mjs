@@ -75,7 +75,7 @@ test('team-only ownership grants no CREATE, init, replay, ledger, scope bucket o
 test('only separate team command and exact bootstrap acknowledgement can skip initialization',async()=>{
   const f=fixture();verifyTeamResumeTargets(f.manifest)
   const plan=scopePlanSummary(f.manifest,'memory-hash');assert.deepEqual(plan.databases,TEAM_DATABASES);assert.equal(plan.mode,'team-after-migrated-empty');assert.equal(plan.executed,false)
-  assert.doesNotThrow(()=>scopeExecutionMode('--run-team',f.manifest))
+  assert.throws(()=>scopeExecutionMode('--run-team',f.manifest),/historical team resume is retired/)
   assert.throws(()=>scopeExecutionMode('--run',f.manifest),/fresh exclusive/)
   for(const old of SCOPE_RETIRED_APPROVALS)assert.throws(()=>scopeExecutionMode('--run-team',f.manifest,old),/new approval/)
   assert.equal(await teamResumeBootstrap(...TEAM_DATABASES),false)

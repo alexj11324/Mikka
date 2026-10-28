@@ -1,4 +1,5 @@
 import { scopeSubtest,teamResumeBootstrap } from './support/scope-acceptance.mjs'
+import { SCOPE_DATABASES } from '../scripts/scope-acceptance-policy.mjs'
 import 'next/dist/server/node-environment-baseline'
 import { installTeamSessionFixture } from './fixtures/team-auth-runtime.mjs'
 import assert from 'node:assert/strict'
@@ -20,8 +21,8 @@ if (!url && process.env.REQUIRE_DB === '1') throw new Error('Team task DB tests 
 test('explicit team task creation across two real PostgreSQL databases', { skip: !url }, async t => {
   const { Pool } = await import('pg')
   const suffix=randomUUID().replaceAll('-','')
-  const appName=process.env.ISSUE184_LOCAL_TEST === '1' ? 'team184_app_69649a2f38184d8b8edf1fe6a6524f31_e2e' : `team184_app_${suffix}_e2e`
-  const workspaceName=process.env.ISSUE184_LOCAL_TEST === '1' ? 'team184_workspace_1bf3cc4e4430443c841d27f4a5115dc9_e2e' : `team184_workspace_${suffix}_e2e`
+  const appName=process.env.ISSUE184_LOCAL_TEST === '1' ? SCOPE_DATABASES.app : `team184_app_${suffix}_e2e`
+  const workspaceName=process.env.ISSUE184_LOCAL_TEST === '1' ? SCOPE_DATABASES.workspace : `team184_workspace_${suffix}_e2e`
   const resumed=await teamResumeBootstrap(appName,workspaceName)
   if(!resumed){
   const admin=new Pool({connectionString:url,max:1})

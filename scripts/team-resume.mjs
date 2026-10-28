@@ -1,11 +1,11 @@
 // One known pair of retained, migrated, empty team DBs. No native pg imports.
 import {readFileSync} from 'node:fs'
 import {createHash} from 'node:crypto'
-import {SCOPE_DATABASES,SCOPE_RETAINED_DATABASE,SCOPE_RETIRED_APPROVALS} from './scope-acceptance-policy.mjs'
+import {SCOPE_PREVIOUS_DATABASES,SCOPE_RETAINED_DATABASE,SCOPE_RETIRED_APPROVALS} from './scope-acceptance-policy.mjs'
 export const teamHash=value=>createHash('sha256').update(value).digest('hex')
-export const TEAM_DATABASES=Object.freeze([SCOPE_DATABASES.app,SCOPE_DATABASES.workspace])
+export const TEAM_DATABASES=Object.freeze([SCOPE_PREVIOUS_DATABASES.app,SCOPE_PREVIOUS_DATABASES.workspace])
 export const TEAM_OIDS=Object.freeze(['68678','68679'])
-export const TEAM_PRESERVED_SCOPES=[{name:SCOPE_RETAINED_DATABASE,oid:'65537',owner:'postgres',businessSqlAuthorized:false},{name:SCOPE_DATABASES.scope,oid:'67104',owner:'postgres',businessSqlAuthorized:false}]
+export const TEAM_PRESERVED_SCOPES=[{name:SCOPE_RETAINED_DATABASE,oid:'65537',owner:'postgres',businessSqlAuthorized:false},{name:SCOPE_PREVIOUS_DATABASES.scope,oid:'67104',owner:'postgres',businessSqlAuthorized:false}]
 // Fingerprint this explicit public schema/catalog scope, not physical database
 // bytes or sequence last-values. All queries are read-only and source-pinned.
 export const TEAM_CATALOG_QUERIES={
