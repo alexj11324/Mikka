@@ -8,9 +8,9 @@ Existing `acceptance` assignments with an exact 40-character `baseBranch` and th
 
 The shared report shape is additive and optional for existing non-Factory consumers. It does not introduce another run kind, verifier, publisher or permission system.
 
-## Executable question ancestry contract v1
+## Executable question ancestry contract v2
 
-`lib/factory/check-independence.ts` exports an actual read-only predicate and `FACTORY_CHECK_ANCESTRY_CONTRACT_VERSION = 1`:
+`lib/factory/check-independence.ts` exports an actual read-only predicate and `FACTORY_CHECK_ANCESTRY_CONTRACT_VERSION = 2`:
 
 ```ts
 factoryCheckIndependent(
@@ -32,9 +32,9 @@ if (!independent) {
 // Continue the SAME consumer's receipt/result validation. true does not mean passed.
 ```
 
-V1 supports **review and verify only**. Other stages, including monitor, return false; #195 must not treat it as a monitor pass gate. Any requested extension requires an explicitly coordinated contract change. For valid question continuations, the entire same-owner/issue/task/candidate/phase/session origin chain must match durable resolved questions, accepted answers and exact attempt/run/revision fences. The operational predicate body is preserved from the final #235 correction; only its structural TypeScript projection is decoupled from the unavailable foundation imports.
+V2 supports **review, verify and monitor**, following the explicit coordinated monitor extension. The same strict ancestry rules apply to successful and failed results in every supported phase. Execute/approval/publish still return false. This predicate does not install or replace the #195 monitor business gate, target receipt checks, permissions or approval. Frozen v1 at `3ee0c745a99aba6c65c64a06007197a375a3d1a2` remains review/verify-only. For valid question continuations, the entire same-owner/issue/task/candidate/phase/session origin chain must match durable resolved questions, accepted answers and exact attempt/run/revision fences. All original #235 ancestry comparisons are retained; the authorized monitor stage is the only runtime-condition extension. The structural TypeScript projection stays independent of unavailable foundation imports and introduces no state owner.
 
-`pnpm test:factory-check-independence` runs pure persisted-row fixtures for success and failure, multi-hop continuation, cross-identity/phase/session/SHA reuse, cancellation/revocation, missing metadata/answers, arbitrary retries and cycles. They execute the real predicate against a synthetic SELECT adapter; they do not prove actual PostgreSQL, claim transactions, authorization or a provider run. Normal CI runs this pure contract; integrated PostgreSQL/HTTP coverage remains dependent on #192's actual foundation.
+`pnpm test:factory-check-independence` runs pure persisted-row fixtures for success and failure, multi-hop continuation, cross-identity/phase/session/SHA reuse, cancellation/revocation, missing metadata/answers, arbitrary retries and cycles. They execute the real predicate against a synthetic SELECT adapter; they do not prove actual PostgreSQL, claim transactions, authorization or a provider run. Normal CI runs this pure contract. The required DB inventory also runs `test:factory-check-independence-db` against its existing Actions-only loopback PG17 service, with no skip/application-URL fallback.
 
 ## Consumer handoff to #192 / #194 / #195
 
@@ -56,4 +56,12 @@ For #194, the latest passed execute/review/verify attempts retain distinct run/s
 
 ## Validation boundary
 
-The daemon regression uses real Git worktrees and child commands with an explicitly simulated Harness. It records an actual failing command/exit 17, then a new commit and separate check sessions with exit 0. This is process-layer evidence, not real CC/Codex acceptance or a model-quality evaluation. Existing sandbox and deployment restrictions remain in effect. Database/HTTP checks require the matching #192 integration and isolated CI PostgreSQL; production/provider acceptance and any actual interface capture remain separate release gates. No live model evaluation is enabled by this increment.
+The daemon regression uses real Git worktrees and child commands with an explicitly simulated Harness. It records an actual failing command/exit 17, then a new commit and separate check sessions with exit 0. This is process-layer evidence, not real CC/Codex acceptance or a model-quality evaluation. Existing sandbox and deployment restrictions remain in effect. The reader-contract PG/HTTP tests described below run in authorized CI. Complete production-store/dispatch/claim integration still requires the matching #192 foundation; provider/fixed-deployment acceptance and any actual interface capture remain separate release gates. No live model evaluation is enabled by this increment.
+
+## Actual isolated PG/HTTP consumer contract
+
+`lib/factory/check-independence.db.test.ts` creates a random schema inside the existing authorized GitHub Actions `127.0.0.1:5432/mikka_e2e` PG17 service. It refuses all application/cloud URLs, missing isolation flags or mismatched configured targets. Its synthetic tables project exactly the rows read by this predicate; they are test fixtures, not a #192 migration or alternative Factory implementation. They are retained until the existing CI service teardown, with no application-table change or manual DROP.
+
+A real loopback HTTP fixture consumer holds the task/permission/run transaction fences and calls the actual exported function over real PostgreSQL joins/JSON/timestamp values. It covers all three phases and terminal outcomes, multiple questions, concurrent deterministic consumption, cross-owner/task/candidate/phase/session/origin/revision/answer/metadata/retry denial, and a cancellation or permission revocation winning actual PostgreSQL row-lock contention. A valid failed observation remains failed; the function never promotes a task or grants a business result.
+
+The actor/assignment records and outcomes are explicitly synthetic. This proves the reader and HTTP consumption contract under those fences, not actual OAuth authentication, Mikka dispatch/claim/token routes, #195 business/probe validation, a provider run or a deployment. Those integrations remain with their existing owners and must be accepted against their real implementations. No provider is executed here.

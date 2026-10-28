@@ -7,6 +7,7 @@
   "packageManager": "pnpm@10.34.3",
   "scripts": {
     "test:mailbox-verification": "node --import tsx --test scripts/personal-mailbox-acceptance/r4-verification.test.mts",
+    "test:factory-check-independence-db": "node --import tsx --test lib/factory/check-independence.db.test.ts",
     "test:factory-check-independence": "node --import tsx --test lib/factory/check-independence.test.ts",
     "test:credential-diagnostics": "TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./scripts/server-test.mjs --import tsx --test lib/infisical-workload.test.ts lib/infisical-auth-diagnostics.test.ts",
     "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts",

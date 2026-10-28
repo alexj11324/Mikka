@@ -13,7 +13,7 @@ export interface FactoryCheckTaskIdentity {
   candidateId: string | null;
 }
 
-export const FACTORY_CHECK_ANCESTRY_CONTRACT_VERSION = 1 as const;
+export const FACTORY_CHECK_ANCESTRY_CONTRACT_VERSION = 2 as const;
 
 type FactoryAttempt = {
   id: string;
@@ -82,8 +82,8 @@ type AttemptRun = FactoryAttempt & { run: CheckRun | null };
  * other phase/session. The caller holds the authorized task lock. No retryOf
  * edge or same-stage coincidence establishes a trusted question ancestor.
  *
- * Version 1 supports review/verify only. true proves session independence/ancestry,
- * not a passed check, current permission, a daemon receipt or monitor approval.
+ * Version 2 supports review/verify/monitor with the same strict ancestry fences. true proves session independence/ancestry,
+ * not a passed check, current permission, a daemon receipt or approval of a monitor result.
  * The caller must hold the authorized task lock and validate its frozen check
  * assignment; pass and failure consumers invoke this same read-only predicate. */
 export async function factoryCheckIndependent(
@@ -100,7 +100,7 @@ export async function factoryCheckIndependent(
   const session = current?.run?.sessionId;
   if (
     task.status !== "running" ||
-    !["review", "verify"].includes(task.stage) ||
+    !["review", "verify", "monitor"].includes(task.stage) ||
     !task.candidateId ||
     !current ||
     current.runId !== runId ||
@@ -201,7 +201,7 @@ export async function factoryCheckIndependent(
     child = parent;
   }
   // Same-run reuse is never allowed. Only exact ancestors may share a session;
-  // execute/review/verify and unrelated retries retain distinct identities.
+  // Other phases and unrelated retries retain distinct identities.
   return rows.every(
     (a) =>
       a.id === task.attemptId ||

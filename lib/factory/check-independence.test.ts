@@ -3,102 +3,11 @@ import test from "node:test";
 import {
   FACTORY_CHECK_ANCESTRY_CONTRACT_VERSION,
   factoryCheckIndependent,
-  type FactoryCheckTaskIdentity,
 } from "./check-independence";
 
 // Pure, explicit persisted-row fixtures: these do not execute SQL or prove a
 // provider run. Integration must use the actual #192 tables/transaction fences.
-const uuid = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-const session = "synthetic-shared-check-session";
-const base = {
-  id: uuid(1),
-  userId: "fixture-owner",
-  issueId: uuid(2),
-  sourceEventId: uuid(3),
-  stage: "verify",
-  status: "running",
-  candidateId: uuid(4),
-};
-function fixture(depth = 2, failed = false) {
-  const task: FactoryCheckTaskIdentity = {
-    ...base,
-    attemptId: uuid(10 + depth),
-  };
-  const attempts = Array.from({ length: depth + 1 }, (_, i) => ({
-    id: uuid(10 + i),
-    taskId: task.id,
-    stage: task.stage,
-    candidateId: task.candidateId,
-    ordinal: i + 1,
-    position: i + 1,
-    status: i === depth ? "running" : "waiting",
-    runId: uuid(20 + i),
-    sessionId: session,
-    run: {
-      id: uuid(20 + i),
-      userId: task.userId,
-      issueId: task.issueId,
-      sessionId: session,
-      kind: "acceptance",
-      retryOf: null as string | null,
-      status: i === depth ? (failed ? "failed" : "succeeded") : "stopped",
-      stopReason: i === depth ? "submitted" : "asked_human",
-      stopRequestedAt: null as string | null,
-      agentId: uuid(5),
-      deviceId: uuid(6),
-      deviceRepoId: uuid(7),
-      baseBranch: "a".repeat(40),
-      questionContinuation: i
-        ? {
-            questionId: uuid(30 + i),
-            originRunId: uuid(19 + i),
-            originSessionId: session,
-            requireSessionResume: true,
-          }
-        : null,
-    },
-  }));
-  const questions = Array.from({ length: depth }, (_, j) => {
-    const i = j + 1,
-      originRevision = 1 + j * 3;
-    return {
-      id: uuid(30 + i),
-      userId: task.userId,
-      issueId: task.issueId,
-      taskId: task.id,
-      attemptId: uuid(9 + i),
-      candidateId: task.candidateId,
-      stage: task.stage,
-      originRunId: uuid(19 + i),
-      originSessionId: session,
-      originRevision,
-      waitingBinding: {
-        taskId: task.id,
-        issueId: task.issueId,
-        attemptId: uuid(9 + i),
-        candidateId: task.candidateId,
-        revision: originRevision + 1,
-      },
-      status: "resolved",
-      answerId: uuid(40 + i),
-      answerSource: "orchestrator",
-      answerFingerprint: `synthetic-answer-${i}`,
-      answeredAt: new Date(0),
-      continuationRunId: uuid(20 + i),
-      result: {
-        questionId: uuid(30 + i),
-        continuationRunId: uuid(20 + i),
-        task: {
-          ...task,
-          attemptId: uuid(10 + i),
-          revision: originRevision + 3,
-        },
-      },
-    };
-  });
-  return { task, attempts, questions, runId: uuid(20 + depth) };
-}
+import { fixture, uuid } from "./test-support/check-ancestry-fixture";
 type Fixture = ReturnType<typeof fixture>;
 async function independent(f: Fixture) {
   const before = structuredClone(f);
@@ -122,9 +31,9 @@ async function independent(f: Fixture) {
   return result;
 }
 
-test("v1 exports an actual read-only predicate; both terminal outcomes use identical ancestry rules", async (t) => {
-  assert.equal(FACTORY_CHECK_ANCESTRY_CONTRACT_VERSION, 1);
-  for (const stage of ["review", "verify"])
+test("v2 exports an actual read-only predicate; both terminal outcomes use identical ancestry rules", async (t) => {
+  assert.equal(FACTORY_CHECK_ANCESTRY_CONTRACT_VERSION, 2);
+  for (const stage of ["review", "verify", "monitor"])
     for (const failed of [false, true]) {
       await t.test(
         `${stage} ${failed ? "failure" : "pass"} supports zero, one and multiple questions`,
@@ -164,10 +73,10 @@ const corruptions: Record<string, (f: Fixture) => void> = {
     f.questions[0].candidateId = uuid(90);
   },
   "phase mismatch": (f) => {
-    f.attempts[0].stage = "review";
+    f.attempts[0].stage = f.task.stage === "review" ? "verify" : "review";
   },
   "question phase mismatch": (f) => {
-    f.questions[0].stage = "review";
+    f.questions[0].stage = f.task.stage === "review" ? "verify" : "review";
   },
   "origin attempt mismatch": (f) => {
     f.questions[0].attemptId = uuid(90);
@@ -263,15 +172,19 @@ const corruptions: Record<string, (f: Fixture) => void> = {
     f.runId = uuid(90);
   },
 };
-test("v1 denies corrupt or unrelated continuation ancestry for success AND failure", async (t) => {
+test("v2 denies corrupt or unrelated continuation ancestry for success AND failure", async (t) => {
   for (const [name, mutate] of Object.entries(corruptions))
-    for (const failed of [false, true]) {
-      await t.test(`${name} (${failed ? "failure" : "pass"})`, async () => {
-        const f = fixture(2, failed);
-        mutate(f);
-        assert.equal(await independent(f), false);
-      });
-    }
+    for (const stage of ["review", "verify", "monitor"])
+      for (const failed of [false, true]) {
+        await t.test(
+          `${stage}: ${name} (${failed ? "failure" : "pass"})`,
+          async () => {
+            const f = fixture(2, failed, stage);
+            mutate(f);
+            assert.equal(await independent(f), false);
+          },
+        );
+      }
 });
 test("ordinary same-phase retry or cross-phase reuse never acquires a question exemption", async () => {
   const f = fixture(0);
@@ -285,8 +198,8 @@ test("ordinary same-phase retry or cross-phase reuse never acquires a question e
   f.attempts.at(-1)!.stage = "execute";
   assert.equal(await independent(f), false);
 });
-test("v1 does not grant monitor/approval/publish or permission/check-result authority", async () => {
-  for (const stage of ["execute", "monitor", "approval", "publish"]) {
+test("v2 does not grant execute/approval/publish or permission/check-result authority", async () => {
+  for (const stage of ["execute", "approval", "publish"]) {
     const f = fixture(0);
     f.task.stage = stage;
     f.attempts[0].stage = stage;
