@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { answerModel } from './model.mjs'
 import { REPOSITORY } from './isolated-env.mjs'
+import { assertMvpRunAllowed, finishMvpResources, indexMvpResource, retainMvpResources } from './retention.mjs'
 
 const execute = promisify(execFile)
 const git = async (cwd, args) => (await execute('git', args, { cwd, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' } })).stdout.trim()
@@ -29,7 +30,9 @@ async function readBody(request) {
 
 /** Loopback only. Real git changes are required before the fake GitHub accepts a PR. */
 export async function startMvpServices(port = 3191) {
+  assertMvpRunAllowed()
   const directory = await mkdtemp(join(tmpdir(), 'mikka-mvp-origin-'))
+  await indexMvpResource('origin-directory', directory)
   let scenario = null
   let observations = []
   let errors = []
@@ -145,6 +148,11 @@ export async function startMvpServices(port = 3191) {
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve) })
   return {
     origin: `http://127.0.0.1:${server.address().port}`,
-    async close() { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, { recursive: true, force: true }) },
+    async close() {
+      await finishMvpResources({ retain: retainMvpResources(),
+        stop: async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)) },
+        cleanup: async () => { await rm(directory, { recursive: true, force: true }) },
+      })
+    },
   }
 }

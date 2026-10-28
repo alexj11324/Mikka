@@ -6,10 +6,15 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertMvpEnvironment, MVP_ORIGIN } from '../tests/mvp/isolated-env.mjs'
 import { startMvpServices } from '../tests/mvp/services.mjs'
+import { assertMvpRunAllowed, finishMvpResources, indexMvpResource, retainMvpResources } from '../tests/mvp/retention.mjs'
 
+assertMvpRunAllowed()
 assertMvpEnvironment()
+const database = new URL(process.env.E2E_DATABASE_URL)
+await indexMvpResource('database-target', `${database.hostname}:${database.port || '5432'}${database.pathname}`)
 const services = await startMvpServices()
 const workflowDirectory = await mkdtemp(join(tmpdir(), 'mikka-mvp-workflow-'))
+await indexMvpResource('workflow-directory', workflowDirectory)
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const preload = fileURLToPath(new URL('../tests/mvp/preload.mjs', import.meta.url))
 const child = spawn(process.execPath, ['--import', preload, 'node_modules/next/dist/bin/next', 'start', '--port', '3100'], {
@@ -26,12 +31,16 @@ let closing = false
 async function close(signal = 'SIGTERM') {
   if (closing) return
   closing = true
-  child.kill(signal)
-  const timer = setTimeout(() => { child.kill('SIGKILL') }, 5_000)
-  await childDone
-  clearTimeout(timer)
-  await services.close()
-  await rm(workflowDirectory, { recursive: true, force: true })
+  await finishMvpResources({ retain: retainMvpResources(),
+    stop: async () => {
+      child.kill(signal)
+      const timer = setTimeout(() => { child.kill('SIGKILL') }, 5_000)
+      await childDone
+      clearTimeout(timer)
+      await services.close()
+    },
+    cleanup: async () => { await rm(workflowDirectory, { recursive: true, force: true }) },
+  })
 }
 process.on('SIGTERM', () => { void close() })
 process.on('SIGINT', () => { void close('SIGINT') })

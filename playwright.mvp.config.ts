@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 import { assertMvpEnvironment, MVP_ORIGIN } from './tests/mvp/isolated-env.mjs'
+import { assertMvpRunAllowed } from './tests/mvp/retention.mjs'
 
+assertMvpRunAllowed()
 assertMvpEnvironment()
 export default defineConfig({
   testDir: './tests/mvp', testMatch: '**/*.spec.ts', fullyParallel: false,

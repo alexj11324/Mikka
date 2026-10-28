@@ -11,6 +11,7 @@ import { test, expect, register, openCreateIssue } from '../e2e/fixtures'
 import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 import { assertMvpEnvironment, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from './isolated-env.mjs'
 import { RepositoryCache } from '../../packages/daemon/src/repositories'
+import { finishMvpResources, indexMvpResource, retainMvpResources } from './retention.mjs'
 
 const execute = promisify(execFile)
 type Device = { id: string; name: string; protocolVersion: number }
@@ -48,12 +49,16 @@ async function setup(page: Page, testInfo: TestInfo) {
   const { email } = await register(page, '/', `${prefix}-${randomUUID()}@example.com`)
   const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
   expect(user?.id).toBeTruthy()
+  await indexMvpResource('owner-id', user.id)
+  await indexMvpResource('scenario-id', marker)
   const githubAccountId = String(randomInt(1_000_000, 2_000_000_000))
   const scenario = await service<{ barePath: string; repo: string; baseBranch: string }>('/scenario', { marker, title, githubAccountId })
   const token = `orv_${randomBytes(32).toString('base64url')}`
   await recordAuthenticationSecrets([token])
   const tokenId = randomUUID()
   const dataDir = await mkdtemp(join(tmpdir(), 'mikka-mvp-daemon-'))
+  await indexMvpResource('daemon-directory', dataDir)
+  await indexMvpResource('token-id', tokenId)
   await pool.query('INSERT INTO device_tokens (id, "userId", name, "tokenHash") VALUES ($1, $2, $3, $4)', [tokenId, user.id, 'Disposable MVP daemon', createHash('sha256').update(token).digest('hex')])
   // The GitHub identity is synthetic; repository approval must go through the
   // real proposal store and the authenticated browser decision below.
@@ -98,8 +103,9 @@ async function setup(page: Page, testInfo: TestInfo) {
   const checkpoints: { at: string; step: string }[] = []
   const checkpoint = (step: string) => { checkpoints.push({ at: new Date().toISOString(), step }) }
   const cleanup = async () => {
-    await stopProcess(daemon)
-    await pool.query('UPDATE device_tokens SET "revokedAt" = now() WHERE id = $1 AND "userId" = $2', [tokenId, user.id])
+    await finishMvpResources({ retain: retainMvpResources(), stop: async () => { await stopProcess(daemon) },
+      cleanup: async () => { await pool.query('UPDATE device_tokens SET "revokedAt" = now() WHERE id = $1 AND "userId" = $2', [tokenId, user.id]) },
+    })
     const services = await service<ServiceEvidence>('/observations').catch(() => ({ observations: [], errors: ['Fixture service unavailable'], pullRequests: [] }))
     const sha = (await execute('git', ['rev-parse', 'HEAD'])).stdout.trim()
     const runs = (await pool.query('SELECT id, "issueId", "deviceId", status, "stopReason" FROM agent_runs WHERE "userId" = $1', [user.id])).rows
@@ -109,7 +115,7 @@ async function setup(page: Page, testInfo: TestInfo) {
     await testInfo.attach('mvp-acceptance-evidence.json', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' })
     if (daemonOutput) await testInfo.attach('daemon-output', { body: daemonOutput, contentType: 'text/plain' })
     // Credentials, daemon.secret, device.json and Workflow storage are never artifacts.
-    await rm(dataDir, { recursive: true, force: true })
+    await finishMvpResources({ retain: retainMvpResources(), stop: async () => {}, cleanup: async () => { await rm(dataDir, { recursive: true, force: true }) } })
   }
   try {
     await expect.poll(async () => {
@@ -119,6 +125,7 @@ async function setup(page: Page, testInfo: TestInfo) {
       return rows.length
     }, { timeout: 45_000 }).toBe(1)
     expect(device!.protocolVersion).toBeGreaterThanOrEqual(3)
+    await indexMvpResource('device-id', device!.id)
     await expect.poll(async () => (await pool.query('SELECT id FROM agents WHERE "userId" = $1 AND "deviceId" = $2 AND harness = $3', [user.id, device!.id, 'mock'])).rowCount).toBe(1)
     await service('/scenario/device', { deviceId: device!.id })
     checkpoint('Real daemon logged in, registered and exposed its mock harness')
@@ -141,6 +148,7 @@ async function setup(page: Page, testInfo: TestInfo) {
       runId = rows[0]?.id
       return rows.length
     }, { timeout: 60_000 }).toBe(1)
+    await indexMvpResource('run-id', runId!)
     const run = async () => (await pool.query<Run>('SELECT * FROM agent_runs WHERE id = $1 AND "userId" = $2', [runId, user.id])).rows[0]
     expect((await run()).deviceId).toBe(device!.id)
     expect((await run()).baseBranch).toBeNull()
