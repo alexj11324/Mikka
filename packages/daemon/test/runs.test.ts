@@ -460,7 +460,8 @@ describe("follow-up runs", () => {
   function queueFollowUp(
     server: MemoryServer,
     continuesRunId: string,
-    resumeSessionId: string
+    resumeSessionId: string,
+    requireSessionResume = false
   ) {
     return server.queueRun(DEVICE, {
       issueId: "issue-success-edit",
@@ -471,6 +472,7 @@ describe("follow-up runs", () => {
       followUp: FOLLOW_UP,
       continuesRunId,
       resumeSessionId,
+      requireSessionResume,
       fixture: "success-edit",
       verifyCommand: VERIFY,
     })
@@ -499,6 +501,39 @@ describe("follow-up runs", () => {
     const third = queueFollowUp(server, second, sessionId)
     expect(await runToEnd(daemon, server, third)).toMatchObject({ sessionId })
     expect(mockSession(dataDir, sessionId).messages).toHaveLength(3)
+  })
+
+  it("required question continuation retains its exact earlier session", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const first = queue(server, "success-edit")
+    const earlier = await runToEnd(daemon, server, first)
+    const sessionId = earlier.sessionId as string
+    const second = queueFollowUp(server, first, sessionId, true)
+    expect(await runToEnd(daemon, server, second)).toMatchObject({state:"succeeded",sessionId,worktree:earlier.worktree})
+    expect(mockSession(dataDir,sessionId).messages).toEqual(["do it",FOLLOW_UP])
+  })
+
+  it("required question continuation refuses a missing worktree without fresh execution", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const first = queue(server, "success-edit")
+    const earlier = await runToEnd(daemon, server, first)
+    const sessionId=earlier.sessionId as string
+    const second=queueFollowUp(server,"run-unknown",sessionId,true)
+    expect(await runToEnd(daemon,server,second)).toMatchObject({state:"failed"})
+    expect(mockSession(dataDir,sessionId).messages).toEqual(["do it"])
+    expect(server.runs.get(second)?.completion?.report?.summary ?? '').toContain('factory_question_session_resume_required')
+  })
+
+  it("required question continuation rejects adapter fallback to another session", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const first = queue(server, "success-edit")
+    await runToEnd(daemon, server, first)
+    const second=queueFollowUp(server,first,"mock-unknown",true)
+    expect(await runToEnd(daemon,server,second)).toMatchObject({state:"failed"})
+    expect(server.runs.get(second)?.completion?.report?.summary ?? '').toContain('factory_question_session_mismatch')
   })
 
   it("starts a new session with the full brief in a fresh worktree", async () => {

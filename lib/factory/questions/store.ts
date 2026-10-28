@@ -382,7 +382,7 @@ export function createFactoryQuestions(
         const {
           rows: [q],
         } = await tx.query<FactoryQuestion>(
-          `INSERT INTO factory_questions (id,"userId","issueId","taskId","attemptId","candidateId",stage,"originRunId","originSessionId","originRevision","waitingBinding",kind,question,context,options,request,status,reason,"sourceEventId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'open',$13,$17) RETURNING *`,
+          `INSERT INTO factory_questions (id,"userId","issueId","taskId","attemptId","candidateId",stage,"originRunId","originSessionId","originRevision","waitingBinding",kind,question,context,options,request,status,reason,"sourceEventId","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'open',$13,$17,now()+interval '24 hours') RETURNING *`,
           [
             handoff.questionId,
             userId,
@@ -465,6 +465,7 @@ export function createFactoryQuestions(
           input.reference.questionId,
         );
         if (stopped(task)) fail("factoryStopped");
+        if (q.expiresAt && q.expiresAt.getTime() <= Date.now()) fail("factoryQuestionExpired");
         if (task.candidateId !== q.candidateId) fail("factoryQuestionStale");
         let answerText = "",
           sourceEventId: string | null = null;

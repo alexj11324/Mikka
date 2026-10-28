@@ -110,8 +110,11 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
       assert.equal((await send(answer,{authorization:'Bearer synthetic-test'})).status,401);
       assert.equal((await send(answer,{origin:'https://foreign.invalid'})).status,403);
       assert.equal((await send({...answer,source:'human'})).status,422);
-      const accepted=await send(answer);assert.equal(accepted.status,200);
-      const result=await accepted.json() as {continuationRunId:string};
+      const responses=await Promise.all(Array.from({length:10},()=>send(answer)));
+      for (const response of responses) assert.equal(response.status,200);
+      const results=await Promise.all(responses.map(response=>response.json() as Promise<{continuationRunId:string}>));
+      assert.equal(new Set(results.map(result=>result.continuationRunId)).size,1);
+      const result=results[0];
       const replay=await send(answer);assert.equal(replay.status,200);
       assert.equal((await replay.json() as {continuationRunId:string}).continuationRunId,result.continuationRunId);
       const current=await store.read('owner',r.task.id);
@@ -119,6 +122,21 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
       assert.equal((await send(answer)).status,409);
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[r.task.issueId])).rows[0].n,2);
     }finally{server.closeAllConnections();await new Promise<void>((resolve,reject)=>server.close(e=>e?reject(e):resolve()));}
+  });
+  await t.test('expired questions refuse new answers while another task progresses independently',async()=>{
+    const r=await store.route('owner',await fixture());
+    const d=await dispatch('owner',{binding:factoryBinding(r.task),agentId,deviceRepoId:repoId});
+    await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"='expired-session',report=$2 WHERE id=$1`,[d.runId,JSON.stringify({question:{questionId:randomUUID(),kind:'context',question:'Need source?',options:[]}})]);
+    const q=await questions.record('owner',d.runId);
+    assert.ok(q.expiresAt);
+    const other=await store.route('owner',await fixture());
+    const progressing=await dispatch('owner',{binding:factoryBinding(other.task),agentId,deviceRepoId:repoId});
+    assert.equal(progressing.task.status,'running');
+    assert.equal((await store.read('owner',r.task.id)).task.status,'waiting');
+    await pool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 second' WHERE id=$1`,[q.id]);
+    await denies(()=>questions.answer({source:'orchestrator',userId:'owner'},{reference:questionReference(q),answerId:randomUUID(),facts:[{kind:'issue',quote:'Fixture'}]}),'factoryQuestionExpired');
+    assert.equal((await questions.read('owner',q.id)).status,'expired');
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[r.task.issueId])).rows[0].n,1);
   });
   await t.test('unadopted retry and revoked issue access cannot claim',async()=>{
     const r=await store.route('owner',await fixture());
