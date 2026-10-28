@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Pool, type PoolClient } from 'pg'
-import { drizzle } from 'drizzle-orm/node-postgres'
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as schema from './schema'
 import { mikkaDatabaseURL } from './config'
 
@@ -20,7 +20,7 @@ if (process.env.NODE_ENV !== 'production' && process.env.VERCEL_ENV !== 'preview
 const defaultDatabase = createDatabase(defaultPool)
 const requestDatabase = new AsyncLocalStorage<{ pool: Pool; db: typeof defaultDatabase }>()
 type Transaction = Parameters<Parameters<typeof defaultDatabase.transaction>[0]>[0]
-const transactionDatabase = new AsyncLocalStorage<Transaction | typeof defaultDatabase>()
+const transactionDatabase = new AsyncLocalStorage<Transaction | NodePgDatabase<typeof schema>>()
 
 export const pool = new Proxy(defaultPool, {
   get(target, property) {
