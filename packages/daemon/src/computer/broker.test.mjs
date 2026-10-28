@@ -63,6 +63,8 @@ test("listen rejects a pre-existing path without deleting or replacing it", asyn
   const b = await fixture(t, { socketPath });
   await assert.rejects(() => b.listen(), { code: "EADDRINUSE" });
   assert.equal(await readFile(socketPath, "utf8"), "retained evidence");
+  await b.close();
+  assert.equal(await readFile(socketPath, "utf8"), "retained evidence");
   t.after(() => rm(dir, { recursive: true, force: true }));
 });
 for (const permission of ["allow", "ask"]) test(`suspension during ${permission} asynchronous admission blocks the later action`, async (t) => {

@@ -4,7 +4,7 @@ import {
   createHash,
   timingSafeEqual,
 } from "node:crypto";
-import { chmodSync, rmSync } from "node:fs";
+import { chmodSync } from "node:fs";
 import { createServer } from "node:net";
 import { normalizeCall, executeDriver } from "./driver.mjs";
 export class ComputerBroker {
@@ -195,7 +195,8 @@ export class ComputerBroker {
   async close() {
     this.suspend();
     for (const socket of this.sockets) socket.destroy();
-    if (this.server) await new Promise((resolve) => this.server.close(resolve));
-    rmSync(this.socketPath, { force: true });
+    // Node unlinks the socket it owns on close. A failed bind owns nothing:
+    // never unlink a path that may belong to another daemon or retained file.
+    if (this.server?.listening) await new Promise((resolve) => this.server.close(resolve));
   }
 }
