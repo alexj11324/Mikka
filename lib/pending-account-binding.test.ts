@@ -12,7 +12,7 @@ const db = {
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { exports })
 stub('./db/index.ts', { db })
 stub('./composio.ts', {
-  resolveActionAccount: async () => selected,
+  resolveActionAccount: async (_userId: string, _action: string, requested?: string) => ({ accountId: requested ?? selected, accounts: [] }),
   runComposioAction: async (...args: unknown[]) => { calls.push(args); return { data: { summary: 'event' }, accountId: args[3] } },
 })
 stub('./coordinator-event-store.ts', { recordCoordinatorEvent: async () => {} })
@@ -36,4 +36,11 @@ test('an old unbound proposal fails closed without a provider call', async () =>
   const result = await actions.decidePendingAction('u', 'old', true)
   assert.equal(result.error, 'integrationAccountNotBound')
   assert.deepEqual(calls, [])
+})
+
+
+test('a model-selected account is frozen in the proposal', async () => {
+  selected = 'default-account'
+  await store.proposeAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, 'selected-account')
+  assert.equal(row.connectedAccountId, 'selected-account')
 })

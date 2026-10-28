@@ -14,14 +14,14 @@ const MAX_PENDING = 20
  * approve. Nothing runs here. A calendar change also reads the event as it is
  * now, so the card can show what changes.
  */
-export async function proposeAction(userId: string, action: string, input: unknown) {
+export async function proposeAction(userId: string, action: string, input: unknown, selectedAccountId?: string) {
   if (!isApprovalAction(action)) return { error: 'integrationActionNotAllowed' }
   const parsed = parseActionInput(action, input)
   if (!parsed) return { error: 'invalidIntegrationInput' }
   const waiting = await db.$count(pendingActions, and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
   if (waiting >= MAX_PENDING) return { error: 'tooManyPendingActions: ask the person to approve or decline the waiting ones first' }
-  const accountId = await resolveActionAccount(userId, action)
-  if (!accountId) return { error: 'integrationNotConnected' }
+  const { accountId, accounts } = await resolveActionAccount(userId, action, selectedAccountId)
+  if (!accountId) return accounts.length ? { error: 'integrationAccountSelectionRequired', accounts } : { error: 'integrationNotConnected' }
   let context: PendingActionView['context'] = null
   if (action === 'update_calendar_event') {
     const current = await runComposioAction(userId, 'get_calendar_event', { event_id: parsed.event_id }, accountId)

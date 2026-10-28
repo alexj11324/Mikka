@@ -60,7 +60,7 @@ test('a reconnect does not carry an alias that was only the old email, nor a def
 
 test('the only account being reconnected stays the default', () => {
   const items = [gmail('old', '2026-09-01T00:00:00Z'), gmail('new', '2026-10-28T00:00:00Z')]
-  assert.equal(reconnectHandover(items, [], 'old').isDefault, true)
+  assert.equal(reconnectHandover(items, [], 'old', 'new').isDefault, true)
 })
 
 test('a failed retire still reads the email; another toolkit is never retired', async () => {

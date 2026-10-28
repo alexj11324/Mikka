@@ -196,16 +196,16 @@ export async function forget(userId: string, input: { text: string }, scope?: Na
   }, botId)
 }
 
-export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope) {
+export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope, accountId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return runComposioAction(userId, action, input)
+  return accountId ? runComposioAction(userId, action, input, accountId) : runComposioAction(userId, action, input)
 }
 
-export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope) {
+export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return proposeAction(userId, action, input)
+  return accountId ? proposeAction(userId, action, input, accountId) : proposeAction(userId, action, input)
 }
 
 export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope) {

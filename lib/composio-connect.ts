@@ -46,7 +46,7 @@ function effectiveDefault(items: ComposioListedAccount[], records: ComposioAccou
  * What a reconnect carries from the old account to the new one: a name the
  * person gave it (not the email Mikka filled in), and whether the bots used it.
  */
-export function reconnectHandover(items: ComposioListedAccount[], records: ComposioAccountRecord[], oldId: string) {
+export function reconnectHandover(items: ComposioListedAccount[], records: ComposioAccountRecord[], oldId: string, addedId?: string) {
   const old = items.find(item => item.id === oldId)
   if (!old) return { alias: null, isDefault: false }
   const alias = old.alias?.trim() || null
@@ -54,7 +54,7 @@ export function reconnectHandover(items: ComposioListedAccount[], records: Compo
   const custom = alias && alias.toLowerCase() !== record?.email?.toLowerCase() ? alias : null
   // The person's choice counts even while the old account is expired (and so
   // not usable, which is why it is being reconnected).
-  return { alias: custom, isDefault: Boolean(record?.isDefault) || effectiveDefault(items, records, old.toolkit.slug) === oldId }
+  return { alias: custom, isDefault: Boolean(record?.isDefault) || effectiveDefault(items.filter(item => item.id !== addedId), records, old.toolkit.slug) === oldId }
 }
 
 /** Reads, keeps and (when it has no name) names the account after its email. Never throws. */
@@ -92,7 +92,7 @@ export async function followUpComposioConnect(
   const replaced = input.replaceId && input.replaceId !== added.id
     ? input.items.find(item => item.id === input.replaceId && item.toolkit.slug === toolkit)
     : undefined
-  const handover = replaced ? reconnectHandover(input.items, input.records, replaced.id) : null
+  const handover = replaced ? reconnectHandover(input.items, input.records, replaced.id, added.id) : null
   let reconnectComplete = !input.replaceId
   if (replaced && added.status === 'ACTIVE' && !added.isDisabled) {
     let retired = false

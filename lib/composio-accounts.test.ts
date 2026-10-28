@@ -56,13 +56,13 @@ test('revocation failure leaves the alias and stored account untouched, includin
   assert.deepEqual(calls, ['revoke', 'clear', 'forget'])
 })
 
-test('the default account is the chosen usable one, else the oldest usable one', () => {
+test('choose only an explicit usable default or a sole usable account', () => {
   const a = { id: 'a', status: 'ACTIVE', isDisabled: false, createdAt: '2026-09-01T00:00:00Z' }
   const b = { id: 'b', status: 'ACTIVE', isDisabled: false, createdAt: '2026-10-01T00:00:00Z' }
   assert.equal(pickDefaultAccountId([b, a], 'b'), 'b')
-  assert.equal(pickDefaultAccountId([b, a], null), 'a')
-  assert.equal(pickDefaultAccountId([b, a], 'gone'), 'a')
-  assert.equal(pickDefaultAccountId([{ ...b, isDisabled: true }, a], 'b'), 'a')
+  assert.equal(pickDefaultAccountId([b, a], null), null)
+  assert.equal(pickDefaultAccountId([b, a], 'gone'), null)
+  assert.equal(pickDefaultAccountId([{ ...b, isDisabled: true }, a], 'b'), null)
   assert.equal(pickDefaultAccountId([b, { ...a, status: 'EXPIRED' }], null), 'b')
   assert.equal(pickDefaultAccountId([{ ...a, status: 'EXPIRED' }], null), null)
 })
@@ -73,7 +73,7 @@ test('stored emails and the chosen default are joined per toolkit', () => {
   const joined = withAccountRecords(accounts, [{ accountId: 'g2', email: 'me@example.com', emailChecked: true, lastAttemptAt: null, isDefault: true }, { accountId: 'other-user', email: 'x@example.com', emailChecked: true, lastAttemptAt: null, isDefault: true }])
   assert.deepEqual(joined.map(item => [item.id, item.email, item.isDefault]), [['g1', null, false], ['g2', 'me@example.com', true], ['n1', null, true]])
   const fallback = withAccountRecords(accounts, [])
-  assert.deepEqual(fallback.filter(item => item.isDefault).map(item => item.id), ['g1', 'n1'])
+  assert.deepEqual(fallback.filter(item => item.isDefault).map(item => item.id), ['n1'])
 })
 
 test('only a plain email address is kept', () => {

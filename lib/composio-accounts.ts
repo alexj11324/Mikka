@@ -56,13 +56,13 @@ type DefaultCandidate = { id: string; status: string; isDisabled: boolean; creat
 
 /**
  * The account bots use for one toolkit: the one the person chose with 设为默认
- * while it is usable (ACTIVE and on), otherwise the oldest usable one. Null
- * when none is usable.
+ * while it is usable (ACTIVE and on). With no choice, a sole usable account
+ * is unambiguous; otherwise require a selection rather than changing identity.
  */
 export function pickDefaultAccountId(accounts: DefaultCandidate[], chosenId: string | null | undefined) {
   const usable = accounts.filter(account => account.status === 'ACTIVE' && !account.isDisabled)
-  if (chosenId && usable.some(account => account.id === chosenId)) return chosenId
-  return usable.toSorted((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')) || a.id.localeCompare(b.id))[0]?.id ?? null
+  if (chosenId) return usable.some(account => account.id === chosenId) ? chosenId : null
+  return usable.length === 1 ? usable[0].id : null
 }
 
 export type ComposioAccountRecord = {

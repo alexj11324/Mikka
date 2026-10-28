@@ -16,10 +16,10 @@ export function runComposioAction(userId: string, action: ComposioActionName, in
   return executeComposioAction(userId, action, input, getComposio(), toolkit => chosenComposioDefault(userId, toolkit), accountId)
 }
 
-export async function resolveActionAccount(userId: string, action: ComposioActionName): Promise<string | null> {
+export async function resolveActionAccount(userId: string, action: ComposioActionName, accountId?: string) {
   const composio = getComposio()
-  if (!composio) return null
-  return resolveComposioAccount(userId, COMPOSIO_ACTIONS[action].toolkit, composio, toolkit => chosenComposioDefault(userId, toolkit))
+  if (!composio) return { accountId: null, accounts: [] }
+  return resolveComposioAccount(userId, COMPOSIO_ACTIONS[action].toolkit, composio, toolkit => chosenComposioDefault(userId, toolkit), accountId)
 }
 
 export function isComposioToolkit(value: string): value is ComposioToolkit {

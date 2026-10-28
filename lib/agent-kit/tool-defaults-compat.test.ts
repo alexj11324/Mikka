@@ -68,6 +68,13 @@ test('Gmail reads retain the real input schema, host owner and native scope; acc
   assert.equal((await asSchema(tools.read_gmail_message.inputSchema).validate!({message_id: ''})).success, false)
 })
 
+test('explicit model account selection travels with the host owner and scope', async () => {
+  calls.length = 0
+  const tools = registry.coordinatorTools(owner, bot, scope, { execution: execution() })
+  await invoke(tools, 'read_gmail_message', { message_id: 'message-1', account_id: 'chosen-account' })
+  assert.deepEqual(calls, [{ name: 'read', args: [owner, 'read_gmail_message', { message_id: 'message-1' }, scope, 'chosen-account'] }])
+})
+
 test('conditional computer defaults keep the named Bot boundary and disabled capabilities fail closed', async () => {
   calls.length = 0
   const run = execution(builtinAgentDefinition({computerEnabled: true}))
