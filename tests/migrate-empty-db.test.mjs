@@ -12,6 +12,7 @@ import * as workspaceSchema from '../lib/db/workspace-schema.ts'
 import * as projectSchema from '../lib/db/project-schema.ts'
 import * as teamSchema from '../lib/db/team-schema.ts'
 import { APPLICATION_BASELINE } from '../scripts/migration-order.mjs'
+import { validateTarget } from '../scripts/run-db-tests.mjs'
 
 const run = promisify(execFile)
 const directory = new URL('../drizzle/', import.meta.url)
@@ -20,6 +21,7 @@ const enabled = process.env.MIGRATION_BOOTSTRAP_CI === '1'
 // Never default to DATABASE_URL or a developer/production service. The workflow
 // opts in only against its disposable postgres:17 service, before E2E setup.
 function ciTarget() {
+  validateTarget(process.env)
   assert.equal(process.env.CI, 'true', 'Database regression is CI-only')
   const target = new URL(process.env.E2E_DATABASE_URL)
   assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(target.hostname), 'Requires loopback CI Postgres')
@@ -75,6 +77,8 @@ for (const separateTargets of [false, true]) {
     const fixtureDatabase = `bootstrap_${randomUUID().replaceAll('-', '')}`
     try {
       assert.equal((await rootAdmin.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+      const identity = (await rootAdmin.query('select current_database() as database, session_user as role')).rows[0]
+      assert.deepEqual(identity, { database: 'mikka_e2e', role: 'e2e' })
       // Each scenario needs its own catalog: historical SQL checks some
       // constraint names database-wide. Never rewrite that executed SQL.
       await rootAdmin.query(`create database "${fixtureDatabase}"`)
