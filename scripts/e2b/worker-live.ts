@@ -201,10 +201,8 @@ async function main() {
     throw error
   } finally {
     const ids = await pool.query('SELECT "sandboxId" FROM cloud_machines WHERE "sandboxId" IS NOT NULL').catch(() => ({ rows: [] }))
-    console.log(JSON.stringify({ retainedSchema: schema, retainedSandboxIds: ids.rows.map(({ sandboxId }) => sandboxId) }))
-    await pool.end(); await admin.end()
+    for (const { sandboxId } of ids.rows) await Sandbox.kill(sandboxId, connection)
+    await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
   }
 }
-// HOLD: this acceptance provisions live resources and is not retention-safe.
-console.error('E2B worker acceptance held: resource retention required')
-process.exitCode = 1
+void main().catch(error => { console.error(`stage=${stage}`, error instanceof assert.AssertionError ? error.message : error instanceof Error ? error.name : 'Worker acceptance failed'); process.exitCode = 1 })
