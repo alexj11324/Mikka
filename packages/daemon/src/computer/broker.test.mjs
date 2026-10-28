@@ -84,30 +84,74 @@ test("keys and scrolling require the exact approval and use the selected desktop
   assert.deepEqual(driverArguments({ name: "press_key", arguments: { key: "tab" } }, "linux"), { key: "tab", scope: "desktop", delivery_mode: "foreground" });
   assert.deepEqual(driverArguments({ name: "scroll", arguments: { direction: "down", amount: 2, x: 10, y: 20 } }, "linux"), { direction: "down", amount: 2, x: 10, y: 20, scope: "desktop", coordinate_frame: "desktop", delivery_mode: "foreground" });
 });
-test("ask and allow both suspend; one exact review delivers result, replay denied", async (t) => {
-  for (const permission of ["ask", "allow"]) {
-    let calls = 0;
-    const b = await fixture(t, {
-      execute: async () => {
-        calls++;
-        return { ok: true };
-      },
-    });
-    const grant = b.spec("r", permission);
-    const pending = b.request(grant.token, {
-      name: "click",
-      arguments: { y: 2, x: 1 },
-    });
-    assert.equal(calls, 0);
-    const row = b.list()[0];
-    assert.deepEqual(row.call.arguments, { x: 1, y: 2 });
-    await assert.rejects(() => b.decide(row.id, "bad", true));
-    assert.equal(calls, 0);
-    await b.decide(row.id, row.digest, true);
-    assert.deepEqual(await pending, { ok: true });
-    assert.equal(calls, 1);
-    await assert.rejects(() => b.decide(row.id, row.digest, true));
+test("ask suspends; one exact review delivers result, replay denied", async (t) => {
+  let calls = 0;
+  const b = await fixture(t, {
+    execute: async () => {
+      calls++;
+      return { ok: true };
+    },
+  });
+  const grant = b.spec("r", "ask");
+  const pending = b.request(grant.token, {
+    name: "click",
+    arguments: { y: 2, x: 1 },
+  });
+  assert.equal(calls, 0);
+  const row = b.list()[0];
+  assert.deepEqual(row.call.arguments, { x: 1, y: 2 });
+  await assert.rejects(() => b.decide(row.id, "bad", true));
+  assert.equal(calls, 0);
+  await b.decide(row.id, row.digest, true);
+  assert.deepEqual(await pending, { ok: true });
+  assert.equal(calls, 1);
+  await assert.rejects(() => b.decide(row.id, row.digest, true));
+});
+test("allow executes once without an approval; deny and missing policy revoke earlier grants", async (t) => {
+  let calls = 0;
+  const b = await fixture(t, { execute: async (_, call, display, runId) => {
+    calls++;
+    return { call, display, runId };
+  } });
+  const grant = b.spec("run", "allow", { display: ":1" });
+  const result = await b.request(grant.token, { name: "click", arguments: { x: 3, y: 4 } });
+  assert.deepEqual(result, { call: { name: "click", arguments: { x: 3, y: 4 } }, display: ":1", runId: "run" });
+  assert.equal(calls, 1);
+  assert.deepEqual(b.list(), []);
+  assert.equal(b.spec("run", "deny"), undefined);
+  await assert.rejects(b.request(grant.token, { name: "get_desktop_state" }));
+  const next = b.spec("run", "allow");
+  assert.equal(b.spec("run", undefined), undefined);
+  await assert.rejects(b.request(next.token, { name: "get_desktop_state" }));
+  const malformed = b.spec("run", "allow");
+  assert.throws(() => b.spec("run", "deny", { display: ":1;bad" }));
+  await assert.rejects(b.request(malformed.token, { name: "get_desktop_state" }));
+  assert.equal(calls, 1);
+});
+test("allow rechecks live authority, cancellation, grant replacement and driver identity before executing", async (t) => {
+  let allowed = true, calls = 0;
+  const b = await fixture(t, { permitted: () => allowed, execute: async () => { calls++; } });
+  for (const mode of ["stop", "abort", "replace", "fingerprint"]) {
+    allowed = true;
+    b.driver = { ...driver };
+    const grant = b.spec("run", "allow");
+    const abort = new AbortController();
+    const result = b.request(grant.token, { name: "get_desktop_state" }, abort.signal);
+    if (mode === "stop") allowed = false;
+    if (mode === "abort") abort.abort();
+    if (mode === "replace") b.spec("run", "deny");
+    if (mode === "fingerprint") b.driver.fingerprint = "changed";
+    await assert.rejects(result);
   }
+  assert.equal(calls, 0);
+});
+test("allow returns an uncertain driver error without retrying the operation", async (t) => {
+  let calls = 0;
+  const b = await fixture(t, { execute: async () => { calls++; throw new Error("outcome unknown"); } });
+  const grant = b.spec("run", "allow");
+  await assert.rejects(b.request(grant.token, { name: "click", arguments: { x: 1, y: 2 } }), /outcome unknown/);
+  assert.equal(calls, 1);
+  assert.deepEqual(b.list(), []);
 });
 test("denied, expired and newly forbidden requests never execute", async (t) => {
   for (const mode of ["deny", "expire", "policy"]) {
@@ -196,6 +240,27 @@ test("real stdio MCP proxy holds call until trusted broker approval; cannot deci
   assert.match(replies[0].result.content[0].text, /'click'|"click"/);
   child.stdin.end();
   lines.close();
+});
+
+test("allow returns actual PNG bytes through the request-only MCP proxy to the scripted client", async (t) => {
+  // A one-pixel PNG fixture; this validates image transport, not vision-model reasoning.
+  const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/aV8AAAAASUVORK5CYII=";
+  const b = await fixture(t, { execute: async () => ({ content: [{ type: "image", mimeType: "image/png", data: png }] }) });
+  await b.listen();
+  const grant = b.spec("run", "allow");
+  const child = spawn(process.execPath, [new URL("./proxy.mjs", import.meta.url).pathname, grant.socketPath, grant.token]);
+  t.after(() => child.kill());
+  const lines = createInterface({ input: child.stdout });
+  t.after(() => lines.close());
+  const reply = new Promise(resolve => lines.once("line", line => resolve(JSON.parse(line))));
+  child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_desktop_state", arguments: {} } }) + "\n");
+  const result = await reply;
+  assert.equal(result.id, 1);
+  const image = result.result.content.find(item => item.type === "image");
+  assert.equal(image.mimeType, "image/png");
+  assert.deepEqual(Buffer.from(image.data, "base64"), Buffer.from(png, "base64"));
+  assert.deepEqual(b.list(), []);
+  child.stdin.end();
 });
 
 test("replaced run session and disconnected model discard pending execution", async (t) => {

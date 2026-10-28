@@ -30,7 +30,7 @@ export const TOOLS = [
   {
     name: "get_desktop_state",
     description:
-      "Screenshot this device desktop. Requires exact human approval.",
+      "Screenshot this device desktop, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -39,7 +39,7 @@ export const TOOLS = [
   },
   {
     name: "click",
-    description: "Click this device desktop at the approved coordinates.",
+    description: "Click this device desktop at the requested coordinates, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
       properties: {
@@ -53,7 +53,7 @@ export const TOOLS = [
   {
     name: "type_text",
     description:
-      "Type exactly the approved text into the focused desktop control.",
+      "Type exactly the requested text into the focused desktop control, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
       properties: { text: { type: "string", minLength: 1, maxLength: 8000 } },
@@ -63,7 +63,7 @@ export const TOOLS = [
   },
   {
     name: "press_key",
-    description: "Press the approved key and modifiers on the focused desktop.",
+    description: "Press the requested key and modifiers on the focused desktop, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
       properties: { key: { type: "string" }, modifiers: { type: "array", items: { type: "string", enum: ["ctrl", "shift", "alt", "super"] }, maxItems: 4, uniqueItems: true } },
@@ -72,7 +72,7 @@ export const TOOLS = [
   },
   {
     name: "scroll",
-    description: "Scroll the approved amount at a desktop coordinate.",
+    description: "Scroll the requested amount at a desktop coordinate, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
       properties: { direction: { type: "string", enum: ["up", "down", "left", "right"] }, amount: { type: "integer", minimum: 1, maximum: 50 }, x: { type: "integer", minimum: 0, maximum: 100000 }, y: { type: "integer", minimum: 0, maximum: 100000 } },
