@@ -239,6 +239,39 @@ test('关系选择器在服务端搜索：编号和标题片段都能找到，�
   await expect(related.getByRole('button').filter({ hasText: target })).toBeVisible()
 })
 
+test('子任务选择器跨过已关联任务占满的第一页，读取真实后续页并保存', async ({ page }) => {
+  test.setTimeout(180000)
+  await register(page)
+  const suffix = randomUUID().slice(0, 8)
+  const current = `分页当前任务 ${suffix}`
+  const target = `分页可选任务 ${suffix}`
+  const currentId = await seedTask(page, current)
+  await seedTask(page, target)
+  // Newer, already-linked children fill the first server page. The selectable
+  // target remains on a later page; no search response is mocked or rewritten.
+  for (let i = 0; i < 51; i++) await seedTask(page, `分页已有子任务 ${suffix} ${i}`, { parentId: currentId })
+  await page.reload()
+  await rail(page, '看板').click()
+  await openIssue(page, current)
+  const children = page.getByRole('region', { name: '子任务', exact: true })
+  await expect(children.getByRole('button', { name: '子任务 0 / 51', exact: true })).toBeVisible()
+  const cursors: string[] = []
+  page.on('request', request => {
+    const url = new URL(request.url())
+    if (url.pathname.endsWith('/api/issues/search') && url.searchParams.get('cursor')) cursors.push(url.searchParams.get('cursor')!)
+  })
+  await children.getByRole('button', { name: '添加现有任务', exact: true }).click()
+  const picker = page.getByRole('dialog', { name: '添加现有子任务', exact: true })
+  const option = picker.getByRole('option').filter({ hasText: target })
+  await expect(option).toBeVisible()
+  expect(cursors.length).toBeGreaterThan(0)
+  await option.click()
+  await expect(picker).not.toBeVisible()
+  await expect(children.getByRole('button', { name: '子任务 0 / 52', exact: true })).toBeVisible()
+  await page.reload()
+  await expect(children.getByRole('button', { name: '子任务 0 / 52', exact: true })).toBeVisible()
+})
+
 test('402x400 短视口：关系选择器标题和关闭按钮不被裁切，列表在内部滚动，状态高度不跳', async ({ page }) => {
   test.setTimeout(120000)
   await register(page)
