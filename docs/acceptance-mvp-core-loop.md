@@ -58,7 +58,8 @@ gate exercises the existing `daemon login --token` route.
 4. Mikka's existing AI SDK `WorkflowAgent` invokes real `create_issue`,
    `list_agents` and `dispatch_run` tools and their durable steps. No issue, run,
    conversation, output chunk or completion is seeded. The test checks that one
-   task and one run were created on the selected device.
+   task and one run were created on the selected device. It also checks the
+   delivered host event's issue binding against the create-tool receipt and run.
 5. Claim sends fixture `mvp-core-loop`; a real daemon started with
    `--mock-speed 1 --fixtures-dir tests/mvp/fixtures` claims it, clones into its
    private cache, resolves `origin/HEAD` to **trunk**, and creates its own worktree.

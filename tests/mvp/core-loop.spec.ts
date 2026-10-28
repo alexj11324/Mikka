@@ -145,6 +145,14 @@ async function setup(page: Page, testInfo: TestInfo) {
     expect((await run()).deviceId).toBe(device!.id)
     expect((await run()).baseBranch).toBeNull()
     expect((await pool.query('SELECT id FROM issues WHERE "userId" = $1 AND title = $2', [user.id, title])).rowCount).toBe(1)
+    const event = await pool.query<{ id: string; issueId: string; deliveredAt: Date | null; botId: string | null; payload: { taskDestination?: unknown } }>(
+      'SELECT id, "issueId", "deliveredAt", "botId", payload FROM coordinator_events WHERE "userId" = $1 AND kind = $2 AND payload->>\'text\' LIKE $3', [user.id, 'user_message', `%${marker}%`])
+    expect(event.rows).toHaveLength(1)
+    expect(event.rows[0]).toMatchObject({ issueId: (await run()).issueId, botId: null, payload: { taskDestination: { kind: 'device', deviceId: device!.id } } })
+    expect(event.rows[0].deliveredAt).toBeTruthy()
+    const receipt = await pool.query('SELECT operation, "issueId" FROM issue_tool_calls WHERE "userId" = $1 AND "toolCallId" = $2', [user.id, `${marker}-dispatch-create_issue`])
+    expect(receipt.rows).toEqual([{ operation: 'create_issue', issueId: event.rows[0].issueId }])
+    checkpoint(`Delivered task event ${event.rows[0].id} bound to the same issue as the create tool receipt and run`)
     const repo = (await pool.query<{ repoPath: string; remoteUrl: string; baseBranch: string | null }>('SELECT "repoPath", "remoteUrl", "baseBranch" FROM device_repos WHERE id = $1', [(await run()).deviceRepoId])).rows[0]
     expect(repo).toEqual({ repoPath: REPOSITORY_KEY, remoteUrl: REPOSITORY, baseBranch: null })
     checkpoint('Coordinator created exactly one task and dispatched to the selected device')
