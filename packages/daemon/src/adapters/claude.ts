@@ -94,6 +94,8 @@ export interface ClaudeAdapterOptions {
    * drive fake CLIs through it; unset, the SDK starts the build it ships.
    */
   binary?: string
+  /** Trusted host-only restriction; never widens the run's network ceiling. */
+  networkCeiling?: readonly string[]
   /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
   spawnHosted?: (options: SpawnOptions, oauthPlaceholder: string) => SpawnedProcess
   onHostedSession?(sessionId:string):Promise<void>
@@ -520,7 +522,12 @@ export class ClaudeAdapter implements AgentAdapter {
     const outerLocal = !this.options.spawnHosted && this.options.sandbox?.kind !== 'none'
     const spawnOuter = (config: SpawnOptions): SpawnedProcess => {
       const policy = ctx.policy()
-      const child = spawnRunSandbox({ command:this.options.binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:policy.allowDomains, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,policy.allowDomains), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
+      const requested = this.options.networkCeiling
+      const maximum = requested === undefined ? policy.allowDomains
+        : policy.allowDomains.includes('*') ? [...requested]
+        : requested.includes('*') ? policy.allowDomains
+        : requested.filter(domain => policy.allowDomains.includes(domain))
+      const child = spawnRunSandbox({ command:this.options.binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,maximum), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
       const off = options.toolApproval!.onRevoke(() => { void child.revoke().catch(() => undefined) })
       void child.exited.finally(off)
       return child.process

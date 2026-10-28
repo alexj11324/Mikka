@@ -153,6 +153,8 @@ jobs:
           path: |
             /tmp/mikka-official-codex-synthetic-*/evidence.json
             /tmp/mikka-official-codex-synthetic-*/official-cli.stderr.log
+            /tmp/mikka-official-claude-synthetic-*/evidence.json
+            /tmp/mikka-official-claude-synthetic-*/adapters/runs/*/official-cli.stderr.log
           if-no-files-found: warn
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/protocol typecheck
