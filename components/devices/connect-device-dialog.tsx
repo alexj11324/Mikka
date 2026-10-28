@@ -12,7 +12,7 @@ import { BASE_PATH } from '@/lib/base-path'
 import { daemonCommands } from '@/lib/daemon-commands'
 
 /** The public name is confirmed with the release; no workspace checkout is needed. */
-const packageName = process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@mikka/daemon'
+const packageName = process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka'
 
 export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTrigger = false }: {
   open?: boolean
