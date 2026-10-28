@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, chmodSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -41,7 +41,7 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
     assert.notEqual(missing.status, 0)
     assert.match(missing.stderr, /PREVIEW_DATABASE_URL_REQUIRED/)
     assert.doesNotMatch(missing.stderr, /DATABASE_ACCESS|ENOENT/)
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+  } finally { console.log(`Retained migration test directory: ${dir}`) }
 })
 
 test('explicit Preview migration never connects to the global application target', () => {
@@ -71,7 +71,7 @@ test('explicit Preview migration never connects to the global application target
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /0001_application.sql/)
     assert.match(result.stdout, /0002_workspace.sql/)
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+  } finally { console.log(`Retained migration test directory: ${dir}`) }
 })
 
 
@@ -98,7 +98,7 @@ esac
     })
     assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'pnpm lint', 'next build'])
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+  } finally { console.log(`Retained migration test directory: ${dir}`) }
 })
 
 test('all files preflight before a database connection, even if an earlier file is valid', () => {
@@ -125,5 +125,5 @@ test('all files preflight before a database connection, even if an earlier file 
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /20261028000002_invalid.sql.*exactly one statement/)
     assert.doesNotMatch(result.stderr, /DATABASE_ACCESS/)
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+  } finally { console.log(`Retained migration test directory: ${dir}`) }
 })
