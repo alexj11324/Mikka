@@ -46,7 +46,7 @@ export async function executeCredentialLease(lease: string, origin: string) {
     if (!response.ok) { await response.body?.cancel(); throw new Error() }
     // Do not forward arbitrary responses from another process to the model.
     const result = await response.json()
-    if (!['submitted', 'session_applied'].includes(result.status) || result.origin !== origin) throw new Error()
-    return { status: result.status as 'submitted' | 'session_applied', origin }
+    if (!['submitted', 'session_applied', 'guarded'].includes(result.status) || result.origin !== origin) throw new Error()
+    return { status: result.status as 'submitted' | 'session_applied' | 'guarded', origin }
   } catch { throw new CredentialError() }
 }

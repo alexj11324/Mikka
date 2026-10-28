@@ -149,12 +149,15 @@ test('broker reports mechanical session application or submission without judgin
   const snapshot = await sealSession(kms, owner, password.wrappedDek, Buffer.from(JSON.stringify({ cookies: [], localStorage: [] })))
   for (const forcePassword of [false, true]) {
     const calls: string[] = []
-    const claimed = { user_id: owner.userId, workspace_id: 'workspace', bot_id: 'bot', run_id: 'run', subagent_id: null, credential_id: owner.credentialId, origin: owner.origin, input_kind: 'password', target: { targetId: 'target', origin: owner.origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, credentialMode: forcePassword ? 'password' : 'session-first' } }
+    let guardEnded = false
+    const claimed = { user_id: owner.userId, workspace_id: 'workspace', bot_id: 'bot', run_id: null, subagent_id: 'subagent', credential_id: owner.credentialId, origin: owner.origin, input_kind: 'password', target: { targetId: 'target', origin: owner.origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, credentialMode: forcePassword ? 'password' : 'session-first', observedInput: { loaderId: 'loader', backendNodeId: 7, credentialRole: 'password', epoch: 1, permissionVersion: 0 } } }
     const credential = { wrapped_dek: password.wrappedDek, nonce: password.nonce, ciphertext: password.ciphertext, username: 'fixture-user' }
     const session = { wrapped_dek: snapshot.wrappedDek, nonce: snapshot.nonce, ciphertext: snapshot.ciphertext }
     const client = {
       async query(sql: string) {
         if (sql.includes('FROM bots ') || sql.includes('FROM agent_runs ')) return { rows: [{ id: 'ok' }] }
+        if (sql.includes('FROM bot_subagents s LEFT JOIN')) return { rows: [{ targetId: 'target', epoch: 1, permissionVersion: 0, permission: 'ask' }] }
+        if (sql.includes('FROM bot_subagents ')) return { rows: [{ id: 'ok' }] }
         if (sql.includes('JOIN credential_secrets')) return { rows: [credential] }
         if (sql.includes('FROM browser_sessions')) return { rows: [session] }
         return { rows: [] }
@@ -163,20 +166,25 @@ test('broker reports mechanical session application or submission without judgin
     const pool = { async query() { return { rows: [claimed] } }, async connect() { return client } }
     const cdp = {
       async attach() {}, async origin() {}, async safeToResume() { return true }, close() {},
-      async fill() { calls.push('fill') },
+      async insertAtObservedInput(origin: string, loader: string, node: number, role: string, value: string) {
+        assert.deepEqual([origin, loader, node, role], [owner.origin, 'loader', 7, 'password'])
+        assert.equal(value, 'fixture-password')
+        calls.push('insertAtObservedInput')
+      },
       async call(method: string) {
         calls.push(method)
-        if (method === 'Page.getFrameTree') return { frameTree: { frame: { url: owner.origin } } }
+        if (method === 'Page.getFrameTree') return { frameTree: { frame: { url: owner.origin, loaderId: 'loader' } } }
         if (method === 'Runtime.evaluate') return { result: { objectId: 'fixture' } }
         if (method === 'Network.getCookies') return { cookies: [] }
         return {}
       },
       async evaluate(expression: string) { calls.push(`evaluate:${expression}`); return [] },
     }
-    const result = await fillCredential(pool as never, 'a'.repeat(43), { kms, guard: { begin: async () => ({ cdpUrl: 'wss://example.e2b.app/', targetId: 'target', guardToken: 'fixture' }), end: async () => {} }, connect: (async () => cdp) as never })
-    assert.equal(result.status, forcePassword ? 'submitted' : 'session_applied')
-    assert.equal(calls.includes('fill'), forcePassword)
+    const result = await fillCredential(pool as never, 'a'.repeat(43), { kms, guard: { begin: async () => ({ cdpUrl: 'wss://example.e2b.app/', targetId: 'target', guardToken: 'fixture' }), end: async () => { guardEnded = true } }, connect: (async () => cdp) as never })
+    assert.equal(result.status, forcePassword ? 'guarded' : 'session_applied')
+    assert.equal(calls.includes('insertAtObservedInput'), forcePassword)
     assert.equal(calls.includes('Page.reload'), !forcePassword)
+    assert.equal(guardEnded, !forcePassword)
     assert(!calls.some(call => /readyState|one-time-code|input\[type/.test(call)))
   }
 })
@@ -201,6 +209,38 @@ test('password retry is bound to the server-authorized caller and its one-use ta
   captured.values = undefined
   await assert.rejects(store.lease({ ...caller, workspaceId: 'other' }, owner.origin, target, undefined, true), CredentialError)
   assert.equal(captured.values, undefined)
+})
+
+test('broker rejects a lease without a trusted observed target before opening credentials', async () => {
+  const claimed = { user_id: 'owner', workspace_id: 'workspace', bot_id: 'bot', subagent_id: 'subagent', run_id: null, credential_id: 'credential', origin: 'https://example.com', target: { targetId: 'target', origin: 'https://example.com', endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000 } }
+  let began = false
+  const client = { async query(sql: string) { return { rows: sql.includes('SELECT id FROM') ? [{ id: 'ok' }] : [] } }, release() {} }
+  const pool = { async query() { return { rows: [claimed] } }, async connect() { return client } }
+  const kms: Kms = { async generate() { throw new Error('unexpected') }, async decrypt() { throw new Error('unexpected') } }
+  await assert.rejects(fillCredential(pool as never, 'a'.repeat(43), { kms, guard: { begin: async () => { began = true; throw new Error('unexpected') }, end: async () => {} } }), CredentialError)
+  assert.equal(began, false)
+})
+
+test('broker rejects changed epoch, policy, target, origin and loader before decryption', async () => {
+  for (const failure of ['epoch', 'policy', 'deny', 'target', 'origin', 'loader'] as const) {
+    const origin = 'https://example.com'
+    const observedInput = { loaderId: 'loader', backendNodeId: 7, credentialRole: 'password', epoch: 1, permissionVersion: 1 }
+    const target = { targetId: 'target', origin: failure === 'origin' ? 'https://other.example' : origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, observedInput }
+    const claimed = { user_id: 'owner', workspace_id: 'workspace', bot_id: 'bot', subagent_id: 'subagent', run_id: null, credential_id: 'credential', origin, target }
+    const bound = { targetId: failure === 'target' ? 'other' : 'target', epoch: failure === 'epoch' ? 2 : 1, permissionVersion: failure === 'policy' ? 2 : 1, permission: failure === 'deny' ? 'deny' : 'ask' }
+    const client = { async query(sql: string) {
+      if (sql.includes('FROM bot_subagents s LEFT JOIN')) return { rows: [bound] }
+      if (sql.includes('SELECT id FROM')) return { rows: [{ id: 'ok' }] }
+      if (sql.includes('JOIN credential_secrets')) return { rows: [{ wrapped_dek: 'synthetic' }] }
+      return { rows: [] }
+    }, release() {} }
+    const pool = { async query() { return { rows: [claimed] } }, async connect() { return client } }
+    let decrypted = false
+    const kms: Kms = { async generate() { throw new Error('unexpected') }, async decrypt() { decrypted = true; throw new Error('unexpected') } }
+    const cdp = { async attach() {}, async origin() {}, async call() { return { frameTree: { frame: { url: origin, loaderId: 'stale' } } } }, close() {} }
+    await assert.rejects(fillCredential(pool as never, 'a'.repeat(43), { kms, guard: { begin: async () => ({ cdpUrl: 'wss://example.e2b.app/', targetId: 'target', guardToken: 'fixture' }), end: async () => {} }, connect: (async () => cdp) as never }), CredentialError, failure)
+    assert.equal(decrypted, false, failure)
+  }
 })
 
 test('credential action fails closed when the trusted page binding changes', () => {
