@@ -82,6 +82,7 @@ export interface InboxTake {
   pushReasons: PushReason[]
   /** A handed-over verification code: the push says only that one came, the code stays in the app chat. */
   pushHidesText: boolean
+  taskEventId?: string
 }
 
 const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushReasons: [], pushHidesText: false }
@@ -115,6 +116,7 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     const handoffs = events.filter(event => isHandoff(event.kind))
     return {
       held: true, added: events.length,
+      ...(isolatedTask ? { taskEventId: due[0].id } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : telegramReplyTargets(events),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),

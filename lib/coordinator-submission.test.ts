@@ -257,6 +257,8 @@ test('new-task machine choice is owner-checked, preserved separately from copy a
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { queued: true })
   assert.equal([...current.rows.values()][0].payload.text, 'do the task')
   assert.deepEqual([...current.rows.values()][0].payload.taskDestination, destination)
+  ;[...current.rows.values()][0].issueId = 'c4000000-0000-4000-8000-000000000004' as never
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { queued: true })
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { error: 'submissionConflict', params: undefined })
   current.deviceRows.get(deviceId)!.ownerId = 'foreign'
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { error: 'deviceNotFound', params: undefined })

@@ -36,6 +36,6 @@ export async function recordPersonalSubmission(executor: Executor, userId: strin
   const [prior] = await executor.select({ id: coordinatorEvents.id, userId: coordinatorEvents.userId, botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, issueId: coordinatorEvents.issueId, runId: coordinatorEvents.runId, payload: coordinatorEvents.payload })
     .from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey, dedupeKey)).limit(1)
   if (!prior) throw new Error('personalSubmissionUnavailable')
-  if (!submissionId || prior.userId !== userId || prior.botId !== botId || prior.kind !== event.kind || prior.issueId !== null || prior.runId !== null || !isDeepStrictEqual(prior.payload, event.payload)) throw new SubmissionConflictError()
+  if (!submissionId || prior.userId !== userId || prior.botId !== botId || prior.kind !== event.kind || (prior.issueId !== null && !taskDestination) || prior.runId !== null || !isDeepStrictEqual(prior.payload, event.payload)) throw new SubmissionConflictError()
   return { duplicate: true, eventId: prior.id }
 }
