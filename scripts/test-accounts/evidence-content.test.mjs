@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { mkdtemp, rm, symlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { deflateRawSync } from 'node:zlib'
 import { createEvidenceScanBudget, scanEvidenceContent } from './evidence-content.mjs'
+import { formatEvidenceFailure } from './evidence.mjs'
 
 const canary = 'synthetic-report-credential-349'
 function crc(data) {
@@ -99,4 +106,52 @@ test('scans nested embedded reports but rejects excessive depth and raw nested a
 test('rejects trace/HAR/video members and scans entry names for known secrets', () => {
   for (const name of ['trace.trace', 'capture.har', 'video.webm', 'nested/trace.zip']) assert.throws(() => scan(html(zip([{ name }]))), /UNREVIEWED_SECRET_BEARING_EVIDENCE/)
   assert.throws(() => scan(html(zip([{ name: `${canary}.json` }]))), /EVIDENCE_SECRET_DETECTED/)
+})
+
+test('public scan diagnostics expose only exact allowlisted codes, never arbitrary error fields', () => {
+  const expected = safeCode => JSON.stringify({ status: 'blocked', safeCode })
+  let detected
+  try { scan(html(zip([{ data: canary }]))) } catch (error) { detected = error }
+  assert.equal(formatEvidenceFailure(detected), expected('EVIDENCE_SECRET_DETECTED'))
+  assert.equal(formatEvidenceFailure(Object.assign(new Error(canary), { code: 'UNREVIEWED_SECRET_BEARING_EVIDENCE' })), expected('UNREVIEWED_SECRET_BEARING_EVIDENCE'))
+
+  let accessorRead = false
+  const accessor = { get code() { accessorRead = true; throw new Error(canary) } }
+  for (const error of [
+    Object.assign(new Error(canary), { code: canary }),
+    { code: `EVIDENCE_SECRET_DETECTED\n${canary}` },
+    { code: { toString() { throw new Error(canary) } } },
+    { message: 'EVIDENCE_SECRET_DETECTED' },
+    Object.create({ code: 'EVIDENCE_SECRET_DETECTED' }),
+    accessor, canary, null, undefined,
+  ]) {
+    const output = formatEvidenceFailure(error)
+    assert.equal(output, expected('EVIDENCE_AUDIT_FAILED'))
+    assert.equal(output.includes(canary), false)
+  }
+  assert.equal(accessorRead, false)
+})
+
+test('the actual evidence CLI exits one with a safe code for missing evidence and unknown filesystem errors', async () => {
+  const directory = await mkdtemp(join(tmpdir(), `mikka-evidence-${canary}-`))
+  const script = fileURLToPath(new URL('./evidence.mjs', import.meta.url))
+  const childEnvironment = { ...process.env }
+  delete childEnvironment.NODE_TEST_CONTEXT
+  const check = async safeCode => {
+    const child = spawn(process.execPath, [script], { cwd: directory, env: childEnvironment, stdio: ['ignore', 'pipe', 'pipe'], timeout: 10000 })
+    let stdout = '', stderr = ''
+    child.stdout.setEncoding('utf8').on('data', chunk => { stdout += chunk })
+    child.stderr.setEncoding('utf8').on('data', chunk => { stderr += chunk })
+    const [status, signal] = await once(child, 'close')
+    assert.equal(signal, null)
+    assert.equal(status, 1)
+    assert.equal(stdout, '')
+    assert.equal(stderr.trim(), JSON.stringify({ status: 'blocked', safeCode }))
+    assert.equal(stderr.includes(canary), false)
+  }
+  try {
+    await check('EVIDENCE_MISSING')
+    await symlink('playwright-report', join(directory, 'playwright-report'))
+    await check('EVIDENCE_AUDIT_FAILED')
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })

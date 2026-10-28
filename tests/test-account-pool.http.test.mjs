@@ -64,6 +64,9 @@ async function acquire(workerId, configuration = options(workerId)) {
 async function release(scope, outcome = 'clean') {
   const result = await scope.release({ outcome })
   active.delete(scope)
+  for (const account of [scope.owner, scope.peer]) {
+    await assert.rejects(stat(account.storageStatePath), { code: 'ENOENT' })
+  }
   return result
 }
 async function noSession(path, init = {}) {

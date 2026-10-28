@@ -64,7 +64,7 @@ const transport = {
 }
 const database = { ...transport, async transaction<T>(fn: (tx: typeof transport) => Promise<T>) { return fn(transport) } }
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { exports })
-stub('../db/index.ts', { db: database })
+stub('../db/index.ts', { db: database, pool: { connect: () => { throw Error('No database pool in handler regression') } } })
 stub('./store.ts', { editMemory: () => { throw Error('Unrelated tool outside test') } })
 stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () => {} })
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('Unrelated tool outside test') } })
