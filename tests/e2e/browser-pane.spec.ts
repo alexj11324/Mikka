@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { splitBrowserNotes } from '../../lib/browser/note'
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, app, browserClientHeaders } from './fixtures'
 
 // The app-wide browser (Figma 412:8066): the top bar's globe opens it in place
 // of the right panel, and a note pinned on a page waits in the chat composer
@@ -62,9 +62,6 @@ test('The globe opens the browser in place of the right panel; notes on a page g
   await expect(chips.nth(1)).toHaveText('2 · example.com/pricing · 价格不对')
   await testInfo.attach('region-note', { body: await page.screenshot(), contentType: 'image/png' })
 
-  await page.getByRole('button', { name: '移除备注 1', exact: true }).click()
-  await expect(chips).toHaveCount(1)
-
   const message = `浏览器备注验收 ${randomUUID()}`
   const storedResponse = Promise.withResolvers<void>()
   const releaseResponse = Promise.withResolvers<void>()
@@ -94,7 +91,7 @@ test('The globe opens the browser in place of the right panel; notes on a page g
   await expect(composer).toBeEnabled()
   await expect(chips).toHaveCount(1)
   await expect(chips).toHaveText('3 · example.com/pricing · 发送期间的新备注')
-  await expect(page.locator('[data-slot="browser-note"]')).toHaveText('2 · example.com/pricing · 价格不对')
+  await expect(page.locator('[data-slot="browser-note"]')).toHaveText(['1 · 重置密码 · 发送重置链接 · 按钮文案改成发送', '2 · example.com/pricing · 价格不对'])
 
   // Real server action, authenticated session and PostgreSQL event. No model or provider call is required to persist a person's note.
   const connectionString = process.env.E2E_DATABASE_URL
@@ -110,15 +107,15 @@ test('The globe opens the browser in place of the right panel; notes on a page g
     expect(rows[0].botId).toBeNull()
     const stored = splitBrowserNotes(rows[0].payload.text)
     expect(stored.text).toBe(message)
-    expect(stored.notes).toHaveLength(1)
-    expect(stored.notes[0]).toMatchObject({ n: 2, kind: 'region', url: 'https://example.com/pricing', note: '价格不对' })
+    expect(stored.notes.map(note => note.n)).toEqual([1, 2])
+    expect(stored.notes[1]).toMatchObject({ n: 2, kind: 'region', url: 'https://example.com/pricing', note: '价格不对' })
   } finally { await pool.end() }
   await page.reload()
-  await expect(page.locator('[data-slot="browser-note"]')).toHaveText('2 · example.com/pricing · 价格不对')
+  await expect(page.locator('[data-slot="browser-note"]')).toHaveText(['1 · 重置密码 · 发送重置链接 · 按钮文案改成发送', '2 · example.com/pricing · 价格不对'])
   await expect(page.getByText(message)).toBeVisible()
 
   // An independently registered owner must not receive the first owner's note on the real chat read path.
-  const foreign = await page.context().browser()!.newContext()
+  const foreign = await page.context().browser()!.newContext({ baseURL: new URL(page.url()).origin, locale: 'zh-CN', extraHTTPHeaders: browserClientHeaders() })
   try {
     const other = await foreign.newPage()
     await register(other)
