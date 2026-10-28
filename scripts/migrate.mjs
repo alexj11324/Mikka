@@ -5,10 +5,12 @@
 // skips before reading files or opening a database.
 //
 // A file targets MIKKA_DATABASE_URL unless its first lines contain
-// `-- target: DATABASE_URL` (the workspace database).
+// `-- target: DATABASE_URL` (the workspace database). In Preview both targets
+// resolve to its explicit DATABASE_URL, matching the application runtime.
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { alreadyApplied, orderMigrations } from './migration-order.mjs'
+import { migrationTargets } from './migration-targets.mjs'
 
 const shouldRun = process.env.MIGRATE !== '0' && (process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production')
 if (!shouldRun) {
@@ -16,10 +18,7 @@ if (!shouldRun) {
   process.exit(0)
 }
 
-const targets = {
-  MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL,
-  DATABASE_URL: process.env.DATABASE_URL,
-}
+const targets = migrationTargets(process.env)
 
 const dir = new URL('../drizzle/', import.meta.url)
 // 旧迁移是 NNNN_*.sql，新迁移是 YYYYMMDDHHMMSS_*.sql（UTC）。按文件名排序时时间戳文件排在所有旧文件之后。
