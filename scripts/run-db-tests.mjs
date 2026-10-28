@@ -33,6 +33,12 @@ export const SELF_MANAGED = [
   { file: 'tests/byos-application.test.mjs', runner: 'scripts/test-subscription-worker.mjs', reason: 'starts an isolated BYOS Postgres and worker fixture' },
   { file: 'tests/byos-enrollment-binding.test.mjs', runner: 'scripts/test-subscription-worker.mjs', reason: 'starts an isolated BYOS Postgres and worker fixture' },
 ]
+// Dedicated Playwright suites use their own browser runner, never node:test.
+// Register exact files so another pg-backed test in the same folder still fails
+// inventory until it has its own explicit gate.
+export const BROWSER_SUITES = [
+  { file: 'tests/mvp/core-loop.spec.ts', config: 'playwright.mvp.config.ts', script: 'test:e2e:mvp' },
+]
 // This destructive empty-database bootstrap must stay BEFORE test:e2e:setup.
 // Its workflow invocation is independently checked, not silently omitted.
 export const BOOTSTRAP = 'tests/migrate-empty-db.test.mjs'
@@ -66,6 +72,14 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
   const covered = new Set()
   const commandHas = (command, file) => command?.split(/\s+/).includes(file)
   const excluded = new Set()
+  const browser = new Set()
+  for (const { file, config, script } of BROWSER_SUITES) {
+    if (!has(file) && !has(config) && !Object.hasOwn(scripts, script)) continue
+    if (!has(file)) throw new Error(`Expected browser suite missing: ${file}`)
+    if (!has(config)) throw new Error(`Browser suite ${file}: config ${config} missing`)
+    if (!/^playwright\s+test\s/.test(scripts[script] ?? '') || !commandHas(scripts[script], `--config=${config}`)) throw new Error(`Browser script ${script} missing or no longer runs ${config}`)
+    browser.add(file)
+  }
   for (const { file, runner, reason } of selfManaged) {
     if (!has(file)) continue
     if (!reason) throw new Error(`Self-managed DB suite ${file} needs a reason`)
@@ -81,7 +95,7 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
   }
   for (const [file, source] of Object.entries(files)) {
     // Playwright DB fixtures run in the preserved server-backed browser/performance gates.
-    if (!/\.(test|spec)\.(ts|mjs|js)$/.test(file) || file === BOOTSTRAP || file === 'scripts/run-db-tests.test.mjs' || file.startsWith('tests/e2e/')) continue
+    if (!/\.(test|spec)\.(ts|mjs|js)$/.test(file) || file === BOOTSTRAP || file === 'scripts/run-db-tests.test.mjs' || file.startsWith('tests/e2e/') || browser.has(file)) continue
     const databaseBacked = /(?:\.db\.test\.|-db\.test\.)/.test(file) || /(?:from\s*['"]pg['"]|import\(['"]pg['"]\)|REQUIRE_DB|CONVERSATION_READS_REQUIRE_DB)/.test(source)
     if (!databaseBacked || covered.has(file) || excluded.has(file)) continue
     const matches = Object.entries(scripts).filter(([name, command]) => name.startsWith('test:') && commandHas(command, file))
@@ -92,7 +106,7 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
     if (!selected.has(name)) throw new Error(`Expected DB script not enrolled: ${name}`)
   }
   if (!selected.size) throw new Error('No database suites enrolled')
-  return { scripts: [...selected].sort(), files: [...covered].sort(), selfManaged: [...excluded].sort() }
+  return { scripts: [...selected].sort(), files: [...covered].sort(), selfManaged: [...excluded].sort(), browser: [...browser].sort() }
 }
 
 export function readTree(root = '.') {
@@ -106,6 +120,7 @@ export function readTree(root = '.') {
     }
   }
   walk('lib'); walk('tests'); walk('scripts')
+  for (const { config } of BROWSER_SUITES) if (existsSync(resolve(root, config))) files[config] = readFileSync(resolve(root, config), 'utf8')
   return files
 }
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { BOOTSTRAP, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
+import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
 
 const target = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
 const env = { CI: 'true', GITHUB_ACTIONS: 'true', E2E_DATABASE_URL: target, MIKKA_DATABASE_URL: target, DATABASE_URL: target }
@@ -58,6 +58,22 @@ test('self-managed suites are excluded only with a reason and a live dedicated r
   assert.throws(() => inventory({ ...tree, [own.runner]: sample.file }, scripts, [], REQUIRED_SUITES, [{ ...own, file: sample.file }]), /both required and self-managed/)
   for (const entry of SELF_MANAGED) assert.ok(entry.reason && entry.runner)
 })
+test('dedicated browser inventory requires its spec, config and script, without exempting adjacent DB tests', () => {
+  const suite = BROWSER_SUITES[0]
+  const tree = { ...files, [suite.file]: "import { Pool } from 'pg'", [suite.config]: 'export default {}' }
+  const commands = { ...scripts, [suite.script]: `playwright test --config=${suite.config}` }
+  const plan = inventory(tree, commands)
+  assert.deepEqual(plan.browser, [suite.file])
+  assert.deepEqual(plan.scripts, [sample.script], 'Playwright is not sent to the node:test summary checker')
+  assert.throws(() => inventory(tree, scripts), /Browser script .* missing/)
+  assert.throws(() => inventory(tree, { ...commands, [suite.script]: 'playwright test' }), /no longer runs/)
+  const noSpec = { ...tree }; delete noSpec[suite.file]
+  assert.throws(() => inventory(noSpec, commands), /Expected browser suite missing/)
+  const noConfig = { ...tree }; delete noConfig[suite.config]
+  assert.throws(() => inventory(noConfig, commands), /config .* missing/)
+  assert.throws(() => inventory({ ...tree, 'tests/mvp/new.db.test.ts': "import { Pool } from 'pg'" }, commands), /needs one explicit package test script/)
+  assert.throws(() => inventory({ ...tree, 'tests/mvp/new.spec.ts': "import { Pool } from 'pg'" }, commands), /needs one explicit package test script/)
+})
 test('this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')).scripts
   const tree = readTree()
@@ -97,6 +113,15 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.match(workflow, /REQUIRE_DB: '1'/)
   assert.match(browser, /pnpm test:performance --output=performance-results/)
   assert.match(browser, /pnpm test:e2e --grep-invert @performance/)
+  assert.match(browser, /^\s*run: pnpm test:e2e:mvp\s*$/m, 'the dedicated MVP browser gate remains required')
+  assert.equal(pkg['test:e2e:mvp'], 'playwright test --config=playwright.mvp.config.ts')
+  assert.deepEqual(plan.browser, ['tests/mvp/core-loop.spec.ts'])
+  const mvpConfig = readFileSync('playwright.mvp.config.ts', 'utf8')
+  assert.match(mvpConfig, /testDir:\s*['"]\.\/tests\/mvp['"]/)
+  assert.match(mvpConfig, /testMatch:\s*['"]\*\*\/\*\.spec\.ts['"]/)
+  assert.ok(tree['tests/mvp/core-loop.spec.ts']?.includes('@playwright/test'), 'the real-daemon browser spec remains present')
+  assert.match(browser, /MIKKA_TEST_MODE: '1'/)
+  assert.match(browser, /MIKKA_MVP_E2E: '1'/)
   assert.match(workflow, /image: postgres:17/)
   for (const name of ['test:agent', 'test:suggestions', 'test:integrations', 'test:issues', 'test:db-runner']) {
     assert.ok(workflow.includes(`pnpm ${name}`), `${name} strict gate retained`)

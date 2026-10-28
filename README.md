@@ -229,6 +229,8 @@ Start with these documents:
   chat mean.
 - [`docs/acceptance.md`](docs/acceptance.md): how a change is accepted on a
   Preview.
+- [`docs/acceptance-mvp-core-loop.md`](docs/acceptance-mvp-core-loop.md): the MVP
+  test boundaries and pending CI / blocked Preview acceptance record.
 - [`docs/review-checklist.md`](docs/review-checklist.md): complete before
   presenting UI to others.
 

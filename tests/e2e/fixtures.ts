@@ -49,8 +49,8 @@ function database() {
 }
 
 /**
- * Tasks are created by the Coordinator, which e2e cannot run, so tests write
- * them straight into the signed-in person's tasks, numbered like the app does.
+ * Unrelated browser tests seed tasks directly to stay focused. The separate
+ * tests/mvp suite runs the actual Coordinator workflow and must not use this.
  */
 export async function seedTask(page: Page, title: string, { status = 'todo', priority = 'normal' }: { status?: string; priority?: string } = {}) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))

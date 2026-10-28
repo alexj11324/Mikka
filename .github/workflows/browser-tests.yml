@@ -79,6 +79,12 @@ jobs:
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
+      - name: Apply tracked migrations to the disposable browser database
+        # The actual Coordinator needs the migration-owned indexes/constraints,
+        # including NULLS NOT DISTINCT chat keys; schema-only seeding is not enough.
+        run: pnpm migrate
+        env:
+          MIGRATE: '1'
       - run: pnpm test:e2e:setup
       - run: pnpm build
         id: build
@@ -89,6 +95,12 @@ jobs:
       - name: Browser functionality regression
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: pnpm test:e2e --grep-invert @performance
+      - name: MVP real-daemon core loop
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm test:e2e:mvp
+        env:
+          MIKKA_TEST_MODE: '1'
+          MIKKA_MVP_E2E: '1'
       - name: Upload browser failure evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -99,5 +111,7 @@ jobs:
             test-results/
             playwright-performance-report/
             performance-results/
+            playwright-mvp-report/
+            mvp-test-results/
           if-no-files-found: ignore
           retention-days: 7

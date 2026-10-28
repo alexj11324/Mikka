@@ -88,6 +88,7 @@ jobs:
       - run: pnpm test:agent-kit
       - run: pnpm test:agent-kit-compat
       - run: pnpm test:coordinator-events
+      - run: pnpm test:mvp-fixtures
       - run: pnpm test:run-publication
       - run: pnpm test:mobile-push
       - run: pnpm test:coordinator-native-relay

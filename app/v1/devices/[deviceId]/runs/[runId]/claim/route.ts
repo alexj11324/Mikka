@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { readRepositorySettings } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
+import { runTestFixture } from '@/lib/run-test-fixture'
 import { RUN_LEASE_MS } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
@@ -103,6 +104,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl } : {}),
     ...(run.baseBranch ? { baseBranch: run.baseBranch } : {}), harness, prompt: run.prompt,
     kind: run.kind, leaseExpiresAt,
+    ...(runTestFixture(harness) ? { fixture: runTestFixture(harness) } : {}),
     ...((device.kind === 'cloud' ? repo.verifyCommand : settings?.verifyCommand) ? { verifyCommand: (device.kind === 'cloud' ? repo.verifyCommand : settings?.verifyCommand)! } : {}),
     ...(mcp ? { mcp } : {}),
     ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
