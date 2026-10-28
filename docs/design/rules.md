@@ -258,7 +258,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   products use for the same function (memory = book as in ChatGPT,
   notifications = bell, connectors = blocks as in Claude…). The spec or review
   page names the product for each. Rail icons: 主页 House, 建议 Lightbulb,
-  看板 Columns3, 插件 unchanged. Artifact is the one exception: it uses
+  看板 Columns3, 插件 Blocks. Artifact is the one exception: it uses
   Mikka's own stacked-cards icon (R-56), never lucide Copy or Library.
 - **R-72** Two kinds of work. A real task, such as coding, is a thread: a full
   coding agent (Claude Code, Codex) does it, and it is listed in the thread
