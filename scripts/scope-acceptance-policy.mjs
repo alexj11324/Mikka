@@ -18,14 +18,14 @@ export const SCOPE_PRESERVED_DATABASES = Object.freeze([
   {name:SCOPE_PREVIOUS_DATABASES.app,oid:'68678',owner:'postgres',businessSqlAuthorized:false},
   {name:SCOPE_PREVIOUS_DATABASES.workspace,oid:'68679',owner:'postgres',businessSqlAuthorized:false},
 ])
-// Current integration inventory: 64 main sources plus nine immutable scope
+// Current integration inventory: 65 main sources plus nine immutable scope
 // payloads. Earlier 70-source manifests remain evidence for their original SHA.
-export const SCOPE_MIGRATION_COUNT = 73
+export const SCOPE_MIGRATION_COUNT = 74
 export const SCOPE_LIMITS = Object.freeze({ totalMs: 300000, phaseMs: 140000, migrationMs: 60000, graceMs: 5000,
   statementMs: 20000, lockMs: 10000, idleTransactionMs: 30000, connectionMs: 3000,
   queries: { scope: 11000, team: 7000, 'scope:migrate': 1000, 'team:migrate': 1000 },
   rootQueries: 128, outputBytes: 1 << 20, journalBytes: 32 << 20, listeners: { scope: 5, team: 1 },
-  // Next acceptance only: main adds twelve tables to the old 94-table scope
+  // Next acceptance only: main adds thirteen tables to the old 94-table scope
   // bootstrap, plus its one fixture table. The prior 100-table permit is not
   // reusable for this new 120-table readback limit.
   snapshotTables: 120, snapshotLiveRows: 10000 })

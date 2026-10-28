@@ -1,5 +1,6 @@
 import { SCOPE_DATABASES } from '../scripts/scope-acceptance-policy.mjs'
 import { scopeSubtest, scopeResumeBootstrap } from './support/scope-acceptance.mjs'
+import './fixtures/scope-request-runtime.mjs'
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -8,6 +9,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { readIssueMetadata } from '../lib/issue-metadata'
 
 // Only the dedicated cloud-Linux test DB or Actions' ephemeral service. Never
 // fall back to business credentials. Fixtures are intentionally retained.
@@ -846,8 +848,89 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.deepEqual((await pool.query('select status,attempts from linear_sync_outbox where "issueId"=$1',[id])).rows[0],{status:'done',attempts:2})
     } finally {hold.release();await Promise.allSettled([old,reclaimed].filter(Boolean))}
   })
+  const privacyEvidence: { caller: string; denied: boolean; safePublicDuplicate: boolean }[] = []
+  await scopeSubtest(t, 'late teammate actions cannot read, write or copy a retired task or a later publication', async () => {
+    const issueActions = await import('../app/actions/issues')
+    const metadataActions = await import('../app/actions/issue-metadata')
+    const operations = await import('../app/actions/issue-operations')
+    const collaboration = await import('../app/actions/collaboration')
+    const { withDatabaseTransaction } = await import('../lib/db')
+    const { sql } = await import('drizzle-orm')
+    const Y = await import('yjs')
+    for (const caller of ['document', 'preference', 'save', 'metadata', 'relation-target', 'duplicate-source', 'duplicate-descendant', 'history', 'members', 'options', 'get', 'legacy-get', 'republished-document'] as const) {
+      const target = randomUUID(); await seed(target, target, false)
+      if (caller === 'legacy-get') await pool.query('update issues set content=content #- \'{attrs,mikka,number}\' where id=$1',[target])
+      let source = target
+      if (caller === 'relation-target' || caller === 'duplicate-descendant') { source = randomUUID(); await seed(source, source, false) }
+      for (const id of new Set([source, target])) await pool.query('insert into issue_members ("issueId","userId","memberId") values ($1,$2,$3)', [id,owner,member])
+      if (caller === 'duplicate-descendant') await pool.query('update issues set content=jsonb_set(content,\'{attrs,mikka,parentId}\',to_jsonb($2::text),true) where id=$1', [target,source])
+      const privateText = `synthetic-private-fence-${randomUUID()}`
+      const privateDoc = new Y.Doc(), paragraph = new Y.XmlElement('paragraph'), text = new Y.XmlText()
+      text.insert(0, privateText); paragraph.insert(0, [text]); privateDoc.getXmlFragment('default').insert(0, [paragraph])
+      const privateState = Buffer.from(Y.encodeStateAsUpdate(privateDoc)).toString('base64'); privateDoc.destroy()
+      const beforeMemberIssues = Number((await pool.query('select count(*) from issues where "userId"=$1',[member])).rows[0].count)
+      const invoke = async (): Promise<unknown> => {
+        switch (caller) {
+          case 'document': case 'republished-document': return collaboration.exchangeDocument({id:target})
+          case 'preference': return operations.toggleIssuePreference({id:target,kind:'favorite'})
+          // Deliberately predict the future revision: optimistic concurrency
+          // is not a replacement for a current privacy/authorization check.
+          case 'save': return issueActions.saveIssue({id:target,revision:3,title:'Late teammate edit',content:JSON.parse(doc),status:'todo',priority:'normal'})
+          case 'metadata': return metadataActions.updateIssueMetadata({id:target,revision:3,patch:{estimate:5}})
+          case 'relation-target': return operations.updateIssueRelation({id:source,revision:1,targetId:target,kind:'related'})
+          case 'duplicate-source': return operations.createLinkedIssue({id:target,revision:3,kind:'duplicate'})
+          case 'duplicate-descendant': return operations.createLinkedIssue({id:source,revision:1,kind:'duplicate',includeSubissues:true})
+          case 'history': return issueActions.listIssueVersions(target)
+          case 'members': return collaboration.listMembers(target)
+          case 'options': return metadataActions.getIssuePropertyOptions(target)
+          case 'get': case 'legacy-get': return issueActions.getIssue(target)
+        }
+      }
+      let response: Promise<{value?:unknown;error?:unknown}> | undefined
+      try {
+        await db.transaction(async tx => {
+          await tx.execute(sql`select id from issues where id=${target} for update`)
+          const pid = Number((await tx.execute(sql`select pg_backend_pid() pid`)).rows[0].pid)
+          // The owner transaction is not installed in the caller's ALS. This
+          // is a separate real application connection that passed the old ACL.
+          response = action(() => actAs(member, invoke)).then(value => ({value}), error => ({error}))
+          await waitFor(async () => Boolean((await pool.query("select 1 from pg_stat_activity a where datname=current_database() and wait_event_type='Lock' and $1=any(pg_blocking_pids(a.pid))",[pid])).rowCount), `${caller} did not reach the held task lock`)
+          await withDatabaseTransaction(tx, () => actAs(owner, async () => {
+            const preview = await issueActions.previewIssuePersonalScope(target)
+            assert.ok('preview' in preview && preview.preview)
+            const retired = await issueActions.confirmIssuePersonalScope({id:target,revision:1,confirmation:preview.preview.confirmation})
+            assert.ok('issue' in retired && retired.issue)
+            await collaboration.exchangeDocument({id:target,seed:privateState})
+            const saved = await issueActions.saveIssue({id:target,revision:2,title:privateText,content:JSON.parse(doc),status:'todo',priority:'normal'})
+            assert.ok('issue' in saved && saved.issue); assert.equal(saved.issue.revision,3)
+            if (caller === 'republished-document') {
+              const promoted = await promoteExistingIssueForUser(owner,{requestId:randomUUID(),issueId:target,revision:3,teamId:team,expectedTeamId:team})
+              assert.ok('issue' in promoted && promoted.issue)
+              assert.equal(promoted.issue.scopeVersion,3)
+            }
+          }))
+        })
+        const answer = await response!
+        const result = answer.value as {error?:string;issue?:{id:string}} | undefined
+        const safePublicDuplicate = caller === 'duplicate-descendant'
+        if (safePublicDuplicate) assert.ok(result?.issue)
+        else assert.equal((answer.error as {code?:string} | undefined)?.code ?? result?.error, 'issueNotFound', caller)
+        assert.equal(JSON.stringify(answer).includes(privateText),false)
+        const row = (await pool.query('select title,content,scope,revision from issues where id=$1',[target])).rows[0]
+        assert.ok(row.title===privateText && JSON.stringify(row.content).includes(privateText))
+        assert.equal(row.scope,caller==='republished-document'?'workspace':'personal')
+        assert.equal(row.revision,caller==='republished-document'?4:3)
+        if (caller === 'legacy-get') assert.equal(readIssueMetadata(row.content).number, undefined, 'a retired teammate read must not backfill the private task number')
+        assert.equal(Number((await pool.query('select count(*) from issues where "userId"=$1',[member])).rows[0].count),beforeMemberIssues+(safePublicDuplicate?1:0))
+        assert.equal((await pool.query('select count(*)::int n from issues where "userId"=$1 and content::text like $2',[member,`%${privateText}%`])).rows[0].n,0)
+        assert.equal(JSON.stringify(provider.requests).includes(privateText),false)
+        privacyEvidence.push({caller,denied:!safePublicDuplicate,safePublicDuplicate})
+      } finally { if(response) await Promise.allSettled([response]) }
+    }
+    t.diagnostic(JSON.stringify({privacyFenceCallers:privacyEvidence.length,denied:privacyEvidence.filter(x=>x.denied).length,safePublicDuplicate:privacyEvidence.filter(x=>x.safePublicDuplicate).length,realProviderCalls:0}))
+  })
   await pool.query('create table scope184_provider_evidence (payload jsonb not null)')
-  await pool.query('insert into scope184_provider_evidence values ($1)',[JSON.stringify({requests:provider.requests,issues:[...provider.issues.values()],comments:[...provider.comments.values()]})])
+  await pool.query('insert into scope184_provider_evidence values ($1)',[JSON.stringify({requests:provider.requests,issues:[...provider.issues.values()],comments:[...provider.comments.values()],privacyEvidence})])
   t.diagnostic(`Synthetic provider boundary: ${provider.requests.length} GraphQL calls redirected to loopback HTTP; retained in scope184_provider_evidence; no real Linear acceptance`)
   assert.equal(rejectedExternalRequests,0,'no real provider request is permitted or required')
   assert.equal((await pool.query('select scope from issues where id=$1',[issue])).rows[0].scope,'personal')

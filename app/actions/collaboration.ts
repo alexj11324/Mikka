@@ -14,6 +14,7 @@ import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { bindCommentAuthorship, snapshotCommentAuthorship } from '@/lib/linear-sync/comment-authorship'
 import { activityActor } from '@/lib/activity-actor'
+import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
 
 const encodedState = z.string().max(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/)
 const syncSchema = z.object({ id: z.uuid(), vector: encodedState.optional(), update: encodedState.optional(), seed: encodedState.optional() })
@@ -21,8 +22,8 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>) {
   const parsed = syncSchema.parse(input)
   const { issue, user } = await requireIssueAccess(parsed.id)
   const result = await db.transaction(async tx => {
-    const [locked] = await tx.select({ id: issues.id, content: issues.content, scope: issues.scope, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
-    if (!locked) throw new Error('issue not found')
+    const [locked] = await tx.select({ id: issues.id, userId: issues.userId, scopeVersion: issues.scopeVersion, content: issues.content, scope: issues.scope, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
+    requireLockedIssueScope(locked, user.id, issue.scopeVersion)
     const [stored] = await tx.select().from(issueDocuments).where(and(eq(issueDocuments.issueId, issue.id), eq(issueDocuments.userId, issue.userId))).limit(1)
     const doc = new Y.Doc()
     try {
@@ -50,12 +51,16 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>) {
 }
 export async function listMembers(id: string) {
   const { issue, user } = await requireIssueAccess(id)
-  const members = await db.select({ id: users.id, name: users.name, email: users.email, image: users.image, createdAt: issueMembers.createdAt }).from(issueMembers)
+  return db.transaction(async tx => {
+  const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
+  requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+  const members = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image, createdAt: issueMembers.createdAt }).from(issueMembers)
     .innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId))).orderBy(issueMembers.createdAt, users.id)
-  const [owner] = await db.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(issues)
+  const [owner] = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(issues)
     .innerJoin(users, eq(users.id, issues.userId)).where(and(eq(issues.id, id), eq(issues.userId, issue.userId))).limit(1)
   if (!owner) throw new Error('issue owner not found')
   return { members, owner, currentUserId: user.id, isOwner: issue.userId === user.id }
+  })
 }
 export async function inviteMember(id: string, email: string): Promise<ActionResult<{ success: true; member: { id: string; name: string; email: string; image: string | null; createdAt: Date } }>> {
   return runAction(async () => {

@@ -15,7 +15,7 @@ const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')
 const [A, B, C, D, E, F] = [1, 2, 3, 4, 5, 6].map(id)
 const MISSING = id(99)
 
-type Row = { id: string; userId: string; revision: number; title: string; status: string; priority: string; content: object }
+type Row = { id: string; userId: string; scope: 'personal' | 'workspace'; scopeVersion: number; revision: number; title: string; status: string; priority: string; content: object }
 type Member = { issueId: string; userId: string; memberId: string }
 let rows: Row[] = []
 let members: Member[] = []
@@ -24,7 +24,7 @@ let writes: { id: string; metadata: IssueMetadata }[] = []
 const reset = (next: Row[]) => { rows = next; members = []; actor = OWNER; writes = [] }
 
 const row = (rowId: string, meta: Partial<IssueMetadata> = {}, extra: Partial<Row> = {}): Row => ({
-  id: rowId, userId: OWNER, revision: 1, title: rowId, status: 'todo', priority: 'none',
+  id: rowId, userId: OWNER, scope: 'workspace', scopeVersion: 1, revision: 1, title: rowId, status: 'todo', priority: 'none',
   content: withIssueMetadata({ type: 'doc', content: [] }, metadataSchema.parse(meta)), ...extra,
 })
 

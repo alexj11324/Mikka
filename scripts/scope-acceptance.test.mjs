@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { EventEmitter } from 'node:events'
-import { SCOPE_DATABASES as names, SCOPE_LIMITS, scopeUrl, checkedScopeUrl, scopePolicy, controlledChild, sqlHash, lostScopeSupervisor } from './scope-acceptance-policy.mjs'
+import { SCOPE_DATABASES as names, SCOPE_LIMITS, SCOPE_MIGRATION_COUNT, scopeUrl, checkedScopeUrl, scopePolicy, controlledChild, sqlHash, lostScopeSupervisor } from './scope-acceptance-policy.mjs'
 import { scopeNativeRuntime, SCOPE_IDENTITY_SQL, frozenScopeModule } from './scope-acceptance-runtime.mjs'
 import { verifyScopeManifest, scopePhases, scopeWorkerMode } from './scope-acceptance.mjs'
 import { scopeSubtest } from '../tests/support/scope-acceptance.mjs'
@@ -116,7 +116,7 @@ test('native facade applies per-connection timeouts, logs SQL failure and closes
   await runtime.close();assert.ok(trace.includes('client-end'));assert.ok(trace.includes('pool-end'))
 })
 test('manifest validation is source-only and refuses drift before any executor is invoked',()=>{
-  const migrations=Array.from({length:73},(_,i)=>({path:`sql-${i}`,sha256:sqlHash('sql'),target:i<7?'DATABASE_URL':'MIKKA_DATABASE_URL'}))
+  const migrations=Array.from({length:SCOPE_MIGRATION_COUNT},(_,i)=>({path:`sql-${i}`,sha256:sqlHash('sql'),target:i<7?'DATABASE_URL':'MIKKA_DATABASE_URL'}))
   const manifest={migrations,sources:[...migrations,...Array.from({length:10},(_,i)=>({path:`source-${i}`,sha256:sqlHash('source')}))]}
   assert.doesNotThrow(()=>verifyScopeManifest(manifest,path=>Buffer.from(path.startsWith('sql')?'sql':'source')))
   assert.throws(()=>verifyScopeManifest(manifest,()=>Buffer.from('changed')),/hash mismatch/)
@@ -126,9 +126,9 @@ test('manifest validation is source-only and refuses drift before any executor i
 
 test('current main table additions fit the separately proposed snapshot budget',async()=>{
   const {readFileSync}=await import('node:fs')
-  const additions=['20261027181000_agent_kit.sql','20261027203647_mobile_push.sql','20261027231815_user_facts.sql']
+  const additions=['20261027181000_agent_kit.sql','20261027203647_mobile_push.sql','20261027231815_user_facts.sql','20261028015330_issue_tool_calls.sql']
   const tables=additions.flatMap(name=>[...readFileSync('drizzle/'+name,'utf8').matchAll(/create table if not exists\s+([\w"]+)/ig)].map(match=>match[1]))
-  assert.equal(tables.length,12);assert.equal(new Set(tables).size,12)
+  assert.equal(tables.length,13);assert.equal(new Set(tables).size,13)
   // Original retained scope bootstrap:94 tables. One decision_calls fixture
   // table is added by the unchanged business suite. No live schema is queried.
   assert.ok(SCOPE_LIMITS.snapshotTables>=94+tables.length+1)

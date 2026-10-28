@@ -9,7 +9,7 @@ import pg, * as esm from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { pgTable, integer, text, jsonb, date, timestamp } from 'drizzle-orm/pg-core'
 import { scopeNativeRuntime, SCOPE_IDENTITY_SQL } from './scope-acceptance-runtime.mjs'
-import { scopeUrl, SCOPE_DATABASES } from './scope-acceptance-policy.mjs'
+import { scopeUrl, SCOPE_DATABASES, SCOPE_MIGRATION_COUNT } from './scope-acceptance-policy.mjs'
 
 const require = createRequire(import.meta.url)
 const url = scopeUrl(SCOPE_DATABASES.scope)
@@ -189,7 +189,7 @@ test('real pg.Query result-acknowledgement loss reaches callback/error once and 
 
 test('actual frozen SQL directory and sync/async reads include all pinned migrations before any connection',{timeout:25000},async()=>{
   const output=await promisify(execFile)(process.execPath,['--import','./scripts/credential-diagnostics-offline.mjs','--import','./scripts/server-test.mjs','--import','tsx','scripts/scope-native-offline-startup.mjs','migration-cache'],{timeout:20000,maxBuffer:1<<20,env:{PATH:process.env.PATH,HOME:'/workspace',TSX_DISABLE_CACHE:'1',NODE_DISABLE_COMPILE_CACHE:'1',MIGRATE:'0',VERCEL_ENV:'',NEXT_TELEMETRY_DISABLED:'1'}})
-  assert.match(output.stdout,/"frozenMigrationCache":true,"pinnedSqlEntries":73,"syntheticCacheOnlyEntry":true,"nativeTransportAttempts":0,"nativeSqlSubmissions":0/)
+  assert.match(output.stdout,new RegExp(`"frozenMigrationCache":true,"pinnedSqlEntries":${SCOPE_MIGRATION_COUNT},"syntheticCacheOnlyEntry":true,"nativeTransportAttempts":0,"nativeSqlSubmissions":0`))
 })
 
 for (const phase of ['scope','team','team-resume']) test(`actual ${phase} suite startup and installed loader stop at the first connection boundary, offline`, { timeout: 25000 }, async () => {

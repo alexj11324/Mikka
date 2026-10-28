@@ -10,7 +10,7 @@ import { after } from 'node:test'
 import net from 'node:net'
 import pg, * as esm from 'pg'
 import { scopeNativeRuntime } from './scope-acceptance-runtime.mjs'
-import { scopeUrl } from './scope-acceptance-policy.mjs'
+import { scopeUrl, SCOPE_MIGRATION_COUNT } from './scope-acceptance-policy.mjs'
 import { scopeWireOutput } from './scope-exec-file.mjs'
 import { promisify } from 'node:util'
 import { APPLICATION_BASELINE } from './migration-order.mjs'
@@ -53,7 +53,7 @@ after(async () => {
 })
 if(cacheOnly){
   const names=readdirSync(new URL('../drizzle/',import.meta.url))
-  assert.equal(names.length,74);assert.ok(names.includes(APPLICATION_BASELINE))
+  assert.equal(names.length,SCOPE_MIGRATION_COUNT+1);assert.ok(names.includes(APPLICATION_BASELINE))
   for(const name of names){const path=resolve('drizzle',name),expected=frozen.get(path).toString('utf8');assert.equal(readFileSync(new URL('../drizzle/'+name,import.meta.url),'utf8'),expected);assert.equal(await readFile(new URL('../drizzle/'+name,import.meta.url),'utf8'),expected)}
   console.log(JSON.stringify({frozenMigrationCache:true,pinnedSqlEntries:names.length-1,syntheticCacheOnlyEntry:true,nativeTransportAttempts,nativeSqlSubmissions}))
 }else await import(phase === 'scope' ? '../tests/issue-scope-detachment.db.test.ts' : '../tests/team-issue-create.db.test.ts')
