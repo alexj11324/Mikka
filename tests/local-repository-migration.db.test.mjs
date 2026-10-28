@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -13,7 +13,7 @@ const current = '20261028143922_local_repository_defaults.sql'
 const baseline = '20261023221259_application_baseline.sql'
 const run = promisify(execFile)
 
-test('migration runner handles historical and new names without replay and rejects changed SQL', { skip: !process.env.PR359_MIGRATION_TEST_URL && process.env.REQUIRE_DB !== '1', timeout: 30000 }, async () => {
+test('migration runner handles historical and new names without replay and rejects changed SQL', { skip: !process.env.PR359_MIGRATION_TEST_URL && process.env.REQUIRE_DB !== '1', timeout: 30000 }, async (t) => {
   const target = new URL(process.env.PR359_MIGRATION_TEST_URL || process.env.E2E_DATABASE_URL)
   assert.ok(['postgres:', 'postgresql:'].includes(target.protocol) && !target.search && !target.hash)
   assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname))
@@ -67,7 +67,7 @@ test('migration runner handles historical and new names without replay and rejec
       assert.equal((await conflict.pool.query("SELECT is_nullable FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='device_repos' AND column_name='baseBranch'")).rows[0].is_nullable, 'NO')
     } finally { await conflict.pool.end() }
   } finally {
-    for (const schema of schemas) await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`)
-    await admin.end(); await rm(root, { recursive:true, force:true })
+    t.diagnostic(`Retained migration fixtures: directory=${root}; schemas=${schemas.join(',')}`)
+    await admin.end()
   }
 })
