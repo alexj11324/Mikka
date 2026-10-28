@@ -1,7 +1,7 @@
+raise RuntimeError('Live gateway acceptance suspended: preserve test resources')
 import asyncio,aiohttp,json,time,base64,hmac,hashlib
 from pathlib import Path
 from aiohttp import web
-raise RuntimeError('Live gateway acceptance suspended: preserve test resources')
 KEY=Path('/run/mikka-subagents/key').read_bytes();ID='d20af2f7-fb4b-40d0-b779-a6dbd90b4932'
 def cap(role,owner='probe-owner'):
  p=base64.urlsafe_b64encode(json.dumps({'ownerId':owner,'workspaceId':'probe-workspace','botId':'probe-bot','subagentId':ID,'epoch':1,'role':role,'exp':int(time.time())+110}).encode()).decode().rstrip('=')

@@ -1,4 +1,7 @@
 """Real local Chromium and WebSocket regression; all data is synthetic."""
+# Stop before imports: loading the gateway or test dependencies has not been
+# reviewed for resource-preserving execution.
+raise RuntimeError('Broker regression suspended: preserve test resources')
 import asyncio, contextlib, importlib.util, json, shutil, ssl, subprocess, tempfile
 from pathlib import Path
 from aiohttp import ClientSession, WSMsgType, WSServerHandshakeError, web
@@ -8,9 +11,6 @@ spec=importlib.util.spec_from_file_location('gateway',Path(__file__).with_name('
 gateway=importlib.util.module_from_spec(spec);spec.loader.exec_module(gateway)
 
 async def main():
-    # Gateway guard completion removes marker files. Keep this regression
-    # disabled until the complete path has a reviewed, non-deleting fixture.
-    raise RuntimeError('Broker regression suspended: preserve test resources')
     chromium=shutil.which('google-chrome') or shutil.which('chromium') or shutil.which('chromium-browser')
     if not chromium:raise RuntimeError('Chromium is required')
     with contextlib.nullcontext(tempfile.mkdtemp(prefix='pr346-broker-')) as directory:

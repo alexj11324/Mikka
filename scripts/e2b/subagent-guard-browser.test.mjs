@@ -1,10 +1,10 @@
-// Synthetic local Chromium only: inspect the exact CDP snapshots used by the gateway.
-import { chromium } from '@playwright/test'
-import { existsSync } from 'node:fs'
-
 // Playwright browser.close() and the browser's temporary profile cleanup have
 // not been reviewed for the current preservation rule. Do not launch them.
 throw new Error('Chromium guard regression suspended: preserve test resources')
+
+// Synthetic local Chromium only: inspect the exact CDP snapshots used by the gateway.
+const { chromium } = await import('@playwright/test')
+const { existsSync } = await import('node:fs')
 
 const executablePath = ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(existsSync)
 if (!executablePath) throw new Error('Chromium is required for the guard regression')

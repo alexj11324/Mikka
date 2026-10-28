@@ -2,19 +2,20 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { Pool } from 'pg'
-import { SubagentStore } from './subagents'
-import { startSuggestion } from './suggestions'
-import { nativeRunBinding } from '@/lib/computer/native-run-binding'
-import { claimCloudRun } from '@/lib/computer/claim'
-import { recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
-import { resolveWorkspaceComputerPolicy, withWorkspaceComputerPermission } from './workspace-policy'
-import { bindSubagentRun } from './subagent-run-binding'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
 // Disabled while the called runtime paths and hosted cleanup are reviewed.
 // A skipped regression is not an acceptance result.
 test('real DB: additive migration, subagent owner isolation and separate thread claims', { skip: 'resource-preservation review pending' }, async () => {
+  // Deferred until the disabled test is explicitly reviewed and enabled.
+  const { Pool } = await import('pg')
+  const { SubagentStore } = await import('./subagents')
+  const { startSuggestion } = await import('./suggestions')
+  const { nativeRunBinding } = await import('@/lib/computer/native-run-binding')
+  const { claimCloudRun } = await import('@/lib/computer/claim')
+  const { recordCancelledSandbox, recordThreadSandbox, threadMachineAction } = await import('./thread-machines')
+  const { resolveWorkspaceComputerPolicy, withWorkspaceComputerPermission } = await import('./workspace-policy')
+  const { bindSubagentRun } = await import('./subagent-run-binding')
   assert.ok(['localhost', '127.0.0.1'].includes(new URL(databaseURL!).hostname))
   const schema = `subagent_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: databaseURL })
@@ -189,6 +190,20 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     assert.equal((await claimCloudRun(pool, alice, runA, deviceA, expires, bindingId))?.display, ':1')
     assert.equal((await claimCloudRun(pool, alice, runB, deviceB, expires, bindingId))?.botId, botA)
     assert.equal(await claimCloudRun(pool, alice, runA, deviceA, expires, bindingId), null, 'one claim only')
+    // Exercise missing-policy claim checks on a separate workspace whose
+    // policy row was never created, keeping both rejection and default ask.
+    const absentBot = randomUUID(), absentDevice = randomUUID(), absentRun = randomUUID(), absentBinding = randomUUID()
+    const absentActor = { userId: 'alice', workspaceId: noPolicyWorkspace }
+    await pool.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES ($1,$2,\'alice\',\'Absent policy\')', [absentBot, noPolicyWorkspace])
+    await pool.query('INSERT INTO devices(id,"ownerId",kind) VALUES ($1,\'alice\',\'cloud\')', [absentDevice])
+    await pool.query('INSERT INTO agent_runs(id,"userId","agentId","deviceId",status) VALUES ($1,\'alice\',$2,$3,\'queued\')', [absentRun, agentId, absentDevice])
+    await pool.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,\'alice\')', [absentRun, absentBot, noPolicyWorkspace])
+    await pool.query('INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,\'alice\',$3,$4,\'synthetic\',$5,\'running\',$6)', [absentRun, noPolicyWorkspace, absentBot, `sandbox-${absentRun}`, randomUUID(), absentDevice])
+    await pool.query('INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId") VALUES ($1,\'alice\',$2,$3)', [absentBinding, noPolicyWorkspace, agentId])
+    assert.equal((await pool.query('SELECT 1 FROM workspace_computer_policies WHERE "workspaceId"=$1', [noPolicyWorkspace])).rowCount, 0)
+    assert.equal(await claimCloudRun(pool, { ...absentActor, userId: 'bob' }, absentRun, absentDevice, expires, absentBinding), null, 'another owner cannot claim without a policy row')
+    assert.equal(await claimCloudRun(pool, absentActor, absentRun, absentDevice, expires, randomUUID()), null, 'unbound subscription cannot claim without a policy row')
+    assert.equal((await claimCloudRun(pool, absentActor, absentRun, absentDevice, expires, absentBinding))?.display, ':1', 'a valid claim works when the policy row is absent')
   } finally {
     if (prior === undefined) delete process.env.MIKKA_CLOUD_THREAD_MACHINES
     else process.env.MIKKA_CLOUD_THREAD_MACHINES = prior
