@@ -248,6 +248,20 @@ test('broker rejects changed epoch, policy, target, origin and loader before dec
   }
 })
 
+test('gateway failure after side effects begin reports unknown without exposing details', async () => {
+  const claimed = { user_id: 'owner', workspace_id: 'workspace', bot_id: 'bot', subagent_id: 'subagent', run_id: null, credential_id: 'credential', origin: 'https://example.com', target: { targetId: 'target', origin: 'https://example.com', endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, observedInput: { loaderId: 'loader', backendNodeId: 7, credentialRole: 'password', epoch: 1, permissionVersion: 0 } } }
+  const client = { async query(sql: string) {
+    if (sql.includes('FROM bot_subagents s LEFT JOIN')) return { rows: [{ targetId: 'target', epoch: 1, permissionVersion: 0, permission: 'ask' }] }
+    if (sql.includes('SELECT id FROM')) return { rows: [{ id: 'ok' }] }
+    if (sql.includes('JOIN credential_secrets')) return { rows: [{ wrapped_dek: 'fixture' }] }
+    return { rows: [] }
+  }, release() {} }
+  const pool = { async query() { return { rows: [claimed] } }, async connect() { return client } }
+  const kms: Kms = { async generate() { throw new Error('unexpected') }, async decrypt() { throw new Error('unexpected') } }
+  const guard = { async begin() { throw new Error('untrusted provider detail') }, async end() {} }
+  await assert.rejects(fillCredential(pool as never, 'a'.repeat(43), { kms, guard }), (error: unknown) => error instanceof CredentialError && error.code === 'credential_outcome_unknown' && error.status === 409 && !error.message.includes('provider'))
+})
+
 test('credential action fails closed when the trusted page binding changes', () => {
   const page: CredentialPageBinding = { userId: 'owner', workspaceId: 'workspace', botId: 'bot', subagentId: 'subagent', epoch: 7, targetId: 'target', origin: 'https://example.com', loaderId: 'loader', permissionAction: 'computer_use', permissionVersion: 1 }
   const lease = { ...page, expiresAt: 2000 }
