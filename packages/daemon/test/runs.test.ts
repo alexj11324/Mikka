@@ -16,7 +16,7 @@ import {
   MemoryServer,
   type SetupRecipe,
 } from "../src/server-link"
-import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
+import { makeRepo, tempDir, waitFor } from "./helpers"
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8" }).trim()
@@ -90,7 +90,6 @@ function states(chunks: RunChunk[]) {
 
 afterEach(async () => {
   for (const daemon of daemons.splice(0)) await daemon.stop()
-  cleanupTempDirs()
 })
 
 describe("mock runs", () => {
