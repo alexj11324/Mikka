@@ -35,7 +35,12 @@ export async function proposeAction(userId: string, action: string, input: unkno
 
 /** The person's proposals still waiting for them, newest first. */
 export async function listPendingActions(userId: string): Promise<PendingActionView[]> {
-  const rows = await db.select().from(pendingActions)
+  // Rendering existing cards must remain compatible before the account-binding
+  // migration runs. Only proposal creation/execution needs the new column.
+  const rows = await db.select({
+    id: pendingActions.id, action: pendingActions.action, input: pendingActions.input,
+    context: pendingActions.context, status: pendingActions.status, createdAt: pendingActions.createdAt,
+  }).from(pendingActions)
     .where(and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
     .orderBy(desc(pendingActions.createdAt)).limit(MAX_PENDING)
   return rows.flatMap(row => isApprovalAction(row.action)
