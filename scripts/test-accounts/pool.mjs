@@ -326,7 +326,14 @@ export class TestAccountPool {
     for (const account of bound) {
       const user = (await client.query('SELECT email FROM public."user" WHERE id=$1', [account.user_id])).rows[0]
       if (!user || user.email !== account.email || !account.credential_ref || !account.baseline) return 'ACCOUNT_IDENTITY_UNVERIFIED'
-      if ((await client.query('SELECT 1 FROM public.session WHERE "userId"=$1 AND "expiresAt">clock_timestamp() LIMIT 1', [account.user_id])).rowCount) return 'ACCOUNT_SESSION_STILL_ACTIVE'
+      // Expiry alone is not retention proof: Better Auth deletes an expired row
+      // when its old token is presented. Only this transaction's tracked rotation
+      // can establish that the old token no longer resolves to the retained row.
+      if ((await client.query(`SELECT 1 FROM public.session s WHERE s."userId"=$1
+        AND (s."expiresAt">clock_timestamp() OR NOT EXISTS (
+          SELECT 1 FROM mikka_test_accounts.resources r WHERE r.type='session'
+          AND r.id=s.id AND r.owner_id=s."userId" AND r.state='retained'
+        )) LIMIT 1`, [account.user_id])).rowCount) return 'ACCOUNT_SESSION_STILL_ACTIVE'
       if (await this.fingerprint(client, account.user_id) !== account.baseline) return 'ACCOUNT_DIRTY'
     }
     return null
