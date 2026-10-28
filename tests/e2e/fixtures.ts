@@ -2,6 +2,7 @@ import { randomBytes, randomInt, randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { test as base, expect, type BrowserContext, type Page } from '@playwright/test'
 import { Pool } from 'pg'
+import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 
 // The app is served under next.config.mjs's basePath. page.goto('/x') resolves
 // against the origin, so app paths go through app().
@@ -113,15 +114,49 @@ export const test = base.extend<{ runtimeGuard: void; expectedConsoleErrors: Exp
 })
 export { expect }
 
+export async function fillSecretPassword(page: Page, password: string) {
+  if (process.env.MIKKA_TEST_ENVIRONMENT_FILE) await recordAuthenticationSecrets([password])
+  const input = page.getByLabel('密码', { exact: true })
+  await input.focus()
+  // Playwright exports fill(value) in HTML step titles even with traces off.
+  // Evaluate has no rendered argument params; preserve the real form and its
+  // normal input/change events without exporting the generated password.
+  await input.evaluate((element, value) => {
+    if (!(element instanceof HTMLInputElement) || element.type !== 'password') throw new Error('PASSWORD_INPUT_UNAVAILABLE')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+    if (!setter) throw new Error('PASSWORD_INPUT_UNAVAILABLE')
+    setter.call(element, value)
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText' }))
+    element.dispatchEvent(new Event('change', { bubbles: true }))
+  }, password)
+}
+
+export async function captureAuthenticationCookies(context: BrowserContext) {
+  if (!process.env.MIKKA_TEST_ENVIRONMENT_FILE) return
+  await recordAuthenticationSecrets((await context.cookies()).flatMap(cookie => {
+    const decoded = decodeURIComponent(cookie.value)
+    return [cookie.value, decoded,
+      ...(cookie.name.endsWith('session_token') ? [decoded.split('.')[0]] : []),
+      ...(cookie.name.includes('_multi-') ? [cookie.name] : []),
+    ]
+  }))
+}
+
 export async function register(page: Page, next = '/', email = `e2e-${randomUUID()}@example.com`) {
   const password = randomBytes(32).toString('base64url')
-  await page.goto(app(`/sign-up?next=${encodeURIComponent(next)}`))
-  await page.getByLabel('称呼', { exact: true }).fill('回归测试成员')
-  await page.getByLabel('邮箱', { exact: true }).fill(email)
-  await page.getByLabel('密码', { exact: true }).fill(password)
-  // Better Auth 的生产规则为同一来源每 10 秒最多注册 3 次；CI 所有浏览器共享来源。
-  await delay(4000)
-  await page.getByRole('button', { name: '创建账号并进入', exact: true }).click()
-  await expect(page).toHaveURL(url => `${url.pathname}${url.search}` === app(next))
-  return { email, password }
+  try {
+    await page.goto(app(`/sign-up?next=${encodeURIComponent(next)}`))
+    await page.getByLabel('称呼', { exact: true }).fill('回归测试成员')
+    await page.getByLabel('邮箱', { exact: true }).fill(email)
+    await fillSecretPassword(page, password)
+    // Better Auth 的生产规则为同一来源每 10 秒最多注册 3 次；CI 所有浏览器共享来源。
+    await delay(4000)
+    await page.getByRole('button', { name: '创建账号并进入', exact: true }).click()
+    await expect(page).toHaveURL(url => `${url.pathname}${url.search}` === app(next))
+    return { email, password }
+  } finally {
+    // Existing real signup tests also feed the private artifact scanner. A
+    // failed form submit must not leave its generated password unaccounted for.
+    await captureAuthenticationCookies(page.context())
+  }
 }
