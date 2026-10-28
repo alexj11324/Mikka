@@ -15,8 +15,15 @@ export function replyLine(text: string | null | undefined): string | null {
  * the chunks stored by this request, so a re-sent chunk never counts twice.
  */
 export function lastReplyUpdate(chunks: readonly Record<string, unknown>[]): { part: string; text: string } | null {
+  // The last part with real text; a part opened by whitespace alone does not take over yet.
   let part: string | null = null
-  for (const chunk of chunks) if (chunk.type === 'text-delta' && typeof chunk.id === 'string' && typeof chunk.delta === 'string' && chunk.delta) part = chunk.id
+  let any: string | null = null
+  for (const chunk of chunks) {
+    if (chunk.type !== 'text-delta' || typeof chunk.id !== 'string' || typeof chunk.delta !== 'string' || !chunk.delta) continue
+    any = chunk.id
+    if (chunk.delta.trim()) part = chunk.id
+  }
+  part ??= any
   if (part === null) return null
   const text = chunks.filter(chunk => chunk.type === 'text-delta' && chunk.id === part && typeof chunk.delta === 'string').map(chunk => chunk.delta as string).join('')
   return { part, text }

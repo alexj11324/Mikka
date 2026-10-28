@@ -137,6 +137,10 @@ test('a new part replaces the old reply; more of the same part appends', () => {
   assert.deepEqual(r.send(4, [{ type: 'text-delta', id: 'b', delta: '，像是 Infisical 的出站' }]), { lastReply: '日志里是 ETIMEDOUT，像是 Infisical 的出站', lastReplyPart: 'b' })
   // A new part with only whitespace so far keeps the old reply.
   assert.equal(nextReply({ lastReply: 'x', lastReplyPart: 'b' }, [{ type: 'text-delta', id: 'c', delta: '\n' }]), null)
+  // A batch that ends the stored part and opens the next with whitespace still appends the stored part's text.
+  assert.deepEqual(nextReply({ lastReply: 'abc', lastReplyPart: 'a' }, [
+    { type: 'text-delta', id: 'a', delta: 'def' }, { type: 'text-end', id: 'a' }, { type: 'text-start', id: 'b' }, { type: 'text-delta', id: 'b', delta: ' ' },
+  ]), { lastReply: 'abcdef', lastReplyPart: 'a' })
 })
 
 test('the reply stops at 240 characters; once full only its time moves', () => {

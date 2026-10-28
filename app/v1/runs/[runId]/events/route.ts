@@ -30,7 +30,7 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 async function recordLastReply(tx: Tx, runId: string, chunks: Record<string, unknown>[]) {
   if (!chunks.some(chunk => chunk.type === 'text-delta')) return
   const [stored] = await tx.select({ lastReply: agentRuns.lastReply, lastReplyPart: agentRuns.lastReplyPart }).from(agentRuns)
-    .where(eq(agentRuns.id, runId)).for('update')
+    .where(eq(agentRuns.id, runId)).for('no key update')
   if (!stored) return
   const next = nextReply(stored, chunks)
   if (!next) return
