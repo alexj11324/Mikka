@@ -1,16 +1,20 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import test from 'node:test'
-import type { Pool, PoolClient } from 'pg'
 import { writeTransaction } from './write-transaction'
 import { cancelMailboxBackend } from '@/lib/mailbox-pg-cancel'
 import { MailboxError } from '@/lib/mailbox-error'
+
+// This suite uses canned query results, not a PostgreSQL transport. Keep the
+// real function's client/pool types without enrolling this pure suite as DB acceptance.
+type TransactionPool = Parameters<typeof writeTransaction>[0]
+type PoolClient = Parameters<Parameters<typeof writeTransaction>[1]>[0]
 
 const defer = <T>() => { let resolve!: (value:T)=>void; let reject!: (error:Error)=>void; const promise=new Promise<T>((a,b)=>{resolve=a;reject=b}); return {promise,resolve,reject} }
 function fixture(query: (text:string)=>Promise<unknown> = async()=>({rows:[]})) {
   const statements:string[]=[],releases:(Error|undefined)[]=[]
   const client=Object.assign(new EventEmitter(),{query:async(text:string)=>{statements.push(text);return query(text)},release:(error?:Error)=>{releases.push(error)}}) as unknown as PoolClient
-  const pool={connect:async()=>client} as Pick<Pool,'connect'>
+  const pool={connect:async()=>client} as TransactionPool
   return {client,pool,statements,releases}
 }
 test('pre-abort opens no connection; a late pool checkout is discarded exactly once',async()=>{
@@ -18,7 +22,7 @@ test('pre-abort opens no connection; a late pool checkout is discarded exactly o
  await assert.rejects(writeTransaction({connect:async()=>{calls++;throw Error('forbidden')}},async()=>{}, {signal:c.signal}),/writeTransactionCancelled/)
  assert.equal(calls,0)
  const pending=defer<PoolClient>(),f=fixture(),d=new AbortController()
- const run=writeTransaction({connect:()=>pending.promise} as Pick<Pool,'connect'>,async()=>{}, {signal:d.signal});d.abort()
+ const run=writeTransaction({connect:()=>pending.promise} as TransactionPool,async()=>{}, {signal:d.signal});d.abort()
  await assert.rejects(run,/writeTransactionCancelled/);pending.resolve(f.client);await Promise.resolve();await Promise.resolve()
  assert.equal(f.releases.length,1);assert.ok(f.releases[0]);assert.deepEqual(f.statements,[])
 })
@@ -66,7 +70,7 @@ test('real cancellation helper uses only checked-out endpoint/PID/key and report
 
 test('checkout resolved then same-turn abort cannot fall between ownership and waiter resolution',async()=>{
  const pending=defer<PoolClient>(),f=fixture(),c=new AbortController()
- const run=writeTransaction({connect:()=>pending.promise} as Pick<Pool,'connect'>,async()=>{throw Error('must not start')},{signal:c.signal})
+ const run=writeTransaction({connect:()=>pending.promise} as TransactionPool,async()=>{throw Error('must not start')},{signal:c.signal})
  pending.resolve(f.client);queueMicrotask(()=>c.abort())
  await assert.rejects(run,/writeTransactionCancelled/);assert.equal(f.releases.length,1);assert.ok(f.releases[0]);assert.deepEqual(f.statements,[])
 })
