@@ -46,8 +46,8 @@ async function nextPosition(executor: Executor, userId: string, botId: string | 
   return Number(row?.last ?? 0) + 1
 }
 
-/** Undelivered events that should start a turn; issue_done is background even before triage. */
-const wakingEvent = and(isNull(coordinatorEvents.deliveredAt), ne(coordinatorEvents.kind, 'issue_done'), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background')))
+/** Only classified events wake/enter a turn. A missing judgment remains pending. */
+const wakingEvent = and(isNull(coordinatorEvents.deliveredAt), isNotNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background'))
 function waking(userId: string, botId: string | null) {
   return and(eventsOf(userId, botId), wakingEvent)
 }
@@ -60,7 +60,7 @@ export async function hasWakingEvents(userId: string, botId: string | null = nul
 
 /** The person's chats with events that should start a turn: null is the Coordinator. */
 export async function wakingChats(userId: string): Promise<(string | null)[]> {
-  const rows = await db.selectDistinct({ botId: coordinatorEvents.botId }).from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), wakingEvent))
+  const rows = await db.selectDistinct({ botId: coordinatorEvents.botId }).from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background'))))
   return rows.map(row => row.botId)
 }
 
@@ -100,7 +100,7 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     if (!due.length) return { held: true, ...NO_TAKE }
     const backgroundLimit = INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
-      .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
+      .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), eq(coordinatorEvents.tier, 'background')))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
     if (!events.length) return { held: true, ...NO_TAKE }
@@ -141,13 +141,18 @@ export async function releaseLease(userId: string, holder: string, botId: string
 
 /** Undelivered events not yet triaged, oldest first. */
 export async function untriagedEvents(userId: string, botId: string | null = null) {
-  return db.select().from(coordinatorEvents)
+  const events = await db.select().from(coordinatorEvents)
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier)))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+  const runIds = [...new Set(events.flatMap(event => event.runId ? [event.runId] : []))]
+  // Reuse the existing visibility gate; teammate projections stay restricted.
+  const observed = new Map((runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length }) : [])
+    .map(run => [run.id, { id: run.id, status: run.status, finishedAt: run.finishedAt }]))
+  return events.map(event => ({ ...event, observedRun: event.runId ? observed.get(event.runId) ?? null : null }))
 }
 
-export async function setEventTier(id: string, tier: CoordinatorEventTier): Promise<void> {
-  await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.tier)))
+export async function setEventTier(id: string, tier: CoordinatorEventTier, scope?: { userId: string; botId: string | null }): Promise<void> {
+  await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier), scope ? eventsOf(scope.userId, scope.botId) : undefined))
 }
 
 /**

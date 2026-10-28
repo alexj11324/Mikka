@@ -3,9 +3,7 @@ import { start } from 'workflow/api'
 import { releaseAttention } from '@/lib/attention/store'
 import { hasWakingEvents, setEventTier, untriagedEvents, wakingChats } from '@/lib/coordinator/store'
 import { decide } from '@/lib/coordinator/decide'
-import { decisionInput } from '@/lib/coordinator/decision'
-import { ruleTier, tierFromDecision, triageQuestions, triageState } from '@/lib/coordinator/triage'
-import type { CoordinatorEventTier } from '@/lib/db/schema'
+import { ruleTier, tierFromDecision, triageQuestions, triageInput } from '@/lib/coordinator/triage'
 import { coordinatorTurn } from '@/workflows/coordinator/workflow'
 
 /**
@@ -17,17 +15,23 @@ export function coordinatorEnabled(): boolean {
   return process.env.MIKKA_NATIVE_COORDINATOR === '1' || process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY)
 }
 
-/** Asks the decision model whether an event needs the person. When it does not answer, the event gets its quiet tier. */
-async function decideTier(event: Parameters<typeof triageState>[0]): Promise<CoordinatorEventTier> {
-  const answer = (await decide('triage', decisionInput(triageState(event)), triageQuestions(event)))?.get('needsPerson')
-  if (answer?.type === 'predicate') return tierFromDecision(answer.probability, event.kind)
-  return event.kind === 'run_report' ? 'background' : 'result'
-}
-
-/** Gives every untriaged event in the inbox its tier. */
-async function triageInbox(userId: string, botId: string | null): Promise<void> {
+/** No answer leaves the event pending; it does not become background, result or a request for human approval. */
+export async function triageInbox(userId: string, botId: string | null = null): Promise<void> {
+  // Retry only this classification, at most twice within a ten-second inbox
+  // budget. No answer is persisted as a business outcome. A later wake can
+  // revisit the still-untriaged event without duplicating delivery.
+  const budget = AbortSignal.timeout(10_000)
   for (const event of await untriagedEvents(userId, botId)) {
-    await setEventTier(event.id, ruleTier(event) ?? await decideTier(event))
+    let tier = ruleTier(event)
+    for (let attempt = 0; tier === null && attempt < 2 && !budget.aborted; attempt++) {
+      const answers = await decide('triage', triageInput(event), triageQuestions(event), budget)
+      tier = tierFromDecision(answers?.get('tier'))
+    }
+    if (tier === null) {
+      console.error('Coordinator event judgment pending', { eventId: event.id })
+      continue
+    }
+    await setEventTier(event.id, tier, { userId, botId })
   }
 }
 

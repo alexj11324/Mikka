@@ -47,7 +47,7 @@ test('an artifact with no reply yet shows on its own, and quotes show on the per
 })
 
 test('artifact events are results', () => {
-  assert.equal(ruleTier({ kind: 'artifact_submitted', payload: {} }), 'result')
+  assert.equal(ruleTier({ kind: 'artifact_submitted', payload: {} }), null)
 })
 
 const render = (markdown: string) => renderToStaticMarkup(<Markdown remarkPlugins={[remarkGfm, remarkDiff]}>{markdown}</Markdown>)

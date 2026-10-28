@@ -114,7 +114,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         `[Event] The agent in run ${event.runId} asks the person: ${payload.question}`,
         Array.isArray(payload.options) ? `Options: ${payload.options.join(' / ')}` : null,
         payload.context ? `Context: ${payload.context}` : null,
-        'The run keeps going. Ask the person, then pass their answer on with send_to_run.',
+        'Check the current run state and existing task facts first. Resolve within existing authority when possible; ask the person only for a concrete missing decision or policy ask. Never invent their permission. send_to_run does not itself prove the run resumed.',
         note,
       ].filter(Boolean).join('\n')
     case 'artifact_submitted':
