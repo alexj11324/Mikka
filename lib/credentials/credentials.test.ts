@@ -265,6 +265,30 @@ test('gateway failure after side effects begin reports unknown without exposing 
   await assert.rejects(fillCredential(pool as never, 'a'.repeat(43), { kms, guard }), (error: unknown) => error instanceof CredentialError && error.code === 'credential_outcome_unknown' && error.status === 409 && !error.message.includes('provider'))
 })
 
+test('retention hold refuses credential removal without touching the database', async () => {
+  let touched = false
+  const pool = { async connect() { touched = true; throw new Error('unexpected database access') } }
+  const store = new CredentialStore(pool as never, fixtureKms())
+  await assert.rejects(store.remove({ userId: 'fixture', workspaceId: 'workspace' }, owner.origin, 'fixture-user'), (error: unknown) => error instanceof CredentialError && error.code === 'credential_deletion_retention_hold')
+  assert.equal(touched, false)
+})
+
+test('retention hold prevents replacing an existing saved login', async () => {
+  const statements: string[] = []
+  const client = { async query(sql: string) {
+    statements.push(sql)
+    if (sql.includes('SELECT id FROM bots') || sql.includes('SELECT id FROM agent_runs')) return { rows: [{ id: 'ok' }], rowCount: 1 }
+    if (sql.includes('UPDATE credential_challenges')) return { rows: [{ nonce_hash: 'fixture' }], rowCount: 1 }
+    if (sql.includes('SELECT id FROM credentials')) return { rows: [{ id: 'existing' }], rowCount: 1 }
+    return { rows: [], rowCount: 0 }
+  }, release() {} }
+  const pool = { async connect() { return client } }
+  const store = new CredentialStore(pool as never, fixtureKms())
+  await assert.rejects(store.save({ userId: 'fixture', workspaceId: 'workspace', botId: 'bot', runId: 'run' }, { nonce: 'a'.repeat(43), origin: owner.origin, username: 'fixture', password: 'synthetic' }), (error: unknown) => error instanceof CredentialError && error.code === 'credential_update_retention_hold')
+  assert(statements.includes('ROLLBACK'))
+  assert(!statements.some(sql => /\bDELETE\b|INSERT INTO credential_secrets/i.test(sql)))
+})
+
 test('credential action fails closed when the trusted page binding changes', () => {
   const page: CredentialPageBinding = { userId: 'owner', workspaceId: 'workspace', botId: 'bot', subagentId: 'subagent', epoch: 7, targetId: 'target', origin: 'https://example.com', loaderId: 'loader', permissionAction: 'computer_use', permissionVersion: 1 }
   const lease = { ...page, expiresAt: 2000 }

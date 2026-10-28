@@ -14,7 +14,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
   const claimed = (await pool.query(`WITH candidate AS MATERIALIZED (
     SELECT * FROM credential_fill_leases WHERE nonce_hash=$1 AND consumed_at IS NULL AND expires_at>now() FOR UPDATE
   ), consumed AS (
-    UPDATE credential_fill_leases l SET consumed_at=now(),input_envelope=NULL FROM candidate c WHERE l.nonce_hash=c.nonce_hash RETURNING l.nonce_hash
+    UPDATE credential_fill_leases l SET consumed_at=now() FROM candidate c WHERE l.nonce_hash=c.nonce_hash RETURNING l.nonce_hash
   ) SELECT c.* FROM candidate c JOIN consumed USING(nonce_hash)`, [hashNonce(lease)])).rows[0]
   if (!claimed) throw new CredentialError('credential_denied', 404)
   const caller = { userId: claimed.user_id, workspaceId: claimed.workspace_id, botId: claimed.bot_id, subagentId: claimed.subagent_id, runId: claimed.run_id }

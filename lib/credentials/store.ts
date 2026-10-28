@@ -44,12 +44,12 @@ export class CredentialStore {
       // Serializes upserts, use and deletion for this account/site; no workspace credential sharing.
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${caller.userId}:${origin}`])
       const existing = (await client.query('SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND username=$3 FOR UPDATE', [caller.userId, origin, input.username])).rows[0]
+      if (existing) throw new CredentialError('credential_update_retention_hold', 409)
       const id = existing?.id ?? randomUUID()
       const leak = fingerprint(caller.userId, input.password)
       const envelope = await seal(this.kms, { userId: caller.userId, credentialId: id, origin }, Buffer.from(JSON.stringify({ username: input.username, password: input.password })))
       await client.query(`INSERT INTO credentials(id,user_id,origin,username) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,origin,username) DO UPDATE SET revoked_at=NULL`, [id, caller.userId, origin, input.username])
       await client.query(`INSERT INTO credential_secrets(credential_id,wrapped_dek,nonce,ciphertext,leak_hmac,leak_length) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(credential_id) DO UPDATE SET wrapped_dek=$2,nonce=$3,ciphertext=$4,leak_hmac=$5,leak_length=$6`, [id, envelope.wrappedDek, envelope.nonce, envelope.ciphertext, leak.digest, leak.length])
-      await client.query('DELETE FROM browser_sessions WHERE credential_id=$1', [id])
       await client.query('COMMIT')
       return { status: 'saved' as const, origin }
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
@@ -85,21 +85,10 @@ export class CredentialStore {
       return value
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   }
-  async remove(actor: Actor, origin: string, username: string) {
-    const client = await this.pool.connect()
-    try {
-      await client.query('BEGIN')
-      origin = canonicalOrigin(origin)
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${actor.userId}:${origin}`])
-      const row = (await client.query('UPDATE credentials SET revoked_at=now() WHERE user_id=$1 AND origin=$2 AND username=$3 RETURNING id', [actor.userId, origin, username])).rows[0]
-      if (row) {
-        await client.query('DELETE FROM credential_secrets WHERE credential_id=$1', [row.id])
-        await client.query('DELETE FROM browser_sessions WHERE credential_id=$1', [row.id])
-        await client.query('DELETE FROM credential_fill_leases WHERE credential_id=$1', [row.id])
-      }
-      await client.query('COMMIT')
-      return { status: 'deleted' as const } // Same response for absent/other-owner/deleted.
-    } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  async remove(_actor: Actor, _origin: string, _username: string): Promise<{ status: 'deleted' }> {
+    // Existing records and their sessions are retained until an exact deletion
+    // is explicitly authorized. No credential existence is revealed.
+    throw new CredentialError('credential_deletion_retention_hold', 409)
   }
 }
 

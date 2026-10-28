@@ -9,6 +9,7 @@ import { fillCredential } from './broker'
 import type { Kms } from './kms'
 
 const databaseURL = process.env.CREDENTIAL_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
+if (databaseURL) throw new Error('Credential database tests are on retention hold: their test operations include deletion')
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Credential test database is required')
 test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation and opaque responses', { skip: !databaseURL }, async () => {
   process.env.BETTER_AUTH_SECRET = 'isolated-credential-test-fingerprint-key'
@@ -76,7 +77,6 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
     assert.equal((await pool.query('SELECT * FROM credential_fill_leases')).rowCount, 0)
   } finally {
     await pool.end()
-    await admin.query(`DROP SCHEMA ${schema} CASCADE`)
     await admin.end()
   }
 })
@@ -121,7 +121,6 @@ test('real PostgreSQL: observed credential lease inserts once and stays guarded'
     assert.equal(decrypts, 1); assert.equal(inserted, 1)
   } finally {
     await pool.end()
-    await admin.query(`DROP SCHEMA ${schema} CASCADE`)
     await admin.end()
   }
 })
