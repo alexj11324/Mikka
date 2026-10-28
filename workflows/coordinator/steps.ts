@@ -243,12 +243,14 @@ export async function createIssue(userId: string, input: CreateIssueInput, toolC
   await assertNativeToolScope(userId, scope)
   if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
   if (!taskRequestEventId) {
-    const [pending] = await db.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(and(
+    const [latest] = await db.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(and(
       eq(coordinatorEvents.userId, userId), botId ? eq(coordinatorEvents.botId, botId) : isNull(coordinatorEvents.botId),
       eq(coordinatorEvents.kind, 'user_message'), sql`${coordinatorEvents.payload}->'taskDestination'->>'kind' = 'device'`,
-      sql`not exists (select 1 from task_request_bindings b where b."eventId" = ${coordinatorEvents.id})`,
-    )).limit(1)
-    if (pending) return { error: 'submissionConflict' }
+    )).orderBy(desc(coordinatorEvents.createdAt), desc(coordinatorEvents.id)).limit(1)
+    if (latest) {
+      const [binding] = await db.select({ eventId: taskRequestBindings.eventId }).from(taskRequestBindings).where(eq(taskRequestBindings.eventId, latest.id)).limit(1)
+      if (!binding) return { error: 'submissionConflict' }
+    }
   }
   return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId ?? 'coordinator'), toolCallId, taskRequestEventId ? { eventId: taskRequestEventId, botId } : undefined)
 }
