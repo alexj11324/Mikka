@@ -157,3 +157,19 @@ test('all required gates reject failed classification and skipped full jobs', ()
     }
   }
 })
+
+test('each actual workflow temp-file command produces a classifier Node can load outside the package', () => {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+    const source = readFileSync(file, 'utf8')
+    const command = source.match(/^          (trusted="\$\(mktemp[^\n]*\)")$/m)?.[1]
+    assert.ok(command, 'Exercise the actual workflow temporary-file command')
+    const dir = mkdtempSync(join(tmpdir(), 'docs-gate-module-retained-'))
+    const env = { PATH: process.env.PATH, TMPDIR: dir }
+    const trusted = execFileSync('bash', ['-e', '-c', command + '; printf "%s" "$trusted"'], { cwd: dir, env, encoding: 'utf8' })
+    assert.equal(resolve(trusted, '..'), dir, 'Fixture must belong to this new temporary directory')
+    writeFileSync(trusted, readFileSync('scripts/ci-docs-only.mjs'))
+    const output = execFileSync(process.execPath, [trusted], { cwd: dir, env: { ...env, GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main' }, encoding: 'utf8' })
+    assert.match(output, /docs_only=false \(push to main\)/)
+    console.log(`Retained workflow module-loader evidence: ${trusted}`)
+  }
+})
