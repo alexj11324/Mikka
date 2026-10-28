@@ -137,7 +137,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId,
       agentDefinition: retryWorkerDefinition(run.agentDefinition, retryPrompt(run.prompt, outcome.attempt)),
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
-      prompt: retryPrompt(run.prompt, outcome.attempt), attempt: outcome.attempt, retryOf: run.id,
+      prompt: retryPrompt(run.prompt, outcome.attempt), attempt: outcome.attempt, retryOf: run.id, repositoryAdmission: run.repositoryAdmission,
     })
     await tx.execute(sql`insert into computer_run_bindings ("runId","botId","workspaceId","ownerId") select ${retryId},"botId","workspaceId","ownerId" from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
     await recordCoordinatorEvent(tx, runRetriedEvent(run, { runId: retryId, attempt: outcome.attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedToDeviceId: target?.deviceId ?? null }))

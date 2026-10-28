@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db, pool } from '@/lib/db'
 import { SubscriptionRepository } from '@/lib/subscription-repository'
-import { agents, agentRuns, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { agents, agentRuns, devices, issues, repositorySettings, runPublications, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
@@ -18,6 +18,10 @@ import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { runPrompt } from '@/lib/run-prompt'
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
 import { runBotName } from '@/lib/run-bot-name'
+import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { readIssueMetadata } from '@/lib/issue-metadata'
+import { publicationBranch } from '@/lib/run-publication-policy'
+import { admitRepositoryTask } from '@/lib/repository-admission'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -76,10 +80,26 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   const agentDefinition = captureDefinition
     ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription })
     : null
-  await db.insert(agentRuns).values({
-    id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
-    prompt, agentDefinition,
+  await db.transaction(async tx => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['repository-approval', userId, repo.repoPath])}, 0))`)
+    const [setting] = await tx.select().from(repositorySettings).where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, repo.repoPath)))
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-publication:' + issue.id}, 0))`)
+    const [previous] = await tx.select().from(runPublications).where(and(eq(runPublications.issueId, issue.id), eq(runPublications.remoteKey, repo.repoPath), sql`${runPublications.branch} is not null`)).orderBy(asc(runPublications.createdAt)).limit(1)
+    const identifiers = await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: readIssueMetadata(issue.content).number }], tx)
+    const identifier = previous?.identifier ?? identifiers.get(issue.id) ?? null
+    const branch = previous?.branch ?? publicationBranch(identifier)
+    if (!branch || !repo.remoteUrl) throw new ActionFailureError('runInvalid')
+    const admission = admitRepositoryTask({ userId, issueId: issue.id, remoteKey: repo.repoPath, remoteUrl: repo.remoteUrl, targetBranch: branch, push: setting?.push, now: new Date() })
+    if (!admission) throw new ActionFailureError('runInvalid')
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'repository-branch:' + repo.repoPath + ':' + branch}, 0))`)
+    const [collision] = await tx.select({ runId: runPublications.runId }).from(runPublications).where(and(eq(runPublications.remoteKey, repo.repoPath), eq(runPublications.branch, branch), sql`${runPublications.issueId} <> ${issue.id}`)).limit(1)
+    if (collision) throw new ActionFailureError('runInvalid')
+    await tx.insert(agentRuns).values({
+      id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
+      deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
+      prompt, agentDefinition, repositoryAdmission: admission,
+    })
+    await tx.insert(runPublications).values({ runId, userId, issueId: issue.id, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: repo.baseBranch, pushApproved: true })
   })
   return { runId }
 }

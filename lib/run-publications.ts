@@ -6,14 +6,14 @@ import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { remoteKey } from '@mikka/protocol/repository'
 import { db } from '@/lib/db'
 import { agentRuns, devices, issues, issueVersions, runPublications, runTokens, type RunStatus } from '@/lib/db/schema'
-import { readRepositorySettings } from '@/lib/device-repositories'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { issueForUser } from '@/lib/issue-access'
 import { systemActor } from '@/lib/activity-actor'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
-import { publicationBranch, publicationGate, repositoryPushApproved } from '@/lib/run-publication-policy'
+import { publicationGate } from '@/lib/run-publication-policy'
+import { matchesRepositoryAdmission } from '@/lib/repository-admission'
 import { linkedGitHubAccountId, saveRepositoryInstallation } from '@/lib/github/repository-installation'
 import { openRunPullRequest, PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/github/run-pull-request'
 
@@ -31,12 +31,12 @@ function reportOf(run: Run): RunReport | null {
 }
 
 /** Pin the task's branch and explicit repository approval before claiming it. */
-export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'issueId' | 'baseBranch'>, remoteUrl: string) {
+export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'issueId' | 'baseBranch' | 'repositoryAdmission'>, remoteUrl: string) {
   if (!run.issueId) throw new PublicationError('issue_unavailable')
   const issueId = run.issueId
   const key = remoteKey(remoteUrl)
-  const settings = await readRepositorySettings(run.userId, remoteUrl)
-  const pushApproved = repositoryPushApproved(settings?.push, run.userId)
+  const admission = run.repositoryAdmission
+  if (!admission || !matchesRepositoryAdmission(admission, { userId: run.userId, issueId, remoteKey: key, remoteUrl, targetBranch: admission.targetBranch })) throw new PublicationError('push_not_approved')
   const task = await issueForUser(run.userId, issueId)
   if (!task) throw new PublicationError('issue_unavailable')
   const row = await db.transaction(async tx => {
@@ -44,15 +44,16 @@ export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'is
     const [existing] = await tx.select().from(runPublications).where(and(eq(runPublications.runId, run.id), eq(runPublications.userId, run.userId)))
     if (existing) {
       if (existing.remoteKey !== key || existing.issueId !== issueId) throw new PublicationError('publication_mismatch')
-      const [refreshed] = await tx.update(runPublications).set({ pushApproved, updatedAt: new Date() }).where(and(eq(runPublications.runId, run.id), eq(runPublications.status, 'assigned'))).returning()
-      return refreshed ?? existing
+      if (!existing.pushApproved || existing.branch !== admission.targetBranch) throw new PublicationError('publication_mismatch')
+      return existing
     }
     const [previous] = await tx.select().from(runPublications)
       .where(and(eq(runPublications.issueId, issueId), eq(runPublications.remoteKey, key), sql`${runPublications.branch} is not null`))
       .orderBy(asc(runPublications.createdAt)).limit(1)
     const identifiers = await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }], tx)
     const identifier = previous?.identifier ?? identifiers.get(issueId) ?? null
-    const branch = previous?.branch ?? publicationBranch(identifier)
+    const branch = admission.targetBranch
+    if (previous?.branch && previous.branch !== branch) throw new PublicationError('publication_mismatch')
     if (branch) {
       // Personal identifiers are only unique per owner. Reserve the shared
       // repository branch across tasks before any daemon can fetch or push it.
@@ -61,7 +62,7 @@ export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'is
         .where(and(eq(runPublications.remoteKey, key), eq(runPublications.branch, branch), ne(runPublications.issueId, issueId))).limit(1)
       if (collision) throw new PublicationError('pull_request_conflict')
     }
-    const [saved] = await tx.insert(runPublications).values({ runId: run.id, userId: run.userId, issueId, remoteUrl, remoteKey: key, identifier, branch, baseBranch: run.baseBranch, pushApproved }).returning()
+    const [saved] = await tx.insert(runPublications).values({ runId: run.id, userId: run.userId, issueId, remoteUrl, remoteKey: key, identifier, branch, baseBranch: run.baseBranch, pushApproved: true }).returning()
     return saved
   })
   const policy = defaultRunPolicy()
@@ -175,10 +176,9 @@ export async function publishRunResult(runId: string, openPullRequest = openRunP
     const [run] = await db.select().from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, claim.userId)))
     const report = run ? reportOf(run) : null
     if (claim.remoteKey !== remoteKey(claim.remoteUrl)) throw new PublicationError('publication_mismatch')
-    if (!run || !report?.publish?.commit || !claim.branch || !claim.identifier) throw new PublicationError('publication_mismatch')
+    if (!run || run.stopRequestedAt || !report?.publish?.commit || !claim.branch || !claim.identifier) throw new PublicationError('publication_mismatch')
     if (!await issueForUser(claim.userId, claim.issueId)) throw new PublicationError('issue_unavailable')
-    const settings = await readRepositorySettings(claim.userId, claim.remoteUrl)
-    if (!claim.pushApproved || !repositoryPushApproved(settings?.push, claim.userId)) throw new PublicationError('push_not_approved')
+    if (!claim.pushApproved || !run.repositoryAdmission || !matchesRepositoryAdmission(run.repositoryAdmission, { userId: claim.userId, issueId: claim.issueId, remoteKey: claim.remoteKey, remoteUrl: claim.remoteUrl, targetBranch: claim.branch })) throw new PublicationError('push_not_approved')
     const [task] = await db.select({ title: issues.title, content: issues.content }).from(issues).where(eq(issues.id, claim.issueId))
     if (!task) throw new PublicationError('issue_unavailable')
     const pullRequest = await openPullRequest({ remoteKey: claim.remoteKey, githubAccountId: await linkedGitHubAccountId(claim.userId), issueId: claim.issueId, identifier: claim.identifier, title: task.title, summary: report.summary, branch: claim.branch, commit: report.publish.commit, baseBranch: claim.baseBranch, draft: report.verify.status === 'not_run', allowCreate: readIssueMetadata(task.content).pullRequests.length < 10, onVerified: binding => saveRepositoryInstallation(claim.userId, claim.remoteKey, binding) })

@@ -1,4 +1,5 @@
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
+import type { RepositoryAdmission } from '../repository-admission'
 import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
@@ -223,6 +224,7 @@ export type RunStatus = (typeof RUN_STATUSES)[number]
 
 /** One execution of one agent. The daemon claims it, runs it and reports back. */
 export const agentRuns = pgTable('agent_runs', {
+  repositoryAdmission: jsonb('repositoryAdmission').$type<RepositoryAdmission | null>(),
   /** Immutable execution provenance; old rows remain unrecorded. */
   agentDefinition: jsonb('agentDefinition').$type<WorkerDefinitionSnapshot | null>(),
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
@@ -571,6 +573,7 @@ export const coordinatorMessages = pgTable('coordinator_messages', {
 
 /** A message a person sent a running agent, delivered on its next poll. */
 export const runMessages = pgTable('run_messages', {
+  repositoryAdmission: jsonb('repositoryAdmission').$type<RepositoryAdmission | null>(),
   id: uuid('id').primaryKey(), runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull(), text: text('text').notNull(),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
