@@ -27,7 +27,7 @@ const completed=mock.fn(async()=>{throw Error('Claim unexpectedly completed a ru
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
 let selectIndex=0
 let mismatch: string|undefined
-const db={select:()=>({from:()=>({where:()=>({limit:async()=>[[{id:randomUUID(),userId:mismatch==='run'?'other-owner':owner,agentId,deviceId,deviceRepoId:repoId,issueId,baseBranch:null,kind:'implement',prompt:'task',agentDefinition:definition}],[{id:agentId,userId:mismatch==='agent'?'other-owner':owner,deviceId:randomUUID(),harness:'claude_code'}],[{id:repoId,userId:mismatch==='repo'?'other-owner':owner,deviceId:mismatch==='device'?randomUUID():deviceId,baseBranch:'main',remoteUrl:'https://github.com/example/repo.git'}]][selectIndex++]})})})}
+const db={select:()=>({from:()=>({where:()=>({limit:async()=>[[{id:randomUUID(),userId:mismatch==='run'?'other-owner':owner,agentId,deviceId,deviceRepoId:repoId,issueId,baseBranch:null,kind:'implement',prompt:'task',agentDefinition:definition}],[{id:agentId,userId:mismatch==='agent'?'other-owner':owner,deviceId:randomUUID(),harness:'claude_code'}],[{id:repoId,userId:mismatch==='repo'?'other-owner':owner,deviceId:mismatch==='device'?randomUUID():deviceId,baseBranch:'main',repoPath:mismatch==='legacy-key'?'github.com/example/repo':'v2/github.com/example/repo',remoteUrl:mismatch==='repo-url'?'https://github.com:8443/example/repo.git':'https://github.com/example/repo.git'}]][selectIndex++]})})})}
 let cloud=false
 let protocolVersion=3
 stub('../db/index.ts',{db,pool:{}})
@@ -60,6 +60,10 @@ test('claim refuses cross-owner or cross-device records even without a subscript
  for(const target of ['run','agent','repo','device']){mismatch=target;selectIndex=0;assert.equal((await request()).status,409)}
  assert.equal(claimed.mock.callCount(),0);assert.equal(cloudClaimed.mock.callCount(),0)
  assert.equal(prepared.mock.callCount(),0)
+})
+test('claim refuses legacy or endpoint-mismatched repository bindings before taking a lease',async()=>{
+ for(const target of ['legacy-key','repo-url']){mismatch=target;selectIndex=0;assert.equal((await request()).status,409)}
+ assert.equal(claimed.mock.callCount(),0);assert.equal(cloudClaimed.mock.callCount(),0)
 })
 test('cloud claim preserves main scoped claim and frozen subscription',async()=>{
  cloud=true;const response=await request();assert.equal(response.status,200);assert.equal(cloudClaimed.mock.callCount(),1);assert.equal(claimed.mock.callCount(),0)

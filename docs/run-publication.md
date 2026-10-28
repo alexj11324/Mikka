@@ -11,6 +11,21 @@ team, adds an identity suffix, or changes the branch on a retry. A transaction
 reserves `(remoteKey, branch)` across issues, so two users whose personal tasks
 have the same identifier cannot push into each other's task branch.
 
+Repository identities use the `v2/` namespace. Only GitHub's standard HTTPS and
+`git` SSH endpoints share a cross-transport identity. Other hosts retain their
+port, SSH user, absolute/relative namespace, path case and literal suffix. SSH
+URLs must state the login user; a machine's implicit OS login is not a shared
+repository identity.
+Daemon clone directories use a digest of that identity, including on
+case-insensitive filesystems. An existing scheduling record never changes its
+clone URL when another request registers an alias or a different repository.
+
+Old identity keys, approvals and publication receipts are preserved but are not
+adopted or rewritten. A queued legacy or mismatched binding is refused; schedule
+a new thread and explicitly approve the current repository identity. Only old
+GitHub physical-checkout records with a verified equivalent endpoint can reuse
+their record ID, without changing the clone URL. No data migration grants a push.
+
 `repository_settings.push` stores `{ approved, remote: 'origin',
 approvedByUserId, approvedAt }`, keyed by `(userId, remoteKey)`. Only the
 human-session backend action can create that receipt; neither MCP nor native

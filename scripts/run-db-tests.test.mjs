@@ -71,11 +71,11 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(plan.selfManaged.includes('lib/auth-email.test.ts'))
   const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
   const custodyWorkflow = readFileSync('.github/workflows/e2b-byos.yml', 'utf8')
+  const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
   for (const { runner } of SELF_MANAGED) {
     const dedicatedScript = Object.entries(pkg).find(([, command]) => command === `node ${runner}`)?.[0]
-    assert.ok(workflow.includes(`run: node ${runner}`) || (dedicatedScript && custodyWorkflow.includes(`run: pnpm ${dedicatedScript}`)), `${runner} runs in CI`)
+    assert.ok(workflow.includes(`run: node ${runner}`) || browser.includes(`run: node ${runner}`) || (dedicatedScript && custodyWorkflow.includes(`run: pnpm ${dedicatedScript}`)), `${runner} runs in CI`)
   }
-  const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
   // Pure gates also run without a database in the fast job; their DB run is still only through pnpm test:db.
   const pureGates = ['test:groups', 'test:active-agents', 'test:group-turns', 'test:issue-search']
   for (const script of plan.scripts) {

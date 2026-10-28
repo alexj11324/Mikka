@@ -174,6 +174,7 @@ export async function publishRunResult(runId: string, openPullRequest = openRunP
   try {
     const [run] = await db.select().from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, claim.userId)))
     const report = run ? reportOf(run) : null
+    if (claim.remoteKey !== remoteKey(claim.remoteUrl)) throw new PublicationError('publication_mismatch')
     if (!run || !report?.publish?.commit || !claim.branch || !claim.identifier) throw new PublicationError('publication_mismatch')
     if (!await issueForUser(claim.userId, claim.issueId)) throw new PublicationError('issue_unavailable')
     const settings = await readRepositorySettings(claim.userId, claim.remoteUrl)

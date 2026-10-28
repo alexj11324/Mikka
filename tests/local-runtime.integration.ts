@@ -15,7 +15,7 @@ test('device identity convergence, repository URL deduplication and history pres
   const { Pool } = await import('pg')
   const { readFile } = await import('node:fs/promises')
   const { ensureDeviceAgents } = await import('../lib/device-agents')
-  const { ensureDeviceRepository } = await import('../lib/device-repositories')
+  const { ensureDeviceRepository, readRepositorySettings } = await import('../lib/device-repositories')
   const { executionBotName, runBotName } = await import('../lib/run-bot-name')
   const { enrichActivityActors } = await import('../lib/activity-actor-server')
   const { db, pool: applicationPool } = await import('../lib/db')
@@ -23,7 +23,7 @@ test('device identity convergence, repository URL deduplication and history pres
   const { eq } = await import('drizzle-orm')
   const pool = new Pool({ connectionString: url, max: 12 })
   const owner = `local-runtime-${randomUUID()}`
-  const first = randomUUID(), second = randomUUID(), issue = randomUUID(), run = randomUUID()
+  const first = randomUUID(), second = randomUUID(), issue = randomUUID(), run = randomUUID(), queuedIdentityRun = randomUUID()
   const infos = [{ harness: 'claude_code' as const, installed: true, version: 'test' }, { harness: 'codex' as const, installed: true, version: 'test' }]
   try {
     // The E2E table bootstrap omits indexes; restore their tracked SQL so
@@ -52,7 +52,7 @@ test('device identity convergence, repository URL deduplication and history pres
     const variants = ['example/local-runtime', 'https://github.com/example/local-runtime.git', 'git@github.com:example/local-runtime.git']
     const records = await Promise.all(Array.from({ length: 12 }, (_, i) => ensureDeviceRepository(owner, first, variants[i % variants.length]!)))
     assert.equal(new Set(records.map(row => row.id)).size, 1)
-    assert.equal(records[0]!.repoPath, 'github.com/example/local-runtime')
+    assert.equal(records[0]!.repoPath, 'v2/github.com/example/local-runtime')
     assert.equal(records[0]!.baseBranch, null)
     const other = await ensureDeviceRepository(owner, second, variants[0]!)
     assert.notEqual(other.id, records[0]!.id)
@@ -62,12 +62,32 @@ test('device identity convergence, repository URL deduplication and history pres
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,$6)', [legacy, first, owner, '/personal/checkout', 'git@github.com:example/legacy.git', 'release'])
     const migrated = await ensureDeviceRepository(owner, first, 'example/legacy')
     assert.equal(migrated.id, legacy)
-    assert.equal(migrated.repoPath, 'github.com/example/legacy')
-    assert.equal(migrated.remoteUrl, 'https://github.com/example/legacy.git')
+    assert.equal(migrated.repoPath, 'v2/github.com/example/legacy')
+    assert.equal(migrated.remoteUrl, 'git@github.com:example/legacy.git', 'legacy endpoint is never replaced by an alias')
     assert.equal(migrated.baseBranch, 'release')
 
     await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Disposable local task','{"type":"doc","content":[]}','todo','normal')`, [issue, owner])
     await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","baseBranch") VALUES ($1,$2,$3,$4,$5,$6,NULL)`, [run, owner, issue, codex.id, first, records[0]!.id])
+    const aURL = 'https://git.example.com:8443/Team/Repo.git'
+    const bURL = 'https://git.example.com:9443/team/repo.git'
+    const a = await ensureDeviceRepository(owner, first, aURL)
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status) VALUES ($1,$2,$3,$4,$5,$6,'queued')`, [queuedIdentityRun, owner, issue, codex.id, first, a.id])
+    const b = await ensureDeviceRepository(owner, first, bURL)
+    assert.notEqual(a.id, b.id)
+    assert.notEqual(a.repoPath, b.repoPath)
+    assert.equal((await ensureDeviceRepository(owner, first, 'https://GIT.example.com:8443/Team/Repo.git')).remoteUrl, aURL, 'equivalent aliases cannot replace a queued endpoint')
+    const queued = (await pool.query('SELECT d."remoteUrl" FROM agent_runs r JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r.id=$1', [queuedIdentityRun])).rows[0]
+    assert.equal(queued.remoteUrl, aURL, 'registering B cannot retarget queued A')
+    const push = { approved: true, remote: 'origin', approvedByUserId: owner, approvedAt: new Date().toISOString() }
+    await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [owner, 'git.example.com/team/repo', push])
+    assert.equal(await readRepositorySettings(owner, aURL), null, 'unversioned ambiguous approval is not adopted')
+    assert.equal(await readRepositorySettings(owner, bURL), null)
+    await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [owner, a.repoPath, push])
+    assert.equal((await readRepositorySettings(owner, aURL))?.push?.approved, true)
+    assert.equal(await readRepositorySettings(owner, bURL), null, 'B cannot borrow A approval')
+    assert.equal(await readRepositorySettings(owner, 'ssh://git.example.com/team/repo.git'), null, 'an invalid legacy endpoint cannot break device repo listing')
+    assert.equal(await readRepositorySettings(owner, 'git.example.com:team/repo.git'), null)
+    assert.equal((await readRepositorySettings(owner, aURL))?.push?.approved, true, 'healthy repository settings remain readable after invalid legacy entries')
     const [display] = await db.select({ name: runBotName }).from(agentRuns).innerJoin(agents, eq(agentRuns.agentId, agents.id)).where(eq(agentRuns.id, run))
     assert.equal(display?.name, 'Coordinator')
     const [identity] = await db.select({ name: executionBotName }).from(agents).where(eq(agents.id, codex.id))
@@ -85,7 +105,8 @@ test('device identity convergence, repository URL deduplication and history pres
     assert.equal((await pool.query('SELECT "deviceId" FROM agents WHERE id=$1', [codex.id])).rows[0].deviceId, first)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agents WHERE "userId"=$1', [owner])).rows[0].n, 4)
   } finally {
-    await pool.query('DELETE FROM agent_runs WHERE id=$1', [run])
+    await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [[run, queuedIdentityRun]])
+    await pool.query('DELETE FROM repository_settings WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM issues WHERE id=$1', [issue])
     await pool.query('DELETE FROM agents WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM device_repos WHERE "userId"=$1', [owner])

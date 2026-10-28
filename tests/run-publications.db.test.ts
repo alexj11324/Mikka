@@ -4,6 +4,7 @@ import test from 'node:test'
 import type { RunCompleteRequest } from '@mikka/protocol/run'
 import type { PublishedPullRequest } from '../lib/run-publication-result'
 import type { openRunPullRequest } from '../lib/github/run-pull-request'
+import { remoteKey as repositoryKey } from '@mikka/protocol/repository'
 
 const connection = process.env.E2E_DATABASE_URL
 const enabled = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && Boolean(connection)
@@ -47,7 +48,7 @@ test('run result publication commits one owner-scoped result through retries and
   let githubId = 800_000
 
   const assignment = (fixture: Fixture) => ({ id: fixture.runId, userId: fixture.userId, issueId: fixture.issueId, baseBranch: null })
-  const prFor = (fixture: Fixture, number = 77): PublishedPullRequest => ({ url: `https://${fixture.remoteKey}/pull/${number}`, state: 'open' })
+  const prFor = (fixture: Fixture, number = 77): PublishedPullRequest => ({ url: `https://${fixture.remoteKey.slice(3)}/pull/${number}`, state: 'open' })
   const counts = async (fixture: Fixture) => {
     const result = await pool.query<{ versions: string; events: string }>(`select
       (select count(*) from issue_versions where "issueId"=$1) as versions,
@@ -62,14 +63,14 @@ test('run result publication commits one owner-scoped result through retries and
     await pool.query(`insert into repository_settings ("userId","remoteKey",push) values ($1,$2,$3)
       on conflict ("userId","remoteKey") do update set push=excluded.push,"updatedAt"=now()`, [fixture.userId, fixture.remoteKey, JSON.stringify(push)])
   }
-  const fixture = async (options: { approved?: boolean; prefix?: string; number?: number; remoteKey?: string } = {}) => {
+  const fixture = async (options: { approved?: boolean; prefix?: string; number?: number; remoteKey?: string; remoteUrl?: string } = {}) => {
     const seed = randomUUID()
     const prefix = options.prefix ?? 'TEST'
     const number = options.number ?? 1
-    const remoteKey = options.remoteKey ?? `github.com/mikka-ci/repo-${seed}`
+    const remoteKey = options.remoteUrl ? repositoryKey(options.remoteUrl) : options.remoteKey ?? `v2/github.com/mikka-ci/repo-${seed}`
     const row: Fixture = {
       userId: `publication-${seed}`, deviceId: randomUUID(), agentId: randomUUID(), repoId: randomUUID(), issueId: randomUUID(), runId: randomUUID(),
-      remoteUrl: `https://${remoteKey}.git`, remoteKey, identifier: `${prefix}-${number}`, branch: `mikka/${prefix.toLowerCase()}-${number}`, githubAccountId: String(++githubId),
+      remoteUrl: options.remoteUrl ?? `https://${remoteKey.slice(3)}.git`, remoteKey, identifier: `${prefix}-${number}`, branch: `mikka/${prefix.toLowerCase()}-${number}`, githubAccountId: String(++githubId),
     }
     fixtures.push(row)
     await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$1,$2,true,now(),now())', [row.userId, `${row.userId}@example.invalid`])
@@ -78,7 +79,7 @@ test('run result publication commits one owner-scoped result through retries and
     await pool.query('insert into devices (id,"ownerId",name,kind,harnesses) values ($1,$2,\'Publication CI computer\',\'local\',$3)', [row.deviceId, row.userId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents (id,"userId","deviceId",harness,name) values ($1,$2,$3,\'codex\',$4)', [row.agentId, row.userId, row.deviceId, `codex ${row.deviceId}`])
     await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") values ($1,$2,$3,$4,$5,null)', [row.repoId, row.deviceId, row.userId, row.remoteKey, row.remoteUrl])
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Fix redirect\',$3,\'todo\',\'none\',\'personal\')', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] })])
+    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Fix redirect\',$3,\'todo\',\'normal\',\'personal\')', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] })])
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt) values ($1,$2,$3,$4,$5,$6,\'running\',\'implement\',null,\'Fix redirect\')', [row.runId, row.userId, row.issueId, row.agentId, row.deviceId, row.repoId])
     await pool.query('insert into run_tokens (id,"runId","userId","tokenHash","expiresAt") values ($1,$2,$3,$4,now()+interval \'1 hour\')', [randomUUID(), row.runId, row.userId, `synthetic-${randomUUID()}`])
     if (options.approved) await approval(row, true)
@@ -217,7 +218,7 @@ test('run result publication commits one owner-scoped result through retries and
     })
 
     await t.test('different owners with the same task identifier cannot reserve one repository branch concurrently', async () => {
-      const remoteKey = `github.com/mikka-ci/shared-${randomUUID()}`
+      const remoteKey = `v2/github.com/mikka-ci/shared-${randomUUID()}`
       const a = await fixture({ approved: true, prefix: 'SAME', number: 7, remoteKey })
       const b = await fixture({ approved: true, prefix: 'SAME', number: 7, remoteKey })
       const results = await Promise.allSettled([prepareRunPublication(assignment(a), a.remoteUrl), prepareRunPublication(assignment(b), b.remoteUrl)])
@@ -229,6 +230,27 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal((await pool.query('select count(*) from run_publications where "remoteKey"=$1 and branch=$2', [remoteKey, a.branch])).rows[0].count, '1')
       assert.deepEqual(await counts(a), { versions: 0, events: 0 })
       assert.deepEqual(await counts(b), { versions: 0, events: 0 })
+    })
+
+    await t.test('different endpoints and legacy keys cannot lend an owner approval to another repository', async () => {
+      const f = await fixture({ remoteUrl: 'https://git.example.com:9443/team/repo.git' })
+      const aKey = repositoryKey('https://git.example.com:8443/Team/Repo.git')
+      await approval({ ...f, remoteKey: aKey }, true)
+      await approval({ ...f, remoteKey: 'git.example.com/team/repo' }, true)
+      assert.equal((await prepareRunPublication(assignment(f), f.remoteUrl)).policy.permissions.git_push, 'ask')
+      assert.equal((await receipt(f)).remoteKey, f.remoteKey)
+      const github = await fixture()
+      await approval({ ...github, remoteKey: github.remoteKey.slice(3) }, true)
+      assert.equal((await prepareRunPublication(assignment(github), github.remoteUrl)).policy.permissions.git_push, 'ask', 'old GitHub keys also require explicit reapproval')
+      await approval(github, true)
+      assert.equal((await prepareRunPublication(assignment(github), github.remoteUrl)).policy.permissions.git_push, 'allow')
+      await pool.query('UPDATE run_publications SET "remoteKey"=$2 WHERE "runId"=$1', [github.runId, github.remoteKey.slice(3)])
+      await assert.rejects(prepareRunPublication(assignment(github), github.remoteUrl), { code: 'publication_mismatch' })
+      await persistRunCompletion(github.userId, github.runId, completion(github))
+      let opened = 0
+      assert.deepEqual(await publishRunResult(github.runId, async () => { opened++; throw new Error('Legacy publication must not contact GitHub') }), { done: true })
+      assert.equal(opened, 0)
+      assert.equal((await receipt(github)).errorCode, 'publication_mismatch')
     })
 
     await t.test('missing human approval and revoked approval cannot open a PR', async () => {

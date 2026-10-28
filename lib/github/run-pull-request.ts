@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { githubAppJwt } from '@/lib/suggestions/github-redelivery'
 import { pullRequestBody } from '@mikka/protocol/orchestrator'
+import { normalizeRepository } from '@mikka/protocol/repository'
 
 import { PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/run-publication-result'
 export { PublicationError, PUBLICATION_ERRORS, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/run-publication-result'
@@ -37,10 +38,13 @@ const prSchema = z.object({
 })
 
 export function githubRepository(key: string) {
-  const [host, owner, repo, extra] = key.split('/')
-  if (host !== 'github.com' || !owner || !repo || extra !== undefined || !repoName.test(owner) || !repoName.test(repo) || [owner, repo].some(value => value === '.' || value === '..')) {
+  const [version, host, owner, repo, extra] = key.split('/')
+  if (version !== 'v2' || host !== 'github.com' || !owner || !repo || extra !== undefined || !repoName.test(owner) || !repoName.test(repo) || [owner, repo].some(value => value === '.' || value === '..')) {
     throw new PublicationError('repository_not_github')
   }
+  try {
+    if (normalizeRepository(`https://${host}/${owner}/${repo}.git`).key !== key) throw new Error('Noncanonical key')
+  } catch { throw new PublicationError('repository_not_github') }
   return { owner, repo, path: `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}` }
 }
 
