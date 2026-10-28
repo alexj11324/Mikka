@@ -201,8 +201,11 @@ retain changes were handed to their sole owner #364 and are excluded from this
 batch's final diff; they must not be overwritten by another owner. Fresh test
 execution isolates every writable fixture/cache under its new root, including
 the normal temporary cleanup allowed by the newer user instruction. Agent Kit
-database setup checks existing
-schema metadata instead of automatically replaying migrations against its target.
+database setup checks existing schema metadata. Only a fresh Actions-owned service
+with all seven Kit tables, both functions and its named constraint absent can be
+initialized once with the unchanged pinned SQL, because the CI ORM bootstrap does
+not create these raw-SQL tables. Old dedicated or partially present targets are
+never automatically rebuilt or replayed by setup.
 After the user's newer authorization for this run's new managed CI resources,
 the replay assertion uses an exclusively created per-test database on the owned
 Actions PostgreSQL service. It refuses the old dedicated retained targets,

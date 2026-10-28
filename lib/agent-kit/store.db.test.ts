@@ -23,13 +23,29 @@ if(!loopback || (!dedicated && !actions)) throw new Error('Refusing non-isolated
 const pool=new Pool({connectionString,max:12})
 const store=new AgentKitStore(pool)
 const defaults=DEFAULT_AGENT_DEFINITION
+const kitTables=['agent_kit_heads','agent_kit_versions','agent_kit_executions','agent_kit_events','agent_kit_proposals','agent_kit_evaluations','agent_kit_activations']
+function fixedMigration(){
+  const migration=readFileSync(new URL('../../drizzle/20261027181000_agent_kit.sql',import.meta.url),'utf8')
+  assert.equal(createHash('sha256').update(migration).digest('hex'),'365230faab874af93a8f696a1f83f1b3276a83bb6ea933b3939a6b654dea1be2')
+  return migration
+}
+async function relationExists(name:string){
+  const {rows}=await pool.query("select to_regclass(format('%I.%I',current_schema(),$1::text)) as relation",[name])
+  return Boolean(rows[0]?.relation)
+}
 before(async()=>{
-  // Setup is metadata-only. The historical migration rebuilds triggers, so it
-  // must not be replayed automatically under the resource-retention rule.
-  for(const name of ['user','bots','agent_runs','agent_kit_heads','agent_kit_versions','agent_kit_executions','agent_kit_events','agent_kit_proposals','agent_kit_evaluations','agent_kit_activations']){
-    const {rows}=await pool.query("select to_regclass(format('%I.%I',current_schema(),$1::text)) as relation",[name])
-    assert.ok(rows[0]?.relation,`Existing isolated Agent Kit schema required: ${name}; no automatic migration or rebuild`)
+  for(const name of ['user','bots','agent_runs'])assert.ok(await relationExists(name),`Existing isolated parent schema required: ${name}`)
+  const present=await Promise.all(kitTables.map(relationExists))
+  if(actions && present.every(value=>!value)){
+    // The CI ORM bootstrap does not create these raw-SQL tables. Initialize
+    // only this job's newly owned service, never an old dedicated target or
+    // partially present schema. Existing Kit tables are never replayed here.
+    const {rows:[objects]}=await pool.query("select to_regprocedure('agent_kit_immutable_row()') as immutable,to_regprocedure('agent_kit_snapshot_guard()') as guard,exists(select 1 from pg_constraint where conname='agent_kit_active_version_fk') as constraint_present")
+    assert.ok(!objects.immutable && !objects.guard && !objects.constraint_present,'Refusing partial Agent Kit objects in the fresh CI fixture')
+    await pool.query(fixedMigration())
+    console.info(JSON.stringify({event:'agent_kit_fresh_ci_schema_initialized',database:'mikka_e2e',tables:kitTables,sqlSha256:'365230faab874af93a8f696a1f83f1b3276a83bb6ea933b3939a6b654dea1be2'}))
   }
+  for(const name of kitTables)assert.ok(await relationExists(name),`Existing isolated Agent Kit schema required: ${name}; partial or old targets are not automatically rebuilt`)
 })
 after(async()=>{await pool.end()})
 async function owner(bot=true):Promise<AgentScope>{
@@ -78,8 +94,7 @@ test('the unchanged Agent Kit migration replays only in a newly created CI-owned
   // The newer user authorization covers this run's NEW managed CI resources.
   // It does not permit replay against a prior dedicated retained database.
   assert.ok(actions,'Migration replay requires this Actions job\'s owned temporary PostgreSQL service')
-  const migration=readFileSync(new URL('../../drizzle/20261027181000_agent_kit.sql',import.meta.url),'utf8')
-  assert.equal(createHash('sha256').update(migration).digest('hex'),'365230faab874af93a8f696a1f83f1b3276a83bb6ea933b3939a6b654dea1be2')
+  const migration=fixedMigration()
   const database=`mikka_agent_kit_replay_${randomUUID().replaceAll('-','')}`
   assert.match(database,/^mikka_agent_kit_replay_[a-f0-9]{32}$/)
   await pool.query(`create database "${database}"`)
@@ -101,6 +116,7 @@ test('the unchanged Agent Kit migration replays only in a newly created CI-owned
     await isolated.query(migration)
     const rows=await isolated.query('select "agentDefinition" from agent_runs where id=$1',[historicalId])
     assert.deepEqual(rows.rows,[{agentDefinition:null}],'migration replay does not invent or delete historical execution evidence')
+    assert.equal((await isolated.query('select count(*)::int as count from agent_runs')).rows[0].count,1,'the new replay database retains exactly its one synthetic historical run')
     const triggers=await isolated.query("select tgname from pg_trigger where tgrelid in ('agent_kit_versions'::regclass,'agent_kit_events'::regclass,'agent_kit_activations'::regclass,'agent_kit_executions'::regclass) and not tgisinternal order by tgname")
     assert.deepEqual(triggers.rows.map(row=>row.tgname),['agent_kit_activations_immutable','agent_kit_events_immutable','agent_kit_execution_guard','agent_kit_versions_immutable'])
     const constraint=await isolated.query("select count(*)::int as count from pg_constraint where conrelid='agent_kit_heads'::regclass and conname='agent_kit_active_version_fk'")
