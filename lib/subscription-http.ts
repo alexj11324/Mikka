@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { SubscriptionRefusal, subscriptionRouteSchema } from '@mikka/protocol/subscription'
 import type { SubscriptionService } from './subscription-service'
-import { unavailableUsage, usageCache } from './subscription-usage'
+import { accountLabel, failedUsage, usageCache } from './subscription-usage'
 
 const id = z.uuid()
 const input = z.discriminatedUnion('action', [
@@ -68,8 +68,10 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
     const service = deps.service(true)
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
     await deps.workspace(session.userId, workspaceId)
-    const { rows } = await service.repository.pool.query('select id,provider,state,epoch from byos_connections where "ownerId"=$1 and "workspaceId"=$2 order by "createdAt" desc limit 50', [session.userId, workspaceId])
-    return Response.json({ enabled: true, providers: ['codex', 'claude'].map(provider => ({ provider, available: Boolean(service.capabilities.oauth?.[provider as 'codex' | 'claude']) })), connections: rows.map(row => ({ id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch) })) }, { headers })
+    const { rows } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel" from byos_connections where "ownerId"=$1 and "workspaceId"=$2 order by "createdAt" desc limit 50', [session.userId, workspaceId])
+    // Which Bots use each connection is a nicety: the list still loads without it.
+    const bots = await service.repository.connectionBots(session.userId, workspaceId).catch(() => [])
+    return Response.json({ enabled: true, providers: ['codex', 'claude'].map(provider => ({ provider, available: Boolean(service.capabilities.oauth?.[provider as 'codex' | 'claude']) })), connections: rows.map(row => ({ id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch), account: accountLabel(row.accountLabel), bots: bots.filter(bot => bot.connectionId === row.id).map(({ id, name, color, shape }) => ({ id, name, color, shape })) })) }, { headers })
   } catch (error) {
     if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable') return Response.json({ enabled: false, providers: [], connections: [] }, { headers })
     return Response.json({ error: 'subscription_unavailable' }, { status: 409, headers })
@@ -78,8 +80,8 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
 
 const cachedUsage = usageCache()
 /** Remaining 5-hour and weekly allowance of the owner's connected subscriptions.
- * Each read is cached a minute and fails soft to `unavailable`; tokens stay in
- * the worker. */
+ * A successful read is cached a minute; a failed one is not, so 重试 reads
+ * again. Failures degrade to `reauth` / `unavailable`; tokens stay in the worker. */
 export async function subscriptionUsage(request: Request, deps: SubscriptionHTTPDependencies) {
   const session = await deps.session(request)
   if (!session) return Response.json({ error: 'auth_required' }, { status: 401, headers })
@@ -89,7 +91,7 @@ export async function subscriptionUsage(request: Request, deps: SubscriptionHTTP
     await deps.workspace(session.userId, workspaceId)
     const { rows } = await service.repository.pool.query('select id,epoch from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and state=\'connected\' order by "createdAt" desc limit 20', [session.userId, workspaceId])
     const connections = await Promise.all(rows.map(row => cachedUsage(`${session.userId}:${row.id}:${row.epoch}`, () =>
-      service.usage(session.userId, row.id, AbortSignal.timeout(15_000)).catch(() => unavailableUsage(row.id)))))
+      service.usage(session.userId, row.id, AbortSignal.timeout(15_000)).catch(() => failedUsage(row.id, 'unavailable')))))
     return Response.json({ connections }, { headers })
   } catch (error) {
     if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable') return Response.json({ connections: [] }, { headers })

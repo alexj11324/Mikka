@@ -1494,7 +1494,8 @@
       },
       "integrations": {
         "title": "集成",
-        "description": "管理已连接的应用与消息平台。"
+        "description": "管理已连接的应用与消息平台。",
+        "keywords": "模型订阅 订阅 额度 用量"
       },
       "devices": {
         "title": "设备",
@@ -1607,7 +1608,7 @@
       "teamAlreadyLinked": "此 Linear 团队已连接到另一个 Mikka 账号。"
     },
     "subscriptions": {
-      "heading": "订阅",
+      "heading": "模型订阅",
       "description": "连接你自己的订阅，供此工作区中获授权的 Bot 任务使用。",
       "codex": "ChatGPT / Codex",
       "claude": "Claude",
@@ -1637,7 +1638,15 @@
       "quotaWeekly": "每周",
       "quotaLeft": "剩余 {percent}%",
       "quotaReset": "{time} 重置",
-      "quotaUnavailable": "额度暂时读不到"
+      "quotaUnavailable": "额度暂时读不到",
+      "reauth": "需要重新连接",
+      "remove": "移除",
+      "retry": "重试",
+      "updatedJustNow": "刚刚更新",
+      "updatedAgo": "{minutes} 分钟前更新",
+      "whenExhausted": "用完后，用它的 Bot 会停下，等额度重置",
+      "usedBy": "使用中：",
+      "quotaWeeklyModel": "每周 · {model}"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",

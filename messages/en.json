@@ -1494,7 +1494,8 @@
       },
       "integrations": {
         "title": "Integrations",
-        "description": "Manage connected apps and message platforms."
+        "description": "Manage connected apps and message platforms.",
+        "keywords": "model subscriptions subscription quota usage"
       },
       "devices": {
         "title": "Devices",
@@ -1607,7 +1608,7 @@
       "teamAlreadyLinked": "This Linear team is already connected to another Mikka account."
     },
     "subscriptions": {
-      "heading": "Subscriptions",
+      "heading": "Model subscriptions",
       "description": "Connect your own subscription for authorized Bot tasks in this workspace.",
       "codex": "ChatGPT / Codex",
       "claude": "Claude",
@@ -1637,7 +1638,15 @@
       "quotaWeekly": "Weekly",
       "quotaLeft": "{percent}% left",
       "quotaReset": "Resets {time}",
-      "quotaUnavailable": "Usage unavailable"
+      "quotaUnavailable": "Usage unavailable",
+      "reauth": "Sign in again",
+      "remove": "Remove",
+      "retry": "Retry",
+      "updatedJustNow": "Updated just now",
+      "updatedAgo": "Updated {minutes} min ago",
+      "whenExhausted": "When it runs out, Bots using it stop until it resets",
+      "usedBy": "Used by",
+      "quotaWeeklyModel": "Weekly · {model}"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",

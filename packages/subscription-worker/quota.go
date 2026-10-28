@@ -49,27 +49,57 @@ var emailPattern = regexp.MustCompile(`^[^\s@<>"\x00-\x1f\x7f]{1,64}@[^\s@<>"\x0
 
 // Usage reads the connection's own allowance for its owner's Settings page. It
 // needs no model binding: the custody scope (owner, workspace, connection) and
-// the connected epoch are the authorization, as for status.
+// the connected epoch are the authorization, as for status. A provider 401 is
+// answered once with a refresh from the version this read used, then a retry.
+// Status 0 means the provider could not be reached; the email still returns.
 func (w *Worker) Usage(ctx context.Context, epoch int64) (UsageResult, error) {
 	if w.ExecutionOnly || w.Use != nil {
 		return UsageResult{}, ErrUnsupported
 	}
-	_, auth, err := w.readyAuth(ctx, epoch)
+	r, auth, err := w.readyAuth(ctx, epoch)
 	if err != nil {
 		return UsageResult{}, err
 	}
+	result := UsageResult{Body: map[string]any{}, Account: accountEmail(auth)}
 	quota, err := w.fetchQuota(ctx, auth)
-	if err != nil {
-		return UsageResult{}, err
+	if err == nil && quota.Status == http.StatusUnauthorized {
+		_, refreshErr := w.refreshFrom(ctx, epoch, r.Version)
+		switch {
+		case refreshErr == nil || refreshErr == ErrStale || refreshErr == ErrBusy:
+			// Renewed here or by another process: read once more with what is stored now.
+			_, again, loadErr := w.readyAuth(ctx, epoch)
+			if loadErr != nil || accessToken(again) == accessToken(auth) {
+				quota = QuotaResult{}
+			} else {
+				quota, err = w.fetchQuota(ctx, again)
+			}
+		case refreshErr == ErrUnsupported:
+			quota = QuotaResult{}
+		}
+		// Any other refresh failure leaves the provider's 401: the owner signs in again.
 	}
-	if r, err := w.Repo.Lookup(ctx, w.Scope); err != nil || r.State != "connected" || r.Epoch != epoch {
+	if err == nil {
+		result.Status, result.Body = quota.Status, quota.Body
+		if result.Body == nil {
+			result.Body = map[string]any{}
+		}
+	}
+	if current, err := w.Repo.Lookup(ctx, w.Scope); err != nil || current.Epoch != epoch || (current.State != "connected" && current.State != "reconnect_required") {
 		return UsageResult{}, ErrUnavailable
 	}
-	result := UsageResult{Status: quota.Status, Body: quota.Body}
-	if email, ok := auth.Metadata["email"].(string); ok && emailPattern.MatchString(email) {
-		result.Account = email
-	}
 	return result, nil
+}
+
+func accessToken(auth *core.Auth) string {
+	token, _ := auth.Metadata["access_token"].(string)
+	return token
+}
+
+func accountEmail(auth *core.Auth) string {
+	if email, ok := auth.Metadata["email"].(string); ok && emailPattern.MatchString(email) {
+		return email
+	}
+	return ""
 }
 
 func (w *Worker) fetchQuota(ctx context.Context, auth *core.Auth) (QuotaResult, error) {

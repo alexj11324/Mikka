@@ -503,23 +503,30 @@ func TestCleanupFailuresCannotStarveLaterArtifacts(t *testing.T) {
 	}
 }
 
+func usageAnswer(provider string, rejected func(string) bool) *http.Client {
+	return &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		secret := request.Header.Get("Authorization")
+		if rejected(secret) {
+			return &http.Response{StatusCode: 401, Body: io.NopCloser(strings.NewReader(`{"error":"` + secret + `"}`)), Header: make(http.Header)}, nil
+		}
+		body := map[string]any{"diagnostic": secret, "plan_type": "plus"}
+		if provider == "codex" {
+			body["rate_limit"] = map[string]any{"primary_window": map[string]any{"used_percent": 25, "limit_window_seconds": 18000, "reset_at": 1793000000}, "secondary_window": map[string]any{"used_percent": 60, "limit_window_seconds": 604800, "reset_at": 1793400000}}
+		} else {
+			body["five_hour"] = map[string]any{"utilization": 25, "resets_at": "2026-10-28T12:00:00Z"}
+			body["seven_day"] = map[string]any{"utilization": 60, "resets_at": "2026-11-02T08:00:00Z"}
+		}
+		raw, _ := json.Marshal(body)
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(raw)), Header: make(http.Header)}, nil
+	})}
+}
+
 func TestUsageReadsOwnConnectionWithoutBindingOrToken(t *testing.T) {
 	for _, provider := range []string{"codex", "claude"} {
 		t.Run(provider, func(t *testing.T) {
-			w, _, _ := fixtureWorker(t, provider)
+			w, _, issuer := fixtureWorker(t, provider)
 			initial := mustAcquire(t, w)
-			w.QuotaClient = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
-				secret := request.Header.Get("Authorization")
-				body := map[string]any{"diagnostic": secret, "plan_type": "plus"}
-				if provider == "codex" {
-					body["rate_limit"] = map[string]any{"primary_window": map[string]any{"used_percent": 25, "limit_window_seconds": 18000, "reset_at": 1793000000}, "secondary_window": map[string]any{"used_percent": 60, "limit_window_seconds": 604800, "reset_at": 1793400000}}
-				} else {
-					body["five_hour"] = map[string]any{"utilization": 25, "resets_at": "2026-10-28T12:00:00Z"}
-					body["seven_day"] = map[string]any{"utilization": 60, "resets_at": "2026-11-02T08:00:00Z"}
-				}
-				raw, _ := json.Marshal(body)
-				return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(raw)), Header: make(http.Header)}, nil
-			})}
+			w.QuotaClient = usageAnswer(provider, func(string) bool { return false })
 			ctx := context.Background()
 			bound := w.Use
 			if _, err := w.Usage(ctx, initial.Revision); err != ErrUnsupported {
@@ -534,7 +541,7 @@ func TestUsageReadsOwnConnectionWithoutBindingOrToken(t *testing.T) {
 			if bytes.Contains(raw, []byte("Bearer")) || bytes.Contains(raw, []byte("fixture-"+provider)) || bytes.Contains(raw, []byte("diagnostic")) {
 				t.Fatal("usage exported a credential")
 			}
-			if result.Status != 200 || result.Account != "fixture@example.invalid" || !bytes.Contains(raw, []byte("60")) {
+			if result.Status != 200 || result.Account != "fixture@example.invalid" || !bytes.Contains(raw, []byte("60")) || issuer.refreshes.Load() != 0 {
 				t.Fatalf("usage lost its projection: %s", raw)
 			}
 			if _, err := w.Usage(ctx, initial.Revision+1); err == nil {
@@ -546,5 +553,57 @@ func TestUsageReadsOwnConnectionWithoutBindingOrToken(t *testing.T) {
 			}
 			w.ExecutionOnly, w.Use = false, bound
 		})
+	}
+}
+
+func TestUsageRefreshesOnceOn401AndReportsAPersistent401(t *testing.T) {
+	w, _, issuer := fixtureWorker(t, "claude")
+	initial := mustAcquire(t, w)
+	w.Use = nil
+	ctx := context.Background()
+	// The acquired token is refused; the renewed one is accepted.
+	w.QuotaClient = usageAnswer("claude", func(secret string) bool { return strings.Contains(secret, "-access-a") })
+	result, err := w.Usage(ctx, initial.Revision)
+	if err != nil || result.Status != 200 || issuer.refreshes.Load() != 1 || result.Account == "" {
+		t.Fatalf("401 was not renewed and retried: %+v %v", result, err)
+	}
+	raw, _ := json.Marshal(result)
+	if bytes.Contains(raw, []byte("Bearer")) {
+		t.Fatal("refused answer leaked a credential")
+	}
+	// Refused even after renewal: one refresh, then the 401 stands, with the email kept.
+	w.QuotaClient = usageAnswer("claude", func(string) bool { return true })
+	result, err = w.Usage(ctx, initial.Revision)
+	if err != nil || result.Status != 401 || issuer.refreshes.Load() != 2 || result.Account != "fixture@example.invalid" {
+		t.Fatalf("persistent 401 not reported: %+v %v", result, err)
+	}
+	if len(result.Body) != 0 {
+		t.Fatal("refused answer body crossed IPC")
+	}
+}
+
+func TestConcurrentUsage401sSpendTheRotatingRefreshTokenOnce(t *testing.T) {
+	w, _, issuer := fixtureWorker(t, "codex")
+	initial := mustAcquire(t, w)
+	w.Use = nil
+	issuer.refreshEntered, issuer.refreshRelease = make(chan struct{}), make(chan struct{})
+	w.QuotaClient = usageAnswer("codex", func(secret string) bool { return strings.Contains(secret, "-access-a") })
+	results := make(chan UsageResult, 2)
+	run := func() {
+		// A read during the other's refresh is refused (temporary), never a second refresh.
+		result, _ := w.Usage(context.Background(), initial.Revision)
+		results <- result
+	}
+	go run()
+	<-issuer.refreshEntered // the first read holds the refresh claim at the provider
+	go run()
+	second := <-results // the second cannot claim the same version and does not refresh
+	close(issuer.refreshRelease)
+	first := <-results
+	if issuer.refreshes.Load() != 1 {
+		t.Fatalf("rotating refresh token spent %d times", issuer.refreshes.Load())
+	}
+	if first.Status != 200 || second.Status == 401 {
+		t.Fatalf("unexpected outcomes: first %d second %d", first.Status, second.Status)
 	}
 }
