@@ -36,7 +36,7 @@ export function credentialAwareExecutor(deps: CredentialExecutorAuthority & {
       if (!live.running || live.runId !== runId || live.userId !== intent.userId || live.workspaceId !== intent.workspaceId || live.botId !== intent.botId || live.subagentId !== intent.subagentId || live.epoch !== intent.epoch || live.display !== intent.display || live.policyVersion !== intent.policyVersion || live.driverFingerprint !== intent.driverFingerprint || live.targetId !== intent.targetId || live.origin !== intent.origin || live.loaderId !== intent.loaderId || live.backendNodeId !== intent.backendNodeId || intent.expiresAt <= (deps.now ?? Date.now)()) throw new Error('Credential action unavailable')
       context.assertLive()
       const result = await deps.executeCredential(intent, context.assertLive)
-      if (!result || typeof result !== 'object' || !('status' in result) || typeof result.status !== 'string' || !['needs_login', 'session_applied', 'submitted'].includes(result.status)) throw new Error('Credential action unavailable')
+      if (!result || typeof result !== 'object' || !('status' in result) || typeof result.status !== 'string' || !['needs_login', 'session_applied', 'submitted', 'guarded'].includes(result.status)) throw new Error('Credential action unavailable')
       return { status: result.status }
     })
   }
