@@ -378,6 +378,7 @@ export class CodexAdapter implements AgentAdapter {
     let activeTurn: string | null = null
     let pendingTurnStart: Promise<void> | null = null
     let ending = false
+    let cancelling = false
     let lastError: string | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
 
@@ -529,6 +530,7 @@ export class CodexAdapter implements AgentAdapter {
         },
       })
       if (ending) return
+      if (cancelling) return finish({ outcome: "cancelled" })
       const handoff = ctx.readHandoff(log)
       if (handoff) return finish(handoff)
       const next = pending.shift()
@@ -581,6 +583,7 @@ export class CodexAdapter implements AgentAdapter {
       if (ending) return
       ending = true
       rpc.dispose()
+      if (cancelling) return queue.exit({ outcome: "cancelled" })
       const handoff = ctx.readHandoff(log)
       if (handoff) return queue.exit(handoff)
       queue.exit({
@@ -697,6 +700,10 @@ export class CodexAdapter implements AgentAdapter {
         else await startTurn(message)
       },
       async cancel() {
+        // Revoking the gate tears down the owned proxy/CLI immediately. Mark
+        // intent first so that child exit or turn/completed cannot win the
+        // race and report a successful/failed run for this cancellation.
+        cancelling = true
         options.toolApproval?.revoke()
         if (activeTurn && !ending) {
           await rpc

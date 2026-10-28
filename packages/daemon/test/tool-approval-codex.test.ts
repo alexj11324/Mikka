@@ -33,6 +33,9 @@ it('cancels a pending JSON-RPC approval without waiting for a late host reply', 
   await vi.waitFor(() => expect(asked).toHaveBeenCalledOnce())
   await session.cancel()
   expect(signal?.aborted).toBe(true)
+  const events = []
+  for await (const event of session.events()) events.push(event)
+  expect(events.at(-1)).toEqual({type:'exit',outcome:'cancelled'})
   release('allow')
   expect(await gate.request({ runId: 'run-1', requestId: 'after-stop', harness: 'codex', method: 'synthetic', input: {} })).toBe('deny')
 })
