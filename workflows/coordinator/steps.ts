@@ -164,6 +164,8 @@ export async function preparePrompt(userId: string, botId: string | null = null,
   return { instructions: instructionsWithMemory(instructions, memory), messages: promptMessages(summary, messages, summaryTrust) }
 }
 
+export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
+
 export async function mailboxToolsEnabled() { 'use step'; return personalMailboxEnabled() }
 export async function mailboxCatalogue(userId: string, botId: string | null, executionId?: string) {
   'use step'
