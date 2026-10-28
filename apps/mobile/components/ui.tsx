@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from 'react'
 import { Pressable, StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ArrowUp, ChevronLeft, Mic, Plus, X } from 'lucide-react-native'
+import { ArrowUp, ChevronLeft, X } from 'lucide-react-native'
 import { Text } from '@/components/Text'
 import { colors, font, lift } from '@/lib/theme'
 
@@ -40,30 +40,45 @@ export function Header({ left, title, right, subtitle, style }: { left?: ReactNo
 }
 
 /**
- * The composer: one rounded field holding 「+」, the text, the mic and send
- * (Alex 2026-10-27: 「加号改在里边」).
+ * The composer: one rounded field holding the text and send (Alex
+ * 2026-10-27). The 「+」 and the mic come back inside the field, at its ends,
+ * when attachments and dictation exist; until then they are left out rather
+ * than drawn as buttons that do nothing. The text stays until `onSend`
+ * resolves true (the server took it), so a failed send loses nothing.
+ * Controlled when `value` and `onChangeText` are passed.
  */
-export function Composer({ placeholder, onSend, initial = '', disabled = false }: { placeholder: string; onSend?: (text: string) => void; initial?: string; disabled?: boolean }) {
+export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText }: {
+  placeholder: string
+  onSend?: (text: string) => boolean | void | Promise<boolean | void>
+  initial?: string
+  disabled?: boolean
+  value?: string
+  onChangeText?: (text: string) => void
+}) {
   const insets = useSafeAreaInsets()
-  const [text, setText] = useState(initial)
-  const send = () => {
-    const value = text.trim()
-    if (!value) return
-    onSend?.(value)
-    setText('')
+  const [own, setOwn] = useState(initial)
+  const [sending, setSending] = useState(false)
+  const text = value ?? own
+  const setText = onChangeText ?? setOwn
+  const blocked = disabled || sending
+  const send = async () => {
+    const message = text.trim()
+    if (!message || blocked) return
+    setSending(true)
+    try {
+      const ok = await onSend?.(message)
+      if (ok !== false) setText('')
+    } finally {
+      setSending(false)
+    }
   }
   return (
     <View style={[styles.composerWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
       <View style={styles.field}>
-        <Pressable accessibilityRole="button" accessibilityLabel="添加附件" hitSlop={8} style={styles.fieldIcon}>
-          <Plus size={22} color={colors.ink} strokeWidth={2} />
-        </Pressable>
-        <TextInput value={text} onChangeText={setText} onSubmitEditing={send} placeholder={placeholder} editable={!disabled}
-          placeholderTextColor={colors.tertiary} style={styles.input} returnKeyType="send" />
-        <Pressable accessibilityRole="button" accessibilityLabel="语音输入" hitSlop={8} style={styles.fieldIcon}>
-          <Mic size={21} color={colors.secondary} strokeWidth={2} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="发送" onPress={send} disabled={disabled} style={[styles.send, disabled && { backgroundColor: colors.tertiary }]}>
+        <TextInput value={text} onChangeText={setText} onSubmitEditing={() => void send()} placeholder={placeholder} editable={!blocked}
+          placeholderTextColor={colors.tertiary} style={[styles.input, sending && { color: colors.secondary }]} returnKeyType="send" />
+        <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: blocked || !text.trim() }} onPress={() => void send()} disabled={blocked}
+          style={[styles.send, (blocked || !text.trim()) && { backgroundColor: colors.tertiary }]}>
           <ArrowUp size={20} color="#fff" strokeWidth={2.4} />
         </Pressable>
       </View>
@@ -102,8 +117,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 17, fontWeight: '600' },
   subtitle: { fontSize: 11, color: colors.secondary, marginTop: 1 },
   composerWrap: { paddingHorizontal: 16, paddingTop: 10 },
-  field: { flexDirection: 'row', alignItems: 'center', height: 52, borderRadius: 26, backgroundColor: '#fff', paddingLeft: 14, paddingRight: 6, gap: 10, ...lift },
-  fieldIcon: { width: 24, alignItems: 'center' },
+  field: { flexDirection: 'row', alignItems: 'center', height: 52, borderRadius: 26, backgroundColor: '#fff', paddingLeft: 18, paddingRight: 6, gap: 10, ...lift },
   input: { flex: 1, minWidth: 0, width: 0, fontFamily: font, fontSize: 16, color: colors.text, paddingVertical: 0, outlineStyle: 'none' } as never,
   send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   groupLabel: { fontSize: 13, color: colors.secondary, marginLeft: 16, marginBottom: 7 },
