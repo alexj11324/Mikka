@@ -41,6 +41,7 @@ export function scopeExecutionMode(mode,manifest,approvalReference){
   if(mode==='--run-team'&&manifest.mode==='team-after-migrated-empty')return
   if(mode!=='--run'||manifest.mode!=='fresh-exclusive-scope')throw Error('only fresh exclusive scope execution is enabled; legacy resume is retired')
 }
+export function scopePlanSummary(manifest,manifestHash){return {candidate:manifest.candidate,manifestHash,mode:manifest.mode,limits:manifest.limits,databases:manifest.databases,preservedDatabases:manifest.preservedDatabases??[manifest.preservedDatabase],invocation:manifest.invocation,executed:false}}
 export async function scopePhases(run) { for(const phase of ['scope','team'])await run(phase) }
 async function execute(manifest, manifestPath, manifestHash, output, approvalReference, started) {
   if(approvalReference&&Buffer.byteLength(approvalReference)>256)throw Error('scope approval reference too long')
@@ -261,7 +262,7 @@ export async function main(args=process.argv.slice(2)) {
   if(process.versions.node!==manifest.nodeVersion)throw Error('scope Node version mismatch')
   const git=(...argv)=>execFileSync('git',argv,{encoding:'utf8',timeout:5000}).trim()
   if(git('rev-parse','HEAD')!==manifest.candidate||git('rev-parse','HEAD^{tree}')!==manifest.tree||git('status','--porcelain'))throw Error('scope candidate/worktree mismatch')
-  if(mode==='--plan'){console.log(JSON.stringify({candidate:manifest.candidate,manifestHash:expectedHash,limits:SCOPE_LIMITS,databases:SCOPE_DATABASES,executed:false}));return}
+  if(mode==='--plan'){console.log(JSON.stringify(scopePlanSummary(manifest,expectedHash)));return}
   scopeExecutionMode(mode,manifest,approvalReference)
   if(!output)throw Error('scope requires a new retained evidence directory')
   await execute(manifest,manifestPath,expectedHash,resolve(output),approvalReference,started)

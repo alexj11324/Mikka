@@ -6,7 +6,7 @@ import {orderMigrations} from './migration-order.mjs'
 import {scopeMigrationBeforeCommit} from './scope-migration-history.mjs'
 import {TEAM_DATABASES,TEAM_OIDS,TEAM_PRESERVED_SCOPES,TEAM_CATALOG_QUERIES,teamHash,verifyTeamResumeTargets,verifyTeamResumeEvidence,verifyTeamResumeMetadata,validateTeamResumeState} from './team-resume.mjs'
 import {SCOPE_DATABASES,SCOPE_RETAINED_DATABASE,SCOPE_RETIRED_APPROVALS,scopePolicy,scopeUrl} from './scope-acceptance-policy.mjs'
-import {scopeExecutionMode} from './scope-acceptance.mjs'
+import {scopeExecutionMode,scopePlanSummary} from './scope-acceptance.mjs'
 import {teamResumeBootstrap} from '../tests/support/scope-acceptance.mjs'
 
 function fixture() {
@@ -79,6 +79,7 @@ test('team-only ownership grants no CREATE, init, replay, ledger, scope bucket o
 })
 test('only separate team command and exact bootstrap acknowledgement can skip initialization',async()=>{
   const f=fixture();verifyTeamResumeTargets(f.manifest)
+  const plan=scopePlanSummary(f.manifest,'memory-hash');assert.deepEqual(plan.databases,TEAM_DATABASES);assert.equal(plan.mode,'team-after-migrated-empty');assert.equal(plan.executed,false)
   assert.doesNotThrow(()=>scopeExecutionMode('--run-team',f.manifest))
   assert.throws(()=>scopeExecutionMode('--run',f.manifest),/fresh exclusive/)
   for(const old of SCOPE_RETIRED_APPROVALS)assert.throws(()=>scopeExecutionMode('--run-team',f.manifest,old),/new approval/)
