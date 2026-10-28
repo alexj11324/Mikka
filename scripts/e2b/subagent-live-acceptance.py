@@ -23,7 +23,7 @@ async def main():
   async with s.post(url('/action'),json={'action':'type','selector':'#password','text':'must-not-enter'}) as r:assert r.status==403
   async with s.post(url('/action'),json={'action':'type','selector':'#otp','text':'must-not-enter'}) as r:assert r.status==403
   async with s.post(url('/action'),json={'action':'click','selector':'#link','expectedLoaderId':'other-document','expectedOrigin':'http://127.0.0.1:6083'}) as r:assert r.status==409
-  print('PASS: independent Chrome pipe, redacted observation, ordinary/risky distinction, password typing denial, approval document fencing',flush=True)
+  print('PASS: independent Chrome pipe, redacted observation, tested text/form risk hints, password typing denial, approval document fencing',flush=True)
   async with s.ws_connect(url('/viewer','view')) as v:
    frame=await v.receive(timeout=10);assert frame.json()['type']=='frame'
    await v.send_json({'id':1,'method':'Input.insertText','params':{'text':'forbidden'}})

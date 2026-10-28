@@ -67,8 +67,12 @@ actual registration and heartbeat use the same transport as daemon polling.
 
 Ordinary browser navigate/click/type/key actions are implemented. Password and
 OTP typing is broker-only; sensitive observations and display access remain
-blocked until cleared. Irreversible actions use the existing pending_actions
-approval ledger, while normal navigation does not request per-action approval.
+blocked until cleared. The model is instructed to request confirmation before
+irreversible actions; its `irreversible` flag and the gateway's text/form
+heuristics route detected actions through the existing pending_actions ledger.
+These heuristics cannot determine arbitrary page-script effects and are not a
+general guarantee that every irreversible operation is intercepted. Normal
+navigation does not request per-action approval.
 Joint acceptance must keep #180's actual login provider and #342's actual browser
 resolver; standalone seams intentionally fail closed without the other PR.
 
