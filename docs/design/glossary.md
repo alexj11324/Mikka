@@ -18,8 +18,10 @@ How they connect: a person chats with a bot (center). The bot dispatches
 real tasks such as coding to threads, which do the work (right). A web task
 stays with the bot: one of its sub-agents (分身) does it in its own browser,
 it shows only as a card in the chat, never in the thread list, and the bot
-reports the result itself (R-72). Every thread belongs to exactly one bot and shows that
-bot's avatar. The computer a thread uses is its bot's computer.
+reports the result itself (R-72). Every thread belongs to exactly one bot but
+is never drawn with the bot's avatar; it shows a status icon (decisions
+2026-10-27). A cloud thread runs on its own thread machine, not on its bot's
+machine (`cloud-computer-backend.md` § 2).
 
 ## Rules for designs
 
