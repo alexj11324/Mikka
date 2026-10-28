@@ -1,0 +1,59 @@
+# Factory independent checks (#193)
+
+This increment is based on current main and selectively restores #193. PR #316 remains separate and unmerged. It does not replace current host message policy, Agent Kit snapshots, subscriptions, mailbox transport or native Coordinator behavior.
+
+## Runtime receipt
+
+Existing `acceptance` assignments with an exact 40-character `baseBranch` and the existing `readOnly` policy produce daemon-owned `report.check = { sha, readOnly: true }`. The daemon pins Git operations to the real worktree Git directory and checks clean, unchanged HEAD before the Harness and around verification. Read-only runs skip writable setup and the existing publisher. The existing verify process supplies `verify.command/exitCode/signal/timedOut/output`; model handoff data cannot provide this receipt. Reports lacking it cannot establish Factory verification.
+
+The shared report shape is additive and optional for existing non-Factory consumers. It does not introduce another run kind, verifier, publisher or permission system.
+
+## Executable question ancestry contract v1
+
+`lib/factory/check-independence.ts` exports an actual read-only predicate and `FACTORY_CHECK_ANCESTRY_CONTRACT_VERSION = 1`:
+
+```ts
+factoryCheckIndependent(
+  tx: Pick<PoolClient, "query">,
+  task: FactoryCheckTaskIdentity,
+  runId: string,
+): Promise<boolean>
+```
+
+`FactoryCheckTaskIdentity` projects only `id/userId/issueId/sourceEventId/stage/status/attemptId/candidateId`. Existing #192 task values are structurally assignable. The projection neither owns state nor defines another stage enum/schema; the function reads the existing attempt/run/question rows through the caller's transaction. Callers must already hold an authorized current-task lock and validate the frozen check assignment. This predicate does not reauthorize a user or validate a daemon report.
+
+Example trusted consumer call, for either a successful or failed completed check:
+
+```ts
+const independent = await factoryCheckIndependent(tx, currentTask, currentRun.id);
+if (!independent) {
+  // Reject provenance through the existing blocked/denial path.
+}
+// Continue the SAME consumer's receipt/result validation. true does not mean passed.
+```
+
+V1 supports **review and verify only**. Other stages, including monitor, return false; #195 must not treat it as a monitor pass gate. Any requested extension requires an explicitly coordinated contract change. For valid question continuations, the entire same-owner/issue/task/candidate/phase/session origin chain must match durable resolved questions, accepted answers and exact attempt/run/revision fences. The operational predicate body is preserved from the final #235 correction; only its structural TypeScript projection is decoupled from the unavailable foundation imports.
+
+`pnpm test:factory-check-independence` runs pure persisted-row fixtures for success and failure, multi-hop continuation, cross-identity/phase/session/SHA reuse, cancellation/revocation, missing metadata/answers, arbitrary retries and cycles. They execute the real predicate against a synthetic SELECT adapter; they do not prove actual PostgreSQL, claim transactions, authorization or a provider run. Normal CI runs this pure contract; integrated PostgreSQL/HTTP coverage remains dependent on #192's actual foundation.
+
+## Consumer handoff to #192 / #194 / #195
+
+The consumer increment depends on #192's single task/attempt/candidate store and authenticated `route/read/apply` transaction. Required identities are owner, issue, task, attempt, revision and exact candidate SHA/repository/environment/scope. The store must recheck current issue access, cancellation and revocation before mutation or replay. A device-loss retry stays unclaimable until its existing adoption contract binds it to the current attempt.
+
+#193's consumer functions retain these established interfaces:
+
+- `configureFactoryCheck(tx, task, runId)` freezes the read-only SHA, command and repository/device in the current attempt before transactional binding.
+- `factoryCheckAssignment(tx, userId, runId)` and `createFactoryCheckClaim(pool, authorize)` validate the current owner/issue/attempt/candidate binding before claim and token creation. Unbound retry descendants cannot enter the ordinary claim path.
+- `factoryCheckGates.review/verify` require the daemon receipt and persisted current-run evidence. Verification also requires paired actual verifier input/output chunks for the frozen command.
+- `reconcileFactoryCheck(tx, store, task, run)` uses the existing Coordinator transaction, retains original command/exit/report/chunk evidence on failure, and opens only the existing bounded execute repair path. New candidates require fresh review and verification.
+- `factoryRepairBrief(tx, task, runId)` forwards the original failed attempt and artifact references to that repair run.
+
+These callbacks need the existing dispatch/reconciliation/claim transaction seams; no separate scheduler or stage source is introduced. Approval, publication and monitoring adapters belong to their existing owners and are not installed here.
+
+The final #235 same-phase question ancestry rule (`d4e7da9` plus correction `0341837`) is preserved. Only exact resolved question ancestors in the same owner/issue/task/candidate/phase/session chain may share a session; every run remains distinct. Each edge binds the waiting attempt/revision, original run/session and persisted continuation result to the new attempt. Arbitrary retries, foreign or cancelled/revoked ancestry and cross-phase/candidate/session reuse remain rejected. Do not combine this predicate with the older blanket rejection of every historical same-session attempt.
+
+For #194, the latest passed execute/review/verify attempts retain distinct run/session identities. Evidence references are the original `run-report:<runId>` and `run-chunk:<chunkId>` artifacts with the frozen candidate SHA/environment and truthful recorded/source times. Original waiting question attempts do not replace the current continuation's completion artifacts. #193 grants no publication or monitoring authority.
+
+## Validation boundary
+
+The daemon regression uses real Git worktrees and child commands with an explicitly simulated Harness. It records an actual failing command/exit 17, then a new commit and separate check sessions with exit 0. This is process-layer evidence, not real CC/Codex acceptance or a model-quality evaluation. Existing sandbox and deployment restrictions remain in effect. Database/HTTP checks require the matching #192 integration and isolated CI PostgreSQL; production/provider acceptance and any actual interface capture remain separate release gates. No live model evaluation is enabled by this increment.
