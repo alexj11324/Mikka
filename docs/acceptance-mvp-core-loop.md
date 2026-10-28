@@ -39,11 +39,12 @@ fixture checks run under `pnpm test:mvp-fixtures` and `pnpm check`.
 
 The browser signs up through the existing email/password form using a generated,
 disposable account. Its credential never enters a committed file or artifact.
-The fixture provides an ephemeral daemon token, a synthetic linked GitHub subject
-and an explicit repository push-approval receipt for that owner. These are setup
-conditions; this test does not claim to accept GitHub OAuth or a future repository
-approval UI. Daemon browser login is covered by its separate device-authorization
-tests; this gate exercises the existing `daemon login --token` route.
+The fixture provides an ephemeral daemon token and a synthetic linked GitHub subject.
+It creates a push proposal through the real proposal store and confirms it through
+the authenticated browser card, checking the stored receipt and that dispatch does
+not create a second proposal. This is not GitHub OAuth or a real-provider acceptance.
+Daemon browser login is covered by its separate device-authorization tests; this
+gate exercises the existing `daemon login --token` route.
 
 ### What actually runs
 

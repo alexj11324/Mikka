@@ -55,10 +55,24 @@ async function setup(page: Page, testInfo: TestInfo) {
   const tokenId = randomUUID()
   const dataDir = await mkdtemp(join(tmpdir(), 'mikka-mvp-daemon-'))
   await pool.query('INSERT INTO device_tokens (id, "userId", name, "tokenHash") VALUES ($1, $2, $3, $4)', [tokenId, user.id, 'Disposable MVP daemon', createHash('sha256').update(token).digest('hex')])
-  // These are explicit fixture preconditions, not an approval/OAuth UI bypass:
-  // this disposable owner has approved this one repository and linked GitHub.
+  // The GitHub identity is synthetic; repository approval must go through the
+  // real proposal store and the authenticated browser decision below.
   await pool.query('INSERT INTO account (id, "accountId", "providerId", "userId", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, now(), now())', [randomUUID(), githubAccountId, 'github', user.id])
-  await pool.query('INSERT INTO repository_settings ("userId", "remoteKey", "verifyCommand", push) VALUES ($1, $2, $3, $4)', [user.id, REPOSITORY_KEY, 'test -f MIKKA_MOCK.md', { approved: true, remote: 'origin', approvedByUserId: user.id, approvedAt: new Date().toISOString() }])
+  await pool.query('INSERT INTO repository_settings ("userId", "remoteKey", "verifyCommand") VALUES ($1, $2, $3)', [user.id, REPOSITORY_KEY, 'test -f MIKKA_MOCK.md'])
+  const proposalId = (await execute(process.execPath, ['--import', './scripts/server-test.mjs', '--import', 'tsx', 'tests/mvp/propose-push.mts', user.id])).stdout.trim()
+  expect(proposalId).toMatch(/^[a-f0-9-]{36}$/)
+  const before = (await pool.query('SELECT status, input FROM pending_actions WHERE id = $1 AND "userId" = $2', [proposalId, user.id])).rows[0]
+  expect(before.status).toBe('pending')
+  expect(before.input).toMatchObject({ remoteKey: REPOSITORY_KEY, permission: 'push_to_origin' })
+  expect((await pool.query('SELECT push FROM repository_settings WHERE "userId" = $1 AND "remoteKey" = $2', [user.id, REPOSITORY_KEY])).rows[0].push?.approved).not.toBe(true)
+  const approvalCard = page.getByRole('list', { name: '等你确认' }).getByRole('listitem').filter({ hasText: REPOSITORY })
+  await expect(approvalCard).toHaveCount(1, { timeout: 30_000 })
+  await expect(approvalCard).toContainText('向此仓库的 origin 推送')
+  await approvalCard.getByRole('button', { name: '允许推送', exact: true }).click()
+  await expect.poll(async () => (await pool.query('SELECT status FROM pending_actions WHERE id = $1', [proposalId])).rows[0]?.status).toBe('done')
+  const push = (await pool.query('SELECT push FROM repository_settings WHERE "userId" = $1 AND "remoteKey" = $2', [user.id, REPOSITORY_KEY])).rows[0].push
+  expect(push).toMatchObject({ approved: true, approvedByUserId: user.id, remote: 'origin' })
+  await expect(approvalCard).toHaveCount(0)
   const daemon = spawn(process.execPath, ['--import', 'tsx', 'tests/mvp/start-daemon.mts'], {
     cwd: resolve('.'), stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, MIKKA_E2E_DEVICE_TOKEN: token, MIKKA_E2E_DAEMON_DIR: dataDir,
@@ -91,7 +105,7 @@ async function setup(page: Page, testInfo: TestInfo) {
     const runs = (await pool.query('SELECT id, "issueId", "deviceId", status, "stopReason" FROM agent_runs WHERE "userId" = $1', [user.id])).rows
     const publications = (await pool.query('SELECT "runId", status, "workflowRunId", "errorCode", "pullRequest" FROM run_publications WHERE "userId" = $1', [user.id])).rows
     const evidence = { sha, githubSha: process.env.GITHUB_SHA ?? null, environment: 'disposable GitHub Actions Postgres / Next production build', startedAt, finishedAt: new Date().toISOString(), scenarioAssertions: assertionsCompleted ? 'completed' : 'incomplete or failed', overallResult: 'See the Playwright report; runtime guard and teardown run after this attachment', marker, deviceId: device?.id ?? null, runId: runId ?? null, checkpoints, runs, publications, requestIds: { browser: browserRequests, fixture: services.observations.flatMap(row => row.requestId ? [row.requestId] : []) }, services,
-      boundaries: ['Scripted AI SDK provider; real Mikka WorkflowAgent and durable tools', 'GitHub API stub; real daemon clone/worktree/verify/commit/push', 'Synthetic GitHub repository identity; daemon-only file:// transport rewrite', 'Repository approval and GitHub identity are fixture preconditions', 'No production or Preview acceptance performed by this suite'] }
+      boundaries: ['Scripted AI SDK provider; real Mikka WorkflowAgent and durable tools', 'GitHub API stub; real daemon clone/worktree/verify/commit/push', 'Synthetic GitHub repository identity; daemon-only file:// transport rewrite', 'Synthetic proposal through real store and authenticated browser decision; GitHub identity is seeded', 'No production or Preview acceptance performed by this suite'] }
     await testInfo.attach('mvp-acceptance-evidence.json', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' })
     if (daemonOutput) await testInfo.attach('daemon-output', { body: daemonOutput, contentType: 'text/plain' })
     // Credentials, daemon.secret, device.json and Workflow storage are never artifacts.
@@ -178,6 +192,7 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     expect(evidence.pullRequests).toEqual([{ number: 41, url: pr, branch: completed.report!.publish!.branch, draft: false }])
     expect(evidence.observations.filter(item => item.kind === 'pull-request-created')).toEqual([expect.objectContaining({ runId: loop.runId, issueId: completed.issueId, commit: completed.report!.publish!.commit })])
     expect(evidence.observations.filter(item => item.kind === 'tool').map(item => item.toolName)).toEqual(expect.arrayContaining(['create_issue', 'list_agents', 'dispatch_run']))
+    expect(Number((await pool.query('SELECT count(*) FROM pending_actions WHERE "userId" = $1 AND action = $2', [loop.userId, 'approve_repository_push'])).rows[0].count)).toBe(1)
     loop.checkpoint('Real verification and push completed; GitHub stub confirmed the commit and stored PR on the task')
     await loop.thread.getByRole('button', { name: '返回 Coordinator', exact: true }).click()
     await expect(loop.chat).toContainText('已完成：Added MIKKA_MOCK.md', { timeout: 60_000 })
