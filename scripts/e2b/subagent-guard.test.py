@@ -13,10 +13,13 @@ constants = {node.targets[0].id: ast.literal_eval(node.value)
              and node.targets[0].id in ('SAFE_TO_RESUME', 'SENSITIVE_FIELD')}
 safe_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'safe_resume_snapshot')
 inspect_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'inspect_mutation_expression')
+broker_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'broker_command_allowed')
+methods_node = next(node for node in module.body if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id == 'BROKER_METHODS')
 namespace = {'json': json}
-exec(compile(ast.Module(body=[safe_node, inspect_node], type_ignores=[]), str(__file__), 'exec'), namespace)
+exec(compile(ast.Module(body=[methods_node, safe_node, inspect_node, broker_node], type_ignores=[]), str(__file__), 'exec'), namespace)
 safe_resume_snapshot = namespace['safe_resume_snapshot']
 inspect_mutation_expression = namespace['inspect_mutation_expression']
+broker_command_allowed = namespace['broker_command_allowed']
 
 
 def evaluate(expression, fields):
@@ -35,6 +38,17 @@ process.stdout.write(JSON.stringify(eval(process.argv[2])));
 
 
 class GuardTest(unittest.TestCase):
+    def test_broker_commands_bind_target_session_and_methods(self):
+        attach = {'id': 1, 'method': 'Target.attachToTarget', 'params': {'targetId': 'target', 'flatten': True}}
+        self.assertTrue(broker_command_allowed(attach, 'target', set()))
+        self.assertFalse(broker_command_allowed(attach, 'other-target', set()))
+        self.assertFalse(broker_command_allowed({**attach, 'params': {}}, 'target', set()))
+        evaluate = {'id': 2, 'method': 'Runtime.evaluate', 'params': {}, 'sessionId': 'bound-session'}
+        self.assertTrue(broker_command_allowed(evaluate, 'target', {'bound-session'}))
+        self.assertFalse(broker_command_allowed(evaluate, 'target', {'other-session'}))
+        self.assertFalse(broker_command_allowed({**evaluate, 'method': 'Target.createTarget'}, 'target', {'bound-session'}))
+        self.assertFalse(broker_command_allowed({**evaluate, 'id': True}, 'target', {'bound-session'}))
+
     def test_uninspectable_or_nested_documents_fail_closed(self):
         frames = {'frameTree': {'frame': {'id': 'main'}}}
         document = {'root': {'nodeName': '#document', 'children': []}}
