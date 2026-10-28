@@ -65,6 +65,7 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   const plan = inventory(tree, pkg)
   assert.ok(plan.scripts.includes('test:groups'))
   assert.ok(plan.scripts.includes('test:workspace-migration-db'))
+  assert.ok(plan.scripts.includes('test:local-repository-migration-db'))
   assert.ok(plan.scripts.includes('test:relation-cycle'))
   assert.ok(plan.scripts.includes('test:coordinator-native'))
   assert.ok(plan.files.includes('lib/coordinator/native-relay.db.test.ts'))

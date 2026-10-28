@@ -13,8 +13,9 @@ const current = '20261028143922_local_repository_defaults.sql'
 const baseline = '20261023221259_application_baseline.sql'
 const run = promisify(execFile)
 
-test('migration runner handles historical and new names without replay and rejects changed SQL', { skip: !process.env.PR359_MIGRATION_TEST_URL, timeout: 30000 }, async () => {
-  const target = new URL(process.env.PR359_MIGRATION_TEST_URL)
+test('migration runner handles historical and new names without replay and rejects changed SQL', { skip: !process.env.PR359_MIGRATION_TEST_URL && process.env.REQUIRE_DB !== '1', timeout: 30000 }, async () => {
+  const target = new URL(process.env.PR359_MIGRATION_TEST_URL || process.env.E2E_DATABASE_URL)
+  assert.ok(['postgres:', 'postgresql:'].includes(target.protocol) && !target.search && !target.hash)
   assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname))
   assert.ok(target.pathname === '/mikka_alias_test' || (process.env.CI === 'true' && target.pathname === '/mikka_e2e'))
   const root = await mkdtemp(join(tmpdir(), 'pr359-migration-'))
