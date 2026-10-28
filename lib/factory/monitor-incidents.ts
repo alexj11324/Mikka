@@ -8,7 +8,7 @@ import { validateMonitorV2Observation, type MonitorV2Observation } from "./monit
 export interface MonitorIncidentInput {
  ownerId: string; workspaceKey: string; fingerprint: string; checkKey: string;
  issueId: string; eventId: string; outcome: "unhealthy" | "healthy";
- publicationId: string; candidateId: string; runId: string;
+ publicationId: string; candidateId: string; runId: string; evidenceDigest: string;
 }
 /** Caller owns transaction and current authorized task/issue lock. No issue writes.
  * Healthy observations only mark recovery evidence; they never resolve an issue. */
@@ -35,11 +35,11 @@ export async function recordMonitorIncident(tx: PoolClient, input: MonitorIncide
 }
 /** Only a callback for the future #192 authorized transaction seam, not a route.
  * Both successful and failed observations consume the same actual #193 predicate. */
-export async function consumeMonitorObservation(tx: PoolClient, task: FactoryCheckTaskIdentity, input: MonitorIncidentInput, observation: MonitorV2Observation, productionOrigin: string) {
+export async function consumeMonitorObservation(tx: PoolClient, task: FactoryCheckTaskIdentity, input: Omit<MonitorIncidentInput, "evidenceDigest">, observation: MonitorV2Observation, productionOrigin: string) {
  if (task.stage !== "monitor" || task.status !== "running" || !task.candidateId || input.ownerId !== task.userId || input.issueId !== task.issueId || input.candidateId !== task.candidateId || !await factoryCheckIndependent(tx,task,input.runId)) throw Error("factoryMonitorIndependentRequired");
  const receipt = await readFactoryPublicationReceiptV2(tx,task.userId,task.id,task.candidateId);
  if (receipt.publicationId !== input.publicationId) throw Error("factoryMonitorPublicationMismatch");
  const result = validateMonitorV2Observation(receipt,observation,productionOrigin);
  if (result === "blocked" || result !== input.outcome) throw Error("factoryMonitorObservationBlocked");
- return recordMonitorIncident(tx,input);
+ return recordMonitorIncident(tx,{ ...input, evidenceDigest: digest({ receipt, observation, artifact: `run-report:${input.runId}` }) });
 }

@@ -63,7 +63,7 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
       const recovered = await consumeMonitorObservation(tx,task,{...input,eventId:"recovery-evidence",outcome:"healthy"},o,"https://app.example.com");
       assert.equal(failed.incidentId,recovered.incidentId);
       const audit = (await tx.query("SELECT identity FROM factory_monitor_observations WHERE event_id='recovery-evidence'")).rows[0].identity;
-      assert.equal(audit.publicationId,r.publicationId); assert.equal(audit.runId,monitorRun); assert.equal(audit.candidateId,r.candidateId);
+      assert.match(audit.evidenceDigest,/^[a-f0-9]{64}$/); assert.equal(audit.publicationId,r.publicationId); assert.equal(audit.runId,monitorRun); assert.equal(audit.candidateId,r.candidateId);
       await tx.query("ROLLBACK");
     } finally { tx.release(); }
   } finally { await f.close(); }

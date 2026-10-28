@@ -10,7 +10,7 @@ test("atomic monitor incident concurrency/replay/recovery evidence on isolated P
  const f = await factory194Fixture(db!);
  try {
   await f.pool.query(await readFile(new URL("../../docs/factory/schema-proposals/195-incidents.sql",import.meta.url),"utf8"));
-  const base = { ownerId:"owner",workspaceKey:"workspace",fingerprint:"fingerprint",checkKey:"check",issueId:"original",eventId:"event",outcome:"unhealthy" as const,publicationId:"publication",candidateId:"candidate",runId:"run" };
+  const base = { ownerId:"owner",workspaceKey:"workspace",fingerprint:"fingerprint",checkKey:"check",issueId:"original",eventId:"event",outcome:"unhealthy" as const,publicationId:"publication",candidateId:"candidate",runId:"run",evidenceDigest:"synthetic-proof" };
   const write = async (input: Parameters<typeof recordMonitorIncident>[1]) => {
    const tx = await f.pool.connect(); try { await tx.query("BEGIN"); const r=await recordMonitorIncident(tx,input); await tx.query("COMMIT"); return r; } catch(e) { await tx.query("ROLLBACK"); throw e; } finally { tx.release(); }
   };
