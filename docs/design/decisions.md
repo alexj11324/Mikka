@@ -8,13 +8,6 @@ rule id here.
 
 Newest first.
 
-## MVP decisions awaiting Alex
-
-| Date | Proposal | Status / behavior until confirmed |
-| --- | --- | --- |
-| 2026-10-28 | Publish the daemon as an npm JavaScript package with `@mikka/protocol` bundled. Proposed public name: `@mikka/daemon`; proposed release: a manual main-branch GitHub Actions workflow using npm trusted publishing and provenance. `MIKKA_DAEMON_PACKAGE_NAME` supplies the approved package name at build time. | **待 Alex 确认**. No npm publish has been performed. The source workspace remains private; only the generated distribution is publishable. Configure the trusted publisher and approve the name before release. |
-| 2026-10-28 | Replace the Vercel-incompatible SSH setup dialog with three online commands (install, browser login, start), using the current origin plus base path. Add a web code-review page that approves or denies only the initiating daemon's device grant. | **待 Alex 确认**. Existing accepted Figma frames do not cover these views; review frames are prepared before implementation and linked from `daemon-connection.md`. |
-
 ## Decided
 
 | Date | Decision | Rule | Replaces |

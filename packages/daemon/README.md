@@ -5,14 +5,16 @@ Claude Code or Codex. Node.js 24 or newer and Git are required. Sign in to the
 coding CLI and make sure your local Git credentials can read the repositories
 you want to use.
 
-The public npm name and release trigger are awaiting Alex's confirmation. The
-source workspace stays private; `pnpm --filter @mikka/daemon build` produces a
-publishable `dist/` package containing JavaScript and the bundled private
-protocol. Set `MIKKA_DAEMON_PACKAGE_NAME` to the approved npm name when building.
+The release candidate is a single `@aspectlylabs/mikka` package containing the
+`mikka` command and its daemon subcommands. The source workspace stays private;
+`pnpm --filter @mikka/daemon build` produces the package with the private
+protocol bundled. The npm organization and trusted publisher must be verified
+before publication.
 
-After installing the published package:
+Once the package has been published, install it once and start the daemon:
 
 ```sh
+npm install -g @aspectlylabs/mikka
 mikka daemon login
 mikka daemon
 ```
