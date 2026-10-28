@@ -17,13 +17,13 @@ import { ComputerCard } from '@/components/computer/computer-card'
 import { ThreadStatus, harnessLabel } from './issue-threads'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
-import { listArtifacts } from '@/app/actions/artifacts'
+import { listRunArtifacts } from '@/app/actions/artifacts'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
-import { StatusDot } from '@/components/nav/status-dot'
 import { ArtifactKindIcon } from '@/components/artifacts/artifact-card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
-const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
+// Loaded on demand: the window itself shows this panel, bare, on its right.
+const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
 
 const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm whitespace-pre-wrap break-words'
 
@@ -101,7 +101,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
       </>}
       {detail && <BotAvatar color={colorFor(detail.agentName)} size="pill" still />}
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{detail?.name ?? t('title')}</h2>
-      {back && <ThreadArtifacts issueId={issueId} runId={runId} name={detail?.name ?? t('title')} status={data?.thread.status ?? ''} />}
+      {back && <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />}
       {!back && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
     </header>}
     <div className={cn('flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4', back && 'mx-auto w-full max-w-3xl')}>
@@ -146,11 +146,13 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
  * thread handed over. One opens straight in the Artifact window, with this
  * thread's conversation on its right (F4); several open a list first.
  */
-function ThreadArtifacts({ issueId, runId, name, status }: { issueId: string; runId: string; name: string; status: string }) {
+function ThreadArtifacts({ issueId, runId, status }: { issueId: string; runId: string; status: string }) {
   const t = useTranslations('ArtifactsPage')
-  const { data } = useSWR('artifacts', () => listArtifacts(), { revalidateOnFocus: false })
+  const { data, mutate } = useSWR(['run-artifacts', runId], () => listRunArtifacts(runId), { revalidateOnFocus: false })
   const [open, setOpen] = useState<string | null>(null)
-  const mine = (data ?? []).filter(item => item.runId === runId)
+  // A thread usually hands its artifact over as it finishes.
+  useEffect(() => { void mutate() }, [status, mutate])
+  const mine = data ?? []
   if (!mine.length) return null
   const label = t('threadEntry', { count: mine.length })
   return <>
@@ -162,8 +164,6 @@ function ThreadArtifacts({ issueId, runId, name, status }: { issueId: string; ru
           <DropdownMenuGroup>{mine.map(item => <DropdownMenuItem key={item.id} onClick={() => setOpen(item.id)}><ArtifactKindIcon kind={item.kind} /><span className="truncate">{item.title}</span></DropdownMenuItem>)}</DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>}
-    {open && <ArtifactViewer artifactId={open} onArtifactChange={setOpen} onClose={() => setOpen(null)} quotes={[]}
-      bot={{ name, avatar: <StatusDot status={status === 'waiting_input' ? 'waiting' : runIsActive(status) ? 'running' : status === 'succeeded' ? 'done' : status} /> }}
-      chat={() => <IssueThreadPanel issueId={issueId} runId={runId} onClose={() => setOpen(null)} bare />} />}
+    {open && <ArtifactWindow artifact={{ id: open, runId, issueId }} onChange={setOpen} onClose={() => setOpen(null)} />}
   </>
 }

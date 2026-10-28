@@ -71,13 +71,13 @@ export async function listSuggestions(userId: string) {
 
 /** One suggestion still on the person's list, or null. */
 export async function readSuggestion(userId: string, id: string) {
-  const [row] = await db.select().from(suggestions).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), isNull(suggestions.dismissedAt))).limit(1)
+  const [row] = await db.select().from(suggestions).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), eq(suggestions.shown, true), isNull(suggestions.dismissedAt))).limit(1)
   return row ?? null
 }
 
 /** Takes a suggestion off the person's list. False when it is not theirs. */
-export async function dismissSuggestion(userId: string, id: string) {
-  const rows = await db.update(suggestions).set({ dismissedAt: new Date() }).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), isNull(suggestions.dismissedAt))).returning({ id: suggestions.id })
+export async function dismissSuggestion(userId: string, id: string, executor: Pick<typeof db, 'update'> = db) {
+  const rows = await executor.update(suggestions).set({ dismissedAt: new Date() }).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), isNull(suggestions.dismissedAt))).returning({ id: suggestions.id })
   return rows.length > 0
 }
 

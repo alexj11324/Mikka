@@ -3,14 +3,14 @@ import { createHash, randomBytes } from 'node:crypto'
 import { after } from 'next/server'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { agentRuns, artifactShares, artifactVersions, artifacts, bots, issues, type ArtifactKind } from '@/lib/db/schema'
+import { agentRuns, artifactShares, artifactVersions, artifacts, bots, issueMembers, issues, type ArtifactKind } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { artifactSubmittedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { ARTIFACT_CONTENT_TYPES, ARTIFACT_EXTENSIONS, ARTIFACT_MAX_BYTES, cleanTitle, utf8Bytes } from '@/lib/artifacts/limits'
 import { stripDiffMarkers } from '@/lib/artifacts/diff'
 import type { ArtifactDetail, ArtifactListItem, ArtifactSummary } from '@/lib/artifacts/types'
-import { readIssueMetadata } from '@/lib/issue-metadata'
+import { issueVisibility } from '@/lib/issue-visibility'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactStorage, getArtifactObject, putArtifactObject } from '@/lib/artifacts/storage'
 
@@ -116,21 +116,38 @@ export async function readArtifact(userId: string, artifactId: string): Promise<
 
 const LIST_LIMIT = 200
 
-/** The person's artifacts, last changed first, each with its latest author and the task it was made for. */
-export async function listArtifacts(userId: string): Promise<ArtifactListItem[]> {
-  const rows = await db.select({ id: artifacts.id, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion, runId: artifacts.runId, issueId: artifacts.issueId, updatedAt: artifacts.updatedAt, authorName: artifactVersions.authorName })
-    .from(artifacts)
-    .leftJoin(artifactVersions, and(eq(artifactVersions.artifactId, artifacts.id), eq(artifactVersions.version, artifacts.latestVersion)))
-    .where(eq(artifacts.userId, userId)).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
+const listColumns = { id: artifacts.id, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion, runId: artifacts.runId, issueId: artifacts.issueId, updatedAt: artifacts.updatedAt, authorName: artifactVersions.authorName }
+const latestVersion = and(eq(artifactVersions.artifactId, artifacts.id), eq(artifactVersions.version, artifacts.latestVersion))
+/** The issue number as stored in its document; null when it has none. */
+const issueNumber = sql<number | null>`(coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'number')::int`
+
+/** Rows with their task key: only for tasks the person can still see. */
+async function withIssueKeys(userId: string, rows: (Omit<ArtifactListItem, 'issueKey' | 'updatedAt'> & { updatedAt: Date })[]): Promise<ArtifactListItem[]> {
   const issueIds = [...new Set(rows.flatMap(row => row.issueId ? [row.issueId] : []))]
-  const tasks = issueIds.length ? await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, content: issues.content }).from(issues).where(inArray(issues.id, issueIds)) : []
-  const numbers = new Map(tasks.map(task => [task.id, readIssueMetadata(task.content).number ?? null]))
-  const identifiers = await taskIdentifiers(tasks.map(task => ({ id: task.id, ownerId: task.ownerId, scope: task.scope, number: numbers.get(task.id) ?? null })))
+  const tasks = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, number: issueNumber })
+    .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
+    .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId)).predicate)) : []
+  const identifiers = await taskIdentifiers(tasks)
+  const numbers = new Map(tasks.map(task => [task.id, task.number]))
   return rows.map(({ updatedAt, ...row }) => {
     const number = row.issueId ? numbers.get(row.issueId) ?? null : null
-    const issueKey = row.issueId ? identifiers.get(row.issueId) ?? (number === null ? null : `#${number}`) : null
+    const issueKey = row.issueId && numbers.has(row.issueId) ? identifiers.get(row.issueId) ?? (number === null ? null : `#${number}`) : null
     return { ...row, issueKey, updatedAt: updatedAt.toISOString() }
   })
+}
+
+/** The person's artifacts, last changed first, each with its latest author and the task it was made for. */
+export async function listArtifacts(userId: string): Promise<ArtifactListItem[]> {
+  const rows = await db.select(listColumns).from(artifacts).leftJoin(artifactVersions, latestVersion)
+    .where(eq(artifacts.userId, userId)).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
+  return withIssueKeys(userId, rows)
+}
+
+/** What one of the person's runs handed over, last changed first. */
+export async function listRunArtifacts(userId: string, runId: string): Promise<ArtifactListItem[]> {
+  const rows = await db.select(listColumns).from(artifacts).leftJoin(artifactVersions, latestVersion)
+    .where(and(eq(artifacts.userId, userId), eq(artifacts.runId, runId))).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
+  return withIssueKeys(userId, rows)
 }
 
 /** The file of one version, or null when the artifact or version is not there. */

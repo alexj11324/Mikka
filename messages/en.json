@@ -945,6 +945,7 @@
     "runNotFound": "This run does not exist.",
     "artifactNotFound": "This artifact does not exist.",
     "suggestionNotFound": "This suggestion was already handled.",
+    "coordinatorUnavailable": "The Coordinator is not available right now. Try again later.",
     "messageRequired": "A message cannot be empty.",
     "submissionConflict": "This submission ID was already used for a different message.",
     "pendingActionUnavailable": "This action was already handled or has expired.",
@@ -2680,11 +2681,7 @@
       "handle": "Handle",
       "read": "Read"
     },
-    "instruction": {
-      "source": "Source: {from}",
-      "original": "Original: “{title}”",
-      "confirm": "Stop and ask me before anything that can't be undone."
-    }
+    "original": "Original: “{title}”"
   },
   "ArtifactsPage": {
     "title": "Artifact",
@@ -2695,7 +2692,6 @@
     },
     "columns": {
       "name": "Name",
-      "status": "Status",
       "source": "Source",
       "updated": "Last activity"
     },
@@ -2703,7 +2699,6 @@
     "retry": "Retry",
     "loading": "Loading artifacts",
     "empty": "No artifacts yet",
-    "home": "Back to home",
     "threadEntry": "Artifact · {count}"
   },
   "Artifact": {

@@ -25,11 +25,15 @@ const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinat
 type SuggestionItem = SuggestionCard & { id: string }
 type SuggestionsView = { groups: { items: SuggestionItem[] }[] }
 
-const fetchSuggestions = async (url: string): Promise<SuggestionsView> => {
+/** Composio's connected apps for the person; only whether any is active matters here. */
+type Connections = { accounts: { status: string }[] }
+
+const fetchJson = async <T,>(url: string): Promise<T> => {
   const response = await fetch(url, { credentials: 'same-origin' })
   if (!response.ok) throw new Error(String(response.status))
   return response.json()
 }
+
 
 /**
  * 建议 (rail, Figma F8 `420:5831`): the cards on the left, the Coordinator's
@@ -45,7 +49,11 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
   const locale = useLocale()
   const timeZone = typeof Intl === 'undefined' ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone
   const { mutate: mutateAll } = useSWRConfig()
-  const { data, error, isValidating, mutate } = useSWR(withBasePath(`/api/suggestions?tz=${encodeURIComponent(timeZone)}&locale=${encodeURIComponent(locale)}`), fetchSuggestions, { revalidateOnFocus: false })
+  const { data, error, isValidating, mutate } = useSWR(withBasePath(`/api/suggestions?tz=${encodeURIComponent(timeZone)}&locale=${encodeURIComponent(locale)}`), fetchJson<SuggestionsView>, { revalidateOnFocus: false })
+  const empty = !!data && !data.groups.some(group => group.items.length)
+  // 「连接应用」 only for someone with no app connected yet; an unknown answer shows nothing.
+  const { data: connections } = useSWR(empty ? withBasePath('/api/integrations/composio') : null, fetchJson<Connections>, { revalidateOnFocus: false, shouldRetryOnError: false })
+  const noConnection = !!connections && !connections.accounts.some(account => account.status === 'ACTIVE')
   const [sending, setSending] = useState<string | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
   // One list, newest first (R-21); the API still groups by app.
@@ -72,12 +80,12 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-6 pb-6">
         {error && <div role="alert" className="flex items-center gap-2 text-xs"><span className="text-destructive">{t('loadError')}</span><Button variant="ghost" size="xs" onClick={() => { void mutate() }}>{t('retry')}</Button></div>}
         {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
-        {!data && !error && <div role="status" aria-label={t('loading')} className="flex flex-col gap-2.5">{[0, 1, 2].map(index => <Skeleton key={index} className="h-14 w-full rounded-2xl" />)}</div>}
+        {!data && !error && <div role="status" aria-label={t('loading')} className="flex flex-col gap-2.5">{[0, 1, 2].map(index => <Skeleton key={index} className="h-14 w-full rounded-[16px]" />)}</div>}
         {items.map(item => <Button key={item.id} variant="ghost" data-slot="suggestion-card" disabled={sending !== null} aria-busy={sending === item.id || undefined} onClick={() => { void pick(item) }}
           className={cn(CARD_FRAME, 'h-auto w-full justify-start hover:bg-muted/40', sending === item.id && 'opacity-60')}>
           <SuggestionCardBody card={item} />
         </Button>)}
-        {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader><Button variant="secondary" className="rounded-full" onClick={onConnect}>{t('connect')}</Button></Empty>}
+        {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader>{noConnection && <Button variant="secondary" className="rounded-full" onClick={onConnect}>{t('connect')}</Button>}</Empty>}
       </div>
     </section>
     <div className="relative hidden min-h-0 flex-1 flex-col border-l border-rule md:flex md:basis-1/2 has-data-[slot=thread-view]:[&_[data-slot=conversation-pill]]:hidden">

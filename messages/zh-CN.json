@@ -945,6 +945,7 @@
     "runNotFound": "运行不存在。",
     "artifactNotFound": "找不到这个成果。",
     "suggestionNotFound": "这条建议已经处理过了。",
+    "coordinatorUnavailable": "Coordinator 现在不可用，稍后再试。",
     "messageRequired": "消息不能为空。",
     "submissionConflict": "此提交标识已用于另一条消息。",
     "pendingActionUnavailable": "这项操作已处理或已过期。",
@@ -2680,11 +2681,7 @@
       "handle": "处理",
       "read": "查看"
     },
-    "instruction": {
-      "source": "来源：{from}",
-      "original": "原文：「{title}」",
-      "confirm": "做不可撤销的操作前，先停下来问我。"
-    }
+    "original": "原文：「{title}」"
   },
   "ArtifactsPage": {
     "title": "Artifact",
@@ -2695,7 +2692,6 @@
     },
     "columns": {
       "name": "名称",
-      "status": "状态",
       "source": "来源",
       "updated": "上次活动"
     },
@@ -2703,7 +2699,6 @@
     "retry": "重试",
     "loading": "正在加载 Artifact",
     "empty": "还没有 Artifact",
-    "home": "回到主页",
     "threadEntry": "Artifact · {count}"
   },
   "Artifact": {
