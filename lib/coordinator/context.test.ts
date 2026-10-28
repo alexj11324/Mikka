@@ -128,11 +128,14 @@ test('chatItems marks inbox (pending) user messages so they are never reported a
 })
 
 test('finished run publication names the verified PR or missing setup in the existing chat', () => {
-  const event = { kind: 'run_finished' as const, issueId: 'i1', runId: 'r1', payload: { status: 'succeeded', stopReason: 'submitted', publication: { pullRequest: { url: 'https://github.com/owner/repo/pull/7', state: 'draft' } } } }
+  const event = { kind: 'run_finished' as const, issueId: 'i1', runId: 'r1', payload: { status: 'succeeded', stopReason: 'submitted', verification: 'not_run', publication: { pullRequest: { url: 'https://github.com/owner/repo/pull/7', state: 'draft' } } } }
   const prompt = eventPrompt(event)
   assert.match(prompt, /Verified GitHub pull request: https:\/\/github.com\/owner\/repo\/pull\/7 \(draft\)/)
   assert.match(prompt, /existing thread card updates in place/)
+  assert.match(prompt, /Verification was not run/)
+  assert.match(prompt, /Never say the changes passed verification/)
   const blocked = eventPrompt({ ...event, payload: { ...event.payload, publication: { errorCode: 'github_permission_required' } } })
   assert.match(blocked, /pull_requests: write/)
   assert.doesNotMatch(blocked, /Verified GitHub/)
+  assert.match(blocked, /Mention a draft PR only when the server-confirmed publication includes one/)
 })

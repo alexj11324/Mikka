@@ -99,7 +99,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         event.issueId ? `Issue: ${event.issueId}.` : null,
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
         ...publicationPrompt(payload.publication),
-        payload.verification === 'not_run' ? 'Verification was not run. Tell the person that no verification command is configured and the draft PR needs human review. Never say the changes passed verification.' : null,
+        payload.verification === 'not_run' ? 'Verification was not run. Tell the person that no verification command is configured and the work needs human review. Mention a draft PR only when the server-confirmed publication includes one. Never say the changes passed verification.' : null,
         note,
       ].filter(Boolean).join('\n')
     case 'run_retried':

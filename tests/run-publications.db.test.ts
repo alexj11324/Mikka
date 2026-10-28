@@ -171,6 +171,26 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await counts(f), { versions: 1, events: 1 })
     })
 
+    await t.test('unverified work without an approved matching push cannot succeed or advance the task', async () => {
+      for (const mode of ['unapproved', 'not-pushed', 'wrong-branch'] as const) {
+        const f = await fixture({ approved: mode !== 'unapproved' })
+        await prepareRunPublication(assignment(f), f.remoteUrl)
+        const submitted = completion(f, 'Unverified submission')
+        submitted.report!.verify = { status: 'not_run' }
+        if (mode === 'not-pushed') submitted.report!.publish!.pushed = false
+        if (mode === 'wrong-branch') submitted.report!.publish!.branch = 'main'
+        assert.equal((await persistRunCompletion(f.userId, f.runId, submitted))?.publicationPending, false)
+        const run = (await pool.query('select status,report from agent_runs where id=$1', [f.runId])).rows[0]
+        assert.equal(run.status, 'stopped')
+        assert.equal(run.report.verify.status, 'not_run')
+        assert.equal((await task(f)).status, 'todo')
+        assert.equal((await receipt(f)).status, 'blocked')
+        assert.equal((await receipt(f)).pullRequest, null)
+        await publishRunResult(f.runId, async () => { throw new Error('Unapproved or unpushed unverified work must never reach GitHub') })
+        assert.deepEqual(await counts(f), { versions: 0, events: 1 })
+      }
+    })
+
     await t.test('terminal replay without a publication receipt cannot undo later task edits', async () => {
       const f = await fixture()
       const initial = await persistRunCompletion(f.userId, f.runId, completion(f))

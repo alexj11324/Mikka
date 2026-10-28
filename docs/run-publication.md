@@ -36,8 +36,12 @@ infrastructure retries enter a final failure step and report a safe result.
 
 `verify: passed` can create an open PR. When there is no configured verification
 command, the daemon snapshots the real submitted tree, retains `verify: not_run`,
-and may push only after repository approval. The server requests a draft PR and
-tells the Coordinator that human checking remains. A failed verify never publishes.
+and may commit/push only after repository approval. Without an approved,
+matching, actually pushed result the thread stays stopped/unverified and the
+task is not advanced to review. After a successful approved push the server
+requests a draft PR and tells the Coordinator that human checking remains.
+A failed verify never publishes. A harness's self-reported verification is
+discarded in both the approved and unapproved paths.
 This missing-verification behavior is a proposed product decision, **待 Alex 确认**.
 
 The GitHub client reuses an existing task-marked PR. An unverified continuation

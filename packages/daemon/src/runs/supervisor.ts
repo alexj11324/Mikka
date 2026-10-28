@@ -26,8 +26,8 @@
 //
 // The handoff report's verify result is always the daemon's own: only the
 // agent's summary, open questions, next step and blocker are taken from the
-// agent. A submitted execution can finish unverified; its report keeps
-// `not_run`, and the server may open only a draft PR for human review.
+// agent. An explicitly approved, pushed submission can finish unverified;
+// its report keeps `not_run`, and the server may open only a draft PR.
 import { randomUUID } from "node:crypto"
 import { resolve } from "node:path"
 
@@ -662,12 +662,12 @@ export class RunSupervisor {
     this.endMessage(runId)
     this.openParts.delete(runId)
     if (stopReason === "submitted") this.setState(runId, "finishing")
-    // Completion and verification are separate: absent verification stays
-    // not_run and is delivered as a draft PR, never a fabricated pass.
+    // A trusted daemon push can hand unverified work in for a draft PR.
+    // Without that approved publication, the existing unverified stop stays.
     let state = runStateForStop(stopReason)
     if (stopReason === "submitted" && report.verify.status !== "passed") {
       const failed = report.verify.status === "failed"
-      if (!planning && failed) state = "failed"
+      if (!planning) state = failed ? "failed" : report.publish?.pushed === true ? "succeeded" : "stopped"
       // A `plan` run writes no code, so a verify that did not run says
       // nothing about it.
       if (!failed && !planning)
@@ -1099,13 +1099,17 @@ export class RunSupervisor {
         if (this.stopping) return
         const { verifyError, tree } = outcome
         let report = outcome.report
+        const policy = runPolicy(assignment.policy)
         if (
           stopReason === "submitted" &&
           report.verify.status !== "failed" &&
           tree &&
+          // The draft-PR exception requires an explicit repository push
+          // approval. It must not even create a local commit without it.
+          (report.verify.status === "passed" || pushDecision(policy, repo.push?.approved === true).push) &&
           // A read-only check (ADR 0046) never commits or pushes: it reports
           // on the commit the implementation run already pushed.
-          runPolicy(assignment.policy).readOnly !== true
+          policy.readOnly !== true
         ) {
           const publish = await this.publish(
             runId,

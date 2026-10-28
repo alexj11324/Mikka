@@ -15,6 +15,7 @@ import { join } from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { HarnessInfo } from "@mikka/protocol"
+import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 
 import { InvalidIdError } from "../src/errors"
 import { SandboxRuntime } from "../src/agents/sandbox"
@@ -115,7 +116,8 @@ describe("server ids never leave the daemon's dirs", () => {
 
 describe("verify is the daemon's, never the agent's", () => {
   it("ignores a self-reported verify; an unverified submit does not succeed", async () => {
-    const { server, dataDir } = await setup()
+    const { repo, server, dataDir } = await setup()
+    const initialHead = spawnSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).stdout.trim()
     const daemon = await boot(server, dataDir)
     const runId = server.queueRun(DEVICE, {
       issueId: "issue-self-verify",
@@ -137,6 +139,9 @@ describe("verify is the daemon's, never the agent's", () => {
     expect(run.error).toMatch(/no verify command ran/)
     const report = server.runs.get(runId)?.completion?.report
     expect(report?.verify).toEqual({ status: "not_run" })
+    expect(report?.publish?.pushed).not.toBe(true)
+    expect(report?.publish?.commit).toBeUndefined()
+    expect(spawnSync("git", ["rev-parse", "HEAD"], { cwd: run.worktree!, encoding: "utf8" }).stdout.trim()).toBe(initialHead)
     expect(report?.summary).toBe("All done, tests pass.")
     // The daemon's view of changed files, not the agent's empty list.
     expect(report?.filesChanged).toEqual(["CLAIMED.md"])
@@ -145,6 +150,32 @@ describe("verify is the daemon's, never the agent's", () => {
       "review"
     )
     expect(server.unownedRuns()).toEqual([])
+  })
+
+  it("keeps a forged verify untrusted even when an approved push hands work in for a draft", async () => {
+    const { repo, server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const policy = defaultRunPolicy()
+    policy.permissions.git_push = "allow"
+    const runId = server.queueRun(DEVICE, {
+      issueId: "issue-self-verify-approved", repoId: "repo-1", baseBranch: "main",
+      harness: "mock", prompt: "p", fixture: "self-verify", pushBranch: "mikka/mik-42", policy,
+    })
+    await daemon.syncWithServer()
+    await waitFor(() => daemon.supervisor.list().find(run => run.runId === runId))
+    await daemon.supervisor.idle()
+    await waitFor(() => daemon.status().pendingUploads === 0)
+    const run = daemon.supervisor.get(runId)
+    const report = server.runs.get(runId)?.completion?.report
+    expect(run.state).toBe("succeeded")
+    expect(run.error).toMatch(/no verify command ran/)
+    expect(report?.verify).toEqual({ status: "not_run" })
+    expect(report?.summary).toBe("All done, tests pass.")
+    expect(report?.publish).toMatchObject({ pushed: true, remote: "origin", branch: "mikka/mik-42" })
+    const pushed = spawnSync("git", ["rev-parse", "mikka/mik-42"], { cwd: repo, encoding: "utf8" })
+    expect(pushed.status).toBe(0)
+    expect(pushed.stdout.trim()).toBe(report?.publish?.commit)
+    expect(spawnSync("git", ["show", "mikka/mik-42:CLAIMED.md"], { cwd: repo, encoding: "utf8" }).status).toBe(0)
   })
 })
 

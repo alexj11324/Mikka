@@ -10,6 +10,7 @@ import { readRepositorySettings } from '@/lib/device-repositories'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { issueForUser } from '@/lib/issue-access'
+import { systemActor } from '@/lib/activity-actor'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { publicationBranch, publicationGate, repositoryPushApproved } from '@/lib/run-publication-policy'
@@ -86,10 +87,10 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
         const pullRequests = found ? metadata.pullRequests.map(existing => existing.url.replace(/\/$/, '') === pr.url ? pr : existing) : [...metadata.pullRequests, pr]
         content = withIssueMetadata(task.content, { ...metadata, pullRequests })
       }
-      const status = run.stopReason === 'submitted' && reachesReview('submitted', report ?? undefined) && !['done', 'cancelled', 'canceled'].includes(task.status) ? 'review' : task.status
+      const status = run.status === 'succeeded' && run.stopReason === 'submitted' && reachesReview('submitted', report ?? undefined) && !['done', 'cancelled', 'canceled'].includes(task.status) ? 'review' : task.status
       if (status !== task.status || JSON.stringify(content) !== JSON.stringify(task.content)) {
         const [saved] = await tx.update(issues).set({ content, status, revision: task.revision + 1, updatedAt: new Date() }).where(eq(issues.id, task.id)).returning()
-        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, actorType: 'system', actorId: 'run-result' })
+        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...systemActor('run-result') })
       }
     } else if (attachPullRequest && publication?.pullRequest) throw new PublicationError('issue_unavailable')
   }
@@ -110,7 +111,13 @@ export async function persistRunCompletion(userId: string, runId: string, comple
     const [publication] = await tx.select().from(runPublications).where(and(eq(runPublications.runId, runId), eq(runPublications.userId, userId))).for('update')
     if (firstCompletion) {
       let status: RunStatus = runStateForStop(completion.stopReason)
-      if (completion.stopReason === 'submitted' && completion.report?.verify.status === 'failed' && run.kind !== 'plan') status = 'failed'
+      if (completion.stopReason === 'submitted' && run.kind !== 'plan') {
+        if (completion.report?.verify.status === 'failed') status = 'failed'
+        else if (completion.report?.verify.status !== 'passed') {
+          const gate = publicationGate({ stopReason: completion.stopReason, kind: run.kind, report: completion.report ?? null, assignment: publication ?? null })
+          if (gate.state !== 'pending') status = 'stopped'
+        }
+      }
       ;[run] = await tx.update(agentRuns).set({ status, stopReason: completion.stopReason, report: completion.report ?? null, finishedAt: new Date(), updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))
     }

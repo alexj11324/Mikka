@@ -159,7 +159,7 @@ export async function openRunPullRequest(options: Options & {
   if (existing) return existing
   if (options.allowCreate === false) throw new PublicationError('pull_request_limit')
   try {
-    return result(await request(`${path}/pulls`, writeToken, { method: 'POST', body: {
+    return await result(await request(`${path}/pulls`, writeToken, { method: 'POST', body: {
       title: `${options.identifier}: ${options.title}`.slice(0, 256),
       head: options.branch, base: options.baseBranch ?? binding.defaultBranch,
       ...(options.draft ? { draft: true } : {}),

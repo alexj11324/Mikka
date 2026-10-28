@@ -11,7 +11,7 @@ const input = { remoteKey: 'github.com/owner/repo', githubAccountId: '456', env,
 const marker = `<!-- mikka-issue:${issueId} -->`
 const pr = { number: 77, node_id: 'PR_synthetic_77', html_url: 'https://github.com/owner/repo/pull/77', state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: input.branch, repo: { id: 789 } }, base: { repo: { id: 789 } } }
 
-function stub(options: { permission?: string; userId?: number; prPermission?: string; installed?: boolean; existing?: unknown[]; create?: 'timeout' | '422'; head?: string; forbiddenUser?: boolean } = {}) {
+function stub(options: { permission?: string; userId?: number; prPermission?: string; installed?: boolean; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; forbiddenUser?: boolean } = {}) {
   const calls: { path: string; method: string; body: Record<string, unknown> | null; authorization: string }[] = []
   let created = false
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
@@ -38,6 +38,7 @@ function stub(options: { permission?: string; userId?: number; prPermission?: st
       created = true
       if (options.create === 'timeout') throw new Error('transport failure containing synthetic-secret')
       if (options.create === '422') return Response.json({ message: 'synthetic-secret' }, { status: 422 })
+      if (options.create === 'malformed') return Response.json({}, { status: 201 })
       return Response.json({ ...pr, draft: body?.draft === true }, { status: 201 })
     }
     if (path === '/graphql') return Response.json({ data: { convertPullRequestToDraft: { pullRequest: { id: pr.node_id, isDraft: true } } } })
@@ -98,8 +99,8 @@ test('a full task output list refuses a new external PR before POST', async () =
   assert.ok(!calls.some(call => call.path.endsWith('/pulls') && call.method === 'POST'))
 })
 
-test('ambiguous POST timeout and concurrent 422 converge on the existing PR', async () => {
-  for (const create of ['timeout', '422'] as const) {
+test('ambiguous POST timeout, malformed reply and concurrent 422 converge on the existing PR', async () => {
+  for (const create of ['timeout', '422', 'malformed'] as const) {
     const { calls, fetcher } = stub({ create })
     assert.deepEqual(await openRunPullRequest({ ...input, fetcher }), { url: pr.html_url, state: 'open' })
     assert.equal(calls.filter(call => call.path.endsWith('/pulls') && call.method === 'POST').length, 1)
