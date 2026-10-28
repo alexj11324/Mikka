@@ -26,7 +26,7 @@ def safe_resume_snapshot(frames, document, evaluation):
     """
     frame=frames.get('frameTree') if isinstance(frames,dict) else None
     root=document.get('root') if isinstance(document,dict) else None
-    if not isinstance(frame,dict) or not isinstance(root,dict) or frame.get('childFrames'):return False
+    if not isinstance(frame,dict) or not isinstance(frame.get('frame'),dict) or not frame['frame'].get('id') or not isinstance(root,dict) or root.get('nodeName') != '#document' or frame.get('childFrames'):return False
     def unsafe(value):
         if isinstance(value,list):return any(unsafe(item) for item in value)
         if not isinstance(value,dict):return False
@@ -37,7 +37,7 @@ def safe_resume_snapshot(frames, document, evaluation):
         if any(root.get('shadowRootType') != 'user-agent' for root in value.get('shadowRoots',[]) if isinstance(root,dict)):return True
         if any(not isinstance(root,dict) for root in value.get('shadowRoots',[])):return True
         return any(unsafe(item) for item in value.values())
-    return not unsafe(root) and isinstance(evaluation,dict) and not evaluation.get('exceptionDetails') and evaluation.get('result',{}).get('value') is True
+    return not unsafe(root) and isinstance(evaluation,dict) and 'exceptionDetails' not in evaluation and isinstance(evaluation.get('result'),dict) and evaluation['result'].get('value') is True
 
 def decode(value):
     return base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))

@@ -39,8 +39,9 @@ class GuardTest(unittest.TestCase):
         success = {'result': {'value': True}}
         self.assertTrue(safe_resume_snapshot(frames, document, success))
         self.assertFalse(safe_resume_snapshot({}, document, success))
+        self.assertFalse(safe_resume_snapshot({'frameTree': {}}, document, success))
         self.assertFalse(safe_resume_snapshot(frames, {}, success))
-        self.assertFalse(safe_resume_snapshot(frames, document, {'exceptionDetails': {}, 'result': {}}))
+        self.assertFalse(safe_resume_snapshot(frames, document, {'exceptionDetails': {}, 'result': {'value': True}}))
         self.assertFalse(safe_resume_snapshot({'frameTree': {'childFrames': [{}]}}, document, success))
         self.assertFalse(safe_resume_snapshot(frames, {'root': {'nodeName': 'IFRAME'}}, success))
         self.assertFalse(safe_resume_snapshot(frames, {'root': {'shadowRoots': [{'shadowRootType': 'closed'}]}}, success))
