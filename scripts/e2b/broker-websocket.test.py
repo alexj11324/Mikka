@@ -1,5 +1,5 @@
 """Real local Chromium and WebSocket regression; all data is synthetic."""
-import asyncio, importlib.util, json, shutil, ssl, subprocess, tempfile
+import asyncio, importlib.util, json, os, shutil, signal, ssl, subprocess, tempfile
 from pathlib import Path
 from aiohttp import ClientSession, WSMsgType, WSServerHandshakeError, web
 from aiohttp.test_utils import TestClient, TestServer
@@ -31,7 +31,7 @@ async def main():
         fixture_site=web.TCPSite(fixture_runner,'127.0.0.1',0,ssl_context=tls);await fixture_site.start()
         fixture_port=fixture_site._server.sockets[0].getsockname()[1]
         origin=f'https://127.0.0.1:{fixture_port}'
-        process=await asyncio.create_subprocess_exec(chromium,'--headless','--no-sandbox','--disable-gpu','--no-first-run','--ignore-certificate-errors','--remote-debugging-address=127.0.0.1','--remote-debugging-port=0',f'--user-data-dir={path}/chrome','about:blank',stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL)
+        process=await asyncio.create_subprocess_exec(chromium,'--headless','--no-sandbox','--disable-gpu','--no-first-run','--ignore-certificate-errors','--remote-debugging-address=127.0.0.1','--remote-debugging-port=0',f'--user-data-dir={path}/chrome','about:blank',stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL,start_new_session=True)
         try:
             active=path/'chrome'/'DevToolsActivePort'
             for _ in range(150):
@@ -93,11 +93,20 @@ async def main():
                         assert observation['observation']['url']==origin+'/login'
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[type=password]").value="synthetic-secret"','returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as secret:
-                        assert secret.status==409, 'never capture a populated sensitive field'
+                        assert secret.status==200
+                        assert (await secret.json())['screenshot']==observation['screenshot'], 'password value must never appear in the screenshot'
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[type=password]").value=""','returnByValue':True})
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value="ordinary-text"','returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as populated:
-                        assert populated.status==409, 'unknown text fields remain confidential until a safe masking strategy exists'
+                        assert populated.status==200
+                        assert (await populated.json())['screenshot']==observation['screenshot'], 'ordinary field values must be masked too'
+                    await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=otp]").value="123456"','returnByValue':True})
+                    async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as otp:
+                        assert otp.status==200
+                        assert (await otp.json())['screenshot']==observation['screenshot'], 'OTP must never appear in the screenshot'
+                    restored=await browser.rpc('Runtime.evaluate',{'expression':'({username:document.querySelector("input[name=username]").value,otp:document.querySelector("input[name=otp]").value,visibility:document.querySelector("input[name=username]").style.visibility})','returnByValue':True})
+                    assert restored['result']['value']=={'username':'ordinary-text','otp':'123456','visibility':''}, 'masking must restore the page without reading or changing values'
+                    await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=otp]").value=""','returnByValue':True})
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value=""','returnByValue':True})
                     await browser.rpc('Runtime.evaluate',{'expression':"(()=>{const e=document.createElement('iframe');e.id='unsafe-test';document.body.append(e)})()",'returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as nested:
@@ -109,6 +118,8 @@ async def main():
                     async with client.post('/agents/case/credentials/begin?token=synthetic') as accepted_begin:
                         assert accepted_begin.status==200
                         token=(await accepted_begin.json())['guardToken']
+                    async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as guarded_observation:
+                        assert guarded_observation.status==409, 'active credential session blocks visual observation'
                     endpoint=f'/agents/case/credentials/cdp?guard={token}'
                     async def response(ws,ident):
                         while True:
@@ -247,6 +258,8 @@ async def main():
                 unix.close();await unix.wait_closed()
             print('PASS: real Chromium through local broker WebSocket: fixed templates and session storage; wrong target/session/origin, scripts and extra parameters rejected')
         finally:
-            process.terminate();await process.wait();await fixture_runner.cleanup()
+            try:os.killpg(process.pid,signal.SIGKILL)
+            except ProcessLookupError:pass
+            await process.wait();await fixture_runner.cleanup()
 
 asyncio.run(main())

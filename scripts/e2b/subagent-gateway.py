@@ -37,6 +37,27 @@ SAFE_TO_RESUME = """(() => {
   return !fields.some(e => e.value && (e.tagName === 'TEXTAREA' ||
     !['hidden','checkbox','radio','button','submit','reset','image','file','range','color'].includes(e.type)));
 })()"""
+# The browser is script-frozen while this isolated-world operation hides every
+# editable control and its descendants. Original inline properties stay in the
+# isolated world and are restored before page scripts resume; field values are
+# neither read nor returned. Pseudo-elements must also be hidden.
+MASK_VISUAL_FIELDS = """(() => {
+  globalThis.__mikkaMasks = [];
+  if (document.readyState !== 'complete') return false;
+  const roots = [...document.querySelectorAll('input,textarea,select,[contenteditable]:not([contenteditable="false"])')];
+  const elements = [...new Set(roots.flatMap(e => [e, ...e.querySelectorAll('*')]))];
+  globalThis.__mikkaMasks = elements.map(e => [e, e.style.getPropertyValue('visibility'), e.style.getPropertyPriority('visibility'), e.style.getPropertyValue('transition'), e.style.getPropertyPriority('transition')]);
+  for (const e of elements) { e.style.setProperty('transition','none','important'); e.style.setProperty('visibility','hidden','important'); }
+  return elements.every(e => ['','::before','::after'].every(p => getComputedStyle(e,p || null).visibility === 'hidden'));
+})()"""
+RESTORE_VISUAL_FIELDS = """(() => {
+  if (!Array.isArray(globalThis.__mikkaMasks)) return false;
+  for (const [e,v,vp,t,tp] of globalThis.__mikkaMasks) {
+    if (v) e.style.setProperty('visibility',v,vp); else e.style.removeProperty('visibility');
+    if (t) e.style.setProperty('transition',t,tp); else e.style.removeProperty('transition');
+  }
+  delete globalThis.__mikkaMasks; return true;
+})()"""
 SENSITIVE_FIELD = "(e.type === 'password' || /(?:otp|one[\\s_-]*time|verification[\\s_-]*code|security[\\s_-]*code|auth(?:entication)?[\\s_-]*code)/i.test([e.autocomplete,e.name,e.id,e.getAttribute('aria-label'),e.getAttribute('placeholder')].join(' ')))"
 
 def safe_resume_snapshot(frames, document, evaluation):
@@ -419,19 +440,32 @@ async def action(request):
             if u.scheme not in ('https','http') or not u.hostname or u.username or u.password:raise web.HTTPBadRequest()
             await b.rpc('Page.navigate',{'url':data['url']},b.session)
         elif name=='observe':
-            # Capture only while page scripts are frozen and all inspectable
-            # text fields are empty. Never forward credential-bearing frames
-            # or a page whose nested contexts cannot be inspected.
+            # Capture only while scripts are frozen and all editable values
+            # are hidden in an isolated world. Nested documents and shadow
+            # trees remain blocked until their contents can be fenced.
             await b.rpc('Emulation.setScriptExecutionDisabled',{'value':True},b.session)
+            context=None;restored=False
             try:
                 tree=await b.rpc('Page.getFrameTree',session=b.session)
                 document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
-                check=await b.rpc('Runtime.evaluate',{'expression':SAFE_TO_RESUME,'returnByValue':True},b.session)
-                if not safe_resume_snapshot(tree,document,check):raise web.HTTPConflict()
+                if not safe_resume_snapshot(tree,document,{'result':{'value':True}}):raise web.HTTPConflict()
+                world=await b.rpc('Page.createIsolatedWorld',{'frameId':tree['frameTree']['frame']['id'],'worldName':'mikka-visual-mask'},b.session)
+                context=world['executionContextId']
+                masked=await b.rpc('Runtime.evaluate',{'expression':MASK_VISUAL_FIELDS,'contextId':context,'returnByValue':True},b.session)
+                if 'exceptionDetails' in masked or masked.get('result',{}).get('value') is not True:raise web.HTTPConflict()
                 screenshot=await b.rpc('Page.captureScreenshot',{'format':'jpeg','quality':60},b.session)
                 if not isinstance(screenshot.get('data'),str) or not screenshot['data']:raise web.HTTPServiceUnavailable()
             finally:
-                await b.rpc('Emulation.setScriptExecutionDisabled',{'value':False},b.session)
+                if context is None:restored=True
+                else:
+                    try:
+                        result=await b.rpc('Runtime.evaluate',{'expression':RESTORE_VISUAL_FIELDS,'contextId':context,'returnByValue':True},b.session)
+                        restored='exceptionDetails' not in result and result.get('result',{}).get('value') is True
+                    except Exception:restored=False
+                if restored:await b.rpc('Emulation.setScriptExecutionDisabled',{'value':False},b.session)
+                else:
+                    b.guard='locked';b.guard_file.write_text('locked')
+                    raise web.HTTPConflict()
             # Exclude all form values, cookies, storage and raw HTML.
             text=await b.rpc('Runtime.evaluate',{'expression':'(() => { const copy=document.body.cloneNode(true); copy.querySelectorAll(\'input,textarea,select,script,style,noscript\').forEach(e=>e.remove()); const elements=Array.from(document.querySelectorAll(\'a,button,input,textarea,select\')).slice(0,150).map((e,i)=>{e.setAttribute(\'data-mikka-ref\',String(i));return {selector:\'[data-mikka-ref=\\"\'+i+\'\\"]\',tag:e.tagName,type:e.type||null,text:[\'INPUT\',\'TEXTAREA\',\'SELECT\'].includes(e.tagName)?null:e.innerText.slice(0,200),label:e.getAttribute(\'aria-label\')||e.getAttribute(\'placeholder\'),href:e.tagName===\'A\'?e.href:null}});return JSON.stringify({url:location.origin+location.pathname,title:document.title,text:(copy.innerText||copy.textContent||\'\').slice(0,16000),elements,needsLogin:Array.from(document.querySelectorAll(\'input[type=password]\')).some(e=>e.getClientRects().length>0)})})()','returnByValue':True},b.session)
             return web.json_response({'observation':json.loads(text['result']['value']),'screenshot':screenshot['data']})
