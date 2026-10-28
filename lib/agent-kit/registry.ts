@@ -1,7 +1,7 @@
 /** Registered capabilities, not grants. Every implementation retains its own host authorization. */
 export const COMPUTER_TOOL_IDS = [
   'list_computer_workspaces', 'create_computer_bot', 'list_computer_bots', 'wake_bot_computer',
-  'list_bot_subscriptions', 'bind_bot_subscription', 'dispatch_bot_computer',
+  'list_bot_subscriptions', 'bind_bot_subscription', 'dispatch_bot_computer', 'start_web_subagent',
 ] as const
 export const MAILBOX_TOOL_IDS = ['mailbox_recipients', 'mailbox_send', 'mailbox_inbox', 'mailbox_ack', 'mailbox_sent'] as const
 

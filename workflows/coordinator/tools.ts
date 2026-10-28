@@ -57,6 +57,11 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       execute: () => steps.listAgents(userId, scope),
     }),
     ...(computerEnabled ? {
+      start_web_subagent: tool({
+        description: 'Start web research as this Bot’s own browser sub-agent. It stays in the Bot chat, not the thread list. Pass suggestionId when starting from a suggestion. Never handle credentials; the browser asks through a login card.',
+        inputSchema: z.object({ botId: botInput, task: z.string().trim().min(1).max(2000), suggestionId: id.optional() }),
+        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.startWebSubagent(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
+      }),
       list_computer_workspaces: tool({
         description: 'List workspaces the person belongs to, so a requested new Bot is created in the right workspace.',
         inputSchema: z.object({}),
@@ -89,7 +94,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       }),
       dispatch_bot_computer: tool({
         description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Computer operations still require their approval.',
-        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional() }),
+        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional(), suggestionId: id.optional() }),
         execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerTask(userId, { ...input, botId: target }, options.toolCallId, scope, execution ?? undefined) : { error: 'botMismatch' } },
       }),
     } : {}),
