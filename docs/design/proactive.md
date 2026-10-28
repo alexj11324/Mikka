@@ -50,7 +50,7 @@ GitHub、Linear 或 Notion 事件，就判断一次要不要告诉人。Hark 和
 | `evidence` | 来源引用（suggestion id、邮件 id、日期），不存原文 |
 | `confidence` | 0–1 |
 | `firstSeenAt`, `lastSeenAt`, `expiresAt` | 例如订阅的扣款日之后过期 |
-| `state` | `active`、`dismissed`（用户说不对）、`deleted` |
+| `state` | `active`、`dismissed`（用户说不对）、`deleted`（用户在「记忆」里删掉，保留记录以免再学到）、`expired`（过了日期或可信度降到很低；再次看到会恢复） |
 | `userEdited` | 用户在「记忆」里改过的，以用户为准，模型不再覆盖 |
 
 「记忆」设置页（R-70，先例 ChatGPT 的记忆摘要）把这些事实写成 Markdown 摘要给人看，

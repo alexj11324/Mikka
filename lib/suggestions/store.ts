@@ -7,6 +7,7 @@ import { judgmentContext, matterContext, recordNotice } from '@/lib/attention/st
 import { briefingEvent } from '@/lib/coordinator-events'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { db } from '@/lib/db'
+import { extractFacts } from '@/lib/profile/extract'
 import { briefings, suggestions, users, userTimeZones } from '@/lib/db/schema'
 import { displayTitle, type ActionTitleInput } from './action-title'
 import { writeActionTitles } from './action-title-server'
@@ -22,8 +23,9 @@ const LIST_LIMIT = 100
  * stores it; repeats are skipped before any model call. Every level but low
  * shows in 建议. Critical, high and ask go on their matter, which the person's
  * Coordinator is handed (lib/attention/store.ts); a later notice on a matter
- * the person has not answered never rates below it. `route: false` only
- * rates and stores, for what was already there when an app was connected.
+ * the person has not answered never rates below it. Each stored item is then
+ * read once for facts about the person (lib/profile). `route: false` does not
+ * hand anything over, for what was already there when an app was connected.
  */
 export async function ingestNotifications(notifications: readonly ExternalNotification[], { route = true } = {}) {
   const woken = new Set<string>()
@@ -47,6 +49,8 @@ export async function ingestNotifications(notifications: readonly ExternalNotifi
     }).onConflictDoNothing().returning({ id: suggestions.id })
     if (stored && level !== 'low') actionItems.set(notification.userId, [...actionItems.get(notification.userId) ?? [], { id, source: notification.source, action: notification.action, title: notification.title, actor: notification.actor, excerpt: notification.excerpt }])
     if (stored && route && await recordNotice(notification, id, { ...score, level }, continuesId)) woken.add(notification.userId)
+    // R-73: what the item says about the person, low ones included (receipts are usually low).
+    if (stored) await extractFacts(notification, id)
   }))
   // One batched call per person writes the shown items as actions (R-45).
   await Promise.all([...actionItems].map(([userId, items]) => writeActionTitles(userId, items)))

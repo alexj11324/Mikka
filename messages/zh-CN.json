@@ -1485,6 +1485,9 @@
         "title": "个人资料",
         "description": "查看你在工作区中的账户信息。"
       },
+      "memory": {
+        "title": "记忆"
+      },
       "account": {
         "title": "账户",
         "description": "管理登录 Mikka 的方式。"
@@ -1527,6 +1530,24 @@
       "email": "电子邮箱",
       "notSet": "未设置",
       "readOnly": "账户信息为只读，当前版本暂不支持在此修改。"
+    },
+    "memory": {
+      "enabled": "使用记忆",
+      "learn": "从已连接的 App 中学习",
+      "error": "无法更新记忆",
+      "empty": "暂无记忆",
+      "correct": "更正",
+      "delete": "删除",
+      "kinds": {
+        "interest": "兴趣",
+        "routine": "习惯",
+        "place": "地点",
+        "subscription": "订阅",
+        "deadline": "截止日期",
+        "tool": "工具",
+        "person": "常联系的人",
+        "preference": "偏好"
+      }
     },
     "workspaceForm": {
       "id": "工作区 ID",
