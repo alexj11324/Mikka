@@ -23,13 +23,14 @@ export const FACTORY_STATUSES = [
 ] as const;
 export type FactoryStage = (typeof FACTORY_STAGES)[number];
 export type FactoryStatus = (typeof FACTORY_STATUSES)[number];
+const canonicalUuid = z.uuid().transform((value) => value.toLowerCase());
 const reason = z.string().trim().min(1).max(4000);
 export const routeSchema = z
   .object({
-    issueId: z.uuid(),
-    eventId: z.uuid(),
+    issueId: canonicalUuid,
+    eventId: canonicalUuid,
     // The source is an existing authenticated Coordinator event, not a new inbox.
-    sourceEventId: z.uuid(),
+    sourceEventId: canonicalUuid,
     rationale: reason,
     missingInformation: z.array(reason).max(20).default([]),
     missingPermissions: z.array(reason).max(20).default([]),
@@ -51,11 +52,11 @@ export function routeStage(
 }
 export const bindingSchema = z
   .object({
-    taskId: z.uuid(),
-    issueId: z.uuid(),
-    attemptId: z.uuid(),
+    taskId: canonicalUuid,
+    issueId: canonicalUuid,
+    attemptId: canonicalUuid,
     revision: z.number().int().positive(),
-    candidateId: z.uuid().nullable(),
+    candidateId: canonicalUuid.nullable(),
   })
   .strict();
 export type FactoryBinding = z.infer<typeof bindingSchema>;
@@ -72,9 +73,9 @@ export const evidenceSchema = z
     // References to existing, access controlled artifacts. No embedded logs or credentials.
     artifact: z.string().min(1).max(2000),
     kind: z.enum(["log", "report", "screenshot", "video", "request"]),
-    runId: z.uuid(),
+    runId: canonicalUuid,
     sessionId: z.string().min(1).max(1000),
-    candidateId: z.uuid().nullable(),
+    candidateId: canonicalUuid.nullable(),
     sha: z
       .string()
       .regex(/^[a-f0-9]{40}$/)
@@ -86,12 +87,12 @@ export const evidenceSchema = z
 export type FactoryEvidence = z.infer<typeof evidenceSchema>;
 export const changeSchema = z.discriminatedUnion("action", [
   z
-    .object({ action: z.literal("adopt_retry"), runId: z.uuid(), reason })
+    .object({ action: z.literal("adopt_retry"), runId: canonicalUuid, reason })
     .strict(),
   z
     .object({
       action: z.literal("resolve"),
-      sourceEventId: z.uuid(),
+      sourceEventId: canonicalUuid,
       rationale: reason,
       missingInformation: z.array(reason).max(20),
       missingPermissions: z.array(reason).max(20),
@@ -103,7 +104,7 @@ export const changeSchema = z.discriminatedUnion("action", [
     .object({
       action: z.literal("candidate"),
       candidate: candidateSchema,
-      runId: z.uuid(),
+      runId: canonicalUuid,
     })
     .strict(),
   z

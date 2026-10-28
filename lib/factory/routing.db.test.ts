@@ -204,6 +204,12 @@ test(
             () => store.apply("owner", bind(state.task), randomUUID(), change),
             "factorySourceMismatch",
           );
+          await denies(
+            () => store.apply("owner", bind(state.task), randomUUID(), {
+              ...change, sourceEventId: input.sourceEventId.toUpperCase(),
+            }),
+            "factorySourceMismatch",
+          );
           change.sourceEventId = await event();
           const eventId = randomUUID();
           const next = await store.apply(
