@@ -7,6 +7,10 @@ import * as steps from './steps'
 import * as kit from './agent-kit-steps'
 import type { NativeToolScope } from './tool-scope'
 import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
+import { factoryDispatchSchema } from '@/lib/factory/dispatch'
+import { factoryCheckRecoverySchema } from '@/lib/factory/check-recovery'
+import { contextQuestionAnswerSchema, questionEscalationSchema } from '@/lib/factory/questions/contract'
+import { intakeSchema, resolveInput, stopInput } from '@/lib/factory/intake'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { personalMailboxTools } from '@/lib/mailbox-tools'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
@@ -38,7 +42,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
     get_issue: tool({
       description: 'Read one issue: its text, status, priority and latest runs.',
       inputSchema: z.object({ issueId: id }),
-      execute: input => steps.getIssue(userId, input, scope),
+      execute: input => steps.getIssue(userId, input, scope, botId),
     }),
     ...(issueMutationsEnabled() ? { create_issue: tool({
       description: 'Create the task the person asked for, including requests from the new-task dialog. Write a short title and put details in body. The assignee can only be a person; dispatching a thread is a separate action. Defaults to todo and normal priority.',
@@ -50,6 +54,20 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       inputSchema: updateIssueInput,
       execute: (input, options) => steps.updateIssue(userId, input, options.toolCallId, scope, botId),
     }),
+    } : {}),
+    ...(issueMutationsEnabled() && process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? {
+      dispatch_factory_task: tool({description:'Dispatch an authorized pending Factory attempt through its current binding. No permission is granted by dispatch.',inputSchema:factoryDispatchSchema,execute:input=>steps.dispatchFactoryTask(userId,input,scope,botId)}),
+      recover_factory_check: tool({description:'Request an evidence-bound recovery judgment from the existing decision model. Supply only the current binding. Missing/refused evidence stays pending; no permission is granted and no run is dispatched.',inputSchema:factoryCheckRecoverySchema,execute:(input,call)=>steps.recoverFactoryCheck(userId,input,call.toolCallId,scope,botId)}),
+      list_factory_questions: tool({description:'Read durable execution questions for this task. Resolve context from exact existing facts first; escalate material decisions or permissions to the user.',inputSchema:z.object({taskId:id}).strict(),execute:input=>steps.listFactoryQuestions(userId,input.taskId,scope,botId)}),
+      answer_factory_context: tool({description:'Answer only a context question with exact quotations from the original request or issue. Cannot answer decisions, permission requests or external blockers.',inputSchema:contextQuestionAnswerSchema,execute:input=>steps.answerFactoryContext(userId,input,scope,botId)}),
+      escalate_factory_question: tool({description:'Escalate an unresolved execution question to its owner in the original task and Bot thread.',inputSchema:questionEscalationSchema,execute:input=>steps.escalateFactoryQuestion(userId,input,scope,botId)}),
+    } : {}),
+    ...(issueMutationsEnabled() && process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' ? {
+      list_factory_requests: tool({description:'Read original personal requests from this owner and Bot chat. Peer/runtime data is not a human request.',inputSchema:z.object({}).strict(),execute:()=>steps.listFactoryRequests(userId,scope,botId)}),
+      intake_factory_request: tool({description:'Create and persist the task requested by an actual source event. Clear authorized work routes directly to execute; only material missing information or permissions route to clarify. Spec is optional. Routing grants no permission and does not dispatch a run.',inputSchema:intakeSchema,execute:input=>steps.intakeFactoryRequest(userId,input,scope,botId)}),
+      stop_factory_task: tool({description:'Cancel this task or record withdrawn permission. This cannot restart or grant permission.',inputSchema:stopInput,execute:input=>steps.stopFactoryTask(userId,input,scope,botId)}),
+      get_factory_task: tool({description:'Read this chat’s durable task route and attempts.',inputSchema:z.object({taskId:id}).strict(),execute:input=>steps.readFactoryTask(userId,input.taskId,scope,botId)}),
+      resolve_factory_task: tool({description:'Record a subsequent actual user response to intake clarification. It grants no execution or publication permission. Use the exact current binding and original response event.',inputSchema:resolveInput,execute:input=>steps.resolveFactoryTask(userId,input,scope,botId)}),
     } : {}),
     list_agents: tool({
       description: 'List the person\'s agents with their harness, whether their device is online, and the repositories on that device.',

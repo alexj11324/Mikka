@@ -160,6 +160,7 @@ const TOOLS = [
       type: "object",
       properties: {
         question: { type: "string" },
+        kind: { type: "string", enum: ["context", "decision", "permission", "external"] },
         summary: { type: "string", description: "Where you are so far." },
       },
       required: ["question"],
@@ -212,6 +213,12 @@ function record(kind, args) {
     ...(plan ? { plan } : {}),
     // Kept as sent; the daemon validates and trims each entry.
     ...(Array.isArray(args.criteria) ? { criteria: args.criteria } : {}),
+    ...(kind === "ask" || kind === "blocked" ? { question: {
+      questionId: randomUUID(),
+      kind: ["context", "decision", "permission", "external"].includes(args.kind) ? args.kind : kind === "blocked" ? "external" : "decision",
+      question: String(args.question ?? args.blockedOn ?? "Execution needs input").slice(0,4000),
+      context: String(args.summary ?? "").slice(0,4000), options: [],
+    } } : {}),
     at: new Date().toISOString(),
   }
   const tmp = `${handoffFile}.${process.pid}.tmp`

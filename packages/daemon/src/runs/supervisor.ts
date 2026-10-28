@@ -27,6 +27,8 @@
 // The handoff report's verify result is always the daemon's own: only the
 // agent's summary, open questions, next step and blocker are taken from the
 // agent. A submission is `succeeded` only when verify passed.
+import { runQuestion } from "@mikka/protocol/run"
+import { fixedCheckSnapshot } from "./check"
 import { randomUUID } from "node:crypto"
 import { resolve } from "node:path"
 
@@ -365,6 +367,7 @@ export class RunSupervisor {
       if (e.assignment.runId === cancelledRunId) return true
       // A verified hand-in is under review; its work is published.
       if (e.state === "succeeded") return false
+      if (e.assignment.preserveQuestionWorktree && e.stopReason === "blocked") return false
       return !e.stopReason || !KEEP_WORKTREE.includes(e.stopReason)
     })
     if (!discardable) return false
@@ -756,7 +759,7 @@ export class RunSupervisor {
     error: string | undefined,
     agent: AgentReport | undefined
   ): Promise<{ report: HandoffReport; verifyError?: string; tree?: string }> {
-    const report = { ...baseReport(error), ...pickAgentReport(agent) }
+    let report: HandoffReport = { ...baseReport(error), ...pickAgentReport(agent) }
     const filesChanged = (
       await this.deps.worktrees.changedFiles(worktree).catch(() => [])
     ).slice(0, MAX_REPORTED_FILES)
@@ -767,11 +770,12 @@ export class RunSupervisor {
       return {
         report: { ...report, filesChanged, verify: { status: "not_run" } },
       }
+    let execution: Partial<HandoffReport["verify"]> = {}
     const failed = (output: string, verifyError: string) => ({
       report: {
         ...report,
         filesChanged,
-        verify: { status: "failed" as const, command, output },
+        verify: { status: "failed" as const, command, output, ...execution },
       },
       verifyError,
     })
@@ -780,7 +784,13 @@ export class RunSupervisor {
     const publisher = this.deps.publisher
     let before: string | undefined
     try {
-      before = await publisher?.snapshot({ worktree, repo })
+      if (fixedCandidateCheck(assignment)) {
+        const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
+        report = { ...report, check: { sha: fixed.sha, readOnly: true } }
+        before = fixed.tree
+      } else {
+        before = await publisher?.snapshot({ worktree, repo })
+      }
     } catch (snapshotError) {
       return failed("", `Could not read the worktree: ${String(snapshotError)}`)
     }
@@ -793,12 +803,13 @@ export class RunSupervisor {
       signal: this.stopController.signal,
       readOnly: runPolicy(assignment.policy).readOnly === true,
     })
+    execution = { exitCode: result.exitCode, signal: result.signal, timedOut: result.timedOut }
     const output = result.output.slice(-4000)
     if (result.exitCode !== 0 || result.timedOut)
       return failed(output, verifyFailure(command, result))
-    const after = publisher
-      ? await publisher.snapshot({ worktree, repo }).catch(() => null)
-      : undefined
+    const after = fixedCandidateCheck(assignment)
+      ? await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch).then(fixed => fixed.tree).catch(() => null)
+      : publisher ? await publisher.snapshot({ worktree, repo }).catch(() => null) : undefined
     if (after !== before)
       return failed(
         output,
@@ -808,7 +819,7 @@ export class RunSupervisor {
       report: {
         ...report,
         filesChanged,
-        verify: { status: "passed", command, output },
+        verify: { status: "passed", command, output, ...execution },
       },
       tree: before,
     }
@@ -976,13 +987,17 @@ export class RunSupervisor {
           "checkpoint from the earlier attempt"
         )
       }
-      const setup = continued
-        ? "continued"
+      const setup = runPolicy(assignment.policy).readOnly === true
+        ? "read-only"
+        : continued ? "continued"
         : this.deps.bootstrap ? await this.deps.bootstrap(worktree,repo) : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
       log.info({ worktree, setup }, "worktree ready")
       this.deps.journal.update(runId, { worktree, baseCommit })
     }
     if (this.stopping) return
+
+    if (fixedCandidateCheck(assignment))
+      await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
 
     const checkMailbox = () => {
       const lease = this.leases.get(runId)
@@ -1035,6 +1050,11 @@ export class RunSupervisor {
             message: assignment.followUp ?? assignment.prompt,
           }
         : undefined
+    if (assignment.requireSessionResume &&
+        (assignment.subscriptionBinding || !assignment.resumeSessionId || !assignment.continuesRunId ||
+          !adapter.capabilities.supportsResume || (!resuming && !continueSession) ||
+          (resuming && entry.sessionId !== assignment.resumeSessionId)))
+      throw new Error("factory_question_session_resume_required")
     const session = assignment.subscriptionBinding
       ? this.deps.startSubscription
         ? await this.deps.startSubscription(assignment,{...options,prompt:assignment.prompt})
@@ -1046,6 +1066,10 @@ export class RunSupervisor {
           prompt: assignment.prompt,
           continueSession,
         })
+    if (assignment.requireSessionResume && session.sessionId !== assignment.resumeSessionId) {
+      await session.cancel()
+      throw new Error("factory_question_session_mismatch")
+    }
     run.session = session
     log.info(
       {
@@ -1205,6 +1229,8 @@ function abortPromise(signal: AbortSignal): Promise<typeof ABORTED> {
 function pickAgentReport(agent: AgentReport | undefined): AgentReport {
   if (!agent) return {}
   const picked: AgentReport = {}
+  const question = runQuestion.safeParse(agent.question)
+  if (question.success) picked.question = question.data
   if (typeof agent.summary === "string")
     picked.summary = agent.summary.slice(0, 10_000)
   if (
@@ -1310,4 +1336,13 @@ function verifyFailure(
 
 export function baseReport(summary = ""): HandoffReport {
   return emptyRunReport(summary.slice(0, 10_000))
+}
+
+/** Existing acceptance runs stay compatible; Factory checks pin a read-only SHA. */
+function fixedCandidateCheck(assignment: RunAssignment) {
+  return (
+    assignment.kind === "acceptance" &&
+    runPolicy(assignment.policy).readOnly === true &&
+    /^[a-f0-9]{40}$/.test(assignment.baseBranch)
+  )
 }

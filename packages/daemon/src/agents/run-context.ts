@@ -1,3 +1,4 @@
+import { runQuestion } from "@mikka/protocol/run"
 import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../../../../lib/personal-agent-message'
 // What every real harness adapter needs about one run: the sandbox policy,
 // the Mikka MCP server (hand-in tools) and the handoff file it writes, and
@@ -103,6 +104,7 @@ export interface RunContextOptions {
 
 /** Recorded by `mikka-mcp.mjs`. */
 interface HandoffFile {
+  question?: unknown
   kind: "submit" | "ask" | "blocked"
   summary?: string
   nextStep?: string | null
@@ -338,7 +340,9 @@ export class RunContext {
     // dropped rather than passed up as if the daemon had asked for it.
     const plan =
       this.options.kind === "plan" ? planFromHandoff(file.plan, log) : null
+    const question = runQuestion.safeParse(file.question)
     const report: AgentReport = {
+      ...(question.success ? { question: question.data } : {}),
       summary: file.summary ?? "",
       openQuestions: file.openQuestions ?? [],
       nextStep: file.nextStep ?? null,
