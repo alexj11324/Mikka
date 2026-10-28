@@ -4,6 +4,7 @@ import { pool, withDatabaseClient } from '@/lib/db';
 import { issueForUser } from '@/lib/issue-access';
 import { queueRun } from '@/lib/agent-runs';
 import { freezeWorkerDefinition, retryWorkerDefinition } from '@/lib/agent-kit/worker';
+import { factoryCheckIndependent } from './check-independence';
 import { createFactoryReconciler } from './reconcile';
 import { createFactoryClaim, factoryClaimTask } from './claim';
 import { FactoryError } from './contract';
@@ -19,7 +20,7 @@ export const factoryAuthorize = (userId: string, issueId: string, tx: PoolClient
 /** Consumer owners supply their own actual validators/configurators; absent means denied. */
 export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLifecycle = {}, configure: FactoryDispatchAdapters['configure'] = {}, validateCheck?: Parameters<typeof createFactoryClaim>[2], consumers: Parameters<typeof createFactoryReconciler>[3] = {}) {
   if (!factoryLifecycleEnabled()) throw new FactoryError('factoryLifecycleUnavailable');
-  const store = createFactoryStore(pool,factoryAuthorize,botId,lifecycle);
+  const store = createFactoryStore(pool,factoryAuthorize,botId,{independent:factoryCheckIndependent,...lifecycle});
   const dispatch = createFactoryDispatch(pool,store,
     (tx,userId,input,scopeBot) => withDatabaseClient(tx,()=>queueRun(userId,input,scopeBot)), {
       configure: {
