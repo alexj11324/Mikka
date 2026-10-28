@@ -21,18 +21,17 @@ Every agent, from laptop to cloud, working as one team.
 
 </div>
 
-Mikka brings the coding agents on your laptop, remote servers and cloud
-infrastructure together as one team. Describe what you need to a Bot: it
-organizes tasks and coordinates Claude Code, Codex and Cursor across connected
-devices. Work runs on your own machines, with Mikka Cloud computers on the way.
+Mikka connects AI agents across your computers, remote servers and the cloud
+into one coordinated team. Describe the work to a Bot, and it organizes tasks
+for Claude Code, Codex and Cursor on connected devices.
 
-Follow each thread in real time, step in when needed and review the results.
+Track progress, respond when needed and review results in one place.
 
 ## How Mikka works
 
 - **Bots coordinate. Threads execute.**
-  - A Bot chats with you, plans coding work and dispatches threads. Browser
-    sub-agents will extend Bots to web tasks.
+  - A Bot chats with you, plans the work and dispatches it to agents across
+    connected devices.
   - Each piece of work runs in a **thread**: one work run with its own name,
     usually tied to a task. One bot can run many threads at once.
   - The full definitions are in the [glossary](docs/design/glossary.md).
