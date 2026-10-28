@@ -6,7 +6,10 @@ import type {
   evidenceSchema,
 } from "./approval-contract";
 
-/** Consumer views only. #192 owns persistence, stages, transitions and fences. */
+/** Required consumer lifecycle views only; no stage/state implementation.
+ * The current #192 intake store uses botId as its third argument and rejects
+ * finish/advance. It is not a drop-in implementation of this port.
+ * A coordinated adapter must preserve #192 bot/source/owner/fence checks. */
 export interface FactoryCandidate extends z.infer<typeof candidateSchema> {
   id: string;
 }

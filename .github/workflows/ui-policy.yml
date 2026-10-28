@@ -79,6 +79,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm test:factory-check-independence
       - run: pnpm test:ui-policy
       - run: pnpm test:motion
       - run: pnpm test:i18n
@@ -220,5 +221,5 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:factory-approval-db,test:factory-monitor-db,test:groups,test:issue-search-db,test:migration-steps-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:agent-kit-db,test:approved-writes-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:factory-approval-db,test:factory-monitor-db,test:factory-check-independence-db,test:groups,test:issue-search-db,test:migration-steps-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db
       - run: pnpm build
