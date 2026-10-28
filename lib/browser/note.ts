@@ -2,7 +2,7 @@
 // ride at the head of the next message they send, after an artifact quote if
 // there is one, so the bot reads them in place and the chat can show them as
 // chips above the text:
-//   <browser-note n="1" kind="element" url="https://…/memories" label="按钮 · 删除" selector="…">删了，刷新又回来了</browser-note>
+//   <browser-note n="1" kind="element" url="https://…/memories" label="周会 · 删除" selector="…">删了，刷新又回来了</browser-note>
 // `element` is a part of a same-origin page, named by the item it sits in and
 // its own name (「周会 · 删除」) and found again by its selector; none of the
 // page's text is sent.
