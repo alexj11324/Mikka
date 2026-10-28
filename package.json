@@ -88,7 +88,7 @@
     "test:migration-steps-db": "node --test tests/migration-steps.db.test.mjs",
     "test:coordinator-issue-tools": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/issue-tools.test.ts lib/mcp/issue-mutation.test.ts",
     "test:coordinator-issue-tools-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/issue-tool-calls.db.test.ts",
-    "test:run-publication": "node --import tsx --test lib/github/run-pull-request.test.ts lib/run-publication-policy.test.ts lib/repository-approval-proposal.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/run-completion-route.test.ts tests/repository-approval-actions.test.ts lib/repository-approval-transaction.test.ts",
+    "test:run-publication": "node --import tsx --test lib/github/run-pull-request.test.ts lib/run-publication-policy.test.ts lib/repository-approval-proposal.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/run-completion-route.test.ts tests/repository-approval-actions.test.ts lib/repository-approval-transaction.test.ts lib/repository-approval-dedupe.test.ts",
     "test:run-publication-db": "NODE_ENV=test node --import ./tests/support/server-only.mjs --import tsx --test tests/run-publications.db.test.ts",
     "test:e2e:mvp": "playwright test --config=playwright.mvp.config.ts",
     "test:mvp-fixtures": "node --test tests/mvp/fixture.test.mjs tests/mvp/retention.test.mjs && node --import tsx --test lib/run-test-fixture.test.ts",

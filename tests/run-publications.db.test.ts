@@ -351,14 +351,18 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal(rows[0].push.approved, true)
       assert.equal((await pool.query('select count(*)::int as n from repository_settings where "userId"=$1 and "remoteKey"=$2', [owner.userId, repositoryKey('https://git.example.com:9443/Team/Repo.git')])).rows[0].n, 0)
       await assert.rejects(decidePendingAction(owner.userId, id, true), 'a consumed approval cannot be replayed')
-      const pending = await proposeRepositoryPush(owner.userId, { repo })
+      assert.deepEqual(await proposeRepositoryPush(owner.userId, { repo }), { status: 'approved' })
+      const raceRepo = 'https://git.example.com:8443/Team/Other.git'
+      const pending = await proposeRepositoryPush(owner.userId, { repo: raceRepo })
       assert.ok('actionId' in pending && pending.actionId)
+      assert.deepEqual(await proposeRepositoryPush(owner.userId, { repo: raceRepo }), pending)
       const raced = await Promise.allSettled([
         decidePendingAction(owner.userId, pending.actionId, true),
-        writeRepositoryPushApproval(owner.userId, repositoryKey(repo), false),
+        writeRepositoryPushApproval(owner.userId, repositoryKey(raceRepo), false),
       ])
       assert.equal(raced[1].status, 'fulfilled')
-      assert.equal((await pool.query('select push from repository_settings where "userId"=$1 and "remoteKey"=$2', [owner.userId, repositoryKey(repo)])).rows[0].push.approved, false)
+      assert.equal((await pool.query('select push from repository_settings where "userId"=$1 and "remoteKey"=$2', [owner.userId, repositoryKey(raceRepo)])).rows[0].push.approved, false)
+      assert.deepEqual(await proposeRepositoryPush(owner.userId, { repo: raceRepo }), { status: 'denied' })
       await assert.rejects(decidePendingAction(owner.userId, pending.actionId, true), 'revocation invalidates old pending confirmations')
       const declined = await proposeRepositoryPush(owner.userId, { repo: 'other/repo' })
       assert.ok('actionId' in declined && declined.actionId)
