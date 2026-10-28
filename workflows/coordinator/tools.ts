@@ -8,14 +8,14 @@ import * as kit from './agent-kit-steps'
 import type { NativeToolScope } from './tool-scope'
 import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
 import { factoryDispatchSchema } from '@/lib/factory/dispatch'
-import { factoryCheckRecoverySchema, type FactoryRecoveryJudge } from '@/lib/factory/check-recovery'
+import { factoryCheckRecoverySchema } from '@/lib/factory/check-recovery'
 import { contextQuestionAnswerSchema, questionEscalationSchema } from '@/lib/factory/questions/contract'
 import { intakeSchema, resolveInput, stopInput } from '@/lib/factory/intake'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { personalMailboxTools } from '@/lib/mailbox-tools'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
 
-export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; factoryRecoveryJudge?: Omit<FactoryRecoveryJudge,'callId'> }
+export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[] }
 
 export function createCoordinatorRegistry(userId: string, botId: string | null, scope?: NativeToolScope, options: CoordinatorToolOptions = {}) {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
@@ -57,7 +57,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
     } : {}),
     ...(issueMutationsEnabled() && process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? {
       dispatch_factory_task: tool({description:'Dispatch an authorized pending Factory attempt through its current binding. No permission is granted by dispatch.',inputSchema:factoryDispatchSchema,execute:input=>steps.dispatchFactoryTask(userId,input,scope,botId)}),
-      recover_factory_check: tool({description:'Choose recovery from the original failed check evidence: retry the same fixed candidate or request source repair. Requires host-verified vision model provenance; grants no permission and does not dispatch. Use the exact current binding and explain the evidence.',inputSchema:factoryCheckRecoverySchema,execute:(input,call)=>steps.recoverFactoryCheck(userId,input,execution && options.factoryRecoveryJudge && options.factoryRecoveryJudge.executionId===execution.id && options.factoryRecoveryJudge.modelId===execution.snapshot.runtime.model?{...options.factoryRecoveryJudge!,callId:call.toolCallId}:undefined,scope,botId)}),
+      recover_factory_check: tool({description:'Request an evidence-bound recovery judgment from the existing decision model. Supply only the current binding. Missing/refused evidence stays pending; no permission is granted and no run is dispatched.',inputSchema:factoryCheckRecoverySchema,execute:(input,call)=>steps.recoverFactoryCheck(userId,input,call.toolCallId,scope,botId)}),
       list_factory_questions: tool({description:'Read durable execution questions for this task. Resolve context from exact existing facts first; escalate material decisions or permissions to the user.',inputSchema:z.object({taskId:id}).strict(),execute:input=>steps.listFactoryQuestions(userId,input.taskId,scope,botId)}),
       answer_factory_context: tool({description:'Answer only a context question with exact quotations from the original request or issue. Cannot answer decisions, permission requests or external blockers.',inputSchema:contextQuestionAnswerSchema,execute:input=>steps.answerFactoryContext(userId,input,scope,botId)}),
       escalate_factory_question: tool({description:'Escalate an unresolved execution question to its owner in the original task and Bot thread.',inputSchema:questionEscalationSchema,execute:input=>steps.escalateFactoryQuestion(userId,input,scope,botId)}),

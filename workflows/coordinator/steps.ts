@@ -463,11 +463,11 @@ export async function dispatchFactoryTask(userId:string,input:import('@/lib/fact
   await assertNativeToolScope(userId,scope)
   return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).dispatch(userId,input))
 }
-export async function recoverFactoryCheck(userId:string,input:import('@/lib/factory/check-recovery').FactoryCheckRecoveryInput,judge:import('@/lib/factory/check-recovery').FactoryRecoveryJudge|undefined,scope?:NativeToolScope,botId:string|null=null) {
+export async function recoverFactoryCheck(userId:string,input:import('@/lib/factory/check-recovery').FactoryCheckRecoveryInput,sdkToolCallId:string,scope?:NativeToolScope,botId:string|null=null) {
   'use step'
   await assertNativeToolScope(userId,scope)
   if (!issueMutationsEnabled()) return {error:'issue_mutations_unavailable'}
-  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).recoverCheck(userId,input,judge))
+  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).recoverCheck(userId,input,sdkToolCallId))
 }
 export async function listFactoryQuestions(userId:string,taskId:string,scope?:NativeToolScope,botId:string|null=null) {
   'use step'

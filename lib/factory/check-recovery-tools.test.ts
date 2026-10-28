@@ -32,7 +32,7 @@ before(async () => {
   registry = await import("@/workflows/coordinator/tools");
 });
 
-test("actual recovery tool carries only matching host model context and SDK call identity", async () => {
+test("actual recovery tool accepts only binding and carries the actual SDK context identity", async () => {
   const keys = [
     "MIKKA_ISSUE_TOOLS_ENABLED",
     "MIKKA_FACTORY_ROUTING_ENABLED",
@@ -52,11 +52,6 @@ test("actual recovery tool carries only matching host model context and SDK call
         { harness: "ai_sdk", model: "synthetic-vision-model" },
       ),
     };
-    const origin = {
-      executionId: execution.id,
-      modelId: "synthetic-vision-model",
-      vision: "verified" as const,
-    };
     const input = {
       binding: {
         taskId: randomUUID(),
@@ -65,14 +60,11 @@ test("actual recovery tool carries only matching host model context and SDK call
         revision: 4,
         candidateId: randomUUID(),
       },
-      choice: "retry_check" as const,
-      rationale: "Synthetic model judgment from original evidence",
     };
     const scope = { holder: "host", turnId: "turn", callId: "native-call" },
       context = { toolCallId: "sdk-owned-call", messages: [], context: {} };
     const tools = registry.coordinatorTools("owner", "bot", scope, {
       execution,
-      factoryRecoveryJudge: origin,
     });
     assert.deepEqual(Object.keys(tools), ["recover_factory_check"]);
     assert.equal(
@@ -89,26 +81,10 @@ test("actual recovery tool carries only matching host model context and SDK call
     assert.deepEqual(calls.at(-1), [
       "owner",
       input,
-      { ...origin, callId: "sdk-owned-call" },
+      "sdk-owned-call",
       scope,
       "bot",
     ]);
-    for (const bad of [
-      { ...origin, executionId: randomUUID() },
-      { ...origin, modelId: "other-model" },
-    ]) {
-      const other = registry.coordinatorTools("owner", "bot", scope, {
-        execution,
-        factoryRecoveryJudge: bad,
-      });
-      await other.recover_factory_check.execute!(input, context);
-      assert.equal(calls.at(-1)![2], undefined);
-    }
-    const missing = registry.coordinatorTools("owner", "bot", scope, {
-      execution,
-    });
-    await missing.recover_factory_check.execute!(input, context);
-    assert.equal(calls.at(-1)![2], undefined);
   } finally {
     keys.forEach((key, i) => {
       if (old[i] === undefined) delete process.env[key];

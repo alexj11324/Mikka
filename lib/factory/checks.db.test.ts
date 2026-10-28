@@ -1,8 +1,12 @@
 // Real #192 migrations/store/dispatch/questions/claim and #193 consumers.
 // Run production code over isolated PG; queue, actor and terminal reports are fixtures.
+// #331 host invocation is real code with a Gateway HTTP stub and synthetic PNG.
+// No real provider, account credential, screenshot or visual understanding is claimed.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
+import { DECISION_MODEL, DECISIONS_URL } from "../coordinator/decision";
+import { invokeDecision } from "../coordinator/decide";
 import { readFile, readdir } from "node:fs/promises";
 import { createServer } from "node:http";
 import { once } from "node:events";
@@ -36,7 +40,7 @@ import {
 import { reconcileFactoryCheck } from "./reconcile-check";
 import {
   createFactoryCheckRecovery,
-  type FactoryRecoveryJudge,
+  type FactoryCheckRecoveryDependencies,
 } from "./check-recovery";
 
 test(
@@ -65,6 +69,7 @@ test(
     const admin = new Pool({ connectionString: url });
     const database = `factory193_consumers_${randomUUID().replaceAll("-", "")}`;
     let pool: Pool | undefined;
+    let installedGatewayFixture = false;
     try {
       assert.equal(
         Math.floor(
@@ -186,13 +191,105 @@ test(
         assignment,
       );
       const claim = createFactoryClaim(store, questions, assignment);
-      const recover = createFactoryCheckRecovery(db, store);
-      const modelFixture = (): FactoryRecoveryJudge => ({
-        callId: randomUUID(),
-        executionId: randomUUID(),
-        modelId: "synthetic-vision-origin-fixture",
-        vision: "verified",
+      let chosenAction = "repair_code",
+        modelCalls = 0;
+      let mutateReceipt:
+        | ((
+            result: NonNullable<
+              Awaited<
+                ReturnType<
+                  NonNullable<FactoryCheckRecoveryDependencies["invoke"]>
+                >
+              >
+            >,
+          ) => void)
+        | undefined;
+      let beforeModel: (() => Promise<void>) | undefined;
+      let nullModel = false;
+      let replyAnswers: unknown[] | undefined,
+        replyConfidence: number | undefined;
+      assert.equal(
+        Object.hasOwn(process.env, "DECISION_GATEWAY_API_KEY"),
+        false,
+        "Offline tests must not inherit a provider credential",
+      );
+      process.env.DECISION_GATEWAY_API_KEY = "synthetic-offline-fixture";
+      installedGatewayFixture = true;
+      const networkRequests: unknown[] = [];
+      const originalFetch = globalThis.fetch;
+      t.mock.method(
+        globalThis,
+        "fetch",
+        async (
+          resource: Parameters<typeof fetch>[0],
+          options?: Parameters<typeof fetch>[1],
+        ) => {
+          const url = String(resource);
+          if (url === DECISIONS_URL) {
+            const body = JSON.parse(String(options?.body));
+            networkRequests.push(body);
+            assert.equal(body.model, DECISION_MODEL);
+            return Response.json({
+              model: DECISION_MODEL,
+              provider_metadata: {
+                gateway: { generationId: `fixture_generation_${modelCalls}` },
+              },
+              answers: replyAnswers ?? [
+                {
+                  type: "choice",
+                  name: "recovery",
+                  choice: chosenAction,
+                  ...(replyConfidence !== undefined
+                    ? { confidence: replyConfidence }
+                    : {}),
+                },
+              ],
+            });
+          }
+          assert.match(
+            url,
+            /^http:\/\/127\.0\.0\.1:/,
+            "No external provider request is allowed",
+          );
+          return originalFetch(resource, options);
+        },
+      );
+      const modelInvoke: NonNullable<
+        FactoryCheckRecoveryDependencies["invoke"]
+      > = async (purpose, input, questions, signal) => {
+        assert.equal(
+          db.totalCount - db.idleCount,
+          0,
+          "No SQL client may be checked out while invoking the model",
+        );
+        modelCalls++;
+        await beforeModel?.();
+        if (nullModel) return null;
+        const result = await invokeDecision(purpose, input, questions, signal);
+        if (result) mutateReceipt?.(result);
+        return result;
+      };
+      const recoverRaw = createFactoryCheckRecovery(db, store, {
+        invoke: modelInvoke,
       });
+      const recover = async (
+        user: string,
+        input: {
+          binding: import("./contract").FactoryBinding;
+          choice: string;
+          rationale?: string;
+        },
+        _unused?: undefined,
+      ) => {
+        chosenAction = input.choice;
+        const result = await recoverRaw(
+          user,
+          { binding: input.binding },
+          "synthetic_sdk_context",
+        );
+        assert.ok("task" in result, JSON.stringify(result));
+        return result;
+      };
       const reconcile = createFactoryReconciler(db, store, questions, {
         review: reconcileFactoryCheck,
         verify: reconcileFactoryCheck,
@@ -692,7 +789,7 @@ test(
                     rationale:
                       "Synthetic model decision based on original failed command evidence",
                   },
-                  modelFixture(),
+                  undefined,
                 );
                 assert.equal(selected.task.stage, "execute");
                 assert.equal(selected.task.status, "pending");
@@ -801,7 +898,7 @@ test(
                 choice: "repair_code",
                 rationale: "Synthetic model-selected repair",
               },
-              modelFixture(),
+              undefined,
             ),
             (e) =>
               e instanceof FactoryError &&
@@ -837,21 +934,25 @@ test(
             rationale:
               "Synthetic model judges retry appropriate from original persisted evidence",
           };
-          await assert.rejects(
-            recover("owner", input, undefined),
-            (e) =>
-              e instanceof FactoryError &&
-              e.code === "factoryVisionModelProvenanceRequired",
+          nullModel = true;
+          assert.equal(
+            (
+              (await recoverRaw("owner", { binding: input.binding })) as {
+                pending: boolean;
+              }
+            ).pending,
+            true,
           );
+          nullModel = false;
           await assert.rejects(
-            recover(
-              "owner",
-              { ...input, vision: "verified", permissions: "allow" },
-              modelFixture(),
-            ),
+            recoverRaw("owner", {
+              ...input,
+              vision: "verified",
+              permissions: "allow",
+            }),
             (e) => e instanceof FactoryError && e.code === "factoryInvalid",
           );
-          const judge = modelFixture(),
+          const judge = undefined,
             retry = await recover("owner", input, judge);
           assert.equal(retry.task.stage, "review");
           assert.equal(retry.task.candidateId, failed.task.candidateId);
@@ -861,9 +962,8 @@ test(
           );
           assert.deepEqual(await recover("owner", input, judge), retry);
           await assert.rejects(
-            recover("owner", { ...input, choice: "repair_code" }, judge),
-            (e) =>
-              e instanceof FactoryError && e.code === "factoryReplayMismatch",
+            recoverRaw("owner", { ...input, choice: "repair_code" }),
+            (e) => e instanceof FactoryError && e.code === "factoryInvalid",
           );
           const next = await start(retry.task);
           assert.notEqual(next.runId, d.runId);
@@ -903,7 +1003,7 @@ test(
                 choice: "retry_check",
                 rationale: "Explicit synthetic model retry choice",
               },
-              modelFixture(),
+              undefined,
             );
             d = await start(next.task);
           }
@@ -916,13 +1016,13 @@ test(
               rationale: "Another model choice",
             };
           await assert.rejects(
-            recover("owner", input, modelFixture()),
+            recover("owner", input, undefined),
             (e) =>
               e instanceof FactoryError &&
               e.code === "factoryRecoveryBudgetExceeded",
           );
           await assert.rejects(
-            recover("other", input, modelFixture()),
+            recover("other", input, undefined),
             (e) => e instanceof FactoryError && e.code === "factoryNotFound",
           );
           await store.apply(
@@ -932,7 +1032,7 @@ test(
             { action: "cancel", reason: "Cancelled before recovery" },
           );
           await assert.rejects(
-            recover("owner", input, modelFixture()),
+            recover("owner", input, undefined),
             (e) => e instanceof FactoryError && e.code === "factoryStopped",
           );
         },
@@ -964,7 +1064,7 @@ test(
                 rationale:
                   "Synthetic model assesses the same timeout evidence and selects recovery",
               },
-              modelFixture(),
+              undefined,
             );
             assert.equal(
               next.task.candidateId,
@@ -998,7 +1098,7 @@ test(
               choice: "repair_code",
               rationale: "Synthetic model-selected source work",
             },
-            modelFixture(),
+            undefined,
           );
           const repair = await start(selected.task),
             {
@@ -1015,7 +1115,364 @@ test(
           );
         },
       );
+
+      async function failedReview() {
+        const r = await pendingReview(),
+          d = await start(r.task);
+        await terminal(d.runId, "receipt-v2-" + r.task.id, true);
+        await reconcile("owner");
+        return { snapshot: await state(r.task.id), runId: d.runId };
+      }
+      for (const mode of [
+        "null",
+        "refusal",
+        "defer",
+        "request-digest",
+        "image-digest",
+        "generation",
+        "model",
+        "time",
+        "vision",
+      ] as const)
+        await t.test(
+          "shared invocation " +
+            mode +
+            " retains the original observation pending",
+          async () => {
+            const { snapshot } = await failedReview(),
+              input = { binding: factoryBinding(snapshot.task) };
+            const initialCalls = modelCalls;
+            chosenAction = mode === "defer" ? "defer" : "retry_check";
+            nullModel = mode === "null";
+            if (mode === "refusal")
+              replyAnswers = [{ type: "refusal", name: "recovery" }];
+            mutateReceipt = (result) => {
+              if (mode === "request-digest")
+                result.execution.requestDigest = "0".repeat(64);
+              if (mode === "image-digest")
+                result.execution.imageDigests = ["0".repeat(64)];
+              if (mode === "generation")
+                result.execution.providerGenerationId = "";
+              if (mode === "model")
+                result.execution.modelId = "untrusted" as typeof DECISION_MODEL;
+              if (mode === "time")
+                result.execution.startedAt = "1970-01-01T00:00:00.000Z";
+              if (mode === "vision")
+                result.execution.vision =
+                  "verified" as typeof result.execution.vision;
+            };
+            try {
+              const outcome = await recoverRaw("owner", input);
+              assert.ok("pending" in outcome);
+              assert.equal(outcome.pending, true);
+              assert.deepEqual(await state(snapshot.task.id), snapshot);
+              assert.equal(modelCalls, initialCalls + 1);
+            } finally {
+              nullModel = false;
+              replyAnswers = undefined;
+              mutateReceipt = undefined;
+            }
+          },
+        );
+      await t.test(
+        "zero confidence is retained without a programmed human fallback; replay never reinfers",
+        async () => {
+          const { snapshot } = await failedReview(),
+            input = { binding: factoryBinding(snapshot.task) },
+            count = modelCalls;
+          chosenAction = "retry_check";
+          replyConfidence = 0;
+          try {
+            const next = await recoverRaw(
+              "owner",
+              input,
+              "actual-test-context",
+            );
+            assert.ok("task" in next);
+            assert.equal(next.task.stage, "review");
+            assert.equal(next.task.status, "pending");
+            const data = next.attempts.find(
+              (a) => a.id === next.task.attemptId,
+            )!.output.recovery as any;
+            assert.equal(data.answer.confidence, 0);
+            assert.equal(data.execution.modelId, DECISION_MODEL);
+            assert.equal(data.execution.vision, "no-image-input");
+            assert.ok(
+              data.execution.providerGenerationId.startsWith(
+                "fixture_generation_",
+              ),
+            );
+            assert.equal(data.sdkToolCallId, "actual-test-context");
+            const recreated = createFactoryCheckRecovery(db, store, {
+              invoke: modelInvoke,
+            });
+            assert.deepEqual(await recreated("owner", input), next);
+            assert.equal(modelCalls, count + 1);
+          } finally {
+            replyConfidence = undefined;
+          }
+        },
+      );
+      await t.test(
+        "concurrent request observes a bounded reservation without holding SQL during inference",
+        async () => {
+          const { snapshot } = await failedReview(),
+            input = { binding: factoryBinding(snapshot.task) };
+          let release!: () => void, started!: () => void;
+          const wait = new Promise<void>((resolve) => {
+              release = resolve;
+            }),
+            ready = new Promise<void>((resolve) => {
+              started = resolve;
+            });
+          chosenAction = "retry_check";
+          const count = modelCalls;
+          beforeModel = async () => {
+            started();
+            await wait;
+          };
+          const first = recoverRaw("owner", input);
+          try {
+            await ready;
+            const second = await recoverRaw("owner", input);
+            assert.ok("pending" in second);
+            assert.equal(second.reason, "decision_in_progress");
+            assert.equal(modelCalls, count + 1);
+          } finally {
+            release();
+            beforeModel = undefined;
+          }
+          const winner = await first;
+          assert.ok("task" in winner);
+          assert.equal(winner.task.stage, "review");
+          assert.deepEqual(await recoverRaw("owner", input), winner);
+          assert.equal(modelCalls, count + 1);
+        },
+      );
+      for (const mode of ["cancel", "revoke-access", "new-binding"] as const)
+        await t.test(
+          "actual model return cannot apply after " + mode,
+          async () => {
+            const { snapshot } = await failedReview(),
+              input = { binding: factoryBinding(snapshot.task) };
+            chosenAction = "retry_check";
+            beforeModel = async () => {
+              if (mode === "revoke-access")
+                await db.query('UPDATE issues SET "userId"=$2 WHERE id=$1', [
+                  snapshot.task.issueId,
+                  "other",
+                ]);
+              else
+                await store.apply(
+                  "owner",
+                  input.binding,
+                  randomUUID(),
+                  mode === "cancel"
+                    ? {
+                        action: "cancel",
+                        reason: "Cancelled during model call",
+                      }
+                    : {
+                        action: "repair",
+                        reason: "A concurrent trusted test change",
+                      },
+                );
+            };
+            try {
+              await assert.rejects(
+                recoverRaw("owner", input),
+                (e) =>
+                  e instanceof FactoryError &&
+                  e.code ===
+                    (mode === "cancel"
+                      ? "factoryStopped"
+                      : mode === "revoke-access"
+                        ? "factoryNotFound"
+                        : "factoryStale"),
+              );
+            } finally {
+              beforeModel = undefined;
+            }
+            const {
+              rows: [row],
+            } = await db.query(
+              "SELECT stage,status FROM factory_tasks WHERE id=$1",
+              [snapshot.task.id],
+            );
+            assert.equal(
+              row.status,
+              mode === "cancel"
+                ? "cancelled"
+                : mode === "new-binding"
+                  ? "pending"
+                  : "failed",
+            );
+            assert.equal(
+              row.stage,
+              mode === "new-binding" ? "execute" : "review",
+            );
+          },
+        );
+      const png =
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
+      for (const mode of [
+        "valid",
+        "missing",
+        "foreign-session",
+        "wrong-sha",
+        "future-time",
+        "changed-during-call",
+      ] as const)
+        await t.test(
+          "actual shared image request " +
+            mode +
+            " binds pixels and original provenance",
+          async () => {
+            const { snapshot, runId } = await failedReview(),
+              input = { binding: factoryBinding(snapshot.task) },
+              chunkId = randomUUID();
+            await db.query(
+              'INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") SELECT $1,id,99,$3,"finishedAt" FROM agent_runs WHERE id=$2',
+              [
+                chunkId,
+                runId,
+                JSON.stringify({
+                  type: "file",
+                  mediaType: "image/png",
+                  url: png,
+                }),
+              ],
+            );
+            const collector: NonNullable<
+              FactoryCheckRecoveryDependencies["collectImages"]
+            > = async (tx, observation) => {
+              const {
+                rows: [chunk],
+              } = await tx.query(
+                'SELECT chunk,"createdAt" FROM run_chunks WHERE id=$1 AND "runId"=$2',
+                [chunkId, observation.run.id],
+              );
+              return {
+                requiresVisual: true,
+                images:
+                  mode === "missing"
+                    ? []
+                    : [
+                        {
+                          image: { dataUrl: chunk.chunk.url, detail: "high" },
+                          artifact: "run-chunk:" + chunkId,
+                          runId,
+                          sessionId:
+                            mode === "foreign-session"
+                              ? "foreign"
+                              : observation.run.sessionId,
+                          candidateId: observation.candidate.id,
+                          sha:
+                            mode === "wrong-sha"
+                              ? "b".repeat(40)
+                              : observation.candidate.sha,
+                          observedAt:
+                            mode === "future-time"
+                              ? new Date(Date.now() + 60000).toISOString()
+                              : chunk.createdAt.toISOString(),
+                        },
+                      ],
+              };
+            };
+            const withImages = createFactoryCheckRecovery(db, store, {
+              invoke: modelInvoke,
+              collectImages: collector,
+            });
+            const count = modelCalls;
+            chosenAction = "retry_check";
+            if (mode === "changed-during-call") {
+              beforeModel = async () => {
+                await db.query("UPDATE run_chunks SET chunk=$2 WHERE id=$1", [
+                  chunkId,
+                  JSON.stringify({
+                    type: "file",
+                    mediaType: "image/png",
+                    url: png.replace("RZk", "RZl"),
+                  }),
+                ]);
+              };
+              try {
+                await assert.rejects(
+                  withImages("owner", input),
+                  (e) => e instanceof FactoryError && e.code === "factoryStale",
+                );
+              } finally {
+                beforeModel = undefined;
+              }
+              assert.deepEqual(await state(snapshot.task.id), snapshot);
+              return;
+            }
+            const outcome = await withImages("owner", input);
+            if (mode === "valid") {
+              assert.ok("task" in outcome);
+              const receipt = outcome.attempts.find(
+                (a) => a.id === outcome.task.attemptId,
+              )!.output.recovery as any;
+              assert.equal(receipt.execution.vision, "image-input-submitted");
+              assert.deepEqual(receipt.execution.imageDigests, [
+                createHash("sha256")
+                  .update(Buffer.from(png.split(",")[1], "base64"))
+                  .digest("hex"),
+              ]);
+              assert.equal(
+                receipt.imageSources[0].artifact,
+                "run-chunk:" + chunkId,
+              );
+              assert.equal(receipt.imageSources[0].sha, sha);
+              assert.equal(receipt.imageSources[0].runId, runId);
+              assert.equal(
+                receipt.sdkToolCallId,
+                undefined,
+                "REST does not fabricate an SDK ID",
+              );
+              const request = networkRequests.at(-1) as any;
+              assert.equal(
+                request.input[0].content.find(
+                  (part: any) => part.type === "input_image",
+                ).image_url,
+                png,
+              );
+              assert.equal(
+                request.input[0].content.find(
+                  (part: any) => part.type === "input_image",
+                ).detail,
+                "high",
+              );
+              assert.equal(modelCalls, count + 1);
+            } else {
+              assert.ok("pending" in outcome);
+              assert.equal(outcome.reason, "visual_evidence_unavailable");
+              assert.equal(modelCalls, count);
+              assert.deepEqual(await state(snapshot.task.id), snapshot);
+            }
+          },
+        );
+      await t.test(
+        "unavailable model calls exhaust only their invocation budget, with no fixed recovery",
+        async () => {
+          const { snapshot } = await failedReview(),
+            input = { binding: factoryBinding(snapshot.task) },
+            count = modelCalls;
+          nullModel = true;
+          try {
+            for (let n = 0; n < 4; n++) {
+              const result = await recoverRaw("owner", input);
+              assert.ok("pending" in result);
+            }
+            assert.equal(modelCalls, count + 3);
+            assert.deepEqual(await state(snapshot.task.id), snapshot);
+          } finally {
+            nullModel = false;
+          }
+        },
+      );
     } finally {
+      if (installedGatewayFixture) delete process.env.DECISION_GATEWAY_API_KEY;
       await pool?.end();
       // Preserve this database until the existing disposable Actions service teardown.
       await admin.end();
