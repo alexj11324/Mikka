@@ -33,6 +33,7 @@ import {
 
 import type { LocalComputerDecision, LocalComputerRequest } from "@mikka/protocol/computer"
 import type { RunChunk } from "./chunks"
+import type { ToolApprovalGate } from "./agents/tool-approval"
 import type { RunMailbox } from './run-mailbox'
 import type { NativeBrokerContext, NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
@@ -61,6 +62,7 @@ export interface ChunkBatch {
  * the daemon keeps running and retries (offline tolerance, R13).
  */
 export interface ServerLink {
+  prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<ToolApprovalGate>
   /** Optional host-only adapter for the claimed run; never model-supplied. */
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   claimCoordinator?(deviceId: string, signal: AbortSignal): Promise<NativeCoordinatorJob | null>

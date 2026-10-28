@@ -490,6 +490,7 @@ export class ClaudeAdapter implements AgentAdapter {
     if (earlier) return endedSession(sessionId, earlier)
     ctx.clearHandoff()
 
+    if (!options.toolApproval) throw new Error("Run tool approval unavailable")
     const queue = new EventQueue()
     const prompts = new PromptQueue(sessionId)
     let written = 0
@@ -543,14 +544,14 @@ export class ClaudeAdapter implements AgentAdapter {
           preset: "claude_code",
           append: ctx.instructions(),
         },
-        ...(options.toolApproval ? {
+        ...({
           permissionMode: "default" as const,
           canUseTool: async (toolName: string, input: Record<string, unknown>, callback: { toolUseID: string; signal: AbortSignal }) => {
             const gate = options.toolApproval!
             const decision = await gate.request({ runId: options.runId, harness: 'claude_code', requestId: callback.toolUseID, method: toolName, input }, callback.signal)
             return decision === 'allow' ? { behavior: 'allow' as const, updatedInput: input } : { behavior: 'deny' as const, message: 'Permission not granted.' }
           },
-        } : { permissionMode: "bypassPermissions" as const, allowDangerouslySkipPermissions: true }),
+        }),
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
         ...(this.options.spawnHosted && externalAuth

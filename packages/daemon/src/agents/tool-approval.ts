@@ -1,5 +1,6 @@
 // Run-bound CLI approval bridge. Host callbacks are injected in-process by
 // trusted daemon code; model-facing request data never supplies authority.
+import { randomUUID } from 'node:crypto'
 import type { PermissionDecision } from '@mikka/protocol/agent-policy'
 
 export interface ToolApprovalRequest {
@@ -30,20 +31,22 @@ async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 export class ToolApprovalGate {
+  private readonly epoch = randomUUID()
   private readonly seen = new Set<string>()
   private readonly stop = new AbortController()
   constructor(readonly runId: string, private readonly host: ToolApprovalHost) {}
   revoke() { this.stop.abort() }
 
   async request(request: ToolApprovalRequest, signal?: AbortSignal): Promise<'allow' | 'deny'> {
-    if (request.runId !== this.runId || !request.requestId || request.requestId.length > 256 || this.seen.has(request.requestId) || this.seen.size >= 1024 || this.stop.signal.aborted || signal?.aborted) return 'deny'
+    if (request.runId !== this.runId || !request.requestId || request.requestId.length > 219 || this.seen.has(request.requestId) || this.seen.size >= 1024 || this.stop.signal.aborted || signal?.aborted) return 'deny'
     let snapshot: ToolApprovalRequest
     try {
       const serialized = JSON.stringify(request)
       if (serialized.length > 20_000) return 'deny'
       snapshot = JSON.parse(serialized) as ToolApprovalRequest
+      snapshot.requestId = `${this.epoch}/${snapshot.requestId}`
     } catch { return 'deny' }
-    this.seen.add(snapshot.requestId) // consume before asynchronous work; never refund
+    this.seen.add(request.requestId) // consume before asynchronous work; never refund
     const controller = new AbortController()
     const abort = () => controller.abort()
     this.stop.signal.addEventListener('abort', abort, { once: true })

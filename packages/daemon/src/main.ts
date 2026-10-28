@@ -325,6 +325,7 @@ export class Daemon {
       adapters,
       startSubscription: hosted?.start,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
+      prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
       bootstrap: hosted
         ? async (worktree, repo) => {
             if (

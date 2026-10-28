@@ -10,6 +10,7 @@ import { execa } from "execa"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { NoSandbox } from "../src/agents/sandbox"
+import { ToolApprovalGate } from "../src/agents/tool-approval"
 import type { RunChunk } from "../src/chunks"
 import { Daemon } from "../src/main"
 import { MemoryServer } from "../src/server-link"
@@ -33,10 +34,12 @@ afterEach(async () => {
 })
 
 async function boot(server: MemoryServer, dataDir: string) {
+  const link = server.link()
+  link.prepareRunToolApproval = async assignment => new ToolApprovalGate(assignment.runId, { permission: () => 'allow', ask: async () => 'deny', isLive: () => true })
   const daemon = await new Daemon({
     dataDir,
     flavor: "dev",
-    link: server.link(),
+    link,
     credential: "cred",
     heartbeatMs: 50,
     harnesses: (["claude_code", "codex", "cursor"] as const).map((harness) => ({

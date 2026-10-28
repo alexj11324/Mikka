@@ -1,3 +1,4 @@
+import { ToolApprovalGate } from "../src/agents/tool-approval"
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
@@ -22,6 +23,8 @@ import { getEventListeners } from 'node:events'
 // All files/empty IPC directories are retained; no cleanupTempDirs/rm/prune.
 const retained = mkdtempSync(join(tmpdir(), 'mikka-mailbox-cli-'))
 const endpoint = new URL('https://mikka.invalid/mikka/api/mcp')
+const syntheticApproval = (runId: string) => new ToolApprovalGate(runId, { permission: () => 'allow', ask: async () => 'deny', isLive: () => true })
+
 function fixture() {
   const token = 'mkw_' + randomBytes(32).toString('base64url')
   const assignment = { runId: randomUUID(), mcp: { url: endpoint.href, token, mailbox: true } } as RunAssignment
@@ -190,7 +193,7 @@ for (const kind of ['claude_code', 'codex'] as const) test(`${kind} actual fake 
     { name: 'mailbox_send', arguments: { ...args, key: randomUUID() } },
   ]
   try {
-    const session = await adapter.start({ runId: f.assignment.runId, cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'MAILBOX_TEST ' + JSON.stringify(calls) })
+    const session = await adapter.start({ runId: f.assignment.runId, toolApproval: syntheticApproval(f.assignment.runId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'MAILBOX_TEST ' + JSON.stringify(calls) })
     const chunks = []
     for await (const event of session.events()) chunks.push(event)
     const text = chunks.flatMap(event => event.type === 'chunk' && event.chunk.type === 'text-delta' ? [event.chunk.delta] : []).join('')
@@ -248,7 +251,7 @@ for (const kind of ['claude_code', 'codex'] as const) test(`${kind} actual fake 
     ? new CodexAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-codex.mjs'), userHome: home })
     : new ClaudeAdapter({ stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
   try {
-    const session = await adapter.start({ runId: f.assignment.runId, cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox,
+    const session = await adapter.start({ runId: f.assignment.runId, toolApproval: syntheticApproval(f.assignment.runId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox,
       prompt: 'MAILBOX_TEST ' + JSON.stringify([{ name: '__mailbox_catalog' }, { name: 'mailbox_inbox' }, { name: 'mailbox_send', arguments: { to: randomUUID(), key: randomUUID(), text: 'Not granted' } }]) })
     let text = ''
     for await (const event of session.events()) if (event.type === 'chunk' && event.chunk.type === 'text-delta') text += event.chunk.delta
@@ -267,7 +270,8 @@ for (const kind of ['claude_code', 'codex'] as const) test(`${kind} fake CLI has
   const adapter = kind === 'codex'
     ? new CodexAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-codex.mjs'), userHome: home })
     : new ClaudeAdapter({ stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
-  const session = await adapter.start({ runId: randomUUID(), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, prompt: 'MAILBOX_TEST ' + JSON.stringify([{ name: '__mailbox_catalog' }, { name: 'mailbox_inbox' }]) })
+  const noMailboxRunId = randomUUID()
+  const session = await adapter.start({ runId: noMailboxRunId, toolApproval: syntheticApproval(noMailboxRunId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, prompt: 'MAILBOX_TEST ' + JSON.stringify([{ name: '__mailbox_catalog' }, { name: 'mailbox_inbox' }]) })
   const chunks = []
   for await (const event of session.events()) chunks.push(event)
   const text = chunks.flatMap(event => event.type === 'chunk' && event.chunk.type === 'text-delta' ? [event.chunk.delta] : []).join('')
@@ -319,7 +323,8 @@ test('Codex unaudited versions and mailbox-enabled history resume fail closed wi
       const binary = join(dir, 'codex-' + version + '.mjs')
       writeFileSync(binary, original.replace('codex_cli_rs/0.163.0', 'codex_cli_rs/' + version), { mode: 0o700 })
       const adapter = new CodexAdapter({ sandbox: new NoSandbox(), stateDir: join(dir, version), binary, userHome: home })
-      const options = { runId: randomUUID(), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'No provider invocation' }
+      const runId = randomUUID()
+      const options = { runId, toolApproval: syntheticApproval(runId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'No provider invocation' }
       await assert.rejects(adapter.start(options), /audited Codex0.163.0/)
       await assert.rejects(adapter.resume('another-history', options), /fresh Codex thread/)
     }

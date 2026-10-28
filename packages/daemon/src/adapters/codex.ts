@@ -257,6 +257,7 @@ export class CodexAdapter implements AgentAdapter {
     options: SessionOptions &
       Partial<Pick<StartOptions, "prompt" | "continueSession">>
   ): Promise<AgentSession> {
+    if (!options.toolApproval) throw new Error("Run tool approval unavailable")
     const log = options.log.child({ harness: "codex" })
     if (options.mailbox && mode !== 'new') throw new Error('Run mailbox requires a fresh Codex thread; resume capability is unverified')
     const paths = runPaths(this.options.stateDir, options.runId)
@@ -601,7 +602,7 @@ export class CodexAdapter implements AgentAdapter {
       }
       const thread: ThreadStartParams = {
         cwd: ctx.worktree,
-        approvalPolicy: options.toolApproval ? "on-request" : "never",
+        approvalPolicy: "on-request",
         sandbox: "danger-full-access",
         developerInstructions: ctx.instructions(),
         ...(options.mailbox ? { dynamicTools: options.mailbox.tools.map(tool => ({ type: 'function' as const, ...tool })) } : {}),

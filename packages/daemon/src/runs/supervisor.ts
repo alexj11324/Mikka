@@ -80,6 +80,7 @@ import {
 } from "../server-link"
 import type { WorktreeManager } from "../worktrees"
 import type { JournalEntry, RunJournal } from "./journal"
+import type { ToolApprovalGate } from "../agents/tool-approval"
 import { assertMailboxRunAuthority, type RunMailbox } from '../run-mailbox'
 
 export interface SupervisorDeps {
@@ -90,6 +91,7 @@ export interface SupervisorDeps {
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
+  prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<ToolApprovalGate>
   bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
   /** The device's current allow-list (`device_repo`). */
   repos: () => DeviceRepo[]
@@ -996,7 +998,9 @@ export class RunSupervisor {
     if (this.stopping) return
     if (run.cancelRequested) { this.finish(runId, run.forcedStop ?? 'cancelled'); return }
     if (mailbox) checkMailbox()
+    const toolApproval = await this.deps.prepareRunToolApproval?.(assignment, run.abort.signal, checkMailbox)
     const options = {
+      toolApproval,
       runId,
       kind: assignment.kind,
       cwd: worktree,
