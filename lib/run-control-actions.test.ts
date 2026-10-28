@@ -73,7 +73,7 @@ let actions: typeof import('../app/actions/agents')
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => viewer ? { user: { id: viewer } } : null } } } })
   mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
-  mock.module('@/lib/db', { namedExports: { db: database } })
+  mock.module('@/lib/db', { namedExports: { db: database, pool: { query() { throw new Error('Unexpected SQL pool access outside thread control') } } } })
   mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) } } })
   mock.module('@/lib/issue-access', { namedExports: {
     requireIssueAccess: async (id: string) => {

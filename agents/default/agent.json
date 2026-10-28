@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "mikka-personal",
+  "instructions": "",
+  "tools": [
+    "search_notion_pages",
+    "read_notion_page_blocks",
+    "search_slack_messages",
+    "read_slack_thread",
+    "search_gmail",
+    "list_calendar_events",
+    "get_calendar_event",
+    "send_email",
+    "create_calendar_event",
+    "update_calendar_event",
+    "web_search",
+    "list_issues",
+    "get_issue",
+    "list_agents",
+    "dispatch_run",
+    "list_runs",
+    "get_run",
+    "send_to_run",
+    "record_attention",
+    "remember",
+    "forget",
+    "stop_run",
+    "load_skill"
+  ],
+  "skills": [],
+  "hooks": [
+    "audit",
+    "failure_cases"
+  ],
+  "memory": {
+    "scope": "owner-bot"
+  },
+  "evalSuite": "mikka.core.v1"
+}

@@ -1,3 +1,5 @@
+import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
+import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
 import type { CoordinatorRuntime, NativeCoordinatorJob } from '@mikka/protocol/coordinator'
 import { nativeCoordinatorEnabled, nativeCoordinatorStore } from '@/lib/coordinator/native'
 import { loadConversation } from '@/lib/coordinator/store'
@@ -9,12 +11,12 @@ export async function runtime(userId: string): Promise<CoordinatorRuntime> {
   'use step'
   return nativeCoordinatorEnabled() ? nativeCoordinatorStore.runtime(userId) : { harness: 'ai_sdk' }
 }
-export async function enqueue(userId: string, holder: string, round: number, selected: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, tools: NativeCoordinatorJob['tools'], botId: string | null = null) {
+export async function enqueue(userId: string, holder: string, round: number, selected: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, tools: NativeCoordinatorJob['tools'], botId: string | null = null, snapshot?: DefinitionSnapshot) {
   'use step'
   const { summary, memory, messages } = await loadConversation(userId, botId)
   return nativeCoordinatorStore.enqueue(userId,holder,round,selected,{
-    instructions: instructionsWithMemory(await botInstructions(userId, botId, personalCoordinatorInstructions()), memory),
-    context: nativeCoordinatorContext(promptMessages(summary,messages)), tools,
+    instructions: instructionsWithMemory(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, personalCoordinatorInstructions()), memory),
+    context: nativeCoordinatorContext(promptMessages(summary,messages,{ key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) })), tools,
   })
 }
 export async function poll(userId: string, holder: string, turnId: string) {

@@ -23,6 +23,7 @@ export function orderMigrations(names) {
 
 // Earlier branch and deployment names are aliases only for identical SQL.
 export const MIGRATION_EQUIVALENTS = {
+  '20261027181000_agent_kit.sql': ['20261027040500_agent_kit.sql'],
   '20261027164500_artifact_legacy_compat.sql': ['20261027040459_artifact_legacy_compat.sql'],
   '20261027164501_cloud_computers.sql': ['20261027040500_cloud_computers.sql', '20261026235901_cloud_computers.sql'],
   '20261027164502_computer_run_bindings.sql': ['20261027040501_computer_run_bindings.sql', '20261027000000_computer_run_bindings.sql'],
@@ -41,6 +42,7 @@ export const MIGRATION_EQUIVALENTS = {
   '20261027164515_workspace_computer_policy.sql': ['20261027040514_workspace_computer_policy.sql', '20261027000700_workspace_computer_policy.sql'],
 }
 const EQUIVALENT_SQL_SHA256 = {
+  '20261027181000_agent_kit.sql': '365230faab874af93a8f696a1f83f1b3276a83bb6ea933b3939a6b654dea1be2',
   '20261027164500_artifact_legacy_compat.sql': 'e82a90aec2a61675877e8fb12d66ac62d02ae4fbdcd174d543b82e03a2fc49a8',
   '20261027164501_cloud_computers.sql': '018c0fbf7941f607b42e02c1d56bdeebef38ab9717ef9a84bce9df7f173ffe65',
   '20261027164502_computer_run_bindings.sql': 'fbb9384171873aeb0762481e09d35051cd7adc09569332e8594ecfb459cffaf5',
