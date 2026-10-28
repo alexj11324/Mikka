@@ -112,7 +112,7 @@ test('The globe opens the browser in place of the right panel; notes on a page g
   } finally { await pool.end() }
   await page.reload()
   await expect(page.locator('[data-slot="browser-note"]')).toHaveText(['1 · 重置密码 · 发送重置链接 · 按钮文案改成发送', '2 · example.com/pricing · 价格不对'])
-  await expect(page.getByText(message)).toBeVisible()
+  await expect(page.locator('[data-slot="bubble-content"]').filter({ hasText: message })).toBeVisible()
 
   // An independently registered owner must not receive the first owner's note on the real chat read path.
   const foreign = await page.context().browser()!.newContext({ baseURL: new URL(page.url()).origin, locale: 'zh-CN', extraHTTPHeaders: browserClientHeaders() })
