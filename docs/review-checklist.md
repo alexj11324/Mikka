@@ -6,6 +6,26 @@ fails, fix it first; do not show work with known failures.
 
 ## Before showing UI
 
+### Usability (first, before anything visual)
+
+Looks and rules are not enough: a screen passes only if people can get done
+what they came for. A reviewer who did not build the screen runs this.
+
+- [ ] Task list written from the user's side, not from the UI: owner/admin,
+      member and first-time user; first use, daily use and trouble (something
+      broke, ran away, needs undo, is needed from yesterday, on the phone).
+      Each task cites the feature in code or docs.
+- [ ] Each task walked: where a person looks first (cite the convention),
+      where it actually is, whether the control exists, and whether it can be
+      finished — states, feedback, confirmation, undo, error recovery, empty,
+      permission, keyboard, touch and narrow width.
+- [ ] Each task rated Found / Hard to find / Missing / Present but
+      insufficient, with severity 0–4. No task at severity 3 or 4 is left.
+- [ ] Every capability the code already ships for this area is reachable;
+      the change removes no recovery or safety control.
+- [ ] The walk-through table (task | before | after) is in the PR body or the
+      review page.
+
 ### Model
 
 - [ ] Left column lists bots and group chats only; no thread names (R-01).
