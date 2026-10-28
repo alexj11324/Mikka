@@ -33,6 +33,7 @@ access checks require the separate server/storage implementation.
 
 Run the retained, offline process fixtures from `packages/daemon`:
 `node --import tsx --test test/run-mailbox.node-test.ts`.
+The normal daemon `test` script also runs this required profile after Vitest.
 They exercise the actual claim parser, Supervisor lifecycle and both adapter
 process interfaces with fake vendor binaries and an injected fetch transport.
 They use no database, Docker, external HTTP, login or model. Temporary fixture
