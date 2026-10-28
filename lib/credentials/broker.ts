@@ -1,6 +1,6 @@
 import type { Pool } from 'pg'
 import { CredentialError } from './contracts'
-import { awsKms, open, type Kms } from './kms'
+import { awsKms, open, sealSession, type Kms } from './kms'
 import { CredentialStore, hashNonce, rowEnvelope, type BrowserTarget } from './store'
 import { Cdp, gatewayGuard, type BrowserGuard } from './browser'
 import { assertCredentialPageBinding } from './page-binding'
@@ -51,6 +51,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     if (!receipt.rowCount) throw new CredentialError('credential_denied', 404)
     const observed = target.observedInput
     if (observed.loaderId !== action.loaderId || observed.backendNodeId !== action.backendNodeId || observed.credentialRole !== action.role || observed.epoch !== action.epoch || observed.permissionVersion !== action.policyVersion) throw new CredentialError('credential_denied', 404)
+    if (observed.additionalInput?.backendNodeId !== action.additionalInput?.backendNodeId || observed.additionalInput?.role !== action.additionalInput?.role || observed.submitNodeId !== action.submitNodeId) throw new CredentialError('credential_denied', 404)
     if (!Number.isSafeInteger(observed.backendNodeId) || observed.backendNodeId < 1 || !['username','password'].includes(observed.credentialRole)) throw new CredentialError('credential_denied', 404)
     const common = { userId: caller.userId, workspaceId: caller.workspaceId, botId: caller.botId, subagentId: caller.subagentId, origin: context.origin, loaderId: observed.loaderId, permissionAction: 'computer_use' as const }
     assertCredentialPageBinding({ ...common, targetId: target.targetId, epoch: observed.epoch, permissionVersion: observed.permissionVersion, expiresAt: target.expiresAt }, { ...common, targetId: bound.targetId, epoch: bound.epoch, permissionVersion: bound.permissionVersion })
@@ -94,13 +95,21 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
       let value = JSON.parse(plaintext.toString('utf8'))
       plaintext.fill(0); plaintext = undefined
       if (typeof value.username !== 'string' || typeof value.password !== 'string') throw new CredentialError()
-      await cdp.insertAtObservedInput(context.origin, observed.loaderId, observed.backendNodeId, observed.credentialRole, observed.credentialRole === 'password' ? value.password : value.username)
+      const inputs = [{ backendNodeId: observed.backendNodeId, role: observed.credentialRole }, ...(observed.additionalInput ? [observed.additionalInput] : [])]
+      for (const input of inputs) {
+        if (action.expiresAt <= Date.now() || target.expiresAt <= Date.now()) throw new CredentialError('credential_denied', 404)
+        await cdp.insertAtObservedInput(context.origin, observed.loaderId, input.backendNodeId, input.role, input.role === 'password' ? value.password : value.username)
+      }
       value = null
       await client.query(`INSERT INTO credential_access_events(credential_id,user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,$6,$7)`, [context.credentialId, context.userId, caller.botId, caller.runId, caller.subagentId, context.origin, 'input_inserted_guarded'])
-      await client.query('COMMIT'); completed = true
-      // The guard must stay closed while an inserted value may be visible.
-      // A subsequent trusted host action is needed to submit or clear it.
-      return { status: 'guarded' as const, origin: context.origin }
+      if (!observed.submitNodeId) {
+        await client.query('COMMIT'); completed = true
+        // A single-field tool without a model-selected submission cannot infer
+        // a next business action; keep the viewer locked for human handover.
+        return { status: 'guarded' as const, origin: context.origin }
+      }
+      if (action.expiresAt <= Date.now() || target.expiresAt <= Date.now()) throw new CredentialError('credential_denied', 404)
+      await cdp.submitObservedButton(context.origin, observed.loaderId, observed.submitNodeId)
     }
     // Never resume viewing merely because insertion succeeded. On failure the
     // gateway stays locked, including across broker timeout or process death.
@@ -112,6 +121,14 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     } while (!safe && Date.now() < deadline)
     if (!safe) throw new CredentialError('credential_login_pending', 409)
     await cdp.origin(context.origin)
+    if (!sessionApplied) {
+      // Capture only after the credential-bearing document is safe to release.
+      // Cookies and storage stay in the broker and are sealed before storage.
+      const cookies = (await cdp.call('Network.getCookies', { urls: [context.origin] })).cookies
+      const localStorage = await cdp.evaluate('Object.entries(localStorage)')
+      const sessionEnvelope = await sealSession(kms, context, credential.wrapped_dek, Buffer.from(JSON.stringify({ cookies, localStorage })))
+      await client.query(`INSERT INTO browser_sessions(credential_id,wrapped_dek,nonce,ciphertext,expires_at) VALUES($1,$2,$3,$4,now()+interval '7 days') ON CONFLICT(credential_id) DO UPDATE SET wrapped_dek=$2,nonce=$3,ciphertext=$4,expires_at=excluded.expires_at`, [context.credentialId, sessionEnvelope.wrappedDek, sessionEnvelope.nonce, sessionEnvelope.ciphertext])
+    }
     await client.query('UPDATE credentials SET last_used_at=now() WHERE id=$1', [context.credentialId])
     await client.query(`INSERT INTO credential_access_events(credential_id,user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,$6,$7)`, [context.credentialId, context.userId, caller.botId, caller.runId, caller.subagentId, context.origin, sessionApplied ? 'session_applied' : claimed.input_kind === 'otp' ? 'otp_submitted' : 'password_submitted'])
     await client.query('COMMIT'); completed = true

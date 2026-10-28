@@ -17,7 +17,7 @@ safe_node = next(node for node in module.body if isinstance(node, ast.FunctionDe
 broker_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'broker_command_allowed')
 origin_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'browser_origin')
 observed_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'valid_observed_input')
-policy_nodes = [node for node in module.body if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id in ('BROKER_METHODS', 'BROKER_STORAGE_FUNCTION', 'BROKER_OTP_SELECTOR', 'BROKER_FOCUS_SELECTORS', 'BROKER_FOCUS_EXPRESSIONS', 'BROKER_EVALUATIONS')]
+policy_nodes = [node for node in module.body if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id in ('BROKER_METHODS', 'BROKER_SUBMIT_FUNCTION', 'BROKER_STORAGE_FUNCTION', 'BROKER_OTP_SELECTOR', 'BROKER_FOCUS_SELECTORS', 'BROKER_FOCUS_EXPRESSIONS', 'BROKER_EVALUATIONS')]
 namespace = {'json': json, 'math': math, 'urlsplit': urlsplit}
 exec(compile(ast.Module(body=[*policy_nodes, safe_node, origin_node, observed_node, broker_node], type_ignores=[]), str(__file__), 'exec'), namespace)
 safe_resume_snapshot = namespace['safe_resume_snapshot']
@@ -40,6 +40,20 @@ process.stdout.write(JSON.stringify(eval(process.argv[2])));
 
 
 class GuardTest(unittest.TestCase):
+    def test_model_selected_submit_accepts_only_its_bound_node_and_fixed_method(self):
+        allowed=lambda command:broker_command_allowed(command,'target',{'session'},{},'https://example.test',42,{}, {42:'username',43:'password'},50,{'session':'submit-object'})
+        call={'id':1,'method':'DOM.resolveNode','sessionId':'session','params':{'backendNodeId':50}}
+        self.assertTrue(allowed(call))
+        self.assertFalse(allowed({**call,'params':{'backendNodeId':51}}))
+        submit={'id':2,'method':'Runtime.callFunctionOn','sessionId':'session','params':{'objectId':'submit-object','functionDeclaration':namespace['BROKER_SUBMIT_FUNCTION'],'returnByValue':True}}
+        self.assertTrue(allowed(submit))
+        self.assertFalse(allowed({**submit,'params':{**submit['params'],'arguments':[]}}))
+        self.assertFalse(allowed({**submit,'params':{**submit['params'],'functionDeclaration':'function(){return document.cookie}'}}))
+        self.assertFalse(allowed({**submit,'params':{**submit['params'],'objectId':'old-object'}}))
+        focus={'id':3,'method':'DOM.focus','sessionId':'session','params':{'backendNodeId':43}}
+        self.assertTrue(allowed(focus))
+        self.assertFalse(allowed({**focus,'params':{'backendNodeId':44}}))
+
     def test_actual_broker_client_commands_match_gateway_policy(self):
         result=subprocess.run(['node','--import','tsx',str(Path(__file__).with_name('broker-contract.test.mjs'))],check=True,capture_output=True,text=True)
         commands=json.loads(result.stdout);sessions=set();objects={};active_objects={}

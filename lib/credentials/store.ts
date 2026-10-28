@@ -5,7 +5,7 @@ import { seal, type Kms } from './kms'
 import { fingerprint } from './fingerprint'
 
 /** Only the trusted host may attach these to an owner-bound broker grant. */
-export type ObservedCredentialInput = { loaderId: string; backendNodeId: number; credentialRole: 'username' | 'password'; epoch: number; permissionVersion: number }
+export type ObservedCredentialInput = { loaderId: string; backendNodeId: number; credentialRole: 'username' | 'password'; epoch: number; permissionVersion: number; additionalInput?: { backendNodeId: number; role: 'username' | 'password' }; submitNodeId?: number }
 export type BrowserTarget = { targetId: string; origin: string; endpoint: string; expiresAt: number; sandboxId?: string; observedInput?: ObservedCredentialInput; credentialAction?: import('../cloud-computer/credential-action-ledger').CredentialAction }
 export const nonce = () => randomBytes(32).toString('base64url')
 export const hashNonce = (value: string) => createHash('sha256').update(value).digest('hex')

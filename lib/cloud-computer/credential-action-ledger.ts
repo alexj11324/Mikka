@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { z } from 'zod'
 import { ComputerError } from '@/lib/computer/store'
+import { effectiveWebComputerPermission } from './workspace-policy'
 
 // This is an action receipt in the existing approval ledger, not an
 // authorization source. The caller must resolve the run's policy itself.
@@ -12,14 +13,21 @@ const bindingSchema = z.object({
   targetId: z.string().min(1), origin: z.string().url(), loaderId: z.string().min(1),
   backendNodeId: z.number().int().positive(), role: z.enum(['username', 'password']),
   expiresAt: z.number().int().positive(),
+  additionalInput: z.object({ backendNodeId: z.number().int().positive(), role: z.enum(['username', 'password']) }).strict().optional(),
+  submitNodeId: z.number().int().positive().optional(),
 }).strict()
 export type CredentialActionBinding = z.infer<typeof bindingSchema>
 export type CredentialAction = CredentialActionBinding & { kind: 'browser_credential'; actionId: string; admission: 'allow' | 'ask'; digest: string; summary: string }
 function digest(binding: CredentialActionBinding, actionId: string, admission: 'allow' | 'ask') {
-  return createHash('sha256').update(JSON.stringify([actionId, admission, binding.userId, binding.workspaceId, binding.botId, binding.subagentId, binding.runId, binding.epoch, binding.policyVersion, binding.targetId, binding.origin, binding.loaderId, binding.backendNodeId, binding.role, binding.expiresAt])).digest('hex')
+  return createHash('sha256').update(JSON.stringify([actionId, admission, binding.userId, binding.workspaceId, binding.botId, binding.subagentId, binding.runId, binding.epoch, binding.policyVersion, binding.targetId, binding.origin, binding.loaderId, binding.backendNodeId, binding.role, binding.expiresAt, binding.additionalInput ?? null, binding.submitNodeId ?? null])).digest('hex')
 }
 
 /** The host persists this id with its workflow step before attempting I/O. */
+function summaryFor(binding: CredentialActionBinding) {
+  const roles = binding.additionalInput ? `${binding.role} and ${binding.additionalInput.role}` : binding.role
+  return `Fill ${roles}${binding.submitNodeId ? ' and submit' : ''} on ${new URL(binding.origin).hostname}`
+}
+
 export const newCredentialActionId = () => randomUUID()
 
 /** The decision and stable id must come from the authenticated host, never model input. */
@@ -32,7 +40,9 @@ export async function recordCredentialAction(pool: Pick<Pool, 'query'>, raw: Cre
   // unrelated daemon agent_runs record merely to obtain an action id.
   if (binding.runId !== binding.subagentId) throw new ComputerError(403, 'Credential action unavailable')
   if (!z.uuid().safeParse(actionId).success) throw new ComputerError(403, 'Credential action unavailable')
-  const summary = `Fill ${binding.role} on ${origin.hostname}`
+  if (binding.additionalInput && (binding.additionalInput.role === binding.role || binding.additionalInput.backendNodeId === binding.backendNodeId)) throw new ComputerError(403, 'Credential inputs must be distinct')
+  if (binding.submitNodeId && [binding.backendNodeId, binding.additionalInput?.backendNodeId].includes(binding.submitNodeId)) throw new ComputerError(403, 'Credential submit target must be distinct')
+  const summary = summaryFor(binding)
   const action: CredentialAction = { ...binding, kind: 'browser_credential', actionId, admission: decision, digest: digest(binding, actionId, decision), summary }
   // The regular decision handler consumes pending -> running for ask. Allow
   // starts at running; both paths must atomically claim it before any I/O.
@@ -50,7 +60,9 @@ export function parseCredentialAction(raw: CredentialAction) {
   const { kind, actionId, admission, digest: expected, summary, ...rawBinding } = raw
   const binding = bindingSchema.parse(rawBinding)
   const origin = new URL(binding.origin)
-  if (kind !== 'browser_credential' || !z.uuid().safeParse(actionId).success || !['allow', 'ask'].includes(admission) || binding.runId !== binding.subagentId || origin.protocol !== 'https:' || origin.origin !== binding.origin || origin.username || origin.password || summary !== `Fill ${binding.role} on ${origin.hostname}` || digest(binding, actionId, admission) !== expected || binding.expiresAt <= Date.now()) throw new ComputerError(403, 'Credential action unavailable')
+  if (kind !== 'browser_credential' || !z.uuid().safeParse(actionId).success || !['allow', 'ask'].includes(admission) || binding.runId !== binding.subagentId || origin.protocol !== 'https:' || origin.origin !== binding.origin || origin.username || origin.password || summary !== summaryFor(binding) || digest(binding, actionId, admission) !== expected || binding.expiresAt <= Date.now()) throw new ComputerError(403, 'Credential action unavailable')
+  if (binding.additionalInput && (binding.additionalInput.role === binding.role || binding.additionalInput.backendNodeId === binding.backendNodeId)) throw new ComputerError(403, 'Credential inputs must be distinct')
+  if (binding.submitNodeId && [binding.backendNodeId, binding.additionalInput?.backendNodeId].includes(binding.submitNodeId)) throw new ComputerError(403, 'Credential submit target must be distinct')
   return raw
 }
 
@@ -70,7 +82,7 @@ export async function withCredentialActionFence<T>(pool: Pool, action: Credentia
   try {
     await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${action.workspaceId}`])
-    const row = (await client.query(`SELECT m."sandboxId",COALESCE(p.permission,'ask') AS permission,COALESCE(p.version,0) AS version
+    const row = (await client.query(`SELECT m."sandboxId",s."runPolicy",COALESCE(p.permission,'ask') AS permission,COALESCE(p.version,0) AS version
       FROM pending_actions a
       JOIN bot_subagents s ON s.id=$4 AND s."ownerId"=$2 AND s."workspaceId"=$3 AND s."botId"=$5
       JOIN bots bot ON bot.id=s."botId" AND bot."ownerId"=s."ownerId" AND bot."workspaceId"=s."workspaceId"
@@ -81,6 +93,8 @@ export async function withCredentialActionFence<T>(pool: Pool, action: Credentia
         AND s.id=$6 AND s.status IN ('running','needs_you') AND s.epoch=$8 AND s."targetId"=$9
       FOR UPDATE OF s`, [action.actionId, action.userId, action.workspaceId, action.subagentId, action.botId, action.runId, JSON.stringify(action), action.epoch, action.targetId])).rows[0]
     if (!row || !['allow', 'ask'].includes(row.permission) || Number(row.version) !== action.policyVersion || !row.sandboxId || action.expiresAt <= Date.now()) throw new ComputerError(403, 'Credential action unavailable')
+    const decision = effectiveWebComputerPermission(row.permission, row.runPolicy)
+    if (decision === 'deny' || (action.admission === 'allow' && decision !== 'allow')) throw new ComputerError(403, 'Credential action denied')
     // Commit the final one-use transition independently before the external
     // call, while this transaction still holds the policy and run fences.
     // A failure or lost response must never make the action replayable.

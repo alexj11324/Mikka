@@ -38,13 +38,14 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/pr346-gateway"
           "$RUNNER_TEMP/pr346-gateway/bin/pip" install --disable-pip-version-check 'aiohttp==3.14.0'
-          "$RUNNER_TEMP/pr346-gateway/bin/python" scripts/e2b/broker-websocket.test.py
+          PATH="$RUNNER_TEMP/pr346-gateway/bin:$PATH" pnpm test:credential-broker-cdp-db
       - run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/integration.test.ts
       - run: node --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/runtime.test.ts
       - run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/action-reviews.test.ts
       - run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/browser-authority.test.ts
       - run: node --import tsx --test lib/cloud-computer/visual-observation.test.ts
       - run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/credential-consumer.test.ts
+      - run: node --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/credential-action-plan.test.ts
       - run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test workflows/subagent/steps.test.ts
       - run: pnpm --filter @mikka/daemon exec vitest run src/computer/subagent-credential-callback.test.ts
       - run: pnpm --filter @mikka/daemon typecheck

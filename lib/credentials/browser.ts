@@ -27,6 +27,8 @@ export const gatewayGuard: BrowserGuard = {
   },
 }
 
+export const CREDENTIAL_SUBMIT_FUNCTION = 'function(){if(!this.isConnected||this.ownerDocument!==document||!this.form||this.disabled)return false;HTMLFormElement.prototype.requestSubmit.call(this.form,this);return true}'
+
 /** Deliberately no CDP logger, remote exception, message body or console handler. */
 export class Cdp {
   private id = 0
@@ -137,6 +139,16 @@ export class Cdp {
     await check()
     await this.assertObservedFocus(backendNodeId)
     await this.call('Input.insertText', { text: value })
+  }
+  async submitObservedButton(origin: string, loaderId: string, backendNodeId: number) {
+    if (!Number.isSafeInteger(backendNodeId) || backendNodeId < 1) throw new CredentialError('credential_denied', 404)
+    const frame = (await this.call('Page.getFrameTree')).frameTree?.frame
+    if (!frame || frame.loaderId !== loaderId) throw new CredentialError('credential_denied', 404)
+    assertSameOrigin(frame.url, origin)
+    const result = await this.call('DOM.resolveNode', { backendNodeId })
+    if (typeof result.object?.objectId !== 'string') throw new CredentialError('credential_denied', 404)
+    const submitted = await this.call('Runtime.callFunctionOn', { objectId: result.object.objectId, functionDeclaration: CREDENTIAL_SUBMIT_FUNCTION, returnByValue: true })
+    if (submitted.exceptionDetails || submitted.result?.value !== true) throw new CredentialError('credential_denied', 404)
   }
   async fill(_origin: string, _username: string, _password: string) {
     // The legacy API has no observed nodes or consumed host permission.

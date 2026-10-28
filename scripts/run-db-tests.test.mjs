@@ -72,9 +72,10 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
   const custodyWorkflow = readFileSync('.github/workflows/e2b-byos.yml', 'utf8')
   const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
+  const subagents = readFileSync('.github/workflows/subagents.yml', 'utf8')
   for (const { runner } of SELF_MANAGED) {
-    const dedicatedScript = Object.entries(pkg).find(([, command]) => command === `node ${runner}`)?.[0]
-    assert.ok(workflow.includes(`run: node ${runner}`) || browser.includes(`run: node ${runner}`) || (dedicatedScript && custodyWorkflow.includes(`run: pnpm ${dedicatedScript}`)), `${runner} runs in CI`)
+    const dedicatedScript = Object.entries(pkg).find(([, command]) => ['node', 'python3'].some(runtime => command === `${runtime} ${runner}`))?.[0]
+    assert.ok(workflow.includes(`run: node ${runner}`) || browser.includes(`run: node ${runner}`) || (dedicatedScript && [custodyWorkflow, subagents].some(owner => owner.includes(`pnpm ${dedicatedScript}`))), `${runner} runs in CI`)
   }
   // Pure gates also run without a database in the fast job; their DB run is still only through pnpm test:db.
   const pureGates = ['test:groups', 'test:active-agents', 'test:group-turns', 'test:issue-search']

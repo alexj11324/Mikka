@@ -8,23 +8,29 @@ import { fillCredential } from '../../lib/credentials/broker.ts'
 import { CredentialStore } from '../../lib/credentials/store.ts'
 import { seal } from '../../lib/credentials/kms.ts'
 import { recordCredentialAction } from '../../lib/cloud-computer/credential-action-ledger.ts'
-const [url, targetId, origin, loaderId, node] = process.argv.slice(2)
+const [url, targetId, origin, loaderId, node, passwordNode, submitNode] = process.argv.slice(2)
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL
 assert(['127.0.0.1','localhost'].includes(new URL(databaseURL).hostname))
 assert.equal(new URL(origin).hostname, '127.0.0.1')
 const schema = `broker_${randomUUID().replaceAll('-', '')}`
 const admin = new Pool({ connectionString: databaseURL })
 await admin.query(`CREATE SCHEMA ${schema}`)
-const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
+const database = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
+const checkedQuery = target => async (...args) => {
+  try { return await target.query(...args) }
+  catch (error) { console.error('Synthetic fixture SQL failure', error.code, error.message); throw error }
+}
+const pool = { query: checkedQuery(database), async connect() { const client=await database.connect(); return { query: checkedQuery(client), release: () => client.release() } }, end: () => database.end() }
 try {
   await pool.query(`CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
-    CREATE TABLE bot_subagents(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"botId" uuid,status text,epoch int,"targetId" text,"runPolicy" jsonb);
+    CREATE TABLE bot_subagents(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"botId" uuid,status text,epoch int,"targetId" text,"runPolicy" jsonb,step text,needs jsonb,task text DEFAULT 'Synthetic login fixture');
+    CREATE TABLE subagent_events("ownerId" text,"workspaceId" uuid,"botId" uuid,"subagentId" uuid,event jsonb);
     CREATE TABLE cloud_machines("workspaceId" uuid,"ownerId" text,state text,"sandboxId" text);
     CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text,version int);
     CREATE TABLE pending_actions(id uuid PRIMARY KEY,"userId" text,action text,input jsonb,status text,context jsonb,"createdAt" timestamptz DEFAULT now());
     CREATE TABLE credentials(id uuid PRIMARY KEY,user_id text,origin text,username text,revoked_at timestamptz,unattended_allowed boolean DEFAULT true,last_used_at timestamptz,created_at timestamptz DEFAULT now());
     CREATE TABLE credential_secrets(credential_id uuid,wrapped_dek text,nonce text,ciphertext text);
-    CREATE TABLE browser_sessions(credential_id uuid,wrapped_dek text,nonce text,ciphertext text,expires_at timestamptz);
+    CREATE TABLE browser_sessions(credential_id uuid PRIMARY KEY,wrapped_dek text,nonce text,ciphertext text,expires_at timestamptz);
     CREATE TABLE credential_fill_leases(nonce_hash text PRIMARY KEY,credential_id uuid,user_id text,workspace_id uuid,bot_id uuid,subagent_id uuid,run_id uuid,origin text,target jsonb,expires_at timestamptz,consumed_at timestamptz,input_kind text DEFAULT 'password',input_envelope jsonb);
     CREATE TABLE credential_access_events(credential_id uuid,user_id text,bot_id uuid,run_id uuid,subagent_id uuid,origin_seen text,decision text)`)
   const caller = { userId:'synthetic-owner', workspaceId:randomUUID(), botId:randomUUID(), subagentId:randomUUID() }
@@ -33,23 +39,38 @@ try {
   const kms = { async generate(){ return { plaintext: Buffer.from(key), wrapped:'synthetic-only' } }, async decrypt(){ decrypts++; return Buffer.from(key) } }
   const policy = { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use:'allow' } }
   await pool.query('INSERT INTO bots VALUES ($1,$2,$3)',[caller.botId,caller.userId,caller.workspaceId])
-  await pool.query('INSERT INTO bot_subagents VALUES ($1,$2,$3,$4,\'running\',1,$5,$6)',[caller.subagentId,caller.userId,caller.workspaceId,caller.botId,targetId,policy])
+  await pool.query('INSERT INTO bot_subagents(id,"ownerId","workspaceId","botId",status,epoch,"targetId","runPolicy") VALUES ($1,$2,$3,$4,\'running\',1,$5,$6)',[caller.subagentId,caller.userId,caller.workspaceId,caller.botId,targetId,policy])
   await pool.query('INSERT INTO cloud_machines VALUES ($1,$2,\'running\',\'synthetic-sandbox\')',[caller.workspaceId,caller.userId])
   await pool.query('INSERT INTO workspace_computer_policies VALUES ($1,\'allow\',1)',[caller.workspaceId])
   await pool.query('INSERT INTO credentials(id,user_id,origin,username) VALUES ($1,$2,$3,\'synthetic-user\')',[credentialId,caller.userId,origin])
   const encrypted = await seal(kms,{userId:caller.userId,credentialId,origin},Buffer.from(JSON.stringify({username:'synthetic-user',password:'synthetic-password'})))
   await pool.query('INSERT INTO credential_secrets VALUES ($1,$2,$3,$4)',[credentialId,encrypted.wrappedDek,encrypted.nonce,encrypted.ciphertext])
-  const binding = { ...caller,runId:caller.subagentId,epoch:1,policyVersion:1,targetId,origin,loaderId,backendNodeId:Number(node),role:'username',expiresAt:Date.now()+60000 }
+  const binding = { ...caller,runId:caller.subagentId,epoch:1,policyVersion:1,targetId,origin,loaderId,backendNodeId:Number(node),role:'username',expiresAt:Date.now()+60000, ...(passwordNode ? { additionalInput:{backendNodeId:Number(passwordNode),role:'password'}, submitNodeId:Number(submitNode) } : {}) }
   const store = new CredentialStore(pool,kms)
-  const guard = { async begin(){ return {cdpUrl:url,targetId,guardToken:'synthetic-receipt'} }, async end(){ throw Error('Inserted input must remain guarded') } }
+  let released = false
+  const guard = { async begin(){ return {cdpUrl:url,targetId,guardToken:new URL(url).searchParams.get('guard')} }, async end(_target,guardToken){
+    if (!passwordNode) throw Error('Inserted input must remain guarded')
+    const endpoint = new URL(url);endpoint.protocol=endpoint.protocol==='wss:'?'https:':'http:';endpoint.pathname=endpoint.pathname.replace(/cdp$/,'end');endpoint.searchParams.delete('guard')
+    const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({guardToken})})
+    assert.equal(response.status,200);released=true
+  } }
   async function leaseFor(decision='allow') {
     const {action} = await recordCredentialAction(pool,binding,decision,false,randomUUID())
-    const target = {targetId,origin,sandboxId:'synthetic-sandbox',endpoint:'https://synthetic.e2b.app/',expiresAt:Date.now()+60000,observedInput:{loaderId,backendNodeId:Number(node),credentialRole:'username',epoch:1,permissionVersion:1},credentialAction:action}
+    const target = {targetId,origin,sandboxId:'synthetic-sandbox',endpoint:'https://synthetic.e2b.app/',expiresAt:Date.now()+60000,observedInput:{loaderId,backendNodeId:Number(node),credentialRole:'username',epoch:1,permissionVersion:1,...(binding.additionalInput ? {additionalInput:binding.additionalInput,submitNodeId:binding.submitNodeId} : {})},credentialAction:action}
     const lease = await store.lease(caller,origin,target)
     assert.equal(lease.status,'ready')
     return lease.lease
   }
   const lease = await leaseFor()
+  if (passwordNode) {
+    assert.deepEqual(await fillCredential(pool,lease,{kms,guard}),{status:'submitted',origin})
+    assert.equal(released,true)
+    const saved=(await pool.query('SELECT ciphertext FROM browser_sessions WHERE credential_id=$1',[credentialId])).rows
+    assert.equal(saved.length,1)
+    assert(saved[0].ciphertext.length>0)
+    await assert.rejects(fillCredential(pool,lease,{kms,guard}))
+    console.log(`PASS: real PG and broker service filled model-selected fields, submitted selected form, sealed session and released actual gateway; retained schema ${schema}; KMS synthetic`)
+  } else {
   assert.deepEqual(await fillCredential(pool,lease,{kms,guard}),{status:'guarded',origin})
   assert.equal(decrypts,1)
   await assert.rejects(fillCredential(pool,lease,{kms,guard}))
@@ -81,6 +102,7 @@ try {
   await assert.rejects(fillCredential(pool,unknownPolicy,{kms,guard}))
   assert.equal(decrypts,1,'invalid policy must not decrypt')
   console.log(`PASS: real PG and broker service + actual CDP insertion; replay/pending/stale-policy/STOP denied; retained schema ${schema}; KMS synthetic`)
+  }
   key.fill(0)
 } finally {
   await pool.end();await admin.end()

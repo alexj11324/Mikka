@@ -9,6 +9,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/cloud-computer/credential-action-ledger.ts', file: 'lib/cloud-computer/credential-action-ledger.db.test.ts', script: 'test:credential-action-ledger-db' },
   { marker: 'lib/cloud-computer/subagents.ts', file: 'lib/cloud-computer/backend.db.test.ts', script: 'test:cloud-backend-db' },
   { marker: 'lib/credentials/store.ts', file: 'lib/credentials/store.db.test.ts', script: 'test:credentials-db' },
   { marker: 'lib/operations/approved-writes.ts', file: 'lib/operations/write-legacy-schema.db.test.ts', script: 'test:approved-writes-db' },
@@ -32,6 +33,7 @@ export const REQUIRED_SUITES = [
 // Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
 // Each entry names its dedicated runner; the runner must exist and still invoke the file.
 export const SELF_MANAGED = [
+  { file: 'scripts/e2b/broker-service-real-client.test.mjs', runner: 'scripts/e2b/broker-websocket.test.py', reason: 'owns a local synthetic HTTPS page, actual Chromium and isolated PostgreSQL schema in the subagent backend CI job' },
   { file: 'tests/test-account-pool.http.test.mjs', runner: 'scripts/test-accounts/run-http.mjs', reason: 'owns the exact built Next server and registered disposable environment in the browser CI job' },
   { file: 'lib/auth-email.test.ts', runner: 'scripts/test-auth-email.mjs', reason: 'starts its own Docker Postgres and refuses any application database' },
   { file: 'tests/byos-application.test.mjs', runner: 'scripts/test-subscription-worker.mjs', reason: 'starts an isolated BYOS Postgres and worker fixture' },
@@ -106,7 +108,7 @@ export function readTree(root = '.') {
     for (const entry of readdirSync(resolve(root, dir), { withFileTypes: true })) {
       const file = `${dir}/${entry.name}`
       if (entry.isDirectory()) walk(file)
-      else if (/\.(ts|mjs|js)$/.test(file)) files[file] = readFileSync(resolve(root, file), 'utf8')
+      else if (/\.(ts|mjs|js|py)$/.test(file)) files[file] = readFileSync(resolve(root, file), 'utf8')
     }
   }
   walk('lib'); walk('tests'); walk('scripts')

@@ -9,11 +9,13 @@ let currentLoader = 'document'
 let targetIdentity: unknown = 42
 let modelAction: 'login' | 'waiting' = 'login'
 let modelSelector = '[data-mikka-ref="1"]'
+let loginFields: { selector: string; role: 'username' | 'password' }[] | undefined
+let submitSelector: string | undefined
 const oldVisionModel = process.env.MIKKA_BROWSER_VISION_MODEL
 class FakeStore {
   async start() { return { status: 'running', epoch: 7, task: 'Sign in', step: 'start', targetId: 'target' } }
   async action(_actor: unknown, _bot: string, _id: string, action: { action: string }) {
-    if (action.action === 'observe') return { loaderId: 'document', screenshot: '/9j/2Q==', targets: { '1': targetIdentity }, observation: { url: 'https://example.test/login', elements: [{ selector: '[data-mikka-ref="1"]' }] } }
+    if (action.action === 'observe') return { loaderId: 'document', screenshot: '/9j/2Q==', targets: { '1': targetIdentity, '2': 43, '3': 50 }, observation: { url: 'https://example.test/login', elements: [{ selector: '[data-mikka-ref="1"]' }, { selector: '[data-mikka-ref="2"]' }, { selector: '[data-mikka-ref="3"]' }] } }
     if (action.action === 'inspectCredentialTarget') return { targetId: 'target', loaderId: currentLoader, origin: 'https://example.test', backendNodeId: 42, role: 'username' }
     throw new Error('unexpected action')
   }
@@ -24,11 +26,11 @@ mock.module(new URL('../../lib/cloud-computer/subagents.ts', import.meta.url).hr
 mock.module(new URL('../../lib/cloud-computer/credential-consumer.ts', import.meta.url).href, { namedExports: { executeCredentialIntent: async (input: Record<string, unknown>) => { invocations.push(input); return { status: resultStatus } } } })
 mock.module(new URL('../../lib/coordinator-event-store.ts', import.meta.url).href, { namedExports: { recordCoordinatorEvent: async () => {} } })
 mock.module(new URL('../../lib/coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: async () => {} } })
-mock.module('ai', { namedExports: { tool: (input: unknown) => input, generateText: async () => ({ toolCalls: [{ toolName: 'choose_browser_action', input: { action: modelAction, selector: modelSelector, loginRole: 'username', step: 'Login', summary: 'Please take over' } }] }) } })
+mock.module('ai', { namedExports: { tool: (input: unknown) => input, generateText: async () => ({ toolCalls: [{ toolName: 'choose_browser_action', input: { action: modelAction, selector: modelSelector, loginRole: 'username', loginFields, submitSelector, step: 'Login', summary: 'Please take over' } }] }) } })
 let tick: typeof import('./steps').tick
 before(async () => { process.env.MIKKA_BROWSER_VISION_MODEL = 'synthetic/test'; tick = (await import('./steps')).tick })
 after(() => { if (oldVisionModel === undefined) delete process.env.MIKKA_BROWSER_VISION_MODEL; else process.env.MIKKA_BROWSER_VISION_MODEL = oldVisionModel })
-beforeEach(() => { invocations.length = 0; updates.length = 0; currentLoader = 'document'; targetIdentity = 42; modelAction = 'login'; modelSelector = '[data-mikka-ref="1"]' })
+beforeEach(() => { invocations.length = 0; updates.length = 0; currentLoader = 'document'; targetIdentity = 42; modelAction = 'login'; modelSelector = '[data-mikka-ref="1"]'; loginFields = undefined; submitSelector = undefined })
 
 for (const status of ['session_applied', 'submitted'] as const) {
   test(`${status} preserves selected target and requires another observation`, async () => {
@@ -68,5 +70,21 @@ test('model requests human takeover without invoking credential service', async 
 test('model cannot submit an arbitrary selector or script to the credential service', async () => {
   modelSelector = '[data-mikka-ref="1"];alert(1)'
   assert.equal(await tick(actor, 'bot', 'subagent'), 'terminal')
+  assert.equal(invocations.length, 0)
+})
+
+test('model selects both observed login fields and the exact submit button', async () => {
+  resultStatus = 'submitted'
+  loginFields = [{ selector: '[data-mikka-ref="1"]', role: 'username' }, { selector: '[data-mikka-ref="2"]', role: 'password' }]
+  submitSelector = '[data-mikka-ref="3"]'
+  assert.equal(await tick(actor, 'bot', 'subagent'), 'running')
+  assert.deepEqual(invocations[0].intent, { targetSelector: '[data-mikka-ref="1"]', role: 'username', additionalInput: { backendNodeId: 43, role: 'password' }, submitNodeId: 50 })
+})
+test('duplicate roles or an unobserved submit target never reach credentials', async () => {
+  for (const duplicate of [true, false]) {
+    loginFields = [{ selector: '[data-mikka-ref="1"]', role: 'username' }, { selector: '[data-mikka-ref="2"]', role: duplicate ? 'username' : 'password' }]
+    submitSelector = duplicate ? '[data-mikka-ref="3"]' : '[data-mikka-ref="99"]'
+    assert.equal(await tick(actor, 'bot', 'subagent'), 'terminal')
+  }
   assert.equal(invocations.length, 0)
 })

@@ -14,7 +14,8 @@ async def main():
         path=Path(directory)
         fixture=web.Application()
         async def login(_request):
-            result=web.Response(text='''<input name="username"><input type="password"><input name="otp"><script>
+            if _request.cookies.get('synthetic_authenticated')=='yes':return web.Response(text='<h1>Signed in fixture</h1>',content_type='text/html')
+            result=web.Response(text='''<form method=post action=/complete><input name="username"><input type="password" name="password"><input name="otp"><button type=submit>Sign in</button></form><script>
               window.focusHijacked=false;window.inputEvents=0;
               const user=document.querySelector('input[name=username]');
               user.addEventListener('focus',()=>{window.focusHijacked=true;document.querySelector('input[type=password]').focus()});
@@ -23,6 +24,11 @@ async def main():
             result.set_cookie('synthetic_session','synthetic',httponly=True,path='/')
             return result
         fixture.router.add_get('/login',login)
+        async def complete(request):
+            fields=await request.post()
+            assert fields.get('username')=='synthetic-user' and fields.get('password')=='synthetic-password'
+            result=web.Response(text='<h1>Signed in fixture</h1>',content_type='text/html');result.set_cookie('synthetic_authenticated','yes',httponly=True,secure=True,path='/');return result
+        fixture.router.add_post('/complete',complete)
         # A one-use, local-only test certificate makes the broker exercise its
         # real HTTPS origin contract. No account or provider credential is used.
         subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=127.0.0.1','-keyout',str(path/'key.pem'),'-out',str(path/'cert.pem')],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -110,7 +116,7 @@ async def main():
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as without_field:
                         assert without_field.status==200
                         assert (await without_field.json())['screenshot']!=observation['screenshot'], 'the empty input outline must remain visible to the model'
-                    await browser.rpc('Runtime.evaluate',{'expression':'document.body.insertBefore(window.__savedUser,document.querySelector("input[type=password]"))','returnByValue':True})
+                    await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[type=password]").parentNode.insertBefore(window.__savedUser,document.querySelector("input[type=password]"))','returnByValue':True})
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[type=password]").value="synthetic-secret"','returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as secret:
                         assert secret.status==409, 'a populated password blocks observation'
@@ -183,7 +189,7 @@ async def main():
                         for _ in range(100):
                             if not browser.broker_active:break
                             await asyncio.sleep(.01)
-                        service=await asyncio.create_subprocess_exec('node','--import',str(Path(__file__).parents[1]/'server-test.mjs'),'--import','tsx',str(Path(__file__).with_name('broker-service-real-client.test.mjs')),observed_url,target,origin,grant['loaderId'],str(grant['backendNodeId']),stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
+                        service=await asyncio.create_subprocess_exec('node','--import',str(Path(__file__).parents[1]/'server-test.mjs'),'--import','tsx',str(Path(__file__).parents[2]/'scripts/e2b/broker-service-real-client.test.mjs'),observed_url,target,origin,grant['loaderId'],str(grant['backendNodeId']),stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
                         service_out,service_err=await asyncio.wait_for(service.communicate(),45)
                         if service.returncode:raise RuntimeError('Real service regression failed: '+service_err.decode())
                         assert service_out.decode().startswith('PASS: real PG and broker service')
@@ -325,6 +331,29 @@ async def main():
                         if gateway.browser_origin(await browser.url())==origin:break
                         await asyncio.sleep(.05)
                     else:raise AssertionError('synthetic return navigation did not complete')
+                    if __import__('os').environ.get('COMPUTER_TEST_DATABASE_URL'):
+                        async with client.post('/agents/case/credentials/end?token=synthetic',json={'guardToken':token}) as ended:assert ended.status==200
+                        async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as seen:
+                            assert seen.status==200
+                            fresh=await seen.json()
+                        grant.update({'backendNodeId':fresh['targets']['0'],'credentialRole':'username','loaderId':fresh['loaderId'],'origin':origin,'additionalInput':{'backendNodeId':fresh['targets']['1'],'role':'password'},'submitNodeId':fresh['targets']['3']})
+                        async with client.post('/agents/case/credentials/begin?token=synthetic') as begun:
+                            assert begun.status==200
+                            plan_guard=(await begun.json())['guardToken']
+                        plan_url=str(client.make_url(f'/agents/case/credentials/cdp?guard={plan_guard}')).replace('http://','ws://',1)
+                        node=await asyncio.create_subprocess_exec('node','--import',str(Path(__file__).parents[1]/'server-test.mjs'),'--import','tsx',str(Path(__file__).parents[2]/'scripts/e2b/broker-service-real-client.test.mjs'),plan_url,target,origin,fresh['loaderId'],str(fresh['targets']['0']),str(fresh['targets']['1']),str(fresh['targets']['3']),stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
+                        stdout,stderr=await asyncio.wait_for(node.communicate(),45)
+                        if node.returncode:raise RuntimeError('Login submission regression failed: '+stderr.decode())
+                        assert stdout.decode().startswith('PASS: real PG and broker service filled')
+                        assert browser.guard is None
+                        print(stdout.decode().strip(),flush=True)
+                        # The preceding broker capability is document-scoped;
+                        # its context is no longer used for input or observation.
+                        for key in ('backendNodeId','credentialRole','loaderId','origin','additionalInput','submitNodeId'):grant.pop(key,None)
+                        async with client.post('/agents/case/credentials/begin?token=synthetic') as closing_guard:
+                            assert closing_guard.status==200
+                            token=(await closing_guard.json())['guardToken']
+                        endpoint=f'/agents/case/credentials/cdp?guard={token}'
                     async with client.ws_connect(endpoint) as ws:
                         session=await attach(ws)
                         async with http.get(f'http://127.0.0.1:{port}/json/close/{target}') as closed:assert closed.status==200

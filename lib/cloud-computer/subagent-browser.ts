@@ -17,7 +17,13 @@ export async function resolveRecordedCredentialTarget(action: CredentialAction) 
   const observed = { loaderId: action.loaderId, origin: action.origin, backendNodeId: action.backendNodeId, role: action.role }
   const current = await runtimeRequest(row.sandboxId, row, '/action', { action: 'inspectCredentialTarget', ...observed })
   if (current.targetId !== action.targetId || Object.entries(observed).some(([key, value]) => current[key] !== value)) throw new Error('Credential target changed')
-  const observedInput = { loaderId: action.loaderId, backendNodeId: action.backendNodeId, credentialRole: action.role, epoch: action.epoch, permissionVersion: action.policyVersion }
+  if (action.additionalInput) {
+    const extra = action.additionalInput
+    const checked = await runtimeRequest(row.sandboxId, row, '/action', { action: 'inspectCredentialTarget', loaderId: action.loaderId, origin: action.origin, backendNodeId: extra.backendNodeId, role: extra.role })
+    if (checked.targetId !== action.targetId || checked.loaderId !== action.loaderId || checked.origin !== action.origin || checked.backendNodeId !== extra.backendNodeId || checked.role !== extra.role) throw new Error('Credential target changed')
+  }
+  if (action.submitNodeId) await runtimeRequest(row.sandboxId, row, '/action', { action: 'inspectCredentialSubmit', loaderId: action.loaderId, origin: action.origin, backendNodeId: action.submitNodeId })
+  const observedInput = { loaderId: action.loaderId, backendNodeId: action.backendNodeId, credentialRole: action.role, epoch: action.epoch, permissionVersion: action.policyVersion, ...(action.additionalInput ? { additionalInput: action.additionalInput } : {}), ...(action.submitNodeId ? { submitNodeId: action.submitNodeId } : {}) }
   const capability = await grant(await connectComputer(row.sandboxId), row, 'broker', { ...observedInput, origin: action.origin })
   return { targetId: action.targetId, origin: action.origin, sandboxId: row.sandboxId as string, ...capability, observedInput, credentialAction: action }
 }

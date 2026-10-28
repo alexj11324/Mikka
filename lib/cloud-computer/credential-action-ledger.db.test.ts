@@ -2,16 +2,22 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { Pool } from 'pg'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { recordCredentialAction, consumeCredentialAction, withCredentialActionFence } from './credential-action-ledger'
 
-const url = process.env.CREDENTIAL_LEDGER_TEST_DATABASE_URL
+const url = process.env.CREDENTIAL_LEDGER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
+if (process.env.REQUIRE_DB === '1' && !url) throw new Error('Isolated ledger database required')
 test('isolated PostgreSQL: pending action is claimed once; STOP and policy revocation fence I/O', { skip: !url }, async () => {
-  const pool = new Pool({ connectionString: url })
+  assert.ok(['127.0.0.1', 'localhost'].includes(new URL(url!).hostname))
+  const schema = `ledger_${randomUUID().replaceAll('-', '')}`
+  const admin = new Pool({ connectionString: url })
+  await admin.query(`CREATE SCHEMA ${schema}`)
+  const pool = new Pool({ connectionString: url, options: `-c search_path=${schema}` })
   const owner = 'fixture-owner', workspace = randomUUID(), bot = randomUUID(), subagent = randomUUID(), run = randomUUID(), device = randomUUID(), agent = randomUUID(), subscription = randomUUID(), connection = randomUUID()
   try {
     await pool.query(`CREATE TABLE pending_actions (id uuid PRIMARY KEY,"userId" text,action text,input jsonb,status text,context jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid, "ownerId" text, "workspaceId" uuid);
-      CREATE TABLE bot_subagents (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"botId" uuid,status text,epoch int,"targetId" text);
+      CREATE TABLE bot_subagents (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"botId" uuid,status text,epoch int,"targetId" text,"runPolicy" jsonb);
       CREATE TABLE subagent_run_bindings ("subagentId" uuid,"runId" uuid,"ownerId" text,"workspaceId" uuid,"botId" uuid);
       CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,"agentId" uuid,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz);
       CREATE TABLE cloud_machines ("workspaceId" uuid,"ownerId" text,"deviceId" uuid,state text,"sandboxId" text);
@@ -21,7 +27,7 @@ test('isolated PostgreSQL: pending action is claimed once; STOP and policy revoc
       CREATE TABLE byos_connections (id uuid,"ownerId" text,"workspaceId" text,state text,epoch int);
       CREATE TABLE workspace_computer_policies ("workspaceId" uuid,permission text,version int)`)
     await pool.query('INSERT INTO bots VALUES ($1,$2,$3)', [bot, owner, workspace])
-    await pool.query('INSERT INTO bot_subagents VALUES ($1,$2,$3,$4,\'running\',1,\'target\')', [subagent, owner, workspace, bot])
+    await pool.query('INSERT INTO bot_subagents VALUES ($1,$2,$3,$4,\'running\',1,\'target\',$5)', [subagent, owner, workspace, bot, { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: 'allow' } }])
     await pool.query('INSERT INTO subagent_run_bindings VALUES ($1,$2,$3,$4,$5)', [subagent, run, owner, workspace, bot])
     await pool.query('INSERT INTO agent_runs VALUES ($1,$2,$3,$4,\'running\',NULL,now()+interval \'1 minute\')', [run, owner, device, agent])
     await pool.query('INSERT INTO cloud_machines VALUES ($1,$2,$3,\'running\',\'sandbox\')', [workspace, owner, device])
@@ -57,5 +63,5 @@ test('isolated PostgreSQL: pending action is claimed once; STOP and policy revoc
     await pool.query('UPDATE workspace_computer_policies SET permission=\'deny\',version=3 WHERE "workspaceId"=$1', [workspace])
     await assert.rejects(withCredentialActionFence(pool, revoked, async () => { calls++; return 'bad' }))
     assert.equal(calls, 2)
-  } finally { await pool.end() }
+  } finally { console.info(`Retained isolated ledger schema: ${schema}`); await pool.end(); await admin.end() }
 })

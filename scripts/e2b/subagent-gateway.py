@@ -8,7 +8,8 @@ from urllib.parse import urlsplit
 from aiohttp import web, WSMsgType
 ROOT = Path('/run/mikka-subagents')
 AGENTS = {}
-BROKER_METHODS = frozenset(('Page.getFrameTree', 'DOM.getDocument', 'DOM.focus', 'DOM.describeNode', 'Runtime.evaluate', 'Runtime.callFunctionOn', 'Input.insertText', 'Input.dispatchKeyEvent', 'Network.setCookies', 'Network.getCookies', 'Page.reload'))
+BROKER_METHODS = frozenset(('Page.getFrameTree', 'DOM.getDocument', 'DOM.focus', 'DOM.describeNode', 'DOM.resolveNode', 'Runtime.evaluate', 'Runtime.callFunctionOn', 'Input.insertText', 'Input.dispatchKeyEvent', 'Network.setCookies', 'Network.getCookies', 'Page.reload'))
+BROKER_SUBMIT_FUNCTION = 'function(){if(!this.isConnected||this.ownerDocument!==document||!this.form||this.disabled)return false;HTMLFormElement.prototype.requestSubmit.call(this.form,this);return true}'
 BROKER_STORAGE_FUNCTION = 'function(entries){localStorage.clear();for(const [k,v] of entries)localStorage.setItem(k,v)}'
 BROKER_OTP_SELECTOR = 'input[autocomplete="one-time-code"],input[name="code"],input[name="otp"]'
 BROKER_FOCUS_SELECTORS = ('input[autocomplete="username"],input[type="email"],input[name="username"]', 'input[type="password"]')
@@ -110,6 +111,21 @@ def valid_observed_input(document, backend_id, role):
     values=dict(zip((k.lower() for k in attrs[::2]),attrs[1::2]))
     allowed=('password',) if role=='password' else ('text','email','tel') if role=='username' else ()
     return node.get('nodeName')=='INPUT' and 'disabled' not in values and 'readonly' not in values and values.get('type','text').lower() in allowed
+def valid_observed_submit(document, backend_id):
+    def find(node):
+        if not isinstance(node,dict):return None
+        if node.get('backendNodeId')==backend_id:return node
+        for child in node.get('children',[]):
+            value=find(child)
+            if value:return value
+        return None
+    node=find(document.get('root')) if isinstance(document,dict) else None
+    attrs=node.get('attributes') if isinstance(node,dict) else None
+    if not isinstance(attrs,list) or len(attrs)%2 or any(not isinstance(v,str) for v in attrs):return False
+    values=dict(zip((k.lower() for k in attrs[::2]),attrs[1::2]))
+    if 'disabled' in values:return False
+    return (node.get('nodeName')=='BUTTON' and values.get('type','submit').lower()=='submit') or (node.get('nodeName')=='INPUT' and values.get('type','').lower()=='submit')
+
 SENSITIVE_FIELD = "(e.type === 'password' || /(?:otp|one[\\s_-]*time|verification[\\s_-]*code|security[\\s_-]*code|auth(?:entication)?[\\s_-]*code)/i.test([e.autocomplete,e.name,e.id,e.getAttribute('aria-label'),e.getAttribute('placeholder')].join(' ')))"
 
 def safe_resume_snapshot(frames, document, evaluation):
@@ -147,7 +163,7 @@ def browser_origin(value):
         return f'{parsed.scheme}://{host}'+(f':{port}' if port and port != (443 if parsed.scheme=='https' else 80) else '')
     except (ValueError,TypeError):return None
 
-def broker_command_allowed(data, target, sessions, objects=None, origin=None, observed_node=None, active_objects=None):
+def broker_command_allowed(data, target, sessions, objects=None, origin=None, observed_node=None, active_objects=None, observed_inputs=None, submit_node=None, submit_objects=None):
     if not isinstance(data,dict) or type(data.get('id')) is not int or data['id'] < 1 or not isinstance(data.get('params'),dict):return False
     objects=objects or {}
     method=data.get('method')
@@ -155,14 +171,18 @@ def broker_command_allowed(data, target, sessions, objects=None, origin=None, ob
         return set(data)=={'id','method','params'} and not sessions and data['params']=={'targetId':target,'flatten':True}
     if set(data)!={'id','method','params','sessionId'} or not isinstance(method,str) or method not in BROKER_METHODS or not isinstance(data.get('sessionId'),str) or data['sessionId'] not in sessions:return False
     params=data['params']
+    allowed_inputs=observed_inputs or ({observed_node:None} if observed_node is not None else {})
+    if method=='DOM.resolveNode':return submit_node is not None and params=={'backendNodeId':submit_node}
+    if method=='Runtime.callFunctionOn' and submit_node is not None and params.get('functionDeclaration')==BROKER_SUBMIT_FUNCTION:
+        return set(params)=={'objectId','functionDeclaration','returnByValue'} and isinstance(params.get('objectId'),str) and params['objectId']==(submit_objects or {}).get(data['sessionId']) and params['returnByValue'] is True
     if observed_node is not None:
         if method=='Runtime.evaluate':
             if params=={'expression':'document.activeElement','returnByValue':False}:return True
-            if params.get('expression') not in ('globalThis', "![...document.querySelectorAll('input,textarea')].some(e=>e.value && (e.tagName==='TEXTAREA'||!['hidden','checkbox','radio','button','submit','reset','image','file','range','color'].includes(e.type)))"):return False
+            if params.get('expression') not in ('globalThis', 'Object.entries(localStorage)', "![...document.querySelectorAll('input,textarea')].some(e=>e.value && (e.tagName==='TEXTAREA'||!['hidden','checkbox','radio','button','submit','reset','image','file','range','color'].includes(e.type)))"):return False
         if method=='DOM.getDocument':return params in ({'depth':-1,'pierce':False},{'depth':-1,'pierce':True})
     if method in ('Page.getFrameTree','Page.reload'):return params=={}
     if method=='DOM.getDocument':return params=={'depth':-1,'pierce':True}
-    if method=='DOM.focus':return observed_node is not None and type(params.get('backendNodeId')) is int and params=={'backendNodeId':observed_node}
+    if method=='DOM.focus':return observed_node is not None and type(params.get('backendNodeId')) is int and set(params)=={'backendNodeId'} and params['backendNodeId'] in allowed_inputs
     if method=='DOM.describeNode':return observed_node is not None and set(params)=={'objectId'} and isinstance(params['objectId'],str) and params['objectId']==(active_objects or {}).get(data['sessionId'])
     if method=='Runtime.evaluate':
         return set(params)=={'expression','returnByValue'} and isinstance(params['expression'],str) and ((params['expression'] in BROKER_EVALUATIONS and params['returnByValue'] is True) or (params['expression']=='globalThis' and params['returnByValue'] is False))
@@ -343,7 +363,13 @@ async def begin(request):
         if b.guard:raise web.HTTPConflict()
         node=grant.get('backendNodeId');role=grant.get('credentialRole')
         if (node is not None or role is not None) and (type(node) is not int or node<=0 or role not in ('username','password') or not isinstance(grant.get('loaderId'),str) or not grant['loaderId'] or not browser_origin(grant.get('origin'))):raise web.HTTPForbidden()
+        extra=grant.get('additionalInput');submit=grant.get('submitNodeId')
+        if extra is not None and (not isinstance(extra,dict) or set(extra)!={'backendNodeId','role'} or type(extra.get('backendNodeId')) is not int or extra['backendNodeId']<=0 or extra['backendNodeId']==node or extra.get('role') not in ('username','password') or extra['role']==role or node is None):raise web.HTTPForbidden()
+        if submit is not None and (type(submit) is not int or submit<=0 or submit==node or (extra and submit==extra['backendNodeId']) or node is None):raise web.HTTPForbidden()
         b.guard_node=node;b.guard_role=role
+        b.guard_inputs={node:role} if node is not None else {}
+        if extra:b.guard_inputs[extra['backendNodeId']]=extra['role']
+        b.guard_submit=submit
         b.guard=secrets.token_urlsafe(32);b.guard_file.write_text(b.guard);b.frame=None
         display=b.grant.get('display')
         if display:
@@ -372,6 +398,7 @@ async def begin(request):
         document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
         if not b.guard_origin or not safe_resume_snapshot(tree,document,{'result':{'value':True}}):raise web.HTTPConflict()
         if node is not None and (grant['loaderId']!=b.guard_loader or browser_origin(grant['origin'])!=b.guard_origin or not valid_observed_input(document,node,role)):raise web.HTTPConflict()
+        if any(not valid_observed_input(document,key,value) for key,value in b.guard_inputs.items()) or (submit is not None and not valid_observed_submit(document,submit)):raise web.HTTPConflict()
         for ws in list(b.viewer):await ws.close()
     base=f'https://{request.host}'
     return web.json_response({'cdpUrl':base.replace('https:','wss:')+request.path.replace('/credentials/begin','/credentials/cdp')+'?token='+request.query['token']+'&guard='+b.guard,'targetId':b.target,'guardToken':b.guard})
@@ -382,6 +409,9 @@ async def cdp(request):
     async with b.lock:
         if not b.guard or not hmac.compare_digest(guard,b.guard):raise web.HTTPForbidden()
         if getattr(b,'guard_node',None) is not None and (grant.get('backendNodeId')!=b.guard_node or grant.get('credentialRole')!=b.guard_role or grant.get('loaderId')!=b.guard_loader or browser_origin(grant.get('origin'))!=b.guard_origin):raise web.HTTPForbidden()
+        expected_inputs={grant.get('backendNodeId'):grant.get('credentialRole')} if grant.get('backendNodeId') is not None else {}
+        if grant.get('additionalInput'):expected_inputs[grant['additionalInput']['backendNodeId']]=grant['additionalInput']['role']
+        if getattr(b,'guard_inputs',{})!=expected_inputs or getattr(b,'guard_submit',None)!=grant.get('submitNodeId'):raise web.HTTPForbidden()
         if getattr(b,'broker_active',False):raise web.HTTPConflict()
         b.broker_active=True
     try:return await broker_cdp_session(request,b,grant,raw,guard)
@@ -396,16 +426,18 @@ async def broker_cdp_session(request,b,grant,raw,guard):
     try:reader,writer=await asyncio.open_unix_connection(str(b.path/'cdp.sock'),limit=4*1024*1024)
     except Exception:
         b.brokers.discard(ws);await ws.close();raise
-    sessions=set();pending={};objects={};active_objects={};focused={};origin=getattr(b,'guard_origin',None);observed_node=getattr(b,'guard_node',None);input_done=asyncio.Event()
+    sessions=set();pending={};objects={};active_objects={};submit_objects={};focused={};origin=getattr(b,'guard_origin',None);observed_node=getattr(b,'guard_node',None);input_done=asyncio.Event()
     if not origin:
         b.brokers.discard(ws);writer.close();await writer.wait_closed();await ws.close();return ws
+    observed_inputs=getattr(b,'guard_inputs',{}) or ({observed_node:getattr(b,'guard_role',None)} if observed_node is not None else {})
+    submit_node=getattr(b,'guard_submit',None)
     async def incoming():
         async for message in ws:
             token(raw,'broker')
             if b.stopped or b.guard!=guard or message.type!=WSMsgType.TEXT:break
             data=json.loads(message.data)
             # Broker capability is scoped to this page, not a general CDP socket.
-            if not broker_command_allowed(data,b.target,sessions,objects,origin,observed_node,active_objects) or data['id'] in pending:break
+            if not broker_command_allowed(data,b.target,sessions,objects,origin,observed_node,active_objects,observed_inputs,submit_node,submit_objects) or data['id'] in pending:break
             if data['method']!='Target.attachToTarget' and browser_origin(await b.url())!=origin:break
             if data['method']=='Target.attachToTarget' and any(item[0]=='Target.attachToTarget' for item in pending.values()):break
             if data['method']=='Runtime.callFunctionOn':objects.pop(data['sessionId'],None)
@@ -417,7 +449,7 @@ async def broker_cdp_session(request,b,grant,raw,guard):
                 tree=await b.rpc('Page.getFrameTree',session=b.session)
                 document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
                 frame=tree.get('frameTree',{}).get('frame',{})
-                if frame.get('loaderId')!=b.guard_loader or browser_origin(frame.get('url'))!=origin or not safe_resume_snapshot(tree,document,{'result':{'value':True}}) or not valid_observed_input(document,observed_node,b.guard_role):break
+                if frame.get('loaderId')!=b.guard_loader or browser_origin(frame.get('url'))!=origin or not safe_resume_snapshot(tree,document,{'result':{'value':True}}) or not valid_observed_input(document,data['params']['backendNodeId'],observed_inputs.get(data['params']['backendNodeId'])):break
             if data['method']=='Runtime.evaluate':
                 if data['params']['expression']!='document.activeElement':focused.pop(data['sessionId'],None)
                 if data['params']['expression'] in BROKER_FOCUS_EXPRESSIONS:
@@ -426,6 +458,11 @@ async def broker_cdp_session(request,b,grant,raw,guard):
                     # timer cannot retarget the subsequent native CDP input.
                     b.credential_scripts_disabled=True
                     await b.rpc('Emulation.setScriptExecutionDisabled',{'value':True},b.session)
+            if data['method']=='Runtime.callFunctionOn' and data['params'].get('functionDeclaration')==BROKER_SUBMIT_FUNCTION:
+                tree=await b.rpc('Page.getFrameTree',session=b.session)
+                document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
+                frame=tree.get('frameTree',{}).get('frame',{})
+                if getattr(b,'credential_scripts_disabled',False) or frame.get('loaderId')!=b.guard_loader or browser_origin(frame.get('url'))!=origin or not safe_resume_snapshot(tree,document,{'result':{'value':True}}) or not valid_observed_submit(document,submit_node):break
             if data['method']=='Input.dispatchKeyEvent' and (not focused.get(data['sessionId']) or not getattr(b,'credential_scripts_disabled',False)):break
             if data['method']=='Input.insertText':
                 selector=focused.pop(data['sessionId'],None)
@@ -435,7 +472,7 @@ async def broker_cdp_session(request,b,grant,raw,guard):
                 if not safe_resume_snapshot(tree,document,{'result':{'value':True}}):break
                 if type(selector) is int:
                     frame=tree.get('frameTree',{}).get('frame',{})
-                    if frame.get('loaderId')!=b.guard_loader or not valid_observed_input(document,selector,b.guard_role):break
+                    if frame.get('loaderId')!=b.guard_loader or not valid_observed_input(document,selector,observed_inputs.get(selector)):break
                     check=await b.rpc('Runtime.evaluate',{'expression':'document.activeElement','returnByValue':False},b.session)
                 else:
                     check=await b.rpc('Runtime.evaluate',{'expression':f"(()=>{{const e=document.querySelector({json.dumps(selector)});return e && !e.disabled && !e.readOnly && document.activeElement===e ? e : null}})()",'returnByValue':False},b.session)
@@ -466,6 +503,9 @@ async def broker_cdp_session(request,b,grant,raw,guard):
             if call and call[0]=='Target.attachToTarget':
                 session=data.get('result',{}).get('sessionId')
                 if isinstance(session,str) and session:sessions.add(session)
+            if call and call[0]=='DOM.resolveNode':
+                object_id=data.get('result',{}).get('object',{}).get('objectId')
+                if isinstance(object_id,str) and object_id:submit_objects[call[1]]=object_id
             if call and call[0]=='Runtime.evaluate' and call[2]=='globalThis':
                 object_id=data.get('result',{}).get('result',{}).get('objectId')
                 if isinstance(object_id,str) and object_id:objects[call[1]]=object_id
@@ -545,6 +585,13 @@ async def action(request):
             tree=await b.rpc('Page.getFrameTree',session=b.session);frame=tree['frameTree']['frame'];u=urlsplit(frame['url'])
             if u.scheme not in ('https','http') or not u.hostname or u.username or u.password:raise web.HTTPConflict()
             return web.json_response({'loaderId':frame['loaderId'],'origin':f'{u.scheme}://{u.netloc}'})
+        if name=='inspectCredentialSubmit':
+            if set(data)!={'action','loaderId','origin','backendNodeId'} or type(data.get('backendNodeId')) is not int or data['backendNodeId']<=0:raise web.HTTPBadRequest()
+            tree=await b.rpc('Page.getFrameTree',session=b.session);frame=tree.get('frameTree',{}).get('frame',{})
+            document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
+            origin=browser_origin(frame.get('url'))
+            if origin!=browser_origin(data.get('origin')) or frame.get('loaderId')!=data['loaderId'] or not safe_resume_snapshot(tree,document,{'result':{'value':True}}) or not valid_observed_submit(document,data['backendNodeId']):raise web.HTTPConflict()
+            return web.json_response({'targetId':b.target,'loaderId':frame['loaderId'],'origin':origin,'backendNodeId':data['backendNodeId']})
         if name=='inspectCredentialTarget':
             if set(data)!={'action','loaderId','origin','backendNodeId','role'} or type(data.get('backendNodeId')) is not int or data['backendNodeId']<=0 or data.get('role') not in ('username','password') or not isinstance(data.get('loaderId'),str):raise web.HTTPBadRequest()
             tree=await b.rpc('Page.getFrameTree',session=b.session);frame=tree.get('frameTree',{}).get('frame',{})

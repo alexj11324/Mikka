@@ -34,7 +34,7 @@ export async function installSubagentRuntime(sandbox: Sandbox, ownerId: string) 
   await sandbox.commands.run('for i in $(seq 1 30); do curl -fsS --max-time 1 http://127.0.0.1:6082/version >/dev/null && exit 0; sleep .2; done; exit 1', { user: 'root', timeoutMs: 10_000 })
   await verifyGatewayVersion(sandbox)
 }
-export async function grant(sandbox: Sandbox, row: BrowserBinding, role: 'runtime' | 'view' | 'broker', credential?: { loaderId: string; origin: string; backendNodeId: number; credentialRole: 'username' | 'password' }) {
+export async function grant(sandbox: Sandbox, row: BrowserBinding, role: 'runtime' | 'view' | 'broker', credential?: { loaderId: string; origin: string; backendNodeId: number; credentialRole: 'username' | 'password'; additionalInput?: { backendNodeId: number; role: 'username' | 'password' }; submitNodeId?: number }) {
   await verifyGatewayVersion(sandbox)
   const expiresAt = Date.now() + (role === 'broker' ? 90_000 : 120_000)
   if (credential && role !== 'broker') throw new Error('Invalid credential capability role')
