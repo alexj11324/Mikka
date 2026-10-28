@@ -25,9 +25,26 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  browser-e2e:
-    name: Browser tests (before merge)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+  changes:
+    name: Changed files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      docs_only: ${{ steps.docs.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: docs
+        run: node scripts/ci-docs-only.mjs
+      - run: node --test scripts/ci-docs-only.test.mjs
+
+  browser-e2e-full:
+    name: Browser tests (full)
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     # OS/browser setup took 9–10 minutes in runs 40320688470/40324658490.
     # Budget setup separately without weakening any Playwright test limits.
@@ -151,3 +168,26 @@ jobs:
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7
+
+  browser-e2e:
+    # The required check name. It reports success when only documentation
+    # changed; otherwise it mirrors the full suite's result.
+    name: Browser tests (before merge)
+    needs: [changes, browser-e2e-full]
+    if: always() && needs.changes.result == 'success' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the full suite unless only documentation changed
+        env:
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          FULL_RESULT: ${{ needs.browser-e2e-full.result }}
+        run: |
+          if [ "$DOCS_ONLY" = "true" ]; then
+            echo "Documentation-only change; the full browser suite is skipped."
+            exit 0
+          fi
+          if [ "$FULL_RESULT" != "success" ]; then
+            echo "The full browser suite did not succeed: $FULL_RESULT"
+            exit 1
+          fi

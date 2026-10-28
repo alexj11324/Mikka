@@ -49,6 +49,13 @@ cannot.
    hand: Actions → Browser tests → Run workflow.
 4. **After merging** (CI): the same suite on main, and again every night.
 
+A pull request that only changes documentation — `docs/`, `tasks/`, root
+Markdown such as the READMEs, `LICENSE`, the pull request template, or the
+README diagram generator — skips the heavy unit, build and browser jobs. The
+required status checks still report success from a small gate job. Code,
+workflow, configuration, message and public-asset changes always run the full
+suites; one non-documentation file is enough.
+
 ## License
 
 Mikka is licensed under [AGPL-3.0-only](LICENSE). Contributions are submitted
