@@ -1,21 +1,23 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { after } from 'next/server'
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { agentRuns, artifactShares, artifactVersions, artifacts, bots, type ArtifactKind } from '@/lib/db/schema'
+import { agentRuns, artifactShares, artifactVersions, artifacts, bots, issues, type ArtifactKind } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { artifactSubmittedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { ARTIFACT_CONTENT_TYPES, ARTIFACT_EXTENSIONS, ARTIFACT_MAX_BYTES, cleanTitle, utf8Bytes } from '@/lib/artifacts/limits'
 import { stripDiffMarkers } from '@/lib/artifacts/diff'
-import type { ArtifactDetail, ArtifactSummary } from '@/lib/artifacts/types'
+import type { ArtifactDetail, ArtifactListItem, ArtifactSummary } from '@/lib/artifacts/types'
+import { readIssueMetadata } from '@/lib/issue-metadata'
+import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactStorage, getArtifactObject, putArtifactObject } from '@/lib/artifacts/storage'
 
 // Artifacts in Neon (who, which version, share links) with their files in R2.
 // Every read is scoped to the owner, or to a live share token.
 
-export type { ArtifactDetail, ArtifactSummary, ArtifactVersionInfo } from '@/lib/artifacts/types'
+export type { ArtifactDetail, ArtifactListItem, ArtifactSummary, ArtifactVersionInfo } from '@/lib/artifacts/types'
 
 /** Who is handing an artifact over: the run's agent, or an agent signed in with OAuth. */
 export interface ArtifactSubmitter {
@@ -110,6 +112,25 @@ export async function readArtifact(userId: string, artifactId: string): Promise<
   const [live] = await db.select({ id: artifactShares.id }).from(artifactShares)
     .where(and(eq(artifactShares.artifactId, artifactId), isNull(artifactShares.revokedAt))).limit(1)
   return { ...found, shared: Boolean(live) }
+}
+
+const LIST_LIMIT = 200
+
+/** The person's artifacts, last changed first, each with its latest author and the task it was made for. */
+export async function listArtifacts(userId: string): Promise<ArtifactListItem[]> {
+  const rows = await db.select({ id: artifacts.id, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion, runId: artifacts.runId, issueId: artifacts.issueId, updatedAt: artifacts.updatedAt, authorName: artifactVersions.authorName })
+    .from(artifacts)
+    .leftJoin(artifactVersions, and(eq(artifactVersions.artifactId, artifacts.id), eq(artifactVersions.version, artifacts.latestVersion)))
+    .where(eq(artifacts.userId, userId)).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
+  const issueIds = [...new Set(rows.flatMap(row => row.issueId ? [row.issueId] : []))]
+  const tasks = issueIds.length ? await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, content: issues.content }).from(issues).where(inArray(issues.id, issueIds)) : []
+  const numbers = new Map(tasks.map(task => [task.id, readIssueMetadata(task.content).number ?? null]))
+  const identifiers = await taskIdentifiers(tasks.map(task => ({ id: task.id, ownerId: task.ownerId, scope: task.scope, number: numbers.get(task.id) ?? null })))
+  return rows.map(({ updatedAt, ...row }) => {
+    const number = row.issueId ? numbers.get(row.issueId) ?? null : null
+    const issueKey = row.issueId ? identifiers.get(row.issueId) ?? (number === null ? null : `#${number}`) : null
+    return { ...row, issueKey, updatedAt: updatedAt.toISOString() }
+  })
 }
 
 /** The file of one version, or null when the artifact or version is not there. */

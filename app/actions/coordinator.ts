@@ -16,6 +16,10 @@ import { bots } from '@/lib/db/schema'
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { coordinatorWelcome } from '@/lib/agent-welcome'
+import { getTranslations } from 'next-intl/server'
+import { dismissSuggestion, readSuggestion } from '@/lib/suggestions/store'
+import { displayTitle } from '@/lib/suggestions/action-title'
+import { SOURCE_NAMES, withSuggestion } from '@/lib/suggestions/card'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -93,5 +97,40 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot?.name), { botId: bot?.id ?? null }))
     after(() => wakeCoordinator(session.user.id))
     return { queued: true }
+  })
+}
+
+/**
+ * A tapped 建议 card goes to the Coordinator at once, with no composer step
+ * (R-21): the same card heads the person's message, then the full instruction
+ * built from what the source said. The card leaves 建议; the Coordinator then
+ * runs it or dispatches a thread. Tapping twice sends once.
+ */
+export async function sendSuggestion(suggestionId: string): Promise<ActionResult<{ queued: true }>> {
+  return runAction(async () => {
+    const userId = await getUserId()
+    const id = z.uuid().safeParse(suggestionId)
+    if (!id.success) throw new ActionFailureError('validationGeneric')
+    const item = await readSuggestion(userId, id.data)
+    if (!item) throw new ActionFailureError('suggestionNotFound')
+    const t = await getTranslations('SuggestionsPage.instruction')
+    const line = displayTitle(item)
+    const app = SOURCE_NAMES[item.source]
+    const instruction = [
+      line,
+      t('source', { from: item.actor ? `${app} · ${item.actor}` : app }),
+      item.actionTitle?.trim() && item.title.trim() !== line ? t('original', { title: item.title.trim() }) : null,
+      item.url,
+      t('confirm'),
+    ].filter(Boolean).join('\n')
+    const text = withSuggestion(instruction, { source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle })
+    try { await recordPersonalSubmission(db, userId, text, { submissionId: item.id }) }
+    catch (error) {
+      if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
+      throw error
+    }
+    await dismissSuggestion(userId, item.id)
+    after(() => wakeCoordinator(userId))
+    return { queued: true as const }
   })
 }

@@ -124,6 +124,8 @@
     "members": "成员管理",
     "inviteMembers": "邀请成员",
     "plugins": "插件",
+    "suggestions": "建议",
+    "artifacts": "Artifact",
     "toggleTeam": "展开或收起 {name} 团队",
     "sidebarRail": "展开或收起侧栏边轨",
     "rail": "主导航",
@@ -942,6 +944,7 @@
     "runInvalid": "运行参数不正确。",
     "runNotFound": "运行不存在。",
     "artifactNotFound": "找不到这个成果。",
+    "suggestionNotFound": "这条建议已经处理过了。",
     "messageRequired": "消息不能为空。",
     "submissionConflict": "此提交标识已用于另一条消息。",
     "pendingActionUnavailable": "这项操作已处理或已过期。",
@@ -2662,6 +2665,46 @@
       "expand": "展开对话",
       "unassigned": "未分配"
     }
+  },
+  "SuggestionsPage": {
+    "title": "建议",
+    "refresh": "刷新建议",
+    "loadError": "建议加载失败。",
+    "retry": "重试",
+    "loading": "正在加载建议",
+    "empty": "暂时没有要看的消息",
+    "connect": "连接应用",
+    "action": {
+      "reply": "回复",
+      "review": "Review",
+      "handle": "处理",
+      "read": "查看"
+    },
+    "instruction": {
+      "source": "来源：{from}",
+      "original": "原文：「{title}」",
+      "confirm": "做不可撤销的操作前，先停下来问我。"
+    }
+  },
+  "ArtifactsPage": {
+    "title": "Artifact",
+    "category": {
+      "all": "全部",
+      "documents": "文档",
+      "pages": "网页"
+    },
+    "columns": {
+      "name": "名称",
+      "status": "状态",
+      "source": "来源",
+      "updated": "上次活动"
+    },
+    "loadError": "Artifact 加载失败。",
+    "retry": "重试",
+    "loading": "正在加载 Artifact",
+    "empty": "还没有 Artifact",
+    "home": "回到主页",
+    "threadEntry": "Artifact · {count}"
   },
   "Artifact": {
     "kindDocument": "文档",

@@ -124,6 +124,8 @@
     "members": "Members",
     "inviteMembers": "Invite members",
     "plugins": "Plugins",
+    "suggestions": "Suggestions",
+    "artifacts": "Artifact",
     "toggleTeam": "Expand or collapse the {name} team",
     "sidebarRail": "Expand or collapse the sidebar rail",
     "rail": "Main navigation",
@@ -942,6 +944,7 @@
     "runInvalid": "The run parameters are invalid.",
     "runNotFound": "This run does not exist.",
     "artifactNotFound": "This artifact does not exist.",
+    "suggestionNotFound": "This suggestion was already handled.",
     "messageRequired": "A message cannot be empty.",
     "submissionConflict": "This submission ID was already used for a different message.",
     "pendingActionUnavailable": "This action was already handled or has expired.",
@@ -2662,6 +2665,46 @@
       "expand": "Show conversation",
       "unassigned": "Unassigned"
     }
+  },
+  "SuggestionsPage": {
+    "title": "Suggestions",
+    "refresh": "Refresh suggestions",
+    "loadError": "Suggestions failed to load.",
+    "retry": "Retry",
+    "loading": "Loading suggestions",
+    "empty": "Nothing to look at right now",
+    "connect": "Connect apps",
+    "action": {
+      "reply": "Reply",
+      "review": "Review",
+      "handle": "Handle",
+      "read": "Read"
+    },
+    "instruction": {
+      "source": "Source: {from}",
+      "original": "Original: “{title}”",
+      "confirm": "Stop and ask me before anything that can't be undone."
+    }
+  },
+  "ArtifactsPage": {
+    "title": "Artifact",
+    "category": {
+      "all": "All",
+      "documents": "Documents",
+      "pages": "Web pages"
+    },
+    "columns": {
+      "name": "Name",
+      "status": "Status",
+      "source": "Source",
+      "updated": "Last activity"
+    },
+    "loadError": "Artifacts failed to load.",
+    "retry": "Retry",
+    "loading": "Loading artifacts",
+    "empty": "No artifacts yet",
+    "home": "Back to home",
+    "threadEntry": "Artifact · {count}"
   },
   "Artifact": {
     "kindDocument": "Document",

@@ -29,6 +29,7 @@ import dynamic from 'next/dynamic'
 import { ArtifactCard, ArtifactChip } from '@/components/artifacts/artifact-card'
 import { ArtifactQuoteChip, ArtifactQuoteLine } from '@/components/artifacts/artifact-quote'
 import type { ArtifactChatSlot } from '@/components/artifacts/artifact-viewer'
+import { CARD_FRAME, SuggestionCardBody } from '@/components/suggestions/mobile-card'
 
 const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
 
@@ -147,6 +148,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               {item.from === 'event'
                 ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
+                    {/* A tapped 建议 card: the same card, then the instruction it sent (R-21). */}
+                    {item.suggestion && <div data-slot="suggestion-card" className={cn(CARD_FRAME, 'self-end', compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><SuggestionCardBody card={item.suggestion} /></div>}
                     {item.text && (item.from === 'coordinator'
                       ? <CoordinatorReply text={item.text} citations={citations} />
                       : <Bubble variant="secondary" align="end" className={cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.text}</BubbleContent></Bubble>)}

@@ -31,6 +31,7 @@ export const ACTION_ERROR_CODES = [
   'runInvalid',
   'runNotFound',
   'artifactNotFound',
+  'suggestionNotFound',
   'messageRequired',
   'submissionConflict',
   'pendingActionUnavailable',

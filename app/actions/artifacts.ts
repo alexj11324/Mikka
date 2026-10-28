@@ -4,12 +4,17 @@ import { headers } from 'next/headers'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
-import { createShare, readArtifact, readArtifactContent, revokeShares, type ArtifactDetail } from '@/lib/artifacts/store'
+import { createShare, listArtifacts as listOwnArtifacts, readArtifact, readArtifactContent, revokeShares, type ArtifactDetail, type ArtifactListItem } from '@/lib/artifacts/store'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   return session.user.id
+}
+
+/** Every artifact of the person's, last changed first, for the Artifact page and a thread's 「Artifact · N」. */
+export async function listArtifacts(): Promise<ArtifactListItem[]> {
+  return listOwnArtifacts(await getUserId())
 }
 
 /** One of the person's artifacts with its versions, or null. */
