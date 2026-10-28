@@ -71,7 +71,7 @@ test('a changed worker policy revokes an approved but unconsumed request', async
   assert.equal(await store.check(actor, runId, current.revision), true)
 })
 
-test('workspace may narrow agent policy and rejects forged generations', async () => {
+test('workspace may narrow agent policy, rejects forged generations, and invalidates a recreated fixture', async () => {
   const wid=randomUUID(), botId=randomUUID(), workerId=randomUUID(), scopedRun=randomUUID()
   await pool.query(`INSERT INTO bots VALUES ($1,$2,$3)`, [botId,wid,actor.userId])
   await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,$2,'active','admin')`, [wid,actor.userId])
@@ -90,10 +90,17 @@ test('workspace may narrow agent policy and rejects forged generations', async (
   const regenerated = await readCliRunPolicy(pool,scopedRun,actor.userId,guard)
   assert.equal(regenerated.policy.permissions.install_dependency, 'ask')
   assert.equal(regenerated.revision,asking.revision)
+  // This nonce-owned row was created by this test immediately above. Current
+  // authorization permits recycling newly created temporary test resources;
+  // no pre-existing policy row, database, volume, directory or log is removed.
+  await pool.query(`DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1`, [wid])
+  const recreated = await readCliRunPolicy(pool,scopedRun,actor.userId,guard)
+  assert.equal(recreated.policy.permissions.install_dependency,'allow')
+  assert.notEqual(recreated.revision,asking.revision)
   await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`, [wid,actor.userId])
-  await assert.rejects(setCliPolicy(pool,actor.userId,scopedRun,'workspace',regenerated.revision,{},guard))
+  await assert.rejects(setCliPolicy(pool,actor.userId,scopedRun,'workspace',recreated.revision,{},guard))
   const scopedStore = new AgentToolApprovalStore(pool, guard)
-  const pending = await scopedStore.propose(actor, { ...payload('workspace-revocation'), runId:scopedRun, policyRevision:regenerated.revision })
+  const pending = await scopedStore.propose(actor, { ...payload('workspace-revocation'), runId:scopedRun, policyRevision:recreated.revision })
   await pool.query(`UPDATE mikka_workspace_members SET status='removed' WHERE "workspaceId"=$1 AND "userId"=$2`, [wid,actor.userId])
   await assert.rejects(scopedStore.decide(actor.userId,scopedRun,pending.id,pending.digest,'approve'))
   assert.equal((await pool.query('SELECT status FROM agent_tool_approvals WHERE id=$1',[pending.id])).rows[0].status,'pending')

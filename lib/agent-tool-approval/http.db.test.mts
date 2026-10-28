@@ -48,6 +48,12 @@ before(async () => {
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r)); origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
 })
 after(async () => { if (server) await new Promise<void>(r => server.close(() => r())); await pool.end() })
+// Original roundtrip assertions at def8b396: other user gets 409; owner gets
+// 200; the fake Codex responses are accept, decline on replay, and decline
+// for a foreign run. Direct gate.request below is not equivalent coverage.
+test('BLOCKED: claim → fake Codex → pending → owner decision → response and replay', { skip:'CLI subprocess lifecycle performs unapproved cleanup' }, () => {
+  throw new Error('Roundtrip is not implemented under the current retention policy')
+})
 test('real HTTP claim carries policy and unavailable CLI callbacks do not create approvals', async () => {
   const { HttpServerLink } = await import('../../packages/daemon/src/server-link-http')
   const link = new HttpServerLink(origin)

@@ -61,8 +61,10 @@ import {
   runPaths,
   type McpServerSpec,
 } from "../agents/run-context"
-import type { SandboxPolicy } from "../agents/sandbox"
+import type { AgentSandbox, SandboxPolicy } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
+import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
+import { runNetworkApproval } from "../agents/run-network"
 import { ownDir } from "../agents/harness-home"
 import { buildChildEnv } from "../env"
 import { mailboxInputs } from '@mikka/protocol/mailbox'
@@ -83,6 +85,8 @@ import type {
 } from "./types"
 
 export interface ClaudeAdapterOptions {
+  /** Explicit synthetic-test transport only; production uses the outer launcher. */
+  sandbox?: AgentSandbox
   /** The daemon's adapter state dir (per-run dirs live under it). */
   stateDir: string
   /**
@@ -513,6 +517,14 @@ export class ClaudeAdapter implements AgentAdapter {
     if(externalAuth && this.options.onHostedSession) {
       try{await this.options.onHostedSession(sessionId)}catch{throw new Error(SUBSCRIPTION_ERROR)}
     }
+    const outerLocal = !this.options.spawnHosted && this.options.sandbox?.kind !== 'none'
+    const spawnOuter = (config: SpawnOptions): SpawnedProcess => {
+      const policy = ctx.policy()
+      const child = spawnRunSandbox({ command:this.options.binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:policy.allowDomains, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,policy.allowDomains), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
+      const off = options.toolApproval!.onRevoke(() => { void child.revoke().catch(() => undefined) })
+      void child.exited.finally(off)
+      return child.process
+    }
     const session = query({
       prompt: prompts,
       options: {
@@ -533,6 +545,9 @@ export class ClaudeAdapter implements AgentAdapter {
         settingSources: [],
         settings: {
           ...claudeSettings(ctx.policy(), options.policy),
+          // The official runtime launcher encloses the entire CLI. Nesting
+          // the CLI's Bash-only sandbox is unsupported on macOS.
+          ...(outerLocal ? {sandbox:{enabled:false,allowUnsandboxedCommands:true,autoAllowBashIfSandboxed:false}} : {}),
           ...(externalAuth ? { forceLoginMethod: "claudeai" as const } : {})
         },
         mcpServers: {
@@ -550,12 +565,12 @@ export class ClaudeAdapter implements AgentAdapter {
         canUseTool: async (toolName: string, input: Record<string, unknown>, callback: { toolUseID: string; signal: AbortSignal }) => {
             const gate = options.toolApproval!
             const signal = AbortSignal.any([callback.signal, approvalTransport.signal])
-            const decision = await gate.request({ runId: options.runId, harness: 'claude_code', requestId: callback.toolUseID, method: toolName, input }, signal)
+            const decision = await gate.request({ runId: options.runId, harness: 'claude_code', requestId: callback.toolUseID, method: `cli/${toolName}`, input }, signal)
             return decision === 'allow' && !gate.revoked && !signal.aborted && !ending ? { behavior: 'allow' as const, updatedInput: input } : { behavior: 'deny' as const, message: 'Permission not granted.' }
         },
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
-        ...(this.options.spawnHosted && externalAuth
+        ...(outerLocal ? {spawnClaudeCodeProcess:spawnOuter} : this.options.spawnHosted && externalAuth
           ? { spawnClaudeCodeProcess: (options:SpawnOptions) => this.options.spawnHosted!(options,nativeToken!) }
           : this.options.binary || externalAuth
           ? { spawnClaudeCodeProcess: spawnBinary(this.options.binary, nativeToken) }

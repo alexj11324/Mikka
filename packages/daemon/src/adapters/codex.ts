@@ -33,6 +33,8 @@ import {
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
+import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
+import { runNetworkApproval } from "../agents/run-network"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
@@ -58,6 +60,8 @@ import type {
 
 export interface CodexAdapterOptions {
   sandbox: AgentSandbox
+  /** Optional host-owned additional ceiling; conservative intersection only. */
+  networkCeiling?: readonly string[]
   /** The daemon's adapter state dir (per-run dirs and homes live under it). */
   stateDir: string
   binary?: string
@@ -339,13 +343,27 @@ export class CodexAdapter implements AgentAdapter {
       ]),
     ]
     const checkAuth = guardCodexAuth(codexHome.authFile, log)
-    const child = await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, {
+    const spawnOptions = {
       cwd: ctx.worktree,
       env: { ...options.env, ...ctx.tempEnv(), CODEX_HOME: codexHome.home },
       policy: ctx.policy(),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
-    })
+    }
+    const requestedCeiling = this.options.networkCeiling
+    const maximum = requestedCeiling === undefined ? spawnOptions.policy.allowDomains
+      : spawnOptions.policy.allowDomains.includes('*') ? [...requestedCeiling]
+      : requestedCeiling.includes('*') ? spawnOptions.policy.allowDomains
+      : requestedCeiling.filter(domain => spawnOptions.policy.allowDomains.includes(domain))
+    let launcher: ReturnType<typeof spawnRunSandbox> | undefined
+    const child = this.options.spawnCli || this.options.sandbox.kind === 'none'
+      ? await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
+      : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum) }))
+    if (launcher) {
+      const ownedLauncher = launcher
+      const off = options.toolApproval!.onRevoke(() => { void ownedLauncher.revoke().catch(() => undefined) })
+      void child.exited.finally(off)
+    }
     // After the whole group is gone (`exited` kills it first).
     void child.exited.then(checkAuth)
     const rpc: MessageConnection = jsonlConnection(

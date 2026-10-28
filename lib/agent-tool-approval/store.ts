@@ -37,6 +37,7 @@ export class AgentToolApprovalStore {
     return this.transaction(value.runId, actor.userId, async client => {
       const policy = await lockCliRunPolicy(client, value.runId, actor.userId)
       if (policy.revision !== value.policyRevision) throw new ApprovalUnavailable()
+      if (value.method === 'sandbox/network' && policy.policy.permissions.network === 'deny') throw new ApprovalUnavailable()
       const valid = await client.query(`SELECT 1 FROM agent_runs r JOIN agents a ON a.id=r."agentId" AND a."userId"=r."userId" JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId" AND d.enabled=true WHERE r.id=$1 AND r."deviceId"=$2 AND COALESCE(r."agentDefinition"->>'harness', a.harness)=$3`, [value.runId, actor.deviceId, value.harness])
       if (!valid.rowCount) throw new ApprovalUnavailable()
       const id = randomUUID()

@@ -672,7 +672,7 @@ export class Daemon {
     const stateDir = this.paths.adapterState
     const bin = this.options.harnessBinaries ?? {}
     return [
-      ["claude_code", new ClaudeAdapter({ stateDir, binary: bin.claude_code })],
+      ["claude_code", new ClaudeAdapter({ sandbox, stateDir, binary: bin.claude_code })],
       ["codex", new CodexAdapter({ sandbox, stateDir, binary: bin.codex })],
       ["cursor", new CursorAdapter({ sandbox, stateDir, binary: bin.cursor })],
     ]

@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn, execFileSync } from 'node:child_process'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -29,7 +29,10 @@ test('official Codex reports the actual explicit approval policy and sandbox', {
     assert.equal(thread.result.approvalPolicy,'on-request')
     assert.equal(thread.result.sandbox.type,'dangerFullAccess')
   } finally {
-    lines.close(); child.kill('SIGTERM'); await new Promise<void>(r => { if (child.exitCode !== null || child.signalCode !== null) r(); else child.once('exit',()=>r()) })
-    await rm(dir,{recursive:true,force:true})
+    lines.close()
+    // Only the child created by this invocation is stopped; its directory and
+    // diagnostics are retained. No previously retained process is addressed.
+    child.kill('SIGTERM')
+    await new Promise<void>(resolve => { if (child.exitCode !== null || child.signalCode !== null) resolve(); else child.once('exit',()=>resolve()) })
   }
 })

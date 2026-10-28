@@ -62,7 +62,7 @@ export interface ChunkBatch {
  * the daemon keeps running and retries (offline tolerance, R13).
  */
 export interface ServerLink {
-  prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<ToolApprovalGate>
+  prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
   /** Optional host-only adapter for the claimed run; never model-supplied. */
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   claimCoordinator?(deviceId: string, signal: AbortSignal): Promise<NativeCoordinatorJob | null>

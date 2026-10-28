@@ -8,6 +8,7 @@ import {
 } from "../src/adapters/claude"
 import { buildChildEnv } from "../src/env"
 import { createLogger } from "../src/log"
+import { NoSandbox } from "../src/agents/sandbox"
 import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
 
 afterEach(cleanupTempDirs)
@@ -42,6 +43,7 @@ async function fixture(
     }))
   }
   const adapter = new ClaudeAdapter({
+    sandbox: new NoSandbox(),
     stateDir: tempDir(),
     binary,
     configDir: join(home, ".claude"),

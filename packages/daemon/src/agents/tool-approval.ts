@@ -37,6 +37,16 @@ export class ToolApprovalGate {
   constructor(readonly runId: string, private readonly host: ToolApprovalHost) {}
   revoke() { this.stop.abort() }
   get revoked(): boolean { return this.stop.signal.aborted }
+  onRevoke(callback: () => void): () => void {
+    if (this.revoked) { callback(); return () => {} }
+    this.stop.signal.addEventListener('abort', callback, { once: true })
+    return () => this.stop.signal.removeEventListener('abort', callback)
+  }
+  async checkLive(): Promise<boolean> {
+    if (this.revoked) return false
+    try { return await abortable(Promise.resolve(this.host.isLive(this.runId)), this.stop.signal) && !this.revoked }
+    catch { return false }
+  }
 
   async request(request: ToolApprovalRequest, signal?: AbortSignal): Promise<'allow' | 'deny'> {
     if (request.runId !== this.runId || !request.requestId || request.requestId.length > 219 || this.seen.has(request.requestId) || this.seen.size >= 1024 || this.stop.signal.aborted || signal?.aborted) return 'deny'

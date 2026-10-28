@@ -90,7 +90,7 @@ describe("hosted subscription seam", () => {
               binary,
               userHome: accountHome,
             })
-          : new ClaudeAdapter({ stateDir, binary, configDir: accountHome })
+          : new ClaudeAdapter({ sandbox:new NoSandbox(), stateDir, binary, configDir: accountHome })
       const backend = {
         access: async () => access,
         adapter: async () => adapter,

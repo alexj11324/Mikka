@@ -91,7 +91,7 @@ export interface SupervisorDeps {
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
-  prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<ToolApprovalGate>
+  prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
   bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
   /** The device's current allow-list (`device_repo`). */
   repos: () => DeviceRepo[]
@@ -1003,7 +1003,7 @@ export class RunSupervisor {
     if (this.stopping) return
     if (run.cancelRequested) { this.finish(runId, run.forcedStop ?? 'cancelled'); return }
     if (mailbox) checkMailbox()
-    const toolApproval = await this.deps.prepareRunToolApproval?.(assignment, run.abort.signal, checkMailbox)
+    const toolApproval = await this.deps.prepareRunToolApproval?.(assignment, run.abort.signal, checkMailbox, worktree)
     run.toolApproval = toolApproval
     // Cancellation or lease loss may win while the gate is being prepared.
     // Revoke it before refusing, and never launch a CLI with stale authority.

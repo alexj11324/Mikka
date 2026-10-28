@@ -37,7 +37,7 @@ export interface CodexHome {
 /** Settings every Mikka Codex run starts from; nothing from the user's config. */
 export const CODEX_CONFIG = [
   "# Written by Mikka for agent runs. Edits are overwritten.",
-  'approval_policy = "never"',
+  'approval_policy = "on-request"',
   // Mikka's sandbox is the boundary; Codex's own Seatbelt cannot nest in it.
   'sandbox_mode = "danger-full-access"',
   "",
