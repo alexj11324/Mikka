@@ -25,10 +25,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
-DROP TRIGGER IF EXISTS cli_run_policy_revision ON agent_kit_heads;
 CREATE TRIGGER cli_run_policy_revision BEFORE INSERT OR UPDATE ON agent_kit_heads FOR EACH ROW EXECUTE FUNCTION cli_run_policy_revision();
-DROP TRIGGER IF EXISTS cli_run_policy_revision ON workspace_computer_policies;
 CREATE TRIGGER cli_run_policy_revision BEFORE INSERT OR UPDATE ON workspace_computer_policies FOR EACH ROW EXECUTE FUNCTION cli_run_policy_revision();
 
-DROP TRIGGER IF EXISTS cli_run_policy_revision ON agents;
 CREATE TRIGGER cli_run_policy_revision BEFORE INSERT OR UPDATE ON agents FOR EACH ROW EXECUTE FUNCTION cli_run_policy_revision();

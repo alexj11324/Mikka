@@ -2,10 +2,6 @@ import { after, before, mock, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
-import { execFileSync } from 'node:child_process'
-import { resolve } from 'node:path'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { Pool } from 'pg'
 
 const url = process.env.APPROVAL_TEST_DATABASE_URL
@@ -30,7 +26,7 @@ mock.module(new URL('../run-retry.ts', import.meta.url).href, { namedExports: { 
 mock.module(new URL('../mcp/resource.ts', import.meta.url).href, { namedExports: { mcpResourceURL: null } })
 mock.module(new URL('../personal-mailbox-config.ts', import.meta.url).href, { namedExports: { personalMailboxEnabled: () => false } })
 mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async ({ headers }: { headers: Headers }) => ({ user: { id: headers.get('cookie') === 'owner=1' ? owner : 'other' } }) } } } })
-let server: Server, origin: string, dir: string, savedAssignment: import('@mikka/protocol/device').RunAssignment
+let server: Server, origin: string, savedAssignment: import('@mikka/protocol/device').RunAssignment
 before(async () => {
   await pool.query(`ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS "startedAt" timestamptz; ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS "updatedAt" timestamptz; CREATE TABLE IF NOT EXISTS computer_run_bindings ("runId" uuid PRIMARY KEY)` )
   await pool.query(`INSERT INTO agents (id,"userId",harness) VALUES ($1,$2,'codex')`, [agentId,owner])
@@ -50,15 +46,10 @@ before(async () => {
     } catch { res.writeHead(500).end() }
   })
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r)); origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  dir = await mkdtemp(resolve(tmpdir(), 'pr13-approval-'))
-  execFileSync('git', ['init', '-q', dir])
 })
-after(async () => { if (server) await new Promise<void>(r => server.close(() => r())); if (dir) await rm(dir,{recursive:true,force:true}); await pool.end() })
+after(async () => { if (server) await new Promise<void>(r => server.close(() => r())); await pool.end() })
 test('real HTTP claim carries policy and unavailable CLI callbacks do not create approvals', async () => {
   const { HttpServerLink } = await import('../../packages/daemon/src/server-link-http')
-  const { CodexAdapter } = await import('../../packages/daemon/src/adapters/codex')
-  const { NoSandbox } = await import('../../packages/daemon/src/agents/sandbox')
-  const { createLogger } = await import('../../packages/daemon/src/log')
   const link = new HttpServerLink(origin)
   Object.assign(link, { credential: 'synthetic' })
   const settings = async (cookie: string, payload: object) => fetch(`${origin}/api/agent-cli-policy`, { method:'POST', headers:{cookie,origin,'content-type':'application/json'}, body:JSON.stringify(payload) })
@@ -89,11 +80,11 @@ test('real HTTP claim carries policy and unavailable CLI callbacks do not create
   assert.equal(assignment.policy?.permissions.install_dependency, 'allow')
   assert.match(assignment.policyRevision ?? '', /^[a-f0-9]{64}$/)
   const gate = await link.prepareRunToolApproval(assignment, new AbortController().signal, () => {})
-  const adapter = new CodexAdapter({ sandbox: new NoSandbox(), stateDir: dir, userHome: dir, binary: resolve('packages/daemon/test/fakes/fake-codex.mjs') })
-  const session = await adapter.start({ runId, cwd: dir, prompt: assignment.prompt, env: { PATH: process.env.PATH ?? '' }, log: createLogger(), toolApproval: gate })
   const browser = async (cookie: string, payload: object) => fetch(`${origin}/api/agent-tool-approvals`, { method: 'POST', headers: { cookie, origin, 'content-type': 'application/json' }, body: JSON.stringify(payload) })
-  let output=''; for await (const event of session.events()) if (event.type === 'chunk' && event.chunk.type === 'text-delta') output+=event.chunk.delta
-  const result=JSON.parse(output); assert.equal(result.first.decision,'decline'); assert.equal(result.replay.decision,'decline'); assert.equal(result.foreign.decision,'decline')
+  const request = {runId,requestId:'synthetic',harness:'codex' as const,method:'item/commandExecution/requestApproval',input:{command:'npm install synthetic'}}
+  assert.equal(await gate.request(request),'deny')
+  assert.equal(await gate.request(request),'deny')
+  assert.equal(await gate.request({...request,runId:randomUUID(),requestId:'foreign'}),'deny')
   const response = await browser('owner=1',{ operation:'list',runId })
   const body = await response.json() as { requests: unknown[] }
   assert.deepEqual(body.requests, [])
@@ -103,16 +94,9 @@ test('policy revocation invalidates an old assignment before CLI approval', asyn
   const settings = await fetch(`${origin}/api/agent-cli-policy`, { method:'POST', headers:{cookie:'owner=1',origin,'content-type':'application/json'}, body:JSON.stringify({operation:'set',runId,target:'worker',expectedRevision:savedAssignment.policyRevision,policy:{permissions:{install_dependency:'deny'}}}) })
   assert.equal(settings.status,200)
   const { HttpServerLink } = await import('../../packages/daemon/src/server-link-http')
-  const { CodexAdapter } = await import('../../packages/daemon/src/adapters/codex')
-  const { NoSandbox } = await import('../../packages/daemon/src/agents/sandbox')
-  const { createLogger } = await import('../../packages/daemon/src/log')
   const link=new HttpServerLink(origin); Object.assign(link,{credential:'synthetic'})
   const gate=await link.prepareRunToolApproval(savedAssignment,new AbortController().signal,()=>{})
-  const adapter=new CodexAdapter({sandbox:new NoSandbox(),stateDir:dir,userHome:dir,binary:resolve('packages/daemon/test/fakes/fake-codex.mjs')})
-  const session=await adapter.start({runId,cwd:dir,prompt:'APPROVAL_TEST',env:{PATH:process.env.PATH ?? ''},log:createLogger(),toolApproval:gate})
-  let output=''; for await (const event of session.events()) if (event.type==='chunk' && event.chunk.type==='text-delta') output+=event.chunk.delta
-  const result=JSON.parse(output)
-  assert.equal(result.first.decision,'decline')
+  assert.equal(await gate.request({runId,requestId:'stale',harness:'codex',method:'item/commandExecution/requestApproval',input:{command:'npm install synthetic'}}),'deny')
   const pending = await pool.query(`SELECT count(*)::int AS count FROM agent_tool_approvals WHERE "runId"=$1 AND status='pending'`,[runId])
   assert.equal(pending.rows[0].count,0)
 })
