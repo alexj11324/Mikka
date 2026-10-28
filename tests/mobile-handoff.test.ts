@@ -94,7 +94,7 @@ test('confirmation rejects expired, tampered state and a revoked underlying sess
   assert.equal((await confirm(response, 'https://handoff.test', `mikka-mobile-handoff=${otherOrigin}`)).status, 403)
   const expired = sealHandoff({ ...state, expires: Date.now() - 1 }, secret)
   assert.equal((await confirm(response, 'https://handoff.test', `mikka-mobile-handoff=${expired}`)).status, 403)
-  assert.equal(openHandoff(encoded + 'x', secret), null)
+  assert.equal(openHandoff(encoded.slice(0, 30) + (encoded[30] === 'A' ? 'B' : 'A') + encoded.slice(31), secret), null)
   await auth.api.signOut({ headers: new Headers({ cookie: alice.cookie }) })
   assert.equal((await confirm(response)).status, 403)
 })

@@ -16,6 +16,7 @@ export function openHandoff(value: string, secret: string): MobileHandoff | null
   try {
     if (value.length > 16000) return null
     const bytes = Buffer.from(value, 'base64url')
+    if (bytes.toString('base64url') !== value) return null
     const decipher = createDecipheriv('aes-256-gcm', key(secret), bytes.subarray(0, 12))
     decipher.setAuthTag(bytes.subarray(12, 28))
     const state = stateSchema.parse(JSON.parse(Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString()))
