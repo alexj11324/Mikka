@@ -1,15 +1,21 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
+import type { Pool } from 'pg'
 import { before, after as afterTests, mock, test } from 'node:test'
 import { eq } from 'drizzle-orm'
 import { suggestions, coordinatorEvents } from '../lib/db/schema'
 
-const url = new URL(process.env.MIKKA_DATABASE_URL ?? '')
-if (process.env.SUGGESTION_TEST_DISPOSABLE !== '1' || url.hostname !== '127.0.0.1' || url.pathname !== '/pr371_test') throw new Error('requires disposable pr371_test on loopback')
+const url = new URL(process.env.E2E_DATABASE_URL ?? '')
+if (process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true' || url.hostname !== '127.0.0.1' || url.port !== '5432' || url.pathname !== '/mikka_e2e' || url.search || url.hash || process.env.MIKKA_DATABASE_URL !== url.href || process.env.DATABASE_URL !== url.href) throw new Error('requires GitHub Actions isolated mikka_e2e service')
+const fixtureSchema = `suggestion_artifact_${randomUUID().replaceAll('-', '')}`
+let scope: ReturnType<typeof import('../lib/db/request-scope').createRequestDatabaseScope>
+const check = (name: string, run: () => Promise<void>) => test(name, () => scope.run(run))
 let owner = 'owner'
 const callbacks: Array<() => unknown> = []
 let action: typeof import('../app/actions/coordinator').sendSuggestion
 let db: typeof import('../lib/db').db
-let pool: typeof import('../lib/db').pool
+let pool: Pool
+let artifactActions: typeof import('../app/actions/artifacts')
 let claim: typeof import('../lib/suggestions/store').claimSuggestion
 const id = 'b4000000-0000-4000-8000-000000000010'
 const other = 'b4000000-0000-4000-8000-000000000011'
@@ -25,13 +31,20 @@ before(async () => {
   ;({ db, pool } = await import('../lib/db'))
   ;({ claimSuggestion: claim } = await import('../lib/suggestions/store'))
   ;({ sendSuggestion: action } = await import('../app/actions/coordinator'))
-  await pool.query(`CREATE TABLE suggestions (id uuid primary key, "userId" text not null, source text not null, "externalId" text not null, action text not null, title text not null, url text, actor text, shown boolean not null, "decidedBy" text not null, probability real, level text, "matterKey" text, "actionTitle" text, required boolean not null default false, "occurredAt" timestamptz not null, "dismissedAt" timestamptz, "createdAt" timestamptz not null default now()); CREATE TABLE coordinator_events (id uuid primary key, "userId" text not null, "botId" uuid, kind text not null, "dedupeKey" text not null unique, "issueId" uuid, "runId" uuid, payload jsonb not null CHECK (position('fail-fixture' in payload::text) = 0), tier text, "deliveredAt" timestamptz, "createdAt" timestamptz not null default now())`)
+  artifactActions = await import('../app/actions/artifacts')
+  await pool.query(`CREATE SCHEMA "${fixtureSchema}"`)
+  const scopedUrl = new URL(url)
+  scopedUrl.searchParams.set('options', `-c search_path=${fixtureSchema}`)
+  scope = (await import('../lib/db/request-scope')).createRequestDatabaseScope(scopedUrl.href)
+  console.info(`Retained CI fixture schema: ${fixtureSchema}`)
+  await scope.run(() => pool.query(`CREATE TABLE suggestions (id uuid primary key, "userId" text not null, source text not null, "externalId" text not null, action text not null, title text not null, url text, actor text, shown boolean not null, "decidedBy" text not null, probability real, level text, "matterKey" text, "actionTitle" text, required boolean not null default false, "occurredAt" timestamptz not null, "dismissedAt" timestamptz, "createdAt" timestamptz not null default now()); CREATE TABLE coordinator_events (id uuid primary key, "userId" text not null, "botId" uuid, kind text not null, "dedupeKey" text not null unique, "issueId" uuid, "runId" uuid, payload jsonb not null CHECK (position('fail-fixture' in payload::text) = 0), tier text, "deliveredAt" timestamptz, "createdAt" timestamptz not null default now())`))
+  await scope.run(() => pool.query(`CREATE TABLE artifacts (id uuid primary key, "userId" text not null, kind text not null, title varchar(200) not null, "runId" uuid, "issueId" uuid, "latestVersion" int not null default 1, "createdAt" timestamptz not null default now(), "updatedAt" timestamptz not null default now()); CREATE TABLE artifact_versions (id uuid primary key, "artifactId" uuid not null, version int not null, "storageKey" text not null, "inlineContent" text, sha256 text not null, size int not null, "authorName" text not null, "createdAt" timestamptz not null default now(), unique("artifactId",version))`))
 })
-afterTests(async () => { await pool?.end() })
+afterTests(async () => { await scope?.close(); await pool?.end() })
 async function seed(key: string, title = 'synthetic') { await db.insert(suggestions).values({ id: key, userId: 'owner', source: 'gmail', externalId: key, action: 'reply', title, shown: true, decidedBy: 'rule', occurredAt: new Date() }) }
 function gate() { const ready = new Promise<void>(r => { signal = r }); const proceed = new Promise<void>(r => { release = r }); return { ready, proceed } }
 
-test('a concurrent dismiss wins before send: no event or wake', async () => {
+check('a concurrent dismiss wins before send: no event or wake', async () => {
   await seed(id)
   const g = gate()
   const first = db.transaction(async tx => { assert.ok(await claim('owner', id, tx)); signal(); await g.proceed })
@@ -55,7 +68,7 @@ test('a concurrent dismiss wins before send: no event or wake', async () => {
   assert.equal((await db.select().from(coordinatorEvents)).length, 0); assert.equal(callbacks.length, 0)
 })
 
-test('failed insert rolls claim back; a successful send has an idempotent receipt', async () => {
+check('failed insert rolls claim back; a successful send has an idempotent receipt', async () => {
   await seed(other, 'fail-fixture')
   await assert.rejects(action(other))
   assert.equal((await db.select().from(suggestions).where(eq(suggestions.id, other)))[0].dismissedAt, null)
@@ -68,10 +81,30 @@ test('failed insert rolls claim back; a successful send has an idempotent receip
   assert.equal(callbacks.length, 2)
 })
 
-test('two concurrent sends commit one event and both receive a receipt', async () => {
+check('two concurrent sends commit one event and both receive a receipt', async () => {
   await seed(concurrent); callbacks.length = 0
   const results = await Promise.all([action(concurrent), action(concurrent)])
   assert.deepEqual(results, [{ queued: true }, { queued: true }])
   assert.equal((await db.select().from(coordinatorEvents)).length, 2)
   assert.equal(callbacks.length, 2)
+})
+
+check('Artifact actions return only owned rows, latest author, run filter and real timestamps', async () => {
+  const runId = randomUUID(), mine = randomUUID(), foreign = randomUUID(), outside = randomUUID()
+  await pool.query(`INSERT INTO artifacts (id,"userId",kind,title,"runId","latestVersion","updatedAt") VALUES ($1,'owner','markdown','Real fixture document',$2,2,'2026-10-28T10:00:00Z'),($3,'foreign','html','Private fixture',$2,1,'2026-10-28T11:00:00Z'),($4,'owner','html','Other run',null,1,'2026-10-28T09:00:00Z')`, [mine, runId, foreign, outside])
+  for (const [artifactId, version, author] of [[mine,1,'Earlier author'],[mine,2,'Latest author'],[foreign,1,'Foreign author'],[outside,1,'Other author']] as const) {
+    await pool.query(`INSERT INTO artifact_versions (id,"artifactId",version,"storageKey",sha256,size,"authorName") VALUES ($1,$2,$3,'synthetic','synthetic',1,$4)`, [randomUUID(),artifactId,version,author])
+  }
+  owner = 'owner'
+  const listed = await artifactActions.listArtifacts()
+  assert.deepEqual(listed.map(row => row.id), [mine, outside])
+  assert.equal(listed[0].authorName, 'Latest author')
+  assert.equal(listed[0].latestVersion, 2)
+  assert.equal(listed[0].updatedAt, '2026-10-28T10:00:00.000Z')
+  assert.equal(listed[0].issueKey, null)
+  assert.deepEqual((await artifactActions.listRunArtifacts(runId)).map(row => row.id), [mine])
+  assert.deepEqual(await artifactActions.listRunArtifacts('invalid'), [])
+  owner = 'foreign'
+  assert.deepEqual((await artifactActions.listRunArtifacts(runId)).map(row => row.id), [foreign])
+  owner = 'owner'
 })
