@@ -73,13 +73,13 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
     console.log('CI synthetic selective title EXPLAIN:',JSON.stringify(plan.rows[0]['QUERY PLAN']))
     assert.match(JSON.stringify(plan.rows[0]['QUERY PLAN']),/issues_title_search_trgm_idx/)
   } finally {
-    await pool.query('delete from issue_members where "userId"=$1',[owner])
-    await pool.query('delete from mikka_team_issues where "userId"=$1',[owner])
-    await pool.query('delete from issues where "userId"=$1',[owner])
-    await pool.query('delete from mikka_teams where id=$1',[team])
-    await pool.query('delete from mikka_workspace_members where "workspaceId"=any($1::uuid[])',[[workspace,otherWorkspace]])
-    await pool.query('delete from mikka_workspaces where id=any($1::uuid[])',[[workspace,otherWorkspace]])
-    await pool.query('delete from "user" where id=any($1::text[])',[[owner,viewer]])
+    // Retain synthetic fixtures on success and failure for audit and later inspection.
+    // Closing the client pool does not delete database rows, schemas or the server.
+    console.log('Issue-search fixture retention audit:', JSON.stringify({
+      recordedAt: new Date().toISOString(), database: 'mikka_e2e', retention: 'preserve',
+      note: 'Identifiers are allocated before setup; failed setup may leave only a subset present',
+      owner, viewer, workspace, otherWorkspace, team, root, child, hidden,
+    }))
     await pool.end()
   }
 })
