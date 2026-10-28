@@ -95,9 +95,18 @@ source wins in a conflict is in [`README.md`](README.md).
   (no per-app cards). The daily briefing is not in 建议; it is the
   Coordinator's 08:00 message, also sent right after the person connects an app. A 任务 here is a thread started by the
   orchestrator or a bot; all of them stay listed. It is not a flat list of the
-  board's issues. The flow: the person says yes to a Coordinator card, or
-  clicks a 建议 item (which fills the centre composer) → the bot dispatches a
-  thread → the item leaves 建议 and shows up below as a 任务.
+  board's issues. 建议 items are standalone cards, each one sentence: a verb
+  chip, the app's icon inline, the concrete thing and its reason, deadline or
+  amount (「取消你的 Verizon 套餐，赶在 11 月 1 日自动扣款 $52.13 之前」); no
+  separate meta line. Tapping posts the card in the bot's chat followed by the
+  full instruction handed to the orchestrator, written with its background
+  (account, source, what to check, and to stop for confirmation before an
+  irreversible step). While it runs, the card sits under 进行中 with a
+  progressive verb (正在取消). The flow: the person says
+  yes to a Coordinator card, or taps a 建议 card, which starts the task at once
+  (no composer step) → the orchestrator runs it as a bot sub-agent (web, R-72)
+  or dispatches a thread (a real task such as coding) → the card shows it
+  running and leaves 建议 when done; a thread also shows up below as a 任务.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
@@ -184,6 +193,21 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   products use for the same function (memory = book as in ChatGPT,
   notifications = bell, connectors = blocks as in Claude…). The spec or review
   page names the product for each.
+- **R-72** Two kinds of work. A real task, such as coding, is a thread: a full
+  coding agent (Claude Code, Codex) does it, and it is listed in the thread
+  list. A web task is the bot's own: the bot runs it as a sub-agent (分身) with
+  its own browser, and can run several at once. A sub-agent is never listed
+  as a thread and has no name or avatar of its own; in the chat it shows as
+  one card per web task with its live screen and a step line (进行中, 需要你操作,
+  完成), and the bot itself reports what it did, in its own voice. The user
+  never drives a sub-agent's screen. When a site needs a login, the card shows
+  需要你操作, the bot says it in one message, and a 登录 <site> pill appears
+  under it. Tapping the pill expands it in place into the login card (logo,
+  登录 <site>, ✕; 邮箱, 密码; Google, Apple, 登录; 🔒 Secured by Mikka); ✕
+  shrinks it back. No sheet and no sentence in the card. The login is saved
+  to the user's encrypted vault (bound to the account, not one-time) and every
+  thread and bot sub-agent of that user can use it; the model never sees it.
+  Browsing is open to every site, with no allowlist. Once saved, the card collapses to 已登录 <site>.
 
 ## Look
 
@@ -224,7 +248,19 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   this on 2026-10-23 and 2026-10-24). If a sentence only explains the screen
   or narrates state, remove it. Examples that were removed: 「谁在工作 · 1 个
   agent 正在处理任务」 above the composer, 「和你的 Coordinator 聊聊」,
-  「有值得看的会第一时间放到这里」.
+  「有值得看的会第一时间放到这里」, and on a login sheet the subtitle
+  「Mikka 会把密码直接填进 Cloudflare 登录页，然后接着检查隧道。」 and the
+  small print 「密码只填进 Cloudflare 的登录页，Mikka 不保存，也不会给 AI
+  看」 (2026-10-27).
+  - A sheet or dialog is a title, its fields and its button. No subtitle that
+    says what will happen next.
+  - Reassurance (privacy, security) is a short mark, never a sentence: a lock
+    and 「Secured by Mikka」, as Stripe's 「Secured by Stripe」.
+  - A status line names the state only (「已登录 Cloudflare」), not the next
+    step (「…，继续检查」).
+  - Test: delete the string. If the screen still says the same thing, keep it
+    deleted. This applies to copy written in specs and agent briefs too: do not
+    hand a designer or subagent an explanatory sentence to draw.
 - **R-41** An empty state is one colloquial line plus one button (often
   "send to a bot"). Never "这里是空的" or "Check back later".
 - **R-42** Every visible string lives in `messages/zh-CN.json` and

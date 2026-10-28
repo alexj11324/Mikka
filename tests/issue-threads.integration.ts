@@ -58,9 +58,15 @@ test('real actions keep thread content with its owner; current members see only 
     await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: otherRun, text: 'Wrong issue' })))
     await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: '   ' })))
     // Stopping stays with the owner.
-    await requestRunStop(viewer, run)
+    await assert.rejects(requestRunStop(viewer, run), /runNotFound/)
     const {rows:[unchanged]} = await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1',[run])
     assert.equal(unchanged.stopRequestedAt,null)
+    await requestRunStop(owner, run)
+    const {rows:[stopped]} = await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1',[run])
+    assert.ok(stopped.stopRequestedAt instanceof Date)
+    await requestRunStop(owner, run)
+    const {rows:[repeated]} = await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1',[run])
+    assert.equal(repeated.stopRequestedAt.getTime(),stopped.stopRequestedAt.getTime())
     // Suspension or removal from the workspace ends access, even with stale direct membership.
     await pool.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2',[workspace,removed,'suspended'])
     assert.deepEqual((await actAs(viewer,()=>listIssueThreads(issue))).map(row=>row.id),[run])

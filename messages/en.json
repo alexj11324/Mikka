@@ -943,6 +943,7 @@
     "runNotFound": "This run does not exist.",
     "artifactNotFound": "This artifact does not exist.",
     "messageRequired": "A message cannot be empty.",
+    "submissionConflict": "This submission ID was already used for a different message.",
     "pendingActionUnavailable": "This action was already handled or has expired.",
     "deviceSaveFailed": "The save failed. Please try again.",
     "tokenCreateFailed": "Could not create a token. Please try again.",

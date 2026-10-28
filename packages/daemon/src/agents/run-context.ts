@@ -1,3 +1,4 @@
+import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../../../../lib/personal-agent-message'
 // What every real harness adapter needs about one run: the sandbox policy,
 // the Mikka MCP server (hand-in tools) and the handoff file it writes, and
 // the instructions that tell the agent how a run ends.
@@ -288,6 +289,7 @@ export class RunContext {
       runInstructions(this.worktree, this.options.policy),
       this.options.kind === "plan" ? planInstructions() : "",
       skills,
+      PERSONAL_MESSAGE_INSTRUCTIONS,
     ]
       .filter(Boolean)
       .join("\n\n")

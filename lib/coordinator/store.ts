@@ -1,3 +1,4 @@
+import { sourcedEventMessage } from './message-safety'
 import { visibleRuns } from '@/lib/agent-runs'
 import { issueForUser } from '@/lib/issue-access'
 import { issueVisibility } from '@/lib/issue-visibility'
@@ -106,7 +107,7 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     const first = await nextPosition(tx, userId, botId)
     await tx.insert(coordinatorMessages).values(events.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
-      message: { role: 'user', content: eventPrompt(event) } satisfies ModelMessage,
+      message: sourcedEventMessage({ ...event, deliveredAt: now }, eventPrompt(event)),
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
     const handoffs = events.filter(event => isHandoff(event.kind))

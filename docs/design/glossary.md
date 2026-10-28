@@ -10,15 +10,19 @@ Decided by Alex, 2026-10-24.
 
 | Word | 中文 | What it is | Where it shows | Its name |
 | --- | --- | --- | --- | --- |
-| **Bot** | Bot | Chats with people and dispatches tasks to threads. It does not do the work itself. The user creates it (Grok Bot style) and can put several bots in a group chat. The Coordinator is a bot too. Stored in its own `bots` table (name, colour, shape) and runs on Mikka's AI SDK harness; it is not a row in `agents`. | **Bot list** (left column), one row per bot or group chat. | The bot's own name, e.g. "Mikka Frontend". |
+| **Bot** | Bot | Chats with people. Does web tasks itself through sub-agents (分身, R-72), each with its own browser, and dispatches real tasks such as coding to threads. The user creates it (Grok Bot style) and can put several bots in a group chat. The Coordinator is a bot too. Stored in its own `bots` table (name, colour, shape) and runs on Mikka's AI SDK harness; it is not a row in `agents`. | **Bot list** (left column), one row per bot or group chat. | The bot's own name, e.g. "Mikka Frontend". |
 | **Chat** | 对话 | The conversation between a person and the selected bot or group chat. | **Center column**. Header pill = the bot's (or group's) name. | Same as the bot or group. It has no name of its own. |
 | **Thread** | 线程 | Does the work a bot dispatched: one run (`agent_runs`), usually tied to a task. A bot can have many threads at once. | **Thread list** (right column), plus the thread view and its computer. | Its own name, about the work, e.g. "#66 群聊前端骨架" or "MIK-11 群聊建表". Never the bot's name. |
 
 How they connect: a person chats with a bot (center). The bot dispatches
-tasks to threads, which do the work (right). Every thread belongs to exactly one bot (the one that
-dispatched it), but a thread is never drawn with that bot's bloub avatar: the
-bloub stands for a bot, and bots do not do the work. A thread is shown by its
-status icon (Alex, 2026-10-27). The computer a thread uses is its bot's computer.
+real tasks such as coding to threads, which do the work (right). A web task
+stays with the bot: one of its sub-agents (分身) does it in its own browser,
+it shows only as a card in the chat, never in the thread list, and the bot
+reports the result itself (R-72). Every thread belongs to exactly one bot (the
+one that dispatched it), but a thread is never drawn with that bot's bloub
+avatar: the bloub stands for a bot, and bots do not do the work. A thread is
+shown by its status icon (Alex, 2026-10-27). The computer a thread uses is its
+bot's computer.
 
 ## Rules for designs
 
