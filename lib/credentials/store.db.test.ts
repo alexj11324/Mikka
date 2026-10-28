@@ -113,7 +113,14 @@ test('real PostgreSQL: observed credential lease inserts once and stays guarded'
     await store.save(actor, { nonce: challenge.nonce, origin, username: 'fixture-user', password: 'synthetic-fixture' })
     const target = { targetId: 'fixture-target', origin, endpoint: 'https://fixture.e2b.app/', expiresAt: Date.now() + 60000, observedInput: { loaderId: 'fixture-loader', backendNodeId: 7, credentialRole: 'password' as const, epoch: 1, permissionVersion: 1 } }
     const cdp = { async attach() {}, async origin() {}, async call() { return { frameTree: { frame: { url: origin, loaderId: 'fixture-loader' } } } }, async insertAtObservedInput(_origin: string, _loader: string, _node: number, _role: string, value: string) { assert.equal(value, 'synthetic-fixture'); inserted++ }, close() {} }
-    const guard = { async begin() { return { cdpUrl: 'wss://fixture.e2b.app/', targetId: 'fixture-target', guardToken: 'fixture' } }, async end() { ended = true } }
+    const guard = { async begin() {
+      const observer = await pool.connect()
+      try {
+        await observer.query('BEGIN')
+        await assert.rejects(observer.query('SELECT id FROM bot_subagents WHERE id=$1 FOR UPDATE NOWAIT', [actor.subagentId]), (error: unknown) => (error as { code?: string }).code === '55P03')
+      } finally { await observer.query('ROLLBACK'); observer.release() }
+      return { cdpUrl: 'wss://fixture.e2b.app/', targetId: 'fixture-target', guardToken: 'fixture' }
+    }, async end() { ended = true } }
     const lease = await store.lease(actor, origin, target, undefined, true)
     if (lease.status !== 'ready') throw new Error('fixture lease not issued')
     assert.deepEqual(await fillCredential(pool, lease.lease, { kms, guard, connect: (async () => cdp) as never }), { status: 'guarded', origin })
