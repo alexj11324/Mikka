@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { accountUpdateSchema, composioConnectRedirect, revokeAndForgetAccount, isDuplicateAliasError, pickDefaultAccountId, PROVIDER_IDENTITY, safeReturnPath, sanitizeEmail, slackUserEmail, slackUserId, toConnectedAccountView, withAccountRecords } from './composio-accounts'
+import { accountUpdateSchema, composioConnectRedirect, disconnectAndForgetAccount, isDuplicateAliasError, pickDefaultAccountId, PROVIDER_IDENTITY, safeReturnPath, sanitizeEmail, slackUserEmail, slackUserId, toConnectedAccountView, withAccountRecords } from './composio-accounts'
 import { decodeComposioFlow, encodeComposioFlow } from './composio-flow'
 
 const account = { id: 'ca_1', status: 'ACTIVE', isDisabled: false, alias: null as string | null, createdAt: '2026-10-28T10:00:00.000Z', toolkit: { slug: 'gmail' } }
@@ -41,19 +41,18 @@ test('an update either switches an account or renames it, never both', () => {
   assert.equal(accountUpdateSchema.safeParse({ accountId: 'ca_1', default: false }).success, false)
 })
 
-test('revocation failure leaves the alias and stored account untouched, including 400 and 409', async () => {
+test('failed explicit disconnect never falls back or forgets the stored account, including 400 and 409', async () => {
   for (const status of [400, 409, 503]) {
     const calls: string[] = []
-    await assert.rejects(revokeAndForgetAccount({
-      revoke: async () => { calls.push('revoke'); throw new Error(String(status)) },
-      clearAlias: async () => { calls.push('clear') },
+    await assert.rejects(disconnectAndForgetAccount({
+      disconnect: async () => { calls.push('disconnect'); throw new Error(String(status)) },
       forget: async () => { calls.push('forget') },
-    }, true))
-    assert.deepEqual(calls, ['revoke'])
+    }))
+    assert.deepEqual(calls, ['disconnect'])
   }
   const calls: string[] = []
-  await revokeAndForgetAccount({ revoke: async () => { calls.push('revoke') }, clearAlias: async () => { calls.push('clear') }, forget: async () => { calls.push('forget') } }, true)
-  assert.deepEqual(calls, ['revoke', 'clear', 'forget'])
+  await disconnectAndForgetAccount({ disconnect: async () => { calls.push('disconnect') }, forget: async () => { calls.push('forget') } })
+  assert.deepEqual(calls, ['disconnect', 'forget'])
 })
 
 test('choose only an explicit usable default or a sole usable account', () => {

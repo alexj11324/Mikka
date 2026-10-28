@@ -189,14 +189,12 @@ export function isDuplicateAliasError(error: unknown) {
   return status === 409 || (typeof message === 'string' && /alias/i.test(message) && /(unique|already|exist|duplicate|taken|conflict)/i.test(message))
 }
 
-/** Revoke before clearing any alias. SDK HTTP-status wrappers do not prove
- * a delete is safe, so errors leave the account and its alias untouched. */
-export async function revokeAndForgetAccount(deps: {
-  revoke: () => Promise<unknown>
-  clearAlias: () => Promise<unknown>
+/** Complete the person's explicit disconnect before forgetting local metadata.
+ * No HTTP-status-based fallback may choose another destructive operation. */
+export async function disconnectAndForgetAccount(deps: {
+  disconnect: () => Promise<unknown>
   forget: () => Promise<unknown>
-}, hasAlias: boolean) {
-  await deps.revoke()
-  if (hasAlias) await deps.clearAlias().catch(() => undefined)
+}) {
+  await deps.disconnect()
   await deps.forget()
 }

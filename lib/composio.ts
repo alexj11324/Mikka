@@ -1,7 +1,7 @@
 import 'server-only'
 import { Composio } from '@composio/core'
 import { COMPOSIO_ACTIONS, executeComposioAction, resolveComposioAccount, type ComposioActionName, type ComposioActionResult } from '@/lib/composio-actions'
-import { COMPOSIO_APP_IDS, revokeAndForgetAccount, PROVIDER_IDENTITY, providerAnswer, SLACK_USER_INFO, sanitizeEmail, slackAnswer, slackUserEmail, slackUserId, type ComposioAppId } from '@/lib/composio-accounts'
+import { COMPOSIO_APP_IDS, disconnectAndForgetAccount, PROVIDER_IDENTITY, providerAnswer, SLACK_USER_INFO, sanitizeEmail, slackAnswer, slackUserEmail, slackUserId, type ComposioAppId } from '@/lib/composio-accounts'
 import { chosenComposioDefault, forgetComposioAccount } from '@/lib/composio-account-store'
 
 export const COMPOSIO_TOOLKITS = COMPOSIO_APP_IDS
@@ -60,13 +60,17 @@ export async function readComposioAccountEmail(composio: ComposioClient, userId:
 
 /**
  * Disconnects one of the person's accounts and forgets Mikka's notes on it.
- * The alias is cleared only after revocation succeeds, so a failed revoke
- * leaves the old account name intact.
+ * Callers first verify ownership and an explicit disconnect/reconnect request.
+ * The documented delete endpoint stops calls immediately, frees the alias,
+ * and requests best-effort upstream revocation. Never infer deletion permission
+ * from a revoke error. Upstream revocation may finish asynchronously.
  */
-export async function retireComposioAccount(composio: ComposioClient, userId: string, accountId: string, alias?: string | null) {
-  await revokeAndForgetAccount({
-    revoke: () => composio.connectedAccounts.revoke(accountId),
-    clearAlias: () => renameComposioAccount(composio, accountId, ''),
+export async function retireComposioAccount(composio: ComposioClient, userId: string, accountId: string) {
+  await disconnectAndForgetAccount({
+    disconnect: async () => {
+      const result = await composio.getClient().connectedAccounts.delete(accountId, { revoke_on_delete: true })
+      if (!result.success) throw new Error('integrationDisconnectFailed')
+    },
     forget: () => forgetComposioAccount(userId, accountId),
-  }, Boolean(alias))
+  })
 }
