@@ -123,6 +123,7 @@ async def main():
                     stdout,stderr=await asyncio.wait_for(node.communicate(),30)
                     if node.returncode:raise RuntimeError('Actual broker client failed: '+stderr.decode())
                     assert stdout.decode().startswith('PASS: actual broker client')
+                    await browser.rpc('Runtime.evaluate',{'expression':'window.focusHijacked=false;window.inputEvents=0','returnByValue':True})
                     async with client.ws_connect(endpoint) as ws:
                         session=await attach(ws)
                         try:
