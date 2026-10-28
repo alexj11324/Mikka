@@ -57,6 +57,11 @@ function guardContextRequests(context: BrowserContext, scope: AccountScope, orig
  * Raw authentication values stay inside the protected runner files/context.
  */
 export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page }>({
+  // Traces and recordings can retain auth headers and input values. Keep these
+  // options on this fixture type so importing it never changes another suite.
+  trace: 'off',
+  video: 'off',
+  screenshot: 'off',
   testAccounts: async ({ browser }, use, testInfo) => {
     const environment = await loadEnvironment()
     const scope = await acquireTestAccounts({
@@ -153,7 +158,4 @@ export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page 
   peerPage: async ({ testAccounts }, use) => { await use(testAccounts.peer.page) },
 })
 
-// Playwright traces/HAR/video include authentication headers and input values.
-// Keep those disabled for leased sessions; tests attach selected masked images.
-test.use({ trace: 'off', video: 'off', screenshot: 'off' })
 export { expect }
