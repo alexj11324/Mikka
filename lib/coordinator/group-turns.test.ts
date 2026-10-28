@@ -154,6 +154,14 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await send(id,'later'); assert.equal(await processGroupTurn(scoped,id,{...runtime}),true) // new runtime loads persisted correction
     assert.equal((await scoped.query('SELECT count(*)::int n FROM group_routing_corrections WHERE "conversationId"=$1',[id])).rows[0].n,1)
     assert.deepEqual((await scoped.query('SELECT "decisionExecution" FROM group_routing_corrections WHERE "conversationId"=$1',[id])).rows[0].decisionExecution,receipt)
+    const revokedCorrection = await send(id, 'correction during removal', [b])
+    await assert.rejects(processGroupTurn(scoped,id,{...runtime,async correction() {
+      const removed = await handleGroup(scoped,directory,{...base,resource:'members',method:'DELETE',id,body:JSON.stringify({memberType:'agent',memberId:b})},true)
+      assert.equal(removed.status,200)
+      return {kind:'correction',rightId:b,execution:receipt}
+    }}), GroupJudgmentPendingError)
+    assert.equal((await scoped.query('SELECT count(*)::int n FROM group_routing_corrections WHERE "messageId"=$1',[revokedCorrection])).rows[0].n,0)
+    await handleGroup(scoped,directory,{...base,resource:'members',method:'POST',id,body:JSON.stringify({memberType:'agent',memberId:b})},true)
     const awaitingJudgment = await send(id, 'quoted denial', [b])
     await assert.rejects(processGroupTurn(scoped, id, {...runtime, async correction() { return {kind:'uncertain'} }}), GroupJudgmentPendingError)
     assert.equal((await scoped.query('SELECT count(*)::int n FROM group_routing_corrections WHERE "conversationId"=$1', [id])).rows[0].n, 1)

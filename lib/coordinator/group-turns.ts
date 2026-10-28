@@ -62,10 +62,19 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       const route = previous.rows[0].route as GroupRoute
       const prior = route.responders.length === 1 && route.by !== 'mention' ? { message: previous.rows[0].body as string, responderId: route.responders[0] } : null
       const judgment = prior ? await runtime.correction({ previous: prior, current: input, members }) : null
-      const correction = prior && judgment ? checkedCorrection(judgment, prior, await eligible()) : null
-      if (correction === 'uncertain') throw new GroupJudgmentPendingError()
-      if (correction && judgment?.kind === 'correction' && judgment.execution) await client.query(`INSERT INTO group_routing_corrections ("messageId","conversationId",message,"wrongId","rightId","decisionExecution") VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, [messageId, conversationId, correction.message, correction.wrongId, correction.rightId ?? null, JSON.stringify(judgment.execution)])
-      else if (correction) throw new GroupJudgmentPendingError()
+      if (judgment?.kind === 'uncertain') throw new GroupJudgmentPendingError()
+      if (prior && judgment?.kind === 'correction') {
+        // Membership mutations acquire the same row lock. Revalidate and persist
+        // together so a removed member cannot become a stored correction fact.
+        await client.query('BEGIN')
+        try {
+          await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [conversationId])
+          const correction = checkedCorrection(judgment, prior, await eligible())
+          if (!correction || correction === 'uncertain' || !judgment.execution) throw new GroupJudgmentPendingError()
+          await client.query(`INSERT INTO group_routing_corrections ("messageId","conversationId",message,"wrongId","rightId","decisionExecution") VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, [messageId, conversationId, correction.message, correction.wrongId, correction.rightId ?? null, JSON.stringify(judgment.execution)])
+          await client.query('COMMIT')
+        } catch (error) { await client.query('ROLLBACK'); throw error }
+      }
     }
     if (!members.length) throw new MissingGroupLeadError()
     {
