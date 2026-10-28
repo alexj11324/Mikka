@@ -4,6 +4,7 @@ import { createIssueInput, updateIssueInput } from './issue-input'
 import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
 import { AGENT_TOOL_IDS } from '@/lib/agent-kit/registry'
 import { issueMutationsEnabled } from './issue-tools-enabled'
+import { COORDINATOR_INSTRUCTIONS } from './instructions'
 
 const created = mock.fn(async () => ({ id: 'created' }))
 const updated = mock.fn(async () => ({ id: 'updated' }))
@@ -23,6 +24,7 @@ test('rollout defaults off and never widens a frozen execution grant', () => {
   const disabled = registry.createCoordinatorRegistry('owner', null)
   assert.equal(disabled.create_issue, undefined)
   assert.equal(disabled.update_issue, undefined)
+  assert.doesNotMatch(COORDINATOR_INSTRUCTIONS, /When task mutation tools are available|Respect the machine selected in a new-task request/)
   type Execution = NonNullable<NonNullable<Parameters<typeof registry.coordinatorTools>[3]>['execution']>
   const executionFor = (effectiveTools: string[]) => ({ id: 'execution', snapshot: { effectiveTools } }) as unknown as Execution
   assert.deepEqual(Object.keys(registry.coordinatorTools('owner', null, undefined, { execution: executionFor(['create_issue', 'get_issue']) })), ['get_issue'])

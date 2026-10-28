@@ -31,6 +31,11 @@ existing external MCP create/update path retains its pre-rollout behavior
 without querying `issue_tool_calls`. Enabling a flag never adds tools absent
 from an execution's recorded `effectiveTools`.
 
+The legacy MCP schema retains agent assignment and does not offer the new
+human-assignee field. Unknown MCP fields are rejected instead of silently
+discarded; direct no-tool-ID human-assignee calls fail before any write. The
+human-assignee path is available only through the guarded durable tool.
+
 The operator must first verify the actual application database binding, apply
 the reviewed `drizzle/20261028015330_issue_tool_calls.sql` to an authorized
 target and verify its schema/primary key, then separately authorize enablement.

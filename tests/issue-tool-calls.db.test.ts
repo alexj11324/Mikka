@@ -44,6 +44,12 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     assert.deepEqual(await createIssue(stranger, { title: 'Ambiguous', assigneeAgentId: null, assigneeUserId: stranger }, actor), { error: 'validationGeneric' })
     assert.deepEqual(await createIssue(stranger, { title: 'Queued step after shutdown' }, actor, `disabled-${randomUUID()}`), { error: 'issueToolsDisabled' })
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM issue_tool_calls WHERE "userId"=$1', [stranger])).rows[0].n, 0, 'disabled rollout preserves legacy MCP behavior without a receipt dependency')
+    for (let retry = 0; retry < 2; retry++) {
+      assert.deepEqual(await createIssue(owner, { title: 'Unapproved human assignment', assigneeUserId: stranger }, actor), { error: 'issueToolsDisabled' })
+      assert.equal(await count('issues'), 0)
+      assert.equal(await count('issue_versions'), 0)
+      assert.equal(await count('issue_tool_calls'), 0)
+    }
     process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
     // The actual registered Workflow tool invokes its scoped step and shared
     // actions. No test-only issue writer stands in for the Coordinator.
@@ -94,6 +100,11 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     await unchanged(() => updateIssue(owner, { issueId: id, assigneeUserId: stranger }, actor, `suspended-assignee-${randomUUID()}`))
     await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [workspace, stranger])
     await unchanged(() => updateIssue(owner, { issueId: id, assigneeUserId: stranger }, actor, `removed-assignee-${randomUUID()}`))
+    for (let retry = 0; retry < 2; retry++) {
+      const before = (await pool.query('SELECT title,content,revision FROM issues WHERE id=$1', [id])).rows[0]
+      assert.deepEqual(await updateIssue(owner, { issueId: id, title: 'No partial edit', assigneeUserId: stranger }, actor), { error: 'issueToolsDisabled' })
+      assert.deepEqual((await pool.query('SELECT title,content,revision FROM issues WHERE id=$1', [id])).rows[0], before)
+    }
 
     const updateCall = `update-${randomUUID()}`
     const changed = await updateIssue(owner, { issueId: id, title: 'Updated title', status: 'doing' }, actor, updateCall)
