@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { revokeSyntheticMailboxCredentials } from '../scripts/personal-mailbox-ci-cleanup.mjs'
 import { assertPersonalMailboxCITarget } from '../scripts/personal-mailbox-ci-target.mjs'
 import { loadEnvironment, assertDatabaseIdentity } from '../scripts/test-accounts/environment.mjs'
 
@@ -79,8 +80,7 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
   } finally {
     // Retain all records; expire only this nonce's synthetic capabilities.
     try {
-      await pool.query('update run_tokens set "revokedAt"=coalesce("revokedAt",now()) where "runId"=$1 and "userId"=$2', [runId, owner])
-      await pool.query('update device_tokens set "revokedAt"=now() where id=$1 and "userId"=$2', [deviceTokenId, owner])
+      await revokeSyntheticMailboxCredentials(pool, { runId, owner, deviceTokenId })
     } finally { await Promise.all([pool.end(), workspacePool.end()]) }
   }
 })
