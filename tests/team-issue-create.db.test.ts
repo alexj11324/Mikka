@@ -1,6 +1,6 @@
-import { scopeSubtest } from './support/scope-acceptance.mjs'
+import { scopeSubtest,teamResumeBootstrap } from './support/scope-acceptance.mjs'
 import 'next/dist/server/node-environment-baseline'
-import './fixtures/team-auth-runtime.mjs'
+import { installTeamSessionFixture } from './fixtures/team-auth-runtime.mjs'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
@@ -22,15 +22,24 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   const suffix=randomUUID().replaceAll('-','')
   const appName=process.env.ISSUE184_LOCAL_TEST === '1' ? 'team184_app_69649a2f38184d8b8edf1fe6a6524f31_e2e' : `team184_app_${suffix}_e2e`
   const workspaceName=process.env.ISSUE184_LOCAL_TEST === '1' ? 'team184_workspace_1bf3cc4e4430443c841d27f4a5115dc9_e2e' : `team184_workspace_${suffix}_e2e`
+  const resumed=await teamResumeBootstrap(appName,workspaceName)
+  if(!resumed){
   const admin=new Pool({connectionString:url,max:1})
   try { await admin.query(`create database "${appName}"`);await admin.query(`create database "${workspaceName}"`) } finally {await admin.end()}
+  }
   const appUrl=new URL(url!), workspaceUrl=new URL(url!);appUrl.pathname=`/${appName}`;workspaceUrl.pathname=`/${workspaceName}`
   process.env.MIKKA_DATABASE_URL=appUrl.toString();process.env.DATABASE_URL=workspaceUrl.toString()
-  await promisify(execFile)(process.execPath,['scripts/migrate.mjs'],{env:{...process.env,MIGRATE:'1',VERCEL_ENV:''},maxBuffer:4<<20})
+  if(!resumed)await promisify(execFile)(process.execPath,['scripts/migrate.mjs'],{env:{...process.env,MIGRATE:'1',VERCEL_ENV:''},maxBuffer:4<<20})
   const app=new Pool({connectionString:appUrl.toString(),max:5}), workspace=new Pool({connectionString:workspaceUrl.toString(),max:6})
   const originalFetch=globalThis.fetch;let externalCalls=0
   globalThis.fetch=(async(input,init)=>{ const target=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url); if(target.hostname==='127.0.0.1') return originalFetch(input,init); externalCalls++;throw new Error('Real provider requests prohibited') }) as typeof fetch
   t.after(async()=>{globalThis.fetch=originalFetch;await Promise.all([app.end(),workspace.end()])})
+  const {auth}=await import('../lib/auth')
+  const restoreAuth=installTeamSessionFixture(auth)
+  t.after(restoreAuth)
+  // Let the real initialization finish against the selected test DB before
+  // task fixtures. No auth endpoints or external identity providers are called.
+  await auth.$context
   const {actAs}=await import('../lib/acting-user')
   const {agentActor,userActor}=await import('../lib/activity-actor')
   const {workspaceDb}=await import('../lib/workspace-db')

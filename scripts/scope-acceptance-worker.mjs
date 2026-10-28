@@ -31,7 +31,7 @@ const phase = process.env.SCOPE_ACCEPTANCE_PHASE, mode = process.env.SCOPE_ACCEP
 // connection; all subsequent constructors go through the target/timeouts gate.
 const pg = (await import('pg')).default
 runtime = scopeNativeRuntime(pg, rpc, phase, mode)
-runtime.install(frozenSources,manifest.mode==='resume-scope-after-bootstrap'&&phase==='scope'&&mode==='suite')
+runtime.install(frozenSources,manifest.mode==='resume-scope-after-bootstrap'&&phase==='scope'&&mode==='suite',manifest.mode==='team-after-migrated-empty'&&phase==='team'&&mode==='suite')
 if (mode !== 'migrate') after(async () => {
   try { await runtime.close();await rpc('finished', runtime.stats()) }
   finally { completed=true;if(process.connected)process.disconnect() }

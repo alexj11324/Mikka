@@ -189,8 +189,8 @@ export function scopeNativeRuntime(pg, rpc, phase, mode) {
   }
   function cancel() { stopped=true;for(const server of servers){server.closeAllConnections?.();server.close()} }
   function abort(error) { cancel();void rpc('failure', { reason: error?.message ?? 'scope subtest failed' }).catch(() => {}) }
-  function install(frozenSources = new Map(), resumeScope = false) {
-    globalThis.scopeAcceptance = { Pool, Client, abort, ...(resumeScope?{resumeScope:database=>rpc('resume-scope',{database})}:{}) }
+  function install(frozenSources = new Map(), resumeScope = false, resumeTeam = false) {
+    globalThis.scopeAcceptance = { Pool, Client, abort, ...(resumeScope?{resumeScope:database=>rpc('resume-scope',{database})}:{}), ...(resumeTeam?{resumeTeam:databases=>rpc('resume-team',{databases})}:{}) }
     registerHooks({
       load(url, context, next) {
         if(url.startsWith('file:')){const path=fileURLToPath(new URL(url));const bytes=frozenSources.get(path);if(bytes){const loaded=frozenScopeModule(path,bytes);if(loaded)return loaded}}

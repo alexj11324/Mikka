@@ -29,6 +29,12 @@ export const SELF_MANAGED = [
   { file: 'tests/byos-application.test.mjs', runner: 'scripts/test-subscription-worker.mjs', reason: 'starts an isolated BYOS Postgres and worker fixture' },
   { file: 'tests/byos-enrollment-binding.test.mjs', runner: 'scripts/test-subscription-worker.mjs', reason: 'starts an isolated BYOS Postgres and worker fixture' },
 ]
+// These import the locked driver to check its API, with native transport and
+// filesystem destruction denied. They run in the existing pure scope gate.
+export const OFFLINE_GUARDED = [
+  {file:'scripts/scope-native-offline.test.mjs',script:'test:scope-acceptance-guard',guard:'scripts/credential-diagnostics-offline.mjs',reason:'real pg/Drizzle API and denied-startup tests; no server SQL'},
+  {file:'scripts/scope-fresh.test.mjs',script:'test:scope-acceptance-guard',guard:'scripts/credential-diagnostics-offline.mjs',reason:'fresh target models and native connection rejection; no server SQL'},
+]
 // This destructive empty-database bootstrap must stay BEFORE test:e2e:setup.
 // Its workflow invocation is independently checked, not silently omitted.
 export const BOOTSTRAP = 'tests/migrate-empty-db.test.mjs'
@@ -56,12 +62,19 @@ export function validateTarget(env) {
   if (env.ORVILO_DATABASE_URL && env.ORVILO_DATABASE_URL !== env.E2E_DATABASE_URL) throw new Error('Legacy database fallback must not point outside ephemeral service')
 }
 
-export function inventory(files, scripts, expected = [], required = REQUIRED_SUITES, selfManaged = SELF_MANAGED) {
+export function inventory(files, scripts, expected = [], required = REQUIRED_SUITES, selfManaged = SELF_MANAGED, offlineGuarded = OFFLINE_GUARDED) {
   const has = path => Object.hasOwn(files, path)
   const selected = new Set()
   const covered = new Set()
   const commandHas = (command, file) => command?.split(/\s+/).includes(file)
   const excluded = new Set()
+  const offline = new Set()
+  for(const {file,script,guard,reason} of offlineGuarded){
+    if(!has(file))continue
+    const localGuard='./'+guard.split('/').at(-1)
+    if(!reason||!has(guard)||!files[file].includes(`import '${localGuard}'`)||!commandHas(scripts[script],file)||!scripts[script].includes(`--import ./${guard}`))throw Error(`Offline suite ${file} requires its source guard and explicit guarded pure script`)
+    offline.add(file)
+  }
   for (const { file, runner, reason } of selfManaged) {
     if (!has(file)) continue
     if (!reason) throw new Error(`Self-managed DB suite ${file} needs a reason`)
@@ -79,7 +92,7 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
     // Playwright DB fixtures run in the preserved server-backed browser/performance gates.
     if (!/\.(test|spec)\.(ts|mjs|js)$/.test(file) || file === BOOTSTRAP || file === 'scripts/run-db-tests.test.mjs' || file.startsWith('tests/e2e/')) continue
     const databaseBacked = /(?:\.db\.test\.|-db\.test\.)/.test(file) || /(?:from\s*['"]pg['"]|import\(['"]pg['"]\)|REQUIRE_DB|CONVERSATION_READS_REQUIRE_DB)/.test(source)
-    if (!databaseBacked || covered.has(file) || excluded.has(file)) continue
+    if (!databaseBacked || covered.has(file) || excluded.has(file) || offline.has(file)) continue
     const matches = Object.entries(scripts).filter(([name, command]) => name.startsWith('test:') && commandHas(command, file))
     if (matches.length !== 1) throw new Error(`DB test ${file} needs one explicit package test script (found ${matches.length})`)
     selected.add(matches[0][0]); covered.add(file)
@@ -88,7 +101,7 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
     if (!selected.has(name)) throw new Error(`Expected DB script not enrolled: ${name}`)
   }
   if (!selected.size) throw new Error('No database suites enrolled')
-  return { scripts: [...selected].sort(), files: [...covered].sort(), selfManaged: [...excluded].sort() }
+  return { scripts: [...selected].sort(), files: [...covered].sort(), selfManaged: [...excluded].sort(), offlineGuarded: [...offline].sort() }
 }
 
 export function readTree(root = '.') {

@@ -15,3 +15,11 @@ export async function scopeResumeBootstrap(database) {
   await resume(database)
   return true
 }
+
+export async function teamResumeBootstrap(app,workspace) {
+  const resume=globalThis.scopeAcceptance?.resumeTeam
+  if(!resume)return false
+  const databases=[app,workspace],answer=await resume(databases)
+  if(answer?.resumed!==true||answer.bootstrapReexecuted!==false||JSON.stringify(answer.databases)!==JSON.stringify(databases))throw Error('team resume bootstrap acknowledgement mismatch')
+  return true
+}

@@ -187,7 +187,7 @@ test('real pg.Query result-acknowledgement loss reaches callback/error once and 
   } finally { await native.close() }
 })
 
-for (const phase of ['scope','team']) test(`actual ${phase} suite startup and installed loader stop at the first connection boundary, offline`, { timeout: 25000 }, async () => {
+for (const phase of ['scope','team','team-resume']) test(`actual ${phase} suite startup and installed loader stop at the first connection boundary, offline`, { timeout: 25000 }, async () => {
   let failure
   try {
     await promisify(execFile)(process.execPath, ['--import','./scripts/credential-diagnostics-offline.mjs','--import','./scripts/server-test.mjs','--import','tsx','scripts/scope-native-offline-startup.mjs',phase], {

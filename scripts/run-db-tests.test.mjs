@@ -58,6 +58,15 @@ test('self-managed suites are excluded only with a reason and a live dedicated r
   assert.throws(() => inventory({ ...tree, [own.runner]: sample.file }, scripts, [], REQUIRED_SUITES, [{ ...own, file: sample.file }]), /both required and self-managed/)
   for (const entry of SELF_MANAGED) assert.ok(entry.reason && entry.runner)
 })
+test('real-driver offline exclusions require the actual source guard and the explicit pure script',()=>{
+  const entry={file:'scripts/offline.test.mjs',script:'test:offline',guard:'scripts/guard.mjs',reason:'reviewed zero-transport test'}
+  const tree={...files,[entry.file]:"import './guard.mjs'; import pg from 'pg'",[entry.guard]:'deny native transport'}
+  const commands={...scripts,[entry.script]:`node --import ./${entry.guard} --test ${entry.file}`}
+  assert.deepEqual(inventory(tree,commands,[],REQUIRED_SUITES,[],[entry]).offlineGuarded,[entry.file])
+  assert.throws(()=>inventory({...tree,[entry.file]:"import pg from 'pg'"},commands,[],REQUIRED_SUITES,[],[entry]),/source guard/)
+  assert.throws(()=>inventory(tree,{...commands,[entry.script]:`node --test ${entry.file}`},[],REQUIRED_SUITES,[],[entry]),/source guard/)
+  assert.throws(()=>inventory(tree,commands,[],REQUIRED_SUITES,[],[{...entry,reason:''}]),/source guard/)
+})
 test('this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')).scripts
   const tree = readTree()
