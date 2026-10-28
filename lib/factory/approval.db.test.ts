@@ -4,7 +4,10 @@ import test from "node:test";
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { FactoryError } from "./approval-contract";
 import { handleFactoryApproval } from "./approval-http";
-import { PublicationDeferred } from "./publication-operation";
+import {
+  PublicationDeferred,
+  publicationBindingHash,
+} from "./publication-operation";
 import {
   createVercelPublicationAdapter,
   MIKKA_VERCEL,
@@ -37,6 +40,213 @@ test(
     const f = await factory194Fixture(db!);
     try {
       const { actor, pool, provider } = f;
+      await t.test(
+        "policy allow publishes for authenticated backend owner without any human session prerequisite",
+        async () => {
+          const backendActor = { userId: actor.userId },
+            x = await f.prepare(backendActor);
+          const p = await x.publication(),
+            before = provider.posts();
+          const result = await f.service().publish(backendActor, p);
+          assert.ok(result);
+          assert.equal(provider.posts(), before + 1);
+          const grant = (
+            await pool.query(
+              'SELECT "humanSessionId","decisionCredentialId","decisionEvidence" FROM factory_approvals WHERE id=$1',
+              [p.approvalId],
+            )
+          ).rows[0];
+          assert.equal(grant.humanSessionId, null);
+          assert.equal(
+            grant.decisionCredentialId,
+            x.approval.decisionCredentialId,
+          );
+          assert.equal(grant.decisionEvidence.decision, "allow");
+          const tx = await pool.connect();
+          try {
+            const receipt = await readFactoryPublicationReceiptV2(
+              tx,
+              actor.userId,
+              x.task.id,
+              x.task.candidateId!,
+            );
+            assert.equal(receipt.publicationId, result.publicationId);
+            assert.equal(
+              receipt.verifiedTarget.provider?.bindingHash,
+              result.receipt.verifiedTarget.provider?.bindingHash,
+            );
+            const forged = structuredClone(grant.decisionEvidence);
+            forged.verification.signatureDigest = "e".repeat(64);
+            await pool.query(
+              'UPDATE factory_approvals SET "decisionEvidence"=$2 WHERE id=$1',
+              [p.approvalId, JSON.stringify(forged)],
+            );
+            await rejects(
+              () =>
+                readFactoryPublicationReceiptV2(
+                  tx,
+                  actor.userId,
+                  x.task.id,
+                  x.task.candidateId!,
+                ),
+              "factoryPublicationReceiptRequired",
+            );
+            await pool.query(
+              'UPDATE factory_approvals SET "decisionEvidence"=NULL WHERE id=$1',
+              [p.approvalId],
+            );
+            await rejects(
+              () =>
+                readFactoryPublicationReceiptV2(
+                  tx,
+                  actor.userId,
+                  x.task.id,
+                  x.task.candidateId!,
+                ),
+              "factoryPublicationReceiptRequired",
+            );
+          } finally {
+            await pool.query(
+              'UPDATE factory_approvals SET "decisionEvidence"=$2 WHERE id=$1',
+              [p.approvalId, JSON.stringify(grant.decisionEvidence)],
+            );
+            tx.release();
+          }
+        },
+      );
+      await t.test(
+        "only existing policy ask needs its decision-bound confirmation; deny and missing authority never become a second human fallback",
+        async () => {
+          const backendActor = { userId: actor.userId },
+            before = provider.posts();
+          for (const mode of ["ask", "deny"] as const) {
+            const x = await f.prepare(backendActor),
+              d = f.decisions.get(x.approval.decisionCredentialId)!;
+            d.decision = mode;
+            await rejects(
+              () => x.approve(),
+              mode === "ask"
+                ? "factoryPolicyConfirmationRequired"
+                : "factoryPolicyDenied",
+            );
+            assert.equal(
+              (
+                await pool.query(
+                  'SELECT count(*)::int AS n FROM factory_approvals WHERE "taskId"=$1',
+                  [x.task.id],
+                )
+              ).rows[0].n,
+              0,
+            );
+            if (mode === "ask") {
+              d.confirmation = {
+                decisionId: d.credentialId,
+                ownerId: actor.userId,
+                sessionId: actor.sessionId,
+                scopeDigest: d.scopeDigest,
+                confirmedAt: new Date().toISOString(),
+                expiresAt: d.expiresAt,
+              };
+              const p = await x.publication();
+              assert.ok(p.approvalId);
+              assert.equal(
+                (
+                  await pool.query(
+                    'SELECT "humanSessionId" FROM factory_approvals WHERE id=$1',
+                    [p.approvalId],
+                  )
+                ).rows[0].humanSessionId,
+                actor.sessionId,
+              );
+            }
+          }
+          const x = await f.prepare(backendActor);
+          await rejects(
+            () => f.service(undefined, null).approve(backendActor, x.approval),
+            "factoryPolicyDecisionUnavailable",
+          );
+          await rejects(
+            () =>
+              f
+                .service()
+                .approve(backendActor, { ...x.approval, decision: "allow" }),
+            "factoryInvalid",
+          );
+          assert.equal(provider.posts(), before);
+        },
+      );
+      await t.test(
+        "one policy credential cannot create another grant, move to another task or repeat an effect",
+        async () => {
+          const backendActor = { userId: actor.userId },
+            x = await f.prepare(backendActor);
+          const first = await x.approve(),
+            again = await x.approve();
+          assert.equal(first.approvalId, again.approvalId);
+          await rejects(
+            () =>
+              f.service().approve(backendActor, {
+                ...x.approval,
+                eventId: randomUUID(),
+              }),
+            "factoryStale",
+          );
+          const other = await f.prepare(backendActor);
+          await rejects(
+            () =>
+              f.service().approve(backendActor, {
+                ...other.approval,
+                decisionCredentialId: x.approval.decisionCredentialId,
+              }),
+            "factoryPolicyDecisionMismatch",
+          );
+          assert.equal(
+            (
+              await pool.query(
+                'SELECT count(*)::int AS n FROM factory_approvals WHERE "decisionCredentialId"=$1',
+                [x.approval.decisionCredentialId],
+              )
+            ).rows[0].n,
+            1,
+          );
+          // The existing grant table itself enforces the one-credential invariant.
+          await assert.rejects(
+            () =>
+              pool.query(
+                `INSERT INTO factory_approvals SELECT $1,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","decisionCredentialId","decisionScope","decisionEvidence",$2,request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt","revokedAt","createdAt" FROM factory_approvals WHERE id=$3`,
+                [randomUUID(), randomUUID(), first.approvalId],
+              ),
+            (e: unknown) =>
+              e instanceof Error && "code" in e && e.code === "23505",
+          );
+        },
+      );
+      await t.test(
+        "policy revoked during provider project preflight prevents POST without asking a human again",
+        async () => {
+          const backendActor = { userId: actor.userId },
+            x = await f.prepare(backendActor),
+            p = await x.publication();
+          const before = provider.posts(),
+            requestCount = provider.requests.length;
+          provider.state.projectDelayMs = 250;
+          const pending = f.service().publish(backendActor, p);
+          try {
+            for (
+              let i = 0;
+              i < 100 && provider.requests.length === requestCount;
+              i++
+            )
+              await new Promise((r) => setTimeout(r, 5));
+            assert.ok(provider.requests.length > requestCount);
+            f.decisions.get(x.approval.decisionCredentialId)!.decision = "deny";
+            await rejects(() => pending, "factoryPolicyDenied");
+            assert.equal(provider.posts(), before);
+          } finally {
+            provider.state.projectDelayMs = 0;
+          }
+        },
+      );
       await t.test(
         "upstream locked Bot/source authorization also guards reads and pre-publication",
         async () => {
@@ -212,12 +422,15 @@ test(
             ),
             s = f.service([adapter]);
           provider.state.readyState = "READY";
-          const a = await s.approve(actor, {
-            ...x.approval,
-            action: "deploy_production",
-            target: adapter.target,
-            targetEnvironment: "production",
-          });
+          const a = await s.approve(
+            actor,
+            f.issuePolicyDecision({
+              ...x.approval,
+              action: "deploy_production",
+              target: adapter.target,
+              targetEnvironment: "production",
+            }),
+          );
           const result = await s.publish(actor, {
             ...a,
             eventId: randomUUID(),
@@ -457,6 +670,7 @@ test(
                 x.approval.expiresAt = new Date(
                   Date.now() + 2000,
                 ).toISOString();
+              Object.assign(x.approval, f.issuePolicyDecision(x.approval));
               const p = await x.publication();
               if (field === "session")
                 await pool.query(
@@ -532,6 +746,65 @@ test(
           } finally {
             tx.release();
           }
+        },
+      );
+      await t.test(
+        "historical human-bound V2 remains readable but cannot execute through the removed human-only path",
+        async () => {
+          const x = await f.prepare(),
+            p = await x.publication(),
+            s = f.service(),
+            result = await s.publish(actor, p);
+          assert.ok(result);
+          const oldRequest = { ...x.approval } as Record<string, unknown>;
+          delete oldRequest.decisionCredentialId;
+          const legacyReceipt = structuredClone(result.receipt);
+          legacyReceipt.verifiedTarget.provider!.bindingHash =
+            publicationBindingHash({
+              idempotencyKey: result.publicationId,
+              candidate: x.candidate,
+              authorization: {
+                approvalId: p.approvalId,
+                ownerId: actor.userId,
+                humanSessionId: actor.sessionId,
+                expiresAt: x.approval.expiresAt,
+                binding: p.binding,
+                eventId: p.eventId,
+                action: p.action,
+                target: p.target,
+                targetEnvironment: p.targetEnvironment,
+              },
+            });
+          await pool.query(
+            'UPDATE factory_approvals SET request=$2,"humanSessionId"=$3,"decisionCredentialId"=NULL,"decisionScope"=NULL,"decisionEvidence"=NULL WHERE id=$1',
+            [p.approvalId, JSON.stringify(oldRequest), actor.sessionId],
+          );
+          await pool.query(
+            "UPDATE factory_publications SET receipt=$2 WHERE id=$1",
+            [result.publicationId, JSON.stringify(legacyReceipt)],
+          );
+          const tx = await pool.connect();
+          try {
+            assert.equal(
+              (
+                await readFactoryPublicationReceiptV2(
+                  tx,
+                  actor.userId,
+                  x.task.id,
+                  x.task.candidateId!,
+                )
+              ).publicationId,
+              result.publicationId,
+            );
+          } finally {
+            tx.release();
+          }
+          const before = provider.posts();
+          await rejects(
+            () => s.publish(actor, p),
+            "factoryPolicyDecisionUnavailable",
+          );
+          assert.equal(provider.posts(), before);
         },
       );
       await t.test(

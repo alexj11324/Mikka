@@ -3,8 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
 import {
-  approvalGate,
-  publishGate,
+  createFactoryApprovalGates,
   createFactoryApprovals,
   type PublicationAdapter,
 } from "../../lib/factory/approval";
@@ -15,7 +14,14 @@ import type {
 import {
   FactoryError,
   type FactoryBinding,
+  type FactoryActor,
+  approvalRequest,
 } from "../../lib/factory/approval-contract";
+import type { z } from "zod";
+import type {
+  FactoryDecisionAuthority,
+  FactoryVerifiedPolicyDecision,
+} from "../../lib/factory/policy-authorization";
 import { digest } from "../../lib/factory/evidence";
 import {
   createVercelPublicationAdapter,
@@ -82,6 +88,57 @@ export async function factory194Fixture(connectionString: string) {
         )
       ).rowCount,
     );
+  // Contract-only policy/model substitute. No signer, real review issuer or LLM.
+  const decisions = new Map<string, FactoryVerifiedPolicyDecision>();
+  const authority: FactoryDecisionAuthority = {
+    verify: async (_tx, id) => {
+      const d = decisions.get(id);
+      if (!d) throw Error("unknown fixture credential");
+      return d;
+    },
+  };
+  function issuePolicyDecision(input: z.infer<typeof approvalRequest>) {
+    const req = { ...input, decisionCredentialId: randomUUID() };
+    const scope = {
+      ownerId: actor.userId,
+      binding: req.binding,
+      candidate: req.candidate,
+      action: req.action,
+      target: req.target,
+      targetEnvironment: req.targetEnvironment,
+      evidenceDigest: req.evidenceDigest,
+      visualEvidenceDigests: [],
+      expiresAt: req.expiresAt,
+    };
+    decisions.set(req.decisionCredentialId!, {
+      version: 1,
+      credentialId: req.decisionCredentialId!,
+      issuer: "synthetic-policy-authority",
+      policyId: "synthetic-policy",
+      policyRevision: "1",
+      permissionAction: req.action,
+      ownerId: actor.userId,
+      scopeDigest: digest(scope),
+      decision: "allow",
+      issuedAt: new Date(Date.now() - 1000).toISOString(),
+      expiresAt: req.expiresAt,
+      verification: {
+        receiptId: randomUUID(),
+        signatureDigest: "d".repeat(64),
+      },
+      judgment: {
+        receiptId: randomUUID(),
+        model: "synthetic-vision-model",
+        capability: "vision",
+        visualInputRequired: false,
+        scopeDigest: digest(scope),
+        evidenceDigest: req.evidenceDigest,
+        imageDigests: [],
+      },
+    });
+    return req;
+  }
+  const gates = createFactoryApprovalGates(authority);
   const store: FactoryApprovalStore = {
     async lockTask(tx, userId, taskId) {
       const {
@@ -112,7 +169,7 @@ export async function factory194Fixture(connectionString: string) {
         eventId,
       ]);
       if (change.action === "finish") {
-        const gate = task.stage === "approval" ? approvalGate : publishGate;
+        const gate = task.stage === "approval" ? gates.approval : gates.publish;
         assert.equal(await gate(tx, task, {}, change), true);
         await tx.query(
           "UPDATE factory_attempts SET status='passed',output=$2,\"finishedAt\"=clock_timestamp() WHERE id=$1",
@@ -149,9 +206,18 @@ export async function factory194Fixture(connectionString: string) {
       { ...MIKKA_VERCEL, environment: "preview" },
       provider.client,
     );
-  const service = (adapters: PublicationAdapter[] = [adapter]) =>
-    createFactoryApprovals(pool, authorize, store, adapters);
-  async function prepare() {
+  const service = (
+    adapters: PublicationAdapter[] = [adapter],
+    configuredAuthority: FactoryDecisionAuthority | null = authority,
+  ) =>
+    createFactoryApprovals(
+      pool,
+      authorize,
+      store,
+      adapters,
+      configuredAuthority ?? undefined,
+    );
+  async function prepare(executionActor: FactoryActor = actor) {
     const task: FactoryTask = {
       id: randomUUID(),
       userId: actor.userId,
@@ -240,7 +306,7 @@ export async function factory194Fixture(connectionString: string) {
       `INSERT INTO factory_attempts (id,"taskId","candidateId",stage,position,status,evidence,output) VALUES ($1,$2,$3,'approval',3,'pending','[]','{}')`,
       [task.attemptId, task.id, task.candidateId],
     );
-    const e = await service().evidence(actor, task.id);
+    const e = await service().evidence(executionActor, task.id);
     const approval = {
       binding: binding(task),
       eventId: randomUUID(),
@@ -251,8 +317,10 @@ export async function factory194Fixture(connectionString: string) {
       expiresAt: new Date(Date.now() + 600000).toISOString(),
       evidenceDigest: e.evidenceDigest,
       evidenceReadId: e.evidenceReadId,
+      decisionCredentialId: randomUUID(),
     };
-    const approve = () => service().approve(actor, approval);
+    Object.assign(approval, issuePolicyDecision(approval));
+    const approve = () => service().approve(executionActor, approval);
     const publication = async () => ({
       ...(await approve()),
       eventId: randomUUID(),
@@ -265,6 +333,9 @@ export async function factory194Fixture(connectionString: string) {
   return {
     permission,
     source,
+    decisions,
+    authority,
+    issuePolicyDecision,
     pool,
     actor,
     provider,

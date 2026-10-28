@@ -2,13 +2,15 @@
 BEGIN;
 CREATE TABLE IF NOT EXISTS factory_evidence_reads (
   id uuid PRIMARY KEY, "taskId" uuid NOT NULL REFERENCES factory_tasks(id) ON DELETE CASCADE,
-  "userId" text NOT NULL, "humanSessionId" text NOT NULL, binding jsonb NOT NULL,
+  "userId" text NOT NULL, "principalId" text NOT NULL, binding jsonb NOT NULL,
   "evidenceDigest" text NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS factory_approvals (
   id uuid PRIMARY KEY, "taskId" uuid NOT NULL REFERENCES factory_tasks(id) ON DELETE CASCADE,
   "candidateId" uuid NOT NULL, "attemptId" uuid NOT NULL,
-  "userId" text NOT NULL, "humanSessionId" text NOT NULL,
+  "userId" text NOT NULL, "principalId" text NOT NULL,
+  -- Human identity exists only when the existing policy actually asked.
+  "humanSessionId" text, "decisionCredentialId" text, "decisionScope" jsonb, "decisionEvidence" jsonb,
   "eventId" uuid NOT NULL, request jsonb NOT NULL,
   candidate jsonb NOT NULL, action text NOT NULL, target text NOT NULL,
   "evidenceDigest" text NOT NULL, evidence jsonb NOT NULL,
@@ -31,9 +33,14 @@ CREATE TABLE IF NOT EXISTS factory_publications (
   -- Fresh approvals cannot repeat a possibly performed logical action.
   UNIQUE ("taskId","candidateId",action,target), UNIQUE ("taskId","eventId")
 );
+-- One verified credential creates one grant. Replaying that grant is handled by
+-- the existing event and publication ledgers; it never creates another effect.
+CREATE UNIQUE INDEX IF NOT EXISTS factory_approval_policy_once_idx
+  ON factory_approvals (("decisionEvidence"->>'issuer'),"decisionCredentialId")
+  WHERE "decisionCredentialId" IS NOT NULL;
 CREATE TABLE IF NOT EXISTS factory_approval_controls (
   "taskId" uuid NOT NULL REFERENCES factory_tasks(id) ON DELETE CASCADE,
-  "eventId" uuid NOT NULL, "userId" text NOT NULL, "humanSessionId" text NOT NULL,
+  "eventId" uuid NOT NULL, "userId" text NOT NULL, "principalId" text NOT NULL,
   request jsonb NOT NULL, result jsonb NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("taskId","eventId")
 );

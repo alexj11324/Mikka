@@ -62,6 +62,9 @@ export const approvalRequest = z
     // Returned by the authenticated evidence read, never an agent's assertion.
     evidenceDigest: z.string().regex(/^[a-f0-9]{64}$/),
     evidenceReadId: z.uuid(),
+    // Opaque reference to the existing host policy authority, not an LLM claim.
+    // Optional only for historical receipt parsing; new grants require it.
+    decisionCredentialId: z.string().min(1).max(2000).optional(),
   })
   .strict();
 export const approvalControl = z
@@ -83,4 +86,10 @@ export const publicationRequest = approvalControl
 export interface FactoryHuman {
   userId: string;
   sessionId: string;
+}
+/** Authenticated host principal. A browser supplies its real session; an
+ * existing backend transport supplies its authorized owner. Never JSON input. */
+export interface FactoryActor {
+  userId: string;
+  sessionId?: string;
 }

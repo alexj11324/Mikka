@@ -1,190 +1,168 @@
-# Factory approval and publication consumer contract
+# Factory authorization and publication consumer contract
 
-This #194 batch extracts the approval/publisher modules from PR229
-`8878cd519f25ae64dab3cc90a57b4fbe00fee7d5`, with the non-enterprise
-interfaces also present in PR316 `4c1255dbbb81b6247a3b68b7d946d22a6e8030be`.
-It is based on main `4f52bbb2161d7016e95b95b5db3e3aa05afb89a2`.
-It does not carry PR316's Skill activation, monitor, question recovery or other
-Factory stages into main.
+This #194 batch extracts non-enterprise publication consumers from closed PR229
+and PR316, then removes the unconditional human-approval requirement. It does not
+register an application route, migration, issuer, model or enabled adapter.
+Factory functional acceptance is incomplete; no merge or deployment is approved
+by CI success, unregistered code or this document.
 
-## Scope and integration status
+## Existing authority inspected
 
-Main did not yet contain #192's Factory tables/store/routes or #193's independent
-check gates. These modules consequently have **no registered application route,
-daemon tool, production migration or enabled adapter** in this batch. Merging
-application code cannot issue a Factory human approval or authorize provider writes.
-This is a reviewable consumer-library batch, not completion of issue #194 or
-evidence that Factory is available in the application.
+`packages/protocol/src/agent-policy.ts` defines the existing allow/ask/deny policy;
+`packages/daemon/src/permissions.ts` enforces it for registered actions. Its actual
+registry includes git/network permissions, not a generic Factory deployment
+credential. `lib/computer/reviews.ts` authenticates exact computer-operation
+reviews, and `lib/cua/local-review.ts` validates their digest. These are not
+Factory deploy signatures. `lib/coordinator/decide.ts` is a model-answer transport,
+not an execution-permission issuer; its text response cannot grant authority.
 
-`approval-dependencies.ts` describes the consumer lifecycle port. The historical
-#192 intake-only source `283a64232fe444505a59fed15d8364214512f26a` cannot
-perform consumer finish/advance. The published lifecycle candidate
-`b3839211395c6014c2cff4270eaac24ca1b3441f` provides the actual compatible seam:
-`createFactoryStore(pool, authorize, botId = null, lifecycle?)`. The third
-argument remains Bot identity; the fourth contains `{ gates?, independent? }`.
-Its runtime installs the exported `approvalGate` and `publishGate` inside the
-locked transaction. Missing review/verify/monitor configuration still fails closed.
+No current Factory deploy credential issuer/verifier was found in these actual
+call paths. #161's reported local implementation has not been delivered or
+consumed here; it must not be described as a working generic credential service.
+No signing key, identity, credential or permission action is created by this batch.
 
-The approval service requires `store.lockTask(tx, userId, taskId)` for every task
-read, grant, publication and reconciliation, including the last pre-POST check.
-That producer-owned method retains task/issue lock ordering and live Bot/source
-checks; a successful issue authorization alone cannot replace it. `apply` joins
-the same transaction and owns the authoritative finish/advance transitions.
+## Policy and semantic decision seam
 
-Approval and publish do not dispatch model runs. They are advanced only by the
-human approval service and trusted publication receipt. #192's run reconciler
-consumer map is review/verify/monitor only: do not install a publication consumer
-there or manufacture a human session for background reconciliation. The existing
-`createFactoryApprovals(...).reconcile(actor, originalRequestWithPublicationId)`
-is the publication reconciliation export; it requires the original live browser
-identity/grant and performs provider reads only. #195 consumes the reader below.
-The upstream candidate is not merged, migrated, enabled or accepted by this batch.
+`policy-authorization.ts` exports:
 
-Isolated PG17 consumption of that exact source confirms the real locked-store
-port, approval gate, finish/advance and once-only publication replay. It also
-exposes an integration blocker: its publish attempt uses PostgreSQL `now()` for
-`finishedAt`, which is the transaction start time. Provider readback happens
-later in that same transaction. V2 deliberately requires `observedAt` not to
-exceed publish completion, so that source's otherwise legitimate receipt is
-rejected. The producer must supply an actual completion time after observation;
-the reader's timing constraint has not been weakened. This is not passed
-end-to-end lifecycle acceptance. The local protocol endpoint and prior Harness
-reports remain synthetic; no real provider write was made.
+```ts
+interface FactoryDecisionAuthority {
+  verify(
+    tx: PoolClient,
+    credentialId: string,
+    expected: FactoryDecisionScope,
+  ): Promise<unknown>;
+}
+authorizeFactoryDecision(tx, authority, credentialId, expected);
+createFactoryApprovalGates(authority); // exported by approval.ts
+```
 
-The port defines no stage ordering, transition implementation or separate
-task/candidate tables. `approval-contract.ts`
-validates consumer requests using the frozen binding, candidate and artifact
-reference shapes; it is not a second persisted source of phase state.
-At integration, retain one canonical set of these wire validators/error codes
-(the stage contract can re-export the identical schemas), rather than maintaining
-divergent copies. HTTP error normalization must use the public `factory*` code
-when a store and consumer have different Error class identities.
+The host must implement `verify` through its real existing policy/review authority,
+including signature/provenance, immutable credential identity, the registered
+publication action, current policy revision and revocation. It resolves actual
+owner/workspace/run assignment, STOP and lease fences where applicable; these
+cannot come from a model's JSON. An unknown action's `ask` or `network=allow` is
+not a Factory deployment permission. Missing authority returns
+`factoryPolicyDecisionUnavailable`, with no automatic human-confirmation fallback.
 
-The integration owner must provide:
+The expected scope binds owner, complete task/attempt/revision/candidate fence,
+exact candidate SHA/repository/execution environment/scope, explicit publication
+action, destination/environment, evidence digest, visual-input digests and expiry.
+`FactoryVerifiedPolicyDecision` carries the credential/issuer/policy revision,
+registered action, scope digest, issued/expiry times, signature-verification
+receipt/digest and the host-recorded model invocation provenance.
 
-| Owner            | Required input                                                                                                                                                                                                                                      |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #192             | Lifecycle `lockTask` including bot/source checks, plus `apply(userId, binding, eventId, change, tx?)` with finish/advance and the fourth-argument gates; the older intake-only source cannot supply them                                            |
-| #192             | `factory_tasks`, `factory_candidates`, `factory_attempts`, `factory_events`; transaction-compatible owner/candidate/revision fences                                                                                                                 |
-| #193             | Independently passed execute/review/verify attempts, distinct actual run/session identities and readable same-run evidence, accepted by its actual validators through the coordinated lifecycle seam; the intake extraction does not install them   |
-| #194 integration | Apply approval-ledger DDL **after** #192's tables in the coordinated migration order, then install `approvalGate`/`publishGate` in the lifecycle store; the source candidate supplies this hook, while this batch registers no runtime or migration |
-| Browser adapter  | Verify an actual Better Auth cookie via `factoryBrowserHuman`; pass only the resulting identity to the handler, never identity from JSON or a worker token                                                                                          |
-| #195             | Consume the V2 reader below; keep its monitor/probe implementation in its own PR                                                                                                                                                                    |
+Business interpretation and operation selection belong to a vision-capable
+model. The host records its actual model identity/capability, input evidence digest
+and actual image-input digests; a model asserting it saw an image or is allowed
+is insufficient. A visual task without the required image inputs fails closed.
+These consumers do not classify login success, infer it from password visibility,
+or choose an action through deterministic business rules. Program checks retain
+identity, permissions, signatures, binding, expiry, revocation and data integrity.
+The current artifact transport reads owned run reports/chunks; it cannot supply
+real screenshot/video bytes yet. Actual visual provenance remains a dependency.
 
-The test-only ledger DDL in `tests/fixtures/factory194-ledgers.sql` is copied
-from PR316's #194 consumer migration. It is not registered under `drizzle/` and
-must not be mistaken for an applied application migration. The matching runtime
-schema/route integration remains pending #192/#193; this batch cannot consume
-nonexistent upstream evidence as real review or verification.
-Actual application integration must preserve #192's selected bot and original
-source-event authorization. This library's projection and test store port do not
-replace those checks. The required locked-store method has no raw-SQL fallback.
+`allow` advances without a human/session prerequisite. Only an existing policy
+`ask` needs a verified confirmation bound to that exact credential, owner, scope
+and expiry. The existing authority supplies and verifies that confirmation; this
+consumer does not create a second question/approval flow. `deny` stops. Browser
+HTTP still authenticates its real cookie/session and same origin; that is
+transport identity, not a blanket human decision. Backend calls require a trusted
+authenticated owner and the same policy proof; JSON never chooses the actor.
 
-## Human approval and logical action
+The grant remains in the existing approval ledger. New grants require
+`decisionCredentialId`, frozen scope and verified decision evidence. A unique
+issuer/credential index permits one grant; event replay returns that grant.
+Candidate/action/target publication uniqueness reserves one logical effect before
+POST. The authority is rechecked at grant, gate, pre-POST and reconciliation
+boundaries; a stale allow is not cached. Revocation during provider preflight
+prevents POST. Pending/uncertain or post-effect SQL failure permits only GET/list
+reconciliation, never another creation attempt. Preflight failure retains the
+reservation; no automatic reset/rearm operation exists.
 
-`approve` requires the live linked browser session to read the current immutable
-evidence manifest first. The persisted grant binds owner/session, full candidate
-(exact SHA/repository/execution environment/scope), evidence/read digest,
-Factory attempt/revision/candidate fence, action, destination and expiry.
-Expiry is checked against database time with a maximum lifetime of 24 hours.
-Failed provenance, revocation, replacement candidates and stale fences remain closed.
+## #192 integration
 
-Actions are `deploy_preview`, `deploy_production`, `merge`. Candidate push and
-repository merge authorization do not create an application grant. The deployment
-environment is separately approved as `targetEnvironment`; the candidate's
-`environment` remains execution provenance such as `device:<UUID>`.
+The intake-only `283a64232fe444505a59fed15d8364214512f26a` lacks lifecycle
+finish/advance and cannot supply the port. Actual lifecycle source
+`60e6b2a9834bedaaa68b60a03b3807ca640c602c` exposes:
 
-The publication ledger reserves one operation before any effect. Its uniqueness
-fences forbid a second logical action even with a fresh approval. The task lock
-and human/evidence checks are repeated immediately before the registered adapter's
-POST. Pending operations retain a trusted checkpoint; unknown outcomes remain
-uncertain. `reconcile` accepts only the original publication request plus the
-publication ID, and performs provider reads only. A client success receipt or
-checkpoint is never accepted. Database rollback after an external effect does not
-permit another POST. Replay of a stored success still checks current grant/fence.
+```ts
+createFactoryStore(pool, authorize, botId = null, lifecycle?)
+store.lockTask(tx, userId, taskId)
+store.apply(userId, binding, eventId, change, existingTx?)
+```
 
-Preflight failures conservatively retain the reservation. This batch has no
-automatic reset/rearm operation; absence of a matching remote operation is not
-permission to create one again.
+Third argument is Bot identity, fourth is `{gates?, independent?}`. Install
+`createFactoryApprovalGates(realAuthority)` as approval/publish gates, and pass the
+same authority as the fifth argument of
+`createFactoryApprovals(pool, authorize, store, adapters, authority)`. Bare exported
+`approvalGate`/`publishGate` have no configured authority and reject new grants;
+they do not fall back to human approval. The current upstream runtime's bare-gate
+installation therefore still needs this explicit host integration.
 
-## Vercel adapter
+All consumer reads/grants/publication/reconciliation use producer `lockTask`,
+retaining task/issue lock ordering, live owner/Bot/source access and current fences.
+`apply` joins the same transaction. No duplicate stage source is introduced.
+Approval/publish do not dispatch model runs and are outside #192's
+review/verify/monitor run-consumer map. Publication reconciliation is the existing
+service's `reconcile(actor, {...originalPublicationRequest, publicationId})`;
+it consumes the same policy proof and only reads the provider.
+
+Actual isolated consumption of `60e6b2...` passes locked-source denial, configured
+approval/publish gates, atomic advance, once-only publication replay and V2 reader
+consumption. The older `b383921...` completion timestamp defect is fixed in that
+new source and is no longer the current blocker. This uses synthetic upstream
+reports/identity/policy/model records and loopback HTTP, not a real policy issuer,
+Harness, OAuth flow, vision-model invocation or cloud deployment.
+
+`tests/fixtures/factory194-ledgers.sql` is isolated test DDL, not a registered
+Drizzle migration. Its updated principal/decision fields and unique credential
+index need an explicitly coordinated application schema manifest before runtime
+use. No production SQL or flag has been executed or enabled here.
+
+## Vercel and #195 V2 receipt
 
 Only the existing Mikka team/project/repository is configured:
 `team_C7lwxVVvnUicFli6112mvxpv`, `prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH`,
 `https://github.com/alexj11324/Mikka.git` / repo ID `1427517699`.
+The target is `vercel:<teamId>:<projectId>:<preview|production>`.
+`deploy_preview` yields `preview-deployment`; `deploy_production` requires
+`production-deployment`. Execution provenance remains the candidate's separate
+environment. Registration flags and existing secret binding are not enabled here.
 
-| Action              | Qualified target suffix / targetEnvironment | Receipt kind            |
-| ------------------- | ------------------------------------------- | ----------------------- |
-| `deploy_preview`    | `:preview` / `preview`                      | `preview-deployment`    |
-| `deploy_production` | `:production` / `production`                | `production-deployment` |
+One POST uses the exact Git SHA. Readback checks actual Git source, project/team,
+environment, operation metadata, immutable deployment URL and READY; production
+also needs alias assignment. Metadata alone cannot prove code identity. Lost
+responses use complete bounded GET/list inspection. No promotion, domain change,
+new resource or credential creation is included.
 
-The complete target is `vercel:<teamId>:<projectId>:<environment>`. Runtime flags
-separately register Preview (`FACTORY_VERCEL_PUBLICATION=1`) and Production
-(additionally `FACTORY_VERCEL_PRODUCTION=1`) only when explicitly called by the
-trusted integration. The existing secret-managed `VERCEL_TOKEN` binding is
-required; no CLI account file is read and no token is created or copied.
-
-POST `/v13/deployments` uses exact SHA in both Git source `ref` and `sha`.
-Preview omits `target`; Production sets `production` and can assign existing
-production aliases. No project/build overrides, new resources, domain changes,
-promotion or forced rebuild are sent. The code does not promise Vercel request
-idempotency: once-only creation is enforced by the durable Factory reservation.
-
-Readback must confirm the fixed project/account, provider GitHub source SHA and
-repository, destination, operation metadata and unique HTTPS deployment URL.
-Metadata alone cannot establish code identity. READY is required; production also
-requires alias assignment. A known deployment ID is read directly. A lost create
-response uses complete bounded list pagination and exactly one UUID/hash match.
-Reconciliation never creates or promotes a deployment.
-
-## #195 V2 reader
-
-`readFactoryPublicationReceiptV2(tx, userId, taskId, candidateId)` must be called
-inside #192's authorized, locked transaction. It returns `FactoryPublicationReceiptV2`
-or fails closed:
+`readFactoryPublicationReceiptV2(tx, userId, taskId, candidateId)` requires the
+producer's authorized task lock and returns the same V2 envelope:
 
 ```ts
 {
-  version: 2,
-  publicationId, approvalId, taskId, issueId, candidateId,
+  version: 2, publicationId, approvalId, taskId, issueId, candidateId,
   candidate: { sha, repository, environment, scope },
   action, target, targetEnvironment, publishedAt, reference,
   verifiedTarget: {
     kind, operationId, target, environment, repository, sha, reference, observedAt,
-    provider?: {
-      version: 2, name: "vercel", teamId, projectId, deploymentId,
-      environment, publicationId, bindingHash
-    }
+    provider?: { version: 2, name: "vercel", teamId, projectId, deploymentId,
+                 environment, publicationId, bindingHash }
   }
 }
 ```
 
-The reader checks succeeded publication, exact passed publish attempt/output,
-grant/ledger/request/candidate consistency, the original publish fence and receipt
-timing. Provider bindingHash covers publication ID, full candidate, owner,
-approving session, approval ID/expiry, original publish fence/event/action/target.
-Expiry after a legitimate consumption does not erase history; revocation,
-cancelled tasks and changed candidates block consumption. The legacy V1 reader
-rejects production. Local artifacts and merge receipts cannot establish cloud health.
+The discriminator is `verifiedTarget.kind`. New provider binding hashes cover the
+frozen policy decision's credential/issuer/revision/scope/full-evidence digest in
+addition to publication ID, full candidate, owner, grant, original publish fence,
+event, action, destination and expiry. They no longer require a human session.
+Historical human-bound V2 receipts remain read-compatible; no new human-only
+grant is issued. The reader checks recorded policy/model/ask proof consistency,
+exact passed publication and timing. Missing/reserved/uncertain, revoked/stopped,
+replacement candidate or substituted scope fails closed. Expiry after legitimate
+consumption does not erase history. The legacy V1 reader rejects production.
 
-#195 must explicitly bind probes to deployment ID, exact SHA/environment/reference,
-and prove that the current production domain/aliases route to that deployment.
-Provider READY is not application health or real-user acceptance. This PR does not
-change #195's validator or claim its implementation already consumes V2.
-
-## Evidence and next real execution
-
-Tests use actual loopback HTTP and disposable PG17 with synthetic upstream
-run/session reports, a test-only #192 store port and synthetic browser identity.
-They establish approval/receipt/transaction behavior, not real Harness, OAuth or
-Vercel deployment acceptance. They are enrolled in the existing unit and ephemeral
-DB CI gates without relaxing required checks.
-
-Issue #194 remains open until #192/#193 integration, actual human evidence read
-and approval, exact-candidate deployment on a specifically approved controlled
-target, #195 observations and applicable user flow/video acceptance are complete.
-The next provider write requires exact action/target/environment/SHA approval;
-general application deployment or repository merge approval is insufficient.
-The minimal real write scope is the existing project's one deployment POST,
-followed by GET/list reconciliation. No new credential, IAM, resource purchase or
-production migration is included in this code batch.
+#195 keeps its own probes. It must prove deployment ID, exact SHA/environment,
+reference and actual production-domain routing. Provider READY is not user-flow
+health. No real-user acceptance video is claimed until that chain is exercised on
+an authorized real target with real evidence.

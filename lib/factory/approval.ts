@@ -6,7 +6,7 @@ import {
   approvalRequest,
   approvalControl,
   publicationRequest,
-  type FactoryHuman,
+  type FactoryActor,
 } from "./approval-contract";
 import {
   approvalEvidence,
@@ -28,8 +28,18 @@ import {
 import {
   PublicationDeferred,
   publicationBindingHash,
+  publicationPolicyBinding,
   type PublicationInput,
 } from "./publication-operation";
+
+import {
+  authorizeFactoryDecision,
+  type FactoryDecisionAuthority,
+  type FactoryDecisionScope,
+} from "./policy-authorization";
+
+const principalId = (actor: FactoryActor) =>
+  actor.sessionId ? `session:${actor.sessionId}` : `owner:${actor.userId}`;
 
 function providerInput(
   task: FactoryTask,
@@ -43,7 +53,9 @@ function providerInput(
     authorization: {
       approvalId: a.id,
       ownerId: task.userId,
-      humanSessionId: a.humanSessionId,
+      ...(a.decisionEvidence
+        ? { policy: publicationPolicyBinding(a.decisionEvidence) }
+        : { humanSessionId: a.humanSessionId }),
       expiresAt: a.request.expiresAt,
       binding: req.binding,
       eventId: req.eventId,
@@ -80,16 +92,34 @@ const output = z
   .object({ approvalId: z.uuid(), publicationId: z.uuid().optional() })
   .strict();
 
-async function human(tx: PoolClient, actor: FactoryHuman) {
-  if (!actor?.userId || !actor.sessionId) fail("factoryHumanRequired");
-  // The route must first authenticate this session cookie with Better Auth.
-  // These checks re-evaluate expiry/sign-out and linked identity in the transaction.
+/** Browser transport authentication, not a human-approval requirement. */
+async function browserSession(tx: PoolClient, actor: FactoryActor) {
+  if (!actor?.userId) fail("factoryActorRequired");
+  if (!actor.sessionId) return; // Trusted backend owner still requires policy proof.
   const { rows } = await tx.query(
-    `SELECT s.id FROM "session" s WHERE s.id=$1 AND s."userId"=$2 AND s."expiresAt">clock_timestamp()
-     AND EXISTS (SELECT 1 FROM account a WHERE a."userId"=s."userId" AND a."providerId" IN ('github','google')) FOR SHARE`,
+    `SELECT id FROM "session" WHERE id=$1 AND "userId"=$2 AND "expiresAt">clock_timestamp() FOR SHARE`,
     [actor.sessionId, actor.userId],
   );
   if (!rows.length) fail("factoryHumanRequired");
+}
+function decisionScope(
+  task: FactoryTask,
+  req: z.infer<typeof approvalRequest>,
+  current: Awaited<ReturnType<typeof approvalEvidence>>,
+): FactoryDecisionScope {
+  return {
+    ownerId: task.userId,
+    binding: req.binding,
+    candidate: req.candidate,
+    action: req.action,
+    target: req.target,
+    targetEnvironment: req.targetEnvironment,
+    evidenceDigest: current.evidenceDigest,
+    expiresAt: req.expiresAt,
+    visualEvidenceDigests: current.manifest.artifacts
+      .filter((a) => a.kind === "screenshot" || a.kind === "video")
+      .map((a) => a.sha256),
+  };
 }
 
 async function unusedEvent(tx: PoolClient, taskId: string, eventId: string) {
@@ -109,6 +139,7 @@ async function validApproval(
   task: FactoryTask,
   id: string,
   publish: boolean,
+  authority?: FactoryDecisionAuthority,
 ) {
   const {
     rows: [a],
@@ -126,7 +157,6 @@ async function validApproval(
       : a.approvedRevision !== task.revision || a.attemptId !== task.attemptId)
   )
     fail("factoryApprovalInvalid");
-  await human(tx, { userId: a.userId, sessionId: a.humanSessionId });
   const current = await approvalEvidence(tx, task);
   if (
     current.evidenceDigest !== a.evidenceDigest ||
@@ -134,64 +164,98 @@ async function validApproval(
     digest(current.manifest) !== digest(a.evidence)
   )
     fail("factoryApprovalInvalid");
+  if (!a.decisionCredentialId || !a.decisionScope || !a.decisionEvidence)
+    fail("factoryPolicyDecisionUnavailable");
+  const expected = decisionScope(
+    task,
+    approvalRequest.parse(a.request),
+    current,
+  );
+  if (digest(expected) !== digest(a.decisionScope))
+    fail("factoryPolicyDecisionMismatch");
+  const decision = await authorizeFactoryDecision(
+    tx,
+    authority,
+    a.decisionCredentialId,
+    expected,
+  );
+  if (digest(decision) !== digest(a.decisionEvidence))
+    fail("factoryPolicyDecisionMismatch");
   return { a, current };
 }
 
-export const approvalGate: FactoryGate = async (tx, task, _attempt, change) => {
-  const parsed = output.safeParse(change.output);
-  if (task.stage !== "approval" || !parsed.success || parsed.data.publicationId)
-    return false;
-  const { current } = await validApproval(
-    tx,
-    task,
-    parsed.data.approvalId,
-    false,
-  );
-  return digest(change.evidence) === digest(current.evidence);
-};
-export const publishGate: FactoryGate = async (tx, task, _attempt, change) => {
-  const parsed = output.safeParse(change.output);
-  if (task.stage !== "publish" || !parsed.success || !parsed.data.publicationId)
-    return false;
-  const { a, current } = await validApproval(
-    tx,
-    task,
-    parsed.data.approvalId,
-    true,
-  );
-  const {
-    rows: [p],
-  } = await tx.query(
-    `SELECT * FROM factory_publications WHERE id=$1 AND "approvalId"=$2 AND status='succeeded' AND receipt IS NOT NULL`,
-    [parsed.data.publicationId, a.id],
-  );
-  if (p) {
-    const receipt = publicationAdapterReceipt.safeParse(p.receipt);
-    if (!receipt.success) return false;
-    providerBinding(receipt.data, providerInput(task, a, p.request, p.id));
-    assertPublicationTarget(
-      receipt.data,
-      a.candidate,
-      a.action,
-      a.target,
-      a.request.targetEnvironment,
-      p.id,
-    );
+function gatesFor(authority?: FactoryDecisionAuthority) {
+  const approvalGate: FactoryGate = async (tx, task, _attempt, change) => {
+    const parsed = output.safeParse(change.output);
     if (
-      new Date(receipt.data.verifiedTarget.observedAt).getTime() <
-      p.createdAt.getTime()
+      task.stage !== "approval" ||
+      !parsed.success ||
+      parsed.data.publicationId
     )
       return false;
-  }
-  return Boolean(
-    p &&
-    p.taskId === task.id &&
-    p.candidateId === task.candidateId &&
-    p.action === a.action &&
-    p.target === a.target &&
-    digest(change.evidence) === digest(current.evidence),
-  );
-};
+    const { current } = await validApproval(
+      tx,
+      task,
+      parsed.data.approvalId,
+      false,
+      authority,
+    );
+    return digest(change.evidence) === digest(current.evidence);
+  };
+  const publishGate: FactoryGate = async (tx, task, _attempt, change) => {
+    const parsed = output.safeParse(change.output);
+    if (
+      task.stage !== "publish" ||
+      !parsed.success ||
+      !parsed.data.publicationId
+    )
+      return false;
+    const { a, current } = await validApproval(
+      tx,
+      task,
+      parsed.data.approvalId,
+      true,
+      authority,
+    );
+    const {
+      rows: [p],
+    } = await tx.query(
+      `SELECT * FROM factory_publications WHERE id=$1 AND "approvalId"=$2 AND status='succeeded' AND receipt IS NOT NULL`,
+      [parsed.data.publicationId, a.id],
+    );
+    if (p) {
+      const receipt = publicationAdapterReceipt.safeParse(p.receipt);
+      if (!receipt.success) return false;
+      providerBinding(receipt.data, providerInput(task, a, p.request, p.id));
+      assertPublicationTarget(
+        receipt.data,
+        a.candidate,
+        a.action,
+        a.target,
+        a.request.targetEnvironment,
+        p.id,
+      );
+      if (
+        new Date(receipt.data.verifiedTarget.observedAt).getTime() <
+        p.createdAt.getTime()
+      )
+        return false;
+    }
+    return Boolean(
+      p &&
+      p.taskId === task.id &&
+      p.candidateId === task.candidateId &&
+      p.action === a.action &&
+      p.target === a.target &&
+      digest(change.evidence) === digest(current.evidence),
+    );
+  };
+
+  return { approval: approvalGate, publish: publishGate };
+}
+export const createFactoryApprovalGates = gatesFor;
+/** No implicit human fallback and no synthetic allow when an authority is absent. */
+export const { approval: approvalGate, publish: publishGate } = gatesFor();
 
 export interface PublicationAdapter {
   // Registered by trusted backend code. Never accept a callback/command from a tool.
@@ -211,6 +275,7 @@ export function createFactoryApprovals(
   authorize: FactoryAuthorize,
   store: FactoryApprovalStore,
   adapters: PublicationAdapter[] = [],
+  authority?: FactoryDecisionAuthority,
 ) {
   async function transaction<T>(fn: (tx: PoolClient) => Promise<T>) {
     const tx = await pool.connect();
@@ -228,7 +293,7 @@ export function createFactoryApprovals(
   }
   async function owned(
     tx: PoolClient,
-    actor: FactoryHuman,
+    actor: FactoryActor,
     taskId: string,
     allowStopped = false,
   ) {
@@ -237,7 +302,7 @@ export function createFactoryApprovals(
       fail("factoryNotFound");
     if (!allowStopped && ["cancelled", "revoked"].includes(task.status))
       fail("factoryStopped");
-    await human(tx, actor);
+    await browserSession(tx, actor);
     return task;
   }
   function fence(task: FactoryTask, binding: FactoryBinding) {
@@ -309,7 +374,7 @@ export function createFactoryApprovals(
     return response;
   }
   return {
-    async ledger(actor: FactoryHuman, taskId: string) {
+    async ledger(actor: FactoryActor, taskId: string) {
       if (!z.uuid().safeParse(taskId).success) fail("factoryInvalid");
       return transaction(async (tx) => {
         const task = await owned(tx, actor, taskId, true);
@@ -324,7 +389,7 @@ export function createFactoryApprovals(
         return { binding: bindingOf(task), approvals, publications };
       });
     },
-    async artifact(actor: FactoryHuman, taskId: string, artifact: string) {
+    async artifact(actor: FactoryActor, taskId: string, artifact: string) {
       if (!z.uuid().safeParse(taskId).success) fail("factoryInvalid");
       return transaction(async (tx) => {
         const task = await owned(tx, actor, taskId, true);
@@ -340,7 +405,7 @@ export function createFactoryApprovals(
         };
       });
     },
-    async evidence(actor: FactoryHuman, taskId: string) {
+    async evidence(actor: FactoryActor, taskId: string) {
       if (!z.uuid().safeParse(taskId).success) fail("factoryInvalid");
       return transaction(async (tx) => {
         const task = await owned(tx, actor, taskId);
@@ -352,12 +417,12 @@ export function createFactoryApprovals(
         const current = await approvalEvidence(tx, task),
           evidenceReadId = randomUUID();
         await tx.query(
-          'INSERT INTO factory_evidence_reads (id,"taskId","userId","humanSessionId",binding,"evidenceDigest") VALUES ($1,$2,$3,$4,$5,$6)',
+          'INSERT INTO factory_evidence_reads (id,"taskId","userId","principalId",binding,"evidenceDigest") VALUES ($1,$2,$3,$4,$5,$6)',
           [
             evidenceReadId,
             task.id,
             actor.userId,
-            actor.sessionId,
+            principalId(actor),
             JSON.stringify(bindingOf(task)),
             current.evidenceDigest,
           ],
@@ -365,7 +430,7 @@ export function createFactoryApprovals(
         return { binding: bindingOf(task), ...current, evidenceReadId };
       });
     },
-    async approve(actor: FactoryHuman, input: unknown) {
+    async approve(actor: FactoryActor, input: unknown) {
       const parsed = approvalRequest.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
       const req = parsed.data;
@@ -381,11 +446,11 @@ export function createFactoryApprovals(
         if (prior) {
           if (
             digest(prior.request) !== digest(req) ||
-            prior.humanSessionId !== actor.sessionId
+            prior.principalId !== principalId(actor)
           )
             fail("factoryReplayMismatch");
           // No historical success response can revive an expired/revoked/stale approval.
-          await validApproval(tx, task, prior.id, true);
+          await validApproval(tx, task, prior.id, true, authority);
           return { approvalId: prior.id, binding: bindingOf(task) };
         }
         await unusedEvent(tx, task.id, req.eventId);
@@ -396,15 +461,16 @@ export function createFactoryApprovals(
         )
           fail("factoryTransition");
         const current = await approvalEvidence(tx, task);
+        if (!req.decisionCredentialId) fail("factoryPolicyDecisionUnavailable");
         const {
           rows: [read],
         } = await tx.query(
-          `SELECT id FROM factory_evidence_reads WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "humanSessionId"=$4 AND binding=$5::jsonb AND "evidenceDigest"=$6`,
+          `SELECT id FROM factory_evidence_reads WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "principalId"=$4 AND binding=$5::jsonb AND "evidenceDigest"=$6`,
           [
             req.evidenceReadId,
             task.id,
             actor.userId,
-            actor.sessionId,
+            principalId(actor),
             JSON.stringify(req.binding),
             current.evidenceDigest,
           ],
@@ -422,16 +488,23 @@ export function createFactoryApprovals(
           [req.expiresAt],
         );
         if (!expiry.valid) fail("factoryApprovalExpiry");
+        const scope = decisionScope(task, req, current);
+        const decision = await authorizeFactoryDecision(
+          tx,
+          authority,
+          req.decisionCredentialId,
+          scope,
+        );
         const approvalId = randomUUID();
-        await tx.query(
-          `INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$4,$14,$15)`,
+        const inserted = await tx.query(
+          `INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","decisionCredentialId","decisionScope","decisionEvidence","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,$16,$17,$18,$19,$7,$8,$9,$10,$11,$12,$13,$14,$4,$14,$15) ON CONFLICT DO NOTHING RETURNING id`,
           [
             approvalId,
             task.id,
             task.candidateId,
             task.attemptId,
             actor.userId,
-            actor.sessionId,
+            principalId(actor),
             req.eventId,
             JSON.stringify(req),
             JSON.stringify(req.candidate),
@@ -441,8 +514,15 @@ export function createFactoryApprovals(
             JSON.stringify(current.manifest),
             task.revision,
             req.expiresAt,
+            decision.decision === "ask"
+              ? decision.confirmation!.sessionId
+              : null,
+            req.decisionCredentialId,
+            JSON.stringify(scope),
+            JSON.stringify(decision),
           ],
         );
+        if (!inserted.rowCount) fail("factoryPolicyDecisionAlreadyConsumed");
         let result = await store.apply(
           actor.userId,
           req.binding,
@@ -450,7 +530,8 @@ export function createFactoryApprovals(
           {
             action: "finish",
             status: "passed",
-            reason: "Human approved exact candidate and evidence",
+            reason:
+              "Existing policy authorized exact candidate and model-grounded evidence",
             evidence: current.evidence,
             output: { approvalId },
           },
@@ -474,7 +555,7 @@ export function createFactoryApprovals(
         return { approvalId, binding: bindingOf(result.task) };
       });
     },
-    async revoke(actor: FactoryHuman, input: unknown) {
+    async revoke(actor: FactoryActor, input: unknown) {
       const parsed = approvalControl.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
       const req = parsed.data;
@@ -484,13 +565,13 @@ export function createFactoryApprovals(
         const {
           rows: [prior],
         } = await tx.query(
-          'SELECT request,result,"humanSessionId" FROM factory_approval_controls WHERE "taskId"=$1 AND "eventId"=$2',
+          'SELECT request,result,"principalId" FROM factory_approval_controls WHERE "taskId"=$1 AND "eventId"=$2',
           [task.id, req.eventId],
         );
         if (prior) {
           if (
             digest(prior.request) !== digest(req) ||
-            prior.humanSessionId !== actor.sessionId
+            prior.principalId !== principalId(actor)
           )
             fail("factoryReplayMismatch");
           return prior.result as { approvalId: string; revoked: boolean };
@@ -503,12 +584,12 @@ export function createFactoryApprovals(
         if (!rowCount) fail("factoryApprovalInvalid");
         const result = { approvalId: req.approvalId, revoked: true };
         await tx.query(
-          'INSERT INTO factory_approval_controls ("taskId","eventId","userId","humanSessionId",request,result) VALUES ($1,$2,$3,$4,$5,$6)',
+          'INSERT INTO factory_approval_controls ("taskId","eventId","userId","principalId",request,result) VALUES ($1,$2,$3,$4,$5,$6)',
           [
             task.id,
             req.eventId,
             actor.userId,
-            actor.sessionId,
+            principalId(actor),
             JSON.stringify(req),
             JSON.stringify(result),
           ],
@@ -516,7 +597,7 @@ export function createFactoryApprovals(
         return result;
       });
     },
-    async publish(actor: FactoryHuman, input: unknown) {
+    async publish(actor: FactoryActor, input: unknown) {
       const parsed = publicationRequest.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
       const req = parsed.data;
@@ -552,6 +633,7 @@ export function createFactoryApprovals(
             { ...task, revision: req.binding.revision },
             req.approvalId,
             true,
+            authority,
           );
           return {
             result: replay.result as {
@@ -565,7 +647,13 @@ export function createFactoryApprovals(
         fence(task, req.binding);
         if (task.stage !== "publish" || task.status !== "pending")
           fail("factoryTransition");
-        const { a } = await validApproval(tx, task, req.approvalId, true);
+        const { a } = await validApproval(
+          tx,
+          task,
+          req.approvalId,
+          true,
+          authority,
+        );
         if (
           a.action !== req.action ||
           a.target !== req.target ||
@@ -617,12 +705,13 @@ export function createFactoryApprovals(
             task,
             req.approvalId,
             true,
+            authority,
           );
           const trustedInput = providerInput(task, a, req, publicationId);
           trustedInput.beforeCreate = async () => {
             const latest = await owned(tx, actor, task.id);
             fence(latest, req.binding);
-            await validApproval(tx, latest, req.approvalId, true);
+            await validApproval(tx, latest, req.approvalId, true, authority);
           };
           const receipt = publicationAdapterReceipt.parse(
             await adapter.execute(trustedInput),
@@ -633,7 +722,7 @@ export function createFactoryApprovals(
         return defer(error, publicationId);
       }
     },
-    async reconcile(actor: FactoryHuman, input: unknown) {
+    async reconcile(actor: FactoryActor, input: unknown) {
       const parsed = publicationRequest
         .extend({ publicationId: z.uuid() })
         .strict()
@@ -663,6 +752,7 @@ export function createFactoryApprovals(
               { ...task, revision: req.binding.revision },
               req.approvalId,
               true,
+              authority,
             );
             return p.result as {
               publicationId: string;
@@ -678,6 +768,7 @@ export function createFactoryApprovals(
             task,
             req.approvalId,
             true,
+            authority,
           );
           const adapter = adapters.find(
             (x) =>
