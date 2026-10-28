@@ -1,3 +1,4 @@
+import { SCOPE_DATABASES } from '../scripts/scope-acceptance-policy.mjs'
 import { scopeSubtest, scopeResumeBootstrap } from './support/scope-acceptance.mjs'
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
@@ -26,7 +27,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   // Bootstrap a fresh retained database from the real tracked migrations instead
   // of relying on the state left by earlier suites or changing their fixtures.
   const database = process.env.ISSUE184_LOCAL_TEST === '1'
-    ? 'scope184_f14235c6695547ae925d808ab35a399e_e2e'
+    ? SCOPE_DATABASES.scope
     : `scope184_${randomUUID().replaceAll('-', '')}_e2e`
   const resumed=await scopeResumeBootstrap(database)
   if(!resumed){

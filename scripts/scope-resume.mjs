@@ -1,7 +1,7 @@
 // Explicit recovery of the one known empty scope DB; never a generic ledger repair.
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { SCOPE_DATABASES } from './scope-acceptance-policy.mjs'
+import { SCOPE_RETAINED_DATABASE } from './scope-acceptance-policy.mjs'
 const hash=value=>createHash('sha256').update(value).digest('hex')
 export const normalizeScopeDdl=value=>value.toLowerCase().replaceAll('"','').replaceAll('public.','').replace(/\s+/g,' ').replace(/\s*([(),])\s*/g,'$1').replace(/;$/,'').trim()
 export function scopeResumeSchema(migrations,read=readFileSync) {
@@ -20,7 +20,7 @@ export function scopeResumeSchema(migrations,read=readFileSync) {
 export function verifyScopeResumeEvidence(manifest,read=readFileSync) {
   if(manifest.mode!=='resume-scope-after-bootstrap')throw Error('explicit resume manifest required')
   const resume=manifest.resume
-  if(resume.database!==SCOPE_DATABASES.scope||resume.oid!=='65537'||resume.owner!=='postgres')throw Error('resume retained identity mismatch')
+  if(resume.database!==SCOPE_RETAINED_DATABASE||resume.oid!=='65537'||resume.owner!=='postgres')throw Error('resume retained identity mismatch')
   const data={}
   for(const file of resume.evidence){const bytes=read(file.path);if(hash(bytes)!==file.sha256)throw Error('resume evidence hash mismatch');data[file.kind]=file.kind==='journal'?bytes.toString().trim().split('\n').map(line=>JSON.parse(line)):JSON.parse(bytes)}
   const {predecessor,result,readback,journal}=data

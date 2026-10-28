@@ -5,7 +5,7 @@ import {orderMigrations} from './migration-order.mjs'
 import {scopeMigrationBeforeCommit} from './scope-migration-history.mjs'
 import {createHash} from 'node:crypto'
 import {scopeResumeSchema,verifyScopeResumeEvidence,validateScopeResumeState} from './scope-resume.mjs'
-import {scopePolicy,scopeUrl,SCOPE_DATABASES} from './scope-acceptance-policy.mjs'
+import {scopePolicy,scopeUrl,SCOPE_RETAINED_DATABASE} from './scope-acceptance-policy.mjs'
 import {scopeExecutionMode} from './scope-acceptance.mjs'
 import {scopeResumeBootstrap} from '../tests/support/scope-acceptance.mjs'
 const hash=value=>createHash('sha256').update(value).digest('hex')
@@ -26,12 +26,12 @@ function fixture(){
   const snapshot={tableCount:94,totalCommittedRows:70,nonemptyTables:[{name:'schema_migrations',rows:70}]}
   const readback={teamStageStarted:false,fixtureMigrationReplays:0,listenersStarted:0,providerRequests:0,remainingWorkerConnections:[],targets:[{oid:'65537'}],snapshots:[snapshot,snapshot]}
   const bytes=new Map([[files.predecessor,Buffer.from(JSON.stringify(previous))],[files.result,Buffer.from(JSON.stringify(result))],[files.readback,Buffer.from(JSON.stringify(readback))],[files.journal,Buffer.from(journal.map(row=>JSON.stringify(row)).join('\n'))]])
-  const manifest={mode:'resume-scope-after-bootstrap',migrations:previous.migrations,resume:{database:SCOPE_DATABASES.scope,oid:'65537',owner:'postgres',predecessorManifestSha256:hash(bytes.get(files.predecessor)),schema:scopeResumeSchema(previous.migrations),evidence:Object.entries(files).map(([kind,path])=>({kind,path,sha256:hash(bytes.get(path))}))}}
+  const manifest={mode:'resume-scope-after-bootstrap',migrations:previous.migrations,resume:{database:SCOPE_RETAINED_DATABASE,oid:'65537',owner:'postgres',predecessorManifestSha256:hash(bytes.get(files.predecessor)),schema:scopeResumeSchema(previous.migrations),evidence:Object.entries(files).map(([kind,path])=>({kind,path,sha256:hash(bytes.get(path))}))}}
   const read=path=>bytes.get(path)??readFileSync(path)
   const expected=verifyScopeResumeEvidence(manifest,read)
   const bodies={}
   for(const file of manifest.migrations)for(const match of readFileSync(file.path,'utf8').matchAll(/create\s+(?:or\s+replace\s+)?function\s+([\w."]+)\s*\([^)]*\)[\s\S]*?\bas\s+(\$[\w]*\$)([\s\S]*?)\2\s*;/gi))bodies[match[1]]=match[3]
-  const actual={identity:{database:SCOPE_DATABASES.scope,oid:'65537',role:'postgres'},counts:structuredClone(expected.tables),workerConnections:[],ledger:manifest.migrations.map(file=>({name:file.path.split('/').at(-1)})).sort((a,b)=>a.name<b.name?-1:1),functions:Object.entries(bodies).map(([name,body])=>({name,body,language:'plpgsql',securityDefiner:false,arguments:'',returns:'trigger',config:null,volatility:'v',owner:'postgres'})),triggers:Object.entries(manifest.resume.schema.triggers).map(([key,definition])=>({table:key.split('/')[0],name:key.split('/')[1],enabled:'O',definition})),columns:Object.entries(manifest.resume.schema.columns).map(([key,value])=>({table:key.split('/')[0],name:key.split('/')[1],...value})),constraints:[{table:'linear_comment_links',definition:'FOREIGN KEY ("issueLinkId") REFERENCES public.linear_issue_links(id) ON DELETE CASCADE'}],indexes:[]}
+  const actual={identity:{database:SCOPE_RETAINED_DATABASE,oid:'65537',role:'postgres'},counts:structuredClone(expected.tables),workerConnections:[],ledger:manifest.migrations.map(file=>({name:file.path.split('/').at(-1)})).sort((a,b)=>a.name<b.name?-1:1),functions:Object.entries(bodies).map(([name,body])=>({name,body,language:'plpgsql',securityDefiner:false,arguments:'',returns:'trigger',config:null,volatility:'v',owner:'postgres'})),triggers:Object.entries(manifest.resume.schema.triggers).map(([key,definition])=>({table:key.split('/')[0],name:key.split('/')[1],enabled:'O',definition})),columns:Object.entries(manifest.resume.schema.columns).map(([key,value])=>({table:key.split('/')[0],name:key.split('/')[1],...value})),constraints:[{table:'linear_comment_links',definition:'FOREIGN KEY ("issueLinkId") REFERENCES public.linear_issue_links(id) ON DELETE CASCADE'}],indexes:[]}
   return {manifest,bytes,read,expected,actual}
 }
 test('explicit resume accepts the retained successful70-payload evidence without adding ledger markers',()=>{
@@ -53,24 +53,25 @@ test('explicit retained ownership is separate from creation and refuses bootstra
   const f=fixture(),p=scopePolicy(f.manifest.migrations,()=>{},{allowResume:true})
   p.adoptRetainedScope(f.actual.identity)
   assert.equal(p.state.created.size,0);assert.equal(p.state.resumed.size,1)
-  const url=scopeUrl(SCOPE_DATABASES.scope)
-  p.connect('scope',{url})
-  assert.throws(()=>p.grant('scope',{url:scopeUrl('issue184_e2e'),text:`create database "${SCOPE_DATABASES.scope}"`}),/only its exact/)
+  const url=scopeUrl(SCOPE_RETAINED_DATABASE)
+  assert.throws(()=>p.connect('scope',{url}),/mismatch/)
+  assert.throws(()=>p.grant('scope',{url:scopeUrl('issue184_e2e'),text:`create database "${SCOPE_RETAINED_DATABASE}"`}),/only its exact/)
   const file=f.manifest.migrations[0]
-  assert.throws(()=>p.grant('scope:migrate',{url,text:readFileSync(file.path,'utf8')}),/cannot rerun/)
+  assert.throws(()=>p.grant('scope:migrate',{url,text:readFileSync(file.path,'utf8')}),/mismatch/)
 })
 test('bootstrap skip requires the explicit supervisor capability; failure propagates without a fake stdout success',async()=>{
-  assert.equal(await scopeResumeBootstrap(SCOPE_DATABASES.scope),false)
+  assert.equal(await scopeResumeBootstrap(SCOPE_RETAINED_DATABASE),false)
   let calls=0
-  globalThis.scopeAcceptance={resumeScope:async name=>{assert.equal(name,SCOPE_DATABASES.scope);calls++}}
-  try{assert.equal(await scopeResumeBootstrap(SCOPE_DATABASES.scope),true);assert.equal(calls,1);globalThis.scopeAcceptance.resumeScope=async()=>{throw Error('read-only precondition changed')};await assert.rejects(scopeResumeBootstrap(SCOPE_DATABASES.scope),/precondition changed/)}finally{delete globalThis.scopeAcceptance}
+  globalThis.scopeAcceptance={resumeScope:async name=>{assert.equal(name,SCOPE_RETAINED_DATABASE);calls++}}
+  try{assert.equal(await scopeResumeBootstrap(SCOPE_RETAINED_DATABASE),true);assert.equal(calls,1);globalThis.scopeAcceptance.resumeScope=async()=>{throw Error('read-only precondition changed')};await assert.rejects(scopeResumeBootstrap(SCOPE_RETAINED_DATABASE),/precondition changed/)}finally{delete globalThis.scopeAcceptance}
 })
 
 
 test('resume requires a separate command and policy; fresh existing-target protection is not disabled',()=>{
   const f=fixture()
-  assert.throws(()=>scopeExecutionMode('--run',f.manifest),/cannot be interchanged/)
-  assert.throws(()=>scopeExecutionMode('--run-resume',{mode:'fresh'}),/cannot be interchanged/)
-  assert.doesNotThrow(()=>scopeExecutionMode('--run-resume',f.manifest))
+  assert.throws(()=>scopeExecutionMode('--run',f.manifest),/fresh exclusive scope/)
+  assert.throws(()=>scopeExecutionMode('--run-resume',{mode:'fresh'}),/fresh exclusive scope/)
+  assert.throws(()=>scopeExecutionMode('--run-resume',f.manifest),/fresh exclusive scope/)
+  assert.doesNotThrow(()=>scopeExecutionMode('--run',{mode:'fresh-exclusive-scope'}))
   assert.throws(()=>scopePolicy(f.manifest.migrations).adoptRetainedScope(f.actual.identity),/explicit resume policy required/)
 })

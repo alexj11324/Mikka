@@ -5,12 +5,13 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { execFileSync, fork } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { SCOPE_DATABASES, SCOPE_LIMITS, scopeUrl, checkedScopeUrl, scopePolicy, controlledChild } from './scope-acceptance-policy.mjs'
+import { SCOPE_DATABASES, SCOPE_RETAINED_DATABASE, SCOPE_RETIRED_APPROVALS, SCOPE_LIMITS, scopeUrl, checkedScopeUrl, scopePolicy, controlledChild } from './scope-acceptance-policy.mjs'
 import { verifyScopeResumeEvidence,scopeResumeSchema,validateScopeResumeState,SCOPE_RESUME_QUERIES } from './scope-resume.mjs'
 import { scopeWireOutput } from './scope-exec-file.mjs'
 import { SCOPE_IDENTITY_SQL } from './scope-acceptance-runtime.mjs'
 const digest = value => createHash('sha256').update(value).digest('hex')
 export function verifyScopeManifest(manifest, read = readFileSync) {
+  if(manifest.mode==='fresh-exclusive-scope')verifyFreshScopeTargets(manifest)
   if (manifest.migrations.length !== 70 || manifest.sources.length < 10) throw Error('scope manifest inventory mismatch')
   for (const file of [...manifest.sources, ...manifest.migrations]) if (digest(read(file.path)) !== file.sha256) throw Error('scope source/hash mismatch: ' + file.path)
   if(manifest.mode==='resume-scope-after-bootstrap'){verifyScopeResumeEvidence(manifest,read);if(JSON.stringify(scopeResumeSchema(manifest.migrations,read))!==JSON.stringify(manifest.resume.schema))throw Error('resume schema expectation/source mismatch')}
@@ -20,9 +21,22 @@ export function scopeWorkerMode(mode) {
   if(!['suite','migrate'].includes(mode))throw Error('scope worker mode mismatch')
   return {MIGRATE:mode==='migrate'?'1':'0',VERCEL_ENV:''}
 }
-export function scopeExecutionMode(mode,manifest){
+export function verifyFreshScopeTargets(manifest) {
+  if(manifest.mode!=='fresh-exclusive-scope'||JSON.stringify(manifest.databases)!==JSON.stringify(Object.values(SCOPE_DATABASES)))throw Error('fresh exclusive scope targets mismatch')
+  const old=manifest.preservedDatabase
+  if(old?.name!==SCOPE_RETAINED_DATABASE||old.oid!=='65537'||old.owner!=='postgres'||old.businessSqlAuthorized!==false)throw Error('fresh exclusive scope preserved identity mismatch')
+  if(JSON.stringify(manifest.retiredApprovalIds)!==JSON.stringify(SCOPE_RETIRED_APPROVALS))throw Error('fresh exclusive scope retired approval inventory mismatch')
+  if(manifest.approvalTransfer!==false)throw Error('fresh exclusive scope requires a new approval')
+}
+export function verifyFreshScopePreflight(rows) {
+  const retained=rows.filter(row=>row.datname===SCOPE_RETAINED_DATABASE)
+  if(retained.length!==1||retained[0].oid!=='65537'||retained[0].owner!=='postgres')throw Error('preserved scope metadata mismatch; no writes permitted')
+  if(rows.length!==1)throw Error('fresh scope target already exists or catalog mismatch; never reuse')
+}
+export function scopeExecutionMode(mode,manifest,approvalReference){
   if(mode==='--plan')return
-  if((mode==='--run-resume')!==(manifest.mode==='resume-scope-after-bootstrap'))throw Error('fresh and resume execution modes cannot be interchanged')
+  if(SCOPE_RETIRED_APPROVALS.includes(approvalReference))throw Error('fresh exclusive scope requires a new approval reference')
+  if(mode!=='--run'||manifest.mode!=='fresh-exclusive-scope')throw Error('only fresh exclusive scope execution is enabled; legacy resume is retired')
 }
 export async function scopePhases(run) { for(const phase of ['scope','team'])await run(phase) }
 async function execute(manifest, manifestPath, manifestHash, output, approvalReference, started) {
@@ -181,12 +195,10 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
   try {
     ;[adminIdentity]=await read(admin,SCOPE_IDENTITY_SQL)
     if(adminIdentity?.role!=='postgres'||adminIdentity.database!=='issue184_e2e')throw Error('original admin identity mismatch')
-    const existing=await read(admin,'select datname from pg_database where datname=any($1::text[])',[Object.values(SCOPE_DATABASES)])
-    if(isResume){
-      if(existing.length!==1||existing[0].datname!==SCOPE_DATABASES.scope)throw Error('resume requires only its retained scope DB and two absent team DBs')
-      policy.adoptRetainedScope(await validateRetainedScope())
-    }else if(existing.length)throw Error('scope database already exists; never reuse')
-    record({event:'preflight',resource:{id:manifest.resource.id,image:manifest.resource.image,volume:manifest.resource.volume},adminIdentity,targetsAbsent:isResume?[SCOPE_DATABASES.app,SCOPE_DATABASES.workspace]:Object.values(SCOPE_DATABASES),explicitResume:isResume})
+    const existing=await read(admin,'select datname,oid::text,pg_get_userbyid(datdba) as owner from pg_database where datname=any($1::text[])',[[...Object.values(SCOPE_DATABASES),SCOPE_RETAINED_DATABASE]])
+    // Metadata only for the preserved DB; no connection/business query/adoption.
+    verifyFreshScopePreflight(existing)
+    record({event:'preflight',resource:{id:manifest.resource.id,image:manifest.resource.image,volume:manifest.resource.volume},adminIdentity,targetsAbsent:Object.values(SCOPE_DATABASES),preservedDatabase:manifest.preservedDatabase,explicitResume:false})
     await scopePhases(async phase=>{
       await child(phase,'suite',{app:scopeUrl('issue184_e2e'),workspace:scopeUrl('issue184_e2e')})
       for(const database of phase==='scope'?[SCOPE_DATABASES.scope]:[SCOPE_DATABASES.app,SCOPE_DATABASES.workspace])await snapshot(database,'after-suite')
@@ -219,7 +231,7 @@ export async function main(args=process.argv.slice(2)) {
   const git=(...argv)=>execFileSync('git',argv,{encoding:'utf8',timeout:5000}).trim()
   if(git('rev-parse','HEAD')!==manifest.candidate||git('rev-parse','HEAD^{tree}')!==manifest.tree||git('status','--porcelain'))throw Error('scope candidate/worktree mismatch')
   if(mode==='--plan'){console.log(JSON.stringify({candidate:manifest.candidate,manifestHash:expectedHash,limits:SCOPE_LIMITS,databases:SCOPE_DATABASES,executed:false}));return}
-  scopeExecutionMode(mode,manifest)
+  scopeExecutionMode(mode,manifest,approvalReference)
   if(!output)throw Error('scope requires a new retained evidence directory')
   await execute(manifest,manifestPath,expectedHash,resolve(output),approvalReference,started)
 }

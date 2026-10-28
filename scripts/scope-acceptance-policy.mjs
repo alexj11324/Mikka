@@ -1,10 +1,12 @@
 // This task's retained, three-database acceptance only. No pg or process imports.
 import { createHash } from 'node:crypto'
-export const SCOPE_DATABASES = {
-  scope: 'scope184_f14235c6695547ae925d808ab35a399e_e2e',
+export const SCOPE_RETIRED_APPROVALS = Object.freeze(['Sentinel_b406d5bab51881919f61e122434e7205','Sentinel_488b222d9c28819184f7f72938c66322'])
+export const SCOPE_RETAINED_DATABASE = 'scope184_f14235c6695547ae925d808ab35a399e_e2e'
+export const SCOPE_DATABASES = Object.freeze({
+  scope: 'scope184_fresh_8a7b72d9a46e4bd6b295ef2490f7ab63_e2e',
   app: 'team184_app_69649a2f38184d8b8edf1fe6a6524f31_e2e',
   workspace: 'team184_workspace_1bf3cc4e4430443c841d27f4a5115dc9_e2e',
-}
+})
 export const SCOPE_LIMITS = Object.freeze({ totalMs: 300000, phaseMs: 140000, migrationMs: 60000, graceMs: 5000,
   statementMs: 20000, lockMs: 10000, idleTransactionMs: 30000, connectionMs: 3000,
   queries: { scope: 11000, team: 7000, 'scope:migrate': 1000, 'team:migrate': 1000 },
@@ -24,7 +26,7 @@ export function scopePolicy(migrations, record = () => {}, {allowResume=false} =
   const files = new Map(migrations.map(file => [file.sha256, file]))
   for (const file of migrations) if (file.beforeCommitSha256) files.set(file.beforeCommitSha256, file)
   const owned=database=>state.created.has(database)||state.resumed.has(database)
-  function adoptRetainedScope(identity){active();if(!allowResume)throw Error('explicit resume policy required');if(identity.database!==SCOPE_DATABASES.scope||identity.oid!=='65537'||identity.role!=='postgres'||state.created.size||state.resumed.size)throw Error('invalid explicit scope adoption');state.resumed.set(identity.database,identity.oid);record({event:'resume-scope-adopted',...identity})}
+  function adoptRetainedScope(identity){active();if(!allowResume)throw Error('explicit resume policy required');if(identity.database!==SCOPE_RETAINED_DATABASE||identity.oid!=='65537'||identity.role!=='postgres'||state.created.size||state.resumed.size)throw Error('invalid explicit scope adoption');state.resumed.set(identity.database,identity.oid);record({event:'resume-scope-adopted',...identity})}
   function active() { if (state.failed) throw Error('scope acceptance stopped') }
   function abort(reason) { if (!state.failed) { state.failed = reason;record({ event: 'abort', reason }) } }
   function connect(bucket,input) {
