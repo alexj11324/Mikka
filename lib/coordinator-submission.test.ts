@@ -71,6 +71,7 @@ test('concurrent identical submissions use the existing unique target and one im
   assert.equal(f.rows.size, 1)
   assert.equal(results.filter(result => !result.duplicate).length, 1)
   assert.equal(results.filter(result => result.duplicate).length, 9)
+  assert.deepEqual(new Set(results.map(result => result.eventId)), new Set([...f.rows.values()].map(row => row.id)))
   const before = structuredClone([...f.rows.values()])
   await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'different', { submissionId }), SubmissionConflictError)
   assert.deepEqual([...f.rows.values()], before)
@@ -92,7 +93,7 @@ test('an uncommitted winner blocks retry completion and reading until commit', a
     outcome.resolve()
     const result = await request
     if (changed) assert.ok(result.error instanceof SubmissionConflictError)
-    else { assert.equal(result.error, undefined); assert.deepEqual(result.value, { duplicate: true }) }
+    else { assert.equal(result.error, undefined); assert.deepEqual(result.value, { duplicate: true, eventId: 'committed-winner' }) }
     assert.deepEqual(f.trace, ['insert', 'read'])
     assert.equal([...f.rows.values()][0].payload.text, 'winner')
   }
@@ -106,7 +107,7 @@ test('a rolled-back winner allows the waiting insertion without a duplicate read
   await entered.promise
   assert.equal(settled, false); assert.deepEqual(f.trace, ['insert']); assert.equal(f.rows.size, 0)
   rollback.resolve()
-  assert.deepEqual(await request, { duplicate: false })
+  assert.deepEqual(await request, { duplicate: false, eventId: [...f.rows.values()][0].id })
   assert.deepEqual(f.trace, ['insert']); assert.equal(f.rows.size, 1)
 })
 
@@ -121,7 +122,9 @@ test('an unresolved conflict read never becomes an accepted retry', async () => 
 test('same submission UUID is isolated by authenticated owner and actual chat identity', async () => {
   const f = fixture(), botId = '24000000-0000-4000-8000-000000000002'
   for (const [owner, bot] of [['owner', null], ['foreign', null], ['owner', botId]] as const) {
-    assert.deepEqual(await recordPersonalSubmission(f.executor, owner, 'hello', { submissionId, botId: bot }), { duplicate: false })
+    const result = await recordPersonalSubmission(f.executor, owner, 'hello', { submissionId, botId: bot })
+    assert.equal(result.duplicate, false)
+    assert.ok(result.eventId)
   }
   assert.equal(f.rows.size, 3)
   assert.equal(new Set(f.rows.keys()).size, 3)
