@@ -77,7 +77,9 @@ jobs:
 
   local-sandbox:
     name: Local computer through real Linux sandbox
-    runs-on: ubuntu-latest
+    # Pin a host that supports nested unprivileged user namespaces. Keep the
+    # runtime's seccomp/user/PID/network isolation intact; never disable probes.
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
