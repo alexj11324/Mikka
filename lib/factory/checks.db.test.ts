@@ -16,6 +16,7 @@ import {
   type RunPolicy,
 } from "@mikka/protocol/agent-policy";
 import { Pool } from "pg";
+import { exerciseFactoryRecoveryEntry } from "../../tests/support/factory-recovery-entry-fixture";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
 import { claimLocalRun } from "../computer/claim";
@@ -1452,6 +1453,12 @@ test(
             }
           },
         );
+      await exerciseFactoryRecoveryEntry(t, {
+        db, failedReview, png, sha, modelInvoke,
+        callCount: () => modelCalls,
+        chooseRetry: () => { chosenAction = "retry_check"; },
+        latestRequest: () => networkRequests.at(-1),
+      });
       await t.test(
         "unavailable model calls exhaust only their invocation budget, with no fixed recovery",
         async () => {
