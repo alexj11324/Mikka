@@ -21,21 +21,23 @@
 
 </div>
 
-Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只需用自然语言向 bot 描述需求，它会将需求拆解为任务，并分派给 Claude Code、Codex 或 Cursor 执行。目前任务运行在你自己的设备上，云端电脑即将上线。
+Mikka 将运行在本地电脑、远程服务器和云端的 Coding Agent 连接成一个协作团队。
+你只需向 Bot 描述需求，它就会组织任务，协调 Claude Code、Codex 和 Cursor
+在不同设备上执行。你可以使用自己的设备，云端电脑也在持续建设中。
 
-你可以实时跟进每项工作的进展，在需要决策时介入，并在完成后审阅结果。
+在一个地方查看所有线程的进度，必要时介入决策，并审阅交付结果。
 
 ## 工作方式
 
 - **Bot 负责协调，线程负责执行。**
-  - Bot 与你对话，制定计划并分派任务，本身不直接执行工作。
+  - Bot 与你对话、组织任务并派发编码线程；网页分身将进一步支持网页任务。
   - 每项工作在独立的**线程**中运行。线程对应一次工作运行，拥有独立的名称，通常关联一个任务。一个 bot 可以同时管理多个线程。
   - 完整定义参见 [术语表](docs/design/glossary.md)。
-  - **Harness 是执行层，不是另一个 Bot。** Coordinator 通过 Mikka 的 AI SDK / Workflow harness 处理对话和工具；派发的编码线程由 daemon 选择 Claude Code、Codex 或 Cursor CLI harness 执行。旧的独立 Agent 聊天已退役，历史记录仅供查看。
+  - **Harness 是执行引擎。** Bot 对话使用 Mikka 的 AI SDK / Workflow，编码线程由 Claude Code、Codex 或 Cursor CLI 执行。
 
 - **由 Coordinator 协调多个执行 harness。**
   - Coordinator 是常驻运行的 bot。当运行结束、任务状态变更或 worker 提出问题时，它会被唤醒并决定下一步操作，仅在需要你决策时发出通知。
-  - Coordinator 是当前内置的 Bot。它的协调 harness 与执行编码线程的 CLI harness 分开运行。
+  - Coordinator 负责协调团队任务，并将工作分派给可用的 Agent 与设备。
 
 - **先确认，再执行。**
   - 需求不明确时，Coordinator 会在派发运行前，先在对话中向你确认缺少的信息。
@@ -46,7 +48,7 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
   - Daemon 通过你已安装并登录的 CLI harness 执行线程，因此沿用你现有的订阅与配置。
 
 - **故障后自动恢复。**
-  - 每次运行均持有租约，并通过周期性检查点保存工作进度。设备在运行中途离线时，可在另一台兼容的在线设备上接续（[PR #201](https://github.com/alexj11324/Mikka/pull/201)）。
+  - 租约与周期性检查点保存执行进度；设备离线后可在另一台兼容的在线设备上接续。
 
 - **融入现有工具。**
   - 任务与 Linear 双向同步；其他 agent 可通过 MCP 操作 Mikka；在 Telegram 中发送消息即可创建任务。
@@ -58,12 +60,14 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
   <img src="docs/assets/task-flow-zh-light.svg" alt="任务在 Mikka 中的流转：请求经过分诊，需求不明确时在对话中向你澄清后再派发；agent 执行过程中可以向你提问；规划中的 Factory 阶段增加审查、验证、发布审批和监控。">
 </picture>
 
-图中展示了当前的任务与线程流程：运行完成后会在对话中汇报结果。但从设备自助接入到生成 GitHub PR 的完整闭环仍在集成，尚未通过真实 Preview 验收（[#357](https://github.com/alexj11324/Mikka/issues/357)）。虚线部分是规划中的 Factory 流程：独立的审查与验证（[#193](https://github.com/alexj11324/Mikka/issues/193)）、检查未通过时派发修复运行、由人工批准发布（[#194](https://github.com/alexj11324/Mikka/issues/194)），以及将故障转为 issue 的监控（[#195](https://github.com/alexj11324/Mikka/issues/195)）。按需求歧义程度进行系统分流在 [#192](https://github.com/alexj11324/Mikka/issues/192) 中跟踪。
+从需求创建任务，再由 Agent 在线程中执行，结果统一回到 Bot 对话。
+Factory 将进一步加入独立审查、验证、发布审批与监控。
 
 ## 当前功能
 
 - **将需求转化为任务。** Coordinator 将请求拆解为任务并派发运行，同时判断每个任务归属于工作区还是个人。如判断有误，可一键修改。
-- **完整呈现执行过程。** 每个线程都会展示其 agent 当前的操作。Worker 通过 Mikka 的 MCP 工具汇报进度、提出问题或报告阻塞，由 Coordinator 逐一处理；线程也已支持通过输入框停止运行（[PR #336](https://github.com/alexj11324/Mikka/pull/336)）。
+- **完整呈现执行过程。** 每个线程都会展示其 Agent 当前的操作。Worker 通过 Mikka 的 MCP 工具汇报进度、提出问题或报告阻塞，由 Coordinator 逐一处理；你也可以在线程中回复或停止运行。
+- **跨设备接续。** 独立 worktree 与周期性检查点保存工作进度，中断的线程可交接给另一台兼容设备。
 - **注明信息来源。** 回复中引用的任务、运行记录和网页以可点击的标签形式展示。
 - **统一管理任务。** 任务支持看板和列表两种视图，包含关联关系、活动记录和个人任务编号，并与 Linear 双向同步。
 - **筛选重要通知。** Mikka 汇总来自 GitHub、Linear、Notion、Slack 和 Gmail 的通知，仅保留需要你关注的内容，并生成每日简报。
@@ -73,18 +77,15 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 
 ## 开发路线
 
-正在进行的工作在 [GitHub issues](https://github.com/alexj11324/Mikka/issues) 中跟踪，并与 Linear（`MIK-xx`）同步。
-
-**截至 2026 年 10 月 28 日：** 线程停止功能（[PR #336](https://github.com/alexj11324/Mikka/pull/336)）与基于检查点的跨设备接续（[PR #201](https://github.com/alexj11324/Mikka/pull/201)）已经合并。本地 MVP 的集成 PR（[#358](https://github.com/alexj11324/Mikka/pull/358)–[#362](https://github.com/alexj11324/Mikka/pull/362)）仍未合并；从连接设备到交付 PR 的完整流程尚未完成真实 Preview 验收（[#357](https://github.com/alexj11324/Mikka/issues/357)）。
+开发路线见 [GitHub issues](https://github.com/alexj11324/Mikka/issues)。
 
 | 方向 | 规划内容 | 跟踪 |
 | --- | --- | --- |
-| **本地设备到 PR 的 MVP 闭环** | 完成设备自助连接、Coordinator 任务工具、本地 Claude Code/Codex 执行、经批准的 GitHub PR 交付和真实 Preview 验收。 | [#357](https://github.com/alexj11324/Mikka/issues/357)、[PR #358–#362](https://github.com/alexj11324/Mikka/pull/362) |
-| **云端电脑** | 每个 bot 拥有独立的桌面环境，支持实时查看、随时接管及交还控制权。空闲时自动休眠并保留磁盘数据。同时支持接入自有设备。最新规划为 Bot 桌面和网页分身共用云端底层机器，每条云端编码线程则拥有独立机器。 | [#172](https://github.com/alexj11324/Mikka/issues/172)、[#342](https://github.com/alexj11324/Mikka/issues/342)、[#147](https://github.com/alexj11324/Mikka/issues/147) |
+| **设备接入与交付** | 连接电脑，向 Claude Code 或 Codex 派发编码任务，经用户批准后创建 GitHub PR。 | [#357](https://github.com/alexj11324/Mikka/issues/357) |
+| **云端电脑** | 多个 Bot 共用云端基础设施，各自拥有独立桌面与网页分身；云端编码线程使用独立机器，桌面支持实时查看和接管。 | [#172](https://github.com/alexj11324/Mikka/issues/172)、[#342](https://github.com/alexj11324/Mikka/issues/342)、[#147](https://github.com/alexj11324/Mikka/issues/147) |
 | **对话内审批** | Agent 需要授权时，可直接在对话中处理：允许一次、拒绝，或在当前任务内始终允许。 | [#147](https://github.com/alexj11324/Mikka/issues/147)、[#177](https://github.com/alexj11324/Mikka/issues/177) |
 | **群聊** | 支持多个 bot 与多名成员在同一对话中协作，提供轮流发言、@ 提及以及「正在工作」状态栏。 | [#105](https://github.com/alexj11324/Mikka/issues/105) |
 | **Factory** | 完整的交付流程：同一任务同一时间仅执行一次、阶段状态持久化、独立的审查与验证线程，以及基于实际证据的人工发布审批。 | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
-| **跨设备接续** | **已合并：** 保存进行中的工作，并将中断的运行交接给另一台兼容的在线设备继续执行。 | [PR #201](https://github.com/alexj11324/Mikka/pull/201) |
 | **定时任务** | Bot 可在指定时间或按周期执行任务，并将结果返回至对话。 | [#179](https://github.com/alexj11324/Mikka/issues/179) |
 | **Connected apps** | 邮件、日历、文档和 Slack 工作流，经审批后可执行实际操作，而不仅限于读取。 | [#177](https://github.com/alexj11324/Mikka/issues/177) |
 | **安全凭据** | Agent 通过安全表单请求凭据。凭据由保管库存放，受控浏览器仅在获批操作中使用。 | [#180](https://github.com/alexj11324/Mikka/issues/180) |
@@ -127,7 +128,7 @@ Web 应用、Telegram 和 MCP 客户端均接入部署在 Vercel 上的同一个
 
 Linear 同步运行在 Cloudflare Worker 上，通过持久化的 inbox 和 outbox 与 Postgres 交换变更。
 
-虚线框和虚线表示规划中的部分：Scheduler（[#179](https://github.com/alexj11324/Mikka/issues/179)）、Factory 阶段（[#191](https://github.com/alexj11324/Mikka/issues/191)–[#194](https://github.com/alexj11324/Mikka/issues/194)）、监控（[#195](https://github.com/alexj11324/Mikka/issues/195)）、云端电脑（[#172](https://github.com/alexj11324/Mikka/issues/172)）、本机 computer use（[#147](https://github.com/alexj11324/Mikka/issues/147)）、Connected apps 执行操作（[#177](https://github.com/alexj11324/Mikka/issues/177)）以及凭据保管库（[#180](https://github.com/alexj11324/Mikka/issues/180)）。基于检查点的跨设备接续已合并（[PR #201](https://github.com/alexj11324/Mikka/pull/201)）。
+后续将扩展云端电脑、网页操作、定时任务、Factory 审查与验证，以及经过授权的第三方应用操作。
 
 ## 技术栈
 
