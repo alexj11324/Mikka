@@ -47,6 +47,7 @@ import { publishRun, snapshotTree } from "./agents/publish"
 import { runPaths } from "./agents/run-context"
 import { runVerify } from "./agents/verify"
 import { SandboxRuntime, type AgentSandbox } from "./agents/sandbox"
+import { SandboxManager } from '@anthropic-ai/sandbox-runtime'
 import { buildChildEnv } from "./env"
 import { browseFolder } from "./fs-browse"
 import {
@@ -416,7 +417,15 @@ export class Daemon {
     if (this.stopped) throw new Error("daemon stopped during startup")
     // Do not advertise enforcement merely because an approval callback exists:
     // each harness must prove that all policy-gated operations reach it.
-    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({ ...info, toolApproval: undefined, coordinator: hosted ? false : coordinatorCapable(info) }))
+    const runApprovalTransport = this.ownedSandbox !== null && this.sandbox === this.ownedSandbox && typeof this.options.link.prepareRunToolApproval === 'function'
+    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
+      ...info,
+      // A real sandbox probe has already succeeded before this point. A
+      // callback alone or a synthetic NoSandbox transport cannot attest it.
+      // Hosted runtimes need their own verified per-run network integration.
+      toolApproval: !hosted && runApprovalTransport && (info.harness === 'claude_code' || (info.harness === 'codex' && /(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(info.version ?? ''))) ? true as const : undefined,
+      coordinator: hosted ? false : coordinatorCapable(info),
+    }))
     // Runs survive restarts: pick up what the journal says was active.
     this.supervisor.resumeAll()
     if (!hosted && this.options.quotaSource !== null) {
@@ -620,6 +629,10 @@ export class Daemon {
       return false
     })
     try {
+      if (process.platform === 'linux') {
+        const dependencies = SandboxManager.checkDependencies()
+        if (dependencies.warnings.length) throw new Error(`Run sandbox isolation unavailable: ${dependencies.warnings.join('; ')}`)
+      }
       await sandbox.probe()
       this.ownedSandbox = sandbox
       return sandbox

@@ -62,7 +62,9 @@ jobs:
   ui-policy:
     name: UI policy (strict)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
-    runs-on: ubuntu-latest
+    # Use a fixed standard Linux image for the official runtime contract.
+    # Do not change host namespace/security policy to make a probe pass.
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
     env:
       BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
@@ -108,9 +110,18 @@ jobs:
           echo "CODEX_CONTRACT_BIN=$RUNNER_TEMP/pr13-codex-contract/node_modules/.bin/codex" >> "$GITHUB_ENV"
       - name: Require real sandbox probe and daemon lifecycle acceptance (no skips)
         if: ${{ !cancelled() }}
-        run: pnpm --filter @mikka/daemon test
+        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions
         env:
           MIKKA_SANDBOX_ACCEPTANCE: '1'
+      - name: Preserve offline CLI diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr13-cli-diagnostics-${{ github.sha }}
+          path: |
+            /tmp/mikka-official-codex-synthetic-*/evidence.json
+            /tmp/mikka-official-codex-synthetic-*/official-cli.stderr.log
+          if-no-files-found: warn
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm --filter @mikka/mobile typecheck
@@ -168,7 +179,7 @@ jobs:
     # Name kept so the existing required check still reports; browser tests moved to browser-tests.yml.
     name: Production build and browser interactions
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 25
     services:
       postgres:
@@ -205,6 +216,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install native dependencies for the CLI approval database roundtrip
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'

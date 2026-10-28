@@ -105,9 +105,10 @@ export class HttpServerLink implements ServerLink {
     const path = `/v1/runs/${seg(assignment.runId)}/tool-approval`
     const proposal = z.object({ id: z.uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/), status: z.string() })
     const response = z.object({ decision: z.enum(['pending', 'allow', 'deny']) })
+    const liveness = new AbortController()
     const gate = new ToolApprovalGate(assignment.runId, {
       permission: request => toolApprovalDecision(request, assignment.policy, worktree),
-      isLive: async () => { try { check(); const current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean() }) }); check(); return current.live } catch { return false } },
+      isLive: async () => { try { check(); const current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean() }), signal:liveness.signal, timeoutMs:5000 }); check(); return current.live } catch { return false } },
       ask: async (request, signal) => {
         const delay = () => new Promise<void>((resolve, reject) => {
           const done = () => { signal.removeEventListener('abort', stop); resolve() }
@@ -134,8 +135,17 @@ export class HttpServerLink implements ServerLink {
         }
       },
     })
+    let checking = false
+    const monitor = setInterval(() => {
+      if (checking || gate.revoked) return
+      checking = true
+      void gate.checkLive().then(live => { if (!live) gate.revoke() }).finally(() => { checking = false })
+    },1000)
+    monitor.unref()
+    const abort = () => gate.revoke()
+    gate.onRevoke(() => { liveness.abort(); clearInterval(monitor); signal.removeEventListener('abort',abort) })
     if (signal.aborted) gate.revoke()
-    else signal.addEventListener('abort', () => gate.revoke(), { once: true })
+    else signal.addEventListener('abort', abort, { once: true })
     return gate
   }
   async prepareRunMailbox(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
