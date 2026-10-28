@@ -25,7 +25,7 @@ export class ComputerBroker {
     // A new policy or session invalidates every previous grant for this run,
     // including when the new choice is deny or absent.
     for (const [old, grant] of this.grants)
-      if (grant.runId === runId) this.grants.delete(old);
+      if (grant.runId === runId) this.revoke(old);
     // Cloud desktops must be bound by the trusted caller, never the model.
     if (display !== undefined && !/^:[1-9][0-9]{0,2}$/.test(display))
       throw new Error("Invalid desktop display");
@@ -129,6 +129,16 @@ export class ComputerBroker {
   // The model-facing request socket deliberately has no decision/list method.
   list() {
     return [...this.pending.values()].map((p) => structuredClone(p.request));
+  }
+  revoke(token) {
+    this.grants.delete(token);
+    for (const [id, row] of this.pending) {
+      if (row.token !== token) continue;
+      this.pending.delete(id);
+      clearTimeout(row.timer);
+      row.cleanup();
+      row.reject(new Error("Run ended; approval discarded"));
+    }
   }
   async decide(id, digest, approve) {
     const row = this.pending.get(id);

@@ -30,6 +30,20 @@ async function fixture(t, overrides = {}) {
   });
   return broker;
 }
+test("revoking a run grant promptly rejects pending work without revoking another run", async (t) => {
+  let calls = 0;
+  const b = await fixture(t, { execute: async () => { calls++; return 'ok'; } });
+  const first = b.spec('first', 'ask');
+  const second = b.spec('second', 'allow');
+  const pending = b.request(first.token, { name: 'click', arguments: { x: 1, y: 2 } });
+  assert.equal(b.list().length, 1);
+  b.revoke(first.token);
+  await assert.rejects(pending, /Run ended/);
+  assert.equal(b.list().length, 0);
+  await assert.rejects(b.request(first.token, { name: 'get_desktop_state' }), /Not permitted/);
+  assert.equal(await b.request(second.token, { name: 'get_desktop_state' }), 'ok');
+  assert.equal(calls, 1);
+});
 test("only pinned driver detected; missing/unexpected version absent", async (t) => {
   const dir = await mkdtemp(join(tmpdir(), "driver-detect-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
@@ -269,7 +283,7 @@ test("replaced run session and disconnected model discard pending execution", as
   const refused = assert.rejects(b.request(grant.token, { name: "get_desktop_state" }));
   const row = b.list()[0];
   b.spec("r", "ask");
-  await b.decide(row.id, row.digest, true);
+  await assert.rejects(() => b.decide(row.id, row.digest, true));
   await refused;
   grant = b.spec("r", "ask");
   const abort = new AbortController();

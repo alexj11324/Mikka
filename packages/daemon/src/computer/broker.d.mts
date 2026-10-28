@@ -25,6 +25,7 @@ export class ComputerBroker {
   listen(): Promise<void>;
   request(token: string, value: unknown, signal?: AbortSignal): Promise<unknown>;
   list(): PendingComputerRequest[];
+  revoke(token: string): void;
   decide(id: string, digest: string, approve: boolean): Promise<{ ok: true }>;
   close(): Promise<void>;
 }
