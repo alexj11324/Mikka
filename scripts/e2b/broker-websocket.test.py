@@ -1,7 +1,7 @@
 """Real local Chromium and WebSocket regression; all data is synthetic."""
 import asyncio, importlib.util, json, shutil, ssl, subprocess, tempfile
 from pathlib import Path
-from aiohttp import ClientSession, WSMsgType, web
+from aiohttp import ClientSession, WSMsgType, WSServerHandshakeError, web
 from aiohttp.test_utils import TestClient, TestServer
 
 spec=importlib.util.spec_from_file_location('gateway',Path(__file__).with_name('subagent-gateway.py'))
@@ -14,7 +14,12 @@ async def main():
         path=Path(directory)
         fixture=web.Application()
         async def login(_request):
-            result=web.Response(text='<input name="username"><input type="password"><input name="otp">',content_type='text/html')
+            result=web.Response(text='''<input name="username"><input type="password"><input name="otp"><script>
+              window.focusHijacked=false;window.inputEvents=0;
+              const user=document.querySelector('input[name=username]');
+              user.addEventListener('focus',()=>{window.focusHijacked=true;document.querySelector('input[type=password]').focus()});
+              user.addEventListener('input',()=>window.inputEvents++);
+            </script>''',content_type='text/html')
             result.set_cookie('synthetic_session','synthetic',httponly=True,path='/')
             return result
         fixture.router.add_get('/login',login)
@@ -79,7 +84,7 @@ async def main():
                 else:raise AssertionError('synthetic HTTPS fixture did not finish loading')
                 gateway.authorize=lambda request,role:('synthetic',grant)
                 gateway.token=lambda raw,role:grant
-                app=web.Application();app.router.add_get('/agents/{id}/credentials/cdp',gateway.cdp);app.router.add_post('/agents/{id}/credentials/begin',gateway.begin)
+                app=web.Application();app.router.add_get('/agents/{id}/credentials/cdp',gateway.cdp);app.router.add_post('/agents/{id}/credentials/begin',gateway.begin);app.router.add_post('/agents/{id}/credentials/end',gateway.end)
                 async with TestClient(TestServer(app)) as client:
                     await browser.rpc('Runtime.evaluate',{'expression':"(()=>{const e=document.createElement('iframe');e.id='unsafe-test';document.body.append(e)})()",'returnByValue':True})
                     async with client.post('/agents/case/credentials/begin?token=synthetic') as denied_begin:assert denied_begin.status==409
@@ -120,12 +125,21 @@ async def main():
                     assert stdout.decode().startswith('PASS: actual broker client')
                     async with client.ws_connect(endpoint) as ws:
                         session=await attach(ws)
+                        try:
+                            await client.ws_connect(endpoint)
+                            raise AssertionError('second broker session must be refused')
+                        except WSServerHandshakeError as error:
+                            assert error.status==409
                         focus=next(expr for expr,selector in gateway.BROKER_FOCUS_EXPRESSIONS.items() if selector==gateway.BROKER_FOCUS_SELECTORS[0])
                         await ws.send_json({'id':5,'method':'Runtime.evaluate','params':{'expression':focus,'returnByValue':True},'sessionId':session})
                         assert (await response(ws,5))['result']['value'] is True
+                        async with client.post('/agents/case/credentials/end?token=synthetic',json={'guardToken':token}) as guarded_end:
+                            assert guarded_end.status==409, 'cannot release guard while scripts are frozen'
                         await ws.send_json({'id':6,'method':'Input.insertText','params':{'text':'synthetic-user'},'sessionId':session});await response(ws,6)
                         result=await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value','returnByValue':True})
                         assert result['result']['value']=='synthetic-user'
+                        events=await browser.rpc('Runtime.evaluate',{'expression':'({focusHijacked:window.focusHijacked,inputEvents:window.inputEvents})','returnByValue':True})
+                        assert events['result']['value']=={'focusHijacked':False,'inputEvents':1}, 'focus callbacks stay frozen; one input event reaches the page after resume'
                         for ident,selector,value in [(10,gateway.BROKER_FOCUS_SELECTORS[1],'synthetic-password'),(20,gateway.BROKER_OTP_SELECTOR,'123456')]:
                             expression=next(expr for expr,selected in gateway.BROKER_FOCUS_EXPRESSIONS.items() if selected==selector)
                             await ws.send_json({'id':ident,'method':'Runtime.evaluate','params':{'expression':expression,'returnByValue':True},'sessionId':session})
@@ -142,6 +156,10 @@ async def main():
                         await ws.send_json({'id':8,'method':'Network.getCookies','params':{'urls':[origin]},'sessionId':session})
                         cookies=(await response(ws,8))['cookies'];assert any(item['name']=='synthetic_session' for item in cookies)
                         await ws.send_json({'id':7,'method':'Network.setCookies','params':{'cookies':cookies},'sessionId':session});await response(ws,7)
+                    for _ in range(100):
+                        if not browser.broker_active:break
+                        await asyncio.sleep(.01)
+                    assert not browser.broker_active
                     async with client.ws_connect(endpoint) as ws:
                         await ws.send_json({'id':1,'method':'Target.attachToTarget','params':{'targetId':'wrong','flatten':True}})
                         assert (await ws.receive(timeout=10)).type in (WSMsgType.CLOSE,WSMsgType.CLOSED)

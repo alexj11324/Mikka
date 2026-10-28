@@ -60,11 +60,6 @@ def safe_resume_snapshot(frames, document, evaluation):
         return any(unsafe(item) for item in value.values())
     return not unsafe(root) and isinstance(evaluation,dict) and 'exceptionDetails' not in evaluation and isinstance(evaluation.get('result'),dict) and evaluation['result'].get('value') is True
 
-def inspect_mutation_expression(mutation):
-    # Text and form metadata are hints, not a proof of a page's JS effects.
-    selector=json.dumps(str(mutation.get('selector',''))[:500])
-    return f"(() => {{ const e={('document.activeElement' if mutation.get('action')=='key' else 'document.querySelector('+selector+')')}; if (!e) return {{requiresApproval:true}}; const text=(e.innerText||e.getAttribute('aria-label')||'').slice(0,500); const risk=/pay|purchase|buy|delete|remove|cancel|unsubscribe|transfer|send|publish|submit|confirm|付款|支付|购买|删除|取消|转账|发送|发布|确认/i.test(text); return {{requiresApproval:risk || (e.type==='submit' && e.form?.method.toLowerCase()!=='get') || ({json.dumps(mutation.get('action')=='key' and mutation.get('key')=='Enter')} && e.form?.method.toLowerCase()!=='get')}}; }})()"
-
 def browser_origin(value):
     try:
         parsed=urlsplit(value)
@@ -151,6 +146,7 @@ class Browser:
     def __init__(self, grant):
         self.grant=grant;self.pending={};self.seq=0;self.frame=None;self.guard=None
         self.session=None;self.target=None;self.lock=asyncio.Lock();self.viewer=set();self.stopped=False
+        self.broker_active=False;self.credential_scripts_disabled=False
         self.path=ROOT/grant['subagentId']; self.path.mkdir(mode=0o700,exist_ok=True)
         # Restart never silently unlocks a credential-bearing page.
         self.guard_file=self.path/'guard'
@@ -283,10 +279,18 @@ async def begin(request):
 async def cdp(request):
     raw,grant=authorize(request,'broker');b=browser(grant)
     guard=request.query.get('guard','')
-    if not b.guard or not hmac.compare_digest(guard,b.guard):raise web.HTTPForbidden()
+    async with b.lock:
+        if not b.guard or not hmac.compare_digest(guard,b.guard):raise web.HTTPForbidden()
+        if getattr(b,'broker_active',False):raise web.HTTPConflict()
+        b.broker_active=True
+    try:return await broker_cdp_session(request,b,grant,raw,guard)
+    finally:
+        async with b.lock:b.broker_active=False
+
+async def broker_cdp_session(request,b,grant,raw,guard):
     ws=web.WebSocketResponse(max_msg_size=1024*1024);await ws.prepare(request)
     reader,writer=await asyncio.open_unix_connection(str(b.path/'cdp.sock'),limit=4*1024*1024)
-    sessions=set();pending={};objects={};focused={};origin=getattr(b,'guard_origin',None)
+    sessions=set();pending={};objects={};focused={};origin=getattr(b,'guard_origin',None);input_done=asyncio.Event()
     if not origin:
         writer.close();await writer.wait_closed();await ws.close();return ws
     async def incoming():
@@ -300,16 +304,26 @@ async def cdp(request):
             if data['method']=='Target.attachToTarget' and any(item[0]=='Target.attachToTarget' for item in pending.values()):break
             if data['method']=='Runtime.callFunctionOn':objects.pop(data['sessionId'],None)
             if data['method']=='Page.reload':objects.pop(data['sessionId'],None);focused.pop(data['sessionId'],None)
-            if data['method']=='Runtime.evaluate':focused.pop(data['sessionId'],None)
+            if data['method']=='Runtime.evaluate':
+                focused.pop(data['sessionId'],None)
+                if data['params']['expression'] in BROKER_FOCUS_EXPRESSIONS:
+                    if getattr(b,'credential_scripts_disabled',False):break
+                    # Freeze page scripts before focus, so a site callback or
+                    # timer cannot retarget the subsequent native CDP input.
+                    b.credential_scripts_disabled=True
+                    await b.rpc('Emulation.setScriptExecutionDisabled',{'value':True},b.session)
             if data['method']=='Input.insertText':
                 selector=focused.pop(data['sessionId'],None)
-                if not selector:break
+                if not selector or not getattr(b,'credential_scripts_disabled',False):break
                 tree=await b.rpc('Page.getFrameTree',session=b.session)
                 document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
                 if not safe_resume_snapshot(tree,document,{'result':{'value':True}}):break
-                check=await b.rpc('Runtime.evaluate',{'expression':f"(()=>{{const e=document.querySelector({json.dumps(selector)});return !!e && !e.disabled && !e.readOnly && document.activeElement===e}})()",'returnByValue':True},b.session)
-                if check.get('result',{}).get('value') is not True or browser_origin(await b.url())!=origin:break
-            pending[data['id']]=(data['method'],data.get('sessionId'),data.get('params',{}).get('expression'))
+                check=await b.rpc('Runtime.evaluate',{'expression':f"(()=>{{const e=document.querySelector({json.dumps(selector)});return e && !e.disabled && !e.readOnly && document.activeElement===e ? e : null}})()",'returnByValue':False},b.session)
+                element=check.get('result',{}).get('objectId')
+                if not isinstance(element,str) or not element or browser_origin(await b.url())!=origin:break
+                input_done.clear()
+            else:element=None
+            pending[data['id']]=(data['method'],data.get('sessionId'),data.get('params',{}).get('expression'),element)
             writer.write((json.dumps(data)+'\n').encode());await writer.drain()
     async def outgoing():
         while line:=await reader.readline():
@@ -322,7 +336,7 @@ async def cdp(request):
             if data.get('method')=='Page.frameNavigated':
                 frame=data.get('params',{}).get('frame',{})
                 if not frame.get('parentId') and browser_origin(frame.get('url'))!=origin:break
-            call=pending.pop(data.get('id'),None)
+            call=pending.get(data.get('id'))
             if call and call[0]=='Target.attachToTarget':
                 session=data.get('result',{}).get('sessionId')
                 if isinstance(session,str) and session:sessions.add(session)
@@ -331,20 +345,44 @@ async def cdp(request):
                 if isinstance(object_id,str) and object_id:objects[call[1]]=object_id
             if call and call[0]=='Runtime.evaluate' and call[2] in BROKER_FOCUS_EXPRESSIONS and data.get('result',{}).get('result',{}).get('value') is True:
                 focused[call[1]]=BROKER_FOCUS_EXPRESSIONS[call[2]]
+            if call and call[0]=='Input.insertText':
+                # Native input is complete before scripts resume. The browser
+                # suppresses page listeners while frozen; dispatch one input
+                # event to the exact captured element after resuming.
+                await b.rpc('Emulation.setScriptExecutionDisabled',{'value':False},b.session)
+                b.credential_scripts_disabled=False
+                if 'error' not in data:
+                    if browser_origin(await b.url())!=origin:break
+                    emitted=await b.rpc('Runtime.callFunctionOn',{'objectId':call[3],'functionDeclaration':'function(){if(!this.isConnected)return false;this.dispatchEvent(new Event("input",{bubbles:true}));return true}','returnByValue':True},b.session)
+                    if emitted.get('result',{}).get('value') is not True:break
+                input_done.set()
+            if call:pending.pop(data['id'],None)
             await ws.send_str(line.decode().strip())
     async def expiry():
         await asyncio.sleep(max(0,grant['exp']-time.time()))
     tasks=[asyncio.create_task(f()) for f in (incoming,outgoing,expiry)]
     try:await asyncio.wait(tasks,return_when=asyncio.FIRST_COMPLETED)
     finally:
+        if getattr(b,'credential_scripts_disabled',False) and any(call[0]=='Input.insertText' for call in pending.values()):
+            try:await asyncio.wait_for(input_done.wait(),15)
+            except asyncio.TimeoutError:pass
         for task in tasks:task.cancel()
-        await asyncio.gather(*tasks,return_exceptions=True);writer.close();await writer.wait_closed();await ws.close()
+        await asyncio.gather(*tasks,return_exceptions=True)
+        # If an input outcome is unknown, leave scripts disabled and the guard
+        # closed. Otherwise release the short-lived freeze on disconnect.
+        if getattr(b,'credential_scripts_disabled',False) and not any(call[0]=='Input.insertText' for call in pending.values()):
+            try:
+                await b.rpc('Emulation.setScriptExecutionDisabled',{'value':False},b.session)
+                b.credential_scripts_disabled=False
+            except Exception:pass
+        writer.close();await writer.wait_closed();await ws.close()
     return ws
 
 async def end(request):
     _,grant=authorize(request,'broker');b=browser(grant);data=await request.json()
     async with b.lock:
         if not b.guard or not hmac.compare_digest(data.get('guardToken',''),b.guard):raise web.HTTPForbidden()
+        if getattr(b,'credential_scripts_disabled',False):raise web.HTTPConflict()
         try:
             tree=await b.rpc('Page.getFrameTree',session=b.session)
             document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
@@ -372,12 +410,9 @@ async def action(request):
             frame=tree['frameTree']['frame'];u=urlsplit(frame['url'])
             if frame['loaderId']!=data['expectedLoaderId'] or f'{u.scheme}://{u.netloc}'!=data.get('expectedOrigin'):raise web.HTTPConflict()
         if name=='inspectMutation':
-            from urllib.parse import urlsplit
-            mutation=data.get('mutation',{})
-            expression=inspect_mutation_expression(mutation)
-            check=await b.rpc('Runtime.evaluate',{'expression':expression,'returnByValue':True},b.session)
             tree=await b.rpc('Page.getFrameTree',session=b.session);frame=tree['frameTree']['frame'];u=urlsplit(frame['url'])
-            return web.json_response({**check['result']['value'],'loaderId':frame['loaderId'],'origin':f'{u.scheme}://{u.netloc}'})
+            if u.scheme not in ('https','http') or not u.hostname or u.username or u.password:raise web.HTTPConflict()
+            return web.json_response({'loaderId':frame['loaderId'],'origin':f'{u.scheme}://{u.netloc}'})
         if name=='navigate':
             from urllib.parse import urlparse
             u=urlparse(data.get('url',''))

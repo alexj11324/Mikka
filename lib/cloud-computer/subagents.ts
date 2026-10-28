@@ -5,6 +5,7 @@ import { subagentEventSchema, type SubagentEvent } from '@mikka/protocol/subagen
 import { ComputerError } from '@/lib/computer/store'
 import { createComputer, connectComputer } from '@/lib/computer/e2b-provider'
 import { installSubagentRuntime, runtimeRequest, grant, endpointPath, type BrowserBinding } from './runtime'
+import { requireWorkspaceComputerPolicy, withWorkspaceComputerPermission } from './workspace-policy'
 export type Actor = { userId: string; workspaceId: string }
 export type Subagent = BrowserBinding & { task: string; status: SubagentEvent['data']['state']; step: string; needs: SubagentEvent['data']['needs']; targetId: string | null }
 export class SubagentStore {
@@ -31,6 +32,7 @@ export class SubagentStore {
     const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
+      await requireWorkspaceComputerPolicy(client, actor.workspaceId)
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`subagents:${actor.workspaceId}`])
       const row = await this.get(actor, botId, id, client)
       if (row.status !== 'queued') { await client.query('COMMIT'); return row }
@@ -44,9 +46,12 @@ export class SubagentStore {
       // Persist provisioned ID before runtime work so a retry cannot leak a machine.
       await client.query('UPDATE cloud_machines SET "sandboxId"=$2,state=$3,"lastActiveAt"=now() WHERE "workspaceId"=$1', [actor.workspaceId, sandbox.sandboxId, 'running'])
       await client.query('COMMIT')
+      await client.query('BEGIN')
+      // Recheck under the policy lock: denial may have landed while the
+      // machine was being provisioned, before its browser starts.
+      await requireWorkspaceComputerPolicy(client, actor.workspaceId)
       await installSubagentRuntime(sandbox, actor.userId)
       const result = await runtimeRequest(sandbox.sandboxId, row, '/start', {})
-      await client.query('BEGIN')
       // A concurrent stop wins; it cannot be resurrected by provisioning.
       const changed = (await client.query<Subagent>(`UPDATE bot_subagents SET status='running',"targetId"=$2,step='running' WHERE id=$1 AND status='queued' RETURNING *`, [id, result.targetId])).rows[0]
       if (changed) await this.publish(client, changed)
@@ -77,9 +82,9 @@ export class SubagentStore {
     const machine = (await this.pool.query('SELECT "sandboxId" FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
     if (machine?.sandboxId) await runtimeRequest(machine.sandboxId, row, '/stop', {})
   }
-  async machine(actor: Actor, botId: string, id: string) {
-    const row = await this.get(actor, botId, id)
-    const machine = (await this.pool.query('SELECT "sandboxId" FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
+  async machine(actor: Actor, botId: string, id: string, client: Pool | PoolClient = this.pool) {
+    const row = await this.get(actor, botId, id, client)
+    const machine = (await client.query('SELECT "sandboxId" FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
     if (!machine?.sandboxId) throw new ComputerError(409, 'Browser unavailable')
     return { row, sandboxId: machine.sandboxId as string }
   }
@@ -102,8 +107,10 @@ export class SubagentStore {
     return this.update(actor, botId, id, 'stopped', 'stopped')
   }
   async action(actor: Actor, botId: string, id: string, action: Record<string, unknown>) {
-    const { row, sandboxId } = await this.machine(actor, botId, id)
-    if (row.status !== 'running') throw new ComputerError(409, 'Subagent is waiting or stopped')
-    return runtimeRequest(sandboxId, row, '/action', action)
+    return withWorkspaceComputerPermission(this.pool, actor.workspaceId, async client => {
+      const { row, sandboxId } = await this.machine(actor, botId, id, client)
+      if (row.status !== 'running') throw new ComputerError(409, 'Subagent is waiting or stopped')
+      return runtimeRequest(sandboxId, row, '/action', action)
+    })
   }
 }

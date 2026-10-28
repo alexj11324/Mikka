@@ -7,6 +7,7 @@ import { ComputerError } from '@/lib/computer/store'
 import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant, ensureHostedRunnerImage } from '@/lib/computer/e2b-provider'
 import { installSubagentRuntime, runtimeRequest } from './runtime'
 import type { Actor } from './subagents'
+import { withWorkspaceComputerPermission } from './workspace-policy'
 function options() {
   const key = process.env.E2B_API_KEY
   if (!key) throw new Error('Cloud runtime unavailable')
@@ -159,12 +160,17 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   }
   if (action === 'desktop') {
-    await startDesktop(sandbox, 1, true)
-    await syncDesktopLease(sandbox, { botId: machine.botId, ownerId: actor.userId, display: 1, epoch: machine.epoch, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion: 0 })
-    await installSubagentRuntime(sandbox, actor.userId)
-    const browser = await runtimeRequest(machine.sandboxId, { id: runId, ownerId: actor.userId, workspaceId: actor.workspaceId, botId: machine.botId, epoch: machine.epoch, display: 1 }, '/start', {})
-    await pool.query('UPDATE thread_machines SET "targetId"=$2 WHERE "runId"=$1', [runId, browser.targetId])
-    return { runId, state: machine.state, ...await viewerGrant(sandbox, { botId: machine.botId, ownerId: actor.userId, display: 1, epoch: machine.epoch, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion: 0 }, actor.userId, 'view') }
+    return withWorkspaceComputerPermission(pool, actor.workspaceId, async (client, policyVersion) => {
+      const current = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND state=\'running\' FOR UPDATE', [runId, actor.userId, actor.workspaceId])).rows[0]
+      if (!current?.sandboxId || current.sandboxId !== machine.sandboxId) throw new ComputerError(409, 'Thread machine unavailable')
+      const lease = { botId: current.botId, ownerId: actor.userId, display: 1, epoch: current.epoch, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion }
+      await startDesktop(sandbox, 1, true)
+      await syncDesktopLease(sandbox, lease)
+      await installSubagentRuntime(sandbox, actor.userId)
+      const browser = await runtimeRequest(current.sandboxId, { id: runId, ownerId: actor.userId, workspaceId: actor.workspaceId, botId: current.botId, epoch: current.epoch, display: 1 }, '/start', {})
+      await client.query('UPDATE thread_machines SET "targetId"=$2 WHERE "runId"=$1', [runId, browser.targetId])
+      return { runId, state: current.state, ...await viewerGrant(sandbox, lease, actor.userId, 'view') }
+    })
   }
   return { runId, state: action === 'pause' ? 'paused' : machine.state }
 }

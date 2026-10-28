@@ -14,14 +14,12 @@ constants = {node.targets[0].id: ast.literal_eval(node.value)
              and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
              and node.targets[0].id in ('SAFE_TO_RESUME', 'SENSITIVE_FIELD')}
 safe_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'safe_resume_snapshot')
-inspect_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'inspect_mutation_expression')
 broker_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'broker_command_allowed')
 origin_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'browser_origin')
 policy_nodes = [node for node in module.body if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id in ('BROKER_METHODS', 'BROKER_STORAGE_FUNCTION', 'BROKER_OTP_SELECTOR', 'BROKER_FOCUS_SELECTORS', 'BROKER_FOCUS_EXPRESSIONS', 'BROKER_EVALUATIONS')]
 namespace = {'json': json, 'math': math, 'urlsplit': urlsplit}
-exec(compile(ast.Module(body=[*policy_nodes, safe_node, inspect_node, origin_node, broker_node], type_ignores=[]), str(__file__), 'exec'), namespace)
+exec(compile(ast.Module(body=[*policy_nodes, safe_node, origin_node, broker_node], type_ignores=[]), str(__file__), 'exec'), namespace)
 safe_resume_snapshot = namespace['safe_resume_snapshot']
-inspect_mutation_expression = namespace['inspect_mutation_expression']
 broker_command_allowed = namespace['broker_command_allowed']
 
 
@@ -128,9 +126,7 @@ class GuardTest(unittest.TestCase):
 
     def test_isolated_chromium_iframe_and_open_closed_shadow(self):
         result = subprocess.run(['node', str(Path(__file__).with_name('subagent-guard-browser.test.mjs')),
-                                 constants['SAFE_TO_RESUME'],
-                                 inspect_mutation_expression({'action': 'click', 'selector': '#continue'}),
-                                 inspect_mutation_expression({'action': 'click', 'selector': '#delete'})],
+                                 constants['SAFE_TO_RESUME']],
                                 check=True, capture_output=True, text=True)
         cases = json.loads(result.stdout)
         for name, expected in [('empty', True), ('otp', False), ('cleared', True),
@@ -138,9 +134,6 @@ class GuardTest(unittest.TestCase):
             with self.subTest(name=name):
                 case = cases[name]
                 self.assertEqual(safe_resume_snapshot(case['frames'], case['document'], case['evaluation']), expected)
-        self.assertTrue(cases['deleteHint'])
-        self.assertFalse(cases['ambiguousHint'])
-        self.assertTrue(cases['syntheticHandlerRan'], 'metadata cannot predict arbitrary page callbacks')
 
 
 if __name__ == '__main__':

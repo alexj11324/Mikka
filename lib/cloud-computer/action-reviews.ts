@@ -18,8 +18,10 @@ export async function browserAction(pool: Pool, actor: Actor, botId: string, id:
   const row = await store.get(actor, botId, id)
   if (row.status !== 'running') throw new ComputerError(409, 'Subagent is waiting')
   const action = browserMutationSchema.parse(mutation)
+  if (!irreversible) return { state: 'running', ...await store.action(actor, botId, id, action) }
+  // The model decides whether confirmation is needed. The gateway only binds
+  // an approved operation to the current document and origin for replay safety.
   const check = await store.action(actor, botId, id, { action: 'inspectMutation', mutation: action })
-  if (!irreversible && !check.requiresApproval) return { state: 'running', ...await store.action(actor, botId, id, action) }
   const reviewId = randomUUID()
   const input = { actionId: reviewId, workspaceId: actor.workspaceId, botId, subagentId: id, epoch: row.epoch, loaderId: String(check.loaderId), origin: String(check.origin), mutation: action, summary: summary.slice(0, 500) }
   const digest = createHash('sha256').update(JSON.stringify([actor.userId, input])).digest('hex')

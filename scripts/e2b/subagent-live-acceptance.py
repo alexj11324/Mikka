@@ -18,12 +18,12 @@ async def main():
   async with s.post(url('/action'),json={'action':'navigate','url':'http://127.0.0.1:6083/login'}) as r:assert r.status==200
   await asyncio.sleep(1)
   async with s.post(url('/action'),json={'action':'observe'}) as r:o=await r.json();assert o['observation']['needsLogin']
-  async with s.post(url('/action'),json={'action':'inspectMutation','mutation':{'action':'click','selector':'#delete'}}) as r:assert (await r.json())['requiresApproval'] is True
-  async with s.post(url('/action'),json={'action':'inspectMutation','mutation':{'action':'click','selector':'#link'}}) as r:assert (await r.json())['requiresApproval'] is False
+  async with s.post(url('/action'),json={'action':'inspectMutation','mutation':{'action':'click','selector':'#delete'}}) as r:
+   binding=await r.json();assert r.status==200 and binding['origin']=='http://127.0.0.1:6083' and binding['loaderId'] and 'requiresApproval' not in binding
   async with s.post(url('/action'),json={'action':'type','selector':'#password','text':'must-not-enter'}) as r:assert r.status==403
   async with s.post(url('/action'),json={'action':'type','selector':'#otp','text':'must-not-enter'}) as r:assert r.status==403
   async with s.post(url('/action'),json={'action':'click','selector':'#link','expectedLoaderId':'other-document','expectedOrigin':'http://127.0.0.1:6083'}) as r:assert r.status==409
-  print('PASS: independent Chrome pipe, redacted observation, tested text/form risk hints, password typing denial, approval document fencing',flush=True)
+  print('PASS: independent Chrome pipe, redacted observation, password typing denial, approval document fencing',flush=True)
   async with s.ws_connect(url('/viewer','view')) as v:
    frame=await v.receive(timeout=10);assert frame.json()['type']=='frame'
    await v.send_json({'id':1,'method':'Input.insertText','params':{'text':'forbidden'}})

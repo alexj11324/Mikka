@@ -8,6 +8,7 @@ import { startSuggestion } from './suggestions'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { claimCloudRun } from '@/lib/computer/claim'
 import { recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
+import { withWorkspaceComputerPermission } from './workspace-policy'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
 test('real DB: additive migration, subagent owner isolation and separate thread claims', { skip: !databaseURL }, async () => {
@@ -65,6 +66,26 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     await pool.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES ($1,$2,\'alice\',\'A\'),($3,$2,\'bob\',\'B\')', [botA, alice.workspaceId, botB])
     const task = await store.create(alice, botA, 'Read public docs')
     assert.equal(task.status, 'queued')
+    await pool.query('INSERT INTO workspace_computer_policies VALUES ($1,\'deny\',1)', [alice.workspaceId])
+    await assert.rejects(store.start(alice, botA, task.id), { status: 403 })
+    await assert.rejects(store.action(alice, botA, task.id, { action: 'navigate', url: 'https://example.invalid' }), { status: 403 })
+    let ran = false
+    await assert.rejects(withWorkspaceComputerPermission(pool, alice.workspaceId, async () => { ran = true }), { status: 403 })
+    assert.equal(ran, false, 'denied action must never reach its callback')
+    await pool.query('UPDATE workspace_computer_policies SET permission=\'ask\',version=2 WHERE "workspaceId"=$1', [alice.workspaceId])
+    let release!: () => void, entered!: () => void
+    const held = new Promise<void>(resolve => { release = resolve }), started = new Promise<void>(resolve => { entered = resolve })
+    const running = withWorkspaceComputerPermission(pool, alice.workspaceId, async (_client, version) => { assert.equal(version, 2); entered(); await held })
+    await started
+    const contender = await pool.connect()
+    try {
+      await contender.query('BEGIN')
+      const lock = await contender.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired', [`computer-policy:${alice.workspaceId}`])
+      assert.equal(lock.rows[0].acquired, false, 'policy changes wait for an in-flight action')
+      await contender.query('ROLLBACK')
+    } finally { contender.release(); release() }
+    await running
+    await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [alice.workspaceId])
     await assert.rejects(store.get(bob, botA, task.id), { status: 404 })
     await assert.rejects(store.get(stranger, botA, task.id), { status: 404 })
     await assert.rejects(store.create(bob, botA, 'steal'), { status: 404 })

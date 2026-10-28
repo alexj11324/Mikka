@@ -68,10 +68,9 @@ actual registration and heartbeat use the same transport as daemon polling.
 Ordinary browser navigate/click/type/key actions are implemented. Password and
 OTP typing is broker-only; sensitive observations and display access remain
 blocked until cleared. The model is instructed to request confirmation before
-irreversible actions; its `irreversible` flag and the gateway's text/form
-heuristics route detected actions through the existing pending_actions ledger.
-These heuristics cannot determine arbitrary page-script effects and are not a
-general guarantee that every irreversible operation is intercepted. Normal
+irreversible actions; its `irreversible` flag routes selected actions through the existing
+pending_actions ledger, bound to the document and origin. This model decision
+is not a general guarantee about arbitrary page-script effects. Normal
 navigation does not request per-action approval.
 The credential broker's guarded CDP transport is a separate boundary: it only
 attaches to the bound target, accepts the broker's fixed login/session scripts,
