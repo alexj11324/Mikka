@@ -6,6 +6,7 @@ import { canonicalOrigin, assertSameOrigin, submitSchema, otpSchema, CredentialE
 import { seal, open, sealSession, type Kms } from './kms'
 import { checkCredentialRequest, credentialBody, credentialFailure } from './http'
 import { Cdp } from './browser'
+import { fillCredential } from './broker'
 import { assertNoSecret, fingerprint } from './fingerprint'
 
 function fixtureKms(): Kms {
@@ -138,4 +139,42 @@ test('verification codes use a separate authenticated envelope purpose', async (
   await assert.rejects(open(kms, owner, code))
   assert(otpSchema.safeParse({ nonce: 'a'.repeat(43), origin: owner.origin, code: '123456' }).success)
   assert(!otpSchema.safeParse({ nonce: 'a'.repeat(43), origin: owner.origin, code: '123456', credentialId: 'forged' }).success)
+})
+
+test('broker reports mechanical session application or submission without judging login state', async () => {
+  const kms = fixtureKms()
+  const password = await seal(kms, owner, Buffer.from(JSON.stringify({ username: 'fixture-user', password: 'fixture-password' })))
+  const snapshot = await sealSession(kms, owner, password.wrappedDek, Buffer.from(JSON.stringify({ cookies: [], localStorage: [] })))
+  for (const forcePassword of [false, true]) {
+    const calls: string[] = []
+    const claimed = { user_id: owner.userId, workspace_id: 'workspace', bot_id: 'bot', run_id: 'run', subagent_id: null, credential_id: owner.credentialId, origin: owner.origin, input_kind: 'password', target: { targetId: 'target', origin: owner.origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, credentialMode: forcePassword ? 'password' : 'session-first' } }
+    const credential = { wrapped_dek: password.wrappedDek, nonce: password.nonce, ciphertext: password.ciphertext, username: 'fixture-user' }
+    const session = { wrapped_dek: snapshot.wrappedDek, nonce: snapshot.nonce, ciphertext: snapshot.ciphertext }
+    const client = {
+      async query(sql: string) {
+        if (sql.includes('FROM bots ') || sql.includes('FROM agent_runs ')) return { rows: [{ id: 'ok' }] }
+        if (sql.includes('JOIN credential_secrets')) return { rows: [credential] }
+        if (sql.includes('FROM browser_sessions')) return { rows: [session] }
+        return { rows: [] }
+      }, release() {},
+    }
+    const pool = { async query() { return { rows: [claimed] } }, async connect() { return client } }
+    const cdp = {
+      async attach() {}, async origin() {}, async safeToResume() { return true }, close() {},
+      async fill() { calls.push('fill') },
+      async call(method: string) {
+        calls.push(method)
+        if (method === 'Page.getFrameTree') return { frameTree: { frame: { url: owner.origin } } }
+        if (method === 'Runtime.evaluate') return { result: { objectId: 'fixture' } }
+        if (method === 'Network.getCookies') return { cookies: [] }
+        return {}
+      },
+      async evaluate(expression: string) { calls.push(`evaluate:${expression}`); return [] },
+    }
+    const result = await fillCredential(pool as never, 'a'.repeat(43), { kms, guard: { begin: async () => ({ cdpUrl: 'wss://example.e2b.app/', targetId: 'target', guardToken: 'fixture' }), end: async () => {} }, connect: (async () => cdp) as never })
+    assert.equal(result.status, forcePassword ? 'submitted' : 'session_applied')
+    assert.equal(calls.includes('fill'), forcePassword)
+    assert.equal(calls.includes('Page.reload'), !forcePassword)
+    assert(!calls.some(call => /readyState|one-time-code|input\[type/.test(call)))
+  }
 })

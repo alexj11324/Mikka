@@ -40,11 +40,11 @@ async function browserCredentialRoute(request: Request, identity: { botId: strin
       const result = await login(caller, target.origin, parsed.data.username)
       return Response.json(result, { headers: privateHeaders })
     }
-    const parsed = z.object({ site: z.string().max(2048) }).strict().safeParse(await credentialBody(request))
+    const parsed = z.object({ site: z.string().max(2048), ...(action === 'login' ? { forcePassword: z.boolean().optional() } : {}) }).strict().safeParse(await credentialBody(request))
     if (!parsed.success) throw new CredentialError('credential_submission_invalid', 400)
     const target = await resolveCredentialBrowser(caller)
     if (canonicalOrigin(target.origin) !== canonicalOrigin(parsed.data.site)) throw new CredentialError('credential_denied', 404)
-    const result = action === 'challenge' ? await credentialStore.challenge(caller, target.origin) : await login(caller, target.origin)
+    const result = action === 'challenge' ? await credentialStore.challenge(caller, target.origin) : await login(caller, target.origin, undefined, { forcePassword: 'forcePassword' in parsed.data && parsed.data.forcePassword === true })
     return Response.json(result, { headers: privateHeaders })
   } catch (error) { return credentialFailure(error) }
 }

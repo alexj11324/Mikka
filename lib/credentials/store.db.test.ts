@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { CredentialStore } from './store'
+import { CredentialStore, hashNonce } from './store'
 import { CredentialError } from './contracts'
 import { fillCredential } from './broker'
 import type { Kms } from './kms'
@@ -52,6 +52,11 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
     const guard = { begin: async () => { throw new CredentialError() }, end: async () => {} }
     await assert.rejects(fillCredential(pool, lease.lease, { kms, guard }), CredentialError)
     await assert.rejects(fillCredential(pool, lease.lease, { kms, guard }), CredentialError)
+    const retry = await store.lease(otherBot, origin, browserTarget, undefined, true)
+    if (retry.status !== 'ready') throw new Error()
+    const retryTarget = (await pool.query('SELECT target FROM credential_fill_leases WHERE nonce_hash=$1', [hashNonce(retry.lease)])).rows[0].target
+    assert.equal(retryTarget.credentialMode, 'password')
+    await assert.rejects(fillCredential(pool, retry.lease, { kms, guard }), CredentialError)
     const codeChallenge = await store.challenge(a, origin)
     const codeLease = await store.otpLease(a, { nonce: codeChallenge.nonce, origin, code: '123456' }, browserTarget)
     await assert.rejects(fillCredential(pool, codeLease, { kms, guard }), CredentialError)

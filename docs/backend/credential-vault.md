@@ -34,6 +34,8 @@ write. Cookie/localStorage snapshots reuse the credential's DEK with separate
 purpose AAD, so the decrypt-only broker needs no GenerateDataKey permission.
 The snapshot includes cookies returned by Chrome for the credential origin,
 including both HttpOnly and script-accessible cookies, and that origin's localStorage.
+Snapshots recorded after submission are unverified candidates, not proof that
+the website accepted a login; a later visual observation must make that decision.
 
 The server derives the user from an authenticated owner-bound bot/subagent or
 thread; workspace membership alone never authorizes a login. No API or model
@@ -53,12 +55,20 @@ prefix is `/api/threads/:runId/credentials`.
 - `POST <prefix>` accepts `{nonce,origin,username,password}` or
   `{nonce,origin,code}`. Codes are encrypted, used once and never saved as a
   reusable login. The consumed lease's OTP ciphertext is erased immediately.
-- `POST <prefix>/login` with `{site}` attempts account-scoped session reuse,
-  then password filling. Responses contain only status and origin.
+- `POST <prefix>/login` with `{site}` applies a saved session when present or
+  submits the saved password. `{site,forcePassword:true}` selects a password
+  retry after the caller has visually assessed the session result. Responses
+  contain only origin and the mechanical result `session_applied` or
+  `submitted` (or `needs_login` if there is no unambiguous saved login).
+  None means the website accepted a login. After the viewing guard has ended,
+  the visual workflow must inspect the redacted page and decide whether login
+  succeeded, a password retry or a verification code is needed. It must not
+  observe the page while the guard is active or expose credential material.
 - `GET /api/credentials` returns owner-only login metadata without IDs.
 - `DELETE /api/credentials` with `{origin,username}` revokes the saved login.
 - `POST /v1/devices/:deviceId/runs/:runId/credentials/login` is the coding
-  runtime entry point; device/run/user/workspace are all server-checked.
+  runtime entry point with the same `site` and optional `forcePassword` body;
+  device/run/user/workspace are all server-checked.
 
 Cookie-authenticated mutations require exact Origin, `X-Mikka-Credential: 1`,
 JSON and a streamed 12 KiB maximum. Schemas reject unknown fields, including

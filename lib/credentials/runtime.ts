@@ -17,12 +17,12 @@ export async function credentialActor(request: Request) {
   return { userId: session.user.id, workspaceId: context.workspace.id }
 }
 
-export async function login(caller: BrowserCaller, site: string, submittedUsername?: string) {
+export async function login(caller: BrowserCaller, site: string, submittedUsername?: string, options?: { forcePassword?: boolean }) {
   if (process.env.CREDENTIAL_VAULT_ENABLED !== '1') throw new CredentialError()
   const origin = canonicalOrigin(site)
   await credentialStore.authorize(caller)
   const target = await resolveCredentialBrowser(caller)
-  const lease = await credentialStore.lease(caller, origin, target, submittedUsername)
+  const lease = await credentialStore.lease(caller, origin, target, submittedUsername, options?.forcePassword)
   if (lease.status === 'needs_login') return lease
   return executeCredentialLease(lease.lease, origin)
 }
@@ -46,7 +46,7 @@ export async function executeCredentialLease(lease: string, origin: string) {
     if (!response.ok) { await response.body?.cancel(); throw new Error() }
     // Do not forward arbitrary responses from another process to the model.
     const result = await response.json()
-    if (!['submitted', 'needs_code'].includes(result.status) || result.origin !== origin) throw new Error()
-    return { status: result.status as 'submitted' | 'needs_code', origin }
+    if (!['submitted', 'session_applied'].includes(result.status) || result.origin !== origin) throw new Error()
+    return { status: result.status as 'submitted' | 'session_applied', origin }
   } catch { throw new CredentialError() }
 }
