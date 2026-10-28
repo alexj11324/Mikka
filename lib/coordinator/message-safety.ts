@@ -1,3 +1,4 @@
+import { normalizeUserImages, userImageContent } from './user-attachments'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { ModelMessage } from 'ai'
 import { personalMessagePacket, personalMessageSummary } from '../personal-agent-message'
@@ -17,7 +18,10 @@ const asTime = (value: Date | string | null | undefined) => value instanceof Dat
 
 /** Called with the stored server event, never with JSON decoded from its body. */
 export function sourcedEventMessage(event: EventSource, projection: string): SourcedMessage {
-  if (event.kind === 'user_message') return { role: 'user', content: projection, mikkaUserEvent: { id: event.id ?? null, sentAt: asTime(event.createdAt) } }
+  if (event.kind === 'user_message') {
+    const images=userImageContent(event.payload.images)
+    return { role:'user',content:images.length?[{type:'text',text:projection},...images]:projection,mikkaUserEvent:{id:event.id??null,sentAt:asTime(event.createdAt)} }
+  }
   const packet = personalMessagePacket({ messageId: event.id ?? null, senderId: null,
     sourceSessionId: null, replyToSessionId: null, origin: 'runtime_notification',
     runId: event.runId, taskId: event.issueId, sentAt: asTime(event.createdAt), receivedAt: asTime(event.deliveredAt),
@@ -91,12 +95,22 @@ export function summaryMessage(summary: string, trust?: SummaryTrust): ModelMess
   const sources = stored?.sources ?? []
   const shown = sources.slice(-SUMMARY_SOURCE_LIMIT)
   const omitted = sources.slice(0, Math.max(0, sources.length - shown.length))
+  const retained = stored?.retainedUserRecord
+  const retainedParts = retained?.role === 'user' && Array.isArray(retained.content) ? retained.content : []
+  const originalImages = normalizeUserImages(retainedParts.flatMap(part => part.type === 'file' && typeof part.data === 'string' && part.mediaType.startsWith('image/') ? [{ dataUrl:part.data }] : []))
+  const images = userImageContent(originalImages)
+  // Keep the signed source record, but supply its pixels as actual model image
+  // parts rather than turning base64 into summary prose. Unsigned model or
+  // legacy summaries never enter this branch.
+  let imageIndex = 0
+  const retainedProjection = originalImages.length && retained ? { ...retained, content:retainedParts.map(part => part.type === 'file' && typeof part.data === 'string' && part.mediaType.startsWith('image/') ? { type:'text' as const,text:`Original user image attached separately; sha256=${originalImages[imageIndex++].sha256}` } : part) } : retained
   const projected = stored ? {
     sources: shown, sourceCount: sources.length, omittedSourceCount: omitted.length,
     omittedPendingOrUnverifiedCount: omitted.filter(source => !['done', 'succeeded', 'failed', 'cancelled', 'declined'].includes(source.observedState ?? '')).length,
-    retainedUserRecord: stored.retainedUserRecord, retainedUserSource: stored.retainedUserSource,
+    retainedUserRecord: retainedProjection, retainedUserSource: stored.retainedUserSource,
     summary: stored.untrustedData.summary,
     omissionRule: 'Omitted references remain in the stored source history; omission is not approval or completion. Verify original records through available tools before consequential action; if unavailable, ask the person. Retained user record is copied from the original input, not from the model summary.',
   } : { summary: summary.slice(0, 16000), ...(summary.length > 16000 ? { omittedCharacters: summary.length - 16000, omissionRule: 'Legacy or unverifiable summary text omitted explicitly; verify original records. No approval or completion may be inferred.' } : {}) }
-  return { role: 'user', content: JSON.stringify({ kind: 'prior_summary', authority: 'not_user_approval', untrustedData: projected }).replace(/[<>&\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`) }
+  const text = JSON.stringify({ kind: 'prior_summary', authority: 'not_user_approval', untrustedData: projected }).replace(/[<>&\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)
+  return { role:'user',content:images.length ? [{type:'text',text},...images] : text }
 }

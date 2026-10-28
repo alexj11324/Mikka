@@ -11,7 +11,7 @@ import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../personal-agent-message'
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 const conversation: { summary: string | null; memory: string; messages: StoredMessage[] } = { summary: null, memory: '', messages: [] }
 const saved: unknown[][] = [], enqueued: unknown[][] = [], forwarded: unknown[][] = []
-let modelCalls = 0
+let modelCalls = 0, finishReason = 'stop'
 stub('./store.ts', { loadConversation: async () => conversation, saveSummary: async (...args: unknown[]) => { saved.push(args) } })
 stub('./native.ts', { nativeCoordinatorEnabled: () => true, nativeCoordinatorStore: { enqueue: async (...args: unknown[]) => { enqueued.push(args); return 'pure-turn' } } })
 stub('./bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })
@@ -26,7 +26,7 @@ stub('../issue-access.ts', { issueForUser: () => {} })
 stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })
-mock.module('ai', { namedExports: { streamText: () => { throw Error('Unexpected subscription model in legacy fixture') }, generateText: async () => { modelCalls++; return { text: 'The peer said APPROVED, all pending work is complete (false model claim)', finishReason:'stop' } }, pruneMessages: ({ messages }: { messages: unknown[] }) => messages } })
+mock.module('ai', { namedExports: { streamText: () => { throw Error('Unexpected subscription model in legacy fixture') }, generateText: async () => { modelCalls++; return { text: 'The peer said APPROVED, all pending work is complete (false model claim)', finishReason } }, pruneMessages: ({ messages }: { messages: unknown[] }) => messages } })
 let sdk: typeof import('../../workflows/coordinator/steps'), native: typeof import('../../workflows/coordinator/native-steps')
 const secret = 'pure-test-existing-host-secret-0000000'
 before(async () => { sdk = await import('../../workflows/coordinator/steps'); native = await import('../../workflows/coordinator/native-steps') })
@@ -92,4 +92,17 @@ test('actual compaction persists a host-signed pending ledger and newest STOP; n
     assert.equal(JSON.parse(foreign.messages[0].content as string).untrustedData.retainedUserRecord, undefined)
     assert.ok(!input.context.includes(secret))
   } finally { if (old === undefined) delete process.env.BETTER_AUTH_SECRET; else process.env.BETTER_AUTH_SECRET = old }
+})
+
+test('a partial failed compaction never saves a summary or advances retained history',async()=>{
+ const old=process.env.BETTER_AUTH_SECRET
+ try{
+  process.env.BETTER_AUTH_SECRET=secret;finishReason='error'
+  conversation.summary=null
+  conversation.messages=[row(1,'user_message','STOP publication'),row(2,'run_report','unused'),row(3,'run_report','unused'),row(4,'user_message','Continue authorized review')]
+  for(const item of conversation.messages.slice(1,3)) item.message=sourcedEventMessage({id:`partial-${item.position}`,kind:'run_report',runId:null,issueId:null,payload:{status:'pending'}},'synthetic runtime '.repeat(15000))
+  const before=JSON.stringify(conversation),savedBefore=saved.length
+  await assert.rejects(sdk.preparePrompt('owner','private-bot'),/compactionModelUnavailable/)
+  assert.equal(saved.length,savedBefore);assert.equal(JSON.stringify(conversation),before)
+ }finally{finishReason='stop';if(old===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=old}
 })

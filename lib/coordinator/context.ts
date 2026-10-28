@@ -30,11 +30,22 @@ export interface StoredMessage {
 export function estimateTokens(messages: readonly ModelMessage[]): number {
   let ascii = 0
   let other = 0
-  for (const char of JSON.stringify(messages)) {
+  let imageCount = 0
+  // Inline pixel encodings are not language tokens. Reserve a conservative
+  // image allowance instead of counting megabytes of base64 as prose. This is
+  // a compaction estimate, not provider billing or proof of visual capability.
+  const projection = JSON.stringify(messages, function(key, value) {
+    if ((key === 'data' && this.type === 'file' && this.mediaType?.startsWith('image/')) || (key === 'image' && this.type === 'image')) {
+      imageCount++
+      return '[image]'
+    }
+    return value
+  })
+  for (const char of projection) {
     if (char.charCodeAt(0) < 128) ascii++
     else other++
   }
-  return Math.ceil(ascii / 4) + other
+  return Math.ceil(ascii / 4) + other + imageCount * 16_384
 }
 
 /**

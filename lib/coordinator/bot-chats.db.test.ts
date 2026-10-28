@@ -136,3 +136,54 @@ dbTest('personal provenance and STOP/pending survive actual inbox persistence an
     assert.equal(storedRows.length, 3, 'summary never deletes original records')
   })
 })
+
+dbTest('unclassified runtime data stays pending while direct user input and classified results deliver once',async t=>{
+  const [{createRequestDatabaseScope,db},schema,store,{recordCoordinatorEvent},{userMessageEvent},{eq,and,sql}]=await Promise.all([
+    import('../db'),import('../db/schema'),import('./store'),import('../coordinator-event-store'),import('../coordinator-events'),import('drizzle-orm'),
+  ])
+  const scope=createRequestDatabaseScope(databaseUrl!),owner=`test-judgment-inbox-${randomUUID()}`
+  t.after(async()=>{
+    try{await scope.run(async()=>{
+      await db.delete(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.userId,owner))
+      await db.delete(schema.coordinatorMessages).where(eq(schema.coordinatorMessages.userId,owner))
+      await db.delete(schema.coordinatorSessions).where(eq(schema.coordinatorSessions.userId,owner))
+      await db.delete(schema.users).where(eq(schema.users.id,owner))
+    })}finally{await scope.close()}
+  })
+  await scope.run(async()=>{
+    await db.execute(sql`insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values(${owner},'Synthetic judgment owner',${`${owner}@example.invalid`},false,now(),now())`)
+    const runtimeIds:string[]=[]
+    // More than one inbox batch of pending runtime data must not hide direct input.
+    for(let i=0;i<52;i++){
+      const id=randomUUID();runtimeIds.push(id)
+      await db.insert(schema.coordinatorEvents).values({id,userId:owner,botId:null,kind:'action_decided',dedupeKey:`judgment:${owner}:${i}`,issueId:null,runId:null,payload:{status:'pending',action:'synthetic'},createdAt:new Date('2026-10-28T00:00:00Z')})
+    }
+    await recordCoordinatorEvent(db,userMessageEvent(owner,'Continue the existing authorized work'))
+    const selected=await store.untriagedEvents(owner)
+    assert.ok(selected.some(event=>event.kind==='user_message'),'direct input is not starved behind the runtime batch')
+    const direct=await store.takeInbox(owner,'direct-holder')
+    assert.equal(direct.added,1,'NULL runtime tiers are not implicitly consumed as results')
+    assert.equal(await store.releaseLease(owner,'direct-holder'),false)
+    const pending=await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId,owner),eq(schema.coordinatorEvents.id,runtimeIds[0])))
+    assert.equal(pending[0].tier,null);assert.equal(pending[0].deliveredAt,null)
+    await store.setEventTier(runtimeIds[0],'result',{userId:owner+'-foreign',botId:null})
+    const [denied]=await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id,runtimeIds[0]))
+    assert.equal(denied.tier,null,'a foreign scope cannot classify this event')
+    // Explicit synthetic classification tests persistence, not model quality.
+    await store.setEventTier(runtimeIds[0],'result',{userId:owner,botId:null})
+    const takes=await Promise.all(['holder-a','holder-b'].map(holder=>store.takeInbox(owner,holder)))
+    assert.equal(takes.reduce((sum,take)=>sum+take.added,0),1,'concurrent leases cannot deliver a result twice')
+    const winner=takes.findIndex(take=>take.held)
+    assert.notEqual(winner,-1)
+    const repeated=await store.takeInbox(owner,['holder-a','holder-b'][winner])
+    assert.equal(repeated.added,0)
+    await store.setEventTier(runtimeIds[0],'background',{userId:owner,botId:null})
+    const [delivered]=await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id,runtimeIds[0]))
+    assert.equal(delivered.tier,'result','delivered event classification is immutable to a stale update')
+    assert.ok(delivered.deliveredAt)
+    const messages=await db.select().from(schema.coordinatorMessages).where(eq(schema.coordinatorMessages.userId,owner))
+    assert.equal(messages.length,2)
+    const remaining=await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId,owner),sql`${schema.coordinatorEvents.deliveredAt} is null`))
+    assert.equal(remaining.length,51,'unjudged rows remain undelivered')
+  })
+})

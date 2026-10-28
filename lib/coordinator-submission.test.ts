@@ -72,6 +72,16 @@ test('concurrent identical submissions use the existing unique target and one im
   assert.deepEqual([...f.rows.values()], before)
 })
 
+test('attachment bytes are part of the existing immutable submission identity', async () => {
+  const f = fixture()
+  const images = [{dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='}]
+  assert.deepEqual(await recordPersonalSubmission(f.executor,'owner','hello',{submissionId,images}),{duplicate:false})
+  const before = structuredClone([...f.rows.values()])
+  assert.deepEqual(await recordPersonalSubmission(f.executor,'owner','hello',{submissionId,images}),{duplicate:true})
+  await assert.rejects(recordPersonalSubmission(f.executor,'owner','hello',{submissionId,images:[]}),SubmissionConflictError)
+  assert.deepEqual([...f.rows.values()],before)
+})
+
 test('an uncommitted winner blocks retry completion and reading until commit', async () => {
   for (const changed of [false, true]) {
     const f = fixture(), entered = deferred<void>(), outcome = deferred<void>()
