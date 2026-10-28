@@ -32,7 +32,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: node --import tsx --test lib/self-improvement/scorer.test.ts lib/self-improvement/assignments.test.ts lib/self-improvement/postgres.test.ts lib/self-improvement/wiring-postgres.test.ts
+      - run: node --import tsx --test lib/self-improvement/scorer.test.ts lib/self-improvement/evaluation.test.ts lib/self-improvement/assignments.test.ts lib/self-improvement/postgres.test.ts lib/self-improvement/wiring-postgres.test.ts
         env:
           IMPROVEMENT_TEST_URL: postgresql://improvement:disposable-local-only@127.0.0.1:5432/mikka_improvement
       - run: pnpm --filter @mikka/daemon exec vitest run test/server-link-http.test.ts

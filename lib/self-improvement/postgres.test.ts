@@ -11,7 +11,7 @@ import { digest } from './contract'
 import { SCORER, SCORER_DIGEST } from './scorer'
 
 const enabled = Boolean(process.env.IMPROVEMENT_TEST_URL)
-test('actual PG17 and HTTP: immutable feedback → scores → aggregate → candidate → fixed synthetic comparison', { skip: !enabled, timeout: 120000 }, async t => {
+test('actual PG17 and HTTP: immutable feedback → scores → aggregate → candidate → pending semantic comparison', { skip: !enabled, timeout: 120000 }, async t => {
   // Never fall back to an application URL. Retain this synthetic schema for
   // inspection; deleting fixtures requires separate approval.
   const target = new URL(process.env.IMPROVEMENT_TEST_URL!)
@@ -156,7 +156,9 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → cand
     const proposal = results[0].proposal
     assert.equal(proposal.status, 'awaiting_independent_review')
     assert.equal(proposal.candidate.candidateDigest, digest(proposal.candidate.content))
-    assert.equal(proposal.result.noRegression, true)
+    assert.equal(proposal.result.noRegression, null)
+    assert.equal(proposal.result.improved, null)
+    assert.equal(results[0].assessment.status, 'pending')
     assert.equal(proposal.result.independentVerification, false)
     assert.equal(proposal.result.productionEligible, false)
     assert.ok(!proposal.candidate.content.includes('UNTRUSTED'))

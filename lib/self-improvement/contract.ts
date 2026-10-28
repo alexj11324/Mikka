@@ -16,7 +16,7 @@ export type Feedback = Extract<z.infer<typeof commandSchema>, { action: 'feedbac
 export type ImprovementHandoff = Extract<z.infer<typeof commandSchema>, { action: 'handoff' }>
 export type ImprovementRehearsal = Extract<z.infer<typeof commandSchema>, { action: 'rehearse' }>
 export class ImprovementError extends Error {
-  constructor(public code: 'notFound' | 'invalid' | 'conflict' | 'runUnavailable' | 'configurationDrift' | 'workerCapabilityRequired' | 'sourceMismatch' | 'sourceRequired') { super(code) }
+  constructor(public code: 'notFound' | 'invalid' | 'conflict' | 'runUnavailable' | 'configurationDrift' | 'workerCapabilityRequired' | 'sourceMismatch' | 'sourceRequired' | 'evaluationPending' | 'evaluationNotImproved') { super(code) }
 }
 // Canonical content hashing avoids object-key order affecting replay identities.
 export function digest(value: unknown): string {

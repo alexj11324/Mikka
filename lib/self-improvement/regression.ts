@@ -16,21 +16,27 @@ export const BENCHMARK = Object.freeze({ id: 'report-document-contract', version
 ] })
 export const BENCHMARK_DIGEST = digest(BENCHMARK)
 
-/** Fixed cases, fixed evaluator, no model, code execution or caller thresholds. */
+/** Mechanical document identities only. Keywords never establish effectiveness. */
 export function compareDocuments(baseline: string, candidate: string) {
-  const cases = BENCHMARK.cases.map(item => ({ id: item.id,
-    baseline: baseline.includes(item.requires), candidate: candidate.includes(item.requires) }))
-  return { kind: 'synthetic_document_contract' as const, benchmark: BENCHMARK,
-    benchmarkDigest: BENCHMARK_DIGEST, baselineDigest: digest(baseline), candidateDigest: digest(candidate), cases,
-    noRegression: cases.every(item => !item.baseline || item.candidate),
-    improved: cases.some(item => !item.baseline && item.candidate),
+  return { kind: 'semantic_skill_comparison' as const, benchmark: BENCHMARK,
+    benchmarkDigest: BENCHMARK_DIGEST, baselineDigest: digest(baseline), candidateDigest: digest(candidate),
+    status: 'pending' as const, outcome: 'unknown' as const, reason: 'trusted_comparison_required',
+    noRegression: null as boolean | null, improved: null as boolean | null,
     independentVerification: false as const, productionEligible: false as const }
 }
 
 export function createSkillCandidate() {
   const content = `${BASELINE}\n## Evidence\n\n${GUIDELINE}\n`
   const result = compareDocuments(BASELINE, content)
-  if (!result.noRegression || !result.improved) throw new ImprovementError('configurationDrift')
   return { path: SKILL_PATH, baseline: BASELINE, content, baselineDigest: digest(BASELINE), candidateDigest: digest(content),
     diff: `--- a/${SKILL_PATH}\n+++ b/${SKILL_PATH}\n@@ -1,3 +1,7 @@\n # Run report\n \n Summarize the work and the observed result.\n+\n+## Evidence\n+\n+${GUIDELINE}\n`, result }
+}
+
+export type SkillCandidate = Omit<ReturnType<typeof createSkillCandidate>, 'result'>
+/** Recompute identities even for historical proposals; never trust stored booleans. */
+export function pendingCandidateComparison(candidate: SkillCandidate) {
+  if (candidate.path !== SKILL_PATH || candidate.baseline !== BASELINE ||
+    candidate.baselineDigest !== digest(candidate.baseline) || candidate.candidateDigest !== digest(candidate.content))
+    throw new ImprovementError('sourceMismatch')
+  return compareDocuments(candidate.baseline, candidate.content)
 }

@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { commandSchema, digest, ImprovementError, type Feedback } from './contract'
 import { SCORER, SCORER_DIGEST, score } from './scorer'
-import { createSkillCandidate, SKILL_PATH, BASELINE } from './regression'
+import { createSkillCandidate, pendingCandidateComparison, SKILL_PATH, BASELINE } from './regression'
 import { assignedSkillForRun } from './assignments'
+import { createImprovementEvaluator, type ImprovementEvaluator } from './evaluation'
 
 type Authorize = (userId: string, issueId: string, tx: PoolClient) => Promise<boolean>
 interface Run {
@@ -17,7 +18,7 @@ function sameSource(snapshot: Record<string, unknown>, run: Run) {
     snapshot.deviceRepoId === run.deviceRepoId && snapshot.repository === run.repository
 }
 
-export function createImprovementStore(pool: Pool, authorize: Authorize) {
+export function createImprovementStore(pool: Pool, authorize: Authorize, evaluate: ImprovementEvaluator = createImprovementEvaluator()) {
   async function withRun<T>(userId: string, runId: string, work: (tx: PoolClient, run: Run, bucket: string) => Promise<T>) {
     if (!userId || !commandSchema.options[1].shape.runId.safeParse(runId).success) throw new ImprovementError('notFound')
     const tx = await pool.connect()
@@ -90,7 +91,7 @@ export function createImprovementStore(pool: Pool, authorize: Authorize) {
   }
 
   async function propose(userId: string, runId: string) {
-    return withRun(userId, runId, async (tx, run, bucket) => {
+    const result = await withRun(userId, runId, async (tx, run, bucket) => {
       await ensureScorer(tx)
       await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`improvement-bucket:${userId}:${bucket}`])
       // One immutable source per distinct run, not per feedback delivery. A
@@ -130,6 +131,11 @@ export function createImprovementStore(pool: Pool, authorize: Authorize) {
       for (const source of currentFailures) await tx.query(`INSERT INTO improvement_proposal_sources("proposalId","scoreId","userId",bucket,"runId") VALUES($1,$2,$3,$4,$5)`, [id, source.id, userId, bucket, source.runId])
       return { proposal, pendingDistinctFailures: 0, trigger: currentFailures.length >= SCORER.distinctFailures ? 'distinct_failures' : 'oldest_failure' }
     })
+    // The append-only ledger stores mechanical identities and pending status.
+    // A fresh, request-bound assessment is separate; no old keyword verdict is
+    // upgraded or replayed as a current semantic judgment.
+    const proposal = result.proposal ? { ...result.proposal, result: pendingCandidateComparison(result.proposal.candidate) } : null
+    return { ...result, proposal, assessment: proposal ? await evaluate(userId, proposal) : null }
   }
 
   async function read(userId: string, runId: string) {
@@ -144,7 +150,7 @@ export function createImprovementStore(pool: Pool, authorize: Authorize) {
           WHERE src."proposalId"=p.id AND s.snapshot->>'issueId'=$2::text
           AND s.snapshot->>'agentId'=$3 AND s.snapshot->>'deviceRepoId'=$4 AND s.snapshot->>'repository'=$5)
         ORDER BY p."createdAt",p.id`, [userId, run.issueId, run.agentId, run.deviceRepoId, run.repository])).rows
-      return { scores, proposals }
+      return { scores, proposals: proposals.map(proposal => ({ ...proposal, result: pendingCandidateComparison(proposal.candidate) })) }
     })
   }
   return { recordFeedback, propose, read }

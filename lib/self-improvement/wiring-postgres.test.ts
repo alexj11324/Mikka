@@ -18,6 +18,9 @@ import { handleFactoryApproval } from '../factory/approval-http'
 import { insertRunOnce } from '../run-dispatch'
 import { factoryDispatchDatabase } from '../factory/transaction'
 import { verifySkillAssignment } from '../../packages/daemon/src/agents/skill-artifact'
+import { createImprovementEvaluator } from './evaluation'
+import { syntheticComparison, syntheticDecision } from './testing/evaluation-fixture'
+import { createSkillCandidate } from './regression'
 
 test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!process.env.IMPROVEMENT_TEST_URL,timeout:120000},async t=>{
   const target=new URL(process.env.IMPROVEMENT_TEST_URL!)
@@ -36,10 +39,11 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!proces
   await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","verifyCommand") VALUES($1,$2,$3,'/synthetic/mikka','node acceptance.mjs')`,[repoId,deviceId,userId])
   let allowed=true
   const authorize=async(u:string,i:string)=>allowed&&u===userId&&i===issueId
-  const assignments=createSkillAssignments(pool,authorize),scores=createImprovementStore(pool,authorize)
+  const evaluate=createImprovementEvaluator({loadComparison:async()=>syntheticComparison(),invokeDecision:syntheticDecision()})
+  const assignments=createSkillAssignments(pool,authorize),scores=createImprovementStore(pool,authorize,evaluate)
   const factory=createFactoryStore(pool,authorize,{...factoryCheckGates,approval:approvalGate,publish:publishGate})
   const dispatch=createFactoryDispatch(pool,factory,(tx,u,input)=>insertRunOnce(factoryDispatchDatabase(tx),u,input,{deviceId,baseBranch:'main',prompt:input.note??'Synthetic actual queue gate'}))
-  const bridge=createImprovementFactoryBridge(pool,factory,dispatch,assignments)
+  const bridge=createImprovementFactoryBridge(pool,factory,dispatch,assignments,evaluate)
   const approvals=createFactoryApprovals(pool,authorize,factory,[])
   const binding=(task:FactoryTask)=>({taskId:task.id,issueId,attemptId:task.attemptId,revision:task.revision,candidateId:task.candidateId})
   async function route() {
@@ -126,6 +130,11 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!proces
     assert.equal((await post(req)).status,409)
     assert.equal((await pool.query('SELECT * FROM improvement_factory_links')).rowCount,0)
     await pool.query('UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1',[firstRun,repoId])
+    const pendingBridge=createImprovementFactoryBridge(pool,factory,dispatch,assignments)
+    await assert.rejects(pendingBridge.handoff(userId,req),/evaluationPending/)
+    assert.equal((await pool.query('SELECT * FROM improvement_factory_links')).rowCount,0)
+    assert.equal(proposal.proposal.result.improved,null)
+    assert.equal(proposal.assessment.outcome,'improved','Injected synthetic choice only; not real quality acceptance')
     const responses=await Promise.all(Array.from({length:10},()=>post(req)))
     for(const response of responses)assert.equal(response.status,200)
     assert.equal((await pool.query('SELECT * FROM improvement_factory_links')).rowCount,1)
@@ -149,6 +158,55 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!proces
     await pool.query(`UPDATE factory_tasks SET status='cancelled' WHERE id=$1`,[task.id])
     assert.equal((await post(req)).status,409)
     await pool.query(`UPDATE agent_runs SET status='cancelled' WHERE id=$1`,[link.runId])
+  })
+  await t.test('historical keyword verdicts stay immutable but cannot be read or handed off as quality evidence',async()=>{
+    const prepared=await prepare();await claim(prepared.result.runId)
+    const score=await finish(prepared.result.runId),legacyId=randomUUID(),frozen=createSkillCandidate()
+    const {result:pending,...candidate}=frozen
+    await pool.query(`INSERT INTO improvement_proposals(id,"userId",bucket,fingerprint,"issueId","scorerDigest",candidate,result,status)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,'awaiting_independent_review')`,
+    [legacyId,userId,score.bucket,`synthetic-legacy-${legacyId}`,issueId,score.scorerDigest,JSON.stringify(candidate),
+      JSON.stringify({...pending,kind:'synthetic_document_contract',improved:true,noRegression:true})])
+    await pool.query(`INSERT INTO improvement_proposal_sources("proposalId","scoreId","userId",bucket,"runId") VALUES($1,$2,$3,$4,$5)`,
+      [legacyId,score.id,userId,score.bucket,prepared.result.runId])
+    const withoutModel=createImprovementStore(pool,authorize)
+    const read=(await withoutModel.read(userId,prepared.result.runId)).proposals.find(row=>row.id===legacyId)
+    assert.equal(read.result.improved,null);assert.equal(read.result.status,'pending')
+    const replay=await withoutModel.propose(userId,prepared.result.runId)
+    assert.equal(replay.proposal.id,legacyId);assert.equal(replay.assessment.improved,null)
+    assert.equal((await pool.query('SELECT result FROM improvement_proposals WHERE id=$1',[legacyId])).rows[0].result.improved,true,'Historical ledger is not rewritten')
+    const task=await route(),pendingBridge=createImprovementFactoryBridge(pool,factory,dispatch,assignments)
+    await assert.rejects(pendingBridge.handoff(userId,{action:'handoff',proposalId:legacyId,binding:binding(task),agentId,deviceRepoId:repoId}),/evaluationPending/)
+    assert.equal((await pool.query('SELECT * FROM improvement_factory_links WHERE "proposalId"=$1',[legacyId])).rowCount,0)
+    const req={action:'handoff' as const,proposalId:legacyId,binding:binding(task),agentId,deviceRepoId:repoId}
+    for(const choice of ['not_improved','regressed']){
+      const rejected=createImprovementEvaluator({loadComparison:async()=>syntheticComparison(),invokeDecision:syntheticDecision(choice)})
+      await assert.rejects(createImprovementFactoryBridge(pool,factory,dispatch,assignments,rejected).handoff(userId,req),/evaluationNotImproved/)
+    }
+    let entered!:()=>void,release!:()=>void
+    const started=new Promise<void>(resolve=>{entered=resolve}),gate=new Promise<void>(resolve=>{release=resolve})
+    const deferred=createImprovementEvaluator({loadComparison:async()=>{entered();await gate;return syntheticComparison()},invokeDecision:syntheticDecision()})
+    const awaiting=createImprovementFactoryBridge(pool,factory,dispatch,assignments,deferred).handoff(userId,req)
+    await started
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1',[prepared.result.runId])
+    release();await assert.rejects(awaiting,/sourceRequired/)
+    assert.equal((await pool.query('SELECT * FROM improvement_factory_links WHERE "proposalId"=$1',[legacyId])).rowCount,0)
+    // Clear only this synthetic fault injection; no product regrant operation.
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1',[prepared.result.runId])
+    const bounded=new Pool({connectionString:target.toString(),max:5,connectionTimeoutMillis:1500})
+    try {
+      const boundedFactory=createFactoryStore(bounded,authorize,{...factoryCheckGates,approval:approvalGate,publish:publishGate})
+      const boundedDispatch=createFactoryDispatch(bounded,boundedFactory,(tx,u,input)=>insertRunOnce(factoryDispatchDatabase(tx),u,input,
+        {deviceId,baseBranch:'main',prompt:input.note??'synthetic bounded pool'}))
+      const assessed=createImprovementEvaluator({loadComparison:async()=>{await bounded.query('SELECT 1');return syntheticComparison()},invokeDecision:syntheticDecision()})
+      const boundedBridge=createImprovementFactoryBridge(bounded,boundedFactory,boundedDispatch,createSkillAssignments(bounded,authorize),assessed)
+      const concurrent=await Promise.all(Array.from({length:5},()=>boundedBridge.handoff(userId,req)))
+      assert.equal(concurrent.length,5)
+      const linked=await bounded.query('SELECT * FROM improvement_factory_links WHERE "proposalId"=$1',[legacyId])
+      assert.equal(linked.rowCount,1)
+      // Terminal synthetic queue fixture; no Harness execution/feedback claim.
+      await bounded.query('UPDATE agent_runs SET status=\'cancelled\' WHERE id=$1',[linked.rows[0].runId])
+    }finally{await bounded.end()}
   })
   await t.test('current access, receipt source binding and cancellation are checked again',async()=>{
     allowed=false;await assert.rejects(bridge.status(userId,proposalId),/factoryNotFound/);allowed=true
