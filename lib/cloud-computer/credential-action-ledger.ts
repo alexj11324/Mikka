@@ -49,7 +49,8 @@ export async function recordCredentialAction(pool: Pool, raw: CredentialActionBi
 export function parseCredentialAction(raw: CredentialAction) {
   const { kind, actionId, admission, digest: expected, summary, ...rawBinding } = raw
   const binding = bindingSchema.parse(rawBinding)
-  if (kind !== 'browser_credential' || !z.uuid().safeParse(actionId).success || !['allow', 'ask'].includes(admission) || summary !== `Fill ${binding.role} on ${new URL(binding.origin).hostname}` || digest(binding, actionId, admission) !== expected || binding.expiresAt <= Date.now()) throw new ComputerError(403, 'Credential action unavailable')
+  const origin = new URL(binding.origin)
+  if (kind !== 'browser_credential' || !z.uuid().safeParse(actionId).success || !['allow', 'ask'].includes(admission) || binding.runId !== binding.subagentId || origin.protocol !== 'https:' || origin.origin !== binding.origin || origin.username || origin.password || summary !== `Fill ${binding.role} on ${origin.hostname}` || digest(binding, actionId, admission) !== expected || binding.expiresAt <= Date.now()) throw new ComputerError(403, 'Credential action unavailable')
   return raw
 }
 
