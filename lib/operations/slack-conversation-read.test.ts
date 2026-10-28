@@ -24,3 +24,18 @@ test('provider binds local Slack read contract and lets model-selected direct co
  assert.equal(selected.context?.readContract,SLACK_CONVERSATION_READ_CONTRACT)
  assert.equal(selected.context?.is_im,true)
 })
+
+test('Slack provider executes the selected text once and rejects changed target before sending',async()=>{
+ let name='original', sent=0, fence=0
+ const channel='D12345678',input={channel,text:'<!channel> & literal'}
+ const client={connectedAccounts:{list:async()=>({items:[{id:'account',toolkit:{slug:'slack'},status:'ACTIVE',isDisabled:false}]})},tools:{
+  getRawComposioToolBySlug:async()=>({version:'write-v1'}),
+  proxyExecute:async()=>({status:200,data:{ok:true,channel:{id:channel,is_im:true,user:'U12345678',name}}}),
+  execute:async (_name:string,params:{arguments:unknown},options:{beforeExecute:(value:unknown)=>Promise<unknown>})=>{assert.deepEqual(params.arguments,{channel,text:input.text});await options.beforeExecute({params});sent++;return {successful:true,data:{channel,ts:'123.456'}}},
+ }} as unknown as ComposioActionClient
+ const provider=composioWriteProvider(client,'send_slack_message',undefined,undefined,composioSlackConversationReader(client))
+ const selected=await provider.prepare('owner',input)
+ const args={ownerId:'owner',...selected,payload:input,approvalContext:selected.context??null,idempotencyKey:'stable',signal:new AbortController().signal,beforeSend:async()=>{fence++}}
+ assert.equal((await provider.execute(args)).providerObjectId,'123.456');assert.equal(sent,1);assert.ok(fence>0)
+ name='changed';await assert.rejects(provider.execute(args),/operationTargetChanged/);assert.equal(sent,1)
+})
