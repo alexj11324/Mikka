@@ -98,8 +98,8 @@ source wins in a conflict is in [`README.md`](README.md).
   chat.
 - **R-21** 建议 is its own rail page (R-55), not part of the right panel; the
   panel's old 任务 section is the 线程 tab (R-50). 建议 is the normal-level
-  items in one list, newest first, each row with its app's icon (no per-app cards). The
-  daily briefing is not in 建议; it is the Coordinator's 08:00 message, also
+  items in one list, newest first, each row with its app's icon (no per-app
+  cards). The daily briefing is not in 建议; it is the Coordinator's 08:00 message, also
   sent right after the person connects an app. A thread started by the
   orchestrator or a bot stays listed in the thread lists (R-52); they are not
   a flat list of the board's issues. 建议 items are standalone cards, each one
@@ -205,7 +205,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   time on the right (2 分钟前, 昨天).
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
-  header's search, widen and close, and a group's collapse chevron), the only
+  header's search, widen and close, and a list group's collapse chevron), the only
   control is 「展开」 to expand a list. 详情 holds two lists, 例行 (routines)
   and 资料库 (library). The bot creates routines when asked in chat; files are
   uploaded with the composer's 「+」.
