@@ -58,9 +58,8 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
     await store.update(actor, botId, id, 'running', next.step)
     if (next.action === 'navigate') {
       if (!next.url) throw new Error('Navigation target unavailable')
-      const { authorizeBrowserNavigation } = await import('@/lib/cloud-computer/browser-authority')
-      await authorizeBrowserNavigation({ actor, botId, subagentId: id, epoch: row.epoch, url: next.url })
-      await store.action(actor, botId, id, { action: 'navigate', url: next.url })
+      const { executeAuthorizedBrowserNavigation } = await import('@/lib/cloud-computer/browser-authority')
+      await executeAuthorizedBrowserNavigation({ permissionAction: 'computer_use', actor, botId, subagentId: id, epoch: row.epoch, url: next.url })
     }
     return 'running'
   } catch {

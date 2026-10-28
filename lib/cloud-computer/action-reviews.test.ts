@@ -5,10 +5,12 @@ import { before, beforeEach, mock, test } from 'node:test'
 const actor = { userId: 'owner', workspaceId: 'workspace' }
 const calls: Record<string, unknown>[] = []
 const updates: unknown[][] = []
+const authorityCalls: Record<string, unknown>[] = []
+const executed: Record<string, unknown>[] = []
 let status = 'running'
 let pendingId = ''
 let approvalChecks = 0
-let authority: { decision: 'allow' | 'ask' | 'deny'; policyVersion: number; expiresAt: number; readOnly: boolean } | undefined
+let authority: { decision: 'allow' | 'ask' | 'deny'; policyVersion: number; expiresAt: number; readOnly: boolean; review?: { actionId: string; digest: string; summary: string } } | undefined
 class FakeStore {
   async get() { return { status, epoch: 7, needs: { kind: 'approval', actionId: pendingId } } }
   async action(_actor: unknown, _bot: string, _id: string, action: Record<string, unknown>) {
@@ -19,8 +21,9 @@ class FakeStore {
 }
 mock.module(new URL('./subagents.ts', import.meta.url).href, { namedExports: { SubagentStore: FakeStore } })
 mock.module(new URL('./browser-authority.ts', import.meta.url).href, { namedExports: {
-  authorizeBrowserAction: async () => { if (!authority) throw new Error('authority unavailable'); return authority },
-  verifyBrowserApproval: async () => { approvalChecks++; throw new Error('authority unavailable') },
+  authorizeBrowserAction: async (input: Record<string, unknown>) => { authorityCalls.push(input); if (!authority) throw new Error('authority unavailable'); return authority },
+  executeAuthorizedBrowserAction: async (input: Record<string, unknown>) => { executed.push(input); return { accepted: true } },
+  executeReviewedBrowserAction: async () => { approvalChecks++; throw new Error('authority unavailable') },
 } })
 mock.module(new URL('../subscription-runtime.ts', import.meta.url).href, { namedExports: { authorizeSubscriptionWorkspace: async () => {} } })
 let browserAction: typeof import('./action-reviews').browserAction
@@ -28,28 +31,27 @@ let executeApprovedBrowserAction: typeof import('./action-reviews').executeAppro
 before(async () => { const module = await import('./action-reviews'); browserAction = module.browserAction; executeApprovedBrowserAction = module.executeApprovedBrowserAction })
 const queries: { sql: string; args: unknown[] }[] = []
 const pool = { async query(sql: string, args: unknown[]) { queries.push({ sql, args }); return { rows: [] } } } as unknown as Parameters<typeof browserAction>[0]
-beforeEach(() => { calls.length = 0; updates.length = 0; queries.length = 0; status = 'running'; pendingId = ''; approvalChecks = 0; authority = { decision: 'allow', policyVersion: 2, expiresAt: Date.now() + 60_000, readOnly: false } })
+beforeEach(() => { calls.length = 0; updates.length = 0; queries.length = 0; authorityCalls.length = 0; executed.length = 0; status = 'running'; pendingId = ''; approvalChecks = 0; authority = { decision: 'allow', policyVersion: 2, expiresAt: Date.now() + 60_000, readOnly: false, review: { actionId: randomUUID(), digest: 'a'.repeat(64), summary: 'Confirm task' } } })
 
 test('model-selected ordinary action executes without a metadata business classifier', async () => {
   const mutation = { action: 'click' as const, selector: '#continue' }
   const result = await browserAction(pool, actor, 'bot', 'subagent', mutation, 'Continue', false)
   assert.equal(result.state, 'running')
-  assert.deepEqual(calls, [{ action: 'inspectMutation', mutation }, { ...mutation, expectedLoaderId: 'document', expectedOrigin: 'https://example.test' }])
+  assert.deepEqual(calls, [{ action: 'inspectMutation', mutation }])
+  assert.deepEqual(executed[0], { actor, botId: 'bot', subagentId: 'subagent', epoch: 7, policyVersion: 2, expiresAt: authority!.expiresAt, loaderId: 'document', origin: 'https://example.test', mutation })
   assert.equal(queries.length, 0)
 })
 
-test('model-selected confirmation binds the exact action, document and origin', async () => {
+test('host ask reuses the authority review without a second pending action', async () => {
   authority!.decision = 'ask'
   const mutation = { action: 'click' as const, selector: '#confirm' }
   const result = await browserAction(pool, actor, 'bot', 'subagent', mutation, 'Confirm task', true)
   assert.equal(result.state, 'needs_you')
   assert.deepEqual(calls, [{ action: 'inspectMutation', mutation }])
-  assert.equal(queries.length, 1)
-  const input = JSON.parse(queries[0].args[2] as string)
-  assert.equal(input.loaderId, 'document')
-  assert.equal(input.origin, 'https://example.test')
-  assert.deepEqual(input.mutation, mutation)
-  assert.equal(input.actionId, result.actionId)
+  assert.equal(queries.length, 0)
+  assert.equal(result.actionId, authority!.review!.actionId)
+  assert.equal(result.digest, authority!.review!.digest)
+  assert.deepEqual(authorityCalls[0], { permissionAction: 'computer_use', actor, botId: 'bot', subagentId: 'subagent', epoch: 7, loaderId: 'document', origin: 'https://example.test', mutation, summary: 'Confirm task' })
   assert.equal(updates.length, 1)
 })
 
@@ -65,6 +67,13 @@ test('trusted ask applies even when the model does not flag an action irreversib
   assert.equal(result.state, 'needs_you')
 })
 
+test('ask without the authority review fails closed rather than creating another approval', async () => {
+  authority!.decision = 'ask'; authority!.review = undefined
+  await assert.rejects(browserAction(pool, actor, 'bot', 'subagent', { action: 'click', selector: '#continue' }, 'Continue', false))
+  assert.equal(queries.length, 0)
+  assert.equal(updates.length, 0)
+})
+
 for (const condition of ['deny', 'expired', 'readonly', 'unavailable', 'stopped'] as const) {
   test(`${condition} never executes a browser mutation`, async () => {
     if (condition === 'deny') authority!.decision = 'deny'
@@ -74,6 +83,7 @@ for (const condition of ['deny', 'expired', 'readonly', 'unavailable', 'stopped'
     if (condition === 'stopped') status = 'stopped'
     await assert.rejects(browserAction(pool, actor, 'bot', 'subagent', { action: 'click', selector: '#continue' }, 'Continue', false))
     assert.ok(calls.every(call => call.action === 'inspectMutation'))
+    assert.equal(executed.length, 0)
     assert.equal(queries.length, 0)
   })
 }

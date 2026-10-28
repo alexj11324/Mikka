@@ -1,10 +1,10 @@
 import 'server-only'
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import type { Pool } from 'pg'
 import { z } from 'zod'
 import { ComputerError } from '@/lib/computer/store'
 import { SubagentStore, type Actor } from './subagents'
-import { authorizeBrowserAction, verifyBrowserApproval } from './browser-authority'
+import { authorizeBrowserAction, executeAuthorizedBrowserAction, executeReviewedBrowserAction } from './browser-authority'
 export const browserMutationSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('click'), selector: z.string().min(1).max(500) }).strict(),
   z.object({ action: z.literal('type'), selector: z.string().min(1).max(500), text: z.string().max(2000) }).strict(),
@@ -21,17 +21,17 @@ export async function browserAction(pool: Pool, actor: Actor, botId: string, id:
   const action = browserMutationSchema.parse(mutation)
   const check = await store.action(actor, botId, id, { action: 'inspectMutation', mutation: action })
   if (typeof check.loaderId !== 'string' || !check.loaderId || typeof check.origin !== 'string' || !check.origin) throw new ComputerError(503, 'Browser target unavailable')
-  const decision = await authorizeBrowserAction({ actor, botId, subagentId: id, epoch: row.epoch, loaderId: check.loaderId, origin: check.origin, mutation: action })
+  const decision = await authorizeBrowserAction({ permissionAction: 'computer_use', actor, botId, subagentId: id, epoch: row.epoch, loaderId: check.loaderId, origin: check.origin, mutation: action, summary: summary.slice(0, 500) })
   if (!Number.isSafeInteger(decision.policyVersion) || decision.policyVersion < 0 || !Number.isFinite(decision.expiresAt) || decision.expiresAt <= Date.now()) throw new ComputerError(403, 'Browser authorization expired')
   if (decision.readOnly || decision.decision === 'deny') throw new ComputerError(403, 'Browser action denied')
-  if (decision.decision === 'allow') return { state: 'running', ...await store.action(actor, botId, id, { ...action, expectedLoaderId: check.loaderId, expectedOrigin: check.origin }) }
+  if (decision.decision === 'allow') return { ...await executeAuthorizedBrowserAction({ actor, botId, subagentId: id, epoch: row.epoch, policyVersion: decision.policyVersion, expiresAt: decision.expiresAt, loaderId: check.loaderId, origin: check.origin, mutation: action }), state: 'running' as const }
   if (decision.decision !== 'ask') throw new ComputerError(503, 'Browser action authority unavailable')
-  const reviewId = randomUUID()
-  const input = { actionId: reviewId, workspaceId: actor.workspaceId, botId, subagentId: id, epoch: row.epoch, policyVersion: decision.policyVersion, expiresAt: decision.expiresAt, loaderId: check.loaderId, origin: check.origin, mutation: action, summary: summary.slice(0, 500) }
-  const digest = createHash('sha256').update(JSON.stringify([actor.userId, input])).digest('hex')
-  await pool.query(`INSERT INTO pending_actions (id,"userId",action,input) VALUES ($1,$2,'browser_operation',$3)`, [reviewId, actor.userId, JSON.stringify({ ...input, digest })])
-  await store.update(actor, botId, id, 'needs_you', 'approval', { kind: 'approval', actionId: reviewId, summary: input.summary })
-  return { state: 'needs_you', actionId: reviewId, digest, summary: input.summary }
+  // `ask` must reuse the authority's exact pending request. Creating a second
+  // independent pending action would require the same operation to be approved
+  // twice and would not prove the broker's grant was consumed.
+  const review = z.object({ actionId: z.uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/), summary: z.string().max(500) }).strict().parse(decision.review)
+  await store.update(actor, botId, id, 'needs_you', 'approval', { kind: 'approval', actionId: review.actionId, summary: review.summary })
+  return { state: 'needs_you' as const, ...review }
 }
 /** Called only after the existing ledger has atomically consumed pending ->
  * running. It cannot replay, alter the operation, or act on a navigated page. */
@@ -49,10 +49,9 @@ export async function executeApprovedBrowserAction(pool: Pool, userId: string, r
     if (row.status !== 'needs_you' || row.epoch !== input.epoch || row.needs?.kind !== 'approval' || row.needs.actionId !== input.actionId) return { error: 'browserActionExpired' }
     if (!approved) { await store.stop(actor, input.botId, input.subagentId); return { data: {} } }
     if (input.expiresAt <= Date.now()) return { error: 'browserActionExpired' }
-    await verifyBrowserApproval({ actor, botId: input.botId, subagentId: input.subagentId, epoch: input.epoch, actionId: input.actionId, policyVersion: input.policyVersion, expiresAt: input.expiresAt, loaderId: input.loaderId, origin: input.origin, mutation: input.mutation, digest })
     active = { store, actor, botId: input.botId, id: input.subagentId }
+    await executeReviewedBrowserAction({ actor, botId: input.botId, subagentId: input.subagentId, epoch: input.epoch, actionId: input.actionId, policyVersion: input.policyVersion, expiresAt: input.expiresAt, loaderId: input.loaderId, origin: input.origin, mutation: input.mutation, digest })
     await store.update(actor, input.botId, input.subagentId, 'running', input.summary)
-    await store.action(actor, input.botId, input.subagentId, { ...input.mutation, expectedLoaderId: input.loaderId, expectedOrigin: input.origin })
     return { data: { subagentId: input.subagentId } }
   } catch {
     if (active) await active.store.update(active.actor, active.botId, active.id, 'failed', 'Action outcome unknown').catch(() => undefined)
