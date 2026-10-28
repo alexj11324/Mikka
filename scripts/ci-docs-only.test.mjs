@@ -157,3 +157,33 @@ test('all required gates reject failed classification and skipped full jobs', ()
     }
   }
 })
+
+test('actual workflow classifier launches trusted ESM from its retained temporary file', () => {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+    const source = readFileSync(file, 'utf8')
+    const block = source.match(/      - id: docs[\s\S]*?        run: \|\n([\s\S]*?)(?=\n  [a-z][a-z0-9-]*:)/)?.[1]
+    assert.ok(block, file)
+    const script = block.split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
+    const dir = mkdtempSync(join(tmpdir(), 'docs-workflow-retained-'))
+    const repo = join(dir, 'repository'), temporary = join(dir, 'temporary'), template = join(dir, 'empty-template')
+    for (const path of [repo, temporary, template, join(repo, 'scripts')]) mkdirSync(path)
+    console.log(`Retained workflow classifier evidence: ${dir}`)
+    const env = { PATH: process.env.PATH, TMPDIR: temporary, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.invalid', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.invalid' }
+    const git = args => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', ...args], { cwd: repo, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+    git(['init', '--initial-branch=main', '--template=' + template])
+    writeFileSync(join(repo, 'scripts/ci-docs-only.mjs'), readFileSync('scripts/ci-docs-only.mjs'))
+    git(['add', '.']); git(['commit', '-m', 'trusted classifier'])
+    const base = git(['rev-parse', 'HEAD'])
+    git(['remote', 'add', 'origin', repo])
+    git(['switch', '-c', 'candidate'])
+    writeFileSync(join(repo, 'code.js'), 'export const changed = true\n')
+    git(['add', '.']); git(['commit', '-m', 'code change'])
+    const head = git(['rev-parse', 'HEAD']), event = join(dir, 'event.json')
+    writeFileSync(event, JSON.stringify({ pull_request: { base: { sha: base }, head: { sha: head } } }))
+    const output = execFileSync('bash', ['-e', '-c', script], { cwd: repo, env: { ...env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: event }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    writeFileSync(join(dir, 'result.txt'), output)
+    assert.match(output, /docs_only=false/)
+    assert.doesNotMatch(output, /classifier (?:differs|is not on main)/)
+  }
+})
