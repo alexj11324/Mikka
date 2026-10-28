@@ -493,6 +493,7 @@ export class ClaudeAdapter implements AgentAdapter {
     ctx.clearHandoff()
 
     const queue = new EventQueue()
+    const approvalTransport = new AbortController()
     const prompts = new PromptQueue(sessionId)
     let written = 0
     let results = 0
@@ -548,8 +549,9 @@ export class ClaudeAdapter implements AgentAdapter {
         permissionMode: "default" as const,
         canUseTool: async (toolName: string, input: Record<string, unknown>, callback: { toolUseID: string; signal: AbortSignal }) => {
             const gate = options.toolApproval!
-            const decision = await gate.request({ runId: options.runId, harness: 'claude_code', requestId: callback.toolUseID, method: toolName, input }, callback.signal)
-            return decision === 'allow' ? { behavior: 'allow' as const, updatedInput: input } : { behavior: 'deny' as const, message: 'Permission not granted.' }
+            const signal = AbortSignal.any([callback.signal, approvalTransport.signal])
+            const decision = await gate.request({ runId: options.runId, harness: 'claude_code', requestId: callback.toolUseID, method: toolName, input }, signal)
+            return decision === 'allow' && !signal.aborted && !ending ? { behavior: 'allow' as const, updatedInput: input } : { behavior: 'deny' as const, message: 'Permission not granted.' }
         },
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
@@ -566,11 +568,12 @@ export class ClaudeAdapter implements AgentAdapter {
 
     /** The CLI and everything it started are gone before the exit is told. */
     let ended: Promise<void> | undefined
-    const end = (event: Omit<ExitEvent, "type"> | null) =>
-      (ended ??= close(event))
-    const close = async (event: Omit<ExitEvent, "type"> | null) => {
+    const end = (event: Omit<ExitEvent, "type"> | null, revokeRunGate = true) =>
+      (ended ??= close(event, revokeRunGate))
+    const close = async (event: Omit<ExitEvent, "type"> | null, revokeRunGate: boolean) => {
       ending = true
-      options.toolApproval?.revoke()
+      approvalTransport.abort()
+      if (revokeRunGate) options.toolApproval?.revoke()
       clearTimeout(graceTimer)
       clearTimeout(authTimer)
       prompts.close()
@@ -634,6 +637,7 @@ export class ClaudeAdapter implements AgentAdapter {
       } catch (error) {
         if (!ending) diedEarly(errorMessage(error))
       } finally {
+        approvalTransport.abort()
         clearTimeout(authTimer)
         spoke(false)
         finished()
@@ -689,7 +693,9 @@ export class ClaudeAdapter implements AgentAdapter {
         { stderr: stderrTail() },
         "could not continue the earlier claude session; starting a new one"
       )
-      await end(null)
+      // Close the failed transport and its pending callbacks. The same live
+      // run retries once with a fresh transport, retaining its trusted gate.
+      await end(null, false)
       return this.open(randomUUID(), "new", options.prompt ?? "", options)
     }
     log.info({ mode, sandbox: "claude-code" }, "claude session started")

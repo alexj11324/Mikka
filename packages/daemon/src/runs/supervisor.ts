@@ -157,6 +157,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface ActiveRun {
+  toolApproval?: ToolApprovalGate
   mailbox?: RunMailbox
   mailboxClosing?: Promise<void>
   session: AgentSession | null
@@ -320,6 +321,7 @@ export class RunSupervisor {
   /** Asks the session to stop; detaches it if it does not within the grace. */
   private requestCancel(run: ActiveRun): Promise<void> {
     run.cancelRequested = true
+    run.toolApproval?.revoke()
     // Fence new calls and abort outstanding transport immediately; do not
     // leave a mailbox usable during the CLI's cancellation grace period.
     void this.closeMailbox(run).catch(() => this.deps.log.warn('Run mailbox shutdown failed'))
@@ -556,6 +558,7 @@ export class RunSupervisor {
     this.stopController.abort()
     const runs = [...this.active.values()]
     for (const run of runs) {
+      run.toolApproval?.revoke()
       clearTimeout(run.cancelTimer)
       run.abort.abort()
     }
@@ -675,6 +678,7 @@ export class RunSupervisor {
     error?: string,
     report: HandoffReport = baseReport(error)
   ) {
+    this.active.get(runId)?.toolApproval?.revoke()
     // The kind the orchestrator dispatched, not what the agent said: an
     // agent must not be able to make a run read as a planning one (ADR ORV-205).
     const planning = this.deps.journal.get(runId)?.assignment.kind === "plan"
@@ -913,6 +917,7 @@ export class RunSupervisor {
         }
       })
       .finally(async () => {
+        run.toolApproval?.revoke()
         try { await this.closeMailbox(run) }
         catch { this.deps.log.warn('Run mailbox shutdown failed') }
         finally { clearTimeout(run.cancelTimer); this.active.delete(runId) }
@@ -999,6 +1004,14 @@ export class RunSupervisor {
     if (run.cancelRequested) { this.finish(runId, run.forcedStop ?? 'cancelled'); return }
     if (mailbox) checkMailbox()
     const toolApproval = await this.deps.prepareRunToolApproval?.(assignment, run.abort.signal, checkMailbox)
+    run.toolApproval = toolApproval
+    // Cancellation or lease loss may win while the gate is being prepared.
+    // Revoke it before refusing, and never launch a CLI with stale authority.
+    if (this.stopping) { toolApproval?.revoke(); return }
+    if (run.cancelRequested || run.abort.signal.aborted) { toolApproval?.revoke(); this.finish(runId, run.forcedStop ?? 'cancelled'); return }
+    if (toolApproval) {
+      try { checkMailbox() } catch (error) { toolApproval.revoke(); throw error }
+    }
     const options = {
       toolApproval,
       runId,

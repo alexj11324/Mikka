@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest"
 
 import { CLIENT_VERSION_HEADER, emptyRunReport } from "@mikka/protocol"
+import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 
 import {
   DaemonError,
@@ -69,6 +70,20 @@ const assignment = (runId: string) => ({
 })
 
 describe("HttpServerLink", () => {
+  it('revokes a prepared approval gate when its run aborts, including before preparation', async () => {
+    const { fetch, calls } = scripted(() => json({ live: true }))
+    const link = new HttpServerLink('http://server.test', fetch)
+    const run = { ...assignment('run-1'), harness:'codex' as const, policy:defaultRunPolicy(), policyRevision:'a'.repeat(64) }
+    const request = { runId:'run-1', harness:'codex' as const, requestId:'fixture', method:'fixture', input:{} }
+    const before = new AbortController(); before.abort()
+    const alreadyAborted = await link.prepareRunToolApproval(run, before.signal, () => {})
+    expect(await alreadyAborted.request(request)).toBe('deny')
+    const during = new AbortController()
+    const gate = await link.prepareRunToolApproval(run, during.signal, () => {})
+    during.abort()
+    expect(await gate.request(request)).toBe('deny')
+    expect(calls).toHaveLength(0)
+  })
   it('sends a private preview bypass only to the fixed HTTPS preview origin and refuses redirects', async () => {
     const previewSecret = 'fixture-preview-secret-1234567890'
     const fetcher: typeof fetch = async (url, init) => {

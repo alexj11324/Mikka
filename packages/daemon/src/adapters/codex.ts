@@ -419,7 +419,7 @@ export class CodexAdapter implements AgentAdapter {
         const callbackId = typeof call.approvalId === 'string' ? call.approvalId : call.itemId
         const decision = await options.toolApproval.request({ runId: options.runId, harness: 'codex', requestId: `${activeTurn}/${call.itemId}/${callbackId}`, method, input: params })
         // Do not grant a session or policy amendment in place of one action.
-        return { decision: decision === 'allow' ? 'accept' : 'decline' }
+        return { decision: decision === 'allow' && !ending && call.turnId === activeTurn ? 'accept' : 'decline' }
       }
       if (method === "item/permissions/requestApproval") return { permissions: {}, scope: "turn" }
       log.warn({ method }, "unhandled codex request; declining")
@@ -677,6 +677,7 @@ export class CodexAdapter implements AgentAdapter {
         else await startTurn(message)
       },
       async cancel() {
+        options.toolApproval?.revoke()
         if (activeTurn && !ending) {
           await rpc
             .sendRequest("turn/interrupt", {
@@ -688,6 +689,7 @@ export class CodexAdapter implements AgentAdapter {
         await finish({ outcome: "cancelled" })
       },
       async detach() {
+        options.toolApproval?.revoke()
         await finish(null)
       },
     }

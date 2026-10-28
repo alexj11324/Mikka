@@ -99,13 +99,13 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
-  async prepareRunToolApproval(assignment: RunAssignment, _signal: AbortSignal, check: () => void) {
+  async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
     if (!assignment.policy || !assignment.policyRevision) throw new Error('Run policy unavailable')
     const policyRevision = assignment.policyRevision
     const path = `/v1/runs/${seg(assignment.runId)}/tool-approval`
     const proposal = z.object({ id: z.uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/), status: z.string() })
     const response = z.object({ decision: z.enum(['pending', 'allow', 'deny']) })
-    return new ToolApprovalGate(assignment.runId, {
+    const gate = new ToolApprovalGate(assignment.runId, {
       permission: request => toolApprovalDecision(request, assignment.policy),
       isLive: async () => { try { check(); const current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean() }) }); check(); return current.live } catch { return false } },
       ask: async (request, signal) => {
@@ -134,6 +134,9 @@ export class HttpServerLink implements ServerLink {
         }
       },
     })
+    if (signal.aborted) gate.revoke()
+    else signal.addEventListener('abort', () => gate.revoke(), { once: true })
+    return gate
   }
   async prepareRunMailbox(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
     return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: this.fetchImpl,
