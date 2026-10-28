@@ -2,6 +2,8 @@ import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
+import { issueForUser } from '@/lib/issue-access'
+import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { actAs } from '@/lib/acting-user'
 import type { ActivityActor } from '@/lib/activity-actor'
 import { addRunMessage, queueRun, requestRunStop } from '@/lib/agent-runs'
@@ -64,6 +66,9 @@ interface IssueChanges {
 /** Applies the changes one action at a time, each on the revision the last one left. */
 async function applyChanges(userId: string, issueId: string, changes: IssueChanges) {
   let issue = await readIssue(issueId)
+  // Historical invitations do not grant personal-task or revoked workspace
+  // access. Check the proposed person's effective access before any mutation.
+  if (changes.assigneeUserId && !await issueForUser(changes.assigneeUserId, issue.id)) throw new ActionFailureError('memberNotJoined')
   if (changes.title !== undefined || changes.status !== undefined || changes.priority !== undefined) {
     issue = unwrap(await saveIssue({
       id: issue.id, revision: issue.revision, content: issue.content,
@@ -96,6 +101,7 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
       return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeUserId: input.assigneeUserId }))
     }
     if (toolCallId === undefined) return mutate()
+    if (!issueMutationsEnabled()) return { error: 'issueToolsDisabled' }
     const parsed = createIssueInput.safeParse(input)
     if (!parsed.success) return { error: 'validationGeneric' }
     const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
@@ -109,6 +115,7 @@ export async function updateIssue(userId: string, input: IssueChanges & { issueI
     const { issueId, ...changes } = input
     const mutate = async () => issueResult(await applyChanges(userId, issueId, changes))
     if (toolCallId === undefined) return mutate()
+    if (!issueMutationsEnabled()) return { error: 'issueToolsDisabled' }
     const parsed = updateIssueInput.safeParse(input)
     if (!parsed.success) return { error: 'validationGeneric' }
     const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
