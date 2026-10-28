@@ -46,11 +46,17 @@ export async function recordCredentialAction(pool: Pool, raw: CredentialActionBi
 
 /** Claim durably before I/O. Current policy, run and target must be rechecked
  * while holding their existing fence before invoking the credential service. */
-export async function consumeCredentialAction(pool: Pool, raw: CredentialAction) {
+export function parseCredentialAction(raw: CredentialAction) {
   const { kind, actionId, digest: expected, summary, ...rawBinding } = raw
   const binding = bindingSchema.parse(rawBinding)
   if (kind !== 'browser_credential' || !z.uuid().safeParse(actionId).success || summary !== `Fill ${binding.role} on ${new URL(binding.origin).hostname}` || digest(binding, actionId) !== expected || binding.expiresAt <= Date.now()) throw new ComputerError(403, 'Credential action unavailable')
-  const result = await pool.query(`UPDATE pending_actions SET context='{"credentialClaimed":true}'::jsonb WHERE id=$1 AND "userId"=$2 AND action='browser_operation' AND status='running' AND context IS NULL AND input=$3::jsonb AND "createdAt">clock_timestamp()-interval '5 minutes' RETURNING id`, [actionId, binding.userId, JSON.stringify(raw)])
+  return raw
+}
+
+export async function consumeCredentialAction(pool: Pool, raw: CredentialAction) {
+  parseCredentialAction(raw)
+  const { actionId, userId } = raw
+  const result = await pool.query(`UPDATE pending_actions SET context='{"credentialClaimed":true}'::jsonb WHERE id=$1 AND "userId"=$2 AND action='browser_operation' AND status='running' AND context IS NULL AND input=$3::jsonb AND "createdAt">clock_timestamp()-interval '5 minutes' RETURNING id`, [actionId, userId, JSON.stringify(raw)])
   if (!result.rowCount) throw new ComputerError(409, 'Credential action already consumed or unavailable')
   return raw
 }

@@ -35,7 +35,11 @@ export async function browserAction(pool: Pool, actor: Actor, botId: string, id:
 }
 /** Called only after the existing ledger has atomically consumed pending ->
  * running. It cannot replay, alter the operation, or act on a navigated page. */
-export async function executeApprovedBrowserAction(pool: Pool, userId: string, raw: unknown, approved: boolean): Promise<{ data: Record<string, unknown> } | { error: string }> {
+export async function executeApprovedBrowserAction(pool: Pool, userId: string, raw: unknown, approved: boolean, receiptId?: string): Promise<{ data: Record<string, unknown> } | { error: string }> {
+  if (raw && typeof raw === 'object' && 'kind' in raw && raw.kind === 'browser_credential') {
+    const { executeApprovedCredentialAction } = await import('./credential-consumer')
+    return executeApprovedCredentialAction(pool, userId, raw, approved, receiptId)
+  }
   let active: { store: SubagentStore; actor: Actor; botId: string; id: string } | undefined
   try {
     const input = approvedSchema.parse(raw)

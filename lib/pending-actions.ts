@@ -31,7 +31,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
   let outcome: Record<string, string> = {}
   if (approve || row.action === 'browser_operation') {
     const result = row.action === 'browser_operation'
-      ? await (await import('@/lib/cloud-computer/action-reviews')).executeApprovedBrowserAction(pool, userId, row.input, approve)
+      ? await (await import('@/lib/cloud-computer/action-reviews')).executeApprovedBrowserAction(pool, userId, row.input, approve, row.id)
       : await runComposioAction(userId, row.action, row.input)
     if ('error' in result) {
       status = 'failed'
