@@ -74,3 +74,18 @@ test('actual scope component refuses persisted team without this human choice an
     assert.equal(saves.length, 1)
   } finally { await chosen.unmount() }
 })
+
+test('completed-request replay adopts the now-personal issue without claiming a workspace transition', async () => {
+  const personal = { ...task, revision: 5, scope: 'personal' }
+  let calls = 0
+  readTeam = async () => 'team-a'; promote = async () => { calls++; return { issue: personal } }; saves = []; notices = []
+  const view = await mount()
+  try {
+    await view.click()
+    assert.equal(calls, 1)
+    assert.deepEqual(saves, [personal])
+    assert.deepEqual(notices, ['teamIssueChanged'])
+    assert.equal(notices.includes('movedToWorkspace'), false)
+    assert.equal(notices.includes('movedToPersonal'), false)
+  } finally { await view.unmount() }
+})

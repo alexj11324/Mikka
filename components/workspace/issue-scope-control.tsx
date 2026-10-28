@@ -50,6 +50,9 @@ export function IssueScopeControl({ task, disabled, onSaved, teamChoice }: {
       if (!isCurrent()) return
       if (!('issue' in result) || !result.issue) { toast.error(actionError(result.error)); return }
       onSaved(result.issue)
+      // An idempotent replay returns the current task, which another request
+      // may since have made personal. Never describe the old requested state.
+      if (result.issue.scope !== value) { toast.error(actionError('teamIssueChanged')); return }
       toast.success(value === 'workspace' ? t('movedToWorkspace') : t('movedToPersonal'))
     } catch { if (isCurrent()) toast.error(actionError('generic')) }
     finally { setPending(false) }
