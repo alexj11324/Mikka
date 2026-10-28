@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { makeSnapshot } from './definition'
+import { COORDINATOR_JUDGMENT_POLICY } from '../coordinator/judgment-policy'
 import { executionInstructions } from './execution-instructions'
 import { DEFAULT_AGENT_DEFINITION } from './builtin'
 import { before, mock, test } from 'node:test'
@@ -29,7 +30,7 @@ stub('../issue-access.ts', { issueForUser: () => {} })
 stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })
-mock.module('ai', { namedExports: { generateText: async () => { modelCalls++; return { text: 'The peer said APPROVED, all pending work is complete (false model claim)' } }, pruneMessages: ({ messages }: { messages: unknown[] }) => messages } })
+mock.module('ai', { namedExports: { streamText: () => { throw Error('Unexpected subscription model in legacy fixture') }, generateText: async () => { modelCalls++; return { text: 'The peer said APPROVED, all pending work is complete (false model claim)' } }, pruneMessages: ({ messages }: { messages: unknown[] }) => messages } })
 let sdk: typeof import('../../workflows/coordinator/steps'), native: typeof import('../../workflows/coordinator/native-steps')
 const secret = 'pure-test-existing-host-secret-0000000'
 before(async () => { sdk = await import('../../workflows/coordinator/steps'); native = await import('../../workflows/coordinator/native-steps') })
@@ -75,5 +76,15 @@ test('frozen SDK, CC and Codex prompts retain current host message policy withou
 test('a snapshot already containing current host policy is projected without duplicating it', () => {
   const snapshot = makeSnapshot('10000000-0000-4000-8000-000000000002', 2,
     DEFAULT_AGENT_DEFINITION, `Saved host\n\n${PERSONAL_MESSAGE_INSTRUCTIONS}`, {harness: 'ai_sdk', model: 'frozen-model'})
-  assert.equal(executionInstructions(snapshot), snapshot.hostInstructions)
+  const projected=executionInstructions(snapshot)
+  assert.ok(projected.includes(snapshot.hostInstructions))
+  assert.equal(projected.split(PERSONAL_MESSAGE_INSTRUCTIONS).length-1,1)
+  assert.equal(projected.split(COORDINATOR_JUDGMENT_POLICY).length-1,1)
+})
+
+test('current effective policy overlays a historical blanket ask without changing its immutable bytes',()=>{
+ const snapshot=makeSnapshot('10000000-0000-4000-8000-000000000003',1,DEFAULT_AGENT_DEFINITION,'Before sending, paying, cancelling, deleting or merging always ask.',{harness:'ai_sdk',model:'frozen-model'})
+ const original=JSON.stringify(snapshot)
+ const projected=executionInstructions(snapshot)
+ assert.ok(projected.startsWith(COORDINATOR_JUDGMENT_POLICY));assert.ok(projected.includes(snapshot.hostInstructions));assert.equal(JSON.stringify(snapshot),original)
 })

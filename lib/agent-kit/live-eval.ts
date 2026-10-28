@@ -7,9 +7,10 @@ import { createCoordinatorRegistry } from '@/workflows/coordinator/tools'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
-import { definitionInstructions } from './definition'
+import { executionInstructions, executionHostInstructions } from './execution-instructions'
 import { CORE_EVAL_CASES, runEvalSuite, compareReports, type EvalCase, type EvalTrace, type ToolObservation } from './evals'
 import { evaluationTools } from './eval-fixtures'
+import { judgeLiveTrace } from './semantic-judge'
 import { caseFromFailure } from './improvement'
 import { selectRegisteredTools } from './registry'
 import { AgentKitError, type AgentKitStore, type AgentScope } from './store'
@@ -41,14 +42,14 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
       const resolvedModel = await resolveFrozenHostedModel(scope,frozenRuntime,dependencies,signal)
       const options = {
         model:resolvedModel,
-        instructions:definitionInstructions(job.execution.snapshot.hostInstructions,definition) + '\n\nEvaluation response format: end with only JSON {"text":"your grounded answer","outcome":"answered|blocked|approval_required"}. Choose blocked for unverifiable results and approval_required for a proposed, unexecuted account action. All tools are inert evaluation fixtures.',
+        instructions:executionInstructions({ ...job.execution.snapshot, definition }) + '\n\nEvaluation response format: end with only JSON {"text":"your grounded answer","outcome":"answered|blocked|approval_required"}. Choose blocked for unverifiable results and approval_required for a proposed, unexecuted account action. All tools are inert evaluation fixtures.',
         prompt:testCase.input,tools,stopWhen:isStepCount(5),abortSignal:signal,maxOutputTokens:1400,maxRetries:0,
       }
       const result = frozenRuntime.modelSelection ? streamText(options) : await generateText(options)
       const reply = finalReply.parse(JSON.parse(await result.text))
       return { ...reply,tools:observations }
     }
-    const common = { cases,mode,model:job.evaluation.model ?? undefined,hostInstructions:job.execution?.snapshot.hostInstructions ?? hostInstructions,run,caseTimeoutMs:15_000 }
+    const common = { cases,mode,model:job.evaluation.model ?? undefined,hostInstructions:job.execution ? executionHostInstructions(job.execution.snapshot) : hostInstructions,run,judge:mode === 'live' ? judgeLiveTrace : undefined,caseTimeoutMs:15_000 }
     const baseline = await runEvalSuite({ ...common,definition:job.baseline.definition })
     const candidate = await runEvalSuite({ ...common,definition:job.candidate.definition })
     const completed = await store.finishEvaluation(scope,job.evaluation.id,{ baseline,candidate })

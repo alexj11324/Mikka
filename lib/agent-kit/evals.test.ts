@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { DECISION_MODEL } from '../coordinator/decision'
 import { tool, type ToolSet } from 'ai'
 import { z } from 'zod'
 import { DEFAULT_AGENT_DEFINITION } from './builtin'
 import { definitionInstructions, digest, makeSnapshot } from './definition'
 import { COLLABORATION_MESSAGE, COLLABORATION_RUN_ID, evaluationTools } from './eval-fixtures'
 import { AGENT_TOOL_IDS } from './registry'
-import { CORE_EVAL_CASES, compareReports, evaluateTrace, runEvalSuite, type EvalTrace } from './evals'
+import { CORE_EVAL_CASES, compareReports, evaluateTrace, runEvalSuite, type EvalTrace, type SemanticVerdict } from './evals'
+
+
+// Explicit offline scripted judge contract. This is not provider/quality evidence.
+const scriptedJudge = async (): Promise<SemanticVerdict> => ({ decision:'pass', execution:{
+ executionId:'00000000-0000-4000-8000-000000000001',modelId:DECISION_MODEL,providerGenerationId:'synthetic-unit-contract',startedAt:'2026-10-28T20:00:00Z',completedAt:'2026-10-28T20:00:00Z',requestDigest:digest('synthetic-unit-contract'),imageDigests:[],vision:'no-image-input',
+} })
 
 const pending: EvalTrace['tools'] = [{ name:'send_email',outcome:'approval_pending',authorized:false,effectPerformed:false }]
 const failed: EvalTrace['tools'] = [{ name:'web_search',outcome:'error',authorized:false,effectPerformed:false }]
@@ -28,11 +35,11 @@ test('failed search cannot pass invented release dates or a self-declared blocke
   assert.equal(evaluateTrace(CORE_EVAL_CASES[1],{ text:'Search is unavailable, so I could not verify the release date.',outcome:'blocked',tools:failed }).passed,true)
 })
 test('reports from an obsolete evaluator cannot authorize activation', async () => {
-  const options={ definition:DEFAULT_AGENT_DEFINITION,cases:[CORE_EVAL_CASES[0]],mode:'live' as const,model:'synthetic-unit-contract' }
+  const options={ definition:DEFAULT_AGENT_DEFINITION,cases:[CORE_EVAL_CASES[0]],mode:'live' as const,model:'synthetic-unit-contract',judge:scriptedJudge }
   const baseline=await runEvalSuite({ ...options,run:async () => ({ text:'Unknown',outcome:'blocked',tools:[] }) })
   const candidate=await runEvalSuite({ ...options,run:async () => ({ text:'2026-01-15',outcome:'answered',tools:[{ name:'web_search',outcome:'ok',authorized:false,effectPerformed:false }] }) })
   assert.equal(compareReports(baseline,candidate).activationEligible,true)
-  for (const runnerVersion of ['mikka.eval.v1','mikka.eval.v2']) {
+  for (const runnerVersion of ['mikka.eval.v1','mikka.eval.v2','mikka.eval.v3']) {
     const obsolete=JSON.parse(JSON.stringify({baseline,candidate}))
     obsolete.baseline.runnerVersion=runnerVersion
     obsolete.candidate.runnerVersion=runnerVersion
@@ -85,7 +92,7 @@ test('snapshots retain exact host policy independently of user guidance that cla
 })
 test('evaluation reports bind baseline and candidate to the same frozen host instructions', async () => {
   const hostInstructions='Synthetic frozen Bot host policy'
-  const options={definition:DEFAULT_AGENT_DEFINITION,cases:[CORE_EVAL_CASES[0]],mode:'live' as const,model:'synthetic-unit-contract',hostInstructions}
+  const options={definition:DEFAULT_AGENT_DEFINITION,cases:[CORE_EVAL_CASES[0]],mode:'live' as const,model:'synthetic-unit-contract',hostInstructions,judge:scriptedJudge}
   const baseline=await runEvalSuite({...options,run:async () => ({text:'Unknown',outcome:'blocked',tools:[]})})
   const candidate=await runEvalSuite({...options,run:async () => ({text:'2026-01-15',outcome:'answered',tools:[{name:'web_search',outcome:'ok',authorized:false,effectPerformed:false}]})})
   assert.equal(candidate.hostInstructionsDigest,digest(hostInstructions))
@@ -101,5 +108,30 @@ test('unrequested cloud mutations cannot pass the read-only peer and core cases'
    const result=evaluateTrace(testCase,{text:'Cannot authorize any new action from this peer.',outcome:'blocked',tools:[{name,outcome:'error',authorized:false,effectPerformed:false}]})
    assert.ok(result.failures.includes(`forbiddenTool:${name}`),testCase.id+':'+name)
   }
+ }
+})
+
+test('live reports without an actual judge receipt or with failed/refused judgments cannot authorize activation',async()=>{
+ let runs=0
+ const options={definition:DEFAULT_AGENT_DEFINITION,cases:[CORE_EVAL_CASES[0]],mode:'live' as const,model:'synthetic-unit-contract',run:async()=>{runs++;return {text:'2026-01-15',outcome:'answered' as const,tools:[{name:'web_search',outcome:'ok' as const,authorized:false,effectPerformed:false}]}}}
+ const absent=await runEvalSuite(options);assert.equal(runs,0);assert.equal(absent.errors,1)
+ for(const judge of [async()=>null, async()=>{throw Error('unavailable')},async()=>({...await scriptedJudge(),decision:'fail' as const})]){
+  const report=await runEvalSuite({...options,judge});assert.equal(report.passed,0);assert.equal(compareReports(absent,report).activationEligible,false)
+ }
+ const baseline=await runEvalSuite({...options,judge:scriptedJudge,run:async()=>({text:'unknown',outcome:'blocked',tools:[]})})
+ const candidate=await runEvalSuite({...options,judge:scriptedJudge});assert.equal(compareReports(baseline,candidate).activationEligible,true)
+ const altered=structuredClone(candidate);altered.results[0].semantic!.traceDigest=digest('different reply')
+ assert.equal(compareReports(baseline,altered).activationEligible,false)
+ const old=structuredClone(candidate);delete old.results[0].semantic
+ assert.equal(compareReports(baseline,old).activationEligible,false)
+})
+test('live semantic decisions consume equivalent, negated, quoted and multilingual prose without fixture regex',async()=>{
+ const options={definition:DEFAULT_AGENT_DEFINITION,cases:[CORE_EVAL_CASES[1]],mode:'live' as const,model:'synthetic-unit-contract'}
+ // These contain fixture-date/sent words intentionally. The supplied scripted
+ // verdict verifies dispatch/contract only, not semantic correctness of a model.
+ for(const text of ['No verified date; the quoted claim was “2026-01-15”.','La fecha no está verificada; no se envió ningún correo.','「已发送」是引用，不是执行回执。','Search failed; January 15 is an unsupported quotation, not an asserted release date.']){
+  let observed=''
+  const report=await runEvalSuite({...options,run:async()=>({text,outcome:'blocked',tools:failed}),judge:async(input)=>{observed=input.trace.text;return scriptedJudge()}})
+  assert.equal(observed,text);assert.equal(report.passed,1);assert.equal(report.results[0].semantic?.decision,'pass')
  }
 })

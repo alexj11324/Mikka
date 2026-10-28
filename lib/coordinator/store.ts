@@ -139,11 +139,12 @@ export async function releaseLease(userId: string, holder: string, botId: string
   return hasWakingEvents(userId, botId)
 }
 
-/** Undelivered events not yet triaged, oldest first. */
+/** Direct user delivery first, then oldest runtime events. An unavailable
+ * classifier must not let a pending runtime backlog starve new user input. */
 export async function untriagedEvents(userId: string, botId: string | null = null) {
   const events = await db.select().from(coordinatorEvents)
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier)))
-    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+    .orderBy(desc(eq(coordinatorEvents.kind, 'user_message')), asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const runIds = [...new Set(events.flatMap(event => event.runId ? [event.runId] : []))]
   // Reuse the existing visibility gate; teammate projections stay restricted.
   const observed = new Map((runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length }) : [])

@@ -5,8 +5,9 @@ import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
 import { DEFAULT_AGENT_DEFINITION, builtinAgentDefinition } from './builtin'
 import { digest } from './definition'
+import { DECISION_MODEL } from '../coordinator/decision'
 import { AgentKitStore, type AgentScope } from './store'
-import { CORE_EVAL_CASES, EVAL_RUNNER_VERSION, type EvalReport } from './evals'
+import { CORE_EVAL_CASES, EVAL_RUNNER_VERSION, bindSemanticEvidence, type EvalReport } from './evals'
 import { createAgentDefinitionHandler } from './http'
 
 // Explicitly isolated cloud sandbox OR the existing Actions loopback DB gate.
@@ -54,8 +55,27 @@ async function failures(scope:AgentScope){
   }
   return store.propose(scope,current.version,randomUUID(),defaults)
 }
-function report(definitionDigest:string,passed:boolean,mode:'fixture'|'live'):EvalReport{
-  return {runnerVersion:EVAL_RUNNER_VERSION,suiteDigest:digest(CORE_EVAL_CASES),definitionDigest,hostInstructionsDigest:digest('synthetic test host policy'),mode,model:mode==='live'?'synthetic-test-model':null,results:CORE_EVAL_CASES.map(item=>({caseId:item.id,passed,failures:passed?[]:['testFailure']})),passed:passed?CORE_EVAL_CASES.length:0,total:CORE_EVAL_CASES.length,errors:0}
+// Synthetic DB activation contract only; no model is invoked by this fixture.
+function report(definitionDigest:string,passed:boolean,mode:'fixture'|'live'):EvalReport {
+  const suiteDigest=digest(CORE_EVAL_CASES),hostInstructions='synthetic test host policy',hostInstructionsDigest=digest(hostInstructions)
+  const results=CORE_EVAL_CASES.map(item=>{
+    const result={caseId:item.id,passed,failures:passed?[]:['testFailure']}
+    if(mode!=='live') return result
+    const semantic=bindSemanticEvidence({
+      testCase:item,trace:{text:'synthetic contract',outcome:item.expectedOutcome,tools:[]},
+      definitionDigest,hostInstructionsDigest,hostInstructions,suiteDigest,
+    },{
+      decision:passed?'pass':'fail',execution:{
+        executionId:randomUUID(),modelId:DECISION_MODEL,providerGenerationId:'synthetic-database-contract',
+        startedAt:'2026-10-28T20:00:00Z',completedAt:'2026-10-28T20:00:00Z',
+        requestDigest:digest('synthetic-database-contract'),imageDigests:[],vision:'no-image-input',
+      },
+    })
+    return {...result,semantic}
+  })
+  return {runnerVersion:EVAL_RUNNER_VERSION,suiteDigest,definitionDigest,hostInstructionsDigest,
+    mode,model:mode==='live'?'synthetic-test-model':null,results,
+    passed:passed?CORE_EVAL_CASES.length:0,total:CORE_EVAL_CASES.length,errors:0}
 }
 
 test('real PostgreSQL migration is rerunnable and historical runs stay unrecorded',async()=>{

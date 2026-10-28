@@ -10,11 +10,12 @@ import type { AgentExecution } from '@/lib/agent-kit/store'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { createHash } from 'node:crypto'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
-import { generateText, type ModelMessage } from 'ai'
+import type { ModelMessage } from 'ai'
+import { compactWithFrozenModel } from '@/lib/coordinator/compaction-model'
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
-import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
+import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
@@ -147,12 +148,14 @@ export async function preparePrompt(userId: string, botId: string | null = null,
   if (cut !== null) {
     if (summaryTrust.key.length < 32) throw new Error('Existing host auth secret required for summary provenance')
     const folded = messages.filter(row => row.position <= cut)
-    const { text } = await generateText({
-      model: COORDINATOR_MODEL,
-      instructions: SUMMARY_INSTRUCTIONS,
-      maxOutputTokens: 4096,
-      messages: [...promptMessages(summary, folded, summaryTrust), { role: 'user', content: 'Write the summary now.' }],
-    })
+    const runtime = snapshot?.runtime ?? { harness: 'ai_sdk', model: COORDINATOR_MODEL }
+    const subscriptions = runtime.modelSelection ? await import('@/lib/subscription-runtime') : null
+    const scope = runtime.modelSelection
+      ? await (await import('@/lib/agent-kit/service')).agentScope(userId, botId)
+      : { ownerId: userId, botId, workspaceId: null }
+    const text = await compactWithFrozenModel(scope, runtime,
+      [...promptMessages(summary, folded, summaryTrust), { role: 'user', content: 'Write the summary now.' }],
+      { service: () => { if (!subscriptions) throw new Error('subscription_model_unavailable'); return subscriptions.subscriptionRuntime() }, workspace: async (ownerId, workspaceId) => { if (!subscriptions) throw new Error('subscription_model_unavailable'); await subscriptions.authorizeSubscriptionWorkspace(ownerId, workspaceId) } })
     summary = preserveMessageSources(text, folded, summary, summaryTrust)
     await store.saveSummary(userId, summary, cut, botId)
     messages = messages.filter(row => row.position > cut)

@@ -7,8 +7,9 @@ export class GroupDecisionPendingError extends Error {
   constructor() { super('groupDecisionPending'); this.name = 'GroupDecisionPendingError' }
 }
 export type ObservedGroupMessage = GroupMessage & { images?: readonly DecisionImage[]; requiresVisual?: boolean }
+export type GroupDecisionRoute = Exclude<GroupRoute, { by: 'model' }> | { by: 'model'; responders: string[]; confidence?: number }
 /** Exact @mention delivery is not inference. Every other route, even one member, calls the model. */
-export async function routeGroupMessage(message: ObservedGroupMessage, members: readonly RoutingMember[], leadId: string, corrections: readonly RoutingCorrection[] = [], signal?: AbortSignal): Promise<GroupRoute> {
+export async function routeGroupMessage(message: ObservedGroupMessage, members: readonly RoutingMember[], leadId: string, corrections: readonly RoutingCorrection[] = [], signal?: AbortSignal): Promise<GroupDecisionRoute> {
   const mentioned = mentionRoute(message, members)
   if (mentioned) return mentioned
   if (!members.length || !members.some(member => member.id === leadId)) throw new GroupDecisionPendingError()
@@ -28,5 +29,5 @@ export async function routeGroupMessage(message: ObservedGroupMessage, members: 
   const probabilities = new Map(responder.probabilities?.map(entry => [entry.value, entry.probability]))
   const responders = audience.choice === 'selected' ? [responder.choice] : [responder.choice, ...members.map(member => member.id).filter(id => id !== responder.choice).sort((a,b) => (probabilities.get(b) ?? 0) - (probabilities.get(a) ?? 0))]
   // Missing confidence is unknown metadata, not a reason to ask a human.
-  return { by: 'model', responders, confidence: responder.confidence ?? 0 }
+  return { by: 'model', responders, ...(responder.confidence === undefined ? {} : { confidence: responder.confidence }) }
 }

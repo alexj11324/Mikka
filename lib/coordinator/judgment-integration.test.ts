@@ -50,6 +50,8 @@ test('actual pixels reach input_image; a visual request without pixels remains p
 test('a single member is still judged; low confidence alone never creates clarification',async()=>{
  response={answers:[{type:'choice',name:'responder',choice:'one',confidence:0.1},{type:'choice',name:'audience',choice:'selected'}]}
  assert.deepEqual(await group.routeGroupMessage({text:'task',mentions:[]},[{id:'one',name:'One',description:'role'}],'one'),{by:'model',responders:['one'],confidence:0.1});assert.equal(requests.length,1)
+ response={answers:[{type:'choice',name:'responder',choice:'one'},{type:'choice',name:'audience',choice:'selected'}]}
+ assert.deepEqual(await group.routeGroupMessage({text:'task',mentions:[]},[{id:'one',name:'One',description:''}],'one'),{by:'model',responders:['one']})
  delete process.env.DECISION_GATEWAY_API_KEY
  await assert.rejects(group.routeGroupMessage({text:'task',mentions:[]},[{id:'one',name:'One',description:''}],'one'),group.GroupDecisionPendingError)
 })
