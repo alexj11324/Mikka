@@ -10,7 +10,7 @@ import { requireIssueAccess } from '@/lib/issue-access'
 import { listProjects } from '@/app/actions/projects'
 import { issueView } from '@/lib/task-identifier-server'
 import { assigneeSchema, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
-import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
+import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { activityActor } from '@/lib/activity-actor'
 
 const patchSchema = z.object({
@@ -86,7 +86,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
         return { issue: await issueView(saved, tx) }
       })
-      if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
+      if ('issue' in result && result.issue) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error

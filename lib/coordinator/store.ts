@@ -1,3 +1,4 @@
+import { sourcedEventMessage } from './message-safety'
 import { visibleRuns } from '@/lib/agent-runs'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { issueForUser } from '@/lib/issue-access'
@@ -18,6 +19,8 @@ import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
 import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
+import { readPreferences } from '@/lib/preferences'
+import { pushReasons, type PushReason } from '@/lib/push-reasons'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -76,9 +79,13 @@ export interface InboxTake {
   handoffMatterIds: string[]
   /** Every event in the take is a handoff: a reply can only be telling the person about one. */
   handoffOnly: boolean
+  /** Why the reply may go to the person's phones (lib/push-reasons.ts); empty when it answers the person. */
+  pushReasons: PushReason[]
+  /** A handed-over verification code: the push says only that one came, the code stays in the app chat. */
+  pushHidesText: boolean
 }
 
-const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false }
+const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushReasons: [], pushHidesText: false }
 
 export async function takeInbox(userId: string, holder: string, botId: string | null = null): Promise<InboxTake> {
   return db.transaction(async tx => {
@@ -101,7 +108,7 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     const first = await nextPosition(tx, userId, botId)
     await tx.insert(coordinatorMessages).values(events.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
-      message: { role: 'user', content: eventPrompt(event) } satisfies ModelMessage,
+      message: sourcedEventMessage({ ...event, deliveredAt: now }, eventPrompt(event)),
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
     const handoffs = events.filter(event => isHandoff(event.kind))
@@ -111,6 +118,8 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
       telegramTargets: handoffs.some(carriesCode) ? [] : telegramReplyTargets(events),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
       handoffOnly: handoffs.length === events.length,
+      pushReasons: pushReasons(events),
+      pushHidesText: handoffs.some(carriesCode),
     }
   })
 }
@@ -175,7 +184,9 @@ export async function loadConversation(userId: string, botId: string | null = nu
     .from(coordinatorMessages)
     .where(and(messagesOf(userId, botId), gt(coordinatorMessages.position, through)))
     .orderBy(asc(coordinatorMessages.position))
-  return { summary: session?.summary ?? null, memory: session?.memory ?? '', messages: rows.map(row => ({ position: row.position, message: row.message as unknown as ModelMessage })) }
+  // 使用记忆 off (the app's 记忆 setting): the prompt leaves the memory out; it stays saved.
+  const memory = (await readPreferences(userId)).memoryEnabled ? session?.memory ?? '' : ''
+  return { summary: session?.summary ?? null, memory, messages: rows.map(row => ({ position: row.position, message: row.message as unknown as ModelMessage })) }
 }
 
 /** Replaces every message at or before `through` with `summary`. The messages stay stored. */

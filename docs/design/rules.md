@@ -93,7 +93,7 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-21** The right panel has two parts: 建议 on top, then 任务. 建议 is the
   normal-level items in one list, newest first, each row with its app's icon
   (no per-app cards). The daily briefing is not in 建议; it is the
-  Coordinator's 08:00 message. A 任务 here is a thread started by the
+  Coordinator's 08:00 message, also sent right after the person connects an app. A 任务 here is a thread started by the
   orchestrator or a bot; all of them stay listed. It is not a flat list of the
   board's issues. 建议 items are standalone cards, each one sentence: a verb
   chip, the app's icon inline, the concrete thing and its reason, deadline or
@@ -209,6 +209,20 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   thread and bot sub-agent of that user can use it; the model never sees it.
   Browsing is open to every site, with no allowlist. Once saved, the card collapses to 已登录 <site>.
 
+- **R-73** Mikka is proactive as well as reactive (`proactive.md`). Besides
+  rating incoming events (R-20), it keeps a per-person profile of facts drawn
+  from mail, purchases, calendar and chats (interests, routines, places,
+  subscriptions, deadlines, tools), shown and editable in 记忆, and once a day
+  before the briefing it researches new cards from them: deadlines, tools'
+  advisories, and interests matched with what is new nearby. New proactive
+  cards are capped at 5 a day and written as R-21 cards with their source;
+  interest cards are normal and stay in 建议; routine and location triggers
+  go through the Coordinator under R-20's cap. Dismissals lower the fact's
+  confidence. Profiles are per person, never shared in a workspace. Both the
+  profile and the background research sit behind deployment flags (off by
+  default when self-hosted), a per-person entitlement, the person's own
+  toggles and a daily budget.
+
 ## Look
 
 - **R-30** Greys are pure neutral: `rgba(0,0,0,a)` and `#737373 / #A3A3A3 /
@@ -277,8 +291,11 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   secretary, never like a command list. The briefing and follow-ups are
   natural sentences: it says what it sorted and why, names the person, offers
   to take the next step, and ends with one easy question
-  (「早上好，Alex。今天有 4 件事，我按轻重排了一下。最急的是 Kevin 的邮件…
-  先从 Kevin 那封开始？」).
+  (「早上好，Alex。今天有 4 件事：Kevin 来信…我可以按你的日历先起草一封回复。…
+  先从 Kevin 那封开始吗？」).
+  The daily briefing is one message (one bubble). Its tone follows Hark:
+  for each item, what came in and why it matters to the person, then what
+  the Coordinator can do about it (「我可以按你的日历先起草一封回复」).
 
 ## Tokens
 

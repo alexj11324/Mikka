@@ -26,6 +26,16 @@ export const gatedFeatures = {
 
 export type GatedFeature = keyof typeof gatedFeatures
 
+/**
+ * Who gets proactive work (R-73, docs/design/proactive.md § 3), checked on the
+ * server per person (lib/posthog-server.ts) and only once the deployment's
+ * switch is on (lib/profile/flags.ts). `research` is reserved for phase 2.
+ */
+export const proactiveFeatures = {
+  profile: 'mikka-proactive-profile',
+  research: 'mikka-proactive-research',
+} as const
+
 /** On only when PostHog says exactly true; unloaded, missing or multivariate values stay off. */
 export function gatedFeatureEnabled(remoteValue: boolean | string | undefined) {
   return remoteValue === true

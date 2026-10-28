@@ -20,9 +20,11 @@ export function harnessLabel(harness: string) {
   return harness === 'claude_code' ? 'Claude Code' : harness === 'codex' ? 'Codex' : harness
 }
 
-export function ThreadStatus({ status }: { status: string }) {
+export function ThreadStatus({ status, stopping = false }: { status: string; stopping?: boolean }) {
   const statusLabel = useTranslations('Coordinator.citation.runStatus')
+  const t = useTranslations('IssueThreads')
   const key = runStatusKey(status)
+  if (stopping) return <Badge variant="secondary" size="sm">{t('stopping')}</Badge>
   return <Badge variant={RUN_BADGES[status] ?? 'secondary'} size="sm">{key ? statusLabel(key) : status}</Badge>
 }
 
@@ -47,7 +49,7 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
             <span className="truncate text-sm font-medium">{name}</span>
             {meta && <span className="truncate text-xs font-normal text-muted-foreground">{meta}</span>}
           </span>
-          <ThreadStatus status={thread.status} />
+          <ThreadStatus status={thread.status} stopping={thread.stopping} />
           <time className="w-14 shrink-0 text-right text-xs font-normal text-muted-foreground" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(new Date(thread.finishedAt ?? thread.createdAt), now)}</time>
         </>
         return <li key={thread.id}>
