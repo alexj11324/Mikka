@@ -26,7 +26,7 @@ import {
 } from "./run"
 
 /** Bumped on any breaking change to the local RPC methods below. */
-export const DAEMON_PROTOCOL_VERSION = 2
+export const DAEMON_PROTOCOL_VERSION = 3
 
 export {
   HARNESSES,

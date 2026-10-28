@@ -6,7 +6,10 @@ import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db, pool } from '@/lib/db'
 import { SubscriptionRepository } from '@/lib/subscription-repository'
-import { agents, agentRuns, deviceRepos, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { agents, agentRuns, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { ensureDeviceRepository } from '@/lib/device-repositories'
+import { localExecutionHarnesses } from '@/lib/device-agents'
+import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { workspaceRunView } from '@/lib/run-visibility'
 import { issueForUser } from '@/lib/issue-access'
@@ -14,6 +17,7 @@ import { tiptapToText } from '@/lib/tiptap-text'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { runPrompt } from '@/lib/run-prompt'
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
+import { runBotName } from '@/lib/run-bot-name'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -41,7 +45,7 @@ export interface RunDetail {
 }
 
 export const runViewColumns = {
-  id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: sql<string>`coalesce((select b.name from computer_run_bindings crb join bots b on b.id=crb."botId" and b."ownerId"=crb."ownerId" where crb."runId"=${agentRuns.id}), ${agents.name})`,
+  id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: runBotName,
   harness: sql<SupportedHarness>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`, status: agentRuns.status, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
   error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
   startedAt: agentRuns.startedAt, finishedAt: agentRuns.finishedAt,
@@ -53,17 +57,18 @@ export const runViewColumns = {
  * `note` is extra direction for this run only, after the issue.
  */
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
-export async function queueRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, botId: string | null = null, execution?: AgentExecution): Promise<{ runId: string }> {
-  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), deviceRepoId: z.uuid(), note: z.string().trim().max(10_000).optional() }).safeParse(input)
+export async function queueRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, botId: string | null = null, execution?: AgentExecution): Promise<{ runId: string }> {
+  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional() }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   const issue = await issueForUser(userId, parsed.data.issueId)
   if (!issue) throw new ActionFailureError('issueNotFound')
   const [agent] = await db.select().from(agents)
     .where(and(eq(agents.id, parsed.data.agentId), eq(agents.userId, userId))).limit(1)
   if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
-  const [repo] = await db.select().from(deviceRepos)
-    .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.deviceId, agent.deviceId), eq(deviceRepos.userId, userId))).limit(1)
-  if (!repo) throw new ActionFailureError('agentRepoMissing')
+  const [device] = await db.select().from(devices).where(and(eq(devices.id, agent.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).limit(1)
+  if (!device?.enabled || !localExecutionHarnesses(device.harnesses).includes(agent.harness)) throw new ActionFailureError('agentHarnessMissing')
+  try { normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }) } catch { throw new ActionFailureError('repoPathInvalid') }
+  const repo = await ensureDeviceRepository(userId, agent.deviceId, parsed.data.repo)
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = process.env.MIKKA_AGENT_KIT === '1' || Boolean(execution)

@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
+import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
+import { readRepositorySettings } from '@/lib/device-repositories'
+import { localExecutionHarnesses } from '@/lib/device-agents'
 import { RUN_LEASE_MS } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
@@ -25,6 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const { deviceId, runId } = await params
   const device = await ownedDevice(deviceId, caller.userId)
   if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
+  if (device.kind === 'local' && (device.protocolVersion ?? 0) < DAEMON_PROTOCOL_VERSION) return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION }, { status: 409 })
   if (!device.enabled) return NextResponse.json({ error: 'Scheduling is off for this device.' }, { status: 409 })
   const [run] = await db
     .select()
@@ -42,14 +46,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       .where(eq(agentRuns.id, runId))
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
+  if (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId || repo.deviceId !== deviceId) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
   const harness = run.agentDefinition?.harness ?? agent.harness
+  if (device.kind === 'local' && (!repo.remoteUrl || !localExecutionHarnesses(device.harnesses).includes(harness))) return NextResponse.json({ error: 'Repository or execution harness unavailable.' }, { status: 409 })
   const pinned = run.agentDefinition?.subscription
   let subscription: Awaited<ReturnType<ReturnType<typeof subscriptionRuntime>['repository']['nativeBinding']>>
   try { subscription = process.env.MIKKA_BYOS_ENABLED === '1'
     ? pinned ? await subscriptionRuntime().repository.binding(caller.userId,pinned.bindingId) : run.agentDefinition ? null : await subscriptionRuntime().repository.nativeBinding(caller.userId, agent.id, harness) : null
   } catch { return NextResponse.json({ error:'Subscription unavailable.' },{ status:409 }) }
   if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id || subscription.ownerId !== caller.userId)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
-  if (subscription && (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId)) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let computer: Awaited<ReturnType<typeof claimCloudRun>> = null
@@ -81,11 +86,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       ...(resumeFrom ? { resumeFrom } : {}),
     }
     : {}
+  const settings = device.kind === 'local' && repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
   return NextResponse.json({
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
-    baseBranch: repo.baseBranch, harness, prompt: run.prompt,
+    ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl } : {}),
+    ...(run.baseBranch ? { baseBranch: run.baseBranch } : {}), harness, prompt: run.prompt,
     kind: run.kind, leaseExpiresAt,
-    ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
+    ...((device.kind === 'cloud' ? repo.verifyCommand : settings?.verifyCommand) ? { verifyCommand: (device.kind === 'cloud' ? repo.verifyCommand : settings?.verifyCommand)! } : {}),
     ...(mcp ? { mcp } : {}),
     ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...(computer ? { computer } : {}),

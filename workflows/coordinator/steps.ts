@@ -2,11 +2,12 @@ import { preserveMessageSources } from '@/lib/coordinator/message-safety'
 import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
 import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
 import type { AgentExecution } from '@/lib/agent-kit/store'
+import { listAgents as listLocalExecutors } from '@/lib/mcp/actions'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { createHash } from 'node:crypto'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
 import { generateText, type ModelMessage } from 'ai'
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
@@ -16,8 +17,7 @@ import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
-import { agents, deviceRepos, devices, issueMembers, issues, telegramLinks } from '@/lib/db/schema'
-import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
+import { issueMembers, issues, telegramLinks } from '@/lib/db/schema'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
 import { proposeAction } from '@/lib/pending-action-store'
@@ -227,19 +227,11 @@ export async function updateIssue(userId: string, input: UpdateIssueInput, toolC
 export async function listAgents(userId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  const rows = await db.select({ id: agents.id, name: agents.name, description: agents.description, harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt })
-    .from(agents).leftJoin(devices, eq(devices.id, agents.deviceId)).where(and(eq(agents.userId, userId), sql`not exists (select 1 from bot_cloud_runtimes bcr where bcr."agentId" = ${agents.id})`)).orderBy(asc(agents.name))
-  const deviceIds = [...new Set(rows.map(row => row.deviceId).filter((id): id is string => Boolean(id)))]
-  const repos = deviceIds.length ? await db.select().from(deviceRepos).where(inArray(deviceRepos.deviceId, deviceIds)) : []
-  return rows.map(row => ({
-    id: row.id, name: row.name, description: row.description, harness: row.harness, device: row.deviceName,
-    deviceOnline: Boolean(row.enabled && row.lastSeenAt && Date.now() - row.lastSeenAt.getTime() < DEVICE_ONLINE_WINDOW_MS),
-    repos: repos.filter(repo => repo.deviceId === row.deviceId).map(repo => ({ id: repo.id, path: repo.repoPath, baseBranch: repo.baseBranch })),
-  }))
+  return listLocalExecutors(userId)
 }
 
 /** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId,scope)
   return asToolResult(async () => ({ ...(await queueRun(userId, input, botId, execution)), status: 'queued' }))

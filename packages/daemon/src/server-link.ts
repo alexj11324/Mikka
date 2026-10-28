@@ -12,6 +12,7 @@ import type { NativeCoordinatorJob, NativeCoordinatorCommand, NativeCoordinatorT
 // (`completeRun`: stop reason + handoff report) and the server decides the
 // issue's next step (the orchestrator, later; `MemoryServer.nextOwner` now).
 import { randomUUID } from "node:crypto"
+import { pathToFileURL } from "node:url"
 
 import {
   isTerminalRunState,
@@ -254,8 +255,11 @@ export class MemoryServer {
 
   queueRun(deviceId: string, run: QueueRunInput): string {
     const runId = run.runId ?? randomUUID()
+    // Memory fixtures may identify an isolated source repo by path. The real
+    // HTTP server always supplies remoteUrl and never sends checkout paths.
+    const fixturePath = this.repos.get(deviceId)?.find(repo => repo.repoId === run.repoId)?.path
     this.runs.set(runId, {
-      assignment: { ...run, runId },
+      assignment: { ...run, runId, remoteUrl: run.remoteUrl ?? (fixturePath ? pathToFileURL(fixturePath).href : undefined) },
       deviceId,
       state: "queued",
       patches: [],

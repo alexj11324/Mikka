@@ -4,8 +4,8 @@
 // issue's pull request follows (ADR 0009: `git push` is the daemon's job,
 // never the agent's; ADR 0024: one branch and one pull request per issue).
 //
-// The sandbox keeps the agent away from the `.git` file and the git dir,
-// but the daemon still trusts neither: every git call here is pinned to
+// The sandbox keeps indirection/config files read-only while allowing the
+// run's own git index and objects. Every daemon git call here is pinned to
 // the git dir the main repo lists for this worktree (never what a `.git`
 // file in the tree says), and hooks, fsmonitor, signing and `ext::`
 // transports are off.
@@ -17,7 +17,8 @@ import {
   rmSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
+import { assertSafeId } from "../ids"
 
 import type { RunPublish } from "@mikka/protocol"
 import { execa } from "execa"
@@ -26,7 +27,7 @@ import { runBranch } from "../worktrees"
 
 export interface PublishOptions {
   runId: string
-  /** The repo the worktree belongs to (from the device's allow-list). */
+  /** The daemon-owned clone cache (or private hosted workspace). */
   repoPath: string
   worktree: string
   /** The verified tree (`snapshotTree`); what gets committed. */
@@ -112,6 +113,15 @@ export async function worktreeGitDir(
   throw new Error(`${worktree} is not a worktree of ${repoPath}`)
 }
 
+/** Only this run's git administration and shared immutable object storage. */
+export async function worktreeGitWritePaths(repoPath: string, worktree: string, runId: string): Promise<string[]> {
+  const gitDir = await worktreeGitDir(repoPath, worktree)
+  const common = resolve(gitDir, '..', '..')
+  const branch = `mikka/run-${assertSafeId('run id', runId)}`
+  const ref = join(common, 'refs', 'heads', branch)
+  return [gitDir, join(common, 'objects'), ref, `${ref}.lock`, join(common, 'logs', 'refs', 'heads', branch)]
+}
+
 function safeRealpath(path: string) {
   try {
     return realpathSync(path)
@@ -136,7 +146,7 @@ export async function pinnedGit(
   return (args, extra, options) =>
     execa("git", [...SAFE_GIT, ...args], {
       cwd: workTree,
-      env: { ...env, ...extra, GIT_DIR: gitDir, GIT_WORK_TREE: workTree },
+      env: { ...env, ...extra, GIT_DIR: gitDir, GIT_COMMON_DIR: resolve(gitDir, "..", ".."), GIT_WORK_TREE: workTree },
       extendEnv: false,
       stdin: "ignore",
       ...(options?.buffer

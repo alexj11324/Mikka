@@ -1,5 +1,5 @@
 // One `git worktree` per run under the daemon's data dir (R4, R11, R12).
-// The allow-list check happens before anything here is called.
+// Local callers pass daemon-owned clone caches, never user checkouts.
 import {
   copyFileSync,
   existsSync,
@@ -27,7 +27,7 @@ export const DISK_USAGE_TTL_MS = 5 * 60_000
 export const FETCH_TIMEOUT_MS = 60_000
 
 /** Git config for fetching into the main repo: no hooks, no `ext::`. */
-const FETCH_GIT = [
+export const FETCH_GIT = [
   "-c",
   "core.hooksPath=/dev/null",
   "-c",

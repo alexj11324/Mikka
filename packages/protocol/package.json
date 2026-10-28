@@ -43,7 +43,8 @@
     "./artifact-frame": "./src/artifact-frame.ts",
     "./coordinator": "./src/coordinator.ts",
     "./computer": "./src/computer.ts",
-    "./subscription": "./src/subscription.ts"
+    "./subscription": "./src/subscription.ts",
+    "./repository": "./src/repository.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",

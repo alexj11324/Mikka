@@ -192,7 +192,7 @@ export const runCheckpointSchema = z.object({
 })
 export type RunCheckpoint = z.infer<typeof runCheckpointSchema>
 
-// --- Allow-listed repos ---------------------------------------------------
+// --- Repository settings ---------------------------------------------------
 
 export const setupRecipeSchema = z.object({
   /** Paths relative to the main checkout copied into each new worktree. */
@@ -204,11 +204,11 @@ export const setupRecipeSchema = z.object({
 })
 export type SetupRecipe = z.infer<typeof setupRecipeSchema>
 
-/** One allow-listed repo on a device (`device_repo`). */
+/** A repository record and its identity-scoped settings. */
 export const deviceRepoSchema = z.object({
   repoId: id,
   name: z.string().max(500),
-  /** Absolute path of the main checkout on the device. */
+  /** Logical repository key; only trusted cloud runtimes use an absolute path. */
   path: z.string().min(1).max(4_000),
   setup: setupRecipeSchema.optional(),
   /** Domains agents may reach in this repo, on top of the harness's own. */
@@ -246,7 +246,10 @@ export const runAssignmentSchema = z.object({
   issueId: id,
   deviceId: id,
   repoId: id,
-  baseBranch: z.string().min(1).max(500),
+  /** Clone URL for local runs; hosted computer assignments keep their isolated workspace. */
+  remoteUrl: z.string().min(1).max(4_000).optional(),
+  /** Absent means origin/HEAD after fetch. */
+  baseBranch: z.string().min(1).max(500).optional(),
   harness: harnessSchema,
   prompt: z.string().max(100_000),
   /**

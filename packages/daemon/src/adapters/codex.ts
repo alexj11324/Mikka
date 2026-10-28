@@ -299,6 +299,7 @@ export class CodexAdapter implements AgentAdapter {
       harness: "codex",
       kind: options.kind,
       worktree: options.cwd,
+      gitWritePaths: options.gitWritePaths,
       networkAllow: options.networkAllow,
       policy: options.policy,
       skills: options.skills,

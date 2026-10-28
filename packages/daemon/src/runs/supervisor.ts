@@ -62,10 +62,11 @@ import type {
 } from "../adapters/types"
 import { runStateChunk, type RunChunk } from "../chunks"
 import { buildChildEnv } from "../env"
+import { worktreeGitWritePaths } from "../agents/publish"
 import {
   HarnessNotSupportedError,
   InvalidIdError,
-  RepoNotAllowedError,
+  InvalidRepositoryError,
   RunNotFoundError,
   type DaemonError,
 } from "../errors"
@@ -89,8 +90,10 @@ export interface SupervisorDeps {
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
-  /** The device's current allow-list (`device_repo`). */
-  repos: () => DeviceRepo[]
+  /** Resolve only daemon-owned cache paths (or a trusted hosted workspace). */
+  repository: (assignment: RunAssignment) => DeviceRepo
+  prepareRepository: (assignment: RunAssignment, signal: AbortSignal) => Promise<void>
+  baseRef: (assignment: RunAssignment) => Promise<string>
   log: Logger
   /** Watchdog: no progress for this long stops the run (`timeout`). */
   stallMs?: number
@@ -352,10 +355,8 @@ export class RunSupervisor {
       return !e.stopReason || !KEEP_WORKTREE.includes(e.stopReason)
     })
     if (!discardable) return false
-    const repo = this.deps
-      .repos()
-      .find((r) => r.repoId === entry.assignment.repoId)
-    if (!repo) return false
+    let repo: DeviceRepo
+    try { repo = this.deps.repository(entry.assignment) } catch { return false }
     return this.discard(
       group.map((e) => e.assignment.runId),
       worktree,
@@ -413,8 +414,8 @@ export class RunSupervisor {
   }
 
   /**
-   * Starts a claimed run. The allow-list is checked before any worktree or
-   * process exists; a refused run is reported failed with the reason.
+   * Starts a claimed run. Its remote is validated before any worktree or
+   * process exists; repositories need no device registration.
    */
   start(assignment: RunAssignment): RunSummary {
     // The run id names the worktree, the branch and the outbox file; one
@@ -428,9 +429,10 @@ export class RunSupervisor {
     }
     const existing = this.deps.journal.get(assignment.runId)
     if (existing) return this.summary(existing)
-    const repo = this.deps.repos().find((r) => r.repoId === assignment.repoId)
-    if (!repo)
-      this.refuse(assignment, new RepoNotAllowedError(assignment.repoId))
+    let repo: DeviceRepo
+    try { repo = this.deps.repository(assignment) } catch (error) {
+      this.refuse(assignment, new InvalidRepositoryError(error instanceof Error ? error.message : undefined))
+    }
     if (!this.deps.adapters.has(assignment.harness)) {
       this.refuse(assignment, new HarnessNotSupportedError(assignment.harness))
     }
@@ -484,15 +486,9 @@ export class RunSupervisor {
       const outboxSeq = this.deps.outbox.lastChunkSeq(entry.assignment.runId)
       if (outboxSeq > entry.lastSeq)
         this.deps.journal.update(entry.assignment.runId, { lastSeq: outboxSeq })
-      const repo = this.deps
-        .repos()
-        .find((r) => r.repoId === entry.assignment.repoId)
-      if (!repo) {
-        this.finish(
-          entry.assignment.runId,
-          "error",
-          new RepoNotAllowedError(entry.assignment.repoId).message
-        )
+      let repo: DeviceRepo
+      try { repo = this.deps.repository(entry.assignment) } catch {
+        this.finish(entry.assignment.runId, 'error', 'Repository unavailable; dispatch a new thread with a repository URL.')
         continue
       }
       // The old lease is stale; give the first heartbeat time to renew it.
@@ -811,7 +807,8 @@ export class RunSupervisor {
     const resume = assignment.resumeFrom?.baseCommit
     if (resume && (await hasCommit(repo.path, resume))) return resume
     const branch = assignment.pushBranch
-    if (!branch || repo.push?.approved !== true) return assignment.baseBranch
+    const base = await this.deps.baseRef(assignment)
+    if (!branch || repo.push?.approved !== true) return base
     try {
       return await this.deps.worktrees.fetchBranch(
         repo.path,
@@ -824,7 +821,7 @@ export class RunSupervisor {
         { run_id: runId, branch, err: error },
         "issue branch not fetched; starting from the base branch"
       )
-      return assignment.baseBranch
+      return base
     }
   }
 
@@ -883,7 +880,7 @@ export class RunSupervisor {
         this.deps.log.error({ run_id: runId, err: error }, "run failed")
         if (this.stopping) return
         try {
-          this.finish(runId, "error", message)
+          this.finish(runId, run.cancelRequested ? run.forcedStop ?? "cancelled" : "error", run.cancelRequested ? undefined : message)
         } catch (finishError) {
           this.deps.log.error(
             { run_id: runId, err: finishError },
@@ -907,6 +904,12 @@ export class RunSupervisor {
     if (entry.state === "queued") {
       this.setState(runId, "preparing")
       entry = this.deps.journal.get(runId) as JournalEntry
+    }
+
+    await this.deps.prepareRepository(assignment, AbortSignal.any([this.stopController.signal, run.abort.signal]))
+    if (this.stopping || run.cancelRequested) {
+      if (!this.stopping) this.finish(runId, run.forcedStop ?? "cancelled")
+      return
     }
 
     // A retry after a lost lease can arrive while the earlier attempt is
@@ -975,6 +978,7 @@ export class RunSupervisor {
       }),
       log,
       networkAllow: repo.networkAllow,
+      gitWritePaths: await worktreeGitWritePaths(repo.path, worktree, runId),
       policy: assignment.policy,
       skills: assignment.skills,
       fixture: assignment.fixture,
