@@ -520,7 +520,9 @@ test(
       }
       for (const race of ["cancel", "access-loss"] as const)
         await t.test(`dispatch blocked observation cannot overwrite ${race}`, async () => {
-          const pending = await pendingReview();
+          // Compare persisted snapshots, including timestamps. apply's return
+          // contains its pre-save task.updatedAt; a fresh read is authoritative.
+          const pending = await state((await pendingReview()).task.id);
           const input = {binding:factoryBinding(pending.task),agentId,deviceRepoId:repoId};
           await db.query("UPDATE devices SET harnesses='[]' WHERE id=$1",[deviceId]);
           let cancelled: Awaited<ReturnType<typeof state>> | undefined;
@@ -528,9 +530,10 @@ test(
             const raceDispatch: typeof dispatch = async (...args) => {
               try { return await dispatch(...args); }
               catch (error) {
-                if (race === "cancel")
-                  cancelled = await store.apply("owner",input.binding,randomUUID(),{action:"cancel",reason:"Fixture cancellation wins after queue rollback"});
-                else
+                if (race === "cancel") {
+                  await store.apply("owner",input.binding,randomUUID(),{action:"cancel",reason:"Fixture cancellation wins after queue rollback"});
+                  cancelled = await state(pending.task.id);
+                } else
                   await db.query('UPDATE issues SET "userId"=\'other\' WHERE id=$1',[pending.task.issueId]);
                 throw error;
               }
@@ -545,7 +548,7 @@ test(
           assert.equal((await db.query('SELECT count(*)::int n FROM factory_events WHERE "taskId"=$1 AND request->\'change\'->\'output\'->\'dispatch\' IS NOT NULL',[pending.task.id])).rows[0].n,0);
         });
       await t.test("question/caller transaction failure is left to its caller, with no committed blocked state or orphan", async () => {
-        const pending = await pendingReview();
+        const pending = await state((await pendingReview()).task.id);
         const tx = await db.connect();
         const beforeRuns=(await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id',[pending.task.issueId])).rows;
         await db.query("UPDATE devices SET harnesses='[]' WHERE id=$1",[deviceId]);
