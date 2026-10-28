@@ -16,7 +16,6 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
     const page = observation.observation as { url?: string; elements?: { selector?: string }[] }
     const { generateText, tool } = await import('ai')
     const { z } = await import('zod')
-    const { credentialIntentSchema, credentialStep } = await import('@/lib/cloud-computer/credential-intent')
     const actionSchema = z.object({ action: z.enum(['navigate', 'observe', 'login', 'click', 'type', 'key', 'done', 'waiting']), url: z.string().optional(), selector: z.string().max(500).optional(), text: z.string().max(2000).optional(), key: z.enum(['Enter','Tab','Escape','ArrowDown','ArrowUp']).optional(), step: z.string().max(300), summary: z.string().max(1000) })
     const { visualObservation } = await import('@/lib/cloud-computer/visual-observation')
     // No paid provider is selected implicitly. Deployment must supply an
@@ -28,7 +27,8 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
     if (next.action === 'login') {
       if (!page.url) throw new Error('Current site unavailable')
       const site = new URL(page.url).origin
-      const intent = credentialIntentSchema.parse({ targetSelector: next.selector })
+      const targetSelector = z.string().regex(/^\[data-mikka-ref="(?:0|[1-9]\d{0,2})"\]$/).parse(next.selector)
+      const intent = { targetSelector }
       if (!page.elements?.some(element => element.selector === intent.targetSelector)) throw new Error('Credential target was not observed')
       const index = intent.targetSelector.match(/^\[data-mikka-ref="(\d+)"\]$/)?.[1]
       const targets = observation.targets as Record<string, unknown> | undefined
@@ -44,7 +44,7 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
         await report(actor.userId, botId, id, `A browser action needs approval: ${login.summary}. Existing pending action ${login.actionId}. Ask the person to approve or deny this exact operation.`, `approval:${login.actionId}`)
         return 'waiting'
       }
-      if (credentialStep(login.status) === 'running') return 'running'
+      if (login.status === 'session_applied' || login.status === 'submitted') return 'running'
       await store.update(actor, botId, id, 'needs_you', 'needs_you', { kind: 'login', site })
       await report(actor.userId, botId, id, `The web task needs a login at ${site}. Ask for the saved-login card; never request credentials in chat.`, 'login')
       return 'waiting'

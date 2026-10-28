@@ -8,6 +8,7 @@ let resultStatus: 'session_applied' | 'submitted' = 'submitted'
 let currentLoader = 'document'
 let targetIdentity: unknown = 42
 let modelAction: 'login' | 'waiting' = 'login'
+let modelSelector = '[data-mikka-ref="1"]'
 const oldVisionModel = process.env.MIKKA_BROWSER_VISION_MODEL
 class FakeStore {
   async start() { return { status: 'running', epoch: 7, task: 'Sign in', step: 'start' } }
@@ -23,11 +24,11 @@ mock.module(new URL('../../lib/cloud-computer/subagents.ts', import.meta.url).hr
 mock.module(new URL('../../lib/cloud-computer/credential-consumer.ts', import.meta.url).href, { namedExports: { executeCredentialIntent: async (input: Record<string, unknown>) => { invocations.push(input); return { status: resultStatus } } } })
 mock.module(new URL('../../lib/coordinator-event-store.ts', import.meta.url).href, { namedExports: { recordCoordinatorEvent: async () => {} } })
 mock.module(new URL('../../lib/coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: async () => {} } })
-mock.module('ai', { namedExports: { tool: (input: unknown) => input, generateText: async () => ({ toolCalls: [{ toolName: 'choose_browser_action', input: { action: modelAction, selector: '[data-mikka-ref="1"]', step: 'Login', summary: 'Please take over' } }] }) } })
+mock.module('ai', { namedExports: { tool: (input: unknown) => input, generateText: async () => ({ toolCalls: [{ toolName: 'choose_browser_action', input: { action: modelAction, selector: modelSelector, step: 'Login', summary: 'Please take over' } }] }) } })
 let tick: typeof import('./steps').tick
 before(async () => { process.env.MIKKA_BROWSER_VISION_MODEL = 'synthetic/test'; tick = (await import('./steps')).tick })
 after(() => { if (oldVisionModel === undefined) delete process.env.MIKKA_BROWSER_VISION_MODEL; else process.env.MIKKA_BROWSER_VISION_MODEL = oldVisionModel })
-beforeEach(() => { invocations.length = 0; updates.length = 0; currentLoader = 'document'; targetIdentity = 42; modelAction = 'login' })
+beforeEach(() => { invocations.length = 0; updates.length = 0; currentLoader = 'document'; targetIdentity = 42; modelAction = 'login'; modelSelector = '[data-mikka-ref="1"]' })
 
 for (const status of ['session_applied', 'submitted'] as const) {
   test(`${status} preserves selected target and requires another observation`, async () => {
@@ -53,5 +54,11 @@ test('a missing or invalid node identity never reaches the credential broker', a
 test('model requests human takeover without invoking credential service', async () => {
   modelAction = 'waiting'
   assert.equal(await tick(actor, 'bot', 'subagent'), 'waiting')
+  assert.equal(invocations.length, 0)
+})
+
+test('model cannot submit an arbitrary selector or script to the credential service', async () => {
+  modelSelector = '[data-mikka-ref="1"];alert(1)'
+  assert.equal(await tick(actor, 'bot', 'subagent'), 'terminal')
   assert.equal(invocations.length, 0)
 })
