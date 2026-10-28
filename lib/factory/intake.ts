@@ -4,6 +4,7 @@ import { routeSchema, bindingSchema, changeSchema } from "./contract";
 export const intakeSchema = routeSchema
   .omit({ issueId: true, eventId: true })
   .extend({
+    sourceEventId: z.uuid().transform((value) => value.toLowerCase()),
     title: z.string().trim().min(1).max(200),
     body: z.string().max(50_000).default(""),
   })

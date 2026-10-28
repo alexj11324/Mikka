@@ -77,3 +77,25 @@ test("source denial and durable creation conflict cannot proceed to routing", as
   assert.deepEqual(result, { error: "issueToolCallConflict" });
   assert.equal(routed, 0);
 });
+
+test("UUID case cannot allocate a second durable issue receipt", async () => {
+  const r = request(),
+    keys = new Set<string>(),
+    issueId = randomUUID();
+  const deps = {
+    source: async (id: string) => assert.equal(id, r.sourceEventId),
+    create: async (_body: unknown, key: string) => {
+      keys.add(key);
+      return { id: issueId };
+    },
+    route: async (input: unknown) => input,
+  };
+  assert.deepEqual(
+    await intakeRequest(
+      { ...r, sourceEventId: r.sourceEventId.toUpperCase() },
+      deps,
+    ),
+    await intakeRequest(r, deps),
+  );
+  assert.equal(keys.size, 1);
+});

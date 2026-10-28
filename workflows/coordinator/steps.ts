@@ -399,7 +399,7 @@ export async function intakeFactoryRequest(userId: string, input: import('@/lib/
     const store=factoryForBot(botId)
     return intakeRequest(input, {
       source:id=>factoryRequestSource(userId,botId,id),
-      create:(body,key)=>createIssue(userId,body,key,scope,botId),
+      create:async(body,key)=>(await import('@/lib/mcp/actions')).createIssue(userId,body,systemActor(botId ?? 'coordinator'),key),
       route:route=>store.route(userId,route),
     })
   })
