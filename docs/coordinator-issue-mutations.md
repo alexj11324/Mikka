@@ -3,7 +3,8 @@
 MVP tracker: #357, item 2.
 
 The Coordinator exposes `create_issue` and `update_issue` through its normal
-Mikka AI SDK tool registry and the default definition. Both call a durable
+Mikka AI SDK tool registry when explicitly enabled; the default definition
+retains their logical IDs. Both call a durable
 Workflow step, check `assertNativeToolScope` first, and reuse
 `lib/mcp/actions.ts`. No native Coordinator runtime is enabled.
 
@@ -15,6 +16,28 @@ title, status, priority, labels and `assigneeUserId`. Assignees must be people
 already allowed on the task (R-60); execution identities are not accepted.
 An omitted field stays unchanged, and a supplied label array replaces the
 label set. A null human assignee clears the assignment.
+
+The proposed person's effective task access is checked before any writes.
+Historical invitations do not grant personal-task access, and suspended or
+removed workspace members cannot be newly assigned. A failed assignment rolls
+back task changes, history and the tool receipt together.
+
+## Independent deployment gate
+
+`MIKKA_ISSUE_TOOLS_ENABLED` defaults off; only the exact value `1` enables the
+new Coordinator tools and durable mutation receipts. With the flag absent, the
+tools are not exposed to the model, frozen grants can only narrow, and the
+existing external MCP create/update path retains its pre-rollout behavior
+without querying `issue_tool_calls`. Enabling a flag never adds tools absent
+from an execution's recorded `effectiveTools`.
+
+The operator must first verify the actual application database binding, apply
+the reviewed `drizzle/20261028015330_issue_tool_calls.sql` to an authorized
+target and verify its schema/primary key, then separately authorize enablement.
+The code does not create the table or change any deployment setting. This PR
+can therefore ship with the feature disabled without a production migration.
+CI enables it only in the guarded disposable database suite after migrations;
+the later MVP browser fixture must explicitly enable it for its isolated app.
 
 The tools intentionally do not expose project moves. Project membership
 lives in the workspace database; these durable issue mutations use one
@@ -64,4 +87,6 @@ task if execution is unavailable. It must not silently switch machines.
 - Full chat-to-daemon browser acceptance belongs to #357 item 6. A source test
   or skipped DB test is not evidence that deployed acceptance passed.
 
-No new production environment variables are required.
+No configuration is required to merge the disabled code. Enabling the new
+capability requires the schema and `MIKKA_ISSUE_TOOLS_ENABLED=1`; neither is
+installed or enabled automatically by this change.
