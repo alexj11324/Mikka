@@ -11,7 +11,7 @@ export type CredentialPageBinding = {
   targetId: string
   origin: string
   loaderId: string
-  action: 'restore_session' | 'fill_login' | 'submit_login'
+  permissionAction: 'computer_use'
   permissionVersion: number
 }
 
@@ -22,7 +22,7 @@ export function assertCredentialPageBinding(lease: CredentialPageBinding & { exp
   if (!Number.isSafeInteger(lease.expiresAt) || lease.expiresAt <= now || !Number.isSafeInteger(lease.epoch) || lease.epoch < 0 || lease.epoch !== current.epoch) throw denied()
   if (!Number.isSafeInteger(lease.permissionVersion) || lease.permissionVersion < 0 || lease.permissionVersion !== current.permissionVersion) throw denied()
   if (keys.some(key => typeof lease[key] !== 'string' || !lease[key] || lease[key] !== current[key])) throw denied()
-  if (!['restore_session', 'fill_login', 'submit_login'].includes(lease.action) || lease.action !== current.action) throw denied()
+  if (lease.permissionAction !== 'computer_use' || current.permissionAction !== 'computer_use') throw denied()
   try {
     if (canonicalOrigin(lease.origin) !== canonicalOrigin(current.origin)) throw denied()
   } catch { throw denied() }

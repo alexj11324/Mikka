@@ -204,13 +204,13 @@ test('password retry is bound to the server-authorized caller and its one-use ta
 })
 
 test('credential action fails closed when the trusted page binding changes', () => {
-  const page: CredentialPageBinding = { userId: 'owner', workspaceId: 'workspace', botId: 'bot', subagentId: 'subagent', epoch: 7, targetId: 'target', origin: 'https://example.com', loaderId: 'loader', action: 'fill_login', permissionVersion: 1 }
+  const page: CredentialPageBinding = { userId: 'owner', workspaceId: 'workspace', botId: 'bot', subagentId: 'subagent', epoch: 7, targetId: 'target', origin: 'https://example.com', loaderId: 'loader', permissionAction: 'computer_use', permissionVersion: 1 }
   const lease = { ...page, expiresAt: 2000 }
   assert.doesNotThrow(() => assertCredentialPageBinding(lease, page, 1000))
   for (const changed of [
     { userId: 'other' }, { workspaceId: 'other' }, { botId: 'other' }, { subagentId: 'other' },
     { epoch: 8 }, { targetId: 'other' }, { origin: 'https://other.example' }, { loaderId: 'other' },
-    { action: 'submit_login' as const }, { permissionVersion: 2 },
+    { permissionAction: 'other' as never }, { permissionVersion: 2 },
   ]) assert.throws(() => assertCredentialPageBinding(lease, { ...page, ...changed }, 1000), CredentialError)
   assert.throws(() => assertCredentialPageBinding(lease, page, 2000), CredentialError)
   assert.throws(() => assertCredentialPageBinding({ ...lease, origin: 'https://user@example.com' }, page, 1000), CredentialError)
@@ -234,6 +234,7 @@ test('observed input focus uses a top-document CDP node with a matching type', a
   await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
   focusedNode = 7
   await assert.rejects(cdp.focusObservedInput(7, 'username'), CredentialError)
+  await assert.rejects(cdp.focusObservedInput(7, 'code' as never), CredentialError)
   await assert.rejects(cdp.focusObservedInput(8, 'password'), CredentialError)
   root = { nodeName: '#document', children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password', 'disabled', ''] }] }
   await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)

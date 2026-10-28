@@ -82,8 +82,8 @@ export class Cdp {
   /** Focus an observed CDP backend node in the top document. This is a
    * mechanical check only; caller must independently consume a trusted,
    * document-bound policy decision before any credential operation. */
-  async focusObservedInput(backendNodeId: number, role: 'username' | 'password' | 'code') {
-    if (!Number.isSafeInteger(backendNodeId) || backendNodeId <= 0) throw new CredentialError('credential_denied', 404)
+  async focusObservedInput(backendNodeId: number, role: 'username' | 'password') {
+    if (!Number.isSafeInteger(backendNodeId) || backendNodeId <= 0 || !['username', 'password'].includes(role)) throw new CredentialError('credential_denied', 404)
     const result = await this.call('DOM.getDocument', { depth: -1, pierce: false })
     const find = (node: unknown): Record<string, any> | undefined => {
       if (!node || typeof node !== 'object' || Array.isArray(node)) return undefined
@@ -106,7 +106,7 @@ export class Cdp {
       attributes.set(key.toLowerCase(), value)
     }
     const type = (attributes.get('type') ?? 'text').toLowerCase()
-    const allowed = role === 'password' ? ['password'] : role === 'username' ? ['text', 'email', 'tel'] : ['text', 'tel', 'number']
+    const allowed = role === 'password' ? ['password'] : ['text', 'email', 'tel']
     if (attributes.has('disabled') || attributes.has('readonly') || !allowed.includes(type)) throw new CredentialError('credential_denied', 404)
     await this.call('DOM.focus', { backendNodeId })
     await this.assertObservedFocus(backendNodeId)
@@ -121,7 +121,7 @@ export class Cdp {
   }
   /** Use only under an active viewer guard, after the host has consumed the
    * existing computer_use permission for this exact document and action. */
-  async insertAtObservedInput(origin: string, loaderId: string, backendNodeId: number, role: 'username' | 'password' | 'code', value: string) {
+  async insertAtObservedInput(origin: string, loaderId: string, backendNodeId: number, role: 'username' | 'password', value: string) {
     const check = async () => {
       const tree = await this.call('Page.getFrameTree')
       const frame = tree.frameTree?.frame
