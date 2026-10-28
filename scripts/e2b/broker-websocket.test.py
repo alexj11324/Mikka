@@ -93,8 +93,7 @@ async def main():
                         assert observation['observation']['url']==origin+'/login'
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[type=password]").value="synthetic-secret"','returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as secret:
-                        assert secret.status==200
-                        assert (await secret.json())['screenshot']==observation['screenshot'], 'password value must never appear in the screenshot'
+                        assert secret.status==409, 'a populated password blocks observation'
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[type=password]").value=""','returnByValue':True})
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value="ordinary-text"','returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as populated:
@@ -102,8 +101,7 @@ async def main():
                         assert (await populated.json())['screenshot']==observation['screenshot'], 'ordinary field values must be masked too'
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=otp]").value="123456"','returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as otp:
-                        assert otp.status==200
-                        assert (await otp.json())['screenshot']==observation['screenshot'], 'OTP must never appear in the screenshot'
+                        assert otp.status==409, 'a populated OTP blocks observation'
                     restored=await browser.rpc('Runtime.evaluate',{'expression':'({username:document.querySelector("input[name=username]").value,otp:document.querySelector("input[name=otp]").value,visibility:document.querySelector("input[name=username]").style.visibility})','returnByValue':True})
                     assert restored['result']['value']=={'username':'ordinary-text','otp':'123456','visibility':''}, 'masking must restore the page without reading or changing values'
                     await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=otp]").value=""','returnByValue':True})

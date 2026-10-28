@@ -39,11 +39,13 @@ SAFE_TO_RESUME = """(() => {
 })()"""
 # The browser is script-frozen while this isolated-world operation hides every
 # editable control and its descendants. Original inline properties stay in the
-# isolated world and are restored before page scripts resume; field values are
-# neither read nor returned. Pseudo-elements must also be hidden.
+# isolated world and are restored before page scripts resume. A presence check
+# blocks populated sensitive controls; no field value is returned. Pseudo-
+# elements must also be hidden.
 MASK_VISUAL_FIELDS = """(() => {
   globalThis.__mikkaMasks = [];
   if (document.readyState !== 'complete') return false;
+  if ([...document.querySelectorAll('input,textarea')].some(e => e.value && (e.type === 'password' || /(?:otp|one[\\s_-]*time|verification[\\s_-]*code|security[\\s_-]*code|auth(?:entication)?[\\s_-]*code)/i.test([e.autocomplete,e.name,e.id,e.getAttribute('aria-label'),e.getAttribute('placeholder')].join(' '))))) return false;
   const roots = [...document.querySelectorAll('input,textarea,select,[contenteditable]:not([contenteditable="false"])')];
   const elements = [...new Set(roots.flatMap(e => [e, ...e.querySelectorAll('*')]))];
   globalThis.__mikkaMasks = elements.map(e => [e, e.style.getPropertyValue('visibility'), e.style.getPropertyPriority('visibility'), e.style.getPropertyValue('transition'), e.style.getPropertyPriority('transition')]);
