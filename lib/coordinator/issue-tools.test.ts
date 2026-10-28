@@ -57,3 +57,13 @@ test('mutations preserve the host user, Bot and scope and forward the SDK tool c
   assert.deepEqual(created.mock.calls[0].arguments, ['owner', { title: 'Requested task' }, 'durable-call', scope, 'bot'])
   assert.deepEqual(updated.mock.calls[0].arguments, ['owner', { issueId: '550e8400-e29b-41d4-a716-446655440000', status: 'doing' }, 'durable-call', scope, 'bot'])
 })
+
+test('only host-attributed request events enter issue creation, and ambiguity fails closed', async () => {
+  const event = '10000000-0000-4000-8000-000000000001'
+  const options = { toolCallId: 'bound-call', messages: [], context: {} }
+  const tools = registry.createCoordinatorRegistry('owner', null, undefined, { taskRequestEventId: event })
+  await tools.create_issue!.execute!({ title: 'Requested task' }, options)
+  assert.deepEqual(created.mock.calls.at(-1)!.arguments, ['owner', { title: 'Requested task' }, 'bound-call', undefined, null, event])
+  const ambiguous = registry.createCoordinatorRegistry('owner', null, undefined, { taskRequestEventId: null })
+  assert.deepEqual(await ambiguous.create_issue!.execute!({ title: 'Must not guess' }, options), { error: 'submissionConflict' })
+})

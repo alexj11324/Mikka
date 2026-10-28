@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db, pool } from '@/lib/db'
 import { SubscriptionRepository } from '@/lib/subscription-repository'
-import { agents, agentRuns, devices, issues, repositorySettings, runPublications, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { agents, agentRuns, devices, issues, repositorySettings, runPublications, taskRequestBindings, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
@@ -72,6 +72,8 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   const [device] = await db.select().from(devices).where(and(eq(devices.id, agent.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).limit(1)
   if (!device?.enabled || !localExecutionHarnesses(device.harnesses).includes(agent.harness)) throw new ActionFailureError('agentHarnessMissing')
   try { normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }) } catch { throw new ActionFailureError('repoPathInvalid') }
+  const [target] = await db.select().from(taskRequestBindings).where(eq(taskRequestBindings.issueId, issue.id)).limit(1)
+  if (target && (target.userId !== userId || target.deviceId !== agent.deviceId)) throw new ActionFailureError('runInvalid')
   const repo = await ensureDeviceRepository(userId, agent.deviceId, parsed.data.repo)
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
@@ -81,6 +83,8 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
     ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription })
     : null
   await db.transaction(async tx => {
+    const [request] = await tx.select().from(taskRequestBindings).where(eq(taskRequestBindings.issueId, issue.id)).limit(1)
+    if (request && (request.userId !== userId || request.deviceId !== agent.deviceId)) throw new ActionFailureError('runInvalid')
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['repository-approval', userId, repo.repoPath])}, 0))`)
     const [setting] = await tx.select().from(repositorySettings).where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, repo.repoPath)))
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-publication:' + issue.id}, 0))`)

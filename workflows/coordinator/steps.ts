@@ -6,7 +6,7 @@ import { issueVisibility } from '@/lib/issue-visibility'
 import { createHash } from 'node:crypto'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
 import { generateText, type ModelMessage } from 'ai'
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
@@ -16,7 +16,7 @@ import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
-import { issueMembers, issues, telegramLinks } from '@/lib/db/schema'
+import { coordinatorEvents, issueMembers, issues, taskRequestBindings, telegramLinks } from '@/lib/db/schema'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
 import { proposeAction, proposeRepositoryPush } from '@/lib/pending-action-store'
@@ -215,11 +215,19 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
   }
 }
 
-export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope?: NativeToolScope, botId: string | null = null) {
+export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope?: NativeToolScope, botId: string | null = null, taskRequestEventId?: string) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
-  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId ?? 'coordinator'), toolCallId)
+  if (!taskRequestEventId) {
+    const [pending] = await db.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(and(
+      eq(coordinatorEvents.userId, userId), botId ? eq(coordinatorEvents.botId, botId) : isNull(coordinatorEvents.botId),
+      eq(coordinatorEvents.kind, 'user_message'), sql`${coordinatorEvents.payload}->'taskDestination'->>'kind' = 'device'`,
+      sql`not exists (select 1 from task_request_bindings b where b."eventId" = ${coordinatorEvents.id})`,
+    )).limit(1)
+    if (pending) return { error: 'submissionConflict' }
+  }
+  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId ?? 'coordinator'), toolCallId, taskRequestEventId ? { eventId: taskRequestEventId, botId } : undefined)
 }
 
 export async function updateIssue(userId: string, input: UpdateIssueInput, toolCallId: string, scope?: NativeToolScope, botId: string | null = null) {
@@ -236,9 +244,13 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
 }
 
 /** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution, taskRequestEventId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  if (taskRequestEventId) {
+    const [binding] = await db.select({ issueId: taskRequestBindings.issueId }).from(taskRequestBindings).where(and(eq(taskRequestBindings.eventId, taskRequestEventId), eq(taskRequestBindings.userId, userId))).limit(1)
+    if (!binding || binding.issueId !== input.issueId) return { error: 'submissionConflict' }
+  }
   return asToolResult(async () => ({ ...(await queueRun(userId, input, botId, execution)), status: 'queued' }))
 }
 

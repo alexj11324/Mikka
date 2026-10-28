@@ -119,6 +119,25 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     assert.deepEqual(await updateIssue(stranger, { issueId: id, title: 'Unauthorized' }, actor, `foreign-${randomUUID()}`), { error: 'issueNotFound' })
     assert.ok('id' in await createIssue(stranger, { title: 'Separate owner' }, actor, callId), 'same tool call id is scoped to owner')
     assert.equal((await pool.query('select count(*) from issue_versions where "userId"=$1 and actor_type=\'system\' and actor_id=\'coordinator\'', [owner])).rows[0].count, String(await count('issue_versions')))
+    const device = randomUUID(), foreignDevice = randomUUID(), eventId = randomUUID()
+    await pool.query('insert into devices (id,"ownerId",name,kind,harnesses) values ($1,$2,\'Target fixture\',\'local\',$3),($4,$5,\'Foreign fixture\',\'local\',$3)', [device, owner, JSON.stringify([{ harness: 'codex', installed: true }]), foreignDevice, stranger])
+    await pool.query('insert into coordinator_events (id,"userId",kind,"dedupeKey",payload,"deliveredAt") values ($1,$2,\'user_message\',$3,$4,now())', [eventId, owner, `request-${eventId}`, JSON.stringify({ text: 'Make a task', taskDestination: { kind: 'device', deviceId: device } })])
+    const request = { eventId, botId: null }
+    const taskInput = { title: 'Bound task' }
+    const bound = await createIssue(owner, taskInput, actor, `bound-${randomUUID()}`, request)
+    assert.ok('id' in bound)
+    const binding = (await pool.query('select * from task_request_bindings where "eventId"=$1', [eventId])).rows[0]
+    assert.equal(binding.userId, owner)
+    assert.equal(binding.deviceId, device)
+    assert.equal(binding.issueId, bound.id)
+    assert.deepEqual(await createIssue(owner, taskInput, actor, `replay-${randomUUID()}`, request), bound)
+    assert.deepEqual(await createIssue(owner, { title: 'Changed task' }, actor, `changed-${randomUUID()}`, request), { error: 'issueToolCallConflict' })
+    assert.deepEqual(await createIssue(stranger, taskInput, actor, `foreign-${randomUUID()}`, request), { error: 'issueToolCallConflict' })
+    await pool.query('update coordinator_events set payload=jsonb_set(payload,\'{taskDestination,deviceId}\',to_jsonb($2::text)) where id=$1', [eventId, foreignDevice])
+    assert.deepEqual(await createIssue(owner, taskInput, actor, `retarget-${randomUUID()}`, request), { error: 'issueToolCallConflict' })
+    await pool.query('delete from task_request_bindings where "eventId"=$1', [eventId])
+    await pool.query('delete from coordinator_events where id=$1', [eventId])
+    await pool.query('delete from devices where id=any($1::uuid[])', [[device, foreignDevice]])
   } finally {
     await pool.query('DELETE FROM issue_members WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM mikka_team_issues WHERE "workspaceId"=$1', [workspace])

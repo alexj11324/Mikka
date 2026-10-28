@@ -18,6 +18,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    const localRequest = (await client.query('SELECT 1 FROM task_request_bindings WHERE "issueId"=$1', [input.issueId])).rowCount
+    if (localRequest) throw new ComputerError(409, 'Task request targets a local device')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     if (digest) await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-task:${digest}`])
     const target = (await client.query(`SELECT m."deviceId",a.instructions,a.harness,repo."baseBranch" FROM bots b

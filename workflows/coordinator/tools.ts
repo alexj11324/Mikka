@@ -9,7 +9,7 @@ import type { NativeToolScope } from './tool-scope'
 import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 
-export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean }
+export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; taskRequestEventId?: string | null }
 
 export function createCoordinatorRegistry(userId: string, botId: string | null, scope?: NativeToolScope, options: CoordinatorToolOptions = {}) {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
@@ -40,7 +40,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
     ...(issueMutationsEnabled() ? { create_issue: tool({
       description: 'Create the task the person asked for, including requests from the new-task dialog. Write a short title and put details in body. The assignee can only be a person; dispatching a thread is a separate action. Defaults to todo and normal priority.',
       inputSchema: createIssueInput,
-      execute: (input, options) => steps.createIssue(userId, input, options.toolCallId, scope, botId),
+      execute: (input, call) => options.taskRequestEventId === null ? Promise.resolve({ error: 'submissionConflict' }) : options.taskRequestEventId ? steps.createIssue(userId, input, call.toolCallId, scope, botId, options.taskRequestEventId) : steps.createIssue(userId, input, call.toolCallId, scope, botId),
     }),
     update_issue: tool({
       description: 'Update an existing task the person asked to change. Only supplied fields change; labels replaces the full label set. Read the task first. The assignee can only be a person.',
@@ -92,7 +92,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       dispatch_bot_computer: tool({
         description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Computer operations still require their approval.',
         inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional() }),
-        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerTask(userId, { ...input, botId: target }, options.toolCallId, scope, execution ?? undefined) : { error: 'botMismatch' } },
+        execute: (input, call) => { if (options.taskRequestEventId !== undefined) return { error: 'submissionConflict' }; const target = targetBot(input.botId); return target ? steps.dispatchComputerTask(userId, { ...input, botId: target }, call.toolCallId, scope, execution ?? undefined) : { error: 'botMismatch' } },
       }),
     } : {}),
     dispatch_run: tool({
@@ -102,7 +102,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
         repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo or an HTTPS/SSH git URL. The daemon clones it; no repository registration is needed.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
       }),
-      execute: input => steps.dispatchRun(userId, input, scope, botId, execution ?? undefined),
+      execute: input => options.taskRequestEventId === null ? { error: 'submissionConflict' } : options.taskRequestEventId ? steps.dispatchRun(userId, input, scope, botId, execution ?? undefined, options.taskRequestEventId) : steps.dispatchRun(userId, input, scope, botId, execution ?? undefined),
     }),
     list_runs: tool({
       description: 'List recent runs, newest first, optionally for one issue or only those still going.',
