@@ -5,7 +5,7 @@ import { createInterface } from "node:readline"
 
 export async function callMcpTool(server, name, args) {
   const child = spawn(server.command, server.args, {
-    env: { ...process.env, ...(server.env ?? {}) },
+    env: { ...process.env, ...server.env },
     stdio: ["pipe", "pipe", "inherit"],
   })
   const replies = new Map()
@@ -27,7 +27,7 @@ export async function callMcpTool(server, name, args) {
     capabilities: {},
     clientInfo: { name: "fake", version: "1" },
   })
-  const result = await request("tools/call", { name, arguments: args })
+  const result = name === '__mailbox_catalog' ? await request('tools/list', {}) : await request("tools/call", { name, arguments: args })
   child.kill()
   return result
 }

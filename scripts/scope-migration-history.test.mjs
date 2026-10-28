@@ -19,16 +19,17 @@ test('scope aliases pin identical SQL and keep the two-body historical name ambi
     assert.equal((file.sql.match(/\bcommit;/ig) ?? []).length, 1)
     assert.equal(scopeMigrationBeforeCommit(file.name, file.sql) + 'commit;\n', file.sql)
     assert.equal(alreadyApplied(file.name, new Set([file.previous]), file.sql), true)
+    assert.equal(alreadyApplied(file.name, new Set([file.earlier]), file.sql), true)
     if (file.ambiguousOldHashes) {
-      assert.deepEqual(MIGRATION_EQUIVALENTS[file.name], [file.previous])
+      assert.deepEqual(MIGRATION_EQUIVALENTS[file.name], [file.previous, file.earlier])
       const earlier = file.sql.replace(/-- Preserve old jobs while revoking claims[\s\S]*(?=commit;)/, '')
       assert.equal(createHash('sha256').update(earlier).digest('hex'), file.ambiguousOldHashes[0])
       assert.throws(() => alreadyApplied(file.name, new Set([file.old]), file.sql), /ambiguous scope migration/)
     } else {
-      assert.deepEqual(MIGRATION_EQUIVALENTS[file.name], [file.previous, file.old])
+      assert.deepEqual(MIGRATION_EQUIVALENTS[file.name], [file.previous, file.earlier, file.old])
       assert.equal(alreadyApplied(file.name, new Set([file.old]), file.sql), true)
     }
-    for (const ledger of [new Set(), new Set([file.old]), new Set([file.previous]), new Set([file.name])])
+    for (const ledger of [new Set(), new Set([file.old]), new Set([file.previous, file.earlier]), new Set([file.name])])
       assert.throws(() => alreadyApplied(file.name, ledger, file.sql + ' '), /content changed/)
     assert.equal(alreadyApplied(file.name, new Set([file.old + '.unknown']), file.sql), false)
   }
@@ -36,19 +37,20 @@ test('scope aliases pin identical SQL and keep the two-body historical name ambi
 
 test('all partial and mixed ledger models either preserve ordered progress or fail closed', () => {
   const groups = ['MIKKA_DATABASE_URL', 'DATABASE_URL'].map(target => sources.filter(file => file.target === target))
-  for (const mode of ['canonical', 'previous', 'historical', 'mixed', 'both', 'all']) {
+  for (const mode of ['canonical', 'previous', 'earlier', 'historical', 'mixed', 'both', 'all']) {
     for (let mask = 0; mask < 1 << sources.length; mask++) {
       const ledger = new Set()
       sources.forEach((file, index) => {
         if (!(mask & (1 << index))) return
         if (['canonical','both','all'].includes(mode) || (mode === 'mixed' && index % 3 === 0)) ledger.add(file.name)
         if (['previous','all'].includes(mode) || (mode === 'mixed' && index % 3 === 1)) ledger.add(file.previous)
+        if (['earlier','all'].includes(mode)) ledger.add(file.earlier)
         if (['historical','both','all'].includes(mode) || (mode === 'mixed' && index % 3 === 2)) ledger.add(file.old)
       })
       const before = [...ledger]
-      const present = file => ledger.has(file.name) || ledger.has(file.previous) || ledger.has(file.old)
+      const present = file => ledger.has(file.name) || ledger.has(file.previous) || ledger.has(file.earlier) || ledger.has(file.old)
       const hole = groups.some(group => group.some((file, index) => present(file) && group.slice(0, index).some(earlier => !present(earlier))))
-      const ambiguous = sources.some(file => file.ambiguousOldHashes && ledger.has(file.old) && !ledger.has(file.name) && !ledger.has(file.previous))
+      const ambiguous = sources.some(file => file.ambiguousOldHashes && ledger.has(file.old) && !ledger.has(file.name) && !ledger.has(file.previous) && !ledger.has(file.earlier))
       if (hole || ambiguous) assert.throws(() => plan(ledger), /history has a gap|ambiguous scope migration/)
       else assert.deepEqual(plan(ledger), sources.filter(file => !present(file)).map(file => file.name))
       assert.deepEqual([...ledger], before, 'planning never backfills or rewrites ledger identities')

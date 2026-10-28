@@ -2,6 +2,8 @@
 
 ## 19:49 scope audit correction (2026-10-28)
 
+The current source-only integration includes main dd6d8d4 and 76 migration sources (67 main plus nine unchanged scope bodies). Append-only names are now 20261028201200–20261028201208; 72000–72008 and 183117–183125 remain exact-hash aliases without ledger replacement. The ambiguous oldest2242 remains rejected. Historical 70-source proof snapshots remain unchanged. Neither these renames nor a successful static check grants schema execution or proves production readiness.
+
 An explicit task-team save no longer adds a native confirmation dialog. It still rechecks authorization/current relation and emits sharing intent only on success. Changing local team association and choosing workspace visibility remain separate operations; a saved relationship alone is not permission to publish.
 
 An owner can move a local-only workspace task to personal with one `setIssueScope` call and its current revision. There is no blanket second approval for a task with no link, retained publication or queued/processing/failed outbox. Those external or uncertain states still fail closed pending disposition policy. A supplied preview digest remains a state-consistency fence, not proof of a separate human approval; stale digests, stale revisions and unauthorized owners still fail.

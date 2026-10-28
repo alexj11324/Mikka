@@ -60,6 +60,6 @@ export function IssueScopeControl({ task, disabled, onSaved, teamChoice }: {
   const current = options.find(option => option.value === task.scope)?.label ?? task.scope
   return <div className="flex min-w-0 items-center gap-2">
     <IssuePropertyMenu variant="row" label={t('label')} value={task.scope} options={options} icon={task.scope === 'workspace' ? Building2 : User} disabled={disabled || pending} displayValue={current} onChange={value => { void change(value) }} />
-    {task.scopeSetBy === 'agent' && <span className="truncate text-xs text-muted-foreground">{t('judgedByAgent')}</span>}
+    {task.scope === 'workspace' && task.scopeSetBy === 'agent' && <span className="truncate text-xs text-muted-foreground">{t('judgedByAgent')}</span>}
   </div>
 }

@@ -126,9 +126,9 @@ test('manifest validation is source-only and refuses drift before any executor i
 
 test('current main table additions fit the separately proposed snapshot budget',async()=>{
   const {readFileSync}=await import('node:fs')
-  const additions=['20261027181000_agent_kit.sql','20261027203647_mobile_push.sql','20261027231815_user_facts.sql','20261028015330_issue_tool_calls.sql']
+  const additions=['20261027181000_agent_kit.sql','20261027203647_mobile_push.sql','20261027231815_user_facts.sql','20261028015330_issue_tool_calls.sql','20261028143920_operation_ledger.sql']
   const tables=additions.flatMap(name=>[...readFileSync('drizzle/'+name,'utf8').matchAll(/create table if not exists\s+([\w"]+)/ig)].map(match=>match[1]))
-  assert.equal(tables.length,13);assert.equal(new Set(tables).size,13)
+  assert.equal(tables.length,14);assert.equal(new Set(tables).size,14)
   // Original retained scope bootstrap:94 tables. One decision_calls fixture
   // table is added by the unchanged business suite. No live schema is queried.
   assert.ok(SCOPE_LIMITS.snapshotTables>=94+tables.length+1)

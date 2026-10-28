@@ -12,7 +12,7 @@ export function retainedScope70Fixture(){
   const pins=new Map(inventory.files.map(file=>[file.name,file.sha256])),bytes=new Map()
   if(pins.size!==70)throw Error('historical scope source duplicate')
   const migrations=orderMigrations([...pins.keys()]).map(name=>{
-    const current=SCOPE_MIGRATION_IDENTITIES.find(file=>file.previous===name)?.name??name
+    const current=SCOPE_MIGRATION_IDENTITIES.find(file=>file.previous===name||file.earlier===name)?.name??name
     const value=readFileSync(new URL('../../drizzle/'+current,import.meta.url)),sql=value.toString('utf8')
     if(hash(value)!==pins.get(name))throw Error('historical scope SQL changed: '+name)
     const path='drizzle/'+name,before=scopeMigrationBeforeCommit(current,sql)

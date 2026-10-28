@@ -12,6 +12,7 @@ import { retryNote } from '@/lib/run-retry'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
+import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,7 +66,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   // Tool provisioning is best effort, but it never authorizes the response.
   // A retirement during this await must still suppress the prompt below.
   const mcp = await issueRunToken(run)
-      .then(({ token }) => ({ url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token }))
+      .then(async ({ token }) => {
+        const tools = personalMailboxEnabled() ? await (await import('@/lib/personal-mailbox-runtime')).personalWorkerMailboxAdvertised(caller.userId, run.id) : []
+        return { url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token, ...(tools.length ? { mailbox: true as const } : {}) }
+      })
       .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
   // A retry after a lost lease works on in the lost attempt's worktree and,
   // when the harness can, its session; the daemon falls back to `prompt`.

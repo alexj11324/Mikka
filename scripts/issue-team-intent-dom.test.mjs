@@ -89,3 +89,10 @@ test('completed-request replay adopts the now-personal issue without claiming a 
     assert.equal(notices.includes('movedToPersonal'), false)
   } finally { await view.unmount() }
 })
+
+test('default personal scope is not described as an agent classification',async()=>{
+  readTeam=async()=>null;promote=async()=>{throw Error('unexpected promotion')};saves=[];notices=[]
+  const view=await mount({task:{...task,scope:'personal',scopeSetBy:'agent'}})
+  try {assert.equal(view.host.textContent.includes('judgedByAgent'),false)}
+  finally {await view.unmount()}
+})
