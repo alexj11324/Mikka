@@ -23,7 +23,6 @@ const rows = [
 const db = { select: () => ({ from: () => ({ where: () => ({ limit: async () => rows[selectIndex++] }) }) }) }
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool,db } })
 mock.module(new URL('../device-link.ts', import.meta.url).href, { namedExports: { authenticateDevice: async (request: Request) => request.headers.get('authorization') === 'Bearer synthetic' ? { userId: owner } : null, ownedDevice: async () => ({ enabled:true,kind:'local',harnesses:[{harness:'codex',installed:true,...(support ? {toolApproval:true} : {})}] }) } })
-mock.module(new URL('../computer/claim.ts', import.meta.url).href, { namedExports: { claimLocalRun: async () => 'claimed', claimCloudRun: async () => null } })
 mock.module(new URL('../mcp/worker.ts', import.meta.url).href, { namedExports: { issueRunToken: async () => ({token:'synthetic-token'}) } })
 mock.module(new URL('../subscription-runtime.ts', import.meta.url).href, { namedExports: { subscriptionRuntime: () => ({ repository:{} }) } })
 mock.module(new URL('../run-leases.ts', import.meta.url).href, { namedExports: { latestCheckpoint: async () => null } })
@@ -33,10 +32,11 @@ mock.module(new URL('../personal-mailbox-config.ts', import.meta.url).href, { na
 mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async ({ headers }: { headers: Headers }) => ({ user: { id: headers.get('cookie') === 'owner=1' ? owner : 'other' } }) } } } })
 let server: Server, origin: string, dir: string, savedAssignment: import('@mikka/protocol/device').RunAssignment
 before(async () => {
+  await pool.query(`ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS "startedAt" timestamptz; ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS "updatedAt" timestamptz; CREATE TABLE IF NOT EXISTS computer_run_bindings ("runId" uuid PRIMARY KEY)` )
   await pool.query(`INSERT INTO agents (id,"userId",harness) VALUES ($1,$2,'codex')`, [agentId,owner])
   await pool.query(`INSERT INTO devices VALUES ($1,$2,true)`, [deviceId,owner])
   await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,workspace_id,cli_run_policy) VALUES ($1,'coordinator',NULL,'{"permissions":{"install_dependency":"allow"}}'::jsonb)`, [owner])
-  await pool.query(`INSERT INTO agent_runs VALUES ($1,$2,$3,'running',NULL,now()+interval '5 minutes',$4,NULL,NULL)`, [runId,owner,deviceId,agentId])
+  await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"stopRequestedAt","leaseExpiresAt","agentId","agentDefinition","botId") VALUES ($1,$2,$3,'queued',NULL,NULL,$4,NULL,NULL)`, [runId,owner,deviceId,agentId])
   const device = await import('../../app/v1/runs/[runId]/tool-approval/route')
   const claim = await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   const browser = await import('../../app/api/agent-tool-approvals/route')
@@ -62,6 +62,14 @@ test('real HTTP routes carry a pending CLI request to owner approval and one res
   const link = new HttpServerLink(origin)
   Object.assign(link, { credential: 'synthetic' })
   const settings = async (cookie: string, payload: object) => fetch(`${origin}/api/agent-cli-policy`, { method:'POST', headers:{cookie,origin,'content-type':'application/json'}, body:JSON.stringify(payload) })
+  const unstartedAgent = randomUUID()
+  await pool.query(`INSERT INTO agents (id,"userId",harness) VALUES ($1,$2,'codex')`, [unstartedAgent,owner])
+  const beforeFirstRun = await settings('owner=1',{operation:'readAgent',agentId:unstartedAgent,botId:null})
+  assert.equal(beforeFirstRun.status,200)
+  const empty = await beforeFirstRun.json() as {revision:string}
+  assert.equal((await settings('other=1',{operation:'setAgent',agentId:unstartedAgent,botId:null,target:'worker',expectedRevision:empty.revision,policy:{permissions:{install_dependency:'deny'}}})).status,409)
+  assert.equal((await settings('owner=1',{operation:'setAgent',agentId:unstartedAgent,botId:null,target:'worker',expectedRevision:empty.revision,policy:{permissions:{install_dependency:'deny'}}})).status,200)
+  assert.equal((await pool.query('SELECT count(*)::int AS count FROM agent_runs WHERE "agentId"=$1',[unstartedAgent])).rows[0].count,0)
   const settingsRead = await settings('owner=1',{operation:'read',runId})
   assert.equal(settingsRead.status,200)
   const previous = await settingsRead.json() as {revision:string}
@@ -75,6 +83,7 @@ test('real HTTP routes carry a pending CLI request to owner approval and one res
   support = true; selectIndex = 0
   const claim = await fetch(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, { method:'POST', headers:{ authorization:'Bearer synthetic' } })
   assert.equal(claim.status,200)
+  assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'preparing')
   const assignment = await claim.json() as import('@mikka/protocol/device').RunAssignment
   savedAssignment = assignment
   assert.equal(assignment.policy?.permissions.install_dependency, 'allow')

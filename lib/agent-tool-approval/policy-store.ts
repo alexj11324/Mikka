@@ -14,16 +14,16 @@ export const realCliMembershipGuard: CliMembershipGuard = async (workspaceId, us
 
 export const cliPolicyLayerSchema = z.strictObject({ permissions: storedPermissionsSchema.optional(), networkAllow: networkAllowSchema.optional(), approvalMode: approvalModeSchema.optional() })
 const rank = { deny: 0, ask: 1, allow: 2 } as const
-/** Called inside a transaction holding run ownership; CLI writers must take
- * these same advisory locks before inserting or changing a policy row. */
-export async function lockCliRunPolicy(tx: PoolClient, runId: string, userId: string): Promise<{ policy: RunPolicy; revision: string; workspaceId: string | null; layers: { agent: z.infer<typeof cliPolicyLayerSchema>; worker: z.infer<typeof cliPolicyLayerSchema>; workspace: z.infer<typeof cliPolicyLayerSchema> } }> {
-  const run = await tx.query<{ botId: string | null; workspaceId: string | null; agentId: string }>(`SELECT r."botId", r."agentId", b."workspaceId" FROM agent_runs r LEFT JOIN bots b ON b.id=r."botId" AND b."ownerId"=r."userId" WHERE r.id=$1 AND r."userId"=$2`, [runId,userId])
-  const scope = run.rows[0]
-  if (!scope || (scope.botId && !scope.workspaceId)) throw new Error('agentPolicyUnavailable')
-  if (scope.botId) {
-    const bot = await tx.query('SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR SHARE', [scope.botId,userId,scope.workspaceId])
-    if (!bot.rowCount) throw new Error('agentPolicyUnavailable')
+/** Caller identity is authenticated by the host. Workspace membership is
+ * separately pinned by cliAgentPolicyGuard through transaction commit. */
+export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId: string, botId: string | null): Promise<{ policy: RunPolicy; revision: string; workspaceId: string | null; layers: { agent: z.infer<typeof cliPolicyLayerSchema>; worker: z.infer<typeof cliPolicyLayerSchema>; workspace: z.infer<typeof cliPolicyLayerSchema> } }> {
+  let workspaceId: string | null = null
+  if (botId) {
+    const bot = await tx.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2 FOR SHARE', [botId,userId])
+    if (!bot.rows[0]) throw new Error('agentPolicyUnavailable')
+    workspaceId = bot.rows[0].workspaceId
   }
+  const scope = { botId, workspaceId, agentId }
   const key = scope.botId ?? 'coordinator'
   await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`agent-cli-policy:${userId}:${key}`])
   await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`worker-cli-policy:${scope.agentId}`])
@@ -65,6 +65,26 @@ export async function lockCliRunPolicy(tx: PoolClient, runId: string, userId: st
   }
   const revision = createHash('sha256').update(JSON.stringify([userId,scope.botId,scope.workspaceId,scope.agentId,agentRow.rows[0].generation,agentVersion,workerRow.rows[0].generation,workerVersion,workspaceGeneration,workspaceVersion])).digest('hex')
   return { policy, revision, workspaceId: scope.workspaceId, layers: { agent, worker, workspace } }
+}
+
+/** Resolve a run's exact owner, Bot and worker; then use the same policy layer. */
+export async function lockCliRunPolicy(tx: PoolClient, runId: string, userId: string) {
+  const result = await tx.query<{ botId: string | null; agentId: string }>('SELECT "botId","agentId" FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId,userId])
+  const run = result.rows[0]
+  if (!run) throw new Error('agentPolicyUnavailable')
+  return lockCliAgentPolicy(tx,userId,run.agentId,run.botId)
+}
+
+export function cliAgentPolicyGuard(userId: string, agentId: string, botId: string | null, membership: CliMembershipGuard): MailboxTransactionGuard {
+  return async (tx, signal) => {
+    const current = await lockCliAgentPolicy(tx,userId,agentId,botId)
+    if (current.workspaceId) return membership(current.workspaceId,userId,signal)
+    return { async check() {}, async close() {} }
+  }
+}
+
+export async function readCliAgentPolicy(pool: Pick<Pool, 'connect'>, userId: string, agentId: string, botId: string | null, guard: CliMembershipGuard = realCliMembershipGuard) {
+  return writeTransaction(pool, tx => lockCliAgentPolicy(tx,userId,agentId,botId), { guard: cliAgentPolicyGuard(userId,agentId,botId,guard) })
 }
 
 /** Hold the workspace membership lease through the application transaction. */
