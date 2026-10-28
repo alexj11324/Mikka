@@ -2,6 +2,8 @@ import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
+import { issueForUser } from '@/lib/issue-access'
+import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { actAs } from '@/lib/acting-user'
 import type { ActivityActor } from '@/lib/activity-actor'
 import { addRunMessage, queueRun, requestRunStop } from '@/lib/agent-runs'
@@ -15,6 +17,7 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { getIssue as readIssue, saveIssue } from '@/app/actions/issues'
 import { updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issue-metadata'
 import { updateIssueRelation } from '@/app/actions/issue-operations'
+import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
 import { listProjects as readProjects, moveIssueToProject } from '@/app/actions/projects'
 
 // The MCP tools that change things, and the reads that need more than one
@@ -57,12 +60,16 @@ interface IssueChanges {
   priority?: string
   projectId?: string | null
   labels?: string[]
+  assigneeUserId?: string | null
   assigneeAgentId?: string | null
 }
 
 /** Applies the changes one action at a time, each on the revision the last one left. */
 async function applyChanges(userId: string, issueId: string, changes: IssueChanges) {
   let issue = await readIssue(issueId)
+  // Historical invitations do not grant personal-task or revoked workspace
+  // access. Check the proposed person's effective access before any mutation.
+  if (changes.assigneeUserId && !await issueForUser(changes.assigneeUserId, issue.id)) throw new ActionFailureError('memberNotJoined')
   if (changes.title !== undefined || changes.status !== undefined || changes.priority !== undefined) {
     issue = unwrap(await saveIssue({
       id: issue.id, revision: issue.revision, content: issue.content,
@@ -74,6 +81,7 @@ async function applyChanges(userId: string, issueId: string, changes: IssueChang
     const known = await knownLabels(issue.userId)
     patch.labels = changes.labels.map(name => known.get(name.toLowerCase()) ?? { name, color: 'gray' })
   }
+  if (changes.assigneeUserId !== undefined) patch.assignee = changes.assigneeUserId ? { kind: 'member', id: changes.assigneeUserId } : null
   if (changes.assigneeAgentId !== undefined) patch.assignee = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
   if (Object.keys(patch).length) issue = unwrap(await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch })).issue
   if (changes.projectId !== undefined) issue = unwrap(await moveIssueToProject({ issueId: issue.id, revision: issue.revision, projectId: changes.projectId })).issue
@@ -88,17 +96,35 @@ function issueResult(issue: { id: string; title: string; status: string; priorit
   }
 }
 
-export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }, actor?: ActivityActor) {
+export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }, actor?: ActivityActor, toolCallId?: string) {
   return attempt(() => actAs(userId, async () => {
-    const created = unwrap(await saveIssue({ title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' })).issue
-    return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeAgentId: input.assigneeAgentId }))
+    if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
+    const mutate = async () => {
+      const created = unwrap(await saveIssue({ title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' })).issue
+      return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeUserId: input.assigneeUserId, assigneeAgentId: input.assigneeAgentId }))
+    }
+    if (toolCallId === undefined) return mutate()
+    if (!issueMutationsEnabled()) return { error: 'issueToolsDisabled' }
+    const parsed = createIssueInput.safeParse(input)
+    if (!parsed.success) return { error: 'validationGeneric' }
+    const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
+    try { return await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate) }
+    catch (error) { if (error instanceof IssueToolCallConflict) return { error: error.message }; throw error }
   }, actor))
 }
 
-export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }, actor?: ActivityActor) {
+export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }, actor?: ActivityActor, toolCallId?: string) {
   return attempt(() => actAs(userId, async () => {
+    if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
     const { issueId, ...changes } = input
-    return issueResult(await applyChanges(userId, issueId, changes))
+    const mutate = async () => issueResult(await applyChanges(userId, issueId, changes))
+    if (toolCallId === undefined) return mutate()
+    if (!issueMutationsEnabled()) return { error: 'issueToolsDisabled' }
+    const parsed = updateIssueInput.safeParse(input)
+    if (!parsed.success) return { error: 'validationGeneric' }
+    const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
+    try { return await idempotentIssueMutation(userId, 'update_issue', toolCallId, parsed.data, mutate) }
+    catch (error) { if (error instanceof IssueToolCallConflict) return { error: error.message }; throw error }
   }, actor))
 }
 
