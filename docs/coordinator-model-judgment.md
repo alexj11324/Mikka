@@ -1,6 +1,6 @@
 # Coordinator judgment boundaries
 
-This change is based on main `dd6d8d4febbfe56bba5671cc5302c20f8e0e533d`.
+This change includes main `183104e3ecd4fc2cae5d1a48f2e3f6a49bb235c1`.
 It changes source and offline contracts. It does not establish runtime acceptance,
 turn on a feature, run live evaluations, or permit a merge/deployment.
 
@@ -194,10 +194,14 @@ that does not invoke those paths continues. Production and Staging are not part
 of this audit.
 
 Current source retains migration-test fixture directories, worker build scratch,
-and Coordinator database fixtures. Agent Kit database setup now checks existing
-schema metadata instead of automatically creating/replaying the migration that
-replaces triggers. Migration replay is explicitly TODO; the required database
-runner rejects TODO, so this is not a passed migration gate.
+and Coordinator database fixtures. Agent Kit database setup checks existing
+schema metadata instead of automatically replaying migrations against its target.
+After the user's newer authorization for this run's new managed CI resources,
+the replay assertion uses an exclusively created per-test database on the owned
+Actions PostgreSQL service. It refuses the old dedicated retained targets,
+replays the unchanged pinned SQL twice only in that new database, checks retained
+historical rows/triggers/constraint, and closes its pool without dropping the
+database. This is a source repair, not evidence that the DB test has run.
 
 The `a6bede2` isolated build started at 21:49:55 UTC and its task-exclusive process
 group 8684 was paused with SIGSTOP at 21:51:23 UTC, without TERM/KILL, cleanup or
@@ -210,8 +214,14 @@ completed. Random directory suffixes and deleted file counts were not logged;
 they are unknown. Do not reconstruct or restore them. Older passing runs remain
 historical execution evidence, not acceptance under the new retention rule.
 
-Installed Next, tsx and esbuild contain their own cleanup paths. The full build
-and affected test entrypoints remain HOLD; repository teardown changes do not
-prove those dependency paths are retained. The separately reviewed native
-scheduler check does not lift those holds or authorize SQL, provider calls, CI,
-merge or deployment. Retained evidence records each separately reviewed command.
+Installed Next, tsx and esbuild contain their own cleanup paths. The user's later
+authorization permits normal recycling of this run's new managed temporary test
+resources; it does not release previously preserved resources or logs. New tests
+and builds must bind their writable source, HOME/TMP/cache/output to a new owned
+root. The isolated build plan mounts existing dependencies read-only and retains
+its new container/logs, so framework cleanup cannot modify the old checkout or
+old build directories. Each exact execution closure still requires independent
+review. Neither that authorization nor a separately reviewed native check permits
+production migration, provider secrets from another scope, merge before real
+acceptance, or deletion of existing business rows. Retained evidence records each
+reviewed command and its actual outcome.

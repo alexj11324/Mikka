@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
 import { DEFAULT_AGENT_DEFINITION, builtinAgentDefinition } from './builtin'
@@ -73,7 +74,42 @@ function report(definitionDigest:string,passed:boolean,mode:'fixture'|'live'):Ev
     passed:passed?CORE_EVAL_CASES.length:0,total:CORE_EVAL_CASES.length,errors:0}
 }
 
-test.todo('Agent Kit migration replay remains unverified: trigger replacement is paused by resource retention; do not count this as acceptance')
+test('the unchanged Agent Kit migration replays only in a newly created CI-owned database and retains historical rows',async t=>{
+  // The newer user authorization covers this run's NEW managed CI resources.
+  // It does not permit replay against a prior dedicated retained database.
+  assert.ok(actions,'Migration replay requires this Actions job\'s owned temporary PostgreSQL service')
+  const migration=readFileSync(new URL('../../drizzle/20261027181000_agent_kit.sql',import.meta.url),'utf8')
+  assert.equal(createHash('sha256').update(migration).digest('hex'),'365230faab874af93a8f696a1f83f1b3276a83bb6ea933b3939a6b654dea1be2')
+  const database=`mikka_agent_kit_replay_${randomUUID().replaceAll('-','')}`
+  assert.match(database,/^mikka_agent_kit_replay_[a-f0-9]{32}$/)
+  await pool.query(`create database "${database}"`)
+  t.diagnostic(JSON.stringify({event:'agent_kit_replay_database_created',database,retention:'retain',syntheticRowsMaximum:1}))
+  const isolatedTarget=new URL(connectionString)
+  isolatedTarget.pathname='/'+database
+  const isolated=new Pool({connectionString:isolatedTarget.href,max:1})
+  try{
+    const actual=await isolated.query('select current_database() as database')
+    assert.equal(actual.rows[0].database,database)
+    await isolated.query(`
+      create table "user"(id text primary key);
+      create table bots(id uuid primary key,"ownerId" text not null references "user"(id),"workspaceId" uuid not null,unique(id,"workspaceId","ownerId"));
+      create table agent_runs(id uuid primary key);
+    `)
+    const historicalId=randomUUID()
+    await isolated.query('insert into agent_runs(id) values($1)',[historicalId])
+    await isolated.query(migration)
+    await isolated.query(migration)
+    const rows=await isolated.query('select "agentDefinition" from agent_runs where id=$1',[historicalId])
+    assert.deepEqual(rows.rows,[{agentDefinition:null}],'migration replay does not invent or delete historical execution evidence')
+    const triggers=await isolated.query("select tgname from pg_trigger where tgrelid in ('agent_kit_versions'::regclass,'agent_kit_events'::regclass,'agent_kit_activations'::regclass,'agent_kit_executions'::regclass) and not tgisinternal order by tgname")
+    assert.deepEqual(triggers.rows.map(row=>row.tgname),['agent_kit_activations_immutable','agent_kit_events_immutable','agent_kit_execution_guard','agent_kit_versions_immutable'])
+    const constraint=await isolated.query("select count(*)::int as count from pg_constraint where conrelid='agent_kit_heads'::regclass and conname='agent_kit_active_version_fk'")
+    assert.equal(constraint.rows[0].count,1)
+  }finally{
+    await isolated.end()
+    t.diagnostic(JSON.stringify({event:'agent_kit_replay_database_retained',database}))
+  }
+})
 
 test('existing migrated schema leaves historical runs unrecorded',async()=>{
   const id=randomUUID();await pool.query('insert into agent_runs(id) values($1)',[id]).catch(async()=>{

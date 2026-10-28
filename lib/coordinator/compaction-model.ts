@@ -5,10 +5,11 @@ import { SUMMARY_INSTRUCTIONS } from './context'
 
 /** Compression is part of the same execution, not a separate default-model
  * task. Resolution/auth errors propagate before a summary can be saved. */
-export async function compactWithFrozenModel(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, messages: ModelMessage[], dependencies: HostedModelDependencies, signal?: AbortSignal): Promise<string> {
+export async function compactWithFrozenModel(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, messages: ModelMessage[], dependencies: HostedModelDependencies, signal?: AbortSignal, summaryOptions = { instructions: SUMMARY_INSTRUCTIONS, maxOutputTokens: 4096 }): Promise<string> {
   const budget = AbortSignal.any([AbortSignal.timeout(30_000), ...(signal ? [signal] : [])])
   const model = await resolveFrozenHostedModel(scope, runtime, dependencies, budget)
-  const options = { model, instructions: SUMMARY_INSTRUCTIONS, maxOutputTokens: 4096, maxRetries: 0, abortSignal: budget, messages }
+  let failed = false
+  const options = { ...summaryOptions, model, maxRetries: 0, abortSignal: budget, messages, onError: () => { failed = true } }
   // The existing subscription worker supports streaming only. There is no
   // catch/default gateway fallback, including after partial output or refusal.
   const result = runtime.modelSelection ? streamText(options) : await generateText(options)
@@ -17,6 +18,6 @@ export async function compactWithFrozenModel(scope: HostedModelScope, runtime: H
   budget.throwIfAborted()
   // A stream can resolve partial text after an error/length/filter outcome.
   // It must not advance the persisted summary cursor and hide old context.
-  if (!text.trim() || finishReason !== 'stop') throw new Error('compactionModelUnavailable')
+  if (failed || !text.trim() || finishReason !== 'stop') throw new Error('compactionModelUnavailable')
   return text
 }
