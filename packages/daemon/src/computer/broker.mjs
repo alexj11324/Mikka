@@ -81,6 +81,7 @@ export class ComputerBroker {
     if (!grant || signal?.aborted || !this.permitted(grant.runId))
       return Promise.reject(new Error("Not permitted"));
     const call = normalizeCall(value);
+    const actionId = randomUUID();
     if (grant.permission === "allow") {
       // Recheck at execution admission. The trusted execute callback also
       // enforces the live run, owner, display and policy-version fence.
@@ -88,12 +89,12 @@ export class ComputerBroker {
         if (signal?.aborted || this.grants.get(token) !== grant ||
             this.driver?.fingerprint !== grant.fingerprint || !this.permitted(grant.runId))
           throw new Error("Not permitted");
-        return this.execute(this.driver, call, grant.display, grant.runId);
+        return this.execute(this.driver, call, grant.display, grant.runId, { actionId });
       });
     }
     if (this.pending.size >= 20) return Promise.reject(new Error("Not permitted"));
     const request = {
-      id: randomUUID(),
+      id: actionId,
       runId: grant.runId,
       target: this.driver.fingerprint,
       ...(grant.display === undefined ? {} : { display: grant.display }),
@@ -162,7 +163,7 @@ export class ComputerBroker {
       return { ok: true };
     }
     try {
-      row.resolve(await this.execute(this.driver, call, display, runId));
+      row.resolve(await this.execute(this.driver, call, display, runId, { actionId: id }));
     } catch (error) {
       row.reject(error);
     }
