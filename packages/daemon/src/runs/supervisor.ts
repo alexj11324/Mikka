@@ -73,7 +73,7 @@ import {
 import { isSafeId } from "../ids"
 import type { Logger } from "../log"
 import type { Outbox } from "../outbox"
-import { runPolicy } from "../permissions"
+import { pushDecision, runPolicy } from "../permissions"
 import {
   DEFAULT_LEASE_MS,
   type DeviceRepo,
@@ -808,11 +808,11 @@ export class RunSupervisor {
     if (resume && (await hasCommit(repo.path, resume))) return resume
     const branch = assignment.pushBranch
     const base = await this.deps.baseRef(assignment)
-    if (!branch || repo.push?.approved !== true) return base
+    if (!branch || !pushDecision(runPolicy(assignment.policy), repo.push?.approved === true).push) return base
     try {
       return await this.deps.worktrees.fetchBranch(
         repo.path,
-        repo.push.remote ?? "origin",
+        repo.push?.remote ?? "origin",
         branch,
         runId
       )

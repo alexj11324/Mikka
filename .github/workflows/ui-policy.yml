@@ -209,6 +209,8 @@ jobs:
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
+      - name: Verify local repository migration history aliases
+        run: PR359_MIGRATION_TEST_URL="$E2E_DATABASE_URL" node --test tests/local-repository-migration.db.test.mjs
       - run: pnpm test:e2e:setup
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
