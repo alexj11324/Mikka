@@ -157,3 +157,19 @@ test('all required gates reject failed classification and skipped full jobs', ()
     }
   }
 })
+
+
+test('workflow trusted classifier temporary files load as ES modules', () => {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+    const source = readFileSync(file, 'utf8')
+    const command = /trusted="\$\((mktemp[^)]*)\)"/.exec(source)?.[1]
+    assert.ok(command, `${file}: trusted classifier launch must be present`)
+    const path = execFileSync('bash', ['-e', '-c', command], { encoding: 'utf8', env: { PATH: process.env.PATH } }).trim()
+    console.log(`Retained classifier launch evidence: ${path}`)
+    writeFileSync(path, readFileSync('scripts/ci-docs-only.mjs'))
+    const output = execFileSync(process.execPath, [path, '--base', 'HEAD', '--head', 'HEAD'], {
+      encoding: 'utf8', env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
+    })
+    assert.match(output, /docs_only=false/, 'the loaded classifier must emit the empty-range gate result')
+  }
+})
