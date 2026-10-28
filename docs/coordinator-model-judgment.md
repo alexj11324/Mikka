@@ -99,10 +99,11 @@ including when optional features are off, because full-row Drizzle reads include
 the added columns. Resource-retention, target authorization and real database
 acceptance remain prerequisites; historical Agent Kit DDL permission is not reused.
 
-`triage-batch.test.mjs` is a separate proposed native-Node offline scheduling
+`triage-batch.test.mjs` is a separate native-Node offline scheduling
 check: only Node built-ins and the production type-stripped scheduler, without
-tsx/esbuild, filesystem fixtures, DB, network or teardown. It must receive an
-independent static execution-closure review before being run. It does not establish
+tsx/esbuild, filesystem fixtures, DB, network or teardown. Its exact native Node
+execution closure received independent static review; on `c4dac112` its nine
+cases passed at 2026-10-28 22:51 UTC, with no skips or TODOs. It does not establish
 SQL fairness, provider behavior or real visual acceptance. Existing framework
 integration and PG cases remain HOLD; their assertions have not been removed to
 obtain a green result.
@@ -160,13 +161,29 @@ source has not been materialized in this checkout, so the old lock/replay findin
 is not asserted against the newer version. This change does not edit or claim
 independent acceptance of those files.
 
-The current default generative Coordinator model in `lib/coordinator/model.ts`
-is still `nvidia/nemotron-3.5-lightning-free`. Public Gateway metadata declares
-text-only input. The shared decision-model correction does not establish that
-the entire generative/tool-planning path is vision-capable. No new paid default,
-provider or credential is selected by this patch. An authorized compatible model
-configuration and real acceptance remain required before treating that whole path
-as compliant. Frozen historical selections are not silently upgraded.
+The user has selected `deepseek/deepseek-v4.1-flash` as the project default,
+using the team's existing DeepSeek BYOK configuration through Vercel AI Gateway.
+`lib/coordinator/model.ts` now selects that exact generative model. The public
+Gateway catalog declares text/image/pdf input; catalog capability is not real
+functional acceptance. Existing frozen runtime/binding selections stay unchanged,
+including compaction, and no paid fallback is added to subscription execution.
+No new model-selection decision is required from the user. The dedicated Decisions
+API still uses its existing `openai/gpt-6-luna-decisions` contract; this is separate
+from the generative default. Saving a provider BYOK key is not proof of the
+application's Gateway credential injection or a successful image request. The
+Gateway's documented default BYOK behavior can fall back to system credentials;
+provider routing and actual credential-use evidence must not be inferred from
+the model ID alone.
+
+`scripts/coordinator-vision-functional.mjs` prepares two tiny synthetic images
+entirely in memory and invokes the unchanged shared Decisions transport only
+with an explicit execution argument and an existing authorized key injection.
+No secret lookup, fixture directory, subprocess, database, tsx/esbuild, live-eval,
+external action or resource teardown is part of that script. Its scoped native
+Node resolution uses Next's existing backend marker and the actual source files.
+The script requires its own independent execution-closure review before running;
+the default dry-run makes no inference request. Two real component calls cannot
+establish deployed HTTP/auth/image persistence or database scheduling acceptance.
 
 ## Resource retention hold (2026-10-28)
 
@@ -195,5 +212,6 @@ historical execution evidence, not acceptance under the new retention rule.
 
 Installed Next, tsx and esbuild contain their own cleanup paths. The full build
 and affected test entrypoints remain HOLD; repository teardown changes do not
-prove those dependency paths are retained. No new test, SQL, provider call, CI,
-merge or deployment is justified by this source-only repair.
+prove those dependency paths are retained. The separately reviewed native
+scheduler check does not lift those holds or authorize SQL, provider calls, CI,
+merge or deployment. Retained evidence records each separately reviewed command.
