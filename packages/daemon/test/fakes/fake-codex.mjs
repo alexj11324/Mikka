@@ -34,6 +34,13 @@ let turn = 0
 let open = null
 /** The model `thread/start` named; reported when a prompt says MODEL. */
 let model = null
+let dynamicTools = []
+const hostReplies = new Map()
+const hostCall = (tool, args, foreignContext = false) => new Promise(resolve => {
+  const id = `host-tool-${randomUUID()}`
+  hostReplies.set(id, resolve)
+  send({ id, method: 'item/tool/call', params: { threadId: foreignContext ? 'another_native_thread' : threadId, turnId: open, callId: id, namespace: null, tool, arguments: args } })
+})
 
 function item(phase, value) {
   notify(`item/${phase}`, { item: value, threadId, turnId: `turn-${turn}` })
@@ -59,6 +66,30 @@ async function runTurn(text) {
     threadId,
     turn: { id: open, status: "inProgress", error: null },
   })
+  if (text.startsWith('MAILBOX_TEST ')) {
+    const results = []
+    for (const call of JSON.parse(text.slice('MAILBOX_TEST '.length))) {
+      if (call.foreignNotice) {
+        notify('turn/started', { threadId: 'foreign-thread', turn: { id: 'poison-turn', status: 'inProgress', error: null } })
+        notify('turn/completed', { threadId: 'foreign-thread', turn: { id: 'poison-turn', status: 'completed', error: null } })
+        notify('turn/completed', { threadId, turn: { id: 'stale-turn', status: 'completed', error: null } })
+      }
+      if (call.name === '__mailbox_catalog') {
+        const local = await callMcpTool(mcp, call.name, {})
+        results.push({ result: { tools: [...local.result.tools, ...dynamicTools] } })
+      } else if (dynamicTools.some(tool => tool.name === call.name)) {
+        const remote = await hostCall(call.name, call.arguments ?? {}, call.foreignContext)
+        results.push({ result: { isError: !remote.success, content: remote.contentItems.map(part => ({ type: 'text', text: part.text })) } })
+      } else results.push(await callMcpTool(mcp, call.name, call.arguments ?? {}))
+    }
+    const output = JSON.stringify({ mailboxResults: results, mcpConfig: mcp, hostControlMailbox: dynamicTools.length === 5 })
+    item('started', { type: 'agentMessage', id: `m-${turn}`, text: '' })
+    notify('item/agentMessage/delta', { threadId, turnId: open, itemId: `m-${turn}`, delta: output })
+    item('completed', { type: 'agentMessage', id: `m-${turn}`, text: output })
+    await callMcpTool(mcp, 'report_blocked', { reason: 'Synthetic mailbox wiring complete; no provider was invoked' })
+    complete()
+    return
+  }
   // `MODEL` reports the model the thread was started with, so a test can
   // prove the assignment's model reached the CLI.
   const said = text.includes("MODEL")
@@ -98,15 +129,17 @@ async function runTurn(text) {
 
 createInterface({ input: process.stdin }).on("line", async (line) => {
   const { id, method, params } = JSON.parse(line)
+  if (!method && hostReplies.has(id)) { const callback = hostReplies.get(id); hostReplies.delete(id); callback(JSON.parse(line).result); return }
   if (id === undefined) return
   switch (method) {
     case "initialize":
       return send({
         id,
-        result: { userAgent: "fake", codexHome: process.env.CODEX_HOME },
+        result: { userAgent: "codex_cli_rs/0.163.0", codexHome: process.env.CODEX_HOME },
       })
     case "thread/start":
     case "thread/resume":
+      dynamicTools = params.dynamicTools ?? []
       if (!params.cwd || params.sandbox !== "danger-full-access")
         return send({ id, error: { code: -1, message: "bad thread params" } })
       if (params.model) model = params.model

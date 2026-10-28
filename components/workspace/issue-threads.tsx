@@ -6,7 +6,7 @@ import { ChevronRight } from 'lucide-react'
 import { listIssueThreads } from '@/app/actions/agents'
 import type { IssueThread } from '@/lib/issue-threads'
 import { runListRefreshInterval, runStatusKey } from '@/lib/issue-run-conversation'
-import { LetterAvatar } from '@/components/nav/letter-avatar'
+import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { Badge } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
 import { RUN_BADGES } from './agent-citations'
@@ -20,9 +20,11 @@ export function harnessLabel(harness: string) {
   return harness === 'claude_code' ? 'Claude Code' : harness === 'codex' ? 'Codex' : harness
 }
 
-export function ThreadStatus({ status }: { status: string }) {
+export function ThreadStatus({ status, stopping = false }: { status: string; stopping?: boolean }) {
   const statusLabel = useTranslations('Coordinator.citation.runStatus')
+  const t = useTranslations('IssueThreads')
   const key = runStatusKey(status)
+  if (stopping) return <Badge variant="secondary" size="sm">{t('stopping')}</Badge>
   return <Badge variant={RUN_BADGES[status] ?? 'secondary'} size="sm">{key ? statusLabel(key) : status}</Badge>
 }
 
@@ -42,12 +44,12 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
         // The bot runs the thread; the coding agent it hands work to is a step inside it, not the runner (R-05).
         const meta = thread.detail?.summary ?? null
         const body = <>
-          <LetterAvatar name={thread.detail?.agentName ?? t('agent')} size="pill" />
+          <BotAvatar color={colorFor(thread.detail?.agentName ?? t('agent'))} size="pill" still />
           <span className="flex min-w-0 flex-1 flex-col text-left">
             <span className="truncate text-sm font-medium">{name}</span>
             {meta && <span className="truncate text-xs font-normal text-muted-foreground">{meta}</span>}
           </span>
-          <ThreadStatus status={thread.status} />
+          <ThreadStatus status={thread.status} stopping={thread.stopping} />
           <time className="w-14 shrink-0 text-right text-xs font-normal text-muted-foreground" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(new Date(thread.finishedAt ?? thread.createdAt), now)}</time>
         </>
         return <li key={thread.id}>
@@ -69,7 +71,7 @@ export function ThreadEvents({ issueId, onOpen }: { issueId: string; onOpen: (id
   return <>{[...data].reverse().map((thread: IssueThread) => {
     const name = thread.detail?.name ?? (thread.ownerName ? t('ownerThread', { name: thread.ownerName }) : t('hidden'))
     return <div key={thread.id} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-      <LetterAvatar name={thread.detail?.agentName ?? t('agent')} size="pill" />
+      <BotAvatar color={colorFor(thread.detail?.agentName ?? t('agent'))} size="pill" still />
       <span className="font-medium">{thread.detail?.agentName ?? t('agent')}</span>
       <span className="text-muted-foreground">{t('dispatched')}</span>
       {thread.detail

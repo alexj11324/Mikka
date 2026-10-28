@@ -75,6 +75,10 @@ import {
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
+import { createHostedBotRunner } from "./subscription-hosted-runner"
+import { ComputerBroker } from "./computer/broker.mjs"
+import { detectComputerDriver, executeDriver } from "./computer/driver.mjs"
+import { pollWebComputerReviews } from "./computer/web-review"
 
 export * from "./server-link"
 export { DAEMON_VERSION, daemonPaths, defaultDataDir } from "./paths"
@@ -111,6 +115,14 @@ export interface DaemonOptions {
   agentSandbox?: AgentSandbox | null
   /** Override a harness CLI binary (tests use fake CLIs). */
   harnessBinaries?: Partial<Record<"claude_code" | "codex" | "cursor", string>>
+  /** Linux-only operator mode; no native/local credential source is opened. */
+  hostedSubscriptions?: boolean
+  /** Only the trusted E2B runner is allowed to select its isolated socket. */
+  e2bContainerRuntime?: boolean
+  /** Trusted infrastructure supplies its already-listening review broker. */
+  computerBroker?: ComputerBroker
+  /** Trusted E2B mode: create a guarded broker tied to the run journal. */
+  cloudComputer?: boolean
   /** Long-poll wait for run commands, seconds (default 25; tests shorten). */
   commandsWaitSeconds?: number
   /** Called once the daemon stopped after `daemon.drain`. */
@@ -171,6 +183,8 @@ export class Daemon {
   private tick: Promise<void> = Promise.resolve()
   private draining = false
   private stopped = false
+  private stopPromise: Promise<void> | null = null
+  private starting: Promise<Daemon> | null = null
   private adapters = new Map<Harness, AgentAdapter>()
   /** Registered (or re-registered) with the server since this start. */
   private nativeCoordinator: Promise<void> | null = null
@@ -183,6 +197,9 @@ export class Daemon {
   private commandsAbort = new AbortController()
   private commandsLoop: Promise<void> = Promise.resolve()
   private fsLoop: Promise<void> = Promise.resolve()
+  private reviewAbort: AbortController | null = null
+  private reviewLoop: Promise<void> = Promise.resolve()
+  private cloudComputerBroker: ComputerBroker | null = null
   /** Messages handed to an agent whose delivery the server has not taken yet. */
   private unacked = new Set<string>()
   /** Runs this daemon already started cancelling for a stop request. */
@@ -200,6 +217,18 @@ export class Daemon {
   }
 
   async start() {
+    this.starting = this.startInternal()
+    try {
+      return await this.starting
+    } catch (error) {
+      await this.stop().catch((err: unknown) => {
+        this.log.warn({ err }, "daemon startup cleanup failed")
+      })
+      throw error
+    }
+  }
+
+  private async startInternal() {
     const { paths } = this
     mkdirSync(paths.dataDir, { recursive: true, mode: 0o700 })
     // `mode` only applies on creation; tighten a dir that already existed.
@@ -210,6 +239,7 @@ export class Daemon {
       (error) => this.onLockCompromised(error),
       { socketPath: paths.socket }
     )
+    if (this.stopped) throw new Error("daemon stopped during startup")
     const secret = this.ensureSecret()
     this.device = loadDeviceFile(readJson(paths.device))
     if (this.options.credential)
@@ -224,6 +254,38 @@ export class Daemon {
       (runId, _item, error) => this.supervisor.markUndeliverable(runId, error)
     )
     this.worktrees = new WorktreeManager(paths.worktrees)
+    // Hosted subscriptions use their dedicated container sandbox. Local
+    // adapters require the separately probed sandbox-runtime from main.
+    this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
+    if (this.stopped) throw new Error("daemon stopped during startup")
+    if (this.options.cloudComputer) {
+      if (!this.options.hostedSubscriptions || !this.options.e2bContainerRuntime || this.options.computerBroker) throw new Error("Cloud computer runtime unavailable")
+      const driver = await detectComputerDriver('/opt/mikka/computer/cua-driver')
+      if (!driver) throw new Error("Cloud computer driver unavailable")
+      this.cloudComputerBroker = new ComputerBroker({ driver, socketPath: join(paths.dataDir, 'computer.sock'),
+        permitted: runId => {
+          const entry = this.journal.get(runId)
+          return Boolean(!this.stopped && this.registered && entry?.assignment.computer && this.supervisor?.computerRunAllowed(runId))
+        },
+        execute: async (current, call, display, runId) => {
+          const entry = this.journal.get(runId)
+          const computer = entry?.assignment.computer
+          if (!computer || computer.display !== display || computer.ownerId !== entry?.assignment.subscriptionBinding?.ownerId || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
+          return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId, policyVersion: computer.policyVersion })
+        },
+      })
+    }
+    const hosted = this.options.hostedSubscriptions
+      ? await createHostedBotRunner({
+          stateDir: paths.adapterState,
+          link: this.options.link,
+          binaries: this.options.harnessBinaries,
+          ...(this.options.e2bContainerRuntime ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
+          computerBroker: this.cloudComputerBroker ?? this.options.computerBroker,
+        })
+      : undefined
+    await this.cloudComputerBroker?.listen()
+    if (this.stopped) throw new Error("daemon stopped during startup")
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([
       [
         "mock",
@@ -233,7 +295,28 @@ export class Daemon {
           speed: this.options.mockSpeed,
         }),
       ],
-      ...this.realAdapters(),
+      ...(hosted
+        ? hosted.harnesses.map(
+            (harness) =>
+              [
+                harness,
+                {
+                  harness,
+                  capabilities: {
+                    supportsInterject: true,
+                    supportsResume: false,
+                  },
+                  envAllow: [],
+                  async start() {
+                    throw new Error("subscription_binding_required")
+                  },
+                  async resume() {
+                    throw new Error("subscription_binding_required")
+                  },
+                },
+              ] as [Harness, AgentAdapter]
+          )
+        : this.realAdapters()),
     ]))
     this.supervisor = new RunSupervisor({
       journal: this.journal,
@@ -241,6 +324,35 @@ export class Daemon {
       outbox: this.outbox,
       worktrees: this.worktrees,
       adapters,
+      startSubscription: hosted?.start,
+      prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
+      bootstrap: hosted
+        ? async (worktree, repo) => {
+            if (
+              repo.setup?.copyFiles.some((path) =>
+                /(^|\/)(\.git|\.codex\/auth\.json|\.claude\/\.credentials\.json)(\/|$)/.test(
+                  path
+                )
+              )
+            )
+              throw new Error("native_credential_import_refused")
+            const result = await this.worktrees.bootstrap(
+              worktree,
+              repo.path,
+              repo.setup ? { ...repo.setup, command: undefined } : undefined
+            )
+            if (repo.setup?.approved && repo.setup.command) {
+              const checked = await hosted.command(
+                worktree,
+                repo.setup.command,
+                false,
+                30 * 60_000
+              )
+              if (checked.exitCode !== 0) throw new Error("hosted_setup_failed")
+            }
+            return result
+          }
+        : undefined,
       repos: () => this.device.repos ?? [],
       log: this.log,
       stallMs: this.options.stallMs,
@@ -250,7 +362,16 @@ export class Daemon {
         if (!this.registered||!this.device.deviceId) await this.register(this.device.credential)
         return link.validateSkillReceipt(assignment.runId,assignment.skillReceipt.id)
       },
-      verify: this.verifier(),
+      verify: hosted
+        ? (run) =>
+            hosted.command(
+              run.worktree,
+              run.command,
+              run.readOnly,
+              run.timeoutMs,
+              run.signal
+            )
+        : this.verifier(),
       publisher: {
         snapshot: ({ worktree, repo }) => snapshotTree(repo.path, worktree),
         publish: ({ runId, worktree, repo, assignment, report, tree }) =>
@@ -290,15 +411,19 @@ export class Daemon {
       log: this.log,
     })
     await this.rpc.listen()
+    if (this.stopped) throw new Error("daemon stopped during startup")
 
     // Only harnesses this daemon can drive are advertised: the server must
     // never pin a run here that no adapter would take. (A detected CLI
     // without an adapter yet is left out; the schema has no "unsupported".)
-    const detected = this.options.harnesses ?? (await detectHarnesses())
-    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({ ...info, coordinator: coordinatorCapable(info) }))
+    const detected = hosted
+      ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
+      : (this.options.harnesses ?? (await detectHarnesses()))
+    if (this.stopped) throw new Error("daemon stopped during startup")
+    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({ ...info, coordinator: hosted ? false : coordinatorCapable(info) }))
     // Runs survive restarts: pick up what the journal says was active.
     await this.supervisor.resumeAll()
-    if (this.options.quotaSource !== null) {
+    if (!hosted && this.options.quotaSource !== null) {
       this.quota = new QuotaPoller(
         this.options.quotaSource ??
           new LocalCredentialsSource({ log: this.log }),
@@ -480,21 +605,35 @@ export class Daemon {
     return acted
   }
 
-  private sandbox: AgentSandbox | null | undefined
+  private sandbox: AgentSandbox | null = null
+  private ownedSandbox: SandboxRuntime | null = null
 
   /** The agent sandbox (one per daemon), or null where there is none. */
   private agentSandbox(): AgentSandbox | null {
-    this.sandbox ??=
-      this.options.agentSandbox === undefined
-        ? SandboxRuntime.supported()
-          ? new SandboxRuntime(async ({ host }) => {
-              // Approval cards come later; an unlisted host is denied.
-              this.log.warn({ host }, "agent network request denied")
-              return false
-            })
-          : null
-        : this.options.agentSandbox
     return this.sandbox
+  }
+
+  private async createAgentSandbox(): Promise<AgentSandbox | null> {
+    if (this.options.agentSandbox !== undefined) return this.options.agentSandbox
+    if (!SandboxRuntime.supported()) {
+      this.log.warn("agent sandbox unavailable: platform or dependencies unsupported")
+      return null
+    }
+    const sandbox = new SandboxRuntime(async ({ host }) => {
+      this.log.warn({ host }, "agent network request denied")
+      return false
+    })
+    try {
+      await sandbox.probe()
+      this.ownedSandbox = sandbox
+      return sandbox
+    } catch (err) {
+      this.log.warn({ err }, "agent sandbox unavailable")
+      await sandbox.reset().catch((resetError: unknown) => {
+        this.log.warn({ err: resetError }, "agent sandbox cleanup failed")
+      })
+      return null
+    }
   }
 
   /** Verify inside the agent's sandbox; without one, only mock runs exist. */
@@ -597,7 +736,15 @@ export class Daemon {
       this.saveDevice({ deviceId })
       this.log.info({ device_id: deviceId }, "device registered")
     }
+    const computerBroker = this.cloudComputerBroker ?? this.options.computerBroker
+    if (computerBroker && !this.options.link.syncComputerReviews) throw new Error("Computer review transport unavailable")
     this.registered = true
+    if (computerBroker && !this.stopped) {
+      this.reviewAbort?.abort()
+      const abort = new AbortController()
+      this.reviewAbort = abort
+      this.reviewLoop = pollWebComputerReviews(computerBroker, deviceId, this.options.link, abort.signal)
+    }
     this.wakeCommands?.()
   }
 
@@ -628,7 +775,7 @@ export class Daemon {
       const deviceId = this.device.deviceId as string
       // Heartbeat first: lease renewal must not wait on anything else.
       const quotas = this.quota?.snapshot().quotas
-      const { leases, revoked } = await link.heartbeat(deviceId, {
+      const { leases, revoked, cloudCredential } = await link.heartbeat(deviceId, {
         harnesses: this.harnesses,
         runs: this.supervisor.heartbeatRuns(),
         worktreeDiskBytes: await this.worktrees.diskUsage(),
@@ -636,6 +783,12 @@ export class Daemon {
       })
       this.supervisor.renewLeases(leases)
       if (revoked) this.supervisor.revokeLeases(revoked)
+      if (this.options.cloudComputer && cloudCredential && this.device.credential === credential) {
+        // Persist before switching transport. Keep the current token valid
+        // through this pass; the next pass registers with the replacement.
+        this.saveDevice({ credential: cloudCredential })
+        this.registered = false
+      }
       // Work in progress leaves the machine, so another can take over.
       const checkpointRun = link.checkpointRun?.bind(link)
       if (checkpointRun) await this.supervisor.saveCheckpoints(checkpointRun)
@@ -664,6 +817,8 @@ export class Daemon {
         // sees no credential, ADR 0026).
         this.server = "unregistered"
         this.registered = false
+        this.reviewAbort?.abort()
+        this.reviewAbort = null
         this.saveDevice({ credential: undefined })
         this.log.warn("server refused the device session; sign in again")
       } else if (!(error instanceof ServerUnreachableError)) {
@@ -693,6 +848,7 @@ export class Daemon {
       await this.options.link.completeRun(runId, { stopReason: "error", report: baseReport(message) })
       throw new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
     }
+    if (assignment.computer && (!this.cloudComputerBroker || !assignment.subscriptionBinding || assignment.computer.ownerId !== assignment.subscriptionBinding.ownerId)) throw new Error('Cloud computer runtime unavailable')
     return this.supervisor.start(assignment)
   }
 
@@ -828,6 +984,8 @@ export class Daemon {
       },
       "device.setCredential": (raw) => {
         this.nativeAbort?.abort()
+        this.reviewAbort?.abort()
+        this.reviewAbort = null
         const { credential, workspaceId } =
           daemonRpc["device.setCredential"].params.parse(raw)
         // The device id is kept, in every workspace (ADR ORV-284):
@@ -843,6 +1001,8 @@ export class Daemon {
       },
       "device.clearCredential": () => {
         this.nativeAbort?.abort()
+        this.reviewAbort?.abort()
+        this.reviewAbort = null
         // Signed out in the app: stop talking to the server as that person.
         // The device id stays, so signing in again keeps the device.
         this.saveDevice({ credential: undefined })
@@ -918,19 +1078,37 @@ export class Daemon {
     }).finally(() => { this.nativeCoordinator = null; this.nativeAbort = null })
   }
 
-  async stop() {
-    if (this.stopped) return
+  stop(): Promise<void> {
+    return (this.stopPromise ??= this.stopInternal())
+  }
+
+  private async stopInternal() {
     this.stopped = true
+    await this.starting?.catch(() => undefined)
     this.nativeAbort?.abort()
     await this.nativeCoordinator
     if (this.timer) clearTimeout(this.timer)
     await this.quota?.stop()
     this.commandsAbort.abort()
+    this.reviewAbort?.abort()
+    await this.reviewLoop.catch(() => undefined)
     await this.commandsLoop.catch(() => undefined)
     await this.fsLoop.catch(() => undefined)
     await this.tick
     await this.rpc?.close()
-    await this.supervisor?.stop()
+    try {
+      await this.supervisor?.stop()
+    } finally {
+      try {
+        await this.cloudComputerBroker?.close()
+      } finally {
+        const sandbox = this.ownedSandbox
+        this.ownedSandbox = null
+        await sandbox?.reset().catch((err: unknown) => {
+          this.log.warn({ err }, "agent sandbox cleanup failed")
+        })
+      }
+    }
     await this.outbox?.close()
     const release = this.releaseLock
     this.releaseLock = null

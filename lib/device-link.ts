@@ -1,7 +1,9 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { cloudDeviceScopeAllows } from '@/lib/device-token-scope'
+import { z } from 'zod'
 import { agentRuns, deviceTokens, devices, runMessages } from '@/lib/db/schema'
 import type { RunCommand } from '@mikka/protocol/device'
 
@@ -29,6 +31,8 @@ export function hashDeviceToken(token: string): string {
 export interface DeviceCaller {
   userId: string
   tokenId: string
+  scopeDeviceId?: string
+  scopeWorkspaceId?: string
 }
 
 /**
@@ -41,17 +45,29 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
   const token = header.slice('Bearer '.length).trim()
   if (!token) return null
   const [row] = await db
-    .select({ id: deviceTokens.id, userId: deviceTokens.userId, lastUsedAt: deviceTokens.lastUsedAt })
+    .select({ id: deviceTokens.id, userId: deviceTokens.userId, lastUsedAt: deviceTokens.lastUsedAt, boundDeviceId: deviceTokens.boundDeviceId, boundWorkspaceId: deviceTokens.boundWorkspaceId, expiresAt: deviceTokens.expiresAt })
     .from(deviceTokens)
     .where(and(eq(deviceTokens.tokenHash, hashDeviceToken(token)), isNull(deviceTokens.revokedAt)))
     .limit(1)
   if (!row) return null
+  if (row.expiresAt && row.expiresAt.getTime() <= Date.now()) return null
+  if (row.boundDeviceId || row.boundWorkspaceId) {
+    if (!row.boundDeviceId || !row.boundWorkspaceId || !row.expiresAt) return null
+    const machine = await pool.query('SELECT 1 FROM cloud_machines m JOIN devices d ON d.id=m."deviceId" WHERE m."deviceId"=$1 AND m."workspaceId"=$2 AND m."ownerId"=$3 AND d."ownerId"=$3 AND d.kind=$4', [row.boundDeviceId, row.boundWorkspaceId, row.userId, 'cloud'])
+    if (!machine.rowCount) return null
+    const allowed = await cloudDeviceScopeAllows(request, row.boundDeviceId, async (runId, deviceId) => {
+      if (!z.uuid().safeParse(runId).success) return false
+      const [run] = await db.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, row.userId), eq(agentRuns.deviceId, deviceId))).limit(1)
+      return Boolean(run)
+    })
+    if (!allowed) return null
+  }
   // A daemon polls every few seconds; one write a minute is enough to show
   // that a token is still in use.
   if (!row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > 60_000) {
     await db.update(deviceTokens).set({ lastUsedAt: new Date() }).where(eq(deviceTokens.id, row.id))
   }
-  return { userId: row.userId, tokenId: row.id }
+  return { userId: row.userId, tokenId: row.id, ...(row.boundDeviceId && row.boundWorkspaceId ? { scopeDeviceId: row.boundDeviceId, scopeWorkspaceId: row.boundWorkspaceId } : {}) }
 }
 
 export async function ownedDevice(deviceId: string, userId: string) {

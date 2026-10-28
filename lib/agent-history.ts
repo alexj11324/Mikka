@@ -18,4 +18,6 @@ export function sessionPreview(completion: string | null | undefined, prompt: st
 }
 
 export type SavedAgentTurn = { id: string; prompt: string; completion: string; status: 'pending' | 'complete' | 'failed' | 'stopped'; error: string | null }
-export type AgentHistory = { sessions: SavedAgentSession[]; sessionId: string | null; turns: SavedAgentTurn[] }
+/** Optional while clients and servers roll forward independently. The current GET
+ * returns the selected owner's title even when it is outside the recent list. */
+export type AgentHistory = { sessions: SavedAgentSession[]; sessionId: string | null; selectedSession?: { id: string; title: string } | null; turns: SavedAgentTurn[] }

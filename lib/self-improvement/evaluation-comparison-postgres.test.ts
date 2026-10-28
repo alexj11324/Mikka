@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool } from 'pg'
+import { projectionTestTarget } from './testing/projection-target'
 import { createSkillComparisonCollector } from './comparison-collector'
 import { createRegisteredSkillEvaluator } from './registered-evaluation'
 import { createSkillEvaluations } from './evaluations'
@@ -36,10 +37,7 @@ const DDL = [
   'CREATE TRIGGER evaluation_result_immutable BEFORE UPDATE OR DELETE ON improvement_evaluation_results FOR EACH ROW EXECUTE FUNCTION reject_comparison_rewrite()',
 ]
 test('retained PG17/HTTP handler: actual evaluation snapshots, pending, immutable replay and current lineage', {timeout:30000},async t=>{
-  assert.ok(process.env.SKILL_COMPARISON_TEST_URL,'Explicit dedicated local projection target required; this test never silently skips')
-  const target=new URL(process.env.SKILL_COMPARISON_TEST_URL)
-  assert.ok(['127.0.0.1','localhost','[::1]'].includes(target.hostname));assert.equal(target.pathname,'/mikka_improvement')
-  assert.equal(target.port,'55439');assert.equal(target.username,'improvement');assert.equal(target.password,'');assert.equal(target.search,'')
+  const target=projectionTestTarget(process.env)
   const schema=`skill_model_comparison_${randomUUID().replaceAll('-','')}`
   const admin=new Pool({connectionString:target.toString(),max:1})
   const pools:Pool[]=[]

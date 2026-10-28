@@ -123,5 +123,7 @@ export const reconcileFactoryRuns = createFactoryReconciler(
   factoryQuestions,
 );
 
-import { createExecutionClaim } from "./execution-claim";
+import { createExecutionClaim, createExecutionClaimGuard } from "./execution-claim";
 export const claimExecutionRun = createExecutionClaim(pool, authorize);
+
+export const guardExecutionRun=createExecutionClaimGuard(authorize);

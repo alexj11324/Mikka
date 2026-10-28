@@ -1,7 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
@@ -11,22 +11,17 @@ import {
   agents, agentRuns, deviceRepos, deviceTokens, devices, issueMembers, runChunks, runMessages, users,
   SUPPORTED_HARNESSES, type SupportedHarness,
 } from '@/lib/db/schema'
-import {
-  DEVICE_ONLINE_WINDOW_MS,
-  hashDeviceToken,
-  newDeviceToken,
-} from '@/lib/device-link'
+import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/device-link'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
-import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns, type RunDetail, type RunView } from '@/lib/agent-runs'
+import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, type IssueThread } from '@/lib/issue-threads'
+import { runIsActive } from '@/lib/issue-run-conversation'
 import type { HarnessInfo } from '@mikka/protocol/harness'
-import type { DispatchInput, DispatchResult } from '@/lib/run-dispatch'
-import { githubRepository } from '@/lib/self-improvement/source'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -65,66 +60,32 @@ export interface AgentView {
   deviceName: string | null
 }
 
-export type { RunDetail, RunView } from '@/lib/agent-runs'
-
 /** Every device this person owns, with the repos agents may work in. */
 export async function listDevices(): Promise<DeviceView[]> {
   const userId = await getUserId()
-  const rows = await db
-    .select()
-    .from(devices)
-    .where(eq(devices.ownerId, userId))
-    .orderBy(desc(devices.lastSeenAt))
+  const rows = await db.select().from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'))).orderBy(desc(devices.lastSeenAt))
   const repos = rows.length
-    ? await db
-        .select()
-        .from(deviceRepos)
-        .where(
-          inArray(
-            deviceRepos.deviceId,
-            rows.map((row) => row.id),
-          ),
-        )
+    ? await db.select().from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []
-  return rows.map((device) => ({
-    id: device.id,
-    name: device.name,
-    hostname: device.hostname,
-    platform: device.platform,
-    arch: device.arch,
-    harnesses: device.harnesses,
-    lastSeenAt: device.lastSeenAt,
-    enabled: device.enabled,
-    online: device.lastSeenAt
-      ? Date.now() - device.lastSeenAt.getTime() < DEVICE_ONLINE_WINDOW_MS
-      : false,
-    repos: repos
-      .filter((repo) => repo.deviceId === device.id)
-      .map((repo) => ({
-        id: repo.id,
-        repoPath: repo.repoPath,
-        baseBranch: repo.baseBranch,
-        verifyCommand: repo.verifyCommand,
-      })),
+  return rows.map(device => ({
+    id: device.id, name: device.name, hostname: device.hostname, platform: device.platform, arch: device.arch,
+    harnesses: device.harnesses, lastSeenAt: device.lastSeenAt, enabled: device.enabled,
+    online: device.lastSeenAt ? Date.now() - device.lastSeenAt.getTime() < DEVICE_ONLINE_WINDOW_MS : false,
+    repos: repos.filter(repo => repo.deviceId === device.id).map(repo => ({
+      id: repo.id, repoPath: repo.repoPath, baseBranch: repo.baseBranch, verifyCommand: repo.verifyCommand,
+    })),
   }))
 }
 
 /** Mints a device token. The plaintext is returned once and never stored. */
-export async function createDeviceToken(input: {
-  name: string
-}): Promise<ActionResult<{ token: string }>> {
+export async function createDeviceToken(input: { name: string }): Promise<ActionResult<{ token: string }>> {
   return runAction(async () => {
     const userId = await getUserId()
-    const parsed = z
-      .object({ name: z.string().trim().max(60) })
-      .safeParse(input)
+    const parsed = z.object({ name: z.string().trim().max(60) }).safeParse(input)
     if (!parsed.success) return { error: 'deviceNameTooLong' }
     const token = newDeviceToken()
     await db.insert(deviceTokens).values({
-      id: crypto.randomUUID(),
-      userId,
-      name: parsed.data.name,
-      tokenHash: hashDeviceToken(token),
+      id: crypto.randomUUID(), userId, name: parsed.data.name, tokenHash: hashDeviceToken(token),
     })
     return { token }
   })
@@ -140,22 +101,14 @@ export interface SshHostView {
  * Whether the orchestrator may dispatch runs to this device. Off keeps the
  * device registered and visible; it simply gets no work.
  */
-export async function setDeviceEnabled(input: {
-  deviceId: string
-  enabled: boolean
-}): Promise<ActionResult<{ success: true }>> {
+export async function setDeviceEnabled(input: { deviceId: string; enabled: boolean }): Promise<ActionResult<{ success: true }>> {
   return runAction(async () => {
     const userId = await getUserId()
-    const parsed = z
-      .object({ deviceId: z.uuid(), enabled: z.boolean() })
-      .safeParse(input)
+    const parsed = z.object({ deviceId: z.uuid(), enabled: z.boolean() }).safeParse(input)
     if (!parsed.success) return { error: 'deviceNotFound' }
-    await db
-      .update(devices)
+    await db.update(devices)
       .set({ enabled: parsed.data.enabled, updatedAt: new Date() })
-      .where(
-        and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId)),
-      )
+      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId)))
     return { success: true }
   })
 }
@@ -166,78 +119,39 @@ export async function listLocalSshHosts(): Promise<SshHostView[]> {
   return listSshHosts()
 }
 
-export async function addDeviceRepo(input: {
-  deviceId: string
-  repoPath: string
-  remoteUrl: string
-  baseBranch: string
-  verifyCommand: string
-}): Promise<void> {
+export async function addDeviceRepo(input: { deviceId: string; repoPath: string; baseBranch: string; verifyCommand: string }): Promise<void> {
   const userId = await getUserId()
-  const parsed = z
-    .object({
-      deviceId: z.uuid(),
-      repoPath: z.string().trim().min(1).max(4000).startsWith('/'),
-      remoteUrl: z.string().trim().min(1).max(2000),
-      baseBranch: z.string().trim().min(1).max(200),
-      verifyCommand: z.string().trim().max(2000),
-    })
-    .safeParse(input)
+  const parsed = z.object({
+    deviceId: z.uuid(),
+    repoPath: z.string().trim().min(1).max(4000).startsWith('/'),
+    baseBranch: z.string().trim().min(1).max(200),
+    verifyCommand: z.string().trim().max(2000),
+  }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('repoPathInvalid')
-  let remoteUrl: string
-  try { remoteUrl = githubRepository(parsed.data.remoteUrl) } catch { throw new ActionFailureError('repoPathInvalid') }
-  const response = await fetch(`https://api.github.com/repos/${remoteUrl.slice('https://github.com/'.length)}`, { headers: { Accept: 'application/vnd.github+json' }, redirect: 'error', signal: AbortSignal.timeout(10000) })
-  if (!response.ok) throw new ActionFailureError('repoPathInvalid')
-  const metadata = await response.json()
-  if (metadata.private !== false || metadata.full_name?.toLowerCase() !== remoteUrl.slice('https://github.com/'.length).toLowerCase()) throw new ActionFailureError('repoPathInvalid')
-  const [device] = await db
-    .select({ id: devices.id, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt })
-    .from(devices)
-    .where(
-      and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId)),
-    )
-    .limit(1)
-  if (!device || !device.enabled || !device.lastSeenAt || Date.now() - device.lastSeenAt.getTime() >= DEVICE_ONLINE_WINDOW_MS) throw new ActionFailureError('deviceNotFound')
-  const inserted = await db
-    .insert(deviceRepos)
-    .values({
-      id: crypto.randomUUID(),
-      deviceId: device.id,
-      userId,
-      repoPath: parsed.data.repoPath,
-      remoteUrl,
-      baseBranch: parsed.data.baseBranch,
-      verifyCommand: parsed.data.verifyCommand || null,
-    })
-    .onConflictDoNothing().returning({ id: deviceRepos.id })
-  if (!inserted.length) throw new ActionFailureError('repoPathInvalid')
+  const [device] = await db.select({ id: devices.id }).from(devices)
+    .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId))).limit(1)
+  if (!device) throw new ActionFailureError('deviceNotFound')
+  await db.insert(deviceRepos).values({
+    id: crypto.randomUUID(), deviceId: device.id, userId,
+    repoPath: parsed.data.repoPath, baseBranch: parsed.data.baseBranch,
+    verifyCommand: parsed.data.verifyCommand || null,
+  }).onConflictDoNothing()
 }
 
 export async function removeDeviceRepo(id: string): Promise<void> {
   const userId = await getUserId()
   const parsed = z.uuid().safeParse(id)
   if (!parsed.success) throw new ActionFailureError('repoNotFound')
-  await db
-    .delete(deviceRepos)
-    .where(and(eq(deviceRepos.id, parsed.data), eq(deviceRepos.userId, userId)))
+  await db.delete(deviceRepos).where(and(eq(deviceRepos.id, parsed.data), eq(deviceRepos.userId, userId)))
 }
 
 export async function listAgents(): Promise<AgentView[]> {
   const userId = await getUserId()
-  const rows = await db
-    .select({
-      id: agents.id,
-      name: agents.name,
-      description: agents.description,
-      instructions: agents.instructions,
-      harness: agents.harness,
-      deviceId: agents.deviceId,
-      deviceName: devices.name,
-    })
-    .from(agents)
-    .leftJoin(devices, eq(devices.id, agents.deviceId))
-    .where(eq(agents.userId, userId))
-    .orderBy(asc(agents.name))
+  const rows = await db.select({
+    id: agents.id, name: agents.name, description: agents.description, instructions: agents.instructions,
+    harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name,
+  }).from(agents).leftJoin(devices, eq(devices.id, agents.deviceId))
+    .where(and(eq(agents.userId, userId), sql`not exists (select 1 from bot_cloud_runtimes bcr where bcr."agentId" = ${agents.id})`)).orderBy(asc(agents.name))
   return rows
 }
 
@@ -249,12 +163,8 @@ const agentInput = z.object({
   instructions: z.string().trim().max(4000),
 })
 
-function agentValidationCode(
-  error: z.ZodError,
-): 'validationNameRequired' | 'validationGeneric' {
-  return error.issues[0]?.path[0] === 'name'
-    ? 'validationNameRequired'
-    : 'validationGeneric'
+function agentValidationCode(error: z.ZodError): 'validationNameRequired' | 'validationGeneric' {
+  return error.issues[0]?.path[0] === 'name' ? 'validationNameRequired' : 'validationGeneric'
 }
 
 /**
@@ -262,61 +172,37 @@ function agentValidationCode(
  * be one the device actually reports as installed — the daemon's own
  * detection decides what can be added.
  */
-export async function createAgent(
-  input: z.infer<typeof agentInput>,
-): Promise<{ id: string }> {
+export async function createAgent(input: z.infer<typeof agentInput>): Promise<{ id: string }> {
   const userId = await getUserId()
   const parsed = agentInput.safeParse(input)
-  if (!parsed.success)
-    throw new ActionFailureError(agentValidationCode(parsed.error))
-  const device = await ownedDeviceWithHarness(
-    parsed.data.deviceId,
-    parsed.data.harness,
-    userId,
-  )
+  if (!parsed.success) throw new ActionFailureError(agentValidationCode(parsed.error))
+  const device = await ownedDeviceWithHarness(parsed.data.deviceId, parsed.data.harness, userId)
   if (!device) throw new ActionFailureError('agentHarnessMissing')
   const id = crypto.randomUUID()
   try {
     await db.insert(agents).values({ id, userId, ...parsed.data })
   } catch (error) {
     // 23505 is the name unique index; anything else is a real failure.
-    if ((error as { code?: string }).code === '23505')
-      throw new ActionFailureError('agentDuplicateName')
+    if ((error as { code?: string }).code === '23505') throw new ActionFailureError('agentDuplicateName')
     throw new ActionFailureError('agentAddFailed')
   }
   return { id }
 }
 
-export async function updateAgent(input: {
-  id: string
-  name: string
-  description: string
-  instructions: string
-}): Promise<void> {
+export async function updateAgent(input: { id: string; name: string; description: string; instructions: string }): Promise<void> {
   const userId = await getUserId()
-  const parsed = z
-    .object({
-      id: z.uuid(),
-      name: z.string().trim().min(1).max(60),
-      description: z.string().trim().max(200),
-      instructions: z.string().trim().max(4000),
-    })
-    .safeParse(input)
-  if (!parsed.success)
-    throw new ActionFailureError(agentValidationCode(parsed.error))
+  const parsed = z.object({
+    id: z.uuid(), name: z.string().trim().min(1).max(60),
+    description: z.string().trim().max(200), instructions: z.string().trim().max(4000),
+  }).safeParse(input)
+  if (!parsed.success) throw new ActionFailureError(agentValidationCode(parsed.error))
   try {
-    await db
-      .update(agents)
-      .set({
-        name: parsed.data.name,
-        description: parsed.data.description,
-        instructions: parsed.data.instructions,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(agents.id, parsed.data.id), eq(agents.userId, userId)))
+    await db.update(agents).set({
+      name: parsed.data.name, description: parsed.data.description,
+      instructions: parsed.data.instructions, updatedAt: new Date(),
+    }).where(and(eq(agents.id, parsed.data.id), eq(agents.userId, userId)))
   } catch (error) {
-    if ((error as { code?: string }).code === '23505')
-      throw new ActionFailureError('agentDuplicateName')
+    if ((error as { code?: string }).code === '23505') throw new ActionFailureError('agentDuplicateName')
     throw new ActionFailureError('agentSaveFailed')
   }
 }
@@ -325,37 +211,14 @@ export async function deleteAgent(id: string): Promise<void> {
   const userId = await getUserId()
   const parsed = z.uuid().safeParse(id)
   if (!parsed.success) throw new ActionFailureError('agentNotFound')
-  await db
-    .delete(agents)
-    .where(and(eq(agents.id, parsed.data), eq(agents.userId, userId)))
+  await db.delete(agents).where(and(eq(agents.id, parsed.data), eq(agents.userId, userId)))
 }
 
-async function ownedDeviceWithHarness(
-  deviceId: string,
-  harness: SupportedHarness,
-  userId: string,
-) {
-  const [device] = await db
-    .select()
-    .from(devices)
-    .where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId)))
-    .limit(1)
-  if (!device || !device.enabled || !device.lastSeenAt || Date.now() - device.lastSeenAt.getTime() >= DEVICE_ONLINE_WINDOW_MS) return null
-  return device.harnesses.some(
-    (info) => info.harness === harness && info.installed,
-  )
-    ? device
-    : null
-}
-
-/** Queues one run of one agent against one issue. */
-export async function startRun(input: DispatchInput): Promise<DispatchResult> {
-  return queueRun(await getUserId(), input)
-}
-
-export async function listRuns(issueId: string): Promise<RunView[]> {
-  const userId = await getUserId()
-  return visibleRuns(userId, { issueId })
+async function ownedDeviceWithHarness(deviceId: string, harness: SupportedHarness, userId: string) {
+  const [device] = await db.select().from(devices)
+    .where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId))).limit(1)
+  if (!device) return null
+  return device.harnesses.some(info => info.harness === harness && info.installed) ? device : null
 }
 
 /** Who currently collaborates on the issue (R-26): they see that its threads exist. */
@@ -379,9 +242,8 @@ async function issueThreadAccess(issueId: string) {
 
 const threadColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt,
-  report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
-  sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, stopRequestedAt: agentRuns.stopRequestedAt,
-  agentName: agents.name, harness: agents.harness, ownerName: users.name,
+  sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
+  agentName: sql<string>`coalesce((select b.name from computer_run_bindings crb join bots b on b.id=crb."botId" and b."ownerId"=crb."ownerId" where crb."runId"=${agentRuns.id}), ${agents.name})`, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt,
 }
 
 /** The issue's threads, as much of each as this viewer may see (R-62). */
@@ -404,7 +266,8 @@ async function readableThread(issueId: string, runId: string) {
 }
 
 export interface IssueThreadDetail {
-  thread: IssueThread & { prompt: string; feedbackEligible: boolean }
+  /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
+  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
 }
@@ -418,10 +281,8 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
   const [thread] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
-  const eligible = !!row.deviceRepoId && !!row.sessionId && !!row.finishedAt && !row.stopRequestedAt && ['succeeded', 'failed'].includes(row.status)
-  const repo = eligible ? await db.select({ id: deviceRepos.id }).from(deviceRepos).where(and(eq(deviceRepos.id, row.deviceRepoId!), eq(deviceRepos.userId, user.id))).limit(1) : []
   return {
-    thread: { ...thread, prompt: row.prompt, feedbackEligible: repo.length > 0 },
+    thread: { ...thread, prompt: row.prompt, stopRequestedAt: row.stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
   }
@@ -429,12 +290,15 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
 export async function sendIssueThreadMessage(input: { issueId: string; runId: string; text: string }): Promise<void> {
-  await readableThread(input.issueId, input.runId)
-  await sendRunMessage({ runId: input.runId, text: input.text })
-}
-
-export async function getRun(runId: string): Promise<RunDetail | null> {
-  return readRun(await getUserId(), runId)
+  const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
+  if (!text.success) throw new ActionFailureError('messageRequired')
+  const { row, user } = await readableThread(input.issueId, input.runId)
+  if(runIsActive(row.status))return addRunMessage(user.id,{runId:row.id,text:text.data})
+  const requestHeaders=await headers()
+  if(requestHeaders.has('authorization')||!requestHeaders.get('cookie'))throw new ActionFailureError('authRequired')
+  const session=await auth.api.getSession({headers:requestHeaders,query:{disableCookieCache:true}})
+  if(!session?.user||session.user.id!==user.id)throw new ActionFailureError('authRequired')
+  await addRunMessage(user.id,{runId:row.id,text:text.data},{source:'human',sessionId:session.session.id})
 }
 
 /**
@@ -450,25 +314,6 @@ export async function getThreadName(runId: string): Promise<string | null> {
   if (source?.kind !== 'run' || !source.issue) return null
   const key = source.issue.identifier ?? (source.issue.number === null ? null : `#${source.issue.number}`)
   return key ? `${key} ${source.issue.title}` : source.issue.title
-}
-
-/** A message a person sends the running agent; the daemon delivers it. */
-export async function sendRunMessage(input: {
-  runId: string
-  text: string
-}): Promise<void> {
-  const requestHeaders = await headers()
-  if (requestHeaders.has('authorization') || !requestHeaders.get('cookie'))
-    throw new ActionFailureError('authRequired')
-  const session = await auth.api.getSession({
-    headers: requestHeaders,
-    query: { disableCookieCache: true },
-  })
-  if (!session?.user) throw new ActionFailureError('authRequired')
-  await addRunMessage(session.user.id, input, {
-    source: 'human',
-    sessionId: session.session.id,
-  })
 }
 
 /** Asks the daemon to stop the run; it repeats until the run has ended. */

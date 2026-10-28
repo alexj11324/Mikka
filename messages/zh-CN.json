@@ -1,43 +1,4 @@
 {
-  "DeviceSetup": {
-    "title": "设置 {device}",
-    "description": "填写此设备上的仓库和公开 GitHub 远程地址。设备运行前会检查 Git origin。",
-    "path": "本地仓库路径",
-    "remote": "公开 GitHub 远程地址",
-    "branch": "基础分支",
-    "verify": "验证命令",
-    "addRepo": "添加仓库",
-    "repoSaved": "已添加仓库",
-    "repoError": "无法添加仓库，请检查路径、公开 GitHub 地址和设备连接。",
-    "agentName": "Agent 名称",
-    "harness": "已安装的执行器",
-    "chooseHarness": "选择执行器",
-    "addAgent": "添加 Agent",
-    "agentSaved": "已添加 Agent",
-    "agentError": "无法添加 Agent，请检查名称和设备连接。"
-  },
-  "SelfImprovement": {
-    "resume": "继续启用",
-    "activate": "启用已批准的 Skill",
-    "activated": "已记录启用",
-    "feedback": "反馈",
-    "feedbackNote": "补充说明（可选）",
-    "positive": "有帮助",
-    "negative": "需要改进",
-    "saved": "反馈已保存",
-    "error": "操作未完成，请重试。",
-    "candidates": "Skill 候选版本",
-    "review": "查看候选版本",
-    "candidate": "候选指令",
-    "evaluation": "评估",
-    "evidence": "审查和验证证据",
-    "environment": "启用环境",
-    "chooseEnvironment": "选择环境",
-    "preview": "预览",
-    "production": "生产",
-    "approve": "批准启用",
-    "approved": "已记录批准"
-  },
   "Common": {
     "close": "关闭",
     "cancel": "取消",
@@ -168,7 +129,12 @@
     "rail": "主导航",
     "conversations": "对话",
     "board": "看板",
-    "collapseList": "收起对话列表",
+    "collapseList": "收起 Bot 列表",
+    "bots": "Bot",
+    "newBot": "新建 Bot",
+    "writingWelcome": "正在写欢迎语…",
+    "answerBot": "输入你的回答，或聊点别的",
+    "messageBot": "给 {name} 发消息",
     "newConversation": "新对话",
     "pinned": "已置顶",
     "untitledConversation": "未命名对话",
@@ -726,7 +692,6 @@
     "editorAria": "{label}编辑器"
   },
   "Devices": {
-    "setup": "设置仓库和 Agent",
     "otherDevices": "Remote control",
     "menu": "{name} 的更多操作",
     "add": {
@@ -824,7 +789,8 @@
       "daemonRunning": "daemon 已在后台运行",
       "heartbeatTimeout": "等待心跳超时，请查看 ~/.mikka/daemon.log",
       "connectionError": "连接过程出错"
-    }
+    },
+    "setup": "设置仓库和 Agent"
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
@@ -965,6 +931,7 @@
     "deviceNotFound": "设备不存在。",
     "agentHarnessMissing": "这台设备上没有检测到该 harness。",
     "agentDuplicateName": "已有同名 Agent，请换一个名称。",
+    "botDuplicateName": "已有同名 Bot，请换一个名字。",
     "agentInvalidInput": "请检查填写内容。",
     "agentAddFailed": "添加失败，请重试。",
     "agentSaveFailed": "保存失败，请重试。",
@@ -974,12 +941,10 @@
     "repoPathInvalid": "仓库路径需要是绝对路径。",
     "repoNotFound": "仓库不存在。",
     "runInvalid": "运行参数不正确。",
-    "runAlreadyActive": "此任务已有正在执行的线程。",
-    "runDispatchKeyConflict": "此请求标识已用于不同的运行参数。",
     "runNotFound": "运行不存在。",
-    "runNotActive": "此运行已结束，且没有可回答的问题。",
-    "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。",
+    "artifactNotFound": "找不到这个成果。",
     "messageRequired": "消息不能为空。",
+    "submissionConflict": "此提交标识已用于另一条消息。",
     "pendingActionUnavailable": "这项操作已处理或已过期。",
     "deviceSaveFailed": "保存失败，请重试。",
     "tokenCreateFailed": "生成 token 失败，请重试。",
@@ -1042,7 +1007,11 @@
     "inviteExpired": "邀请已失效，请向管理员索取新的链接。",
     "workspaceMembershipSuspended": "成员资格已停用，请联系管理员恢复。",
     "inviteInvalidEmails": "邮箱地址无效、为空或数量过多，请检查后重试。",
-    "workspaceReadFailed": "无法读取工作区设置，请稍后重试。"
+    "workspaceReadFailed": "无法读取工作区设置，请稍后重试。",
+    "runAlreadyActive": "此任务已有正在执行的线程。",
+    "runDispatchKeyConflict": "此请求标识已用于不同的运行参数。",
+    "runNotActive": "此运行已结束，且没有可回答的问题。",
+    "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。"
   },
   "Overview": {
     "sections": {
@@ -1521,6 +1490,9 @@
         "title": "个人资料",
         "description": "查看你在工作区中的账户信息。"
       },
+      "memory": {
+        "title": "记忆"
+      },
       "account": {
         "title": "账户",
         "description": "管理登录 Mikka 的方式。"
@@ -1564,6 +1536,24 @@
       "notSet": "未设置",
       "readOnly": "账户信息为只读，当前版本暂不支持在此修改。"
     },
+    "memory": {
+      "enabled": "使用记忆",
+      "learn": "从已连接的 App 中学习",
+      "error": "无法更新记忆",
+      "empty": "暂无记忆",
+      "correct": "更正",
+      "delete": "删除",
+      "kinds": {
+        "interest": "兴趣",
+        "routine": "习惯",
+        "place": "地点",
+        "subscription": "订阅",
+        "deadline": "截止日期",
+        "tool": "工具",
+        "person": "常联系的人",
+        "preference": "偏好"
+      }
+    },
     "workspaceForm": {
       "id": "工作区 ID",
       "readOnlyNote": "当前工作区信息为只读。切换或新建工作区，请返回应用后点击左上角的工作区名称。",
@@ -1573,6 +1563,16 @@
       "urlHelp": "URL 中的标识用于访问工作区。修改地址会影响现有链接。",
       "previewNote": "表单预览：尚未连接工作区存储，修改不会保存。",
       "previewLabel": "工作区表单预览"
+    },
+    "computerPolicy": {
+      "heading": "云电脑",
+      "description": "控制工作区内的 Bot 是否可以操作电脑。",
+      "label": "Bot 操作电脑",
+      "help": "禁止后，电脑任务会停止，已有授权也会失效。你仍然可以接管电脑。",
+      "adminOnly": "只有工作区管理员可以修改此设置。",
+      "ask": "操作前审批",
+      "deny": "禁止",
+      "error": "无法读取或更新电脑设置。"
     },
     "issuePrefix": {
       "title": "个人任务编号",
@@ -1610,6 +1610,32 @@
       "loadError": "无法加载 Linear 设置。",
       "operationError": "Linear 同步操作失败，请重试。",
       "teamAlreadyLinked": "此 Linear 团队已连接到另一个 Mikka 账号。"
+    },
+    "subscriptions": {
+      "heading": "订阅",
+      "description": "连接你自己的订阅，供此工作区中获授权的 Bot 任务使用。",
+      "codex": "ChatGPT / Codex",
+      "claude": "Claude",
+      "providerDescription": "在服务商的网站登录并同意授权。",
+      "unavailable": "此连接暂不可用。",
+      "connected": "已连接",
+      "notConnected": "未连接",
+      "connect": "连接",
+      "connectAnother": "连接另一个",
+      "reconnect": "重新连接",
+      "disconnect": "断开连接",
+      "deviceInstructions": "打开服务商页面并输入以下代码。请保持此页面打开，Mikka 会检查连接状态。",
+      "callbackInstructions": "打开服务商页面并同意授权。如果浏览器最后停在 localhost 回调页面，请将地址栏中的完整地址粘贴到下方。",
+      "callbackLabel": "回调页面地址",
+      "openProvider": "打开服务商页面",
+      "finish": "完成连接",
+      "close": "关闭",
+      "expired": "连接已过期，请重新开始。",
+      "loadFailed": "无法加载订阅设置。",
+      "connectionFailed": "无法完成连接，请重新开始。",
+      "disconnectFailed": "无法断开订阅连接。",
+      "connectedNotice": "订阅已连接。",
+      "disconnectedNotice": "已从 Mikka 断开。你可能还需要在服务商网站撤销授权。"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",
@@ -2033,8 +2059,10 @@
     "unknownClient": "一个未命名的应用"
   },
   "Coordinator": {
+    "stop": "停止",
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
+    "conversationWith": "与 {name} 的对话",
     "usedTools": "调用了 {tools}",
     "pendingActions": {
       "label": "等你确认",
@@ -2064,6 +2092,7 @@
     "loadError": "对话加载失败，正在重试。",
     "failedTitle": "上一次回复失败了",
     "input": "给 Coordinator 发消息",
+    "inputTo": "给 {name} 发消息",
     "placeholder": "让 Coordinator 开始处理一个 issue…",
     "send": "发送",
     "citation": {
@@ -2340,8 +2369,10 @@
     "started": "开始于 {time}",
     "steps": "交给 {harness} · 执行了 {count} 步",
     "composer": "告诉 {agent} 下一步做什么…",
-    "send": "发送",
-    "sendFailed": "没发出去，草稿还在"
+    "sendFailed": "没发出去，草稿还在",
+    "stopping": "正在停止…",
+    "stopFailed": "没停下来，再试一次",
+    "send": "发送"
   },
   "Computer": {
     "status": {
@@ -2381,6 +2412,13 @@
       "handbackFailed": "没能交还，请重试。"
     },
     "approval": {
+      "action": {
+        "click": "点击屏幕",
+        "type": "输入文字",
+        "key": "按键",
+        "scroll": "滚动",
+        "screenshot": "查看屏幕"
+      },
       "allowRun": "本任务内都允许",
       "deny": "拒绝",
       "allow": "允许",
@@ -2388,11 +2426,62 @@
     }
   },
   "Shell": {
+    "threads": {
+      "title": "线程",
+      "empty": "还没有线程",
+      "untitled": "未命名线程",
+      "waiting": "等你回复",
+      "failed": "失败",
+      "screen": "屏幕"
+    },
+    "newBot": {
+      "title": "新建 Bot",
+      "description": "给 Bot 起名，选一个形状和颜色。",
+      "name": "名字",
+      "namePlaceholder": "名字",
+      "color": "颜色",
+      "colors": {
+        "encre": "墨色",
+        "brun": "棕色",
+        "rouge": "红色",
+        "orange": "橙色",
+        "ambre": "琥珀色",
+        "vert": "绿色",
+        "turquoise": "青色",
+        "bleu": "蓝色",
+        "violet": "紫色",
+        "rose": "粉色",
+        "gris": "灰色",
+        "creme": "奶油色"
+      },
+      "shape": "形状",
+      "shapes": {
+        "cercle": "圆形",
+        "galet": "卵石",
+        "squircle": "圆角方",
+        "capsule": "胶囊",
+        "triangle": "三角",
+        "hexagone": "六边形",
+        "nuage": "云朵",
+        "goutte": "水滴",
+        "coeur": "爱心",
+        "etoile": "星星",
+        "fleur": "花",
+        "chat": "猫",
+        "champignon": "蘑菇",
+        "fantome": "幽灵",
+        "feuille": "叶子",
+        "ecran": "屏幕"
+      },
+      "create": "创建",
+      "creating": "正在创建…"
+    },
     "searchPlaceholder": "搜索对话、任务、Agent、知识库",
     "searchLabel": "全局搜索",
     "searchDescription": "搜索对话、任务和项目，用方向键选择，按 Enter 打开。",
     "searchEmpty": "没有匹配的结果",
     "groups": {
+      "bots": "Bot",
       "conversations": "对话",
       "tasks": "任务",
       "projects": "项目",
@@ -2400,7 +2489,7 @@
     },
     "newTask": "新建任务",
     "newConversation": "新对话",
-    "openList": "展开对话列表",
+    "openList": "展开 Bot 列表",
     "back": "后退",
     "forward": "前进",
     "window": "应用窗口",
@@ -2434,8 +2523,6 @@
       "morning": "早上好，{name}。",
       "afternoon": "下午好，{name}。",
       "evening": "晚上好，{name}。",
-      "briefing": "有 {count} 条新消息值得看，先看",
-      "noneToday": "今天还没有新的建议。",
       "routine": "例行事项",
       "empty": "暂时没有要看的消息",
       "connect": "连接应用",
@@ -2453,7 +2540,9 @@
         "notion": "Notion",
         "github": "GitHub",
         "linear": "Linear"
-      }
+      },
+      "briefing": "有 {count} 条新消息值得看，先看",
+      "noneToday": "今天还没有新的建议。"
     },
     "tasks": {
       "mine": "任务",
@@ -2588,6 +2677,59 @@
       "unassigned": "未分配"
     }
   },
+  "Artifact": {
+    "kindDocument": "文档",
+    "kindPage": "网页",
+    "cardMeta": "{kind} · v{version}",
+    "version": "v{version}",
+    "versions": "版本",
+    "current": "当前",
+    "versionMeta": "{author} · {time}",
+    "updated": "{author} · {time} 更新",
+    "viewingOld": "正在看 v{version} · {time}",
+    "showDiff": "显示与 v{latest} 的差异",
+    "backToLatest": "回到 v{latest}",
+    "download": "下载",
+    "selectElement": "选择元素",
+    "openInBrowser": "在浏览器打开",
+    "close": "关闭",
+    "quote": "引用",
+    "copy": "复制",
+    "copied": "已复制",
+    "removeQuote": "移除引用",
+    "quoteLabel": "引用：{text}",
+    "loadError": "这个成果打不开了。",
+    "retry": "重试",
+    "showChat": "对话",
+    "showContent": "内容",
+    "frameTitle": "{title}（网页）",
+    "share": "分享",
+    "shareHint": "拿到链接的人不用登录就能看最新版本。",
+    "createLink": "创建链接",
+    "copyLink": "复制链接",
+    "linkCopied": "链接已复制",
+    "stopSharing": "停止分享",
+    "sharingOn": "正在分享，之前发出的链接仍然有效。",
+    "newLink": "复制新链接",
+    "shareStopped": "已停止分享",
+    "shareLink": "分享链接",
+    "sharedNotFoundHint": "分享已停止，或者链接不完整。",
+    "notFoundTitle": "这个链接已经失效了",
+    "roles": {
+      "image": "图片",
+      "button": "按钮",
+      "link": "链接",
+      "table": "表格",
+      "row": "行",
+      "heading": "标题",
+      "paragraph": "段落",
+      "listItem": "列表项",
+      "list": "列表",
+      "field": "输入框",
+      "card": "卡片",
+      "block": "区块"
+    }
+  },
   "Unread": {
     "divider": "以下是新消息",
     "newLabel": "新",
@@ -2602,5 +2744,47 @@
     "loadError": "无法加载已保存的历史对话。",
     "retry": "重试",
     "incomplete": "此历史回复未完成。"
+  },
+  "MobilePush": {
+    "verificationCode": "收到一条验证码"
+  },
+  "DeviceSetup": {
+    "title": "设置 {device}",
+    "description": "填写此设备上的仓库和公开 GitHub 远程地址。设备运行前会检查 Git origin。",
+    "path": "本地仓库路径",
+    "remote": "公开 GitHub 远程地址",
+    "branch": "基础分支",
+    "verify": "验证命令",
+    "addRepo": "添加仓库",
+    "repoSaved": "已添加仓库",
+    "repoError": "无法添加仓库，请检查路径、公开 GitHub 地址和设备连接。",
+    "agentName": "Agent 名称",
+    "harness": "已安装的执行器",
+    "chooseHarness": "选择执行器",
+    "addAgent": "添加 Agent",
+    "agentSaved": "已添加 Agent",
+    "agentError": "无法添加 Agent，请检查名称和设备连接。"
+  },
+  "SelfImprovement": {
+    "resume": "继续启用",
+    "activate": "启用已批准的 Skill",
+    "activated": "已记录启用",
+    "feedback": "反馈",
+    "feedbackNote": "补充说明（可选）",
+    "positive": "有帮助",
+    "negative": "需要改进",
+    "saved": "反馈已保存",
+    "error": "操作未完成，请重试。",
+    "candidates": "Skill 候选版本",
+    "review": "查看候选版本",
+    "candidate": "候选指令",
+    "evaluation": "评估",
+    "evidence": "审查和验证证据",
+    "environment": "启用环境",
+    "chooseEnvironment": "选择环境",
+    "preview": "预览",
+    "production": "生产",
+    "approve": "批准启用",
+    "approved": "已记录批准"
   }
 }

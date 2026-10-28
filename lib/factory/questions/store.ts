@@ -658,6 +658,7 @@ export function createFactoryQuestions(
       deviceId: string,
       runId: string,
       leaseExpiresAt: string,
+      onClaim?:(tx:PoolClient)=>Promise<void>,
     ) {
       return transaction(async (tx) => {
         const {
@@ -714,6 +715,7 @@ export function createFactoryQuestions(
           'UPDATE agent_runs SET status=\'preparing\',"startedAt"=now(),"leaseExpiresAt"=$2,"updatedAt"=now() WHERE id=$1',
           [runId, leaseExpiresAt],
         );
+        await onClaim?.(tx);
         return {
           ...check,
           continuesRunId: q.originRunId,

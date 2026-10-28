@@ -33,7 +33,7 @@ test(
     // Explicit reapplication covers migrate-ledger interruption after committed SQL.
     await pool.query(
       await readFile(
-        new URL("20261026204000_skill_lifecycle_operations.sql", dir),
+        new URL("20261028231601_skill_lifecycle_operations.sql", dir),
         "utf8",
       ),
     );

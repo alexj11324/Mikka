@@ -1,4 +1,4 @@
-import { runSummaryText } from './issue-run-conversation'
+import { runIsActive, runSummaryText } from './issue-run-conversation'
 
 /**
  * A thread is one agent run on an issue, and its content is its owner's alone (R-62):
@@ -8,6 +8,8 @@ import { runSummaryText } from './issue-run-conversation'
 export interface IssueThread {
   id: string
   status: string
+  /** A requested stop is status metadata, including for teammates. */
+  stopping: boolean
   createdAt: Date
   finishedAt: Date | null
   ownedByCurrentUser: boolean
@@ -22,6 +24,7 @@ export interface IssueThreadRow {
   id: string; issueId: string | null; userId: string; status: string; prompt: string
   report: unknown; error: string | null; createdAt: Date; finishedAt: Date | null
   agentName: string; harness: string; ownerName?: string | null
+  stopRequestedAt?: Date | null
 }
 
 /** The thread's name: the first line of what it was asked to do. */
@@ -43,6 +46,7 @@ export function projectIssueThreads(rows: readonly IssueThreadRow[], issueId: st
     .slice(0, ISSUE_THREAD_LIMIT)
     .map(row => ({
       id: row.id, status: row.status, createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
+      stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
         ? { name: threadName(row.prompt, row.agentName), agentName: row.agentName, harness: row.harness, summary: runSummaryText({ report: row.report, error: row.error }) }

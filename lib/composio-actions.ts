@@ -35,6 +35,17 @@ export const COMPOSIO_ACTIONS = {
     slug: 'NOTION_SEARCH_NOTION_PAGE',
     inputSchema: z.object({ query: z.string().trim().min(1).max(200), page_size: z.number().int().min(1).max(100).optional(), start_cursor: z.string().max(500).optional() }),
   },
+  // Read by the hourly suggestions backfill (lib/suggestions/reconcile.ts); not offered to agents.
+  list_recent_notion_pages: {
+    title: 'List recently edited Notion pages',
+    description: 'List the pages in the connected Notion workspace, most recently edited first.',
+    toolkit: 'notion',
+    slug: 'NOTION_SEARCH_NOTION_PAGE',
+    inputSchema: z.object({ page_size: z.number().int().min(1).max(100).optional() }),
+    toArguments: (input: { page_size?: number }) => ({
+      query: '', page_size: input.page_size ?? 25, filter_property: 'object', filter_value: 'page', timestamp: 'last_edited_time', direction: 'descending',
+    }),
+  },
   read_notion_page_blocks: {
     title: 'Read Notion page blocks',
     description: 'Read the immediate child blocks of a Notion page or block. Use returned block IDs to read nested content.',
@@ -63,6 +74,15 @@ export const COMPOSIO_ACTIONS = {
     toolkit: 'gmail',
     slug: 'GMAIL_FETCH_EMAILS',
     inputSchema: z.object({ query: z.string().trim().min(1).max(200), max_results: z.number().int().min(1).max(50).optional() }),
+  },
+  // Read by the attention judgment when a mail excerpt cannot tell (lib/attention/score.ts) and by the Coordinator.
+  read_gmail_message: {
+    title: 'Read a Gmail message',
+    description: 'Read one Gmail message in full by its message id.',
+    toolkit: 'gmail',
+    slug: 'GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID',
+    inputSchema: z.object({ message_id: z.string().trim().min(1).max(255) }),
+    toArguments: (input: { message_id: string }) => ({ message_id: input.message_id, format: 'full', user_id: 'me' }),
   },
   list_calendar_events: {
     title: 'List Google Calendar events',
@@ -221,6 +241,7 @@ export function createGoogleAITools(
 ) {
   return {
     search_gmail: tool({ ...COMPOSIO_ACTIONS.fetch_recent_gmail, title: 'Search Gmail', description: 'Search the person\'s Gmail with a Gmail search query, e.g. "from:ana is:unread newer_than:7d".', execute: input => execute('fetch_recent_gmail', input) }),
+    read_gmail_message: tool({ ...COMPOSIO_ACTIONS.read_gmail_message, execute: input => execute('read_gmail_message', input) }),
     list_calendar_events: tool({ ...COMPOSIO_ACTIONS.list_calendar_events, execute: input => execute('list_calendar_events', input) }),
     get_calendar_event: tool({ ...COMPOSIO_ACTIONS.get_calendar_event, execute: input => execute('get_calendar_event', input) }),
     send_email: tool({ ...COMPOSIO_ACTIONS.send_email, description: COMPOSIO_ACTIONS.send_email.description + PROPOSAL_NOTE, execute: input => propose('send_email', input) }),

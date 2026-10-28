@@ -4,6 +4,8 @@ import type { CoordinatorEventKind, RunStatus } from '@/lib/db/schema'
 /** One row for `coordinator_events`, before it gets an id. */
 export interface CoordinatorEventInput {
   userId: string
+  /** The bot whose chat it goes to; null or absent for the Coordinator's. */
+  botId?: string | null
   kind: CoordinatorEventKind
   dedupeKey: string
   issueId: string | null
@@ -20,22 +22,31 @@ export interface TelegramMessageSource extends TelegramReplyTarget {
   messageId: number
 }
 
-/** A message the person wrote to their Coordinator. */
+/** A message the person wrote to their Coordinator, or to one of their bots (`botId`). */
 export function userMessageEvent(
   userId: string,
   text: string,
-  options: { issueId?: string | null; telegram?: TelegramMessageSource } = {},
+  options: { issueId?: string | null; telegram?: TelegramMessageSource; botId?: string | null } = {},
 ): CoordinatorEventInput {
   const id = crypto.randomUUID()
   const telegram = options.telegram
   return {
     userId,
+    ...(options.botId ? { botId: options.botId } : {}),
     kind: 'user_message',
     dedupeKey: telegram ? 'telegram:' + telegram.threadId + ':' + telegram.messageId : 'user_message:' + id,
     issueId: options.issueId ?? null,
     runId: null,
     payload: { text, ...(telegram ? { telegram } : {}) },
   }
+}
+
+/** OAuth delegates access to an Agent; it does not turn Agent prose into a
+ * human decision. Result tier preserves the existing wake-on-send behaviour.
+ */
+export function peerCoordinatorMessageEvent(userId: string, text: string): CoordinatorEventInput & { tier: 'result' } {
+  return { userId, kind: 'run_report', dedupeKey: 'peer_message:' + crypto.randomUUID(), issueId: null, runId: null,
+    payload: { text, source: 'oauth_agent_mcp' }, tier: 'result' }
 }
 
 /** Unique Telegram destinations for the user messages in one claimed batch. */
@@ -54,9 +65,10 @@ export function telegramReplyTargets(events: ReadonlyArray<Pick<CoordinatorEvent
 }
 
 /** A run ended. One event per run, however often the daemon reports it. */
-export function runFinishedEvent(run: { id: string; userId: string; issueId: string | null; kind: string; status: RunStatus; stopReason: string; report?: RunReport | null }): CoordinatorEventInput {
+export function runFinishedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null; kind: string; status: RunStatus; stopReason: string; report?: RunReport | null }): CoordinatorEventInput {
   return {
     userId: run.userId,
+    ...(run.botId ? { botId: run.botId } : {}),
     kind: 'run_finished',
     dedupeKey: `run_finished:${run.id}`,
     issueId: run.issueId,
@@ -66,9 +78,10 @@ export function runFinishedEvent(run: { id: string; userId: string; issueId: str
 }
 
 /** A run lost its device and was queued again as `retryRunId`. Background: nobody needs to act. */
-export function runRetriedEvent(run: { id: string; userId: string; issueId: string | null }, retry: { runId: string; attempt: number; maxAttempts: number; movedToDeviceId?: string | null }): CoordinatorEventInput {
+export function runRetriedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null }, retry: { runId: string; attempt: number; maxAttempts: number; movedToDeviceId?: string | null }): CoordinatorEventInput {
   return {
     userId: run.userId,
+    ...(run.botId ? { botId: run.botId } : {}),
     kind: 'run_retried',
     dedupeKey: `run_retried:${run.id}`,
     issueId: run.issueId,
@@ -95,10 +108,10 @@ export function issueDoneEvent(before: { status: string }, after: { id: string; 
 }
 
 /** The run an agent's worker tool call came from. */
-interface WorkerRun { id: string; userId: string; issueId: string | null }
+interface WorkerRun { id: string; userId: string; botId?: string | null; issueId: string | null }
 
 function workerEvent(kind: 'run_report' | 'run_question' | 'run_blocked', run: WorkerRun, payload: Record<string, unknown>): CoordinatorEventInput {
-  return { userId: run.userId, kind, dedupeKey: `${kind}:${run.id}:${crypto.randomUUID()}`, issueId: run.issueId, runId: run.id, payload }
+  return { userId: run.userId, ...(run.botId ? { botId: run.botId } : {}), kind, dedupeKey: `${kind}:${run.id}:${crypto.randomUUID()}`, issueId: run.issueId, runId: run.id, payload }
 }
 
 /** The agent inside a run reached a milestone and says so (MCP `report`). */
@@ -118,6 +131,42 @@ export function runQuestionEvent(run: WorkerRun, question: { question: string; o
 /** The agent inside a run cannot go on (MCP `blocked`). */
 export function runBlockedEvent(run: WorkerRun, reason: string): CoordinatorEventInput {
   return workerEvent('run_blocked', run, { reason })
+}
+
+/**
+ * One item a briefing names, as the Coordinator reads it. `suggestionId`
+ * links the item to its suggestion so a client can show it as a chip.
+ * `title` is the source's own text until suggestions carry a verb-first
+ * action title (R-45, `suggestions.actionTitle`); then that title goes here, with the raw one as fallback.
+ */
+export interface BriefingEventItem { suggestionId: string; source: string; action: string; title: string; actor: string | null; url: string | null; required: boolean }
+
+/**
+ * The person's briefing is ready: the daily one at 08:00 their time, or the
+ * first one after they connect an app. One event per briefing kind and local
+ * date, so a rerun of the cron does not push it twice.
+ */
+export function briefingEvent(briefing: { userId: string; localDate: string; kind: 'first' | 'daily'; total: number; counts: Record<string, number> }, items: readonly BriefingEventItem[], personName: string | null = null): CoordinatorEventInput {
+  return {
+    userId: briefing.userId, kind: 'daily_briefing', dedupeKey: `daily_briefing:${briefing.userId}:${briefing.localDate}:${briefing.kind}`, issueId: null, runId: null,
+    payload: { localDate: briefing.localDate, briefingKind: briefing.kind, total: briefing.total, counts: briefing.counts, items, ...(personName ? { personName } : {}) },
+  }
+}
+
+/** An agent handed over a document or web page (MCP `submit_artifact`). One event per version. */
+export function artifactSubmittedEvent(
+  submitter: { userId: string; botId?: string | null; runId: string | null; issueId: string | null; authorName: string },
+  artifact: { artifactId: string; version: number; title: string; kind: string },
+): CoordinatorEventInput {
+  return {
+    userId: submitter.userId,
+    ...(submitter.botId ? { botId: submitter.botId } : {}),
+    kind: 'artifact_submitted',
+    dedupeKey: `artifact_submitted:${artifact.artifactId}:${artifact.version}`,
+    issueId: submitter.issueId,
+    runId: submitter.runId,
+    payload: { artifactId: artifact.artifactId, version: artifact.version, title: artifact.title, artifactKind: artifact.kind, authorName: submitter.authorName },
+  }
 }
 
 /** The person approved or declined something an agent proposed in their accounts (lib/pending-actions.ts). */

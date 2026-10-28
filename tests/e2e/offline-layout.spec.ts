@@ -1,7 +1,7 @@
 import { test, expect, register, app, seedTask } from './fixtures'
 
 // Network failure is the action under test, not an ignored application exception.
-test.use({ trace: 'on', expectedConsoleErrors: [{ path: app('/'), message: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }] })
+test.use({ expectedConsoleErrors: [{ path: app('/'), message: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }] })
 
 for (const width of [1280, 402]) {
   // The board is the only task layout since the Figma v3.1 shell (no list toggle).

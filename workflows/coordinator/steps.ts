@@ -1,16 +1,25 @@
+import { preserveMessageSources } from '@/lib/coordinator/message-safety'
+import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
+import { personalMailboxInstructions } from '@/lib/personal-mailbox-instructions'
+import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
+import type { MailboxToolRequest } from '@/lib/mailbox-tools'
+import type { MailboxToolName } from '@mikka/protocol/mailbox'
+import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
+import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
+import type { AgentExecution } from '@/lib/agent-kit/store'
 import { issueVisibility } from '@/lib/issue-visibility'
+import { createHash } from 'node:crypto'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
-import { generateText, type ModelMessage } from 'ai'
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import type { ModelMessage } from 'ai'
+import { summarizeConversation } from '@/lib/coordinator/summary-model'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
-import { addRunMessage, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
+import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
-import { createIssueFromRequest } from '@/lib/coordinator/issue-create'
-import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
+import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import * as store from '@/lib/coordinator/store'
-import { db } from '@/lib/db'
-import { coordinatorEvents, factoryAttempts, factoryTasks } from '@/lib/db/schema'
+import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
 import { agents, deviceRepos, devices, issueMembers, issues, telegramLinks } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
@@ -20,16 +29,15 @@ import { proposeAction } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
-import { FactoryError, type FactoryBinding, type FactoryRoute } from '@/lib/factory/contract'
-import type { FactoryDispatchInput } from '@/lib/factory/dispatch'
-import { factoryEventId } from '@/lib/factory/event-id'
-import { dispatchFactoryRun, factoryMonitor, factoryStore, factoryQuestions, reconcileFactoryRuns } from '@/lib/factory/server'
-import type { QuestionReference, ContextQuestionAnswer } from '@/lib/factory/questions/contract'
-import { improvementStore, skillAssignments, improvementFactory, skillRegistry, skillEvaluations } from '@/lib/self-improvement/server'
-import { readCommittedSkill } from '@/lib/self-improvement/source'
-import { ImprovementError, type Feedback, type ImprovementHandoff, type ImprovementRehearsal, type ImprovementRegistration, type SkillEvaluationCommand } from '@/lib/self-improvement/contract'
 import type { TelegramReplyTarget } from '@/lib/coordinator-events'
 import { postTelegramText } from '@/lib/telegram/client'
+import type { PushReason } from '@/lib/push-reasons'
+import { queueCloudRun } from '@/lib/computer/queue-run'
+import { ComputerStore } from '@/lib/computer/store'
+import { bindBotSubscription } from '@/lib/computer/bot-subscription'
+import { recordDecision, settleTurn } from '@/lib/attention/store'
+import type { CreateIssueInput, UpdateIssueInput } from '@/lib/coordinator/issue-input'
+import { systemActor } from '@/lib/activity-actor'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -37,35 +45,62 @@ import { postTelegramText } from '@/lib/telegram/client'
 
 type ToolResult<T> = T | { error: string }
 
+export async function computerToolsEnabled() {
+  'use step'
+  return process.env.MIKKA_CLOUD_COMPUTER_TASKS === '1' && process.env.MIKKA_BYOS_ENABLED === '1'
+}
+
 async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError || error instanceof FactoryError || error instanceof ImprovementError) return { error: error.code }
+    if (error instanceof ActionFailureError) return { error: error.code }
     throw error
   }
 }
 
-export async function takeInbox(userId: string, holder: string) {
+// `botId` picks the chat: null is the Coordinator, otherwise one of the person's bots.
+
+export async function takeInbox(userId: string, holder: string, botId: string | null = null) {
   'use step'
-  await reconcileFactoryRuns(userId)
-  await factoryMonitor.reconcile(userId)
-  return store.takeInbox(userId, holder)
+  return store.takeInbox(userId, holder, botId)
 }
 
-export async function releaseLease(userId: string, holder: string) {
+/** Settles the matters a turn was handed but did not decide on, and hands over the next one. */
+export async function settleAttention(userId: string, matterIds: string[], toldPerson: boolean) {
   'use step'
-  return store.releaseLease(userId, holder)
+  await settleTurn(userId, matterIds, toldPerson)
 }
 
-export async function failTurn(userId: string, holder: string, error: string) {
+export async function recordAttention(userId: string, input: { matterId: string; decision: 'notify' | 'quiet' | 'snooze' | 'handled'; reason?: string; runAt?: string; personAsked?: boolean }, scope?: NativeToolScope) {
   'use step'
-  await store.failTurn(userId, holder, error)
+  await assertNativeToolScope(userId,scope)
+  const reason = input.reason?.trim()
+  switch (input.decision) {
+    case 'quiet':
+      return reason ? recordDecision(userId, { matterId: input.matterId, decision: 'quiet', reason }) : { error: 'reasonRequired' }
+    case 'snooze':
+      if (!reason) return { error: 'reasonRequired' }
+      if (!input.runAt) return { error: 'runAtRequired' }
+      return recordDecision(userId, { matterId: input.matterId, decision: 'snooze', reason, runAt: new Date(input.runAt), personAsked: input.personAsked })
+    default:
+      return recordDecision(userId, { matterId: input.matterId, decision: input.decision, reason })
+  }
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null) {
+export async function releaseLease(userId: string, holder: string, botId: string | null = null) {
   'use step'
-  await store.appendMessages(userId, holder, messages, warning)
+  return store.releaseLease(userId, holder, botId)
+}
+
+export async function failTurn(userId: string, holder: string, error: string, botId: string | null = null) {
+  'use step'
+  await store.failTurn(userId, holder, error, botId)
+}
+
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null) {
+  'use step'
+  await store.appendMessages(userId, holder, messages, warning, botId)
 }
 
 /** Linked, de-duplicated Telegram threads that should get this reply. */
@@ -91,45 +126,73 @@ export async function sendTelegramChunk(threadId: string, chunk: string) {
   await postTelegramText(threadId, chunk)
 }
 
+/** Pushes a reply the Coordinator raised on its own to the person's phones, as their 通知 settings allow (lib/mobile-push.ts). */
+export async function pushToPhones(userId: string, botId: string | null, text: string | null, reasons: PushReason[]) {
+  'use step'
+  // Loaded here, not at the top: only this step needs the push sender and its settings.
+  const { pushReply } = await import('@/lib/mobile-push')
+  await pushReply(userId, botId, text, reasons)
+}
+
 /**
  * Folds older messages into the summary once the conversation passes the
  * token budget, then returns the prompt for this turn: the instructions with
  * the person's memory, and the messages.
  */
-export async function preparePrompt(userId: string): Promise<{ instructions: string; messages: ModelMessage[] }> {
+export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
-  let { summary, memory, messages } = await store.loadConversation(userId)
-  const cut = compactionCut(summary, messages)
+  let { summary, memory, messages } = await store.loadConversation(userId, botId)
+  const summaryTrust = { key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) }
+  const cut = compactionCut(summary, messages, summaryTrust)
   if (cut !== null) {
+    if (summaryTrust.key.length < 32) throw new Error('Existing host auth secret required for summary provenance')
     const folded = messages.filter(row => row.position <= cut)
-    const { text } = await generateText({
-      model: COORDINATOR_MODEL,
+    const { text } = await summarizeConversation(userId, botId, snapshot, {
       instructions: SUMMARY_INSTRUCTIONS,
-      messages: [...promptMessages(summary, folded), { role: 'user', content: 'Write the summary now.' }],
+      maxOutputTokens: 4096,
+      messages: [...promptMessages(summary, folded, summaryTrust), { role: 'user', content: 'Write the summary now.' }],
     })
-    await store.saveSummary(userId, text, cut)
-    summary = text
+    summary = preserveMessageSources(text, folded, summary, summaryTrust)
+    await store.saveSummary(userId, summary, cut, botId)
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(COORDINATOR_INSTRUCTIONS, memory), messages: promptMessages(summary, messages) }
+  const base = snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS)
+  const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
+  return { instructions: instructionsWithMemory(instructions, memory), messages: promptMessages(summary, messages, summaryTrust) }
 }
 
-export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope) {
+export async function mailboxToolsEnabled() { 'use step'; return personalMailboxEnabled() }
+export async function mailboxCatalogue(userId: string, botId: string | null, executionId?: string) {
+  'use step'
+  if (!personalMailboxEnabled()) return []
+  const { personalConversationMailboxAdvertised } = await import('@/lib/personal-mailbox-runtime')
+  return personalConversationMailboxAdvertised(userId, botId, executionId)
+}
+export async function personalMailbox(userId: string, botId: string | null, request: MailboxToolRequest, scope?: NativeToolScope, executionId?: string) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (!personalMailboxEnabled()) return { error: 'personal_mailbox_unavailable' }
+  const { personalConversationMailbox } = await import('@/lib/personal-mailbox-runtime')
+  const result = await personalConversationMailbox(userId, botId, request, scope, executionId)
+  return result.body
+}
+
+export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope, botId: string | null = null) {
   'use step'
   await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
     const next = rememberNote(memory, input.note)
     return next === null ? { error: 'memoryFull: forget something first' } : { memory: next, result: { remembered: true } }
-  })
+  }, botId)
 }
 
-export async function forget(userId: string, input: { text: string }, scope?: NativeToolScope) {
+export async function forget(userId: string, input: { text: string }, scope?: NativeToolScope, botId: string | null = null) {
   'use step'
   await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
     const { memory: next, removed } = forgetNotes(memory, input.text)
     return { memory: next, result: { removed } }
-  })
+  }, botId)
 }
 
 export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope) {
@@ -162,20 +225,32 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
   const issue = await issueForUser(userId, input.issueId)
   if (!issue) return { error: 'issueNotFound' }
   const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
-  const {tasks: factory} = await factoryStore.listForIssue(userId,issue.id)
   return {
     id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
-    factory: factory.map(({id,...task})=>({taskId:id,...task})),
   }
+}
+
+export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope?: NativeToolScope, botId: string | null = null) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
+  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId ?? 'coordinator'), toolCallId)
+}
+
+export async function updateIssue(userId: string, input: UpdateIssueInput, toolCallId: string, scope?: NativeToolScope, botId: string | null = null) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
+  return (await import('@/lib/mcp/actions')).updateIssue(userId, input, systemActor(botId ?? 'coordinator'), toolCallId)
 }
 
 export async function listAgents(userId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
   const rows = await db.select({ id: agents.id, name: agents.name, description: agents.description, harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt })
-    .from(agents).leftJoin(devices, eq(devices.id, agents.deviceId)).where(eq(agents.userId, userId)).orderBy(asc(agents.name))
+    .from(agents).leftJoin(devices, eq(devices.id, agents.deviceId)).where(and(eq(agents.userId, userId), sql`not exists (select 1 from bot_cloud_runtimes bcr where bcr."agentId" = ${agents.id})`)).orderBy(asc(agents.name))
   const deviceIds = [...new Set(rows.map(row => row.deviceId).filter((id): id is string => Boolean(id)))]
   const repos = deviceIds.length ? await db.select().from(deviceRepos).where(inArray(deviceRepos.deviceId, deviceIds)) : []
   return rows.map(row => ({
@@ -185,230 +260,112 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
   }))
 }
 
-export async function dispatchRun(userId: string, input: FactoryDispatchInput, scope?: NativeToolScope) {
+/** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(() => dispatchFactoryRun(userId, input))
+  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId, execution)), status: 'queued' }))
 }
 
-export async function selectBaselineSkill(userId: string, input: { runId:string }, scope?: NativeToolScope) {
+/** Only the person's own Bots in workspaces they still belong to are listed. */
+export async function listComputerWorkspaces(userId: string, scope?: NativeToolScope) {
   'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(() => skillAssignments.selectBaseline(userId,input.runId))
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  const [{ workspaceDb }, { workspaces, workspaceMembers }] = await Promise.all([import('@/lib/workspace-db'), import('@/lib/db/workspace-schema')])
+  return workspaceDb.select({ id: workspaces.id, name: workspaces.name }).from(workspaces)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+    .where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).orderBy(asc(workspaces.createdAt)).limit(50)
 }
-export async function selectActiveSkill(userId: string, input: { runId: string }, scope?: NativeToolScope) {
+
+/** The tool call id makes a retried Bot creation idempotent. */
+export async function createComputerBot(userId: string, input: { workspaceId: string; name: string }, toolCallId: string, scope?: NativeToolScope) {
   'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(() => skillAssignments.selectActive(userId,input.runId))
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
+  try {
+    await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, input.workspaceId)
+    const hash = createHash('sha256').update(JSON.stringify(['create-bot', userId, toolCallId])).digest('hex')
+    const botId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
+    await pool.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4) ON CONFLICT (id) DO NOTHING', [botId, input.workspaceId, userId, input.name])
+    const found = await pool.query('SELECT id,name FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "ownerId"=$3 AND name=$4', [botId, input.workspaceId, userId, input.name])
+    return found.rows[0] ?? { error: 'cloudComputerUnavailable' }
+  } catch { return { error: 'cloudComputerUnavailable' } }
 }
-export async function registerSkillCandidate(userId: string, input: Omit<ImprovementRegistration,'action'>, scope?: NativeToolScope) {
+
+export async function listComputerBots(userId: string, scope?: NativeToolScope) {
   'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(() => skillRegistry.registerCandidate(userId,input,async source => {
-    const markdown = await readCommittedSkill(source)
-    await assertNativeToolScope(userId,scope)
-    return markdown
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  const { authorizeSubscriptionWorkspace } = await import('@/lib/subscription-runtime')
+  const { rows } = await pool.query(`SELECT b.id,b.name,b."workspaceId",coalesce(array_agg(r.harness) FILTER (WHERE r.harness IS NOT NULL),'{}') AS harnesses
+    FROM bots b LEFT JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
+    WHERE b."ownerId"=$1 GROUP BY b.id ORDER BY b."createdAt",b.id LIMIT 50`, [userId])
+  const visible = await Promise.all(rows.map(async row => {
+    try { await authorizeSubscriptionWorkspace(userId, row.workspaceId); return { id: row.id, name: row.name, harnesses: row.harnesses } }
+    catch { return null }
   }))
-}
-export async function skillEvaluation(userId: string, input: SkillEvaluationCommand, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => {
-    switch (input.action) {
-      case 'freeze_benchmark': return skillEvaluations.freezeBenchmark(userId,input.sourceRunId)
-      case 'dispatch_training': return skillEvaluations.dispatchNext(userId,input.instanceId,true)
-      case 'begin_evaluation': return skillEvaluations.beginEvaluation(userId,input.instanceId,input.proposalId,input.candidateVersionId)
-      case 'dispatch_evaluation': return skillEvaluations.dispatchNext(userId,input.evaluationId,false)
-      case 'compare_evaluation': return skillEvaluations.compare(userId,input.evaluationId)
-    }
-  })
-}
-export async function dispatchBaselineRehearsal(userId:string,input:Omit<ImprovementRehearsal,'action'>, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(()=>improvementFactory.rehearse(userId,{action:'rehearse',...input}))
-}
-export async function recordRunFeedback(userId: string, input: Omit<Feedback,'action'>, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(() => improvementStore.recordFeedback(userId,{ action:'feedback',...input }))
-}
-export async function proposeSkillImprovement(userId: string, input: { runId:string }, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(() => improvementStore.propose(userId,input.runId))
-}
-export async function readRunImprovements(userId: string, input: { runId:string }, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(() => improvementStore.read(userId,input.runId))
-}
-export async function handoffSkillImprovement(userId: string, input: Omit<ImprovementHandoff,'action'>, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(() => improvementFactory.handoff(userId,{ action:'handoff',...input }))
-}
-export async function getSkillImprovementFactory(userId: string, input: { proposalId:string }, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(() => improvementFactory.status(userId,input.proposalId))
+  return visible.filter(item => item !== null)
 }
 
-export async function listFactoryRequests(userId: string, scope?: NativeToolScope) {
+/** Queue and bind atomically, with a stable tool-call id for workflow retries. */
+export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
   'use step'
-  await assertNativeToolScope(userId,scope)
-  const rows = await db
-    .select({
-      sourceEventId: coordinatorEvents.id,
-      issueId: coordinatorEvents.issueId,
-      payload: coordinatorEvents.payload,
-      createdAt: coordinatorEvents.createdAt,
-    })
-    .from(coordinatorEvents)
-    .where(
-      and(
-        eq(coordinatorEvents.userId, userId),
-        eq(coordinatorEvents.kind, 'user_message'),
-      ),
-    )
-    .orderBy(desc(coordinatorEvents.createdAt))
-    .limit(10)
-  return rows.map((row) => ({
-    sourceEventId: row.sourceEventId,
-    issueId: row.issueId,
-    text: String(row.payload.text ?? ''),
-    createdAt: row.createdAt,
-    ...(typeof row.payload.questionId === 'string'
-      ? { questionId: row.payload.questionId }
-      : {}),
-  }))
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
+  const target = (await pool.query(`SELECT b."workspaceId",r."agentId",r."repoId" FROM bots b
+    JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
+    WHERE b.id=$1 AND b."ownerId"=$2 AND r.harness=$3`, [input.botId, userId, input.harness])).rows[0]
+  if (!target) return { error: 'cloudComputerUnavailable' }
+  try { await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, target.workspaceId) } catch { return { error: 'cloudComputerUnavailable' } }
+  const issue = await issueForUser(userId, input.issueId)
+  if (!issue) return { error: 'issueNotFound' }
+  try {
+    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, idempotencyKey: `coordinator:${toolCallId}`,execution })
+    return { ...result, botId: input.botId, task: issue.title, status: 'queued' as const }
+  } catch { return { error: 'cloudComputerUnavailable' } }
 }
 
-export async function createIssueFromRequestStep(userId: string, input: { sourceEventId: string; title: string }, scope?: NativeToolScope) {
+/** Start only an owned Bot's computer after workspace authorization. */
+export async function wakeComputerBot(userId: string, input: { botId: string }, scope?: NativeToolScope) {
   'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(() => createIssueFromRequest(userId, input))
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
+  if (!bot) return { error: 'cloudComputerUnavailable' }
+  try {
+    await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId)
+    const actor = { userId, workspaceId: bot.workspaceId as string }
+    await new ComputerStore(pool).operate(actor, input.botId, 'wake')
+    await (await import('@/lib/computer/wake-worker')).ensureCloudBotWorker(pool, actor, input.botId)
+    // Worker installation is not evidence that any model credential is bound
+    // or that a hosted task can execute. Check that separately before claiming it.
+    return { botId: input.botId, awake: true, taskReadiness: 'not_checked', taskRequirement: 'A connected and bound subscription is required before running a hosted task.' }
+  } catch { return { error: 'cloudComputerUnavailable' } }
 }
 
-export async function routeFactoryTask(userId: string, input: Omit<FactoryRoute,'eventId'>, scope?: NativeToolScope) {
+export async function listBotSubscriptions(userId: string, input: { botId: string }, scope?: NativeToolScope) {
   'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(() => factoryStore.route(userId,{...input,eventId:input.sourceEventId}))
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
+  if (!bot) return { error: 'cloudComputerUnavailable' }
+  try { await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId) } catch { return { error: 'cloudComputerUnavailable' } }
+  const rows = (await pool.query(`SELECT id,provider,epoch FROM byos_connections WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='connected' ORDER BY "createdAt",id LIMIT 50`, [userId, bot.workspaceId])).rows
+  return rows.map(row => ({ connectionId: row.id, provider: row.provider, revision: Number(row.epoch) }))
 }
 
-type CoordinatorQuestionReference = Pick<QuestionReference, 'questionId' | 'questionRevision'>
-
-function coordinatorQuestion(question: Awaited<ReturnType<typeof factoryQuestions.read>>) {
-  return {
-    ...question,
-    reference: { questionId: question.reference.questionId, questionRevision: question.reference.questionRevision },
-  }
-}
-
-async function resolveQuestionReference(userId: string, reference: CoordinatorQuestionReference): Promise<QuestionReference> {
-  const question = await factoryQuestions.read(userId, reference.questionId)
-  // Keep the caller's revision so the store can fence first writes and recognize original replays.
-  return { ...question.reference, questionRevision: reference.questionRevision }
-}
-
-export async function getFactoryTask(
-  userId: string,
-  input: { taskId: string }, scope?: NativeToolScope) {
+export async function bindComputerSubscription(userId: string, input: { botId: string; connectionId: string; revision: number; harness: 'codex' | 'claude_code'; modelId: string }, toolCallId: string, scope?: NativeToolScope) {
   'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => ({
-    ...(await factoryStore.read(userId, input.taskId)),
-    questions: (await factoryQuestions.list(userId, input.taskId)).map(coordinatorQuestion),
-  }))
-}
-
-export async function listFactoryQuestions(
-  userId: string,
-  input: { taskId?: string }, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => (
-    await (input.taskId
-      ? factoryQuestions.list(userId, input.taskId)
-      : factoryQuestions.pending(userId))
-  ).map(coordinatorQuestion))
-}
-
-export async function getFactoryQuestion(
-  userId: string,
-  input: { questionId: string }, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => coordinatorQuestion(await factoryQuestions.read(userId, input.questionId)))
-}
-
-export async function answerFactoryContext(
-  userId: string,
-  input: Omit<ContextQuestionAnswer, 'reference'> & { reference: CoordinatorQuestionReference }, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => {
-    const reference = await resolveQuestionReference(userId, input.reference)
-    await assertNativeToolScope(userId,scope)
-    return factoryQuestions.answer({ source: 'orchestrator', userId }, { ...input, reference })
-  })
-}
-
-export async function escalateFactoryQuestion(
-  userId: string,
-  input: { reference: CoordinatorQuestionReference; eventId: string; reason: string }, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => {
-    const reference = await resolveQuestionReference(userId, input.reference)
-    await assertNativeToolScope(userId,scope)
-    return coordinatorQuestion(await factoryQuestions.escalate(userId, { ...input, reference }))
-  })
-}
-
-export async function answerFactoryQuestionFromUser(
-  userId: string,
-  input: {
-    reference: CoordinatorQuestionReference
-    answerId: string
-    sourceEventId: string
-  }, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => {
-    const [event] = await db
-      .select({ payload: coordinatorEvents.payload })
-      .from(coordinatorEvents)
-      .where(
-        and(
-          eq(coordinatorEvents.id, input.sourceEventId),
-          eq(coordinatorEvents.userId, userId),
-          eq(coordinatorEvents.kind, 'user_message'),
-        ),
-      )
-      .limit(1)
-    if (!event || typeof event.payload.text !== 'string')
-      throw new FactoryError('factoryHumanRequired')
-    const reference = await resolveQuestionReference(userId, input.reference)
-    await assertNativeToolScope(userId,scope)
-    return factoryQuestions.answer(
-      { source: 'human_event', userId },
-      { ...input, reference, text: event.payload.text },
-    )
-  })
-}
-
-export async function resolveFactoryTask(userId: string, input: { binding: FactoryBinding; sourceEventId: string; rationale: string; missingInformation: string[]; missingPermissions: string[]; needsSpec: boolean }, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  const {binding,...resolution} = input
-  return asToolResult(() => factoryStore.apply(userId,binding,input.sourceEventId,{action:'resolve',...resolution}))
-}
-
-export async function stopFactoryTask(userId: string, input: { binding: FactoryBinding; reason: string; action: 'cancel' | 'revoke' }, scope?: NativeToolScope) {
-  'use step'
-  await assertNativeToolScope(userId,scope)
-  return asToolResult(() => factoryStore.apply(userId,input.binding,factoryEventId(input.action,input.binding.attemptId),{action:input.action,reason:input.reason}))
+  await assertNativeToolScope(userId, scope)
+  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
+  const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
+  if (!bot) return { error: 'cloudComputerUnavailable' }
+  try {
+    await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId)
+    await bindBotSubscription(pool, { userId, workspaceId: bot.workspaceId }, { ...input, idempotencyKey: `coordinator:${toolCallId}` })
+    return { botId: input.botId, bound: true }
+  } catch { return { error: 'subscriptionUnavailable' } }
 }
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope) {
@@ -427,8 +384,6 @@ export async function getRun(userId: string, input: { runId: string }, scope?: N
   return {
     id: run.id, issueId: run.issueId, agent: run.agentName, harness: run.harness, status: run.status,
     stopReason: run.stopReason, error: run.error, summary: (run.report as { summary?: string } | null)?.summary ?? null,
-    sourceCommit: run.report?.sourceCommit ?? null, skillMount: run.report?.skillMount ?? null,
-    runtime: run.report?.runtime ?? null, verify: run.report?.verify ?? null,
     startedAt: run.startedAt?.toISOString() ?? null, finishedAt: run.finishedAt?.toISOString() ?? null,
     // The tail of the event stream, enough to see what the agent is doing.
     recentEvents: detail.chunks.slice(-5).map(chunk => JSON.stringify(chunk).slice(0, 1000)),
@@ -438,21 +393,13 @@ export async function getRun(userId: string, input: { runId: string }, scope?: N
 export async function sendToRun(userId: string, input: { runId: string; text: string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => { await addRunMessage(userId, input); return { sent: true } })
+  return asToolResult(async () => { await addRunMessage(userId, input, 'peer'); return { sent: true } })
 }
 
 export async function stopRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => {
-    const [linked] = await db.select({taskId:factoryTasks.id}).from(factoryAttempts).innerJoin(factoryTasks,eq(factoryTasks.id,factoryAttempts.taskId))
-      .where(and(eq(factoryAttempts.runId,input.runId),eq(factoryTasks.userId,userId))).limit(1)
-    if (linked) {
-      const {task} = await factoryStore.read(userId,linked.taskId)
-      if (!['cancelled','revoked'].includes(task.status)) await factoryStore.apply(userId,{taskId:task.id,issueId:task.issueId,attemptId:task.attemptId,revision:task.revision,candidateId:task.candidateId},crypto.randomUUID(),{action:'cancel',reason:'Person requested run stop'})
-    } else await requestRunStop(userId,input.runId)
-    return {stopRequested:true}
-  })
+  return asToolResult(async () => { await requestRunStop(userId, input.runId); return { stopRequested: true } })
 }
 
 /** Web search through the shared SearchProvider (MIK-5); degrades to searchUnavailable on 429/5xx/timeout. */
@@ -461,3 +408,5 @@ export async function webSearchStep(userId: string, input: { query: string; limi
   await assertNativeToolScope(userId,scope)
   return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
 }
+
+export { selectBaselineSkill, selectActiveSkill, registerSkillCandidate, skillEvaluation, dispatchBaselineRehearsal, recordRunFeedback, proposeSkillImprovement, readRunImprovements, handoffSkillImprovement, getSkillImprovementFactory, listFactoryRequests, createIssueFromRequestStep, routeFactoryTask, getFactoryTask, listFactoryQuestions, getFactoryQuestion, answerFactoryContext, escalateFactoryQuestion, answerFactoryQuestionFromUser, resolveFactoryTask, stopFactoryTask } from './factory-steps'

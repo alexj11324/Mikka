@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { FactoryError } from "./contract";
 import type { FactoryAuthorize } from "./store";
 
@@ -6,6 +6,7 @@ import type { FactoryAuthorize } from "./store";
  * adopted spec/execute binding. Lock order matches cancellation: task, issue,
  * run. A retry child is not an ordinary run while adoption is pending. */
 export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
+  const guard=createExecutionClaimGuard(authorize);
   return async (
     userId: string,
     deviceId: string,
@@ -15,6 +16,26 @@ export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
     const tx = await pool.connect();
     try {
       await tx.query("BEGIN");
+      await guard(tx,userId,runId);
+      const { rows } = await tx.query<{ id: string }>(
+        `UPDATE agent_runs SET status='preparing',"startedAt"=now(),"leaseExpiresAt"=$4,"updatedAt"=now()
+         WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 AND status='queued' AND "stopRequestedAt" IS NULL RETURNING id`,
+        [runId, userId, deviceId, leaseExpiresAt],
+      );
+      await tx.query("COMMIT");
+      return rows;
+    } catch (error) {
+      await tx.query("ROLLBACK");
+      throw error;
+    } finally {
+      tx.release();
+    }
+  };
+}
+
+/** Same existing Factory lineage fence, with caller-owned transaction/CAS. */
+export function createExecutionClaimGuard(authorize:FactoryAuthorize){
+  return async(tx:PoolClient,userId:string,runId:string)=>{
       const { rows: tasks } = await tx.query(
         `WITH RECURSIVE lineage AS (
           SELECT id,"retryOf" FROM agent_runs WHERE id=$1
@@ -57,18 +78,5 @@ export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
         if (!run || run.issueId !== task.issueId)
           throw new FactoryError("factoryRunMismatch");
       }
-      const { rows } = await tx.query<{ id: string }>(
-        `UPDATE agent_runs SET status='preparing',"startedAt"=now(),"leaseExpiresAt"=$4,"updatedAt"=now()
-         WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 AND status='queued' AND "stopRequestedAt" IS NULL RETURNING id`,
-        [runId, userId, deviceId, leaseExpiresAt],
-      );
-      await tx.query("COMMIT");
-      return rows;
-    } catch (error) {
-      await tx.query("ROLLBACK");
-      throw error;
-    } finally {
-      tx.release();
-    }
   };
 }

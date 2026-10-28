@@ -26,7 +26,7 @@ test('PG candidate registration, immutable replay and exact-version claim/resume
     const dir = new URL('../../drizzle/', import.meta.url)
     for (const name of orderMigrations((await readdir(dir)).filter(n => n.endsWith('.sql'))))
       await pool.query(await readFile(new URL(name, dir), 'utf8'))
-    await pool.query(await readFile(new URL('20261026200000_skill_candidate_registry.sql', dir), 'utf8'))
+    await pool.query(await readFile(new URL('20261028231556_skill_candidate_registry.sql', dir), 'utf8'))
     const userId = `synthetic-${randomUUID()}`, issueId = randomUUID(), agentId = randomUUID(), deviceId = randomUUID(), repoId = randomUUID()
     const repository = 'https://github.com/example/public'
     await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Registry boundary fixture','{}','todo','normal')`, [issueId,userId])

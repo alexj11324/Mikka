@@ -1,15 +1,21 @@
 import 'server-only'
+import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
+import { freezeWorkerDefinition } from '@/lib/agent-kit/worker'
+import type { AgentExecution } from '@/lib/agent-kit/store'
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
-import { db } from '@/lib/db'
-import { agents, agentRuns, deviceRepos, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { db, pool } from '@/lib/db'
+import { SubscriptionRepository } from '@/lib/subscription-repository'
+import { agents, agentRuns, bots, deviceRepos, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { workspaceRunView } from '@/lib/run-visibility'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
-import { dispatchInput, insertRunOnce, type DispatchInput, type DispatchResult } from '@/lib/run-dispatch'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
+import { runPrompt } from '@/lib/run-prompt'
+import { dispatchInput, insertRunOnce, type DispatchInput, type DispatchResult } from '@/lib/run-dispatch'
+import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -37,8 +43,8 @@ export interface RunDetail {
 }
 
 export const runViewColumns = {
-  id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: agents.name,
-  harness: agents.harness, status: agentRuns.status, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
+  id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: sql<string>`coalesce((select b.name from computer_run_bindings crb join bots b on b.id=crb."botId" and b."ownerId"=crb."ownerId" where crb."runId"=${agentRuns.id}), ${agents.name})`,
+  harness: sql<SupportedHarness>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`, status: agentRuns.status, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
   error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
   startedAt: agentRuns.startedAt, finishedAt: agentRuns.finishedAt,
 }
@@ -48,10 +54,14 @@ export const runViewColumns = {
  * next poll, claims it, and reports back through `/v1/runs/:runId/complete`.
  * `note` is extra direction for this run only, after the issue.
  */
-export async function queueRun(userId: string, input: DispatchInput, executor: Pick<typeof db, 'select' | 'transaction'> = db): Promise<DispatchResult> {
-  const parsed = dispatchInput.safeParse(input)
+/** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
+export async function queueRun(userId: string, input: DispatchInput, botIdOrExecutor: string | null | Pick<typeof db,'select'|'transaction'> = null, execution?: AgentExecution): Promise<DispatchResult> {
+  const parsed=dispatchInput.safeParse(input)
+  const transactional=botIdOrExecutor!==null && typeof botIdOrExecutor==='object'
+  const executor=transactional?botIdOrExecutor:db
+  const botId=typeof botIdOrExecutor==='string'?botIdOrExecutor:null
   if (!parsed.success) throw new ActionFailureError('runInvalid')
-  const issue = await issueForUser(userId, parsed.data.issueId, false, executor)
+  const issue = await issueForUser(userId, parsed.data.issueId,false,executor)
   if (!issue) throw new ActionFailureError('issueNotFound')
   const [agent] = await executor.select().from(agents)
     .where(and(eq(agents.id, parsed.data.agentId), eq(agents.userId, userId))).limit(1)
@@ -59,20 +69,28 @@ export async function queueRun(userId: string, input: DispatchInput, executor: P
   const [repo] = await executor.select().from(deviceRepos)
     .where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.deviceId, agent.deviceId), eq(deviceRepos.userId, userId))).limit(1)
   if (!repo) throw new ActionFailureError('agentRepoMissing')
-  return insertRunOnce(executor, userId, parsed.data, {
-    deviceId: agent.deviceId, baseBranch: repo.baseBranch,
-    prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note),
+  const runId = crypto.randomUUID()
+  const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
+  const captureDefinition = process.env.MIKKA_AGENT_KIT === '1' || Boolean(execution)
+  const subscription = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
+  const mailboxEnabled = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1'
+  let mailboxScope: { botId: string | null; workspaceId: string } | undefined
+  if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
+    const [bot] = botId ? await executor.select({ workspaceId: bots.workspaceId }).from(bots)
+      .where(and(eq(bots.id, botId), eq(bots.ownerId, userId))).limit(1) : []
+    if (botId && !bot) throw new ActionFailureError('runInvalid')
+    mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
+  }
+  const agentDefinition = captureDefinition
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, mailboxEnabled, mailboxScope })
+    : null
+  if(transactional)return insertRunOnce(executor,userId,parsed.data,{deviceId:agent.deviceId,baseBranch:repo.baseBranch,prompt,botId,agentDefinition})
+  await db.insert(agentRuns).values({
+    id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
+    deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
+    prompt, agentDefinition,
   })
-}
-
-/** The brief the agent starts from: the issue, any note for this run, then the agent's own role. */
-function runPrompt(title: string, body: string, instructions: string, note?: string): string {
-  const parts = [`# ${title}`]
-  if (body) parts.push(body)
-  if (note) parts.push('## Notes for this run', note)
-  parts.push('---', 'Work in the repository checked out for this run. Mikka saves your changes as you go and handles commits and pushes, so you do not need to run git commit or git push. When you are done, hand in your work with a short summary of what changed.')
-  if (instructions) parts.push('## Your standing instructions', instructions)
-  return parts.join('\n\n').slice(0, 100_000)
+  return { runId,status:'queued',replayed:false }
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,
@@ -109,10 +127,7 @@ export async function readRun(userId: string, runId: string): Promise<RunDetail 
 export async function addRunMessage(
   userId: string,
   input: { runId: string; text: string },
-  source:
-    { source: 'human'; sessionId: string } | { source: 'orchestrator' } = {
-    source: 'orchestrator',
-  },
+  source:'user'|'peer'|{source:'human';sessionId:string}|{source:'orchestrator'}='user',
 ): Promise<void> {
   const parsed = z
     .object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) })
@@ -152,7 +167,7 @@ export async function addRunMessage(
           source,
         )
     }
-    if (source.source !== 'human')
+    if (typeof source==='string' || source.source !== 'human')
       throw new ActionFailureError('factoryQuestionNeedsAnswerTool')
     const { factoryEventId } = await import('@/lib/factory/event-id')
     const { questionReference } = await import('@/lib/factory/questions/store')
@@ -178,18 +193,11 @@ export async function addRunMessage(
     )
     return
   }
-  await db.insert(runMessages).values({
-    id: crypto.randomUUID(),
-    runId: run.id,
-    userId,
-    text: parsed.data.text,
-  })
+  await sendOwnedRunMessage(db,userId,parsed.data,typeof source==='string'?source:source.source==='human'?'user':'peer')
 }
-
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
 export async function requestRunStop(userId: string, runId: string): Promise<void> {
   const parsed = z.uuid().safeParse(runId)
   if (!parsed.success) throw new ActionFailureError('runNotFound')
-  await db.update(agentRuns).set({ stopRequestedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(agentRuns.id, parsed.data), eq(agentRuns.userId, userId)))
+  await stopOwnedRun(db, userId, parsed.data)
 }

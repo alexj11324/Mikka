@@ -32,7 +32,10 @@ import {
   type RunCheckpoint,
 } from "@mikka/protocol"
 
+import type { LocalComputerDecision, LocalComputerRequest } from "@mikka/protocol/computer"
 import type { RunChunk } from "./chunks"
+import type { RunMailbox } from './run-mailbox'
+import type { NativeBrokerContext, NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
 
 export type {
@@ -59,6 +62,8 @@ export interface ChunkBatch {
  * the daemon keeps running and retries (offline tolerance, R13).
  */
 export interface ServerLink {
+  /** Optional host-only adapter for the claimed run; never model-supplied. */
+  prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   claimCoordinator?(deviceId: string, signal: AbortSignal): Promise<NativeCoordinatorJob | null>
   coordinatorCommand?(deviceId: string, turnId: string, command: NativeCoordinatorCommand, signal: AbortSignal): Promise<void>
   coordinatorToolResult?(deviceId: string, turnId: string, callId: string, signal: AbortSignal): Promise<NativeCoordinatorToolResult>
@@ -83,6 +88,11 @@ export interface ServerLink {
   claimRun(deviceId: string, runId: string): Promise<RunAssignment>
   /** Receipted resumes require a current online source/access/lease fence. */
   validateSkillReceipt?(runId:string,receiptId:string):Promise<SkillReceiptRevalidation>
+  /** Owner-reviewed computer requests; responses carry decisions only. */
+  syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]>
+  /** Private hosted-run channel; these methods never return provider tokens. */
+  nativeContext?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeBrokerContext>
+  nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>
   /** Appends to the run's event stream; returns the new tail offset. */
   appendRunChunks(runId: string, batch: ChunkBatch): Promise<{ offset: string }>
   updateRun(runId: string, patch: RunPatch): Promise<void>

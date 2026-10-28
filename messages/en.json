@@ -1,43 +1,4 @@
 {
-  "DeviceSetup": {
-    "title": "Set up {device}",
-    "description": "Enter a repository on this device and its public GitHub remote. The device checks its Git origin before running.",
-    "path": "Local repository path",
-    "remote": "Public GitHub remote",
-    "branch": "Base branch",
-    "verify": "Verification command",
-    "addRepo": "Add repository",
-    "repoSaved": "Repository added",
-    "repoError": "Could not add the repository. Check the path, public GitHub remote, and device connection.",
-    "agentName": "Agent name",
-    "harness": "Installed harness",
-    "chooseHarness": "Choose a harness",
-    "addAgent": "Add agent",
-    "agentSaved": "Agent added",
-    "agentError": "Could not add the agent. Check its name and device connection."
-  },
-  "SelfImprovement": {
-    "resume": "Resume activation",
-    "activate": "Activate approved Skill",
-    "activated": "Activation recorded",
-    "feedback": "Feedback",
-    "feedbackNote": "Add a note (optional)",
-    "positive": "Helpful",
-    "negative": "Needs improvement",
-    "saved": "Feedback saved",
-    "error": "Could not complete the request. Try again.",
-    "candidates": "Skill candidates",
-    "review": "Review candidate",
-    "candidate": "Candidate instructions",
-    "evaluation": "Evaluation",
-    "evidence": "Review and verification evidence",
-    "environment": "Activation environment",
-    "chooseEnvironment": "Choose an environment",
-    "preview": "Preview",
-    "production": "Production",
-    "approve": "Approve activation",
-    "approved": "Approval recorded"
-  },
   "Common": {
     "close": "Close",
     "cancel": "Cancel",
@@ -168,7 +129,12 @@
     "rail": "Main navigation",
     "conversations": "Conversations",
     "board": "Board",
-    "collapseList": "Collapse conversation list",
+    "collapseList": "Collapse bot list",
+    "bots": "Bots",
+    "newBot": "New bot",
+    "writingWelcome": "Writing a welcome…",
+    "answerBot": "Type your answer, or ask anything",
+    "messageBot": "Message {name}",
     "newConversation": "New conversation",
     "pinned": "Pinned",
     "untitledConversation": "Untitled conversation",
@@ -726,7 +692,6 @@
     "editorAria": "{label} editor"
   },
   "Devices": {
-    "setup": "Set up repository and agent",
     "otherDevices": "Remote control",
     "menu": "More for {name}",
     "add": {
@@ -824,7 +789,8 @@
       "daemonRunning": "The daemon is running in the background",
       "heartbeatTimeout": "Timed out waiting for a heartbeat. Check ~/.mikka/daemon.log",
       "connectionError": "The connection failed"
-    }
+    },
+    "setup": "Set up repository and agent"
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
@@ -965,6 +931,7 @@
     "deviceNotFound": "This device does not exist.",
     "agentHarnessMissing": "The selected harness is not installed on this device.",
     "agentDuplicateName": "An agent with this name already exists. Choose another name.",
+    "botDuplicateName": "A bot with this name already exists. Choose another name.",
     "agentInvalidInput": "Please check the information you entered.",
     "agentAddFailed": "Could not add the agent. Please try again.",
     "agentSaveFailed": "Could not save the agent. Please try again.",
@@ -974,12 +941,10 @@
     "repoPathInvalid": "The repository path must be absolute.",
     "repoNotFound": "This repository does not exist.",
     "runInvalid": "The run parameters are invalid.",
-    "runAlreadyActive": "This task already has an active run.",
-    "runDispatchKeyConflict": "This request key was already used for different run parameters.",
     "runNotFound": "This run does not exist.",
-    "runNotActive": "This run has ended and has no answerable question.",
-    "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
+    "artifactNotFound": "This artifact does not exist.",
     "messageRequired": "A message cannot be empty.",
+    "submissionConflict": "This submission ID was already used for a different message.",
     "pendingActionUnavailable": "This action was already handled or has expired.",
     "deviceSaveFailed": "The save failed. Please try again.",
     "tokenCreateFailed": "Could not create a token. Please try again.",
@@ -1042,7 +1007,11 @@
     "inviteExpired": "This invitation is no longer valid. Ask an admin for a new link.",
     "workspaceMembershipSuspended": "Your membership is suspended. Contact an admin to restore it.",
     "inviteInvalidEmails": "The email addresses are invalid, empty, or too many. Check them and try again.",
-    "workspaceReadFailed": "Could not read the workspace settings. Please try again."
+    "workspaceReadFailed": "Could not read the workspace settings. Please try again.",
+    "runAlreadyActive": "This task already has an active run.",
+    "runDispatchKeyConflict": "This request key was already used for different run parameters.",
+    "runNotActive": "This run has ended and has no answerable question.",
+    "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response."
   },
   "Overview": {
     "sections": {
@@ -1521,6 +1490,9 @@
         "title": "Profile",
         "description": "See the account details used in your workspace."
       },
+      "memory": {
+        "title": "Memory"
+      },
       "account": {
         "title": "Account",
         "description": "Manage how you sign in to Mikka."
@@ -1564,6 +1536,24 @@
       "notSet": "Not set",
       "readOnly": "Account details are read-only; this version does not support editing them here."
     },
+    "memory": {
+      "enabled": "Use memory",
+      "learn": "Learn from connected apps",
+      "error": "Could not update memory",
+      "empty": "No memories yet",
+      "correct": "Correct",
+      "delete": "Delete",
+      "kinds": {
+        "interest": "Interests",
+        "routine": "Routines",
+        "place": "Places",
+        "subscription": "Subscriptions",
+        "deadline": "Deadlines",
+        "tool": "Tools",
+        "person": "People",
+        "preference": "Preferences"
+      }
+    },
     "workspaceForm": {
       "id": "Workspace ID",
       "readOnlyNote": "Workspace information is read-only. To switch or create a workspace, return to the app and select the workspace name at the top left.",
@@ -1573,6 +1563,16 @@
       "urlHelp": "The URL slug identifies the workspace. Changing it affects existing links.",
       "previewNote": "Form preview: workspace storage is not connected, so changes are not saved.",
       "previewLabel": "Workspace form preview"
+    },
+    "computerPolicy": {
+      "heading": "Cloud computers",
+      "description": "Control whether Bots may operate computers in this workspace.",
+      "label": "Bot computer use",
+      "help": "Denying stops computer tasks and revokes their approvals. People can still take control.",
+      "adminOnly": "Only workspace admins can change this setting.",
+      "ask": "Ask for approval",
+      "deny": "Deny",
+      "error": "Could not update or load the computer setting."
     },
     "issuePrefix": {
       "title": "Personal task ids",
@@ -1610,6 +1610,32 @@
       "loadError": "Could not load Linear settings.",
       "operationError": "The Linear sync action failed. Try again.",
       "teamAlreadyLinked": "This Linear team is already connected to another Mikka account."
+    },
+    "subscriptions": {
+      "heading": "Subscriptions",
+      "description": "Connect your own subscription for authorized Bot tasks in this workspace.",
+      "codex": "ChatGPT / Codex",
+      "claude": "Claude",
+      "providerDescription": "Sign in and approve access on the provider's website.",
+      "unavailable": "This connection is not available yet.",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "connect": "Connect",
+      "connectAnother": "Connect another",
+      "reconnect": "Reconnect",
+      "disconnect": "Disconnect",
+      "deviceInstructions": "Open the provider page and enter this code. Keep this page open while Mikka checks the connection.",
+      "callbackInstructions": "Open the provider page and approve access. If the browser ends on a localhost callback page, copy its full address into the field below.",
+      "callbackLabel": "Callback page address",
+      "openProvider": "Open the provider page",
+      "finish": "Complete connection",
+      "close": "Close",
+      "expired": "The connection attempt expired. Start again.",
+      "loadFailed": "Could not load subscription settings.",
+      "connectionFailed": "The connection could not be completed. Start a new attempt.",
+      "disconnectFailed": "The subscription could not be disconnected.",
+      "connectedNotice": "Subscription connected.",
+      "disconnectedNotice": "Disconnected from Mikka. The provider's authorization may still need to be revoked on its website."
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
@@ -2033,8 +2059,10 @@
     "unknownClient": "An unnamed app"
   },
   "Coordinator": {
+    "stop": "Stop",
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
+    "conversationWith": "Conversation with {name}",
     "usedTools": "Used {tools}",
     "pendingActions": {
       "label": "Waiting for your approval",
@@ -2064,6 +2092,7 @@
     "loadError": "Could not load the conversation. Retrying.",
     "failedTitle": "The last reply failed",
     "input": "Message the Coordinator",
+    "inputTo": "Message {name}",
     "placeholder": "Ask the Coordinator to start an issue…",
     "send": "Send",
     "citation": {
@@ -2340,8 +2369,10 @@
     "started": "started {time}",
     "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
     "composer": "Tell {agent} what to do next…",
-    "send": "Send",
-    "sendFailed": "Not sent. Your draft is still here"
+    "sendFailed": "Not sent. Your draft is still here",
+    "stopping": "Stopping…",
+    "stopFailed": "Couldn't stop it. Try again",
+    "send": "Send"
   },
   "Computer": {
     "status": {
@@ -2381,6 +2412,13 @@
       "handbackFailed": "Couldn't hand back. Try again."
     },
     "approval": {
+      "action": {
+        "click": "Click the screen",
+        "type": "Type text",
+        "key": "Press a key",
+        "scroll": "Scroll",
+        "screenshot": "View the screen"
+      },
       "allowRun": "Allow for this task",
       "deny": "Deny",
       "allow": "Allow",
@@ -2388,11 +2426,62 @@
     }
   },
   "Shell": {
+    "threads": {
+      "title": "Threads",
+      "empty": "No threads yet",
+      "untitled": "Untitled thread",
+      "waiting": "Needs you",
+      "failed": "Failed",
+      "screen": "Screen"
+    },
+    "newBot": {
+      "title": "New bot",
+      "description": "Name the bot and pick a shape and colour.",
+      "name": "Name",
+      "namePlaceholder": "Name",
+      "color": "Colour",
+      "colors": {
+        "encre": "Ink",
+        "brun": "Brown",
+        "rouge": "Red",
+        "orange": "Orange",
+        "ambre": "Amber",
+        "vert": "Green",
+        "turquoise": "Turquoise",
+        "bleu": "Blue",
+        "violet": "Violet",
+        "rose": "Pink",
+        "gris": "Grey",
+        "creme": "Cream"
+      },
+      "shape": "Shape",
+      "shapes": {
+        "cercle": "Circle",
+        "galet": "Pebble",
+        "squircle": "Squircle",
+        "capsule": "Capsule",
+        "triangle": "Triangle",
+        "hexagone": "Hexagon",
+        "nuage": "Cloud",
+        "goutte": "Drop",
+        "coeur": "Heart",
+        "etoile": "Star",
+        "fleur": "Flower",
+        "chat": "Cat",
+        "champignon": "Mushroom",
+        "fantome": "Ghost",
+        "feuille": "Leaf",
+        "ecran": "Screen"
+      },
+      "create": "Create",
+      "creating": "Creating…"
+    },
     "searchPlaceholder": "Search conversations, tasks, agents, knowledge",
     "searchLabel": "Search everything",
     "searchDescription": "Search conversations, tasks and projects. Use the arrow keys to choose and Enter to open.",
     "searchEmpty": "Nothing matches",
     "groups": {
+      "bots": "Bots",
       "conversations": "Conversations",
       "tasks": "Tasks",
       "projects": "Projects",
@@ -2400,7 +2489,7 @@
     },
     "newTask": "New task",
     "newConversation": "New conversation",
-    "openList": "Show conversations",
+    "openList": "Expand bot list",
     "back": "Back",
     "forward": "Forward",
     "window": "App window",
@@ -2434,8 +2523,6 @@
       "morning": "Good morning, {name}.",
       "afternoon": "Good afternoon, {name}.",
       "evening": "Good evening, {name}.",
-      "briefing": "{count, plural, one {# new message is} other {# new messages are}} worth a look, starting with",
-      "noneToday": "No new suggestions today.",
       "routine": "Routine",
       "empty": "Nothing to read right now",
       "connect": "Connect apps",
@@ -2453,7 +2540,9 @@
         "notion": "Notion",
         "github": "GitHub",
         "linear": "Linear"
-      }
+      },
+      "briefing": "{count, plural, one {# new message is} other {# new messages are}} worth a look, starting with",
+      "noneToday": "No new suggestions today."
     },
     "tasks": {
       "mine": "Tasks",
@@ -2588,6 +2677,59 @@
       "unassigned": "Unassigned"
     }
   },
+  "Artifact": {
+    "kindDocument": "Document",
+    "kindPage": "Web page",
+    "cardMeta": "{kind} · v{version}",
+    "version": "v{version}",
+    "versions": "Versions",
+    "current": "Current",
+    "versionMeta": "{author} · {time}",
+    "updated": "{author} · updated {time}",
+    "viewingOld": "Viewing v{version} · {time}",
+    "showDiff": "Show changes in v{latest}",
+    "backToLatest": "Back to v{latest}",
+    "download": "Download",
+    "selectElement": "Select element",
+    "openInBrowser": "Open in browser",
+    "close": "Close",
+    "quote": "Quote",
+    "copy": "Copy",
+    "copied": "Copied",
+    "removeQuote": "Remove quote",
+    "quoteLabel": "Quote: {text}",
+    "loadError": "This artifact can't be opened.",
+    "retry": "Retry",
+    "showChat": "Chat",
+    "showContent": "Content",
+    "frameTitle": "{title} (web page)",
+    "share": "Share",
+    "shareHint": "Anyone with the link can view the latest version without signing in.",
+    "createLink": "Create link",
+    "copyLink": "Copy link",
+    "linkCopied": "Link copied",
+    "stopSharing": "Stop sharing",
+    "sharingOn": "Sharing is on. Links you sent still work.",
+    "newLink": "Copy a new link",
+    "shareStopped": "Sharing stopped",
+    "shareLink": "Share link",
+    "sharedNotFoundHint": "Sharing was stopped, or the link is incomplete.",
+    "notFoundTitle": "This link no longer works",
+    "roles": {
+      "image": "Image",
+      "button": "Button",
+      "link": "Link",
+      "table": "Table",
+      "row": "Row",
+      "heading": "Heading",
+      "paragraph": "Paragraph",
+      "listItem": "List item",
+      "list": "List",
+      "field": "Field",
+      "card": "Card",
+      "block": "Block"
+    }
+  },
   "Unread": {
     "divider": "New messages start here",
     "newLabel": "New",
@@ -2602,5 +2744,47 @@
     "loadError": "Unable to load saved chat history.",
     "retry": "Retry",
     "incomplete": "This saved reply did not finish."
+  },
+  "MobilePush": {
+    "verificationCode": "A verification code arrived"
+  },
+  "DeviceSetup": {
+    "title": "Set up {device}",
+    "description": "Enter a repository on this device and its public GitHub remote. The device checks its Git origin before running.",
+    "path": "Local repository path",
+    "remote": "Public GitHub remote",
+    "branch": "Base branch",
+    "verify": "Verification command",
+    "addRepo": "Add repository",
+    "repoSaved": "Repository added",
+    "repoError": "Could not add the repository. Check the path, public GitHub remote, and device connection.",
+    "agentName": "Agent name",
+    "harness": "Installed harness",
+    "chooseHarness": "Choose a harness",
+    "addAgent": "Add agent",
+    "agentSaved": "Agent added",
+    "agentError": "Could not add the agent. Check its name and device connection."
+  },
+  "SelfImprovement": {
+    "resume": "Resume activation",
+    "activate": "Activate approved Skill",
+    "activated": "Activation recorded",
+    "feedback": "Feedback",
+    "feedbackNote": "Add a note (optional)",
+    "positive": "Helpful",
+    "negative": "Needs improvement",
+    "saved": "Feedback saved",
+    "error": "Could not complete the request. Try again.",
+    "candidates": "Skill candidates",
+    "review": "Review candidate",
+    "candidate": "Candidate instructions",
+    "evaluation": "Evaluation",
+    "evidence": "Review and verification evidence",
+    "environment": "Activation environment",
+    "chooseEnvironment": "Choose an environment",
+    "preview": "Preview",
+    "production": "Production",
+    "approve": "Approve activation",
+    "approved": "Approval recorded"
   }
 }

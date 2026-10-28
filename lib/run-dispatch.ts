@@ -30,7 +30,7 @@ function fingerprint(input: DispatchInput): string {
  * Lock order is always request key, then issue; unkeyed calls take only issue.
  */
 export async function insertRunOnce(database: Pick<typeof db, 'transaction'>, userId: string, input: DispatchInput,
-  brief: { deviceId: string; baseBranch: string; prompt: string }): Promise<DispatchResult> {
+  brief: { deviceId: string; baseBranch: string; prompt: string; botId?:string|null; agentDefinition?:typeof agentRuns.$inferInsert.agentDefinition }): Promise<DispatchResult> {
   return database.transaction(async tx => {
     const hash = input.requestKey ? fingerprint(input) : null
     if (input.requestKey) {
@@ -51,7 +51,7 @@ export async function insertRunOnce(database: Pick<typeof db, 'transaction'>, us
     await tx.insert(agentRuns).values({
       id: runId, userId, issueId: input.issueId, agentId: input.agentId, deviceId: brief.deviceId,
       deviceRepoId: input.deviceRepoId, status: 'queued', kind: 'implement', baseBranch: brief.baseBranch,
-      prompt: brief.prompt, dispatchKey: input.requestKey ?? null, dispatchFingerprint: hash,
+      botId:brief.botId??null, agentDefinition:brief.agentDefinition??null, prompt: brief.prompt, dispatchKey: input.requestKey ?? null, dispatchFingerprint: hash,
     })
     return { runId, status: 'queued', replayed: false }
   })

@@ -46,17 +46,22 @@ export const CODEX_CONFIG = [
 export function prepareCodexHome(
   dir: string,
   log: Logger,
-  userHome = process.env.CODEX_HOME || join(homedir(), ".codex")
+  userHome?: string,
+  linkNativeAuth = true
 ): CodexHome {
   ownDir(dir)
   writeOwnFile(join(dir, "config.toml"), CODEX_CONFIG)
   const link = join(dir, "auth.json")
-  const userAuth = join(userHome, "auth.json")
   const current = lstatSync(link, { throwIfNoEntry: false })
   if (current && !current.isSymbolicLink()) {
     log.warn("codex replaced its auth link with a file; removing the copy")
   }
   if (current) rmSync(link, { force: true, recursive: true })
+  if (!linkNativeAuth) return { home: dir, authFile: null }
+  const userAuth = join(
+    userHome ?? (process.env.CODEX_HOME || join(homedir(), ".codex")),
+    "auth.json"
+  )
   if (!existsSync(userAuth)) return { home: dir, authFile: null }
   symlinkSync(userAuth, link)
   return { home: dir, authFile: realpathSync(userAuth) }

@@ -34,7 +34,16 @@ if (flag("--resume")?.startsWith("gone-")) {
   process.stderr.write(`No conversation found with session ID: ${sessionId}\n`)
   process.exit(1)
 }
-const mcp = JSON.parse(flag("--mcp-config")).mcpServers.mikka
+const mcpServers = JSON.parse(flag("--mcp-config")).mcpServers
+const mcp = mcpServers.mikka
+const sdkReplies = new Map()
+let sdkId = 0
+let sdkInitialization
+const sdkCall = (method, params, server_name = 'mikka_mailbox') => new Promise(resolve => {
+  const request_id = `mailbox-${++sdkId}`
+  sdkReplies.set(request_id, resolve)
+  out({ type: 'control_request', request_id, request: { subtype: 'mcp_message', server_name, message: { jsonrpc: '2.0', ...(method !== 'notifications/initialized' ? { id: sdkId } : {}), method, params } } })
+})
 const out = (event) =>
   process.stdout.write(
     `${JSON.stringify({ session_id: sessionId, ...event })}\n`
@@ -62,11 +71,34 @@ let handedIn = null
 let afterHandIn = null
 const lines = createInterface({ input: process.stdin })
 lines.on("line", async (line) => {
+  const frame = JSON.parse(line)
+  if (frame.type === 'control_request') {
+    if (frame.request?.subtype === 'initialize') sdkInitialization = frame.request
+    out({ type: 'control_response', response: { subtype: 'success', request_id: frame.request_id, response: { commands: [], agents: [], output_style: 'default' } } })
+    return
+  }
+  if (frame.type === 'control_response') { const callback = sdkReplies.get(frame.response.request_id); if (callback) { sdkReplies.delete(frame.response.request_id); callback(frame.response.subtype === 'error' ? { error: { message: 'SDK server unavailable' } } : frame.response.response?.mcp_response ?? frame.response.response) }; return }
   // A control request (the SDK's initialize, or its shutdown) carries no
   // user text; only the prompt lines are turns.
   const asked = JSON.parse(line)?.message?.content?.[0]?.text
   if (typeof asked !== "string") return
   const message = asked
+  if (message.startsWith('MAILBOX_TEST ')) {
+    const results = []
+    const enabled = mcpServers.mikka_mailbox?.type === 'sdk' || sdkInitialization?.sdkMcpServers?.includes('mikka_mailbox')
+    if (enabled) { await sdkCall('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'fake-cli', version: '1' } }); await sdkCall('notifications/initialized', {}) }
+    for (const call of JSON.parse(message.slice('MAILBOX_TEST '.length))) {
+      if (enabled && call.name === '__mailbox_catalog') {
+        const local = await callMcpTool(mcp, call.name, {})
+        const remote = await sdkCall('tools/list', {})
+        results.push({ result: { tools: [...local.result.tools, ...remote.result.tools] } })
+      } else results.push(enabled ? await sdkCall('tools/call', { name: call.name, arguments: call.arguments ?? {} }, call.foreignContext ? 'another_run_mailbox' : 'mikka_mailbox') : await callMcpTool(mcp, call.name, call.arguments ?? {}))
+    }
+    text(JSON.stringify({ mailboxResults: results, mcpConfig: mcp, hostControlMailbox: Boolean(enabled) }))
+    await callMcpTool(mcp, 'report_blocked', { reason: 'Synthetic mailbox wiring complete; no provider was invoked' })
+    result()
+    return
+  }
   if (release) {
     const done = release
     release = null

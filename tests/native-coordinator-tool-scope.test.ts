@@ -36,22 +36,15 @@ stub('../lib/coordinator/native.ts',{nativeCoordinatorStore:{assertToolActive:ch
 stub('../lib/coordinator/store.ts',{editMemory:effect})
 stub('../lib/coordinator/issue-create.ts',{createIssueFromRequest:effect})
 stub('../lib/issue-visibility.ts',{issueVisibility:effect})
-stub('../lib/agent-runs.ts',{addRunMessage:effect,queueRun:effect,readRun:readRunResult,requestRunStop:effect,visibleRuns:effect})
-stub('../lib/db/index.ts',{db:{select:()=>({from:()=>({where:()=>({limit:readUserEvent})})})}})
+stub('../lib/agent-runs.ts',{addRunMessage:effect,queueRun:effect,readRun:effect,requestRunStop:effect,visibleRuns:effect})
+stub('../lib/db/index.ts',{db:null,pool:null})
 stub('../lib/search/index.ts',{webSearch:effect})
 stub('../lib/device-link.ts',{DEVICE_ONLINE_WINDOW_MS:60_000})
 stub('../lib/composio.ts',{runComposioAction:effect})
 stub('../lib/pending-action-store.ts',{proposeAction:effect})
 stub('../lib/issue-access.ts',{issueForUser:effect})
 stub('../lib/telegram/client.ts',{postTelegramText:effect})
-stub('../lib/factory/server.ts',{dispatchFactoryRun:effect,factoryMonitor:{reconcile:effect},factoryStore:{read:async()=>({contractVersion:1,task:{id:'task',revision:99},attempts:[],candidates:[]})},factoryQuestions:{read:readQuestion,answer:effect,escalate:escalateQuestion,list:async()=>[questionView()],pending:async()=>[questionView()]},reconcileFactoryRuns:effect})
-stub('../lib/self-improvement/source.ts',{readCommittedSkill:async()=>{revoked=true;return 'source bytes'}})
-stub('../lib/self-improvement/server.ts',{improvementStore:{},skillAssignments:{},improvementFactory:{},skillEvaluations:{freezeBenchmark:effect,dispatchNext:effect,beginEvaluation:effect,compare:effect},skillRegistry:{
-  registerCandidate:async(_user:unknown,_input:unknown,readSource:(source:unknown)=>Promise<string>)=>{
-    await readSource({repository:'https://github.com/example/public',sha:'a'.repeat(40),baseSha:'b'.repeat(40)})
-    return effect()
-  },
-}})
+stub('../lib/attention/store.ts',{recordDecision:effect,settleTurn:effect})
 let steps: typeof import('../workflows/coordinator/steps')
 before(async()=>{steps=await import('../workflows/coordinator/steps')})
 const scope={holder:'holder',turnId:'turn',callId:'call'}
@@ -97,13 +90,23 @@ const calls = {
   proposeAccountAction:()=>steps.proposeAccountAction(user,'send_email',{},scope),
   listIssues:()=>steps.listIssues(user,{},scope),
   getIssue:()=>steps.getIssue(user,{issueId:'issue'},scope),
+  createIssue:()=>steps.createIssue(user,{title:'Task'},'tool-call',scope),
+  updateIssue:()=>steps.updateIssue(user,{issueId:'issue',title:'Updated'},'tool-call',scope),
   listAgents:()=>steps.listAgents(user,scope),
-  dispatchRun:()=>steps.dispatchRun(user,{binding:{taskId:'task',issueId:'issue',attemptId:'attempt',revision:1,candidateId:null},agentId:'agent',deviceRepoId:'repo'},scope),
+  dispatchRun:()=>steps.dispatchRun(user,{issueId:'issue',agentId:'agent',deviceRepoId:'repo'},scope),
+  listComputerWorkspaces:()=>steps.listComputerWorkspaces(user,scope),
+  createComputerBot:()=>steps.createComputerBot(user,{workspaceId:'workspace',name:'Bot'},'tool-call',scope),
+  listComputerBots:()=>steps.listComputerBots(user,scope),
+  wakeComputerBot:()=>steps.wakeComputerBot(user,{botId:'bot'},scope),
+  listBotSubscriptions:()=>steps.listBotSubscriptions(user,{botId:'bot'},scope),
+  bindComputerSubscription:()=>steps.bindComputerSubscription(user,{botId:'bot',connectionId:'connection',revision:1,harness:'codex',modelId:'model'},'tool-call',scope),
+  dispatchComputerTask:()=>steps.dispatchComputerTask(user,{botId:'bot',issueId:'issue',harness:'codex'},'tool-call',scope),
   listRuns:()=>steps.listRuns(user,{},scope),
   getRun:()=>steps.getRun(user,{runId:'run'},scope),
   sendToRun:()=>steps.sendToRun(user,{runId:'run',text:'message'},scope),
   stopRun:()=>steps.stopRun(user,{runId:'run'},scope),
   webSearchStep:()=>steps.webSearchStep(user,{query:'query'},scope),
+  recordAttention:()=>steps.recordAttention(user,{matterId:'matter',decision:'notify'},scope),
 }
 for (const [name,call] of Object.entries(calls)) {
   test(`${name} checks current native authorization inside the business step`,async()=>{

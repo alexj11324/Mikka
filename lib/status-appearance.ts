@@ -38,9 +38,3 @@ export const statusIconTints: Record<StatusTone, string> = {
   destructive: 'text-destructive',
   focus: 'text-info-foreground',
 }
-
-/** Agent sphere gradients (Figma 77:2), keyed by avatar tone. */
-export const SPHERE_TONES = {
-  coordinator: 'from-sidebar-primary/45 to-sidebar-primary', t1: 'from-avatar-1/45 to-avatar-1', t2: 'from-avatar-2/45 to-avatar-2',
-  t3: 'from-avatar-3/45 to-avatar-3', t4: 'from-avatar-4/45 to-avatar-4', t5: 'from-avatar-5/45 to-avatar-5',
-} as const

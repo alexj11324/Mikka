@@ -7,6 +7,9 @@ import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { improvementTestDatabase } from './test-database'
 import { createSkillAssignments } from './assignments'
+import { createSkillComparisonCollector } from './comparison-collector'
+import { createRegisteredSkillEvaluator } from './registered-evaluation'
+import { syntheticDecision } from './testing/evaluation-fixture'
 import { createSkillEvaluations, type EvaluationSettings } from './evaluations'
 import { BASELINE_ARTIFACT, BASELINE_MARKDOWN } from './builtin-skill'
 import { createImprovementStore } from './store'
@@ -44,7 +47,9 @@ test('PG frozen benchmark queues actual owned assignments atomically and keeps s
     await pool.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now(),report=$2 WHERE id=$1`,[sourceRunId,JSON.stringify({sourceCommit:'a'.repeat(40),summary:'Synthetic source fixture'})])
     const settings:EvaluationSettings={harness:'codex',model:'synthetic-model',policyDigest:'b'.repeat(64),fixtureDigest:'c'.repeat(64),verifyCommand:REPORT_BENCHMARK.verifyCommand}
     let queueCalls=0,failSelection=false
-    service=createSkillEvaluations(pool,{authorize,settings:async()=>settings,
+    const loadComparison=createSkillComparisonCollector(pool,authorize,async()=>{throw Error('No stored object in this synthetic fixture')})
+    const assess=createRegisteredSkillEvaluator({loadComparison,modelEvaluationEnabled:true,invokeDecision:syntheticDecision('improved')})
+    service=createSkillEvaluations(pool,{authorize,assess,settings:async()=>settings,
       queue:async(tx,u,input)=>{
         queueCalls++
         assert.equal(u,userId)
@@ -196,5 +201,5 @@ test('PG frozen benchmark queues actual owned assignments atomically and keeps s
       const column=table==='improvement_evaluation_results'?'digest':'userId'
       await assert.rejects(pool.query(`UPDATE ${table} SET "${column}"='forged'`),/immutable/)
     }
-    console.log(JSON.stringify({layer:'PG-evaluation-assignment-boundary',sessions:'synthetic',modelCalls:0,retainedSchema:schema}))
+    console.log(JSON.stringify({layer:'PG-evaluation-assignment-boundary',sessions:'synthetic',realModelCalls:0,decisionTransport:'synthetic',retainedSchema:schema}))
   })

@@ -34,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { runId } = await params
   const [run] = await db
-    .select({ id: agentRuns.id, userId: agentRuns.userId, issueId: agentRuns.issueId, status: agentRuns.status, kind: agentRuns.kind, })
+    .select({ id: agentRuns.id, userId: agentRuns.userId, botId: agentRuns.botId, issueId: agentRuns.issueId, status: agentRuns.status, kind: agentRuns.kind })
     .from(agentRuns)
     .innerJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(eq(agentRuns.id, runId), eq(devices.ownerId, caller.userId)))

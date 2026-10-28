@@ -70,3 +70,14 @@ existing independent review/verification/approval, fixed Preview and production
 user flow, monitoring/recovery and a sanitized playable PR video. Model OFF,
 synthetic tests and default-off paths cannot substitute for these gates. No merge
 or deployment is claimed by this source increment.
+
+## Authorization update, 2026-10-28
+
+The user explicitly authorized existing CI to read Staging secret values through
+its existing protected identity, and reclamation of newly created managed
+temporary test resources. These two categories no longer block source publication
+or applicable CI. This does not expose secret values, delete existing business
+data or preserved logs, authorize production migrations, or enable live benchmark
+model evaluation. Earlier retained local resources remain preserved. Current main
+claim/subscription interfaces are composed with the existing Factory fences in
+the same transaction; no permission/approval bypass is introduced.
