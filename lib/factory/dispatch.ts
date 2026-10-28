@@ -26,7 +26,7 @@ export const factoryBinding = (task: FactoryTask): FactoryBinding => ({
   taskId: task.id, issueId: task.issueId, attemptId: task.attemptId,
   candidateId: task.candidateId, revision: task.revision,
 });
-const fail = (code: string): never => { throw new FactoryError(code); };
+function fail(code: string): never { throw new FactoryError(code); }
 /** Task -> issue/access -> run. The existing queue writes through this transaction.
  * Ledger, queue, server configuration, frozen definition and binding commit together. */
 export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof createFactoryStore>, queue: FactoryQueue, adapters: FactoryDispatchAdapters) {

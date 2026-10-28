@@ -20,7 +20,7 @@ Stage selection: any concrete missing information or permission → `clarify/wai
 
 Both `MIKKA_FACTORY_ROUTING_ENABLED=1` and existing `MIKKA_ISSUE_TOOLS_ENABLED=1` are required for intake tools. Registering capabilities does not expand a frozen execution grant. Existing stored definitions must explicitly include a capability before instrumented execution can use it. No runtime flag, definition, provider authorization or real resource is changed by this PR.
 
-Migration: `20261028070000_factory_192_routing.sql`, application database only. Do not also import old candidate aliases for these tables. #193–195 retain ownership of their validators/adapters. Current main's queueRun has no #191 request-key/transaction contract; this PR does not replace it or claim atomic run dispatch. Native Coordinator and real-model evaluation remain off for this work.
+Migration: `20261028182316_factory_192_routing.sql`, application database only. Do not also import old candidate aliases for these tables. #193–195 retain ownership of their validators/adapters. Current main's queueRun has no #191 request-key/transaction contract; this PR does not replace it or claim atomic run dispatch. Native Coordinator and real-model evaluation remain off for this work.
 
 ## Acceptance boundaries
 

@@ -1,3 +1,6 @@
+import { createServer } from 'node:http';
+import { once } from 'node:events';
+import { handleFactoryQuestion } from './questions/http';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { TestContext } from 'node:test';
@@ -76,6 +79,46 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
     await store.apply('owner',factoryBinding(current.task),randomUUID(),{action:'cancel',reason:'Cancelled'});
     await denies(()=>questions.answer({source:'human',userId:'owner',sessionId:'not-a-session'},{reference:questionReference(q),answerId:randomUUID(),text:'yes'}),'factoryStopped');
     assert.equal((await questions.read('owner',q.id)).status,'cancelled');
+  });
+  await t.test('real loopback HTTP: authenticated human only, origin, strict body, duplicate and cancelled answer fences',async()=>{
+    const r=await store.route('owner',await fixture());
+    const d=await dispatch('owner',{binding:factoryBinding(r.task),agentId,deviceRepoId:repoId});
+    await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"='human-session',report=$2 WHERE id=$1`,[d.runId,JSON.stringify({question:{questionId:randomUUID(),kind:'permission',question:'Confirm requested scope?',options:[]}})]);
+    const q=await questions.record('owner',d.runId), sessionId=randomUUID();
+    await pool.query(`INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES ($1,'owner',$2,now()+interval '1 hour',now(),now())`,[sessionId,randomUUID()]);
+    let origin='';
+    const server=createServer(async(req,res)=>{
+      try {
+        const chunks:Buffer[]=[];for await(const chunk of req)chunks.push(Buffer.from(chunk));
+        const cookie=req.headers.cookie;
+        const result=await handleFactoryQuestion(questions,{
+          actor:cookie==='fixture=owner'?{userId:'owner',sessionId}:cookie==='fixture=other'?{userId:'other',sessionId}:null,
+          authorization:req.headers.authorization??null,method:req.method??'GET',questionId:q.id,
+          origin:req.headers.origin??null,url:origin+req.url,
+          body:chunks.length?JSON.parse(Buffer.concat(chunks).toString()):undefined,
+        });
+        res.writeHead(result.status,{'content-type':'application/json'});res.end(JSON.stringify(result.body));
+      }catch{res.writeHead(500);res.end();}
+    });
+    server.listen(0,'127.0.0.1');await once(server,'listening');
+    origin=`http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}`;
+    const answer={reference:questionReference(q),answerId:randomUUID(),text:'Continue within the already authorized scope'};
+    const send=(body:unknown,headers:Record<string,string>={})=>fetch(origin+'/'+q.id,{method:'POST',headers:{'content-type':'application/json',cookie:'fixture=owner',origin,...headers},body:JSON.stringify(body)});
+    try {
+      assert.equal((await fetch(origin+'/'+q.id)).status,401);
+      assert.equal((await fetch(origin+'/'+q.id,{headers:{cookie:'fixture=other'}})).status,404);
+      assert.equal((await send(answer,{authorization:'Bearer synthetic-test'})).status,401);
+      assert.equal((await send(answer,{origin:'https://foreign.invalid'})).status,403);
+      assert.equal((await send({...answer,source:'human'})).status,422);
+      const accepted=await send(answer);assert.equal(accepted.status,200);
+      const result=await accepted.json() as {continuationRunId:string};
+      const replay=await send(answer);assert.equal(replay.status,200);
+      assert.equal((await replay.json() as {continuationRunId:string}).continuationRunId,result.continuationRunId);
+      const current=await store.read('owner',r.task.id);
+      await store.apply('owner',factoryBinding(current.task),randomUUID(),{action:'cancel',reason:'Stop continuation'});
+      assert.equal((await send(answer)).status,409);
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[r.task.issueId])).rows[0].n,2);
+    }finally{server.closeAllConnections();await new Promise<void>((resolve,reject)=>server.close(e=>e?reject(e):resolve()));}
   });
   await t.test('unadopted retry and revoked issue access cannot claim',async()=>{
     const r=await store.route('owner',await fixture());

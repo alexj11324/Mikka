@@ -39,7 +39,7 @@ test(
       ))
         await pool.query(await readFile(new URL(f, dir), "utf8"));
       const migration = await readFile(
-        new URL("20261028070000_factory_192_routing.sql", dir),
+        new URL("20261028182316_factory_192_routing.sql", dir),
         "utf8",
       );
       await pool.query(migration);

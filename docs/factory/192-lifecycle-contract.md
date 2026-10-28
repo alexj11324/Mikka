@@ -22,7 +22,9 @@ Existing ask_human/report_blocked hand-in records the question; the existing Coo
 
 ## Migration and default-off approval inventory
 
-Frozen intake migration: `20261028070000_factory_192_routing.sql` creates four Factory tables/indexes with issue foreign keys. No ordinary application columns or data are rewritten. It still takes DDL/catalog and referenced-table locks during installation; default-off is not permission to execute production SQL.
+This undeployed candidate renames PR385’s `20261028070000_factory_192_routing.sql` without changing its SQL bytes because main now contains later migrations. Apply exactly one name, never both; PR385 itself remains unchanged.
+
+Candidate intake migration: `20261028182316_factory_192_routing.sql` creates four Factory tables/indexes with issue foreign keys. No ordinary application columns or data are rewritten. It still takes DDL/catalog and referenced-table locks during installation; default-off is not permission to execute production SQL.
 
 Candidate migration: `20261028182317_factory_192_questions.sql` creates Factory questions/indexes and adds nullable JSONB `agent_runs.questionContinuation`. ALTER TABLE requires an ACCESS EXCLUSIVE lock even though there is no backfill/default. The new column is accessed only in explicit Factory raw SQL; it is deliberately absent from ordinary Drizzle all-column projections, so default-off ordinary reads/writes do not require it. Historical event references do not block Bot deletion. Existing issue cascades also delete the new Factory state when an issue is deleted; no deletion operation is performed by these migrations.
 

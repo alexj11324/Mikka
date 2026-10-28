@@ -10,7 +10,6 @@ import { issueRunToken } from '@/lib/mcp/worker'
 import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
-import { guardFactoryClaim } from '@/lib/factory/runtime'
 import { FactoryError } from '@/lib/factory/contract'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
 
@@ -56,6 +55,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let factoryClaim: Record<string, unknown> = {}
   const beforeClaim = async (tx: import('pg').PoolClient) => {
+    if (process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return true
+    const { guardFactoryClaim } = await import('@/lib/factory/runtime')
     try { factoryClaim = await guardFactoryClaim(tx,caller.userId,deviceId,runId,leaseExpiresAt); return true }
     catch (error) { if (error instanceof FactoryError) return false; throw error }
   }
