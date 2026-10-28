@@ -128,8 +128,16 @@ export async function acquireTestAccounts({ database, environment, runId, worker
       try {
         if (lost || performance.now() >= deadline) { lose(); fail('LEASE_LOST') }
         await pool.revokeSessions(lease)
-        // Expired sessions and their private state files remain for audit.
-        const result = await pool.release(lease, { outcome: releaseOutcome })
+        // Retention must not bless swapped, public or missing credential files.
+        let safe = true
+        for (const path of stateFiles) {
+          try {
+            const info = await lstat(path)
+            if (!info.isFile() || info.isSymbolicLink() || (info.mode & 0o077) || (process.getuid && info.uid !== process.getuid())) safe = false
+          } catch { safe = false }
+        }
+        const result = await pool.release(lease, { outcome: safe ? releaseOutcome : 'dirty' })
+        if (!safe) fail('SESSION_STATE_PRESERVATION_FAILED')
         if (outcome === 'clean' && result.state !== 'released') fail('ACCOUNT_DIRTY')
         return result
       } finally {
