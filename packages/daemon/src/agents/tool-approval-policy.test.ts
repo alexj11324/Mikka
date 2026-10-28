@@ -11,5 +11,7 @@ it('uses trusted allow and deny only for recognized commands and asks on ambigui
   expect(toolApprovalDecision(request('npm install example && echo unsafe'), { ...base, permissions:{ ...base.permissions, install_dependency:'allow' } })).toBe('ask')
   expect(toolApprovalDecision(request('npm install example'), { ...base, permissions:{ ...base.permissions, install_dependency:'deny' } })).toBe('deny')
   expect(toolApprovalDecision(request('echo unknown'), base)).toBe('ask')
+  const inputRequest = { ...request('npm install example'), input: { kind:'writeStdin', command:'npm install example' } }
+  expect(toolApprovalDecision(inputRequest, { ...base, permissions:{ ...base.permissions, install_dependency:'allow' } })).toBe('ask')
   expect(toolApprovalDecision(request('echo unknown'), { ...base, readOnly: true })).toBe('deny')
 })

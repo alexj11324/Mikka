@@ -66,6 +66,30 @@ async function runTurn(text) {
     threadId,
     turn: { id: open, status: "inProgress", error: null },
   })
+  if (text === 'APPROVAL_IDS_TEST') {
+    const request = (approvalId) => new Promise(resolve => {
+      const wireId = `approval-${randomUUID()}`
+      hostReplies.set(wireId, resolve)
+      send({ id: wireId, method: 'item/commandExecution/requestApproval', params: { kind: 'command', threadId, turnId: open, itemId: 'parent', startedAtMs: Date.now(), environmentId: null, approvalId, command: 'synthetic' } })
+    })
+    const first = await request('one')
+    const second = await request('two')
+    const replay = await request('one')
+    const fileGrant = await new Promise(resolve => {
+      const id = `approval-${randomUUID()}`; hostReplies.set(id, resolve)
+      send({ id, method: 'item/fileChange/requestApproval', params: { threadId, turnId: open, itemId: 'file-grant', startedAtMs: Date.now(), grantRoot: '/other' } })
+    })
+    const noExactAccept = await new Promise(resolve => {
+      const id = `approval-${randomUUID()}`; hostReplies.set(id, resolve)
+      send({ id, method: 'item/commandExecution/requestApproval', params: { threadId, turnId: open, itemId: 'session-grant', command: 'synthetic', availableDecisions: ['acceptForSession', 'cancel'] } })
+    })
+    const output = JSON.stringify({ first, second, replay, fileGrant, noExactAccept })
+    item('started', { type: 'agentMessage', id: 'approval-output', text: '' })
+    notify('item/agentMessage/delta', { threadId, turnId: open, itemId: 'approval-output', delta: output })
+    item('completed', { type: 'agentMessage', id: 'approval-output', text: output })
+    complete()
+    return
+  }
   if (text === 'APPROVAL_TEST') {
     const request = (id, foreign = false) => new Promise(resolve => {
       const wireId = `approval-${randomUUID()}`

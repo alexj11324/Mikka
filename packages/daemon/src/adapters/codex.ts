@@ -408,9 +408,16 @@ export class CodexAdapter implements AgentAdapter {
       if (method === "item/commandExecution/requestApproval" || method === "item/fileChange/requestApproval") {
         if (!options.toolApproval) return { decision: "decline" }
         if (pendingTurnStart) await pendingTurnStart
-        const call = params as { threadId?: unknown; turnId?: unknown; itemId?: unknown } | null
+        const call = params as { threadId?: unknown; turnId?: unknown; itemId?: unknown; approvalId?: unknown; grantRoot?: unknown; availableDecisions?: unknown } | null
         if (!call || ending || call.threadId !== sessionId || call.turnId !== activeTurn || typeof call.itemId !== 'string' || !activeTurn) return { decision: "decline" }
-        const decision = await options.toolApproval.request({ runId: options.runId, harness: 'codex', requestId: `${activeTurn}/${call.itemId}`, method, input: params })
+        // A grantRoot can widen writes for a session; this bridge grants only
+        // one exact operation. Never convert it into a session-wide grant.
+        if (method === 'item/fileChange/requestApproval' && call.grantRoot != null) return { decision: 'cancel' }
+        if (call.availableDecisions != null && (!Array.isArray(call.availableDecisions) || !call.availableDecisions.includes('accept'))) return { decision: 'cancel' }
+        if (call.approvalId != null && (typeof call.approvalId !== 'string' || !call.approvalId)) return { decision: 'decline' }
+        const callbackId = typeof call.approvalId === 'string' ? call.approvalId : call.itemId
+        const decision = await options.toolApproval.request({ runId: options.runId, harness: 'codex', requestId: `${activeTurn}/${call.itemId}/${callbackId}`, method, input: params })
+        // Do not grant a session or policy amendment in place of one action.
         return { decision: decision === 'allow' ? 'accept' : 'decline' }
       }
       if (method === "item/permissions/requestApproval") return { permissions: {}, scope: "turn" }

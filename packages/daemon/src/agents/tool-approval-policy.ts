@@ -8,6 +8,9 @@ export function toolApprovalDecision(request: Readonly<ToolApprovalRequest>, sen
   const policy = runPolicy(sent)
   if (policy.readOnly && (['item/commandExecution/requestApproval','item/fileChange/requestApproval','Bash','Write','Edit','MultiEdit','NotebookEdit'].includes(request.method))) return 'deny'
   const input = request.input && typeof request.input === 'object' ? request.input as Record<string, unknown> : {}
+  // Codex 0.163 may ask about terminal input rather than a command. It must
+  // never inherit a command's allow even when a command field is present.
+  if (request.method === 'item/commandExecution/requestApproval' && input.kind != null && input.kind !== 'command') return 'ask'
   const command = request.method === 'Bash' || request.method === 'item/commandExecution/requestApproval' ? input.command : null
   if (typeof command !== 'string') return 'ask'
   const action = classifyCommand(command)
