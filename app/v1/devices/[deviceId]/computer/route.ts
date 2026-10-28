@@ -9,6 +9,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const caller = await authenticateDevice(request)
   if (!caller) return Response.json({ error: 'Unauthorized' }, { status: 401, headers })
   const { deviceId } = await params
+  if (caller.scopeDeviceId && caller.scopeDeviceId !== deviceId) return Response.json({ error: 'Unknown device' }, { status: 404, headers })
   const device = await ownedDevice(deviceId, caller.userId)
   if (!device?.enabled) return Response.json({ error: 'Unknown device' }, { status: 404, headers })
   const body = await request.text()

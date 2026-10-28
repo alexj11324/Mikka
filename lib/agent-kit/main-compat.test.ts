@@ -79,3 +79,7 @@ test('cloud request replay cannot substitute another parent execution',async()=>
 })
 
 test('local assignment receives only persisted server computer authority',async()=>{localCapable=true;const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.localComputer.workspaceId,workspace);assert.equal(body.localComputer.ownerId,owner);assert.equal(body.localComputer.policyVersion,3);assert.equal(body.policy.permissions.computer_use,'allow');assert.equal(body.computer,undefined)})
+
+test('a scoped device credential cannot claim a different device even for the same owner',async()=>{
+ const otherDevice=randomUUID();const response=await claim(new Request('https://example.test/claim',{method:'POST'}),{params:Promise.resolve({deviceId:otherDevice,runId:randomUUID()})});assert.equal(response.status,404);assert.equal(selectIndex,0);assert.equal(claimed.mock.callCount(),0);assert.equal(cloudClaimed.mock.callCount(),0)
+})

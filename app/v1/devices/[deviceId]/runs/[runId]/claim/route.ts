@@ -26,6 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId, runId } = await params
+  if (caller.scopeDeviceId && caller.scopeDeviceId !== deviceId) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const device = await ownedDevice(deviceId, caller.userId)
   if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   if (!device.enabled) return NextResponse.json({ error: 'Scheduling is off for this device.' }, { status: 409 })
