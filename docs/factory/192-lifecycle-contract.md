@@ -47,3 +47,58 @@ not a registered migration. Application monitor dispatch/claim/consume still
 requires those host-installed implementations; the owner source handoff itself is
 complete. Before phase callbacks, reconcile now handles cancelled/stop-requested
 runs so consumer callbacks cannot interpret cancelled completion as health.
+
+## Adapter handoff v1 (executable source)
+
+`lib/factory/consumer-contract.ts` exports `FACTORY_CONSUMER_CONTRACT_VERSION=1`
+and `FactoryConsumerAdapter`. Register a complete adapter in the sixth argument
+of `factoryRuntimeForBot(botId, lifecycle, configure, validateCheck, consumers,
+adapters)`. Existing arguments retain their meanings. No adapter is installed by
+default; no mutable global registry, new route or worker-controlled selector exists.
+
+```ts
+interface FactoryConsumerAdapter {
+  stage: 'review' | 'verify' | 'monitor';
+  configure(tx: PoolClient, task: FactoryTask, runId: string): Promise<void>;
+  validateClaim(tx: PoolClient, task: FactoryTask, runId: string): Promise<Record<string, unknown>>;
+  gate: FactoryGate;
+  reconcile(tx: PoolClient, store: ReturnType<typeof createFactoryStore>,
+    task: FactoryTask, run: Record<string, any>): Promise<unknown>;
+}
+```
+
+All four functions are mandatory, phase duplicates reject, and adapters cannot
+silently replace same-phase legacy callbacks. A missing phase's claim rejects.
+Configure must bind the actual publication receipt and frozen check definition to
+the queued run before freeze/bind. Claim must reread that binding under the current
+task/access/run locks; ancestry independence alone never grants execution.
+
+The trusted observation reader is owned by #195. Its input must be the current
+locked task/attempt/run and its output must bind authenticated artifact ID/digest,
+owner/Bot/issue/source event/task/attempt/revision/candidate/stage/run/session,
+candidate SHA and frozen definitionDigest. Source authenticity and workspace scope
+must be checked by that backend reader, not inferred from the worker report or a
+caller flag. `assertFactoryArtifactBinding(task, currentAttemptRun, candidateSha,
+artifact, {now,maxAgeMs})` validates this envelope only AFTER authenticity checks.
+The caller obtains currentAttemptRun by the locked attempt.runId; it cannot choose
+another run. Artifact observedAt must not be future, must meet backend maxAgeMs,
+and expiresAt must be later than now. The freshness policy and trusted expiry are
+backend-owned, never selected by model/user payload. No arbitrary duration is
+installed by this contract; #195 supplies the observation policy.
+
+Reconcile must reject stale revision/attempt/candidate/run/session and expired
+recovery even when the same incident fingerprint exists. Cancellation/revocation
+never resumes work; #192 checks cancellation before invoking phase consumers.
+Question recovery retains origin session and existing 24-hour deadline; an expired
+question cannot claim its queued continuation. A fresh monitor cycle creates a new
+attempt rather than renewing stale evidence. Consumer incident/event/CAS/cycle
+writes must use the supplied tx, without commit or network operations inside the
+transaction. Call consumeMonitorObservation only after these checks. Its incident
+ID/replay flag is not a pass result; store.apply still requires the monitor gate
+and actual independence predicate. Healthy evidence never closes an issue.
+
+These tests exercise actual registration/binding code with synthetic inputs. They
+do not authenticate a provider artifact or prove system monitor acceptance. #195
+must provide the four implementations plus its trusted observation reader; #192
+will install those frozen exports at all entry points, including claim, question
+resume and reconciliation, once delivered. No incident schema is registered here.
