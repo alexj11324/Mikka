@@ -16,7 +16,7 @@ stub('../lib/db/index.ts',{db:null,pool:null})
 stub('../lib/search/index.ts',{webSearch:effect})
 stub('../lib/device-link.ts',{DEVICE_ONLINE_WINDOW_MS:60_000})
 stub('../lib/composio.ts',{runComposioAction:effect})
-stub('../lib/pending-action-store.ts',{proposeAction:effect})
+stub('../lib/pending-action-store.ts',{proposeAction:effect,proposeRepositoryPush:effect})
 stub('../lib/issue-access.ts',{issueForUser:effect})
 stub('../lib/telegram/client.ts',{postTelegramText:effect})
 stub('../lib/attention/store.ts',{recordDecision:effect,settleTurn:effect})
@@ -32,6 +32,7 @@ const calls = {
   forget:()=>steps.forget(user,{text:'preference'},scope),
   composioAction:()=>steps.composioAction(user,'fetch_recent_gmail',{query:'is:unread'},scope),
   proposeAccountAction:()=>steps.proposeAccountAction(user,'send_email',{},scope),
+  proposeRepositoryPushApproval:()=>steps.proposeRepositoryPushApproval(user,{repo:'owner/repo'},scope),
   listIssues:()=>steps.listIssues(user,{},scope),
   getIssue:()=>steps.getIssue(user,{issueId:'issue'},scope),
   createIssue:()=>steps.createIssue(user,{title:'Task'},'tool-call',scope),

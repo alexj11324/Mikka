@@ -87,11 +87,11 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(plan.selfManaged.includes('lib/auth-email.test.ts'))
   const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
   const custodyWorkflow = readFileSync('.github/workflows/e2b-byos.yml', 'utf8')
+  const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
   for (const { runner } of SELF_MANAGED) {
     const dedicatedScript = Object.entries(pkg).find(([, command]) => command === `node ${runner}`)?.[0]
-    assert.ok(workflow.includes(`run: node ${runner}`) || (dedicatedScript && custodyWorkflow.includes(`run: pnpm ${dedicatedScript}`)), `${runner} runs in CI`)
+    assert.ok(workflow.includes(`run: node ${runner}`) || browser.includes(`run: node ${runner}`) || (dedicatedScript && custodyWorkflow.includes(`run: pnpm ${dedicatedScript}`)), `${runner} runs in CI`)
   }
-  const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
   // Pure gates also run without a database in the fast job; their DB run is still only through pnpm test:db.
   const pureGates = ['test:groups', 'test:active-agents', 'test:group-turns', 'test:issue-search']
   for (const script of plan.scripts) {
@@ -113,7 +113,8 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.match(workflow, /REQUIRE_DB: '1'/)
   assert.match(browser, /pnpm test:performance --output=performance-results/)
   assert.match(browser, /pnpm test:e2e --grep-invert @performance/)
-  assert.match(browser, /^\s*run: pnpm test:e2e:mvp\s*$/m, 'the dedicated MVP browser gate remains required')
+  assert.match(browser, /^\s*pnpm test:e2e:mvp > "\$log_file" 2>&1 \|\| test_status=\$\?/m, 'the dedicated MVP browser gate remains required')
+  assert.match(browser, /log_file=\.cache\/e2e\/playwright-mvp\.log[\s\S]*?audit-evidence --evidence "\$log_file"[\s\S]*?exit "\$test_status"/, 'MVP output is audited before display and the test result is preserved')
   assert.equal(pkg['test:e2e:mvp'], 'playwright test --config=playwright.mvp.config.ts')
   assert.deepEqual(plan.browser, ['tests/mvp/core-loop.spec.ts'])
   const mvpConfig = readFileSync('playwright.mvp.config.ts', 'utf8')

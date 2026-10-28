@@ -24,7 +24,7 @@ stub('../agent-runs.ts', { addRunMessage: async (...args: unknown[]) => { forwar
 stub('../search/index.ts', { webSearch: () => {} })
 stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synthetic-unused' })
 stub('../composio.ts', { runComposioAction: () => {} })
-stub('../pending-action-store.ts', { proposeAction: () => {} })
+stub('../pending-action-store.ts', { proposeAction: () => {}, proposeRepositoryPush: () => {} })
 stub('../issue-access.ts', { issueForUser: () => {} })
 stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })

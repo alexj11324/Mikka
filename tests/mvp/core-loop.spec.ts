@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
 import type { Page, Route, TestInfo } from '@playwright/test'
 import { test, expect, register, openCreateIssue } from '../e2e/fixtures'
+import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 import { assertMvpEnvironment, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from './isolated-env.mjs'
 
 const execute = promisify(execFile)
@@ -49,6 +50,7 @@ async function setup(page: Page, testInfo: TestInfo) {
   const githubAccountId = String(randomInt(1_000_000, 2_000_000_000))
   const scenario = await service<{ barePath: string; repo: string; baseBranch: string }>('/scenario', { marker, title, githubAccountId })
   const token = `orv_${randomBytes(32).toString('base64url')}`
+  await recordAuthenticationSecrets([token])
   const tokenId = randomUUID()
   const dataDir = await mkdtemp(join(tmpdir(), 'mikka-mvp-daemon-'))
   await pool.query('INSERT INTO device_tokens (id, "userId", name, "tokenHash") VALUES ($1, $2, $3, $4)', [tokenId, user.id, 'Disposable MVP daemon', createHash('sha256').update(token).digest('hex')])

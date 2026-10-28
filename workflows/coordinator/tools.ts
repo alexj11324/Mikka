@@ -7,6 +7,7 @@ import * as steps from './steps'
 import * as kit from './agent-kit-steps'
 import type { NativeToolScope } from './tool-scope'
 import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
+import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 
 export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean }
 
@@ -36,7 +37,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       inputSchema: z.object({ issueId: id }),
       execute: input => steps.getIssue(userId, input, scope),
     }),
-    create_issue: tool({
+    ...(issueMutationsEnabled() ? { create_issue: tool({
       description: 'Create the task the person asked for, including requests from the new-task dialog. Write a short title and put details in body. The assignee can only be a person; dispatching a thread is a separate action. Defaults to todo and normal priority.',
       inputSchema: createIssueInput,
       execute: (input, options) => steps.createIssue(userId, input, options.toolCallId, scope, botId),
@@ -45,6 +46,12 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       description: 'Update an existing task the person asked to change. Only supplied fields change; labels replaces the full label set. Read the task first. The assignee can only be a person.',
       inputSchema: updateIssueInput,
       execute: (input, options) => steps.updateIssue(userId, input, options.toolCallId, scope, botId),
+    }),
+    } : {}),
+    request_repository_push_approval: tool({
+      description: 'Request the person’s explicit approval to push to this repository. This only creates a confirmation; never claim approval until the person decides.',
+      inputSchema: z.object({ repo: z.string().trim().min(1).max(4000) }).strict(),
+      execute: input => steps.proposeRepositoryPushApproval(userId, input, scope),
     }),
     list_agents: tool({
       description: 'List available local execution tools and their computers. Use the internal id as agentId for dispatch_run with a repository URL; no repository registration is needed. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, never an Agent.',
@@ -145,7 +152,11 @@ export function coordinatorTools(userId: string, botId: string | null, scope?: N
   const registry = createCoordinatorRegistry(userId,botId,scope,options)
   const { execution } = options
   if (!execution) return Object.fromEntries(Object.entries(registry).filter(([name]) => name !== 'load_skill'))
-  return instrumentTools(registry,execution.snapshot.effectiveTools,{
+  // A rollout gate can narrow a frozen grant; enabling it never adds tool IDs
+  // absent from this execution's immutable effectiveTools.
+  const requested = issueMutationsEnabled() ? execution.snapshot.effectiveTools
+    : execution.snapshot.effectiveTools.filter(name => name !== 'create_issue' && name !== 'update_issue')
+  return instrumentTools(registry,requested,{
     before:(callId,name) => kit.beforeAgentTool(userId,botId,execution.id,callId,name,scope),
     after:(callId,name,outcome) => kit.afterAgentTool(userId,botId,execution.id,callId,name,outcome,scope),
   })

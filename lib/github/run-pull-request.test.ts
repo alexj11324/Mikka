@@ -7,7 +7,7 @@ const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048, private
 const env = { GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey }
 const issueId = '10000000-0000-4000-8000-000000000001'
 const commit = 'a'.repeat(40)
-const input = { remoteKey: 'github.com/owner/repo', githubAccountId: '456', env, issueId, identifier: 'MIK-42', title: 'Fix redirect', summary: 'Fixed and verified.', branch: 'mikka/mik-42', commit, baseBranch: null }
+const input = { remoteKey: 'v2/github.com/owner/repo', githubAccountId: '456', env, issueId, identifier: 'MIK-42', title: 'Fix redirect', summary: 'Fixed and verified.', branch: 'mikka/mik-42', commit, baseBranch: null }
 const marker = `<!-- mikka-issue:${issueId} -->`
 const pr = { number: 77, node_id: 'PR_synthetic_77', html_url: 'https://github.com/owner/repo/pull/77', state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: input.branch, repo: { id: 789 } }, base: { repo: { id: 789 } } }
 
@@ -48,8 +48,8 @@ function stub(options: { permission?: string; userId?: number; prPermission?: st
 }
 
 test('requires canonical github.com identity; user-controlled URLs cannot receive credentials', () => {
-  assert.deepEqual(githubRepository('github.com/a/b'), { owner: 'a', repo: 'b', path: '/repos/a/b' })
-  for (const key of ['https://github.com/a/b', 'github.com.evil/a/b', 'github.com/a/b/extra', 'github.com/a/..', 'file/localhost/tmp/origin']) assert.throws(() => githubRepository(key), PublicationError)
+  assert.deepEqual(githubRepository('v2/github.com/a/b'), { owner: 'a', repo: 'b', path: '/repos/a/b' })
+  for (const key of ['github.com/a/b', 'https://github.com/a/b', 'v2/github.com.evil/a/b', 'v2/github.com/a/b/extra', 'v2/github.com/a/..', 'v2/file/localhost/tmp/origin', 'v2/github.com/Owner/repo']) assert.throws(() => githubRepository(key), PublicationError)
 })
 
 test('opens one issue-marked PR with default branch, restricted write token and checked owner permission', async () => {

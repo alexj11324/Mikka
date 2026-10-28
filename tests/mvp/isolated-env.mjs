@@ -10,4 +10,4 @@ export function assertMvpEnvironment(env = process.env) {
 export const MVP_ORIGIN = 'http://localhost:3100'
 export const MVP_SERVICES = 'http://127.0.0.1:3191'
 export const REPOSITORY = 'https://github.com/mikka-e2e/core-loop.git'
-export const REPOSITORY_KEY = 'github.com/mikka-e2e/core-loop'
+export const REPOSITORY_KEY = 'v2/github.com/mikka-e2e/core-loop'

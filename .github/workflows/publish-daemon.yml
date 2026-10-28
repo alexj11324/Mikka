@@ -1,14 +1,9 @@
 name: Publish daemon (manual)
 
-# Proposed release method; Alex must choose the public package name and
-# configure its npm trusted publisher before dispatching this workflow.
+# Manual main-only release. The npm trusted publisher must be configured
+# separately before this workflow can publish.
 on:
   workflow_dispatch:
-    inputs:
-      package_name:
-        description: Approved public npm package name
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -22,7 +17,7 @@ jobs:
       contents: read
       id-token: write
     env:
-      MIKKA_DAEMON_PACKAGE_NAME: ${{ inputs.package_name }}
+      MIKKA_DAEMON_PACKAGE_NAME: '@aspectlylabs/mikka'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

@@ -11,11 +11,29 @@ team, adds an identity suffix, or changes the branch on a retry. A transaction
 reserves `(remoteKey, branch)` across issues, so two users whose personal tasks
 have the same identifier cannot push into each other's task branch.
 
+Repository identities use the `v2/` namespace. Only GitHub's standard HTTPS and
+`git` SSH endpoints share a cross-transport identity. Other hosts retain their
+port, SSH user, absolute/relative namespace, path case and literal suffix. SSH
+URLs must state the login user; a machine's implicit OS login is not a shared
+repository identity.
+Daemon clone directories use a digest of that identity, including on
+case-insensitive filesystems. An existing scheduling record never changes its
+clone URL when another request registers an alias or a different repository.
+
+Old identity keys, approvals and publication receipts are preserved but are not
+adopted or rewritten. A queued legacy or mismatched binding is refused; schedule
+a new thread and explicitly approve the current repository identity. Only old
+GitHub physical-checkout records with a verified equivalent endpoint can reuse
+their record ID, without changing the clone URL. No data migration grants a push.
+
 `repository_settings.push` stores `{ approved, remote: 'origin',
 approvedByUserId, approvedAt }`, keyed by `(userId, remoteKey)`. Only the
 human-session backend action can create that receipt; neither MCP nor native
-Coordinator tools expose it. A bare boolean is insufficient. The proposed chat
-approval entry point remains **待 Alex 确认** in `design/decisions.md`.
+Coordinator tools expose it. A bare boolean is insufficient. Alex approved an
+owner-controlled, per-repository approval in that person's conversation. A
+Coordinator can request a confirmation, but only the authenticated person can
+decide it. Revoking a repository approval invalidates its pending confirmations.
+This entry point still requires fixed-Preview and user-interface acceptance.
 
 Claim sends `pushBranch` and `policy.permissions.git_push`. `/repos` does not
 cache push approval. The daemon uses the same policy for fetching the previous
@@ -42,7 +60,7 @@ task is not advanced to review. After a successful approved push the server
 requests a draft PR and tells the Coordinator that human checking remains.
 A failed verify never publishes. A harness's self-reported verification is
 discarded in both the approved and unapproved paths.
-This missing-verification behavior is a proposed product decision, **待 Alex 确认**.
+Alex approved this missing-verification behavior on 2026-10-28.
 
 The GitHub client reuses an existing task-marked PR. An unverified continuation
 converts that task's open PR to a draft before recording its result. It never

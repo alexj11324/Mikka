@@ -7,6 +7,7 @@ export default defineConfig({
   forbidOnly: true, retries: 0, workers: 1, timeout: 180_000,
   expect: { timeout: 30_000 },
   outputDir: 'mvp-test-results',
+  captureGitInfo: { commit: true, diff: false },
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-mvp-report' }]],
   use: { baseURL: MVP_ORIGIN, locale: 'zh-CN', trace: 'retain-on-failure', screenshot: 'only-on-failure', actionTimeout: 15_000, navigationTimeout: 45_000 },
   projects: [{ name: 'chromium-mvp', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 960 } } }],

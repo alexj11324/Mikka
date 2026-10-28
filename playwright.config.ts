@@ -8,6 +8,9 @@ export default defineConfig({
   workers: 1,
   timeout: 90000,
   expect: { timeout: 15000 },
+  // Keep commit provenance without copying fixture credentials from a PR diff
+  // into the HTML report's embedded metadata.
+  captureGitInfo: { commit: true, diff: false },
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3100',

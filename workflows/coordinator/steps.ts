@@ -19,7 +19,7 @@ import { webSearch } from '@/lib/search'
 import { issueMembers, issues, telegramLinks } from '@/lib/db/schema'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
-import { proposeAction } from '@/lib/pending-action-store'
+import { proposeAction, proposeRepositoryPush } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
@@ -182,6 +182,12 @@ export async function proposeAccountAction(userId: string, action: ApprovalActio
   'use step'
   await assertNativeToolScope(userId,scope)
   return proposeAction(userId, action, input)
+}
+
+export async function proposeRepositoryPushApproval(userId: string, input: { repo: string }, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  return proposeRepositoryPush(userId, input)
 }
 
 export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope) {

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, renameSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -14,7 +14,9 @@ export class RepositoryCache {
 
   pathFor(remoteUrl: string): string {
     const { key } = normalizeRepository(remoteUrl, { allowFile: this.allowFile })
-    const path = resolve(this.root, ...key.split('/'))
+    // A digest also separates case-sensitive repositories on case-insensitive
+    // filesystems and prevents nested repository paths sharing clone roots.
+    const path = resolve(this.root, 'v2', createHash('sha256').update(key).digest('hex'))
     if (!isInside(resolve(this.root), path) || path === resolve(this.root)) throw new Error('Invalid repository cache path')
     return path
   }
