@@ -66,7 +66,8 @@ test('the only account being reconnected stays the default', () => {
 test('a failed retire still reads the email; another toolkit is never retired', async () => {
   const items = [gmail('old', '2026-09-01T00:00:00Z'), gmail('new', '2026-10-28T00:00:00Z'), { ...gmail('n1', '2026-01-01T00:00:00Z'), toolkit: { slug: 'notion' } }]
   const { calls, deps } = fakeDeps({ new: 'me@example.com' })
-  await followUpComposioConnect({ items, records: [], addedId: 'new', replaceId: 'old' }, { ...deps, retire: async () => { throw new Error('boom') } })
+  const completed = await followUpComposioConnect({ items, records: [], addedId: 'new', replaceId: 'old' }, { ...deps, retire: async () => { throw new Error('boom') } })
+  assert.equal(completed, false)
   assert.deepEqual(calls, ['log retire', 'read new', 'save new me@example.com', 'rename new me@example.com'])
   const second = fakeDeps()
   await followUpComposioConnect({ items, records: [], addedId: 'new', replaceId: 'n1' }, second.deps)
@@ -77,7 +78,8 @@ test('a non-working replacement never retires the old connection or takes its de
   for (const extra of [{ status: 'INITIATED' }, { status: 'FAILED' }, { isDisabled: true }]) {
     const items = [gmail('old', '2026-09-01T00:00:00Z'), gmail('new', '2026-10-28T00:00:00Z', extra)]
     const { calls, deps } = fakeDeps()
-    await followUpComposioConnect({ items, records: [record('old', { isDefault: true })], addedId: 'new', replaceId: 'old' }, deps)
+    const completed = await followUpComposioConnect({ items, records: [record('old', { isDefault: true })], addedId: 'new', replaceId: 'old' }, deps)
+    assert.equal(completed, false)
     assert.ok(!calls.some(call => call.startsWith('retire ') || call.startsWith('default ')))
   }
 })
@@ -134,4 +136,24 @@ test('only a 2xx without an email or a 403 is a final "no email"; 429, 5xx and 4
   assert.deepEqual(providerAnswer(200, { emailAddress: 'a@example.com' }), { emailAddress: 'a@example.com' })
   assert.equal(providerAnswer(403, { error: 'insufficientPermissions' }), null)
   for (const status of [401, 404, 429, 500, 503]) assert.throws(() => providerAnswer(status, {}), ComposioEmailLookupError)
+})
+
+
+test('reconnect reports completion only after the expected old account is retired', async () => {
+  const items = [gmail('old', '2026-09-01T00:00:00Z'), gmail('new', '2026-10-28T00:00:00Z')]
+  const { deps } = fakeDeps()
+  assert.equal(await followUpComposioConnect({ items, records: [], addedId: 'new', replaceId: 'old' }, deps), true)
+  assert.equal(await followUpComposioConnect({ items, records: [], addedId: 'new', replaceId: 'missing' }, deps), false)
+  assert.equal(await followUpComposioConnect({ items, records: [], addedId: 'missing', replaceId: 'old' }, deps), false)
+})
+
+
+test('failed alias or default handover is not reported as a complete reconnect', async () => {
+  const items = [gmail('old', '2026-09-01T00:00:00Z', { alias: 'work' }), gmail('new', '2026-10-28T00:00:00Z')]
+  const records = [record('old', { isDefault: true })]
+  for (const step of ['rename', 'chooseDefault'] as const) {
+    const { deps } = fakeDeps()
+    const failing = { ...deps, [step]: async () => { throw new Error('failed') } }
+    assert.equal(await followUpComposioConnect({ items, records, addedId: 'new', replaceId: 'old' }, failing), false)
+  }
 })

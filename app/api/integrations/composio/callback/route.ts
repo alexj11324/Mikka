@@ -62,6 +62,8 @@ async function handleGET(request: NextRequest) {
     const completed = await composio.connectedAccounts.completeAuth({ userId: session.user.id, sessionUri })
     const userId = session.user.id
     const flow = decodeComposioFlow(request.cookies.get(COMPOSIO_FLOW_COOKIE)?.value)
+    const replaceId = flow?.link === completed.connectedAccountId ? flow.replace : undefined
+    let reconnectComplete = !replaceId
     try {
       const [items, records] = await Promise.all([
         listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], cursor })),
@@ -70,11 +72,11 @@ async function handleGET(request: NextRequest) {
       // A reconnect retires the account it replaces only when this callback
       // completes the link that reconnect started; the old account's name and
       // default move to the new one. The email is read either way.
-      await followUpComposioConnect({
+      reconnectComplete = await followUpComposioConnect({
         items,
         records,
         addedId: completed.connectedAccountId,
-        replaceId: flow?.link === completed.connectedAccountId ? flow.replace : null,
+        replaceId,
       }, {
         readEmail: (toolkit, accountId) => readComposioAccountEmail(composio, userId, toolkit, accountId),
         saveEmail: (toolkit, accountId, email) => saveComposioAccountEmail(userId, toolkit, accountId, email),
@@ -90,7 +92,7 @@ async function handleGET(request: NextRequest) {
     // Subscribe the new account's triggers and write the first briefing from what is there now.
     const timeZone = request.headers.get('x-vercel-ip-timezone')
     after(() => bootstrapSuggestions(userId, 'composio', timeZone))
-    const response = integrationRedirect(request, 'connected')
+    const response = integrationRedirect(request, reconnectComplete ? 'connected' : 'callback-failed')
     clearSessionCookie(request, response)
     response.headers.set('Cache-Control', noStore['Cache-Control'])
     return response

@@ -88,24 +88,27 @@ export async function followUpComposioConnect(
 ) {
   const added = input.items.find(item => item.id === input.addedId)
   const toolkit = appOf(added)
-  if (!added || !toolkit) return
+  if (!added || !toolkit) return false
   const replaced = input.replaceId && input.replaceId !== added.id
     ? input.items.find(item => item.id === input.replaceId && item.toolkit.slug === toolkit)
     : undefined
   const handover = replaced ? reconnectHandover(input.items, input.records, replaced.id) : null
+  let reconnectComplete = !input.replaceId
   if (replaced && added.status === 'ACTIVE' && !added.isDisabled) {
     let retired = false
     try {
       await deps.retire(replaced.id, replaced.alias)
       retired = true
+      reconnectComplete = true
     } catch (error) {
       deps.log('retire', error)
     }
     // After the retire, which frees the old name, so Composio takes it for the new account.
-    if (retired && handover?.alias) await deps.rename(added.id, handover.alias).catch(error => deps.log('carryAlias', error))
-    if (retired && handover?.isDefault) await deps.chooseDefault(toolkit, added.id).catch(error => deps.log('carryDefault', error))
+    if (retired && handover?.alias) await deps.rename(added.id, handover.alias).catch(error => { reconnectComplete = false; deps.log('carryAlias', error) })
+    if (retired && handover?.isDefault) await deps.chooseDefault(toolkit, added.id).catch(error => { reconnectComplete = false; deps.log('carryDefault', error) })
   }
   await fillEmail(deps, added, toolkit, Boolean(handover?.alias))
+  return reconnectComplete
 }
 
 export const EMAIL_BACKFILL_LIMIT = 5
