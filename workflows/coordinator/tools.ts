@@ -10,8 +10,11 @@ import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-inpu
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { personalMailboxTools } from '@/lib/mailbox-tools'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
+import { modelWriteTools, type ModelWriteCall, type ModelWriteTool } from '@/lib/operations/model-write-tools'
+import { personalWritesEnabled } from '@/lib/operations/write-feature'
+import { PERSONAL_WRITE_TOOL_IDS } from '@/lib/agent-kit/registry'
 
-export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[] }
+export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
 
 export function createCoordinatorRegistry(userId: string, botId: string | null, scope?: NativeToolScope, options: CoordinatorToolOptions = {}) {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
@@ -21,7 +24,10 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
   // may select any authorized Bot on the person's explicit instruction.
   const botInput = botId ? id.optional() : id
   const targetBot = (requested?: string) => botId ? (!requested || requested === botId ? botId : null) : requested ?? null
+  const writeTools = options.writeTools
+  if (writeTools && writeTools.catalog.some(entry => !(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(entry.name))) throw new Error('invalidWriteToolCatalog')
   return {
+    ...modelWriteTools(personalWritesEnabled() && Boolean(execution) && Boolean(writeTools), writeTools?.catalog ?? [], call => writeTools!.submit(call)),
     ...personalMailboxTools(mailboxEnabled && Boolean(execution), request => steps.personalMailbox(userId, botId, request, scope, execution?.id)),
     ...createComposioAITools((action, input) => steps.composioAction(userId, action, input, scope)),
     ...createGoogleAITools((action, input) => steps.composioAction(userId, action, input, scope), (action, input) => steps.proposeAccountAction(userId, action, input, scope)),
@@ -154,7 +160,8 @@ export function coordinatorTools(userId: string, botId: string | null, scope?: N
   // absent from this execution's immutable effectiveTools.
   const requested = execution.snapshot.effectiveTools.filter(name =>
     (issueMutationsEnabled() || (name !== 'create_issue' && name !== 'update_issue')) &&
-    (!Object.hasOwn(mailboxInputs, name) || (options.mailboxEnabled && options.mailboxTools?.includes(name as MailboxToolName))))
+    (!Object.hasOwn(mailboxInputs, name) || (options.mailboxEnabled && options.mailboxTools?.includes(name as MailboxToolName))) &&
+    (!(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(name) || (personalWritesEnabled() && options.writeTools?.catalog.some(entry => entry.name === name))))
   return instrumentTools(registry,requested,{
     before:(callId,name) => kit.beforeAgentTool(userId,botId,execution.id,callId,name,scope),
     after:(callId,name,outcome) => kit.afterAgentTool(userId,botId,execution.id,callId,name,outcome,scope),

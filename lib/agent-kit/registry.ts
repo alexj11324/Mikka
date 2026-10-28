@@ -3,6 +3,7 @@ export const COMPUTER_TOOL_IDS = [
   'list_computer_workspaces', 'create_computer_bot', 'list_computer_bots', 'wake_bot_computer',
   'list_bot_subscriptions', 'bind_bot_subscription', 'dispatch_bot_computer',
 ] as const
+export const PERSONAL_WRITE_TOOL_IDS = ['append_notion_paragraph', 'send_slack_message', 'cancel_calendar_event'] as const
 export const MAILBOX_TOOL_IDS = ['mailbox_recipients', 'mailbox_send', 'mailbox_inbox', 'mailbox_ack', 'mailbox_sent'] as const
 
 export const AGENT_TOOL_IDS = [
@@ -13,6 +14,7 @@ export const AGENT_TOOL_IDS = [
   'stop_run', 'load_skill', 'record_attention',
   ...COMPUTER_TOOL_IDS,
   ...MAILBOX_TOOL_IDS,
+  ...PERSONAL_WRITE_TOOL_IDS,
 ] as const
 export type AgentToolId = typeof AGENT_TOOL_IDS[number]
 export const AGENT_HOOK_IDS = ['audit', 'failure_cases'] as const
