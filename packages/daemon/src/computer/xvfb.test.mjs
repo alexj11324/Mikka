@@ -62,10 +62,21 @@ app.run()
       process.env.DISPLAY = display;
       const xvfb = spawn("Xvfb", [display, "-screen", "0", "1024x768x24", "-nolisten", "tcp"]);
       t.after(() => xvfb.kill());
-      await new Promise((r) => setTimeout(r, 700));
+      let ready = false;
+      for (let i = 0; i < 100 && !ready; i++) {
+        if (xvfb.exitCode !== null) throw new Error(`Xvfb exited: ${xvfb.exitCode}`);
+        try { execFileSync("xdpyinfo", [], { stdio: "ignore" }); ready = true; }
+        catch { await new Promise((r) => setTimeout(r, 100)); }
+      }
+      assert.ok(ready, "isolated X display did not become ready");
       dialog = spawn("xmessage", ["-title", "Mikka approved click", "-geometry", "400x140+200+200", "-buttons", "OK:0", "Mikka isolated computer-use test"]);
-      await new Promise((r) => setTimeout(r, 500));
-      const window = execFileSync("xdotool", ["search", "--name", "Mikka approved click"], { encoding: "utf8" }).trim().split("\n")[0];
+      let diagnostic = "", window = "";
+      dialog.stderr.on("data", chunk => { diagnostic += chunk.toString(); });
+      for (let i = 0; i < 100 && !window; i++) {
+        if (dialog.exitCode !== null) throw new Error(`xmessage exited: ${dialog.exitCode}: ${diagnostic}`);
+        try { window = execFileSync("xdotool", ["search", "--name", "Mikka approved click"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim().split("\n")[0]; }
+        catch { await new Promise((r) => setTimeout(r, 100)); }
+      }
       assert.ok(window);
       clickAt = { x: 216, y: 326 };
     }
