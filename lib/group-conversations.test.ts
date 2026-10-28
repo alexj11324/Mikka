@@ -71,6 +71,8 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
           FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace
           WHERE n.nspname=current_schema() ORDER BY t.relname,c.conname`)
         const indexes = await target.query(`SELECT t.relname AS table_name,idx.relname AS index_name,i.indisunique,i.indisprimary,
+          i.indnkeyatts,i.indnatts,i.indkey::text AS attributes,i.indoption::text AS options,
+          pg_get_expr(i.indexprs,i.indrelid) AS expressions,
           ARRAY(SELECT pg_get_indexdef(i.indexrelid,k,true) FROM generate_series(1,i.indnkeyatts) AS k ORDER BY k) AS keys,
           pg_get_expr(i.indpred,i.indrelid) AS predicate
           FROM pg_index i JOIN pg_class t ON t.oid=i.indrelid JOIN pg_class idx ON idx.oid=i.indexrelid
