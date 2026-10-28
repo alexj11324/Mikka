@@ -186,9 +186,14 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 
 1. 判断是否上线至少看三层证据：PR 是否 merged、是否有 feature flag / 环境变量门禁、
    对应 issue 是否仍 OPEN。
-2. 合并 PR 的描述里如果记录了生产回调验证（如 Slack #51），才算线上可用；
+2. **生产环境变量和线上接口才是最终证据**：`vercel env ls production` 看开关，
+   再请求生产路由看返回码（禁用是 503，启用但未登录是 401）。issue OPEN
+   只说明验收没收尾，不等于功能没开。
+3. **带日期的验收文档会过期**。这次 E2B 就是被 10-27 的「production flags remain off」
+   误导，而 10-27 晚些时候生产变量已经打开；必须以当前环境为准。
+4. 合并 PR 的描述里如果记录了生产回调验证（如 Slack #51），才算线上可用；
    仅有代码和单测只算「已实现」。
-3. 文档里「规划中」的条目要按能力拆分：同一块能力可能一部分已上线
+5. 文档里「规划中」的条目要按能力拆分：同一块能力可能一部分已上线
    （邮件/日历审批），另一部分仍未上线（文档、Slack 操作）。
-4. 改 README 图表前先找生成脚本（`scripts/generate-diagrams.mjs`），
+6. 改 README 图表前先找生成脚本（`scripts/generate-diagrams.mjs`），
    不要手改 SVG；改完渲染明暗、中英四种组合抽查。

@@ -12,7 +12,7 @@
 | 连接应用「审批后操作」 | 已上线 | PR #204 已合并；`send_email`、`create_calendar_event`、`update_calendar_event` 走 pending-action 卡片 |
 | Slack 指令通道 | 已上线 | PR #51 已合并；PR 描述记录了生产回调验证 |
 | 多 bot 与新建 bot | 已上线 | PR #322 已合并；`app/actions/bots.ts`、`components/nav/bot-list.tsx` 无开关；Coordinator 是其中一个 bot |
-| 云端电脑（E2B） | 未上线 | issue #172 仍 OPEN；`docs/acceptance/e2b-cloud-computer.md` 说明生产 flag 关闭 |
+| 云端电脑（E2B） | **已上线（此前判断错误）** | 生产 Vercel 有 `NEXT_PUBLIC_COMPUTER_ENABLED=1`、`MIKKA_CLOUD_COMPUTER_TASKS=1`、`MIKKA_BYOS_ENABLED=1` 和 E2B 凭据；生产接口返回 401 而非 503；前端 bundle 中 `useCloudComputer` 末尾折叠为 `true`。issue #172 仍 OPEN 只说明完整验收未收尾 |
 | 原生 Coordinator 运行时 | 未上线 | `MIKKA_NATIVE_COORDINATOR === '1'` 才启用，默认关闭 |
 | iOS App | 未上线 | PR #340 已合并，但 `docs/design/mobile.md` 仍是 draft，TestFlight 验收未完成 |
 | Factory / 定时任务 / 凭据库 / 群聊 | 未上线 | issue #191–#195、#179、#180、#105 均 OPEN |
@@ -33,3 +33,4 @@
 - PR: [#384](https://github.com/alexj11324/Mikka/pull/384)
 - 提交: `2cbf4e34` `docs: refresh README and diagrams for shipped features`
 - 额外修正：多 bot（PR #322）已上线，README 原来的「Coordinator 是当前唯一内置 Bot」已过时，改为「左侧栏是 bot 列表，Coordinator 是其中之一」。
+- 追加修正（2026-10-28）：E2B 云端电脑在生产已启用，README 与架构图从「规划中」改为「已上线」；虚线框改实线，`cloud handoff` 改为已上线的 `cloud run`。

@@ -21,7 +21,7 @@
 
 </div>
 
-Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只需用自然语言向 bot 描述需求，它会将需求拆解为任务，并分派给 Claude Code、Codex 或 Cursor 执行。目前任务运行在你自己的设备上，云端电脑即将上线。
+Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只需用自然语言向 bot 描述需求，它会将需求拆解为任务，并分派给 Claude Code、Codex 或 Cursor 执行。任务可以运行在你自己的设备上，也可以运行在 bot 的云端电脑上。
 
 你可以实时跟进每项工作的进展，在需要决策时介入，并在完成后审阅结果。
 
@@ -42,9 +42,10 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
   - 需求不明确时，Coordinator 会在派发运行前，先在对话中向你确认缺少的信息。
   - 运行过程中，agent 可以提出问题或报告阻塞。Coordinator 会连同可选项一起向你提问，不会代你作答，并将你的回答送回该运行。
 
-- **运行在你自己的设备上。**
+- **运行在你的设备或云端电脑上。**
   - Mikka daemon 可连接你的 Mac、Linux 主机或服务器。
-  - Daemon 通过你已安装并登录的 CLI harness 执行线程，因此沿用你现有的订阅与配置。
+  - Bot 也可以拥有一台云端电脑：独立桌面，可实时查看、随时接管并交还；空闲时自动休眠并保留磁盘数据。
+  - 在你自己的设备上，Daemon 通过你已安装并登录的 CLI harness 执行线程，因此沿用你现有的订阅与配置。
 
 - **故障后自动恢复。**
   - 每次运行均持有租约并保存 checkpoint。设备在运行中途离线时，Mikka 会在设备恢复后沿用原有的 worktree 和 agent session 继续；也可以把运行交接到另一台拥有同一仓库的在线设备。
@@ -65,6 +66,7 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 
 - **将需求转化为任务。** Coordinator 将请求拆解为任务并派发运行，同时判断每个任务归属于工作区还是个人。如判断有误，可一键修改。
 - **可创建多个 bot。** 每个 bot 拥有独立的对话、记忆、收件箱和租约，并与 Coordinator 共用同一套 harness。
+- **在云端工作。** Bot 可以拥有独立桌面，支持实时查看、随时接管并交还；空闲时自动休眠并保留磁盘数据。
 - **完整呈现执行过程。** 每个线程都会展示其 agent 当前的操作。Worker 通过 Mikka 的 MCP 工具汇报进度、提出问题或报告阻塞，由 Coordinator 逐一处理。
 - **注明信息来源。** 回复中引用的任务、运行记录和网页以可点击的标签形式展示。
 - **统一管理任务。** 任务支持看板和列表两种视图，包含关联关系、活动记录和个人任务编号，并与 Linear 双向同步。
@@ -80,7 +82,6 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 
 | 方向 | 规划内容 | 跟踪 |
 | --- | --- | --- |
-| **云端电脑** | 每个 bot 拥有独立的桌面环境，支持实时查看、随时接管及交还控制权。空闲时自动休眠并保留磁盘数据。同时支持接入自有设备。 | [#172](https://github.com/alexj11324/Mikka/issues/172)、[#147](https://github.com/alexj11324/Mikka/issues/147) |
 | **iOS App** | 在 iPhone 上使用 Coordinator 对话、线程、任务和设置。App 已接入服务端，TestFlight 验收尚未完成。 | [PR #340](https://github.com/alexj11324/Mikka/pull/340) |
 | **群聊** | 支持多个 bot 与多名成员在同一对话中协作，提供轮流发言、@ 提及以及「正在工作」状态栏。 | [#105](https://github.com/alexj11324/Mikka/issues/105) |
 | **Factory** | 完整的交付流程：同一任务同一时间仅执行一次、阶段状态持久化、独立的审查与验证线程，以及基于实际证据的人工发布审批。 | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
@@ -117,18 +118,18 @@ Claude Code 会打开浏览器完成登录。登录后，agent 可以读取和�
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-zh-dark.svg">
-  <img src="docs/assets/architecture-zh-light.svg" alt="Mikka 架构：Web 应用、Telegram、Slack 和 MCP 客户端接入 Vercel 上的 Next.js 应用；Coordinator 将运行派发给你设备上的 daemon；获批的邮件和日历操作经集成返回到外部应用；agent 通过 MCP 回报；状态存储在 Postgres 并与 Linear 同步。">
+  <img src="docs/assets/architecture-zh-light.svg" alt="Mikka 架构：Web 应用、Telegram、Slack 和 MCP 客户端接入 Vercel 上的 Next.js 应用；Coordinator 将运行派发给你设备上的 daemon 或 bot 的云端电脑；获批的邮件和日历操作经集成返回到外部应用；agent 通过 MCP 回报；状态存储在 Postgres 并与 Linear 同步。">
 </picture>
 
 Web 应用、Telegram、Slack 和 MCP 客户端均接入部署在 Vercel 上的同一个 Next.js 应用。运行结束、worker 提问等事件会发送给 Coordinator。Coordinator 是一个持久化 workflow，负责对每个事件进行分诊并决定下一步操作。
 
-运行在你的设备上执行。Daemon 注册设备后，通过设备 API 领取运行，并在独立的 git worktree 中启动对应的 agent CLI。Agent 通过 Mikka 的 MCP worker 工具汇报进度、提出问题或报告阻塞。运行会保存 checkpoint，设备离线时可由另一台拥有同一仓库的在线设备接手。
+运行在你的设备或 bot 的云端电脑上执行。在你自己的设备上，Daemon 注册设备后，通过设备 API 领取运行，并在独立的 git worktree 中启动对应的 agent CLI；云端电脑则由托管 worker 以同样方式领取运行，运行在属于该 bot 的 E2B 桌面上。Agent 通过 Mikka 的 MCP worker 工具汇报进度、提出问题或报告阻塞。运行会保存 checkpoint，设备离线时可由另一台拥有同一仓库的在线设备接手。
 
 当 Coordinator 需要发送邮件或修改日历时，它会先提出操作，并在输入框上方等待你批准。
 
 Linear 同步运行在 Cloudflare Worker 上，通过持久化的 inbox 和 outbox 与 Postgres 交换变更。
 
-虚线框和虚线表示规划中的部分：Scheduler（[#179](https://github.com/alexj11324/Mikka/issues/179)）、Factory 阶段（[#191](https://github.com/alexj11324/Mikka/issues/191)–[#194](https://github.com/alexj11324/Mikka/issues/194)）、监控（[#195](https://github.com/alexj11324/Mikka/issues/195)）、云端电脑及接续到云端（[#172](https://github.com/alexj11324/Mikka/issues/172)）、本机 computer use（[#147](https://github.com/alexj11324/Mikka/issues/147)）、邮件和日历之外的 Connected apps 工作流（[#177](https://github.com/alexj11324/Mikka/issues/177)）以及凭据保管库（[#180](https://github.com/alexj11324/Mikka/issues/180)）。
+虚线框和虚线表示规划中的部分：Scheduler（[#179](https://github.com/alexj11324/Mikka/issues/179)）、Factory 阶段（[#191](https://github.com/alexj11324/Mikka/issues/191)–[#194](https://github.com/alexj11324/Mikka/issues/194)）、监控（[#195](https://github.com/alexj11324/Mikka/issues/195)）、本机 computer use（[#147](https://github.com/alexj11324/Mikka/issues/147)）、邮件和日历之外的 Connected apps 工作流（[#177](https://github.com/alexj11324/Mikka/issues/177)）以及凭据保管库（[#180](https://github.com/alexj11324/Mikka/issues/180)）。
 
 ## 技术栈
 
@@ -140,7 +141,7 @@ Linear 同步运行在 Cloudflare Worker 上，通过持久化的 inbox 和 outb
 | 数据 | Neon 托管的 Postgres，Drizzle 迁移位于 [`drizzle/`](drizzle) |
 | 认证 | Better Auth，支持 Google 和 GitHub 登录，并为 MCP 提供 OAuth 2.1 server |
 | 集成 | GitHub 与 Linear 使用 webhook；Gmail、Google 日历、Notion、Slack 通过 Composio 接入，邮件和日历可在审批后写入；Linear 同步与定时简报运行在 Cloudflare Worker 上；Telegram 与 Slack 基于 Vercel Chat SDK |
-| 执行 harness | Mikka daemon，内置 Claude Code、Codex 和 Cursor 适配器 |
+| 执行 harness | Mikka daemon，内置 Claude Code、Codex 和 Cursor 适配器；云端运行由托管 worker 在 bot 专属的 E2B 桌面上执行 |
 
 ## 目录结构
 
@@ -149,7 +150,7 @@ agents/              # 内置 Bot 定义与 Skill
 app/                 # Next.js 路由、server actions 与 API（MCP、webhook、daemon /v1）
 apps/mobile/         # Expo iOS App
 components/          # React 界面组件
-lib/                 # 业务逻辑：Coordinator、任务、Linear 同步、MCP、认证
+lib/                 # 业务逻辑：Coordinator、任务、Linear 同步、MCP、认证、云端电脑
 workflows/           # 持久化 workflow（Coordinator 与 Slack）
 packages/daemon/     # 本地 daemon 和 CLI 执行 harness 适配器
 packages/protocol/   # 服务端与 daemon 共用的类型定义

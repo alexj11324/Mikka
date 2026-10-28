@@ -33,7 +33,7 @@ const ARCH_BOXES = {
   worker: [C4, 70, 60, false],
   linear: [C4, 190, 48, false],
   monitor: [C4, 270, 60, true],
-  cloud: [C4, 380, 60, true],
+  cloud: [C4, 380, 60, false],
   agents: [C4, 520, 60, false],
   cu: [C4, 680, 60, true],
 }
@@ -51,7 +51,7 @@ const ARCH_TEXT = {
     agents: ['Coding agent CLI', 'one worktree per run'], cu: ['Computer use', 'local cua-driver'],
     tWebhook: 'webhook', tNotify: 'webhooks, triggers', tMcp: 'MCP', tDb: 'reads, writes',
     tEvents: 'events', tDispatch: 'runs, answers', tTools: 'report, ask, blocked', tLinear: 'webhooks, API',
-    pActions: 'actions after approval', pWake: 'wake', pSecure: 'secure input', pHandoff: 'cloud handoff',
+    pActions: 'actions after approval', pWake: 'wake', pSecure: 'secure input', tCloudRun: 'cloud run',
     title: 'Mikka architecture',
   },
   zh: {
@@ -66,7 +66,7 @@ const ARCH_TEXT = {
     agents: ['Coding agent CLI', '每次运行独立 worktree'], cu: ['Computer use', '本机 cua-driver'],
     tWebhook: 'webhook', tNotify: 'webhook、触发器', tMcp: 'MCP', tDb: '读写',
     tEvents: '事件', tDispatch: '派发运行、回答', tTools: '汇报、提问、阻塞', tLinear: 'webhook、API',
-    pActions: '审批后执行操作', pWake: '唤醒', pSecure: '安全输入', pHandoff: '接续到云端',
+    pActions: '审批后执行操作', pWake: '唤醒', pSecure: '安全输入', tCloudRun: '云端运行',
     title: 'Mikka 架构',
   },
 }
@@ -102,15 +102,14 @@ function archFlows(t, p) {
     // Planned: Factory stages on top of the Coordinator, fed by monitoring.
     ...line([[830, 288], [830, 350]], p, true), ...chevron(830, 300, 'up', p), ...chevron(830, 340, 'down', p),
     ...line([[C4[0], 270], [C3[1], 270]], p, true), ...chevron(932, 270, 'left', p),
-    // Dispatch: your machine today, the cloud computer later. Answers to a
-    // run's questions travel the same way; the agent reads them on its next poll.
-    ...line([[C3[1], 380], [C4[0], 380]], p, true), ...chevron(988, 380, 'right', p),
+    // Dispatch to a bot's cloud computer. Answers to a run's questions travel
+    // the same way; the agent reads them on its next poll.
+    ...line([[C3[1], 380], [C4[0], 380]], p), ...chevron(988, 380, 'right', p),
     ...line([[830, 410], [830, 490]], p), ...chevron(830, 482, 'down', p), ...tag(830, 446, t.tDispatch, p),
     ...line([[C3[1], 520], [C4[0], 520]], p), ...chevron(988, 520, 'right', p),
-    // Planned: runs hand off to the cloud computer. Handoff between the
-    // person's own machines ships today and is described in the README.
-    ...line([[1100, 410], [1100, 490]], p, true), ...chevron(1100, 422, 'up', p), ...chevron(1100, 478, 'down', p),
-    ...tag(1100, 450, t.pHandoff, p, true),
+    // A cloud run executes the coding agent on the bot's cloud computer.
+    ...line([[1100, 410], [1100, 490]], p), ...chevron(1100, 422, 'up', p), ...chevron(1100, 478, 'down', p),
+    ...tag(1100, 450, t.tCloudRun, p),
     // Planned: local computer use for the agent.
     ...line([[1150, 550], [1150, 650]], p, true), ...chevron(1150, 642, 'down', p),
     // Agents report, ask and say they are blocked through the MCP worker tools.

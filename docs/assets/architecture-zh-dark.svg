@@ -51,7 +51,7 @@
   <path d="M822 332 L830 340 L838 332" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M1000 270 L920 270" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-dasharray="7 5"/>
   <path d="M940 262 L932 270 L940 278" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <path d="M920 380 L1000 380" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <path d="M920 380 L1000 380" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
   <path d="M980 372 L988 380 L980 388" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M830 410 L830 490" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
   <path d="M822 474 L830 482 L838 474" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
@@ -59,11 +59,11 @@
   <text x="830" y="451" text-anchor="middle" font-size="14" fill="#ffffff">派发运行、回答</text>
   <path d="M920 520 L1000 520" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
   <path d="M980 512 L988 520 L980 528" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <path d="M1100 410 L1100 490" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <path d="M1100 410 L1100 490" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
   <path d="M1092 430 L1100 422 L1108 430" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M1092 470 L1100 478 L1108 470" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <rect x="1056" y="437" width="88" height="26" fill="#0d1117" stroke="#4d82ff" stroke-width="1.5" stroke-dasharray="4 3"/>
-  <text x="1100" y="455" text-anchor="middle" font-size="14" fill="#4d82ff">接续到云端</text>
+  <rect x="1063" y="437" width="74" height="26" fill="#4d82ff"/>
+  <text x="1100" y="455" text-anchor="middle" font-size="14" fill="#ffffff">云端运行</text>
   <path d="M1150 550 L1150 650" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-dasharray="7 5"/>
   <path d="M1142 634 L1150 642 L1158 634" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M1050 550 L1050 600 L500 600 L500 550" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
@@ -115,7 +115,7 @@
   <rect x="1000" y="240" width="200" height="60" fill="#0d1117" stroke="#e6edf3" stroke-width="2.5" stroke-dasharray="7 5"/>
   <text x="1100" y="265.5" text-anchor="middle" font-size="15" fill="#e6edf3">监控</text>
   <text x="1100" y="284.5" text-anchor="middle" font-size="15" fill="#e6edf3">故障回流为 issue</text>
-  <rect x="1000" y="350" width="200" height="60" fill="#0d1117" stroke="#e6edf3" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <rect x="1000" y="350" width="200" height="60" fill="#0d1117" stroke="#e6edf3" stroke-width="2.5"/>
   <text x="1100" y="375.5" text-anchor="middle" font-size="15" fill="#e6edf3">云端电脑</text>
   <text x="1100" y="394.5" text-anchor="middle" font-size="15" fill="#e6edf3">E2B，每个 bot 一个桌面</text>
   <rect x="1000" y="490" width="200" height="60" fill="#0d1117" stroke="#e6edf3" stroke-width="2.5"/>

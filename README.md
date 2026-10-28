@@ -24,7 +24,7 @@ Every agent, from laptop to cloud, working as one team.
 Mikka coordinates the coding agents you already use as a single team. Describe
 what you need to a bot in natural language. The bot breaks the request into
 tasks and assigns each one to Claude Code, Codex or Cursor. Tasks run on your
-own machines today; cloud computers are coming soon.
+own machines or on a bot's cloud computer.
 
 You can follow each task in real time, step in when a decision is needed, and
 review the results.
@@ -57,10 +57,13 @@ review the results.
     blocked. The Coordinator puts the question to you with its options, never
     answers for you, and sends your answer back to the run.
 
-- **Runs on your own machines.**
+- **Runs on your machines or a cloud computer.**
   - The Mikka daemon connects your Mac, Linux machine or server.
-  - It starts work through the CLI harnesses you have already installed and signed in
-    to, so your existing plans and settings apply.
+  - A bot can also get a cloud computer: its own desktop, which you can watch
+    live, take control of, and hand back. It sleeps when idle and keeps its
+    disk.
+  - On your machines, work starts through the CLI harnesses you have already
+    installed and signed in to, so your existing plans and settings apply.
 
 - **Recovers from failures.**
   - Each run holds a lease and saves checkpoints. If a machine goes offline
@@ -93,6 +96,8 @@ dashed loop is the planned Factory process: independent review and verification
   you. You can change the assignment in one click.
 - **Creates bots.** Each bot gets its own conversation, memory, inbox and lease,
   and runs on the same harness as the Coordinator.
+- **Works in the cloud.** A bot can get its own desktop, watch it live, take
+  control of it, and hand it back. It sleeps when idle and keeps its disk.
 - **Makes progress visible.** Every thread shows what its agent
   is doing. Workers report progress, ask questions and flag blocks through
   Mikka's MCP tools, and the Coordinator triages each one.
@@ -121,7 +126,6 @@ Linear (`MIK-xx`).
 
 | Area | Planned | Tracking |
 | --- | --- | --- |
-| **Cloud computer** | Each bot gets its own desktop, which you can watch live, take control of, and hand back. It sleeps when idle and keeps its disk. Your own machines can also be connected. | [#172](https://github.com/alexj11324/Mikka/issues/172), [#147](https://github.com/alexj11324/Mikka/issues/147) |
 | **iOS app** | The Coordinator chat, threads, tasks and settings on iPhone. The app is wired to the server; TestFlight acceptance is pending. | [PR #340](https://github.com/alexj11324/Mikka/pull/340) |
 | **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
 | **Factory** | An end-to-end delivery process: one run per task at a time, durable stage state, independent review and verification threads, and human release approval based on recorded evidence. | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
@@ -161,7 +165,7 @@ Each run uses its own git worktree, so parallel threads stay isolated.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: the web app, Telegram, Slack and MCP clients reach the Next.js app on Vercel; the Coordinator dispatches runs to the daemon on your machine; approved mail and calendar actions go back through the integrations; agents report through MCP; state lives in Postgres and syncs with Linear.">
+  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: the web app, Telegram, Slack and MCP clients reach the Next.js app on Vercel; the Coordinator dispatches runs to the daemon on your machine or to a bot's cloud computer; approved mail and calendar actions go back through the integrations; agents report through MCP; state lives in Postgres and syncs with Linear.">
 </picture>
 
 The web app, Telegram, Slack and MCP clients all reach the same Next.js
@@ -169,11 +173,13 @@ application on Vercel. Events such as a finished run or a worker question go to
 the Coordinator, a durable workflow that triages each event and decides the next
 step.
 
-Runs execute on your machines. The daemon registers the device, claims runs
-through the device API, and starts the agent CLI in a dedicated git worktree.
-The agent reports progress, questions and blocks through Mikka's MCP worker
-tools. Checkpoints let another connected machine with the same repository take
-over a run whose device went offline.
+Runs execute on your machines or on a bot's cloud computer. On your machine, the
+daemon registers the device, claims runs through the device API, and starts the
+agent CLI in a dedicated git worktree. A cloud computer runs a hosted worker
+that claims the same way on a per-bot E2B desktop. The agent reports progress,
+questions and blocks through Mikka's MCP worker tools. Checkpoints let another
+connected machine with the same repository take over a run whose device went
+offline.
 
 When the Coordinator wants to send mail or change a calendar event, it proposes
 the action and waits for your approval above the composer.
@@ -183,7 +189,7 @@ through a durable inbox and outbox.
 
 Dashed boxes and lines are on the roadmap: the Scheduler
 ([#179](https://github.com/alexj11324/Mikka/issues/179)), Factory stages ([#191](https://github.com/alexj11324/Mikka/issues/191)–[#194](https://github.com/alexj11324/Mikka/issues/194)), Monitoring
-([#195](https://github.com/alexj11324/Mikka/issues/195)), the cloud computer and handoff to it ([#172](https://github.com/alexj11324/Mikka/issues/172)), local computer use
+([#195](https://github.com/alexj11324/Mikka/issues/195)), local computer use
 ([#147](https://github.com/alexj11324/Mikka/issues/147)), connected-app workflows beyond mail and calendar
 ([#177](https://github.com/alexj11324/Mikka/issues/177)) and the credential vault ([#180](https://github.com/alexj11324/Mikka/issues/180)).
 
@@ -197,7 +203,7 @@ Dashed boxes and lines are on the roadmap: the Scheduler
 | Data | Postgres on Neon, Drizzle migrations in [`drizzle/`](drizzle) |
 | Auth | Better Auth, with Google and GitHub sign-in and an OAuth 2.1 server for MCP |
 | Integrations | GitHub and Linear webhooks; Composio for Gmail, Google Calendar, Notion and Slack, including mail and calendar writes after approval; Cloudflare Workers for Linear sync and scheduled briefings; Vercel Chat SDK for Telegram and Slack |
-| Execution harnesses | The Mikka daemon selects a Claude Code, Codex or Cursor CLI adapter for each work thread |
+| Execution harnesses | The Mikka daemon selects a Claude Code, Codex or Cursor CLI adapter for each work thread; cloud runs execute through a hosted worker on a per-bot E2B desktop |
 
 ## Repository layout
 
@@ -206,7 +212,7 @@ agents/              # Built-in Bot definitions and Skills
 app/                 # Next.js routes, server actions and API (MCP, webhooks, daemon /v1)
 apps/mobile/         # Expo iOS app
 components/          # React UI
-lib/                 # Domain logic: coordinator, issues, Linear sync, MCP, auth
+lib/                 # Domain logic: coordinator, issues, Linear sync, MCP, auth, cloud computer
 workflows/           # Durable workflows (the Coordinator and Slack)
 packages/daemon/     # Local daemon and CLI execution harness adapters
 packages/protocol/   # Types shared by the server and the daemon
