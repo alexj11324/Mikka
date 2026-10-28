@@ -28,7 +28,7 @@ it.each(['allow', 'ask'] as const)('host broker invokes credential executor with
     active = false
     await expect(b.request(grant.token, { name: 'click', arguments: { x: 1, y: 2 } })).rejects.toThrow()
     expect(executions).toBe(1)
-  } finally { b.suspend(); console.log('Retained credential broker test resources') }
+  } finally { await b.close() }
 })
 
 it('rejects a substituted action id before reaching the credential service', async () => {
@@ -38,7 +38,7 @@ it('rejects a substituted action id before reaching the credential service', asy
   const intent: CredentialIntent = { actionId: 'other', runId: 'run', userId: 'owner', workspaceId: 'workspace', botId: 'bot', subagentId: 'sub', epoch: 1, display: ':2', policyVersion: 3, driverFingerprint: driver.fingerprint, callDigest: createHash('sha256').update(JSON.stringify(call)).digest('hex'), expiresAt: Date.now() + 10000, targetId: 'target', origin: 'https://example.test', loaderId: 'loader', backendNodeId: 7, role: 'password' }
   const execute = createHostedComputerExecutor({ liveComputer: () => ({ botId: 'bot', ownerId: 'owner', policyVersion: 3 }), executeOrdinary: async () => null, authority: { consumeMatchingIntent: async () => ({ kind: 'credential', intent }), withCurrentLease: async (_intent, action) => action({ ...intent, running: true }), executeCredential: async () => { invoked = true; return { status: 'submitted' } } } })
   const b = new ComputerBroker({ driver, socketPath: join(tempDir(), 'sock'), permitted: () => true, execute })
-  try { const grant = b.spec('run', 'allow', { display: ':2' })!; await expect(b.request(grant.token, call)).rejects.toThrow('Credential action unavailable'); expect(invoked).toBe(false) } finally { b.suspend(); console.log('Retained credential broker test resources') }
+  try { const grant = b.spec('run', 'allow', { display: ':2' })!; await expect(b.request(grant.token, call)).rejects.toThrow('Credential action unavailable'); expect(invoked).toBe(false) } finally { await b.close() }
 })
 
 it.each(['stop', 'target', 'policy'] as const)('rechecks %s after the authority fence is acquired', async mode => {
@@ -56,5 +56,5 @@ it.each(['stop', 'target', 'policy'] as const)('rechecks %s after the authority 
   }
   const execute = createHostedComputerExecutor({ authority, liveComputer: () => { if (!active) throw new Error('stopped'); return { botId: 'bot', ownerId: 'owner', policyVersion: 3 } }, executeOrdinary: async () => null })
   const b = new ComputerBroker({ driver, socketPath: join(tempDir(), 'sock'), permitted: () => active, execute })
-  try { const grant = b.spec('run', 'allow', { display: ':2' })!; await expect(b.request(grant.token, { name: 'click', arguments: { x: 1, y: 2 } })).rejects.toThrow(); expect(executed).toBe(false) } finally { b.suspend(); console.log('Retained credential broker test resources') }
+  try { const grant = b.spec('run', 'allow', { display: ':2' })!; await expect(b.request(grant.token, { name: 'click', arguments: { x: 1, y: 2 } })).rejects.toThrow(); expect(executed).toBe(false) } finally { await b.close() }
 })

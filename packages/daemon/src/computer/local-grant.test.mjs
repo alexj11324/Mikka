@@ -21,7 +21,8 @@ test("local computer injection requires a driver, explicit permission and a writ
     const pending = broker.request(spec.args[2], { name: "click", arguments: { x: 3, y: 4 } });
     assert.equal(executions, permission === "ask" ? 0 : 1);
     const [review] = broker.list();
-    await broker.decide(review.id, review.digest, true);
+    if (permission === "ask") await broker.decide(review.id, review.digest, true);
+    else assert.equal(review, undefined);
     assert.equal(await pending, "done");
   }
   assert.equal(executions, 2);

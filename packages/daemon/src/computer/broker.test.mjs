@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, chmod } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -24,7 +24,7 @@ async function fixture(t, overrides = {}) {
     }),
     ...overrides,
   });
-  t.after(() => { broker.suspend(); console.log(`Retained broker test directory: ${dir}`); });
+  t.after(async () => { await broker.close(); await rm(dir, { recursive: true, force: true }); });
   return broker;
 }
 test("revoking a run grant promptly rejects pending work without revoking another run", async (t) => {
@@ -63,7 +63,7 @@ test("listen rejects a pre-existing path without deleting or replacing it", asyn
   const b = await fixture(t, { socketPath });
   await assert.rejects(() => b.listen(), { code: "EADDRINUSE" });
   assert.equal(await readFile(socketPath, "utf8"), "retained evidence");
-  t.after(() => { console.log(`Retained conflict test directory: ${dir}`); });
+  t.after(() => rm(dir, { recursive: true, force: true }));
 });
 for (const permission of ["allow", "ask"]) test(`suspension during ${permission} asynchronous admission blocks the later action`, async (t) => {
   let release, called = 0;
@@ -102,7 +102,7 @@ test("each broker action has its own trusted id and ask reuses the review id", a
 });
 test("only pinned driver detected; missing/unexpected version absent", async (t) => {
   const dir = await mkdtemp(join(tmpdir(), "driver-detect-"));
-  t.after(() => { console.log(`Retained driver test directory: ${dir}`); });
+  t.after(() => rm(dir, { recursive: true, force: true }));
   const file = join(dir, "driver");
   await writeFile(file, "#!/bin/sh\necho cua-driver 0.38.0\n");
   await chmod(file, 0o700);

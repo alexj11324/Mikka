@@ -7,8 +7,6 @@ permissions:
   contents: read
 jobs:
   backend:
-    # HOLD: hosted runner service/container teardown is not retention-safe.
-    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -49,8 +47,6 @@ jobs:
       - run: node --test packages/daemon/src/computer/local-grant.test.mjs
       - run: cd packages/daemon && node --import tsx --test test/local-computer-adapters.node-test.ts
   local-driver-linux:
-    # HOLD: runner and Xvfb teardown are not retention-safe.
-    if: ${{ false }}
     name: Local driver (Linux Xvfb)
     runs-on: ubuntu-latest
     timeout-minutes: 10
