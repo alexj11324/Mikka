@@ -41,7 +41,7 @@ jobs:
         # required checks.
         run: |
           git fetch origin main --no-tags
-          trusted="$(mktemp)"
+          trusted="$(mktemp --suffix=.mjs)"
           if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
             echo "docs_only=false (classifier is not on main yet)"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"

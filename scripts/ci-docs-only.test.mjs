@@ -157,3 +157,19 @@ test('all required gates reject failed classification and skipped full jobs', ()
     }
   }
 })
+
+test('workflow temporary classifier paths execute as ES modules on the actual Node runtime', () => {
+  const root = mkdtempSync(join(tmpdir(), 'docs-classifier-entry-retained-'))
+  console.log(`Retained classifier entrypoint evidence: ${root}`)
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+    const source = readFileSync(file, 'utf8')
+    const entry = source.split('\n').find(line => line.trimStart().startsWith('trusted="$(mktemp'))
+    assert.ok(entry, 'the immutable main classifier must be copied to a temporary entrypoint')
+    // Exercise the real mktemp expression from the workflow. A plain mktemp
+    // creates an unknown random extension and Node 24 refuses to load the ESM.
+    const output = execFileSync('bash', ['-e', '-c', `${entry.trim()}\ncp "$1" "$trusted"\nnode "$trusted" --base HEAD --head HEAD`, 'classifier-entry', resolve('scripts/ci-docs-only.mjs')], {
+      env: { PATH:process.env.PATH, TMPDIR:root }, encoding:'utf8',
+    })
+    assert.match(output, /docs_only=false \(no changed files\)/)
+  }
+})
