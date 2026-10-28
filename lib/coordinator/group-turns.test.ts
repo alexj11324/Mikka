@@ -275,7 +275,7 @@ test('model route preserves its choice and rejects uncertain or non-member outpu
 
 
 test('injected decision service carries context and fails closed on invalid or unavailable output', async () => {
-  const seen: {kind:string;data:unknown}[] = []
+  const seen: {kind:string;instructions:string;data:unknown}[] = []
   const judge = createGroupJudgment(async request => {
     seen.push(request)
     return request.kind === 'route'
@@ -285,7 +285,7 @@ test('injected decision service carries context and fails closed on invalid or u
   assert.deepEqual(await judge.route(message,members,a,[]), {by:'model',responders:[b],confidence:0.8})
   const input = {previous:{message:'earlier',responderId:a},current:message,members}
   assert.deepEqual(await judge.correction(input), {kind:'correction',rightId:b})
-  assert.deepEqual(seen[1], {kind:'correction',data:input})
+  assert.equal(seen[1].kind, 'correction'); assert.match(seen[1].instructions, /quoted denial/); assert.deepEqual(seen[1].data, input)
   const invalid = createGroupJudgment(async () => ({kind:'route',responders:[outsider],confidence:1}))
   await assert.rejects(invalid.route(message,members,a,[]),GroupJudgmentPendingError)
   assert.deepEqual(await invalid.correction(input), {kind:'uncertain'})
