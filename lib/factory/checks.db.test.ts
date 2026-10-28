@@ -32,6 +32,7 @@ import { createFactoryQuestions, questionReference } from "./questions/store";
 import { handleFactoryQuestion } from "./questions/http";
 import { createFactoryReconciler } from "./reconcile";
 import { factoryCheckIndependent } from "./check-independence";
+import { observeFactoryCheckDispatch } from "./check-dispatch";
 import {
   configureFactoryCheck,
   factoryCheckAssignment,
@@ -456,6 +457,112 @@ test(
           );
       }
       const state = (id: string) => store.read("owner", id);
+      for (const stage of ["review", "verify"] as const) {
+        for (const prerequisite of ["harness", "command"] as const) {
+          await t.test(
+            `${stage} missing ${prerequisite} persists blocked after rollback, without an orphan run`,
+            async () => {
+              let pending = await pendingReview();
+              if (stage === "verify") {
+                const review = await start(pending.task);
+                await terminal(review.runId, `review-${pending.task.id}`);
+                await reconcile("owner");
+                pending = await state(pending.task.id);
+              }
+              const beforeRuns = (await db.query(
+                'SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id',
+                [pending.task.issueId],
+              )).rows;
+              const code = prerequisite === "harness"
+                ? "factoryCheckHarnessUnavailable" : "factoryCheckCommandRequired";
+              if (prerequisite === "harness")
+                await db.query("UPDATE devices SET harnesses='[]' WHERE id=$1", [deviceId]);
+              else
+                await db.query('UPDATE device_repos SET "verifyCommand"=NULL WHERE id=$1', [repoId]);
+              try {
+                await assert.rejects(
+                  observeFactoryCheckDispatch(store, dispatch)("owner", {
+                    binding: {
+                      ...factoryBinding(pending.task),
+                      taskId:pending.task.id.toUpperCase(),
+                      issueId:pending.task.issueId.toUpperCase(),
+                      attemptId:pending.task.attemptId.toUpperCase(),
+                      candidateId:pending.task.candidateId!.toUpperCase(),
+                    }, agentId:agentId.toUpperCase(), deviceRepoId: repoId.toUpperCase(),
+                  }),
+                  (error: unknown) => error instanceof FactoryError && error.code === code,
+                );
+              } finally {
+                if (prerequisite === "harness")
+                  await db.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [deviceId, JSON.stringify([{harness:"codex",installed:true}])]);
+                else
+                  await db.query('UPDATE device_repos SET "verifyCommand"=$2 WHERE id=$1', [repoId, command]);
+              }
+              const blocked = await state(pending.task.id);
+              assert.equal(blocked.task.status, "blocked");
+              assert.equal(blocked.task.stage, stage);
+              assert.equal(blocked.task.candidateId, pending.task.candidateId);
+              assert.equal(blocked.task.attemptId, pending.task.attemptId);
+              assert.equal(blocked.task.revision, pending.task.revision + 1);
+              const attempt = blocked.attempts.find(a => a.id === pending.task.attemptId)!;
+              assert.equal(attempt.runId, null);
+              assert.deepEqual(attempt.output.dispatch, {code,agentId,deviceRepoId:repoId});
+              assert.deepEqual((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id',[pending.task.issueId])).rows,beforeRuns);
+              // Repeating the stale request creates neither another run nor a
+              // second blocked observation; it is not a successful replay.
+              await assert.rejects(observeFactoryCheckDispatch(store,dispatch)("owner",{
+                binding:factoryBinding(pending.task),agentId,deviceRepoId:repoId,
+              }));
+              assert.deepEqual(await state(pending.task.id),blocked);
+            },
+          );
+        }
+      }
+      for (const race of ["cancel", "access-loss"] as const)
+        await t.test(`dispatch blocked observation cannot overwrite ${race}`, async () => {
+          const pending = await pendingReview();
+          const input = {binding:factoryBinding(pending.task),agentId,deviceRepoId:repoId};
+          await db.query("UPDATE devices SET harnesses='[]' WHERE id=$1",[deviceId]);
+          let cancelled: Awaited<ReturnType<typeof state>> | undefined;
+          try {
+            const raceDispatch: typeof dispatch = async (...args) => {
+              try { return await dispatch(...args); }
+              catch (error) {
+                if (race === "cancel")
+                  cancelled = await store.apply("owner",input.binding,randomUUID(),{action:"cancel",reason:"Fixture cancellation wins after queue rollback"});
+                else
+                  await db.query('UPDATE issues SET "userId"=\'other\' WHERE id=$1',[pending.task.issueId]);
+                throw error;
+              }
+            };
+            await assert.rejects(observeFactoryCheckDispatch(store,raceDispatch)("owner",input));
+          } finally {
+            await db.query('UPDATE devices SET harnesses=$2 WHERE id=$1',[deviceId,JSON.stringify([{harness:"codex",installed:true}])]);
+            if (race === "access-loss")
+              await db.query('UPDATE issues SET "userId"=\'owner\' WHERE id=$1',[pending.task.issueId]);
+          }
+          assert.deepEqual(await state(pending.task.id),cancelled ?? pending);
+          assert.equal((await db.query('SELECT count(*)::int n FROM factory_events WHERE "taskId"=$1 AND request->\'change\'->\'output\'->\'dispatch\' IS NOT NULL',[pending.task.id])).rows[0].n,0);
+        });
+      await t.test("question/caller transaction failure is left to its caller, with no committed blocked state or orphan", async () => {
+        const pending = await pendingReview();
+        const tx = await db.connect();
+        const beforeRuns=(await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id',[pending.task.issueId])).rows;
+        await db.query("UPDATE devices SET harnesses='[]' WHERE id=$1",[deviceId]);
+        try {
+          await tx.query("BEGIN");
+          await assert.rejects(observeFactoryCheckDispatch(store,dispatch)("owner",{
+            binding:factoryBinding(pending.task),agentId,deviceRepoId:repoId,
+          },tx),(error:unknown)=>error instanceof FactoryError && error.code === "factoryCheckHarnessUnavailable");
+          assert.equal((await tx.query('SELECT status FROM factory_tasks WHERE id=$1',[pending.task.id])).rows[0].status,"pending");
+        } finally {
+          await tx.query("ROLLBACK");
+          tx.release();
+          await db.query('UPDATE devices SET harnesses=$2 WHERE id=$1',[deviceId,JSON.stringify([{harness:"codex",installed:true}])]);
+        }
+        assert.deepEqual(await state(pending.task.id),pending);
+        assert.deepEqual((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id',[pending.task.issueId])).rows,beforeRuns);
+      });
       for (const decision of ["allow", "ask", "deny"] as const)
         await t.test(
           `claim retains host network ${decision} and its frozen domain list`,

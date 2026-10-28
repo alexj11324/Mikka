@@ -9,6 +9,7 @@ import { createFactoryReconciler } from './reconcile';
 import { configureFactoryCheck, factoryCheckAssignment, factoryCheckGates, factoryRepairBrief } from './checks';
 import { reconcileFactoryCheck } from './reconcile-check';
 import { createFactoryCheckRecovery, type FactoryCheckRecoveryDependencies } from './check-recovery';
+import { observeFactoryCheckDispatch } from './check-dispatch';
 import { createFactoryClaim, factoryClaimTask } from './claim';
 import { FactoryError } from './contract';
 import { createFactoryStore, type FactoryLifecycle } from './store';
@@ -44,7 +45,7 @@ export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLif
       },
     });
   const questions = createFactoryQuestions(pool,factoryAuthorize,store,dispatch,validate);
-  return {store,dispatch,questions,recoverCheck:createFactoryCheckRecovery(pool,store,recovery),reconcile:createFactoryReconciler(pool,store,questions,{review:reconcileFactoryCheck,verify:reconcileFactoryCheck,...consumers},botId),claim:createFactoryClaim(store,questions,validate)};
+  return {store,dispatch:observeFactoryCheckDispatch(store,dispatch),questions,recoverCheck:createFactoryCheckRecovery(pool,store,recovery),reconcile:createFactoryReconciler(pool,store,questions,{review:reconcileFactoryCheck,verify:reconcileFactoryCheck,...consumers},botId),claim:createFactoryClaim(store,questions,validate)};
 }
 
 /** Returns before any Factory SQL when default-off; ordinary claims retain their path. */
