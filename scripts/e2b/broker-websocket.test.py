@@ -99,6 +99,13 @@ async def main():
                         assert observation['targets']['0']==described['node']['backendNodeId'], 'target must bind the observed CDP node'
                         refs=await browser.rpc('Runtime.evaluate',{'expression':'document.querySelectorAll(\'[data-mikka-ref="0"]\').length','returnByValue':True})
                         assert refs['result']['value']==1, 'page-provided reference collisions are removed'
+                    inspect={'action':'inspectCredentialTarget','loaderId':observation['loaderId'],'origin':origin,'backendNodeId':observation['targets']['0'],'role':'username'}
+                    async with client.post('/agents/case/action?token=synthetic',json=inspect) as current:
+                        assert current.status==200
+                        bound=await current.json()
+                        assert bound=={'targetId':target,'loaderId':observation['loaderId'],'origin':origin,'backendNodeId':observation['targets']['0'],'role':'username'}
+                    for changed in ({'loaderId':'wrong'},{'origin':'https://other.invalid'},{'role':'password'},{'backendNodeId':observation['targets']['1']}):
+                        async with client.post('/agents/case/action?token=synthetic',json={**inspect,**changed}) as invalid:assert invalid.status==409
                     await browser.rpc('Runtime.evaluate',{'expression':'window.__savedUser=document.querySelector("input[name=username]");window.__savedUser.remove()','returnByValue':True})
                     async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as without_field:
                         assert without_field.status==200

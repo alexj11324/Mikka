@@ -36,10 +36,10 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
       const backendNodeId = index && targets?.[index]
       if (typeof backendNodeId !== 'number' || !Number.isSafeInteger(backendNodeId) || backendNodeId < 1) throw new Error('Credential target identity unavailable')
       if (typeof observation.loaderId !== 'string' || !observation.loaderId) throw new Error('Observed document unavailable')
-      const current = await store.action(actor, botId, id, { action: 'inspectMutation', mutation: { action: 'click', selector: intent.targetSelector } })
-      if (current.loaderId !== observation.loaderId || current.origin !== site) throw new Error('Observed document changed')
+      const current = await store.action(actor, botId, id, { action: 'inspectCredentialTarget', loaderId: observation.loaderId, origin: site, backendNodeId, role })
+      if (typeof row.targetId !== 'string' || current.targetId !== row.targetId || current.loaderId !== observation.loaderId || current.origin !== site || current.backendNodeId !== backendNodeId || current.role !== role) throw new Error('Observed document changed')
       const { executeCredentialIntent } = await import('@/lib/cloud-computer/credential-consumer')
-      const login = await executeCredentialIntent({ permissionAction: 'computer_use', actor, botId, subagentId: id, epoch: row.epoch, loaderId: observation.loaderId, origin: site, backendNodeId, intent })
+      const login = await executeCredentialIntent({ permissionAction: 'computer_use', actor, botId, subagentId: id, epoch: row.epoch, targetId: row.targetId, loaderId: observation.loaderId, origin: site, backendNodeId, intent })
       if (login.status === 'needs_you') {
         await store.update(actor, botId, id, 'needs_you', 'approval', { kind: 'approval', actionId: login.actionId, summary: login.summary })
         await report(actor.userId, botId, id, `A browser action needs approval: ${login.summary}. Existing pending action ${login.actionId}. Ask the person to approve or deny this exact operation.`, `approval:${login.actionId}`)

@@ -11,10 +11,10 @@ let modelAction: 'login' | 'waiting' = 'login'
 let modelSelector = '[data-mikka-ref="1"]'
 const oldVisionModel = process.env.MIKKA_BROWSER_VISION_MODEL
 class FakeStore {
-  async start() { return { status: 'running', epoch: 7, task: 'Sign in', step: 'start' } }
+  async start() { return { status: 'running', epoch: 7, task: 'Sign in', step: 'start', targetId: 'target' } }
   async action(_actor: unknown, _bot: string, _id: string, action: { action: string }) {
     if (action.action === 'observe') return { loaderId: 'document', screenshot: '/9j/2Q==', targets: { '1': targetIdentity }, observation: { url: 'https://example.test/login', elements: [{ selector: '[data-mikka-ref="1"]' }] } }
-    if (action.action === 'inspectMutation') return { loaderId: currentLoader, origin: 'https://example.test' }
+    if (action.action === 'inspectCredentialTarget') return { targetId: 'target', loaderId: currentLoader, origin: 'https://example.test', backendNodeId: 42, role: 'username' }
     throw new Error('unexpected action')
   }
   async update(...args: unknown[]) { updates.push(args) }
@@ -34,7 +34,7 @@ for (const status of ['session_applied', 'submitted'] as const) {
   test(`${status} preserves selected target and requires another observation`, async () => {
     resultStatus = status
     assert.equal(await tick(actor, 'bot', 'subagent'), 'running')
-    assert.deepEqual(invocations, [{ permissionAction: 'computer_use', actor, botId: 'bot', subagentId: 'subagent', epoch: 7, loaderId: 'document', origin: 'https://example.test', backendNodeId: 42, intent: { targetSelector: '[data-mikka-ref="1"]', role: 'username' } }])
+    assert.deepEqual(invocations, [{ permissionAction: 'computer_use', actor, botId: 'bot', subagentId: 'subagent', epoch: 7, targetId: 'target', loaderId: 'document', origin: 'https://example.test', backendNodeId: 42, intent: { targetSelector: '[data-mikka-ref="1"]', role: 'username' } }])
     assert.equal(updates.length, 0)
   })
 }

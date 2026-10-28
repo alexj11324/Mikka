@@ -518,6 +518,13 @@ async def action(request):
             tree=await b.rpc('Page.getFrameTree',session=b.session);frame=tree['frameTree']['frame'];u=urlsplit(frame['url'])
             if u.scheme not in ('https','http') or not u.hostname or u.username or u.password:raise web.HTTPConflict()
             return web.json_response({'loaderId':frame['loaderId'],'origin':f'{u.scheme}://{u.netloc}'})
+        if name=='inspectCredentialTarget':
+            if set(data)!={'action','loaderId','origin','backendNodeId','role'} or type(data.get('backendNodeId')) is not int or data['backendNodeId']<=0 or data.get('role') not in ('username','password') or not isinstance(data.get('loaderId'),str):raise web.HTTPBadRequest()
+            tree=await b.rpc('Page.getFrameTree',session=b.session);frame=tree.get('frameTree',{}).get('frame',{})
+            document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
+            origin=browser_origin(frame.get('url'))
+            if not origin or origin!=browser_origin(data.get('origin')) or frame.get('loaderId')!=data['loaderId'] or not safe_resume_snapshot(tree,document,{'result':{'value':True}}) or not valid_observed_input(document,data['backendNodeId'],data['role']):raise web.HTTPConflict()
+            return web.json_response({'targetId':b.target,'loaderId':frame['loaderId'],'origin':origin,'backendNodeId':data['backendNodeId'],'role':data['role']})
         if name=='navigate':
             from urllib.parse import urlparse
             u=urlparse(data.get('url',''))
