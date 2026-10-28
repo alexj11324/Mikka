@@ -2,12 +2,29 @@
 Viewer capabilities only receive JPEG frames. Broker capabilities are minted by
 the server for a specific owner/bot/subagent and may enter one guarded fill.
 """
-import asyncio, base64, fcntl, hashlib, hmac, json, os, secrets, time
+import asyncio, base64, fcntl, hashlib, hmac, json, math, os, secrets, time
 from pathlib import Path
+from urllib.parse import urlsplit
 from aiohttp import web, WSMsgType
 ROOT = Path('/run/mikka-subagents')
 AGENTS = {}
 BROKER_METHODS = frozenset(('Page.getFrameTree', 'DOM.getDocument', 'Runtime.evaluate', 'Runtime.callFunctionOn', 'Input.insertText', 'Network.setCookies', 'Network.getCookies', 'Page.reload'))
+BROKER_STORAGE_FUNCTION = 'function(entries){localStorage.clear();for(const [k,v] of entries)localStorage.setItem(k,v)}'
+BROKER_OTP_SELECTOR = 'input[autocomplete="one-time-code"],input[name="code"],input[name="otp"]'
+BROKER_FOCUS_SELECTORS = ('input[autocomplete="username"],input[type="email"],input[name="username"]', 'input[type="password"]')
+BROKER_FOCUS_EXPRESSIONS = {
+    **{f'(()=>{{const e=document.querySelector({json.dumps(selector)});if(!e||e.disabled||e.readOnly)return false;e.focus();e.value=\'\';return document.activeElement===e}})()':selector for selector in BROKER_FOCUS_SELECTORS},
+    f'''(()=>{{const e=document.querySelector('{BROKER_OTP_SELECTOR}');if(!e||e.disabled||e.readOnly)return false;e.focus();e.value='';return document.activeElement===e}})()''':BROKER_OTP_SELECTOR,
+}
+BROKER_EVALUATIONS = frozenset((
+    *BROKER_FOCUS_EXPRESSIONS,
+    '''(()=>{const e=document.querySelector('input[type="password"]');if(!e?.form)return false;e.form.requestSubmit();return true})()''',
+    f'''(()=>{{const e=document.querySelector('{BROKER_OTP_SELECTOR}');if(!e?.form)return false;e.form.requestSubmit();return true}})()''',
+    '''document.readyState==='complete'&&!document.querySelector('input[type="password"]')''',
+    "![...document.querySelectorAll('input,textarea')].some(e=>e.value && (e.tagName==='TEXTAREA'||!['hidden','checkbox','radio','button','submit','reset','image','file','range','color'].includes(e.type)))",
+    f'''Boolean([...document.querySelectorAll('{BROKER_OTP_SELECTOR}')].find(e=>!e.disabled&&e.getClientRects().length))''',
+    'Object.entries(localStorage)',
+))
 # Capture the loaded files at process startup, not on each request: replacing
 # files on disk does not change an already-running Python gateway.
 VERSION = hashlib.sha256(Path(__file__).read_bytes() + Path(__file__).with_name('subagent-cdp.mjs').read_bytes()).hexdigest()
@@ -48,13 +65,66 @@ def inspect_mutation_expression(mutation):
     selector=json.dumps(str(mutation.get('selector',''))[:500])
     return f"(() => {{ const e={('document.activeElement' if mutation.get('action')=='key' else 'document.querySelector('+selector+')')}; if (!e) return {{requiresApproval:true}}; const text=(e.innerText||e.getAttribute('aria-label')||'').slice(0,500); const risk=/pay|purchase|buy|delete|remove|cancel|unsubscribe|transfer|send|publish|submit|confirm|付款|支付|购买|删除|取消|转账|发送|发布|确认/i.test(text); return {{requiresApproval:risk || (e.type==='submit' && e.form?.method.toLowerCase()!=='get') || ({json.dumps(mutation.get('action')=='key' and mutation.get('key')=='Enter')} && e.form?.method.toLowerCase()!=='get')}}; }})()"
 
-def broker_command_allowed(data, target, sessions):
-    if not isinstance(data,dict) or type(data.get('id')) is not int or not isinstance(data.get('params',{}),dict):return False
+def browser_origin(value):
+    try:
+        parsed=urlsplit(value)
+        if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.hostname.endswith('.') or parsed.username or parsed.password:return None
+        # External credential origins require HTTPS. Loopback HTTP is reserved
+        # for the isolated synthetic gateway fixture; the broker API itself
+        # accepts only HTTPS credential origins.
+        if parsed.scheme=='http' and parsed.hostname not in ('127.0.0.1','localhost','::1'):return None
+        host=parsed.hostname.lower();host=f'[{host}]' if ':' in host else host
+        port=parsed.port
+        if port==0:return None
+        return f'{parsed.scheme}://{host}'+(f':{port}' if port and port != (443 if parsed.scheme=='https' else 80) else '')
+    except (ValueError,TypeError):return None
+
+def broker_command_allowed(data, target, sessions, objects=None, origin=None):
+    if not isinstance(data,dict) or type(data.get('id')) is not int or data['id'] < 1 or not isinstance(data.get('params'),dict):return False
+    objects=objects or {}
     method=data.get('method')
     if method=='Target.attachToTarget':
-        params=data.get('params',{})
-        return data.get('sessionId') is None and params.get('targetId')==target and params.get('flatten') is True
-    return method in BROKER_METHODS and data.get('sessionId') in sessions
+        return set(data)=={'id','method','params'} and not sessions and data['params']=={'targetId':target,'flatten':True}
+    if set(data)!={'id','method','params','sessionId'} or not isinstance(method,str) or method not in BROKER_METHODS or not isinstance(data.get('sessionId'),str) or data['sessionId'] not in sessions:return False
+    params=data['params']
+    if method in ('Page.getFrameTree','Page.reload'):return params=={}
+    if method=='DOM.getDocument':return params=={'depth':-1,'pierce':True}
+    if method=='Runtime.evaluate':
+        return set(params)=={'expression','returnByValue'} and isinstance(params['expression'],str) and ((params['expression'] in BROKER_EVALUATIONS and params['returnByValue'] is True) or (params['expression']=='globalThis' and params['returnByValue'] is False))
+    if method=='Runtime.callFunctionOn':
+        args=params.get('arguments')
+        return set(params)=={'objectId','functionDeclaration','arguments','returnByValue'} and isinstance(params['objectId'],str) and bool(params['objectId']) and params['objectId']==objects.get(data['sessionId']) and params['functionDeclaration']==BROKER_STORAGE_FUNCTION and params['returnByValue'] is True and isinstance(args,list) and len(args)==1 and isinstance(args[0],dict) and set(args[0])=={'value'} and isinstance(args[0]['value'],list) and all(isinstance(item,list) and len(item)==2 and all(isinstance(part,str) for part in item) for item in args[0]['value'])
+    if method=='Input.insertText':return set(params)=={'text'} and isinstance(params['text'],str) and 0<len(params['text'])<=4096 and not any(char in params['text'] for char in '\r\n\0')
+    if method=='Network.getCookies':return bool(origin) and set(params)=={'urls'} and params['urls']==[origin]
+    if method=='Network.setCookies':
+        if not origin or set(params)!={'cookies'} or not isinstance(params['cookies'],list) or len(params['cookies'])>500:return False
+        host=urlsplit(origin).hostname
+        keys={'name','value','domain','path','expires','size','httpOnly','secure','session','sameSite','priority','sameParty','sourceScheme','sourcePort','partitionKey'}
+        for item in params['cookies']:
+            if not isinstance(item,dict) or not set(item)<=keys or not isinstance(item.get('name'),str) or not isinstance(item.get('value'),str) or not isinstance(item.get('domain'),str):return False
+            if not item['name'] or any(len(item[key])>4096 or any(char in item[key] for char in '\r\n\0') for key in ('name','value','domain')):return False
+            domain=item['domain'].lstrip('.').lower()
+            if not domain or not host or not (host==domain or host.endswith('.'+domain)):return False
+            if 'path' in item and (not isinstance(item['path'],str) or not item['path'].startswith('/') or any(char in item['path'] for char in '\r\n\0')):return False
+            if any(key in item and type(item[key]) is not bool for key in ('httpOnly','secure','session','sameParty')):return False
+            if 'expires' in item and (type(item['expires']) not in (int,float) or not math.isfinite(item['expires'])):return False
+            if 'size' in item and (type(item['size']) is not int or item['size']<0):return False
+            if 'sourcePort' in item and (type(item['sourcePort']) is not int or not -1<=item['sourcePort']<=65535):return False
+            if 'sameSite' in item and item['sameSite'] not in ('Strict','Lax','None'):return False
+            if 'priority' in item and item['priority'] not in ('Low','Medium','High'):return False
+            if 'sourceScheme' in item and item['sourceScheme'] not in ('Unset','NonSecure','Secure'):return False
+            if 'partitionKey' in item:
+                key=item['partitionKey']
+                if not isinstance(key,dict) or not {'topLevelSite'}<=set(key) or not set(key)<={'topLevelSite','hasCrossSiteAncestor'} or not isinstance(key['topLevelSite'],str):return False
+                if 'hasCrossSiteAncestor' in key and type(key['hasCrossSiteAncestor']) is not bool:return False
+                site=browser_origin(key['topLevelSite'])
+                if not site:return False
+                parsed=urlsplit(key['topLevelSite']);site_parts=urlsplit(site)
+                if parsed.path not in ('','/') or parsed.query or parsed.fragment or site_parts.scheme!=urlsplit(origin).scheme:return False
+                site_host=site_parts.hostname
+                if not site_host or not (host==site_host or host.endswith('.'+site_host)):return False
+        return True
+    return False
 
 def decode(value):
     return base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))
@@ -203,6 +273,8 @@ async def begin(request):
         await b.rpc('Page.stopScreencast',session=b.session)
         tree=await b.rpc('Page.getFrameTree',session=b.session)
         b.guard_loader=tree['frameTree']['frame']['loaderId']
+        b.guard_origin=browser_origin(tree['frameTree']['frame']['url'])
+        if not b.guard_origin:raise web.HTTPConflict()
         for ws in list(b.viewer):await ws.close()
     base=f'https://{request.host}'
     return web.json_response({'cdpUrl':base.replace('https:','wss:')+request.path.replace('/credentials/begin','/credentials/cdp')+'?token='+request.query['token']+'&guard='+b.guard,'targetId':b.target,'guardToken':b.guard})
@@ -213,27 +285,48 @@ async def cdp(request):
     if not b.guard or not hmac.compare_digest(guard,b.guard):raise web.HTTPForbidden()
     ws=web.WebSocketResponse(max_msg_size=1024*1024);await ws.prepare(request)
     reader,writer=await asyncio.open_unix_connection(str(b.path/'cdp.sock'),limit=4*1024*1024)
-    sessions=set();attaching=set()
+    sessions=set();pending={};objects={};focused={};origin=getattr(b,'guard_origin',None)
+    if not origin:
+        writer.close();await writer.wait_closed();await ws.close();return ws
     async def incoming():
         async for message in ws:
             token(raw,'broker')
             if b.guard!=guard or message.type!=WSMsgType.TEXT:break
             data=json.loads(message.data)
             # Broker capability is scoped to this page, not a general CDP socket.
-            if not broker_command_allowed(data,b.target,sessions):break
-            if data['method']=='Target.attachToTarget':
-                if data['id'] in attaching:break
-                attaching.add(data['id'])
+            if not broker_command_allowed(data,b.target,sessions,objects,origin) or data['id'] in pending:break
+            if data['method']!='Target.attachToTarget' and browser_origin(await b.url())!=origin:break
+            if data['method']=='Target.attachToTarget' and any(item[0]=='Target.attachToTarget' for item in pending.values()):break
+            if data['method']=='Runtime.callFunctionOn':objects.pop(data['sessionId'],None)
+            if data['method']=='Page.reload':objects.pop(data['sessionId'],None);focused.pop(data['sessionId'],None)
+            if data['method']=='Runtime.evaluate':focused.pop(data['sessionId'],None)
+            if data['method']=='Input.insertText':
+                selector=focused.pop(data['sessionId'],None)
+                if not selector:break
+                check=await b.rpc('Runtime.evaluate',{'expression':f"(()=>{{const e=document.querySelector({json.dumps(selector)});return !!e && !e.disabled && !e.readOnly && document.activeElement===e}})()",'returnByValue':True},b.session)
+                if check.get('result',{}).get('value') is not True or browser_origin(await b.url())!=origin:break
+            pending[data['id']]=(data['method'],data.get('sessionId'),data.get('params',{}).get('expression'))
             writer.write((json.dumps(data)+'\n').encode());await writer.drain()
     async def outgoing():
         while line:=await reader.readline():
             token(raw,'broker')
             if b.guard!=guard:break
             data=json.loads(line)
-            if data.get('id') in attaching:
-                attaching.discard(data['id'])
+            if data.get('method')=='Target.detachedFromTarget':
+                detached=data.get('params',{}).get('sessionId')
+                sessions.discard(detached);objects.pop(detached,None);focused.pop(detached,None)
+            if data.get('method')=='Page.frameNavigated':
+                frame=data.get('params',{}).get('frame',{})
+                if not frame.get('parentId') and browser_origin(frame.get('url'))!=origin:break
+            call=pending.pop(data.get('id'),None)
+            if call and call[0]=='Target.attachToTarget':
                 session=data.get('result',{}).get('sessionId')
                 if isinstance(session,str) and session:sessions.add(session)
+            if call and call[0]=='Runtime.evaluate' and call[2]=='globalThis':
+                object_id=data.get('result',{}).get('result',{}).get('objectId')
+                if isinstance(object_id,str) and object_id:objects[call[1]]=object_id
+            if call and call[0]=='Runtime.evaluate' and call[2] in BROKER_FOCUS_EXPRESSIONS and data.get('result',{}).get('result',{}).get('value') is True:
+                focused[call[1]]=BROKER_FOCUS_EXPRESSIONS[call[2]]
             await ws.send_str(line.decode().strip())
     async def expiry():
         await asyncio.sleep(max(0,grant['exp']-time.time()))
