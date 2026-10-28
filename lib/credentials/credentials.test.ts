@@ -148,7 +148,7 @@ function bindFixtureAction(claimed: any, revision = 'fixture-revision') {
   claimed.target.sandboxId = 'synthetic-sandbox'
   claimed.target.credentialRevision = revision
   const input = claimed.target.observedInput
-  const action = { kind: 'browser_credential', actionId: '11111111-1111-4111-8111-111111111111', admission: 'ask', digest: 'a'.repeat(64), summary: 'synthetic', userId: claimed.user_id, workspaceId: claimed.workspace_id, botId: claimed.bot_id, subagentId: claimed.subagent_id, runId: claimed.subagent_id, epoch: input?.epoch ?? 1, policyVersion: input?.permissionVersion ?? 0, targetId: claimed.target.targetId, origin: claimed.origin, loaderId: input?.loaderId ?? 'loader', backendNodeId: input?.backendNodeId ?? 7, role: input?.credentialRole ?? 'password', expiresAt: Date.now() + 60000 }
+  const action = { kind: 'browser_credential', actionId: '11111111-1111-4111-8111-111111111111', admission: 'ask', forcePassword: claimed.target.credentialMode === 'password', digest: 'a'.repeat(64), summary: 'synthetic', userId: claimed.user_id, workspaceId: claimed.workspace_id, botId: claimed.bot_id, subagentId: claimed.subagent_id, runId: claimed.subagent_id, epoch: input?.epoch ?? 1, policyVersion: input?.permissionVersion ?? 0, targetId: claimed.target.targetId, origin: claimed.origin, loaderId: input?.loaderId ?? 'loader', backendNodeId: input?.backendNodeId ?? 7, role: input?.credentialRole ?? 'password', expiresAt: Date.now() + 60000 }
   claimed.target.credentialAction = action
   return action
 }

@@ -27,6 +27,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
   if (!action || action.kind !== 'browser_credential' || action.userId !== caller.userId || action.workspaceId !== caller.workspaceId || action.botId !== caller.botId || action.subagentId !== caller.subagentId || action.runId !== caller.subagentId || action.targetId !== target.targetId || action.origin !== context.origin || !['allow', 'ask'].includes(action.admission) || action.expiresAt <= Date.now()) throw new CredentialError('credential_denied', 404)
   const started = await pool.query(`UPDATE pending_actions SET context='{"credentialExecuting":true}'::jsonb WHERE id=$1 AND "userId"=$2 AND action='browser_operation' AND status='running' AND context IS NULL AND input=$3::jsonb AND "createdAt">clock_timestamp()-interval '5 minutes' RETURNING id`, [action.actionId, caller.userId, JSON.stringify(action)])
   if (!started.rowCount) throw new CredentialError('credential_denied', 404)
+  if ((action.forcePassword === true) !== (target.credentialMode === 'password')) throw new CredentialError('credential_denied', 404)
   const client = await pool.connect()
   let cdp: Cdp | undefined, guardToken: string | undefined, completed = false, effectStarted = false
   let plaintext: Buffer | undefined

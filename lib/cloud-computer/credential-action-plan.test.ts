@@ -14,7 +14,7 @@ test('one existing approval receipt binds both model-selected inputs and submiss
   // PostgreSQL jsonb changes key ordering. It must not change the meaning of
   // the selected input or invalidate an otherwise identical receipt.
   assert.doesNotThrow(() => parseCredentialAction({ ...action, additionalInput: { role: 'password', backendNodeId: 2 } }))
-  for (const changed of [{ ...action, submitNodeId: 4 }, { ...action, additionalInput: { backendNodeId: 4, role: 'password' as const } }, { ...action, role: 'password' as const }]) {
+  for (const changed of [{ ...action, submitNodeId: 4 }, { ...action, forcePassword: true }, { ...action, additionalInput: { backendNodeId: 4, role: 'password' as const } }, { ...action, role: 'password' as const }]) {
     assert.throws(() => parseCredentialAction(changed))
   }
 })

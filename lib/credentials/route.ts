@@ -31,11 +31,17 @@ async function browserCredentialRoute(request: Request, identity: { botId: strin
       const target = await resolveCredentialBrowser(caller)
       if (canonicalOrigin(target.origin) !== canonicalOrigin(parsed.data.origin)) throw new CredentialError('credential_denied', 404)
       if ('code' in parsed.data) {
+        if (caller.subagentId) { parsed.data.code = ''; throw new CredentialError('credential_handover_required', 409) }
         let lease: string
         try { lease = await credentialStore.otpLease(caller, parsed.data, target) } finally { parsed.data.code = '' }
         return Response.json(await executeCredentialLease(lease, target.origin), { headers: privateHeaders })
       }
       try { await credentialStore.save(caller, parsed.data) } finally { parsed.data.password = '' }
+      if (caller.subagentId) {
+        const { SubagentStore } = await import('@/lib/cloud-computer/subagents')
+        await new SubagentStore(pool).resumeAfterCredential(caller, caller.botId, caller.subagentId, target.origin)
+        return Response.json({ status: 'saved', origin: target.origin }, { headers: privateHeaders })
+      }
       const result = await login(caller, target.origin, parsed.data.username)
       return Response.json(result, { headers: privateHeaders })
     }
@@ -43,6 +49,11 @@ async function browserCredentialRoute(request: Request, identity: { botId: strin
     if (!parsed.success) throw new CredentialError('credential_submission_invalid', 400)
     const target = await resolveCredentialBrowser(caller)
     if (canonicalOrigin(target.origin) !== canonicalOrigin(parsed.data.site)) throw new CredentialError('credential_denied', 404)
+    if (action === 'login' && caller.subagentId) {
+      const { SubagentStore } = await import('@/lib/cloud-computer/subagents')
+      await new SubagentStore(pool).resumeAfterCredential(caller, caller.botId, caller.subagentId, target.origin)
+      return Response.json({ status: 'resumed', origin: target.origin }, { headers: privateHeaders })
+    }
     const result = action === 'challenge' ? await credentialStore.challenge(caller, target.origin) : await login(caller, target.origin, undefined, { forcePassword: 'forcePassword' in parsed.data && parsed.data.forcePassword === true })
     return Response.json(result, { headers: privateHeaders })
   } catch (error) { return credentialFailure(error) }

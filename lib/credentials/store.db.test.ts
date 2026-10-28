@@ -118,7 +118,7 @@ test('real PostgreSQL: observed credential lease inserts once and stays guarded'
     await store.save(actor, { nonce: challenge.nonce, origin, username: 'fixture-user', password: fixturePassword })
     const target = { targetId: 'fixture-target', origin, sandboxId: 'synthetic-sandbox', endpoint: 'https://fixture.e2b.app/', expiresAt: Date.now() + 60000, observedInput: { loaderId: 'fixture-loader', backendNodeId: 7, credentialRole: 'password' as const, epoch: 1, permissionVersion: 1 } }
     async function actionTarget(version = 1) {
-      const { action } = await recordCredentialAction(pool, { ...actor, runId: actor.subagentId, epoch: 1, policyVersion: version, targetId: target.targetId, origin, loaderId: target.observedInput.loaderId, backendNodeId: 7, role: 'password', expiresAt: Date.now() + 60000 }, 'ask', false, randomUUID())
+      const { action } = await recordCredentialAction(pool, { ...actor, runId: actor.subagentId, epoch: 1, policyVersion: version, targetId: target.targetId, origin, loaderId: target.observedInput.loaderId, backendNodeId: 7, role: 'password', forcePassword: true, expiresAt: Date.now() + 60000 }, 'ask', false, randomUUID())
       await pool.query(`UPDATE pending_actions SET status='running' WHERE id=$1 AND status='pending'`, [action.actionId])
       await pool.query(`UPDATE bot_subagents SET status='needs_you',needs=$2 WHERE id=$1`, [actor.subagentId, { kind: 'approval', actionId: action.actionId }])
       return { ...target, observedInput: { ...target.observedInput, permissionVersion: version }, credentialAction: action }

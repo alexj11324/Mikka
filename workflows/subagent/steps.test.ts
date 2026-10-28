@@ -11,6 +11,7 @@ let modelAction: 'login' | 'waiting' = 'login'
 let modelSelector = '[data-mikka-ref="1"]'
 let loginFields: { selector: string; role: 'username' | 'password' }[] | undefined
 let submitSelector: string | undefined
+let forcePassword: boolean | undefined
 const oldVisionModel = process.env.MIKKA_BROWSER_VISION_MODEL
 class FakeStore {
   async start() { return { status: 'running', epoch: 7, task: 'Sign in', step: 'start', targetId: 'target' } }
@@ -26,18 +27,18 @@ mock.module(new URL('../../lib/cloud-computer/subagents.ts', import.meta.url).hr
 mock.module(new URL('../../lib/cloud-computer/credential-consumer.ts', import.meta.url).href, { namedExports: { executeCredentialIntent: async (input: Record<string, unknown>) => { invocations.push(input); return { status: resultStatus } } } })
 mock.module(new URL('../../lib/coordinator-event-store.ts', import.meta.url).href, { namedExports: { recordCoordinatorEvent: async () => {} } })
 mock.module(new URL('../../lib/coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: async () => {} } })
-mock.module('ai', { namedExports: { tool: (input: unknown) => input, generateText: async () => ({ toolCalls: [{ toolName: 'choose_browser_action', input: { action: modelAction, selector: modelSelector, loginRole: 'username', loginFields, submitSelector, step: 'Login', summary: 'Please take over' } }] }) } })
+mock.module('ai', { namedExports: { tool: (input: unknown) => input, generateText: async () => ({ toolCalls: [{ toolName: 'choose_browser_action', input: { action: modelAction, selector: modelSelector, loginRole: 'username', loginFields, submitSelector, forcePassword, step: 'Login', summary: 'Please take over' } }] }) } })
 let tick: typeof import('./steps').tick
 before(async () => { process.env.MIKKA_BROWSER_VISION_MODEL = 'synthetic/test'; tick = (await import('./steps')).tick })
 after(() => { if (oldVisionModel === undefined) delete process.env.MIKKA_BROWSER_VISION_MODEL; else process.env.MIKKA_BROWSER_VISION_MODEL = oldVisionModel })
-beforeEach(() => { invocations.length = 0; updates.length = 0; currentLoader = 'document'; targetIdentity = 42; modelAction = 'login'; modelSelector = '[data-mikka-ref="1"]'; loginFields = undefined; submitSelector = undefined })
+beforeEach(() => { invocations.length = 0; updates.length = 0; currentLoader = 'document'; targetIdentity = 42; modelAction = 'login'; modelSelector = '[data-mikka-ref="1"]'; loginFields = undefined; submitSelector = undefined; forcePassword = undefined })
 
 for (const status of ['session_applied', 'submitted'] as const) {
   test(`${status} preserves selected target and requires another observation`, async () => {
     resultStatus = status
     assert.equal(await tick(actor, 'bot', 'subagent'), 'running')
     assert.deepEqual(invocations, [{ permissionAction: 'computer_use', actor, botId: 'bot', subagentId: 'subagent', epoch: 7, targetId: 'target', loaderId: 'document', origin: 'https://example.test', backendNodeId: 42, intent: { targetSelector: '[data-mikka-ref="1"]', role: 'username' } }])
-    assert.equal(updates.length, 0)
+    assert.deepEqual((updates[0] as unknown[]).slice(3), ['running', status])
   })
 }
 
@@ -87,4 +88,11 @@ test('duplicate roles or an unobserved submit target never reach credentials', a
     assert.equal(await tick(actor, 'bot', 'subagent'), 'terminal')
   }
   assert.equal(invocations.length, 0)
+})
+
+test('the model may choose password retry after observing a rejected saved session', async () => {
+  resultStatus = 'submitted'
+  forcePassword = true
+  assert.equal(await tick(actor, 'bot', 'subagent'), 'running')
+  assert.equal((invocations[0].intent as { forcePassword?: boolean }).forcePassword, true)
 })

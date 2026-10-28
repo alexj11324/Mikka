@@ -25,7 +25,7 @@ combined dependency tree.
 
 All of the following ran in the cloud Linux workspace, using synthetic data.
 
-- 53 focused Node tests passed without skips: authority/receipt, approval
+- 63 focused Node tests passed without skips: authority/receipt, approval
   dispatch, credential consumer and broker, workflow, visual-message and
   process-version regressions.
 - Ten guard tests and three STOP/revocation tests passed. The guard tests
@@ -80,3 +80,30 @@ Candidate branch: candidate/pr346-acceptance. Source 8acd5b54b1c0e4704ec709a44b5
 The live AI Gateway catalog was read without inference. The existing free Coordinator model reports text-only input. openai/gpt-6.1-sol reports image input and tools, with base input/output rates of US$2/US$10 per million tokens. A maximum three-request, Standard/High functional probe with a US$0.15 ceiling was requested separately; no paid request has run. No benchmark or live-eval was enabled.
 
 Credential submission additionally requires the selected form to POST to its current origin in the same browsing context. GET, cross-origin, URL userinfo and alternate-context transports are rejected before submission. A current ask decision must still match the web run's exact approval record when the broker opens a secret. These are credential-protection checks, not ordinary-page business classifiers. The latest real gateway/DB fixture also executed one exact approved ask and rejected a different current review before decryption.
+
+## Current integration follow-up
+
+The original PR 346 head 92d17ae7c9c629cc86347625d6374d23496f6d05 is
+now an ancestor through merge bcc3a6b. Current main
+3e1f4316ce556f0b9f39475bff5a2eedc6d1b477 and vault head
+c896941e1f5f32328a6937a1fdf717a42323304b have also been normally merged
+into this candidate. Original branches have not been overwritten or force pushed.
+The latest vault nonce/revision fence, unknown-effect handling, retained
+revocation, bounded error parsing and safe guard release remain in place.
+The vault's two actual PostgreSQL regressions passed after their positive
+fixture was connected to the same real pending-action receipt and run policy.
+
+Saving a login now resumes only the same owner/workspace/Bot web task that is
+actually waiting for that site's login; it does not invoke the old unbound fill
+path or claim authentication succeeded. The model receives the last mechanical
+session/submission result and may explicitly select forcePassword on a later
+observed turn. That choice is covered by the same operation digest and policy.
+An unresolved ordinary browser approval also blocks a racing credential action.
+No configured vision model means no new billable browser is provisioned.
+
+Source 13fcf70 and merged-source bcc3a6b passed full CI and backend CI. Full
+browser run 40784948862 passed on the older 8acd5b5 source. All subsequent
+changes still require final exact-SHA cloud CI and real functional acceptance.
+No real model inference, real-account login, production SQL, or merge has been
+performed. Team-account routing and the bounded functional model-request fee
+remain unanswered user questions; no reply is inferred from elapsed time.

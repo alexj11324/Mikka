@@ -21,7 +21,7 @@ export async function executeRecordedCredentialAction(action: CredentialAction):
   const caller = { userId: action.userId, workspaceId: action.workspaceId, botId: action.botId, subagentId: action.subagentId }
   await credentialStore.authorize(caller)
   const target = await resolveRecordedCredentialTarget(action)
-  const lease = await credentialStore.lease(caller, action.origin, target)
+  const lease = await credentialStore.lease(caller, action.origin, target, undefined, action.forcePassword === true)
   if (lease.status === 'needs_login') {
     const consumed = await pool.query(`UPDATE pending_actions SET context='{"credentialExecuting":true}'::jsonb WHERE id=$1 AND "userId"=$2 AND action='browser_operation' AND status='running' AND context IS NULL AND input=$3::jsonb RETURNING id`, [action.actionId, action.userId, JSON.stringify(action)])
     if (!consumed.rowCount) throw new ComputerError(409, 'Credential action already consumed')

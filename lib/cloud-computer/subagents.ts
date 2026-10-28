@@ -4,9 +4,10 @@ import type { Pool, PoolClient } from 'pg'
 import { subagentEventSchema, type SubagentEvent } from '@mikka/protocol/subagent'
 import { defaultRunPolicy, runPolicySchema, type RunPolicy } from '@mikka/protocol/agent-policy'
 import { ComputerError } from '@/lib/computer/store'
+import { canonicalOrigin } from '@/lib/credentials/contracts'
 import { createComputer, connectComputer } from '@/lib/computer/e2b-provider'
 import { installSubagentRuntime, runtimeRequest, grant, endpointPath, type BrowserBinding } from './runtime'
-import { requireWorkspaceComputerPolicy, resolveWorkspaceComputerPolicy, withWorkspaceComputerPermission } from './workspace-policy'
+import { effectiveWebComputerPermission, requireWorkspaceComputerPolicy, resolveWorkspaceComputerPolicy, withWorkspaceComputerPermission } from './workspace-policy'
 export type Actor = { userId: string; workspaceId: string }
 export type Subagent = BrowserBinding & { task: string; status: SubagentEvent['data']['state']; step: string; needs: SubagentEvent['data']['needs']; targetId: string | null; runPolicy: RunPolicy | null }
 export class SubagentStore {
@@ -49,6 +50,9 @@ export class SubagentStore {
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`subagents:${actor.workspaceId}`])
       const row = await this.get(actor, botId, id, client)
       if (row.status !== 'queued') { await client.query('COMMIT'); return row }
+      // Refuse provisioning before an image-capable model is configured. A
+      // missing provider must not create a billable browser and fail afterward.
+      if (!process.env.MIKKA_BROWSER_VISION_MODEL) throw new ComputerError(503, 'Browser vision model unavailable')
       const count = Number((await client.query(`SELECT count(*) AS n FROM bot_subagents WHERE "workspaceId"=$1 AND status IN ('running','needs_you')`, [actor.workspaceId])).rows[0].n)
       const older = await client.query(`SELECT 1 FROM bot_subagents WHERE "workspaceId"=$1 AND status='queued' AND "createdAt"<(SELECT "createdAt" FROM bot_subagents WHERE id=$2) LIMIT 1`, [actor.workspaceId, id])
       if (count >= 6 || older.rowCount) { await client.query('COMMIT'); return row }
@@ -118,6 +122,21 @@ export class SubagentStore {
     // Cleanup first; failures remain retryable and must not claim a stop succeeded.
     await runtimeRequest(machine.sandboxId, machine.row, '/stop', {})
     return this.update(actor, botId, id, 'stopped', 'stopped')
+  }
+  async resumeAfterCredential(actor: Actor, botId: string, id: string, site: string) {
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      const workspace = await resolveWorkspaceComputerPolicy(client, actor.workspaceId)
+      const row = await this.get(actor, botId, id, client)
+      if (effectiveWebComputerPermission(workspace.permission, row.runPolicy) === 'deny') throw new ComputerError(403, 'Computer action denied')
+      if (row.status !== 'needs_you' || row.needs?.kind !== 'login' || canonicalOrigin(row.needs.site) !== canonicalOrigin(site)) throw new ComputerError(409, 'Web task is not waiting for this login')
+      const changed = (await client.query<Subagent>(`UPDATE bot_subagents SET status='running',step='running',needs=NULL WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 AND status='needs_you' AND epoch=$5 AND needs=$6::jsonb RETURNING *`, [id, actor.userId, actor.workspaceId, botId, row.epoch, JSON.stringify(row.needs)])).rows[0]
+      if (!changed) throw new ComputerError(409, 'Web task changed')
+      await this.publish(client, changed)
+      await client.query('COMMIT')
+      return changed
+    } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   }
   async action(actor: Actor, botId: string, id: string, action: Record<string, unknown>) {
     // Mutating I/O must pass through the exact-action ledger, not this read

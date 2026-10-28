@@ -12,7 +12,7 @@ import { credentialServiceOutcome, executeRecordedCredentialAction } from './cre
  * CDP identity, not code and not authority. The host must apply and consume
  * computer_use before any action.
  * The model supplies neither credentials nor a permission decision. */
-export async function executeCredentialIntent(input: { permissionAction: 'computer_use'; actor: Actor; botId: string; subagentId: string; epoch: number; targetId: string; loaderId: string; origin: string; backendNodeId: number; intent: { targetSelector: string; role: 'username' | 'password'; additionalInput?: { backendNodeId: number; role: 'username' | 'password' }; submitNodeId?: number } }): Promise<{ status: 'needs_login' | 'session_applied' | 'submitted' | 'guarded' } | { status: 'needs_you'; actionId: string; summary: string }> {
+export async function executeCredentialIntent(input: { permissionAction: 'computer_use'; actor: Actor; botId: string; subagentId: string; epoch: number; targetId: string; loaderId: string; origin: string; backendNodeId: number; intent: { targetSelector: string; role: 'username' | 'password'; additionalInput?: { backendNodeId: number; role: 'username' | 'password' }; submitNodeId?: number; forcePassword?: boolean } }): Promise<{ status: 'needs_login' | 'session_applied' | 'submitted' | 'guarded' } | { status: 'needs_you'; actionId: string; summary: string }> {
   const { pool } = await import('@/lib/db')
   const { SubagentStore } = await import('./subagents')
   const { authorizeSubscriptionWorkspace } = await import('@/lib/subscription-runtime')
@@ -35,13 +35,13 @@ export async function executeCredentialIntent(input: { permissionAction: 'comput
       if (checked.targetId !== input.targetId || checked.loaderId !== input.loaderId || checked.origin !== input.origin || checked.backendNodeId !== extra.backendNodeId || checked.role !== extra.role) throw new ComputerError(409, 'Credential target changed')
     }
     if (input.intent.submitNodeId) await runtimeRequest(sandboxId, row, '/action', { action: 'inspectCredentialSubmit', loaderId: input.loaderId, origin: input.origin, backendNodeId: input.intent.submitNodeId })
-    const outstanding = (await client.query(`SELECT input,status FROM pending_actions WHERE "userId"=$1 AND action='browser_operation' AND input->>'kind'='browser_credential' AND input->>'subagentId'=$2 AND status IN ('pending','running') LIMIT 2`, [input.actor.userId, input.subagentId])).rows
+    const outstanding = (await client.query(`SELECT input,status FROM pending_actions WHERE "userId"=$1 AND action='browser_operation' AND input->>'subagentId'=$2 AND status IN ('pending','running') LIMIT 2`, [input.actor.userId, input.subagentId])).rows
     if (outstanding.length) {
       if (outstanding.length !== 1 || outstanding[0].status !== 'pending') throw new ComputerError(409, 'Credential action outcome pending')
       action = parseCredentialAction(outstanding[0].input)
-      if (action.admission !== decision || action.policyVersion !== workspace.version || action.epoch !== input.epoch || action.targetId !== input.targetId || action.loaderId !== input.loaderId || action.origin !== input.origin || action.backendNodeId !== input.backendNodeId || action.role !== input.intent.role || action.additionalInput?.backendNodeId !== input.intent.additionalInput?.backendNodeId || action.additionalInput?.role !== input.intent.additionalInput?.role || action.submitNodeId !== input.intent.submitNodeId) throw new ComputerError(409, 'Credential action changed')
+      if (action.admission !== decision || action.policyVersion !== workspace.version || action.epoch !== input.epoch || action.targetId !== input.targetId || action.loaderId !== input.loaderId || action.origin !== input.origin || action.backendNodeId !== input.backendNodeId || action.role !== input.intent.role || action.additionalInput?.backendNodeId !== input.intent.additionalInput?.backendNodeId || action.additionalInput?.role !== input.intent.additionalInput?.role || action.submitNodeId !== input.intent.submitNodeId || (action.forcePassword === true) !== (input.intent.forcePassword === true)) throw new ComputerError(409, 'Credential action changed')
     } else {
-      action = (await recordCredentialAction(client, { userId: input.actor.userId, workspaceId: input.actor.workspaceId, botId: input.botId, subagentId: input.subagentId, runId: input.subagentId, epoch: input.epoch, policyVersion: workspace.version, targetId: input.targetId, origin: input.origin, loaderId: input.loaderId, backendNodeId: input.backendNodeId, role: input.intent.role, ...(input.intent.additionalInput ? { additionalInput: input.intent.additionalInput } : {}), ...(input.intent.submitNodeId ? { submitNodeId: input.intent.submitNodeId } : {}), expiresAt: Date.now() + 5 * 60_000 }, decision, row.runPolicy.readOnly === true, newCredentialActionId())).action
+      action = (await recordCredentialAction(client, { userId: input.actor.userId, workspaceId: input.actor.workspaceId, botId: input.botId, subagentId: input.subagentId, runId: input.subagentId, epoch: input.epoch, policyVersion: workspace.version, targetId: input.targetId, origin: input.origin, loaderId: input.loaderId, backendNodeId: input.backendNodeId, role: input.intent.role, ...(input.intent.additionalInput ? { additionalInput: input.intent.additionalInput } : {}), ...(input.intent.submitNodeId ? { submitNodeId: input.intent.submitNodeId } : {}), ...(input.intent.forcePassword === true ? { forcePassword: true } : {}), expiresAt: Date.now() + 5 * 60_000 }, decision, row.runPolicy.readOnly === true, newCredentialActionId())).action
     }
     await client.query('COMMIT')
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
@@ -72,7 +72,7 @@ export async function executeApprovedCredentialAction(pool: Pool, userId: string
     const result = credentialServiceOutcome(await executeRecordedCredentialAction(action))
     if (result.status === 'guarded') await store.update(actor, action.botId, action.subagentId, 'needs_you', 'Secure login continuation unavailable')
     else if (result.status === 'needs_login') await store.update(actor, action.botId, action.subagentId, 'needs_you', 'needs_you', { kind: 'login', site: action.origin })
-    else await store.update(actor, action.botId, action.subagentId, 'running', 'running')
+    else await store.update(actor, action.botId, action.subagentId, 'running', result.status)
     return { data: result }
   } catch (error) {
     if (error instanceof ComputerError && error.status === 503) return { error: 'browserCredentialServiceUnavailable' }

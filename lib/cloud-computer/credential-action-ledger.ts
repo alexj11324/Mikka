@@ -15,11 +15,12 @@ const bindingSchema = z.object({
   expiresAt: z.number().int().positive(),
   additionalInput: z.object({ backendNodeId: z.number().int().positive(), role: z.enum(['username', 'password']) }).strict().optional(),
   submitNodeId: z.number().int().positive().optional(),
+  forcePassword: z.boolean().optional(),
 }).strict()
 export type CredentialActionBinding = z.infer<typeof bindingSchema>
 export type CredentialAction = CredentialActionBinding & { kind: 'browser_credential'; actionId: string; admission: 'allow' | 'ask'; digest: string; summary: string }
 function digest(binding: CredentialActionBinding, actionId: string, admission: 'allow' | 'ask') {
-  return createHash('sha256').update(JSON.stringify([actionId, admission, binding.userId, binding.workspaceId, binding.botId, binding.subagentId, binding.runId, binding.epoch, binding.policyVersion, binding.targetId, binding.origin, binding.loaderId, binding.backendNodeId, binding.role, binding.expiresAt, binding.additionalInput ?? null, binding.submitNodeId ?? null])).digest('hex')
+  return createHash('sha256').update(JSON.stringify([actionId, admission, binding.userId, binding.workspaceId, binding.botId, binding.subagentId, binding.runId, binding.epoch, binding.policyVersion, binding.targetId, binding.origin, binding.loaderId, binding.backendNodeId, binding.role, binding.expiresAt, binding.additionalInput ?? null, binding.submitNodeId ?? null, binding.forcePassword === true])).digest('hex')
 }
 
 /** The host persists this id with its workflow step before attempting I/O. */
