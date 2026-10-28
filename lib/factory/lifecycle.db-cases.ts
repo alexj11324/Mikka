@@ -1,3 +1,4 @@
+import { personalRunMessageText } from '../personal-run-message';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { handleFactoryQuestion } from './questions/http';
@@ -55,7 +56,7 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
     await denies(()=>questions.answer({source:'orchestrator',userId:'owner'},{...answer,facts:[{...answer.facts[0],quote:'invented'}]}),'factoryQuestionFactMismatch');
     const result=await questions.answer({source:'orchestrator',userId:'owner'},answer);
     assert.equal(result.task.revision,q.waitingBinding.revision+2);
-    assert.equal((await pool.query('SELECT origin FROM run_messages WHERE id=$1',[answer.answerId])).rows[0].origin,'peer');
+    assert.equal((await pool.query('SELECT text FROM run_messages WHERE id=$1',[answer.answerId])).rows[0].text,personalRunMessageText(answer.answerId,answer.facts[0].quote,'peer'));
     assert.equal((await questions.answer({source:'orchestrator',userId:'owner'},answer)).continuationRunId,result.continuationRunId);
     await denies(()=>questions.answer({source:'orchestrator',userId:'owner'},{...answer,answerId:randomUUID()}),'factoryQuestionAnswerConflict');
     const tx=await pool.connect();
@@ -116,7 +117,7 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
       const results=await Promise.all(responses.map(response=>response.json() as Promise<{continuationRunId:string}>));
       assert.equal(new Set(results.map(result=>result.continuationRunId)).size,1);
       const result=results[0];
-      assert.equal((await pool.query('SELECT origin FROM run_messages WHERE id=$1',[answer.answerId])).rows[0].origin,'user');
+      assert.equal((await pool.query('SELECT text FROM run_messages WHERE id=$1',[answer.answerId])).rows[0].text,answer.text);
       const replay=await send(answer);assert.equal(replay.status,200);
       assert.equal((await replay.json() as {continuationRunId:string}).continuationRunId,result.continuationRunId);
       const current=await store.read('owner',r.task.id);
