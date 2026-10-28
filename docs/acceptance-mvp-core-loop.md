@@ -140,8 +140,9 @@ They include the checkout SHA, UTC times, steps, device/run/task IDs, publicatio
 workflow ID and fixture request IDs. Actual browser request IDs are included only
 when the server returned them; the CI loopback server does not supply Vercel IDs.
 Daemon credentials, `device.json`, `daemon.secret` and raw Workflow storage are
-excluded. The whole database disappears with the job; daemon credentials are
-revoked and temporary daemon/workflow/repository directories are removed.
+excluded. Device credentials are revoked separately from resource retention.
+The MVP runner retains its daemon/workflow/repository directories; the Actions
+runner and service lifecycle are managed by the hosting platform.
 
 ## Frozen Preview acceptance — blocked, not executed
 
