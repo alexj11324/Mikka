@@ -93,6 +93,13 @@ async function result(response: Response) {
 }
 const value = (reply: { content: Array<{ text: string }> }) => JSON.parse(reply.content[0].text)
 
+test('real MCP schema rejects an unsupported human assignee before any write', async () => {
+  events = []; inserted = []
+  const reply = await result(await request('create_issue', { title: 'Must not create', assigneeUserId: 'foreign-person' }))
+  assert.equal(reply.isError, true)
+  assert.equal(events.length + inserted.length, 0)
+})
+
 test('real POST/auth wrappers deny missing, revoked, expired and wrong worker credentials before writes', async () => {
   events = []; inserted = []
   assert.equal((await request('send_to_coordinator', { text: 'forged' }, null)).status, 401)
