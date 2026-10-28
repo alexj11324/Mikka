@@ -1,7 +1,7 @@
 name: Site search read contract
 on:
   push:
-    branches: ['codex/131-title-search']
+    branches: ['codex/131-title-search', 'codex/batch-owner-title-search']
   pull_request:
     paths: ['lib/federated-search/**', 'app/api/search/**', 'tests/e2e/site-search.spec.ts', '.github/workflows/site-search.yml']
 permissions:

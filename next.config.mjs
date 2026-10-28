@@ -9,6 +9,13 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingIncludes: {
+    '/api/bots/*/computer/*': ['./scripts/e2b/start-desktop.sh', './scripts/e2b/viewer-gateway.py', './scripts/e2b/lease-driver.py', './scripts/e2b/start-container-runtime.sh'],
+    '/api/workspaces/**': ['./scripts/e2b/lease-driver.py'],
+    '/api/subscriptions/**': ['./packages/subscription-worker/bin/mikka-subscription-worker', './packages/subscription-worker/bin/mikka-subscription-enrollment'],
+    '/api/cron/subscriptions': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
+    '/v1/devices/**/subscription': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
+  },
   turbopack: {
     resolveAlias: {
       'react-syntax-highlighter': './components/workspace/agent-syntax-highlighter.tsx',
@@ -16,8 +23,6 @@ const nextConfig = {
   },
   webpack(config) {
     config.resolve.alias['react-syntax-highlighter$'] = new URL('./components/workspace/agent-syntax-highlighter.tsx', import.meta.url).pathname
-    // noVNC ships ES modules with top-level await but no "type": "module".
-    config.module.rules.push({ test: /[\\/]@novnc[\\/]novnc[\\/]lib[\\/].*\.js$/, type: 'javascript/esm' })
     return config
   },
   onDemandEntries: {
@@ -25,7 +30,7 @@ const nextConfig = {
     pagesBufferLength: 8,
   },
   basePath,
-  env: { MIKKA_BASE_PATH: basePath },
+  env: { MIKKA_BASE_PATH: basePath, NEXT_PUBLIC_COMPUTER_DEPLOYMENT: process.env.VERCEL_ENV ?? '', MIKKA_TEST_BUILD_SHA: process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '' },
   async redirects() {
     return [
       // The app's previous address; keep its links working.

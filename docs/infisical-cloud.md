@@ -2,6 +2,15 @@
 
 Verified on 2026-10-22. Organization: Aspectly Labs. Project: Mikka (`89850d6a-f020-4936-863e-df77380dfe40`). This inventory contains names and migration status only.
 
+## Required identity reuse
+
+**必须使用已有可用的 Infisical 身份；不限定 admin，也不限定非 admin。**
+
+- 在已经授权的项目、环境和操作范围内，只要已有身份能完成任务，就必须复用；不能因为它不是 admin，或因为偏好另一个身份，而停止工作或新建 identity。
+- 已有 admin 可用时可以直接使用；已有非 admin 身份可用时同样应直接使用。选择依据是能否完成当前任务，不是身份名称或类别。
+- 不为了选择身份而新建 identity、增加身份数量、触碰免费额度或升级套餐。某一个身份不可用时，先核对其他现有可用身份；只有确认现有身份都不能完成必要操作时，才报告具体缺项，请用户决定后续处理。
+- 不能把执行审核或规则保存失败写成用户禁止使用非 admin 身份；用户授权与执行限制必须分别记录。身份选择不改变当前任务的其他授权边界。
+
 ## Verified storage
 
 All 89 application/database records were read back and compared to their prepared source values or expanded references. Environment/path counts include repeated names. Seven platform records and ten Worker secret references are stored separately. These counts establish storage, not deployed acceptance.
@@ -38,6 +47,7 @@ Neon integration-managed `DATABASE_URL` and `DATABASE_URL_UNPOOLED` are snapshot
 | Vercel Mikka team | Shared organization-level native App Connection `mikka-team-vercel-native-sync` created with explicit team-wide authorization. Four syncs for Development, default Preview, Production and the existing Linear branch have succeeded; automatic sync is enabled. The temporary OAuth hub branch sync was removed after the fixed production hub was deployed. |
 | Worker `mikka-linear-sync` | Native sync `mikka-workers-prod` succeeded and automatic sync is enabled. Deployed signature checks returned 401 for an invalid signature and 200 for a valid signature. |
 | Worker `mikka-linear-sync-preview` | Native sync `mikka-workers-staging` succeeded and automatic sync is enabled. Deployed signature checks returned 401 for an invalid signature and 200 for a valid signature. |
+| Worker `mikka-suggestions-cron` | Verified 2026-10-27: native sync `mikka-suggestions-cron-prod` succeeded and automatic sync is enabled. Dedicated source `prod:/cloudflare/suggestions-cron` contains only `CRON_SECRET`, referencing `prod:/vercel`; its expanded value matches Production. Worker and version preview URLs are disabled. Release and scheduled-run evidence are recorded in [PR #329](https://github.com/alexj11324/Mikka/pull/329); see [suggestions schedules](suggestions-cron.md). |
 | Cloudflare Pages | No existing Mikka Pages project; no destination was invented. |
 | Cloud workload | GitHub OIDC identity `mikka-github-cloud` configured with 900-second tokens, no organization access and read-only Mikka project membership. Existing CI successfully verified one injected Composio credential against its issuer on a GitHub-hosted runner, without a Mac service. The old local MCP credential belongs to the deleted organization. |
 
@@ -48,6 +58,33 @@ The fixed OAuth hub is `https://app.aspectlylabs.com`. PR #46 was merged at `ae4
 Vercel's exact `VERCEL_BRANCH_URL` is trusted alongside the immutable deployment URL. An authenticated Better Auth regression verifies branch-alias sign-out while rejecting an unrelated deployment origin. No shared-host wildcard is added.
 
 The OIDC trust pins the current numeric GitHub repository and owner IDs and immutable subject prefix, and accepts only branch refs in that repository. Pull request refs and forks cannot use this identity. Only `oidc-auth` is enabled; no persistent identity client secret was created.
+
+## Issue #328 Preview isolation
+
+Verified 2026-10-27. The default Preview database lacked the suggestions and
+Coordinator schema. Neon had reached its branch limit, so two dedicated
+databases were initialized on non-production branch `br-billowing-pine-b5fdxmtt`:
+`mikka_issue328_acceptance` for the supplied `fe94ac2` and
+`mikka_issue328_integrated` for the integration with current main. Keeping
+them separate preserves the older Coordinator keys in the supplied version.
+Existing Preview data and the Production database were left untouched.
+
+Infisical staging sources `/branches/eaa84cc3f2a0/neon` and
+`/branches/498b6cd0736f/neon` hold the respective database credentials. Their
+matching `/vercel` folders contain only `DATABASE_URL` and
+`MIKKA_DATABASE_URL` references. The existing native Vercel syncs were
+preserved; creating another hit the plan's Secret Sync limit. The authorized
+fallback wrote sensitive Preview variables scoped exactly to
+`claude/suggestions-cloudflare-cron` and `codex/suggestions-cron-328`.
+These two branch overrides require explicit resync after credential changes
+until native sync capacity is available. No secret values were written to
+local environment files.
+
+GitHub App `mikka-github` already had the current OAuth callback. Its retired
+installation Setup URL returned 404 and was changed to
+`https://app.aspectlylabs.com/mikka`, which returned 200. This corrects the
+landing page; repository authorization and PR status acceptance remain
+tracked separately in [#330](https://github.com/alexj11324/Mikka/issues/330).
 
 ## Remaining acceptance
 

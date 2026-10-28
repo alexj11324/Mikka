@@ -9,20 +9,31 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/operations/approved-writes.ts', file: 'lib/operations/write-legacy-schema.db.test.ts', script: 'test:approved-writes-db' },
+  { marker: 'scripts/migration-steps.mjs', file: 'tests/migration-steps.db.test.mjs', script: 'test:migration-steps-db' },
+  { marker: 'lib/agent-kit/store.ts', file: 'lib/agent-kit/store.db.test.ts', script: 'test:agent-kit-db' },
+  { marker: 'lib/computer/store.ts', file: 'lib/computer/store.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-conversations.test.ts', script: 'test:groups' },
   { marker: 'lib/active-agents.ts', file: 'lib/active-agents.test.ts', script: 'test:active-agents' },
   { marker: 'lib/coordinator/group-turns.ts', file: 'lib/coordinator/group-turns.test.ts', script: 'test:group-turns' },
+  { marker: 'lib/profile/store.ts', file: 'lib/profile/store.db.test.ts', script: 'test:user-facts-db' },
+  { marker: 'lib/coordinator/bot-instructions.ts', file: 'lib/coordinator/bot-chats.db.test.ts', script: 'test:bot-chats-db' },
   { marker: 'lib/coordinator/native-store.ts', file: 'lib/coordinator/native-store.test.ts', script: 'test:coordinator-native' },
   { marker: 'lib/activity-actor.ts', file: 'tests/activity-actor-db.test.ts', script: 'test:activity-actor-db' },
+  { marker: 'lib/mcp/issue-mutation.ts', file: 'tests/issue-tool-calls.db.test.ts', script: 'test:coordinator-issue-tools-db' },
   { marker: 'lib/run-visibility.ts', file: 'tests/team-visibility.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/issue-search.ts', file: 'tests/issue-search.db.test.ts', script: 'test:issue-search-db' },
   { marker: 'tests/workspace-migration.test.mjs', file: 'tests/workspace-migration.test.mjs', script: 'test:workspace-migration-db' },
+  { marker: 'drizzle/20261027164500_artifact_legacy_compat.sql', file: 'tests/artifact-legacy-migration.test.mjs', script: 'test:artifact-migration-db' },
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
 ]
 // Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
 // Each entry names its dedicated runner; the runner must exist and still invoke the file.
 export const SELF_MANAGED = [
+  { file: 'tests/test-account-pool.http.test.mjs', runner: 'scripts/test-accounts/run-http.mjs', reason: 'owns the exact built Next server and registered disposable environment in the browser CI job' },
   { file: 'lib/auth-email.test.ts', runner: 'scripts/test-auth-email.mjs', reason: 'starts its own Docker Postgres and refuses any application database' },
+  { file: 'tests/byos-application.test.mjs', runner: 'scripts/test-subscription-worker.mjs', reason: 'starts an isolated BYOS Postgres and worker fixture' },
+  { file: 'tests/byos-enrollment-binding.test.mjs', runner: 'scripts/test-subscription-worker.mjs', reason: 'starts an isolated BYOS Postgres and worker fixture' },
 ]
 // This destructive empty-database bootstrap must stay BEFORE test:e2e:setup.
 // Its workflow invocation is independently checked, not silently omitted.

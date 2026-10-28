@@ -10,6 +10,7 @@ import { getAgentUIIssue, type AgentUIIssue } from '@/lib/agent-ui-status'
 import { normalizeAgentUISource } from '@/lib/agent-ui-source'
 import { agentUILibrary } from './agent-ui-library'
 import { AgentMarkdown } from './agent-markdown'
+import { AgentTextBubble } from './agent-text-bubble'
 
 const finalParser = createParser(agentUILibrary.toJSONSchema(), agentUILibrary.root)
 
@@ -61,7 +62,7 @@ export function AgentGenerativeUI({ response, isStreaming, onAction, showErrors 
     }
   }, [response, normalizedResponse, isStreaming, showErrors, isOpenUI, reportedErrors])
 
-  if (!isOpenUI) return isStreaming ? null : <AgentMarkdown text={response} />
+  if (!isOpenUI) return isStreaming ? null : <AgentTextBubble><AgentMarkdown text={response} /></AgentTextBubble>
 
   return <GenerationBoundary response={response} showErrors={!isStreaming && showErrors} onRetry={onRetry}>
     <Renderer response={normalizedResponse} library={agentUILibrary} isStreaming={isStreaming} onAction={onAction} onError={handleError} publishObservability={false} />

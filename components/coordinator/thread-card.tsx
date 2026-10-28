@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
 import type { RunSource } from '@/lib/coordinator/citations'
 import { runIsActive } from '@/lib/issue-run-conversation'
-import { LetterAvatar } from '@/components/nav/letter-avatar'
+import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { Button } from '@/components/ui/button'
 import { ThreadStatus, harnessLabel } from '@/components/workspace/issue-threads'
 
@@ -26,7 +26,7 @@ export function ThreadCard({ run, onOpen }: { run: RunSource; onOpen: (thread: {
     disabled={!issue}
     onClick={issue ? () => onOpen({ issueId: issue.id, runId: run.id }) : undefined}
   >
-    <LetterAvatar name={run.agentName} size="pill" />
+    <BotAvatar color={colorFor(run.agentName)} size="pill" still />
     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="flex min-w-0 items-center gap-2">
         <span className="truncate text-sm font-medium">{run.name}</span>

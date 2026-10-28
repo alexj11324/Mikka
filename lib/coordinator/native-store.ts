@@ -25,7 +25,8 @@ export class NativeCoordinatorStore {
       await client.query('BEGIN')
       await client.query('INSERT INTO coordinator_sessions ("userId") VALUES ($1) ON CONFLICT DO NOTHING', [userId])
       const { rows } = await client.query('SELECT "leaseUntil" > now() AS busy FROM coordinator_sessions WHERE "userId"=$1 FOR UPDATE', [userId])
-      if (rows[0]?.busy) throw new NativeCoordinatorError(409, 'coordinatorBusy')
+      // One row per chat (the Coordinator's and each bot's); the runtime serves them all.
+      if (rows.some(row => row.busy)) throw new NativeCoordinatorError(409, 'coordinatorBusy')
       if (runtime.harness !== 'ai_sdk') {
         const found = await client.query(`SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2 AND enabled=true
           AND "lastSeenAt" > now() - interval '2 minutes' AND harnesses @> $3::jsonb`, [runtime.deviceId, userId, JSON.stringify([{ harness: runtime.harness, installed: true, coordinator: true }])])
