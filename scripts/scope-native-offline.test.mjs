@@ -187,6 +187,11 @@ test('real pg.Query result-acknowledgement loss reaches callback/error once and 
   } finally { await native.close() }
 })
 
+test('actual frozen SQL directory and sync/async reads include all pinned migrations before any connection',{timeout:25000},async()=>{
+  const output=await promisify(execFile)(process.execPath,['--import','./scripts/credential-diagnostics-offline.mjs','--import','./scripts/server-test.mjs','--import','tsx','scripts/scope-native-offline-startup.mjs','migration-cache'],{timeout:20000,maxBuffer:1<<20,env:{PATH:process.env.PATH,HOME:'/workspace',TSX_DISABLE_CACHE:'1',NODE_DISABLE_COMPILE_CACHE:'1',MIGRATE:'0',VERCEL_ENV:'',NEXT_TELEMETRY_DISABLED:'1'}})
+  assert.match(output.stdout,/"frozenMigrationCache":true,"pinnedSqlEntries":73,"syntheticCacheOnlyEntry":true,"nativeTransportAttempts":0,"nativeSqlSubmissions":0/)
+})
+
 for (const phase of ['scope','team','team-resume']) test(`actual ${phase} suite startup and installed loader stop at the first connection boundary, offline`, { timeout: 25000 }, async () => {
   let failure
   try {

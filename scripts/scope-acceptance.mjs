@@ -16,6 +16,9 @@ export function verifyScopeManifest(manifest, read = readFileSync) {
   if(manifest.mode==='fresh-exclusive-scope')verifyFreshScopeTargets(manifest)
   if (manifest.migrations.length !== SCOPE_MIGRATION_COUNT || manifest.sources.length < 10) throw Error('scope manifest inventory mismatch')
   for (const file of [...manifest.sources, ...manifest.migrations]) if (digest(read(file.path)) !== file.sha256) throw Error('scope source/hash mismatch: ' + file.path)
+  const cached=new Map(manifest.sources.map(file=>[resolve(file.path),file.sha256]))
+  if(cached.size!==manifest.sources.length)throw Error('scope frozen source inventory has duplicate paths')
+  for(const file of manifest.migrations)if(cached.get(resolve(file.path))!==file.sha256)throw Error('scope frozen migration cache entry missing or changed: '+file.path)
   if(manifest.mode==='resume-scope-after-bootstrap'){verifyScopeResumeEvidence(manifest,read);if(JSON.stringify(scopeResumeSchema(manifest.migrations,read))!==JSON.stringify(manifest.resume.schema))throw Error('resume schema expectation/source mismatch')}
   if (new Set(manifest.migrations.map(file => file.path)).size !== SCOPE_MIGRATION_COUNT || manifest.migrations.filter(file => file.target === 'DATABASE_URL').length !== 7) throw Error('scope migration targets mismatch')
 }

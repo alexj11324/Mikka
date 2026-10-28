@@ -117,9 +117,11 @@ test('native facade applies per-connection timeouts, logs SQL failure and closes
 })
 test('manifest validation is source-only and refuses drift before any executor is invoked',()=>{
   const migrations=Array.from({length:73},(_,i)=>({path:`sql-${i}`,sha256:sqlHash('sql'),target:i<7?'DATABASE_URL':'MIKKA_DATABASE_URL'}))
-  const manifest={migrations,sources:Array.from({length:10},(_,i)=>({path:`source-${i}`,sha256:sqlHash('source')}))}
+  const manifest={migrations,sources:[...migrations,...Array.from({length:10},(_,i)=>({path:`source-${i}`,sha256:sqlHash('source')}))]}
   assert.doesNotThrow(()=>verifyScopeManifest(manifest,path=>Buffer.from(path.startsWith('sql')?'sql':'source')))
   assert.throws(()=>verifyScopeManifest(manifest,()=>Buffer.from('changed')),/hash mismatch/)
+  assert.throws(()=>verifyScopeManifest({...manifest,sources:manifest.sources.slice(1)},path=>Buffer.from(path.startsWith('sql')?'sql':'source')),/frozen migration cache entry missing/)
+  assert.throws(()=>verifyScopeManifest({...manifest,sources:[...manifest.sources,manifest.sources[0]]},path=>Buffer.from(path.startsWith('sql')?'sql':'source')),/duplicate paths/)
 })
 
 test('current main table additions fit the separately proposed snapshot budget',async()=>{
