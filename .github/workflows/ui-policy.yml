@@ -87,6 +87,7 @@ jobs:
       - run: pnpm test:linear-sync
       - run: pnpm check:agent-definitions
       - run: pnpm test:mailbox-verification
+      - run: pnpm test:personal-mailbox-core
       - run: pnpm test:agent-kit
       - run: pnpm test:agent-kit-compat
       - run: pnpm test:coordinator-events
@@ -219,5 +220,5 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:approved-writes-db,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:captures-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:migration-steps-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:active-agents,test:approved-writes-db,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:captures-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:migration-steps-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db
       - run: pnpm build
