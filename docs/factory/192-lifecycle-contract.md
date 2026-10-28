@@ -102,3 +102,14 @@ do not authenticate a provider artifact or prove system monitor acceptance. #195
 must provide the four implementations plus its trusted observation reader; #192
 will install those frozen exports at all entry points, including claim, question
 resume and reconciliation, once delivered. No incident schema is registered here.
+
+## Producer event clock
+
+Factory store writes event/attempt/candidate/task timestamps with PostgreSQL
+`clock_timestamp()`. `now()` is transaction start and cannot represent completion
+of a gate after a publication observation. Terminal attempt completion is recorded
+only after its gate succeeds, and the next attempt records its own later creation
+time. Idempotent replay returns the stored result without changing either time.
+No caller/provider timestamp is copied or used to push completion into the future;
+V2 reader still rejects future observations and observations after completion.
+No migration/default, old rows, reader validation or external schema is changed.

@@ -183,7 +183,7 @@ export function createFactoryStore(
   ) {
     const result = await snapshot(tx, task);
     await tx.query(
-      'INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',
+      'INSERT INTO factory_events ("taskId","eventId",request,result,"createdAt") VALUES ($1,$2,$3,$4,clock_timestamp())',
       [task.id, eventId, JSON.stringify(request), JSON.stringify(result)],
     );
     return result;
@@ -206,8 +206,8 @@ export function createFactoryStore(
   ) {
     const id = randomUUID();
     await tx.query(
-      `INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"candidateId",reason)
-      SELECT $1,$2,$3,coalesce(max(ordinal) FILTER (WHERE stage=$3),0)+1,coalesce(max(position),0)+1,'pending',$4,$5 FROM factory_attempts WHERE "taskId"=$2`,
+      `INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"candidateId",reason,"createdAt")
+      SELECT $1,$2,$3,coalesce(max(ordinal) FILTER (WHERE stage=$3),0)+1,coalesce(max(position),0)+1,'pending',$4,$5,clock_timestamp() FROM factory_attempts WHERE "taskId"=$2`,
       [id, task.id, stage, task.candidateId, reason],
     );
     task.attemptId = id;
@@ -267,7 +267,7 @@ export function createFactoryStore(
           reason: route.rationale,
         };
         await tx.query(
-          `INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId",route,stage,status,revision,"attemptId",reason,"botId") VALUES ($1,$2,$3,$4,$5,$6,$7,1,$8,$9,$10)`,
+          `INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId",route,stage,status,revision,"attemptId",reason,"botId","createdAt","updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,1,$8,$9,$10,clock_timestamp(),clock_timestamp())`,
           [
             task.id,
             userId,
@@ -282,7 +282,7 @@ export function createFactoryStore(
           ],
         );
         await tx.query(
-          'INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,reason) VALUES ($1,$2,$3,1,1,$4,$5)',
+          'INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,reason,"createdAt") VALUES ($1,$2,$3,1,1,$4,$5,clock_timestamp())',
           [task.attemptId, task.id, task.stage, task.status, task.reason],
         );
         return save(tx, task, route.eventId, route);
@@ -349,12 +349,12 @@ export function createFactoryStore(
           task.status = change.action === "cancel" ? "cancelled" : "revoked";
           task.reason = change.reason;
           await tx.query(
-            `UPDATE agent_runs SET "stopRequestedAt"=coalesce("stopRequestedAt",now()),"updatedAt"=now()
+            `UPDATE agent_runs SET "stopRequestedAt"=coalesce("stopRequestedAt",clock_timestamp()),"updatedAt"=clock_timestamp()
             WHERE id IN (SELECT "runId" FROM factory_attempts WHERE "taskId"=$1) AND "userId"=$2 AND "issueId"=$3
             AND status IN ('queued','preparing','running','waiting_input','finishing')`,
             [task.id, userId, task.issueId],
           );
-          await tx.query(`UPDATE run_tokens SET "revokedAt"=coalesce("revokedAt",now())
+          await tx.query(`UPDATE run_tokens SET "revokedAt"=coalesce("revokedAt",clock_timestamp())
             WHERE "userId"=$2 AND "runId" IN (SELECT a."runId" FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" AND r."userId"=$2 AND r."issueId"=$3 WHERE a."taskId"=$1)`,[task.id,userId,task.issueId]);
         } else if (change.action === "resolve") {
           if (task.stage !== "clarify" || task.status !== "waiting")
@@ -380,7 +380,7 @@ export function createFactoryStore(
           task.reason = change.rationale;
           if (stage !== "clarify") {
             await tx.query(
-              "UPDATE factory_attempts SET status='passed',reason=$2,output=$3,\"finishedAt\"=now() WHERE id=$1",
+              "UPDATE factory_attempts SET status='passed',reason=$2,output=$3,\"finishedAt\"=clock_timestamp() WHERE id=$1",
               [
                 attempt.id,
                 change.rationale,
@@ -421,7 +421,7 @@ export function createFactoryStore(
           )
             fail("factoryRunMismatch");
           await tx.query(
-            'UPDATE factory_attempts SET status=\'failed\',reason=$2,"sessionId"=$3,"finishedAt"=now() WHERE id=$1',
+            'UPDATE factory_attempts SET status=\'failed\',reason=$2,"sessionId"=$3,"finishedAt"=clock_timestamp() WHERE id=$1',
             [
               attempt.id,
               String(prior.error ?? "Device lost").slice(0, 4000),
@@ -476,7 +476,7 @@ export function createFactoryStore(
           const candidate = candidateSchema.parse(change.candidate),
             candidateId = randomUUID();
           await tx.query(
-            'INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,$3,$4,$5,$6,$7)',
+            'INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId","createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,clock_timestamp())',
             [
               candidateId,
               task.id,
@@ -667,18 +667,20 @@ export function createFactoryStore(
           );
         }
         else fail("factoryTransitionUnavailable");
+        // now() is transaction start, potentially before the verified observation.
+        // Completion is the event time after the gate; never copy a provider timestamp.
         const stoppedFinishedAttempt =
           (change.action === "cancel" || change.action === "revoke") &&
           ["passed", "failed", "blocked"].includes(attempt.status);
         if (task.attemptId === attempt.id && !stoppedFinishedAttempt) {
           await tx.query(
-            "UPDATE factory_attempts SET status=$2,reason=$3,\"finishedAt\"=CASE WHEN $2 IN ('passed','failed','blocked','cancelled','revoked') THEN now() ELSE NULL END WHERE id=$1",
+            "UPDATE factory_attempts SET status=$2,reason=$3,\"finishedAt\"=CASE WHEN $2 IN ('passed','failed','blocked','cancelled','revoked') THEN clock_timestamp() ELSE NULL END WHERE id=$1",
             [attempt.id, task.status, task.reason],
           );
         }
         task.revision++;
         await tx.query(
-          'UPDATE factory_tasks SET stage=$2,status=$3,revision=$4,"attemptId"=$5,"candidateId"=$6,reason=$7,"updatedAt"=now() WHERE id=$1',
+          'UPDATE factory_tasks SET stage=$2,status=$3,revision=$4,"attemptId"=$5,"candidateId"=$6,reason=$7,"updatedAt"=clock_timestamp() WHERE id=$1',
           [
             task.id,
             task.stage,

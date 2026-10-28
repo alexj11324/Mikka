@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { readFactoryPublicationReceiptV2 } from './publication-receipt';
 import { personalRunMessageText } from '../personal-run-message';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
@@ -211,6 +213,53 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
       assert.equal(result.attempts[0].status,'waiting');
       assert.equal(result.attempts[1].sessionId,'monitor-question-session');
     }
+  });
+  await t.test('publication completion follows observed evidence in a long transaction; actual V2 reader rejects reversed times',async()=>{
+    // Consumer ledger fixture only; never a registered or external migration.
+    await pool.query(await readFile(new URL('../../tests/fixtures/factory194-ledgers.sql',import.meta.url),'utf8'));
+    const producer=createFactoryStore(pool,authorize,null,{gates:{publish:async()=>true}});
+    const r=await producer.route('owner',await fixture());
+    const candidateId=randomUUID(),runId=randomUUID(),approvalId=randomUUID(),publicationId=randomUUID(),eventId=randomUUID();
+    const candidate={sha:'a'.repeat(40),repository:'fixture',environment:'local-test',scope:'fixture'};
+    await pool.query(`INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,$3,$4,$5,$6,$7)`,[candidateId,r.task.id,candidate.sha,candidate.repository,candidate.environment,candidate.scope,runId]);
+    await pool.query(`UPDATE factory_tasks SET stage='publish',"candidateId"=$2 WHERE id=$1`,[r.task.id,candidateId]);
+    await pool.query(`UPDATE factory_attempts SET stage='publish',"candidateId"=$2 WHERE id=$1`,[r.task.attemptId,candidateId]);
+    const current=(await producer.read('owner',r.task.id)).task,b=factoryBinding(current);
+    const action='deploy_preview',target='local:test',targetEnvironment='local-test';
+    const approvalRequest={binding:b,eventId:randomUUID(),candidate,action,target,targetEnvironment,expiresAt:new Date(Date.now()+3600000).toISOString(),evidenceDigest:'b'.repeat(64),evidenceReadId:randomUUID()};
+    const publicationRequest={binding:b,eventId,approvalId,action,target,targetEnvironment};
+    const tx=await pool.connect();
+    try {
+      await tx.query('BEGIN');
+      // Guarantee an observation later than transaction start on the same PG clock.
+      await tx.query('SELECT pg_sleep(0.025)');
+      const observedAt=(await tx.query('SELECT clock_timestamp() AS observed')).rows[0].observed.toISOString();
+      const reference=`local-artifact:${publicationId}:sha256:${'c'.repeat(64)}`;
+      const receipt={reference,verifiedTarget:{kind:'local-artifact',operationId:publicationId,target,environment:targetEnvironment,repository:candidate.repository,sha:candidate.sha,reference,observedAt}};
+      await tx.query(`INSERT INTO factory_approvals(id,"taskId","candidateId","attemptId","userId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,'owner','fixture-session',$5,$6,$7,$8,$9,$10,'{}',$11,$4,$11,now()+interval '1 hour')`,[approvalId,b.taskId,candidateId,b.attemptId,approvalRequest.eventId,JSON.stringify(approvalRequest),JSON.stringify(candidate),action,target,'b'.repeat(64),b.revision]);
+      await tx.query(`INSERT INTO factory_publications(id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'succeeded',$9,clock_timestamp())`,[publicationId,approvalId,b.taskId,candidateId,action,target,eventId,JSON.stringify(publicationRequest),JSON.stringify(receipt)]);
+      const change={action:'finish' as const,status:'passed' as const,reason:'Synthetic permission/provider fixtures; real producer and reader',evidence:[{kind:'report' as const,artifact:`run-report:${runId}`,runId,sessionId:'fixture-session',candidateId,sha:candidate.sha,environment:candidate.environment,recordedAt:observedAt}],output:{approvalId,publicationId}};
+      const finishId=randomUUID();
+      const result=await producer.apply('owner',b,finishId,change,tx);
+      const actual=await readFactoryPublicationReceiptV2(tx,'owner',b.taskId,candidateId);
+      assert.ok(Date.parse(actual.publishedAt)>=Date.parse(observedAt));
+      assert.equal((await tx.query('SELECT "finishedAt">now() AS later FROM factory_attempts WHERE id=$1',[b.attemptId])).rows[0].later,true);
+      const finished=(await tx.query('SELECT "finishedAt" FROM factory_attempts WHERE id=$1',[b.attemptId])).rows[0].finishedAt;
+      await producer.apply('owner',b,finishId,change,tx);
+      assert.deepEqual((await tx.query('SELECT "finishedAt" FROM factory_attempts WHERE id=$1',[b.attemptId])).rows[0].finishedAt,finished);
+      // Reproduce the previous producer bug; the unchanged reader must reject it.
+      await tx.query('SAVEPOINT backwards');
+      await tx.query('UPDATE factory_attempts SET "finishedAt"=now() WHERE id=$1',[b.attemptId]);
+      await assert.rejects(()=>readFactoryPublicationReceiptV2(tx,'owner',b.taskId,candidateId),/factoryPublicationReceiptRequired/);
+      await tx.query('ROLLBACK TO SAVEPOINT backwards');
+      await tx.query(`UPDATE factory_publications SET receipt=jsonb_set(receipt,'{verifiedTarget,observedAt}','"2999-01-01T00:00:00.000Z"') WHERE id=$1`,[publicationId]);
+      await assert.rejects(()=>readFactoryPublicationReceiptV2(tx,'owner',b.taskId,candidateId),/factoryPublicationReceiptRequired/);
+      await tx.query('ROLLBACK TO SAVEPOINT backwards');
+      const next=await producer.apply('owner',factoryBinding(result.task),randomUUID(),{action:'advance',stage:'monitor',reason:'Next stage after verified publication'},tx);
+      const causal=(await tx.query('SELECT n."createdAt">=p."finishedAt" AS ordered FROM factory_attempts n JOIN factory_attempts p ON p.id=$2 WHERE n.id=$1',[next.task.attemptId,b.attemptId])).rows[0];
+      assert.equal(causal.ordered,true);
+      await tx.query('ROLLBACK');
+    } catch(error) { await tx.query('ROLLBACK'); throw error; } finally {tx.release();}
   });
   await t.test('cancelled check runs never reach a phase consumer',async()=>{
     let consumed=0;
