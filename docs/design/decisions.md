@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-27 | A thread's owner stops it from the shared composer; the draft stays editable. Stop status appears immediately in the thread and the task's thread list. After about 30 seconds without acknowledgement, show an error and retry. Source: Alex's MVP core-loop brief, item 1 (#357). Existing thread layout is `220:5199`; stop/timeout state review and real Preview screenshots remain pending. | R-10, R-62 | PR #336's disabled composer while stopping and unbounded acknowledgement wait |
 | 2026-10-28 | Profile facts (#353) keep a fourth state, `expired` (past its date or faded; revived when seen again), besides active, dismissed and deleted; 记忆 has one switch for web, mobile, the Coordinator prompt and extraction (`user_preferences."memoryEnabled"`); the 提问或更新 input on web 记忆 waits for later (Alex, accepting both questions on #353) | R-73, `proactive.md` § 2.2 | |
 | 2026-10-27 | Build the mobile app now in `apps/mobile` with Expo, and verify screens with Expo web screenshots in the cloud, not the iOS simulator. Alex: 「你做一下移动端 APP…直接开 Expo 的 web 模式进行截图验证就行，不需要本地跑 iOS 的 simulator」 | — | — |
 | 2026-10-27 | Mobile composer: the 「+」 sits inside the input field at its left end, not as a separate circle beside it (as in ChatGPT iOS). Alex: 「加号改在里边」 | — | — |

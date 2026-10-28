@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runIsActive, runListRefreshInterval, runSummaryText, threadItems } from './issue-run-conversation'
+import { runIsActive, runListRefreshInterval, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
 
 test('only active run states offer messages; completed history stays readable', () => {
   for (const state of ['queued', 'preparing', 'running', 'waiting_input', 'finishing']) assert.equal(runIsActive(state), true)
@@ -18,6 +18,16 @@ test('idle and historical lists do not poll; active runs keep supported refresh'
   assert.equal(runListRefreshInterval([]), 0)
   assert.equal(runListRefreshInterval([{ status: 'succeeded' }]), 0)
   assert.equal(runListRefreshInterval([{ status: 'succeeded' }, { status: 'running' }]), 5000)
+})
+
+test('stop acknowledgement has a bounded deadline through polling, reload and retry', () => {
+  const requestedAt = Date.parse('2026-10-27T12:00:00Z')
+  assert.equal(runStopTimeoutRemaining(requestedAt, requestedAt), 30_000)
+  assert.equal(runStopTimeoutRemaining(requestedAt, requestedAt + 25_000), 5_000)
+  assert.equal(runStopTimeoutRemaining(requestedAt, requestedAt + 30_000), 0)
+  assert.equal(runStopTimeoutRemaining(requestedAt, requestedAt + 60_000), 0)
+  assert.equal(runStopTimeoutRemaining(requestedAt + 60_000, requestedAt + 60_000), 30_000, 'retry starts its own wait without changing the durable request')
+  assert.equal(runStopTimeoutRemaining(requestedAt, requestedAt - 60_000), 30_000, 'clock skew must not create an unbounded wait')
 })
 
 test('a thread reads as one conversation: agent text, folded steps and people in time order', () => {
