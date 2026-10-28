@@ -106,7 +106,7 @@ test('old accounts get their email on load: at most five, in parallel, each aske
   // Found and not-found are both kept; a lookup that failed is not, so the next load asks again.
   assert.ok(calls.includes('save a2 two@example.com') && calls.includes('save a3 null') && !calls.some(call => call.startsWith('save a4')))
   assert.ok(calls.includes('attempt a4'))
-  assert.ok(calls.includes('rename a2 two@example.com'))
+  assert.ok(!calls.some(call => call.startsWith('rename ')), 'loading account metadata must not rename provider accounts')
   const byId = new Map(filled.map(item => [item.accountId, item]))
   assert.deepEqual(byId.get('a2'), { accountId: 'a2', email: 'two@example.com', emailChecked: true, lastAttemptAt: now, isDefault: false })
   assert.equal(byId.get('a3')?.emailChecked, true)

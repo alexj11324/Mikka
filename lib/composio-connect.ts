@@ -136,7 +136,9 @@ export async function backfillComposioEmails(
       return !record.lastAttemptAt || now - record.lastAttemptAt.getTime() >= EMAIL_RETRY_AFTER_MS
     })
     .slice(0, input.limit ?? EMAIL_BACKFILL_LIMIT)
-  const answers = await Promise.all(pending.map(async item => ({ id: item.id, ...await fillEmail(deps, item, appOf(item)!, false) })))
+  // Loading the account list may fill Mikka's local metadata, but must not
+  // rename a provider account. Alias changes belong to an explicit mutation.
+  const answers = await Promise.all(pending.map(async item => ({ id: item.id, ...await fillEmail(deps, item, appOf(item)!, true) })))
   const records = new Map(byId)
   for (const answer of answers) {
     const record = records.get(answer.id)
