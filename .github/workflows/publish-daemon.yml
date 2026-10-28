@@ -35,6 +35,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mikka/daemon typecheck
+      - name: Prepare pinned hosted-runner test image
+        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
       - run: pnpm --filter @mikka/daemon test
       - run: pnpm --filter @mikka/daemon build
       - run: pnpm --filter @mikka/daemon test:package
