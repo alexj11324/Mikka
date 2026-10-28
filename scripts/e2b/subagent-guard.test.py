@@ -11,6 +11,10 @@ constants = {node.targets[0].id: ast.literal_eval(node.value)
              for node in module.body if isinstance(node, ast.Assign)
              and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
              and node.targets[0].id in ('SAFE_TO_RESUME', 'SENSITIVE_FIELD')}
+safe_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'safe_resume_snapshot')
+namespace = {}
+exec(compile(ast.Module(body=[safe_node], type_ignores=[]), str(__file__), 'exec'), namespace)
+safe_resume_snapshot = namespace['safe_resume_snapshot']
 
 
 def evaluate(expression, fields):
@@ -29,6 +33,18 @@ process.stdout.write(JSON.stringify(eval(process.argv[2])));
 
 
 class GuardTest(unittest.TestCase):
+    def test_uninspectable_or_nested_documents_fail_closed(self):
+        frames = {'frameTree': {'frame': {'id': 'main'}}}
+        document = {'root': {'nodeName': '#document', 'children': []}}
+        success = {'result': {'value': True}}
+        self.assertTrue(safe_resume_snapshot(frames, document, success))
+        self.assertFalse(safe_resume_snapshot({}, document, success))
+        self.assertFalse(safe_resume_snapshot(frames, {}, success))
+        self.assertFalse(safe_resume_snapshot(frames, document, {'exceptionDetails': {}, 'result': {}}))
+        self.assertFalse(safe_resume_snapshot({'frameTree': {'childFrames': [{}]}}, document, success))
+        self.assertFalse(safe_resume_snapshot(frames, {'root': {'nodeName': 'IFRAME'}}, success))
+        self.assertFalse(safe_resume_snapshot(frames, {'root': {'shadowRoots': [{'shadowRootType': 'closed'}]}}, success))
+
     def test_nonempty_otp_without_autocomplete_blocks_resume_until_cleared(self):
         otp = {'name': 'otp', 'value': '123456'}
         self.assertFalse(evaluate(constants['SAFE_TO_RESUME'], [otp]))
@@ -49,6 +65,16 @@ class GuardTest(unittest.TestCase):
             with self.subTest(field=field):
                 self.assertTrue(evaluate(constants['SENSITIVE_FIELD'], [field]))
         self.assertFalse(evaluate(constants['SENSITIVE_FIELD'], [{'name': 'search'}]))
+
+    def test_isolated_chromium_iframe_and_open_closed_shadow(self):
+        result = subprocess.run(['node', str(Path(__file__).with_name('subagent-guard-browser.test.mjs')),
+                                 constants['SAFE_TO_RESUME']], check=True, capture_output=True, text=True)
+        cases = json.loads(result.stdout)
+        for name, expected in [('empty', True), ('otp', False), ('cleared', True),
+                               ('iframe', False), ('open-shadow', False), ('closed-shadow', False)]:
+            with self.subTest(name=name):
+                case = cases[name]
+                self.assertEqual(safe_resume_snapshot(case['frames'], case['document'], case['evaluation']), expected)
 
 
 if __name__ == '__main__':

@@ -18,6 +18,27 @@ SAFE_TO_RESUME = """(() => {
 })()"""
 SENSITIVE_FIELD = "(e.type === 'password' || /(?:otp|one[\\s_-]*time|verification[\\s_-]*code|security[\\s_-]*code|auth(?:entication)?[\\s_-]*code)/i.test([e.autocomplete,e.name,e.id,e.getAttribute('aria-label'),e.getAttribute('placeholder')].join(' ')))"
 
+def safe_resume_snapshot(frames, document, evaluation):
+    """Fail closed when CDP cannot inspect the whole credential-bearing page.
+
+    Nested documents and shadow trees need their own execution contexts; until
+    those are fenced, never infer that a top-level empty form is safe to show.
+    """
+    frame=frames.get('frameTree') if isinstance(frames,dict) else None
+    root=document.get('root') if isinstance(document,dict) else None
+    if not isinstance(frame,dict) or not isinstance(root,dict) or frame.get('childFrames'):return False
+    def unsafe(value):
+        if isinstance(value,list):return any(unsafe(item) for item in value)
+        if not isinstance(value,dict):return False
+        if str(value.get('nodeName','')).upper() in ('IFRAME','FRAME'):return True
+        # Chromium exposes native input internals as user-agent shadow trees;
+        # their value is already checked on the host input. Author-created
+        # open and closed trees cannot be inspected by the top-level evaluator.
+        if any(root.get('shadowRootType') != 'user-agent' for root in value.get('shadowRoots',[]) if isinstance(root,dict)):return True
+        if any(not isinstance(root,dict) for root in value.get('shadowRoots',[])):return True
+        return any(unsafe(item) for item in value.values())
+    return not unsafe(root) and isinstance(evaluation,dict) and not evaluation.get('exceptionDetails') and evaluation.get('result',{}).get('value') is True
+
 def decode(value):
     return base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))
 
@@ -200,9 +221,14 @@ async def end(request):
     _,grant=authorize(request,'broker');b=browser(grant);data=await request.json()
     async with b.lock:
         if not b.guard or not hmac.compare_digest(data.get('guardToken',''),b.guard):raise web.HTTPForbidden()
-        check=await b.rpc('Runtime.evaluate',{'expression':SAFE_TO_RESUME,'returnByValue':True},b.session)
-        tree=await b.rpc('Page.getFrameTree',session=b.session)
-        if check.get('result',{}).get('value') is not True:raise web.HTTPConflict()
+        try:
+            tree=await b.rpc('Page.getFrameTree',session=b.session)
+            document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
+            check=await b.rpc('Runtime.evaluate',{'expression':SAFE_TO_RESUME,'returnByValue':True},b.session)
+            safe=safe_resume_snapshot(tree,document,check)
+        except Exception:
+            safe=False
+        if not safe:raise web.HTTPConflict()
         # Clear the last frame so no buffered pre-fill frame races resumption.
         b.frame=None;await b.rpc('Page.startScreencast',{'format':'jpeg','quality':60,'maxWidth':1280,'maxHeight':800,'everyNthFrame':2},b.session)
         b.guard_file.unlink();b.guard=None
