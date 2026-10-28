@@ -153,13 +153,14 @@ test('the reply stops at 240 characters; once full only its time moves', () => {
   assert.equal(Array.from(nextReply({ lastReply: null, lastReplyPart: null }, [{ type: 'text-delta', id: 'a', delta: '字'.repeat(300) }])!.lastReply!).length, LAST_REPLY_CHARS)
 })
 
-test('a row\'s time: 刚刚, 昨天, else relative; the last reply\'s time first', () => {
+test('a row\'s time: 刚刚, 昨天, else relative; use the latest activity', () => {
   const now = new Date(2026, 9, 28, 9, 30)
   assert.equal(activityLabel(new Date(2026, 9, 28, 9, 29, 30), now), 'justNow')
   assert.equal(activityLabel(new Date(2026, 9, 28, 9, 25), now), 'relative')
   assert.equal(activityLabel(new Date(2026, 9, 27, 23, 50), now), 'yesterday')
   assert.equal(activityLabel(new Date(2026, 9, 26, 12, 0), now), 'relative')
-  assert.equal(lastActivity({ lastReplyAt: '2026-10-28T09:00:00Z', updatedAt: '2026-10-28T09:10:00Z' }), '2026-10-28T09:00:00Z')
+  assert.equal(lastActivity({ lastReplyAt: '2026-10-28T09:00:00Z', updatedAt: '2026-10-28T09:10:00Z' }), '2026-10-28T09:10:00Z')
+  assert.equal(lastActivity({ lastReplyAt: '2026-10-28T09:20:00Z', updatedAt: '2026-10-28T09:10:00Z' }), '2026-10-28T09:20:00Z')
   assert.equal(lastActivity({ lastReplyAt: null, updatedAt: '2026-10-28T09:10:00Z' }), '2026-10-28T09:10:00Z')
 })
 

@@ -56,9 +56,9 @@ export function nextReply(stored: StoredReply, chunks: readonly Record<string, u
   return { lastReply: Array.from(update.text).slice(0, LAST_REPLY_CHARS).join(''), lastReplyPart: update.part }
 }
 
-/** A thread's last activity: when its last reply was written, else its last update. */
+/** A thread's last activity, whether it was a reply or a status update. */
 export function lastActivity(thread: { lastReplyAt?: string | null; updatedAt: string }) {
-  return thread.lastReplyAt ?? thread.updatedAt
+  return thread.lastReplyAt && thread.lastReplyAt > thread.updatedAt ? thread.lastReplyAt : thread.updatedAt
 }
 
 /** How a row says when: 刚刚 under a minute, 昨天 for the calendar day before, else a relative time. */
