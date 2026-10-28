@@ -30,6 +30,37 @@ async function fixture(t, overrides = {}) {
   });
   return broker;
 }
+test("revoking a run grant promptly rejects pending work without revoking another run", async (t) => {
+  let calls = 0;
+  const b = await fixture(t, { execute: async () => { calls++; return 'ok'; } });
+  const first = b.spec('first', 'ask');
+  const second = b.spec('second', 'allow');
+  const pending = b.request(first.token, { name: 'click', arguments: { x: 1, y: 2 } });
+  assert.equal(b.list().length, 1);
+  b.revoke(first.token);
+  await assert.rejects(pending, /Run ended/);
+  assert.equal(b.list().length, 0);
+  await assert.rejects(b.request(first.token, { name: 'get_desktop_state' }), /Not permitted/);
+  assert.equal(await b.request(second.token, { name: 'get_desktop_state' }), 'ok');
+  assert.equal(calls, 1);
+});
+test("each broker action has its own trusted id and ask reuses the review id", async (t) => {
+  const ids = [];
+  const b = await fixture(t, { execute: async (_driver, _call, _display, _runId, context) => { ids.push(context.actionId); return 'ok'; } });
+  const call = { name: 'click', arguments: { x: 1, y: 2 } };
+  const allow = b.spec('allowed', 'allow');
+  await b.request(allow.token, call);
+  await b.request(allow.token, call);
+  assert.notEqual(ids[0], ids[1]);
+  const ask = b.spec('reviewed', 'ask');
+  const pending = b.request(ask.token, call);
+  const review = b.list()[0];
+  await b.decide(review.id, review.digest, true);
+  await pending;
+  assert.equal(ids[2], review.id);
+  assert.equal(new Set(ids).size, 3);
+  await assert.rejects(() => b.decide(review.id, review.digest, true));
+});
 test("only pinned driver detected; missing/unexpected version absent", async (t) => {
   const dir = await mkdtemp(join(tmpdir(), "driver-detect-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
@@ -269,7 +300,7 @@ test("replaced run session and disconnected model discard pending execution", as
   const refused = assert.rejects(b.request(grant.token, { name: "get_desktop_state" }));
   const row = b.list()[0];
   b.spec("r", "ask");
-  await b.decide(row.id, row.digest, true);
+  await assert.rejects(() => b.decide(row.id, row.digest, true));
   await refused;
   grant = b.spec("r", "ask");
   const abort = new AbortController();

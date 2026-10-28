@@ -25,7 +25,7 @@ export class ComputerBroker {
     // A new policy or session invalidates every previous grant for this run,
     // including when the new choice is deny or absent.
     for (const [old, grant] of this.grants)
-      if (grant.runId === runId) this.grants.delete(old);
+      if (grant.runId === runId) this.revoke(old);
     // Cloud desktops must be bound by the trusted caller, never the model.
     if (display !== undefined && !/^:[1-9][0-9]{0,2}$/.test(display))
       throw new Error("Invalid desktop display");
@@ -81,6 +81,7 @@ export class ComputerBroker {
     if (!grant || signal?.aborted || !this.permitted(grant.runId))
       return Promise.reject(new Error("Not permitted"));
     const call = normalizeCall(value);
+    const actionId = randomUUID();
     if (grant.permission === "allow") {
       // Recheck at execution admission. The trusted execute callback also
       // enforces the live run, owner, display and policy-version fence.
@@ -88,12 +89,12 @@ export class ComputerBroker {
         if (signal?.aborted || this.grants.get(token) !== grant ||
             this.driver?.fingerprint !== grant.fingerprint || !this.permitted(grant.runId))
           throw new Error("Not permitted");
-        return this.execute(this.driver, call, grant.display, grant.runId);
+        return this.execute(this.driver, call, grant.display, grant.runId, { actionId });
       });
     }
     if (this.pending.size >= 20) return Promise.reject(new Error("Not permitted"));
     const request = {
-      id: randomUUID(),
+      id: actionId,
       runId: grant.runId,
       target: this.driver.fingerprint,
       ...(grant.display === undefined ? {} : { display: grant.display }),
@@ -130,6 +131,16 @@ export class ComputerBroker {
   list() {
     return [...this.pending.values()].map((p) => structuredClone(p.request));
   }
+  revoke(token) {
+    this.grants.delete(token);
+    for (const [id, row] of this.pending) {
+      if (row.token !== token) continue;
+      this.pending.delete(id);
+      clearTimeout(row.timer);
+      row.cleanup();
+      row.reject(new Error("Run ended; approval discarded"));
+    }
+  }
   async decide(id, digest, approve) {
     const row = this.pending.get(id);
     if (!row) throw new Error("Request expired or already consumed");
@@ -152,7 +163,7 @@ export class ComputerBroker {
       return { ok: true };
     }
     try {
-      row.resolve(await this.execute(this.driver, call, display, runId));
+      row.resolve(await this.execute(this.driver, call, display, runId, { actionId: id }));
     } catch (error) {
       row.reject(error);
     }
