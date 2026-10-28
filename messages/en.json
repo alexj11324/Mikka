@@ -2422,9 +2422,14 @@
       "title": "Threads",
       "empty": "No threads yet",
       "untitled": "Untitled thread",
-      "waiting": "Needs you",
-      "failed": "Failed",
-      "screen": "Screen"
+      "justNow": "just now",
+      "yesterday": "yesterday",
+      "group": {
+        "waiting": "Waiting on you ({count})",
+        "running": "In progress ({count})",
+        "idle": "Idle ({count})",
+        "resolved": "Resolved ({count})"
+      }
     },
     "newBot": {
       "title": "New bot",
@@ -2490,25 +2495,30 @@
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
     "panel": {
       "label": "Right panel",
+      "views": "Right panel views",
+      "overview": "Overview",
+      "allThreads": "All threads",
       "tabs": "Right panel content",
       "details": "Details",
-      "tasks": "Tasks",
-      "browser": "Browser",
-      "knowledge": "Knowledge",
-      "schedules": "Schedules",
+      "threads": "Threads",
+      "prs": "PRs",
+      "computer": "Computer",
+      "routines": "Routines",
+      "library": "Library",
+      "expand": "Show all",
+      "noRoutines": "No routines yet",
+      "noLibrary": "No files yet",
+      "noPullRequests": "No PRs yet",
+      "prGroup": {
+        "review": "Waiting for review ({count})",
+        "running": "In progress ({count})",
+        "merged": "Merged ({count})"
+      },
       "search": "Search",
       "widen": "Widen panel",
       "narrow": "Restore panel width",
       "close": "Close panel",
       "open": "Open panel"
-    },
-    "details": {
-      "conversation": "This conversation",
-      "kind": "Type",
-      "coordinatorKind": "Coordinator",
-      "agentKind": "Agent conversation",
-      "updated": "Last activity",
-      "none": "No messages yet"
     },
     "suggestions": {
       "title": "Suggestions",
@@ -2533,32 +2543,6 @@
         "github": "GitHub",
         "linear": "Linear"
       }
-    },
-    "tasks": {
-      "mine": "Tasks",
-      "waiting": "Waiting on you",
-      "running": "Running",
-      "failed": "Failed",
-      "doneToday": "Done",
-      "today": "today {count}",
-      "empty": "No tasks yet",
-      "status": {
-        "waiting_input": "needs your reply",
-        "queued": "queued",
-        "preparing": "preparing",
-        "running": "running",
-        "finishing": "finishing",
-        "failed": "failed",
-        "succeeded": "done"
-      }
-    },
-    "empty": {
-      "browser": "No web pages opened yet",
-      "knowledge": "No documents yet",
-      "schedules": "No scheduled tasks yet",
-      "arrange": "Let an agent set it up",
-      "knowledgePrompt": "Help me put the documents I use often into the knowledge base: ",
-      "schedulesPrompt": "Help me set up a scheduled task: "
     },
     "newTaskDialog": {
       "title": "New task",
