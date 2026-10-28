@@ -55,7 +55,7 @@ const binding = (f: Graph) => ({
   issueId: f.task.issueId,
   attemptId: f.task.attemptId,
   candidateId: f.task.candidateId,
-  revision: 1,
+  revision: f.questions.at(-1)?.result.task.revision ?? 1,
 });
 
 // A real loopback HTTP consumer of the actual predicate. Authentication and
@@ -101,7 +101,7 @@ test(
           await tx.query("BEGIN");
           const q = f.task;
           await tx.query(
-            `INSERT INTO factory_tasks VALUES ($1,$2,$3,$4,$5,$6,1,$7,$8)`,
+            `INSERT INTO factory_tasks VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
             [
               q.id,
               q.userId,
@@ -109,6 +109,7 @@ test(
               q.sourceEventId,
               q.stage,
               q.status,
+              binding(f).revision,
               q.attemptId,
               q.candidateId,
             ],
@@ -359,7 +360,7 @@ test(
                       [f.task.id],
                     )
                   ).rows[0],
-                  { status: "running", revision: 1 },
+                  { status: "running", revision: binding(f).revision },
                   "ancestry must never promote a result",
                 );
               }
@@ -487,7 +488,7 @@ test(
                 [f.task.id],
               )
             ).rows[0],
-            { status: "running", revision: 1 },
+            { status: "running", revision: binding(f).revision },
           );
         },
       );
