@@ -5,7 +5,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { handleGroup, type GroupRequest } from '../group-conversations-store'
 import { GroupJudgmentPendingError, processGroupTurn, runGroupRounds, type GroupAgent, type GroupRuntime } from './group-turns'
-import { checkedCorrection } from './group-correction'
+import { checkedCorrection, checkedRoute } from './group-correction'
 import { MissingGroupLeadError, routeFromAnswers, UnknownMentionError, routingInput } from './group-routing'
 
 const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
@@ -186,27 +186,22 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.equal((await scoped.query('SELECT status FROM agent_runs WHERE id=$1',[interruptedRun])).rows[0].status,'failed')
     assert.equal((await scoped.query('SELECT status FROM agent_runs WHERE id=$1',[unrelated])).rows[0].status,'running')
     assert.equal((await scoped.query('SELECT error,"agentId" FROM group_turns WHERE "messageId"=$1',[interrupted])).rows[0].error,'interrupted_generation_not_replayed')
-    // Missing/ineligible lead is actionable; direct mentions still bypass routing.
-    const fallbackRuntime: GroupRuntime = {...runtime,async route(_,current,leadId) {return routeFromAnswers(null,current,leadId)}}
+    // An unavailable or uncertain route never silently selects a lead.
+    const unavailableRuntime: GroupRuntime = {...runtime, async route() { throw new GroupJudgmentPendingError() }}
     await config(id,null)
     const missing = await send(id,'ambiguous')
-    await assert.rejects(processGroupTurn(scoped,id,fallbackRuntime),MissingGroupLeadError)
-    assert.equal((await scoped.query('SELECT error FROM group_turns WHERE "messageId"=$1',[missing])).rows[0].error,'group_lead_required')
+    await assert.rejects(processGroupTurn(scoped,id,unavailableRuntime),GroupJudgmentPendingError)
+    assert.equal((await scoped.query('SELECT error FROM group_turns WHERE "messageId"=$1',[missing])).rows[0].error,'group_judgment_pending')
     const errorHistory = await handleGroup(scoped,directory,{...base,method:'GET',resource:'messages',id},true)
-    assert.equal((errorHistory.body as {routingError:{code:string}}).routingError.code,'group_lead_required')
-    await send(id,'direct without lead',[b]); await processGroupTurn(scoped,id,fallbackRuntime)
+    assert.equal((errorHistory.body as {routingError:{code:string}}).routingError.code,'group_judgment_pending')
+    await send(id,'direct without lead',[b]); await processGroupTurn(scoped,id,unavailableRuntime)
     await config(id,a)
-    const leadRoot = await send(id,'configured fallback'); await processGroupTurn(scoped,id,fallbackRuntime)
-    assert.equal((await scoped.query('SELECT "authorId" FROM conversation_messages WHERE "replyToId"=$1',[leadRoot])).rows[0].authorId,a)
     const removed = await handleGroup(scoped,directory,{...base,resource:'members',method:'DELETE',id,body:JSON.stringify({memberType:'agent',memberId:a})},true)
     assert.equal(removed.status,200)
     assert.equal((await scoped.query('SELECT "leadAgentId" FROM conversations WHERE id=$1',[id])).rows[0].leadAgentId,null)
-    assert.equal((await config(id,a)).status,422) // no longer current member
-    await send(id,'removed lead'); await assert.rejects(processGroupTurn(scoped,id,fallbackRuntime),MissingGroupLeadError)
+    assert.equal((await config(id,a)).status,422)
     await handleGroup(scoped,directory,{...base,resource:'members',method:'POST',id,body:JSON.stringify({memberType:'agent',memberId:a})},true)
     await config(id,a)
-    await send(id,'ownership revoked')
-    await assert.rejects(processGroupTurn(scoped,id,{...fallbackRuntime,async agents(_,ids) {return members.filter(m=>m.id!==a && ids.includes(m.id))}}),MissingGroupLeadError)
     // A human group member can address an explicitly group-selected creator agent,
     // never an arbitrary private agent belonging to themselves or another owner.
     const memberSend = await handleGroup(scoped,directory,{...base,userId:'member',resource:'messages',id,body:JSON.stringify({body:'member asks selected agent',mentions:[{memberType:'agent',memberId:b}]})},true)
@@ -264,4 +259,12 @@ test('correction facts come from model judgment and reject uncertain or invalid 
   assert.equal(checkedCorrection({ kind: 'correction', rightId: outsider }, prior, members), 'uncertain')
   assert.equal(checkedCorrection({ kind: 'correction', rightId: a }, prior, members), 'uncertain')
   assert.deepEqual(checkedCorrection({ kind: 'correction', rightId: b }, prior, members), { message: 'previous', wrongId: a, rightId: b })
+})
+
+
+test('model route preserves its choice and rejects uncertain or non-member output', () => {
+  assert.deepEqual(checkedRoute({kind:'route',responders:[b,a],confidence:0.42},members), {by:'model',responders:[b,a],confidence:0.42})
+  assert.throws(() => checkedRoute({kind:'uncertain',responders:[],confidence:0},members), GroupJudgmentPendingError)
+  assert.throws(() => checkedRoute({kind:'route',responders:[outsider],confidence:1},members), GroupJudgmentPendingError)
+  assert.throws(() => checkedRoute({kind:'route',responders:[a,a],confidence:1},members), GroupJudgmentPendingError)
 })

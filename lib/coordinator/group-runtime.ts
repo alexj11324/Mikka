@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import type { GroupRuntime } from './group-turns'
-import { GroupJudgmentPendingError, type CorrectionJudgment } from './group-correction'
+import { checkedRoute, GroupJudgmentPendingError, type CorrectionJudgment } from './group-correction'
 
 /** Chat only: selected owner's public role description only, no private standing instructions, tools or agent sessions,
  * credentials or device/issue execution. Group messages are quoted untrusted data.
@@ -35,9 +35,7 @@ export const groupRuntime: GroupRuntime = {
         output: Output.object({ schema: z.object({ kind: z.enum(['route', 'uncertain']), responders: z.array(z.string().uuid()).max(100), confidence: z.number().min(0).max(1) }) }),
         maxOutputTokens: 500, maxRetries: 0, abortSignal: AbortSignal.timeout(15000),
       })
-      const { kind, responders, confidence } = result.output
-      if (kind !== 'route' || !responders.length || new Set(responders).size !== responders.length || responders.some(id => !members.some(member => member.id === id))) throw new GroupJudgmentPendingError()
-      return { by: 'model', responders, confidence }
+      return checkedRoute(result.output, members)
     } catch { throw new GroupJudgmentPendingError() }
   },
   async correction(input): Promise<CorrectionJudgment> {
