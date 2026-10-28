@@ -5,6 +5,14 @@ const request = (id = 'call-1', runId = 'run-1'): ToolApprovalRequest => ({ runI
 const deferred = () => { let resolve!: (value: 'allow' | 'deny') => void; const promise = new Promise<'allow' | 'deny'>(r => { resolve = r }); return { promise, resolve } }
 
 describe('run-bound tool approval', () => {
+  it('exposes irreversible revocation for the adapter response handoff', () => {
+    const gate = new ToolApprovalGate('run-1', { permission: () => 'allow', ask: async () => 'deny', isLive: () => true })
+    expect(gate.revoked).toBe(false)
+    gate.revoke()
+    expect(gate.revoked).toBe(true)
+    gate.revoke()
+    expect(gate.revoked).toBe(true)
+  })
   it('requires a gate bound to the exact run', () => {
     const gate = new ToolApprovalGate('run-1', { permission: () => 'deny', ask: async () => 'deny', isLive: () => true })
     expect(requireRunToolApproval('run-1', gate)).toBe(gate)

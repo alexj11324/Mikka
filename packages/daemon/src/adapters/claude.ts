@@ -551,7 +551,7 @@ export class ClaudeAdapter implements AgentAdapter {
             const gate = options.toolApproval!
             const signal = AbortSignal.any([callback.signal, approvalTransport.signal])
             const decision = await gate.request({ runId: options.runId, harness: 'claude_code', requestId: callback.toolUseID, method: toolName, input }, signal)
-            return decision === 'allow' && !signal.aborted && !ending ? { behavior: 'allow' as const, updatedInput: input } : { behavior: 'deny' as const, message: 'Permission not granted.' }
+            return decision === 'allow' && !gate.revoked && !signal.aborted && !ending ? { behavior: 'allow' as const, updatedInput: input } : { behavior: 'deny' as const, message: 'Permission not granted.' }
         },
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
