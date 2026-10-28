@@ -6,10 +6,9 @@ import type {
   evidenceSchema,
 } from "./approval-contract";
 
-/** Required consumer lifecycle views only; no stage/state implementation.
- * The current #192 intake store uses botId as its third argument and rejects
- * finish/advance. It is not a drop-in implementation of this port.
- * A coordinated adapter must preserve #192 bot/source/owner/fence checks. */
+/** Consumer views only; no stage/state implementation. #192's lifecycle store
+ * supplies this port. Its third argument is botId; lifecycle is the fourth.
+ * The older intake-only store cannot perform finish/advance. */
 export interface FactoryCandidate extends z.infer<typeof candidateSchema> {
   id: string;
 }
@@ -34,6 +33,12 @@ export type FactoryGate = (
   change: { output: unknown; evidence: unknown },
 ) => Promise<boolean>;
 export interface FactoryApprovalStore {
+  /** #192 owns task/issue locks and live owner, Bot and source-event checks. */
+  lockTask(
+    tx: PoolClient,
+    userId: string,
+    taskId: string,
+  ): Promise<FactoryTask>;
   apply(
     userId: string,
     binding: z.infer<typeof bindingSchema>,

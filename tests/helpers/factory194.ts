@@ -70,6 +70,8 @@ export async function factory194Fixture(connectionString: string) {
     [actor.userId],
   );
   const permission = { allowed: true };
+  // Separate upstream Bot/source fence: issue authorization cannot replace it.
+  const source = { allowed: true };
   const authorize = async (userId: string, issueId: string, tx: PoolClient) =>
     permission.allowed &&
     Boolean(
@@ -81,6 +83,21 @@ export async function factory194Fixture(connectionString: string) {
       ).rowCount,
     );
   const store: FactoryApprovalStore = {
+    async lockTask(tx, userId, taskId) {
+      const {
+        rows: [task],
+      } = await tx.query<FactoryTask>(
+        'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
+        [taskId, userId],
+      );
+      if (
+        !task ||
+        !source.allowed ||
+        !(await authorize(userId, task.issueId, tx))
+      )
+        throw new FactoryError("factoryNotFound");
+      return task;
+    },
     async apply(userId, b, eventId, change, tx) {
       const {
         rows: [task],
@@ -247,6 +264,7 @@ export async function factory194Fixture(connectionString: string) {
   }
   return {
     permission,
+    source,
     pool,
     actor,
     provider,

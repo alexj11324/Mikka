@@ -38,6 +38,40 @@ test(
     try {
       const { actor, pool, provider } = f;
       await t.test(
+        "upstream locked Bot/source authorization also guards reads and pre-publication",
+        async () => {
+          const x = await f.prepare(),
+            p = await x.publication(),
+            s = f.service();
+          const before = provider.posts();
+          f.source.allowed = false;
+          try {
+            await rejects(
+              () => s.evidence(actor, x.task.id),
+              "factoryNotFound",
+            );
+            await rejects(() => s.ledger(actor, x.task.id), "factoryNotFound");
+            await rejects(() => s.publish(actor, p), "factoryNotFound");
+            await rejects(
+              () => s.reconcile(actor, { ...p, publicationId: randomUUID() }),
+              "factoryNotFound",
+            );
+            assert.equal(provider.posts(), before);
+            assert.equal(
+              (
+                await pool.query(
+                  'SELECT count(*)::int AS n FROM factory_publications WHERE "taskId"=$1',
+                  [x.task.id],
+                )
+              ).rows[0].n,
+              0,
+            );
+          } finally {
+            f.source.allowed = true;
+          }
+        },
+      );
+      await t.test(
         "exact approval read, owner, SHA/scope/environment/digest/expiry and concurrent replay",
         async () => {
           const x = await f.prepare(),

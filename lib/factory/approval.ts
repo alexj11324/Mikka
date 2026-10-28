@@ -232,12 +232,7 @@ export function createFactoryApprovals(
     taskId: string,
     allowStopped = false,
   ) {
-    const {
-      rows: [task],
-    } = await tx.query<FactoryTask>(
-      'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
-      [taskId, actor.userId],
-    );
+    const task = await store.lockTask(tx, actor.userId, taskId);
     if (!task || !(await authorize(actor.userId, task.issueId, tx)))
       fail("factoryNotFound");
     if (!allowStopped && ["cancelled", "revoked"].includes(task.status))

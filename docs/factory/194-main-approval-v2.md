@@ -16,14 +16,40 @@ application code cannot issue a Factory human approval or authorize provider wri
 This is a reviewable consumer-library batch, not completion of issue #194 or
 evidence that Factory is available in the application.
 
-`approval-dependencies.ts` describes the consumer lifecycle port required by this
-library, **not a drop-in adapter for the current #192 intake store**. The actual
-#192 source at `283a64232fe444505a59fed15d8364214512f26a` exports
-`createFactoryStore(pool, authorize, botId: string | null = null)`: the third
-argument is a bot identity, not gates. Its `apply` supports intake resolution,
-cancellation and revocation; consumer `finish`/`advance` actions fail closed with
-`factoryTransitionUnavailable`. It exposes no consumer gate installation interface.
-This library must not be wired to that store as though those hooks exist.
+`approval-dependencies.ts` describes the consumer lifecycle port. The historical
+#192 intake-only source `283a64232fe444505a59fed15d8364214512f26a` cannot
+perform consumer finish/advance. The published lifecycle candidate
+`b3839211395c6014c2cff4270eaac24ca1b3441f` provides the actual compatible seam:
+`createFactoryStore(pool, authorize, botId = null, lifecycle?)`. The third
+argument remains Bot identity; the fourth contains `{ gates?, independent? }`.
+Its runtime installs the exported `approvalGate` and `publishGate` inside the
+locked transaction. Missing review/verify/monitor configuration still fails closed.
+
+The approval service requires `store.lockTask(tx, userId, taskId)` for every task
+read, grant, publication and reconciliation, including the last pre-POST check.
+That producer-owned method retains task/issue lock ordering and live Bot/source
+checks; a successful issue authorization alone cannot replace it. `apply` joins
+the same transaction and owns the authoritative finish/advance transitions.
+
+Approval and publish do not dispatch model runs. They are advanced only by the
+human approval service and trusted publication receipt. #192's run reconciler
+consumer map is review/verify/monitor only: do not install a publication consumer
+there or manufacture a human session for background reconciliation. The existing
+`createFactoryApprovals(...).reconcile(actor, originalRequestWithPublicationId)`
+is the publication reconciliation export; it requires the original live browser
+identity/grant and performs provider reads only. #195 consumes the reader below.
+The upstream candidate is not merged, migrated, enabled or accepted by this batch.
+
+Isolated PG17 consumption of that exact source confirms the real locked-store
+port, approval gate, finish/advance and once-only publication replay. It also
+exposes an integration blocker: its publish attempt uses PostgreSQL `now()` for
+`finishedAt`, which is the transaction start time. Provider readback happens
+later in that same transaction. V2 deliberately requires `observedAt` not to
+exceed publish completion, so that source's otherwise legitimate receipt is
+rejected. The producer must supply an actual completion time after observation;
+the reader's timing constraint has not been weakened. This is not passed
+end-to-end lifecycle acceptance. The local protocol endpoint and prior Harness
+reports remain synthetic; no real provider write was made.
 
 The port defines no stage ordering, transition implementation or separate
 task/candidate tables. `approval-contract.ts`
@@ -36,14 +62,14 @@ when a store and consumer have different Error class identities.
 
 The integration owner must provide:
 
-| Owner            | Required input                                                                                                                                                                                                                                                                 |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| #192             | Authorized/locked task including bot/source checks, and the coordinated lifecycle finish/advance transaction seam required by `FactoryApprovalStore`; the present intake-only `apply(userId, binding, eventId, change, tx?)` cannot supply it                                  |
-| #192             | `factory_tasks`, `factory_candidates`, `factory_attempts`, `factory_events`; transaction-compatible owner/candidate/revision fences                                                                                                                                            |
-| #193             | Independently passed execute/review/verify attempts, distinct actual run/session identities and readable same-run evidence, accepted by its actual validators through the coordinated lifecycle seam; the intake extraction does not install them                              |
-| #194 integration | Apply approval-ledger DDL **after** #192's tables in the coordinated migration order, then implement the agreed lifecycle adapter invoking `approvalGate`/`publishGate` in the same authorized transaction; the current intake store and this batch do not implement that hook |
-| Browser adapter  | Verify an actual Better Auth cookie via `factoryBrowserHuman`; pass only the resulting identity to the handler, never identity from JSON or a worker token                                                                                                                     |
-| #195             | Consume the V2 reader below; keep its monitor/probe implementation in its own PR                                                                                                                                                                                               |
+| Owner            | Required input                                                                                                                                                                                                                                      |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #192             | Lifecycle `lockTask` including bot/source checks, plus `apply(userId, binding, eventId, change, tx?)` with finish/advance and the fourth-argument gates; the older intake-only source cannot supply them                                            |
+| #192             | `factory_tasks`, `factory_candidates`, `factory_attempts`, `factory_events`; transaction-compatible owner/candidate/revision fences                                                                                                                 |
+| #193             | Independently passed execute/review/verify attempts, distinct actual run/session identities and readable same-run evidence, accepted by its actual validators through the coordinated lifecycle seam; the intake extraction does not install them   |
+| #194 integration | Apply approval-ledger DDL **after** #192's tables in the coordinated migration order, then install `approvalGate`/`publishGate` in the lifecycle store; the source candidate supplies this hook, while this batch registers no runtime or migration |
+| Browser adapter  | Verify an actual Better Auth cookie via `factoryBrowserHuman`; pass only the resulting identity to the handler, never identity from JSON or a worker token                                                                                          |
+| #195             | Consume the V2 reader below; keep its monitor/probe implementation in its own PR                                                                                                                                                                    |
 
 The test-only ledger DDL in `tests/fixtures/factory194-ledgers.sql` is copied
 from PR316's #194 consumer migration. It is not registered under `drizzle/` and
@@ -52,7 +78,7 @@ schema/route integration remains pending #192/#193; this batch cannot consume
 nonexistent upstream evidence as real review or verification.
 Actual application integration must preserve #192's selected bot and original
 source-event authorization. This library's projection and test store port do not
-replace those checks or make the current intake API publication-capable.
+replace those checks. The required locked-store method has no raw-SQL fallback.
 
 ## Human approval and logical action
 
