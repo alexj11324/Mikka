@@ -29,5 +29,11 @@ try {
     await page.evaluate(mode => { const root = document.querySelector('#host').attachShadow({ mode }); root.innerHTML = '<input name="otp" value="123456">' }, mode)
     await capture(`${mode}-shadow`)
   }
+  await page.setContent('<button type="button" id="continue">Continue</button><button type="button" id="delete">Delete</button>')
+  await page.evaluate(() => { window.syntheticHandlerRan = false; document.querySelector('#continue').addEventListener('click', () => { window.syntheticHandlerRan = true }) })
+  results.ambiguousHint = (await cdp.send('Runtime.evaluate', { expression: process.argv[3], returnByValue: true })).result.value.requiresApproval
+  results.deleteHint = (await cdp.send('Runtime.evaluate', { expression: process.argv[4], returnByValue: true })).result.value.requiresApproval
+  await page.locator('#continue').click()
+  results.syntheticHandlerRan = await page.evaluate(() => window.syntheticHandlerRan)
   process.stdout.write(JSON.stringify(results))
 } finally { await browser.close() }

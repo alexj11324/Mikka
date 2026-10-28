@@ -42,6 +42,11 @@ def safe_resume_snapshot(frames, document, evaluation):
         return any(unsafe(item) for item in value.values())
     return not unsafe(root) and isinstance(evaluation,dict) and 'exceptionDetails' not in evaluation and isinstance(evaluation.get('result'),dict) and evaluation['result'].get('value') is True
 
+def inspect_mutation_expression(mutation):
+    # Text and form metadata are hints, not a proof of a page's JS effects.
+    selector=json.dumps(str(mutation.get('selector',''))[:500])
+    return f"(() => {{ const e={('document.activeElement' if mutation.get('action')=='key' else 'document.querySelector('+selector+')')}; if (!e) return {{requiresApproval:true}}; const text=(e.innerText||e.getAttribute('aria-label')||'').slice(0,500); const risk=/pay|purchase|buy|delete|remove|cancel|unsubscribe|transfer|send|publish|submit|confirm|付款|支付|购买|删除|取消|转账|发送|发布|确认/i.test(text); return {{requiresApproval:risk || (e.type==='submit' && e.form?.method.toLowerCase()!=='get') || ({json.dumps(mutation.get('action')=='key' and mutation.get('key')=='Enter')} && e.form?.method.toLowerCase()!=='get')}}; }})()"
+
 def decode(value):
     return base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))
 
@@ -252,8 +257,8 @@ async def action(request):
             if frame['loaderId']!=data['expectedLoaderId'] or f'{u.scheme}://{u.netloc}'!=data.get('expectedOrigin'):raise web.HTTPConflict()
         if name=='inspectMutation':
             from urllib.parse import urlsplit
-            mutation=data.get('mutation',{});selector=json.dumps(str(mutation.get('selector',''))[:500])
-            expression=f"(() => {{ const e={('document.activeElement' if mutation.get('action')=='key' else 'document.querySelector('+selector+')')}; if (!e) return {{requiresApproval:true}}; const text=(e.innerText||e.getAttribute('aria-label')||'').slice(0,500); const risk=/pay|purchase|buy|delete|remove|cancel|unsubscribe|transfer|send|publish|submit|confirm|付款|支付|购买|删除|取消|转账|发送|发布|确认/i.test(text); return {{requiresApproval:risk || (e.type==='submit' && e.form?.method.toLowerCase()!=='get') || ({json.dumps(mutation.get('action')=='key' and mutation.get('key')=='Enter')} && e.form?.method.toLowerCase()!=='get')}}; }})()"
+            mutation=data.get('mutation',{})
+            expression=inspect_mutation_expression(mutation)
             check=await b.rpc('Runtime.evaluate',{'expression':expression,'returnByValue':True},b.session)
             tree=await b.rpc('Page.getFrameTree',session=b.session);frame=tree['frameTree']['frame'];u=urlsplit(frame['url'])
             return web.json_response({**check['result']['value'],'loaderId':frame['loaderId'],'origin':f'{u.scheme}://{u.netloc}'})
@@ -278,7 +283,7 @@ async def action(request):
             await b.rpc('Input.dispatchKeyEvent',{'type':'keyDown','key':key},b.session)
             await b.rpc('Input.dispatchKeyEvent',{'type':'keyUp','key':key},b.session)
         elif name=='click':
-            # Selector comes from the bot; irreversible actions still require approval in its harness.
+            # The calling harness applies model and metadata-based approval checks.
             selector=json.dumps(str(data.get('selector',''))[:500])
             await b.rpc('Runtime.evaluate',{'expression':f'document.querySelector({selector})?.click()'},b.session)
         else:raise web.HTTPBadRequest()
