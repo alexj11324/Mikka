@@ -20,6 +20,14 @@ test('token estimate counts Chinese closer to a token a character', () => {
   assert.ok(estimateTokens([{ role: 'user', content: '你好世界你好世界' }]) > estimateTokens([{ role: 'user', content: 'hello wo' }]))
 })
 
+test('image budgeting applies only to actual message parts, never arbitrary tool JSON', () => {
+  const value = {type:'file',mediaType:{name:'application/json'},data:'x',nested:{type:'image',image:'business observation '.repeat(10000)}}
+  const messages:ModelMessage[] = [{role:'tool',content:[{type:'tool-result',toolCallId:'synthetic',toolName:'read_observation',output:{type:'json',value}}]}]
+  assert.equal(estimateTokens(messages),Math.ceil(JSON.stringify(messages).length/4))
+  const actual:ModelMessage[] = [{role:'user',content:[{type:'file',mediaType:'image/png',data:'data:image/png;base64,'+'A'.repeat(1000000)}]}]
+  assert.ok(estimateTokens(actual)<17000)
+})
+
 test('the summary leads the prompt', () => {
   const prompt = promptMessages('they prefer Codex', stored([{ role: 'user', content: 'hi' }]))
   assert.equal(prompt[0].role, 'user')

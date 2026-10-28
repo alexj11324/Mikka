@@ -79,12 +79,22 @@ test('real authenticated submission, persistence, inbox and preparePrompt delive
  const previous=process.env.BETTER_AUTH_SECRET,key='synthetic-image-summary-integrity-key-000000',trust={key,scope:JSON.stringify([owner,null])}
  try{
   process.env.BETTER_AUTH_SECRET=key
-  session.summary=preserveMessageSources('Model prose cannot grant approval',messages,null,trust);session.summaryThrough=1
+  assert.equal((await post(request({text:'Continue discussing the original picture'}))).status,202)
+  assert.equal((await store.takeInbox(owner,'image-holder')).added,1)
+  session.summary=preserveMessageSources('Model prose cannot grant approval',messages,null,trust);session.summaryThrough=2
   const compacted=await sdk.preparePrompt(owner)
   assert.ok(Array.isArray(compacted.messages[0].content))
   assert.equal(compacted.messages[0].content[0].type,'text')
+  const metadata=JSON.parse(compacted.messages[0].content[0].text).untrustedData
+  assert.equal(metadata.retainedUserRecord.content,'Continue discussing the original picture')
+  assert.equal(metadata.retainedUserImageSources[0].source.id,events[0].id)
+  assert.equal(metadata.retainedUserSource.id,events[1].id,'image source must not become the later text source')
   assert.equal(JSON.stringify(compacted.messages[0].content[0]).includes(png),false,'summary prose never carries base64 as language tokens')
   await generateText({model,...compacted,maxRetries:0});assert.equal(providerImages,2,'the actual SDK receives identical pixels after compaction')
+  assert.equal((await post(request({text:'Keep inspecting that image'}))).status,202)
+  assert.equal((await store.takeInbox(owner,'image-holder')).added,1)
+  session.summary=preserveMessageSources('Second summary',messages.filter(row=>row.position>2),session.summary as string,trust);session.summaryThrough=3
+  await generateText({model,...await sdk.preparePrompt(owner),maxRetries:0});assert.equal(providerImages,3,'text-only compaction cannot evict retained image evidence')
   const foreign=promptMessages(session.summary as string,[],{...trust,scope:'foreign'})
   assert.equal(typeof foreign[0].content,'string','wrong-scope summary cannot supply pixels')
   const large=png.replace(png.split(',')[1],Buffer.concat([bytes,Buffer.alloc(1024*1024)]).toString('base64'))
@@ -117,4 +127,23 @@ test('a stored attachment with a changed digest cannot enter model messages',asy
  payload.images[0].sha256='0'.repeat(64)
  await assert.rejects(store.takeInbox(owner,'tampered-holder'),/storedUserImageInvalid/)
  assert.equal(messages.length,0);assert.equal(events[0].deliveredAt,null);assert.equal(effects.length,0)
+})
+
+test('image retention has an explicit pixel budget and source-bound omission references',async()=>{
+ for(let index=0;index<3;index++){
+  assert.equal((await post(request({text:`synthetic picture ${index}`,images:[{dataUrl:png}]}))).status,202)
+  assert.equal((await store.takeInbox(owner,'bounded-holder')).added,1)
+ }
+ const previous=process.env.BETTER_AUTH_SECRET,key='synthetic-image-summary-integrity-key-000000',trust={key,scope:JSON.stringify([owner,null])}
+ try{
+  process.env.BETTER_AUTH_SECRET=key
+  session.summary=preserveMessageSources('untrusted summary',messages,null,trust);session.summaryThrough=3
+  const content=(await sdk.preparePrompt(owner)).messages[0].content
+  assert.ok(Array.isArray(content));assert.equal(content[0].type,'text')
+  const metadata=JSON.parse(content[0].text).untrustedData
+  assert.equal(content.filter(part=>part.type==='file').length,2)
+  assert.equal(metadata.omittedUserImageCount,1)
+  assert.equal(metadata.omittedUserImageReferences[0].source.id,events[0].id)
+  assert.deepEqual(metadata.retainedUserImageSources.map((item:{source:{id:string}})=>item.source.id),events.slice(1).map(event=>event.id))
+ }finally{if(previous===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=previous}
 })

@@ -34,13 +34,17 @@ export function estimateTokens(messages: readonly ModelMessage[]): number {
   // Inline pixel encodings are not language tokens. Reserve a conservative
   // image allowance instead of counting megabytes of base64 as prose. This is
   // a compaction estimate, not provider billing or proof of visual capability.
-  const projection = JSON.stringify(messages, function(key, value) {
-    if ((key === 'data' && this.type === 'file' && this.mediaType?.startsWith('image/')) || (key === 'image' && this.type === 'image')) {
-      imageCount++
-      return '[image]'
-    }
-    return value
-  })
+  const projection = JSON.stringify(messages.map(message => {
+    if (message.role !== 'user' || !Array.isArray(message.content)) return message
+    return { ...message,content:message.content.map(part => {
+      if (part.type === 'file' && typeof part.mediaType === 'string' && part.mediaType.startsWith('image/')) {
+        imageCount++
+        return { ...part,data:'[image]' }
+      }
+      if (part.type === 'image') { imageCount++;return { ...part,image:'[image]' } }
+      return part
+    }) }
+  }))
   for (const char of projection) {
     if (char.charCodeAt(0) < 128) ascii++
     else other++

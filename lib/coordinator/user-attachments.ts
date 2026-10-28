@@ -3,8 +3,8 @@ import { z } from 'zod'
 import type { UserModelMessage } from 'ai'
 
 export const MAX_USER_IMAGES = 2
-export const MAX_USER_IMAGE_BYTES = 2 * 1024 * 1024
-export const MAX_PERSONAL_SUBMISSION_BYTES = 6 * 1024 * 1024
+export const MAX_USER_IMAGE_BYTES = 1024 * 1024
+export const MAX_PERSONAL_SUBMISSION_BYTES = 3 * 1024 * 1024
 export const userImageInputSchema = z.strictObject({ dataUrl: z.string().max(Math.ceil(MAX_USER_IMAGE_BYTES / 3) * 4 + 64) })
 export type UserImageInput = z.infer<typeof userImageInputSchema>
 export interface StoredUserImage { dataUrl: string; mediaType: 'image/png' | 'image/jpeg' | 'image/webp'; byteLength: number; sha256: string }

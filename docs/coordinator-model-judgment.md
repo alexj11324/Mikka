@@ -60,6 +60,42 @@ short result-persistence transaction. Replay lookup happens before running a new
 evaluation. Compaction resolves/calls its model outside the summary-save operation.
 No new SQL or migration is needed by these source changes.
 
+The bounded retry loop still has an unresolved fairness gap: a slow first event
+can consume a wake's whole budget, and repeatedly selecting the oldest batch can
+starve later runtime events. A durable, scoped attempt cursor is being coordinated
+with the shared schema owner. It is not implemented or database-accepted here.
+
+## Authenticated user images
+
+The existing authenticated `POST /api/coordinator/messages` accepts optional
+`images: [{ dataUrl }]`, inline PNG/JPEG/WebP only, at most two images of 1 MiB
+each and a 3 MiB total JSON body. The stream is bounded even if Content-Length
+is missing or false. No external URL is fetched. The normal text Server Action
+keeps its existing interface and body limit; clients submitting images use POST.
+This change does not add or alter a frontend attachment control.
+
+The host derives the media type, byte count and SHA256, persists them in the
+authenticated owner's user event and revalidates them when taking the inbox.
+Peer/tool payload images cannot stamp a user event. Real image file parts reach
+`preparePrompt` and the AI SDK. The response and request logger do not echo image
+bytes; private source rows are not automatically deleted. This does not claim
+that image metadata has been redacted or that model image content grants rights.
+
+Signed compaction keeps the newest user decision and up to two recent user image
+records separately, with each image bound to its original event/time. Later text
+cannot relabel or erase the retained image source. Omitted image references/counts
+are explicit: an old image outside that pixel budget is not visually available
+to the model, and summary prose cannot substitute for it. Wrong-scope or unsigned
+summaries cannot supply pixels. Actual tool JSON is counted as text regardless
+of nested fields named `type`, `image` or `mediaType`.
+
+The image entry regression begins with a synthetic HTTP body, authenticates via
+an explicit test session, persists through the real submission code into a
+SQL-shaped transport fixture, takes the real inbox, prepares the real prompt,
+and checks decoded pixels at the actual installed AI SDK model interface before
+and after repeated compaction. Its database transport and model are substitutes,
+not evidence of a deployed request, real PostgreSQL or a real provider response.
+
 ## Verification limits and ownership
 
 Offline tests replace transport, workflow and database effects explicitly. A
@@ -76,9 +112,11 @@ against the real database. A synthetic transport test alone cannot complete it.
 Group-specific correction helpers in `group-routing.ts` belong to #166; issue
 scope, admission, Factory/monitor and publication owners retain their files.
 `routeGroupMessage` has no current main production caller, so its library tests
-do not establish deployed group behavior. The Factory monitor source supplied by
-its owner still needs replay-before-inference and transaction-duration review;
-this change does not edit or claim acceptance of those files.
+do not establish deployed group behavior. The Factory owner reports a newer
+`276a640` implementation with read-before-model and short transactions. That
+source has not been materialized in this checkout, so the old lock/replay finding
+is not asserted against the newer version. This change does not edit or claim
+independent acceptance of those files.
 
 The current default generative Coordinator model in `lib/coordinator/model.ts`
 is still `nvidia/nemotron-3.5-lightning-free`. Public Gateway metadata declares
