@@ -1,6 +1,5 @@
 import 'server-only'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
-import { WORKSPACE_ID } from '@/lib/device-link'
 import { freezeWorkerDefinition } from '@/lib/agent-kit/worker'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
@@ -76,7 +75,7 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
     const [bot] = botId ? await db.select({ workspaceId: bots.workspaceId }).from(bots)
       .where(and(eq(bots.id, botId), eq(bots.ownerId, userId))).limit(1) : []
     if (botId && !bot) throw new ActionFailureError('runInvalid')
-    mailboxScope = { botId, workspaceId: bot?.workspaceId ?? WORKSPACE_ID }
+    mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
   }
   const agentDefinition = captureDefinition
     ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, mailboxEnabled, mailboxScope })
