@@ -78,6 +78,7 @@ import { WorktreeManager } from "./worktrees"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
 import { ComputerBroker } from "./computer/broker.mjs"
 import { detectComputerDriver, executeDriver } from "./computer/driver.mjs"
+import { createHostedComputerExecutor, type CredentialExecutorAuthority } from "./computer/credential-executor"
 import { pollWebComputerReviews } from "./computer/web-review"
 
 export * from "./server-link"
@@ -123,6 +124,9 @@ export interface DaemonOptions {
   computerBroker?: ComputerBroker
   /** Trusted E2B mode: create a guarded broker tied to the run journal. */
   cloudComputer?: boolean
+  /** Trusted infrastructure only. Omit until the persistent action authority,
+   * live target fence, and credential service are installed together. */
+  credentialExecutorAuthority?: CredentialExecutorAuthority
   /** Long-poll wait for run commands, seconds (default 25; tests shorten). */
   commandsWaitSeconds?: number
   /** Called once the daemon stopped after `daemon.drain`. */
@@ -262,17 +266,22 @@ export class Daemon {
       if (!this.options.hostedSubscriptions || !this.options.e2bContainerRuntime || this.options.computerBroker) throw new Error("Cloud computer runtime unavailable")
       const driver = await detectComputerDriver('/opt/mikka/computer/cua-driver')
       if (!driver) throw new Error("Cloud computer driver unavailable")
+      const liveComputer = (runId: string, display: string | undefined) => {
+        const entry = this.journal.get(runId)
+        const computer = entry?.assignment.computer
+        if (this.stopped || !this.registered || !computer || computer.display !== display || computer.ownerId !== entry?.assignment.subscriptionBinding?.ownerId || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
+        return computer
+      }
+      const executeOrdinary = async (current: typeof driver, call: import('./computer/driver.mjs').ComputerCall, display: string | undefined, runId: string) => {
+        const computer = liveComputer(runId, display)
+        return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId, policyVersion: computer.policyVersion })
+      }
       this.cloudComputerBroker = new ComputerBroker({ driver, socketPath: join(paths.dataDir, 'computer.sock'),
         permitted: runId => {
           const entry = this.journal.get(runId)
           return Boolean(!this.stopped && this.registered && entry?.assignment.computer && this.supervisor?.computerRunAllowed(runId))
         },
-        execute: async (current, call, display, runId) => {
-          const entry = this.journal.get(runId)
-          const computer = entry?.assignment.computer
-          if (!computer || computer.display !== display || computer.ownerId !== entry?.assignment.subscriptionBinding?.ownerId || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
-          return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId, policyVersion: computer.policyVersion })
-        },
+        execute: createHostedComputerExecutor({ liveComputer, executeOrdinary, authority: this.options.credentialExecutorAuthority }),
       })
     }
     const hosted = this.options.hostedSubscriptions
