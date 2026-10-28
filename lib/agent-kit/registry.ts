@@ -11,6 +11,8 @@ export const AGENT_TOOL_IDS = [
   'create_calendar_event', 'update_calendar_event', 'web_search', 'list_issues', 'get_issue', 'create_issue', 'update_issue',
   'list_agents', 'dispatch_run', 'list_runs', 'get_run', 'send_to_run', 'remember', 'forget',
   'stop_run', 'load_skill', 'record_attention',
+  'dispatch_factory_task', 'list_factory_questions', 'answer_factory_context', 'escalate_factory_question',
+  'list_factory_requests', 'intake_factory_request', 'get_factory_task', 'resolve_factory_task', 'stop_factory_task',
   ...COMPUTER_TOOL_IDS,
   ...MAILBOX_TOOL_IDS,
 ] as const

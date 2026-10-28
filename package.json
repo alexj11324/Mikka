@@ -87,13 +87,15 @@
     "test:agent-kit-compat": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-kit/main-compat.test.ts lib/agent-kit/registry-compat.test.ts && pnpm test:agent-kit-model",
     "test:agent-kit-model": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-execution-model.test.ts lib/subscription-model-snapshot.test.ts lib/subscription-workflow-model.test.ts lib/subscription-workflow-turn.test.ts lib/agent-kit/hosted-replay.test.ts lib/agent-kit/live-eval-disabled.test.ts lib/agent-kit/core-entry.test.ts lib/agent-kit/disabled-entry.test.ts lib/agent-kit/message-safety-compat.test.ts lib/agent-kit/tool-defaults-compat.test.ts lib/agent-kit/defaults-consumers.test.ts",
     "test:migration-steps-db": "node --test tests/migration-steps.db.test.mjs",
-    "test:coordinator-issue-tools": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/issue-tools.test.ts lib/mcp/issue-mutation.test.ts",
+    "test:coordinator-issue-tools": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/issue-tools.test.ts lib/mcp/issue-mutation.test.ts && pnpm test:factory-routing",
     "test:coordinator-issue-tools-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/issue-tool-calls.db.test.ts",
     "test:write-transactions": "node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-transaction.test.ts",
     "test:personal-mailbox-default-off-db": "MIKKA_MAILBOX_DEFAULT_OFF_CI=1 node --import ./tests/support/server-only-loader.mjs --import tsx --test lib/mailbox-pg-cancel.test.ts lib/workspace-membership-guard.test.ts tests/personal-mailbox-default-off.db.test.ts",
     "test:personal-mailbox-core": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/personal-mailbox-core.test.ts lib/personal-mailbox-fence.test.ts lib/personal-mailbox-grant.test.ts lib/personal-mailbox-scope.test.ts lib/agent-kit/mailbox-registry.test.ts lib/personal-mailbox-worker-entry.test.ts lib/personal-mailbox-producer.test.ts scripts/personal-mailbox-ci-target.test.mjs scripts/personal-mailbox-ci-cleanup.test.mjs lib/personal-mailbox-retry-context.test.ts lib/agent-kit/tool-defaults-compat.test.ts lib/agent-kit/registry-compat.test.ts lib/coordinator/issue-tools.test.ts",
     "test:approved-writes": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-preparation.test.ts lib/operations/write-discovery.test.ts lib/operations/write-http.test.ts lib/operations/write-provider.test.ts lib/operations/write-route.test.ts lib/operations/write-view.test.ts",
-    "test:approved-writes-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-legacy-schema.db.test.ts"
+    "test:approved-writes-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-legacy-schema.db.test.ts",
+    "test:factory-routing": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/intake.test.ts lib/factory/tools.test.ts",
+    "test:factory-routing-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/routing.db.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

@@ -10,6 +10,7 @@ import { issueRunToken } from '@/lib/mcp/worker'
 import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
+import { FactoryError } from '@/lib/factory/contract'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 
@@ -53,18 +54,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (subscription && (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId)) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
+  let factoryClaim: Record<string, unknown> = {}
+  let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
+  const beforeClaim = async (tx: import('pg').PoolClient) => {
+    if (process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return true
+    const { guardFactoryClaim } = await import('@/lib/factory/runtime')
+    try { factoryClaim = await guardFactoryClaim(tx,caller.userId,deviceId,runId,leaseExpiresAt); return true }
+    catch (error) { if (error instanceof FactoryError) return false; throw error }
+  }
+  const afterClaim = async (tx: import('pg').PoolClient) => {
+    if (factoryClaim.preserveQuestionWorktree === true) {
+      const { withDatabaseClient } = await import('@/lib/db')
+      factoryToken = await withDatabaseClient(tx, () => issueRunToken(run))
+    }
+  }
   let computer: Awaited<ReturnType<typeof claimCloudRun>> = null
   if (device.kind === 'cloud') {
     if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
-    computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id)
+    computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id, beforeClaim, afterClaim)
     if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
   } else {
-    const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id)
+    const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim)
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
   }
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
-  const mcp = await issueRunToken(run)
+  const mcp = await (factoryToken ? Promise.resolve(factoryToken) : issueRunToken(run))
       .then(async ({ token }) => {
         const tools = personalMailboxEnabled() ? await (await import('@/lib/personal-mailbox-runtime')).personalWorkerMailboxAdvertised(caller.userId, run.id) : []
         return { url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token, ...(tools.length ? { mailbox: true as const } : {}) }
@@ -94,5 +109,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...(computer ? { computer } : {}),
     ...retry,
+    ...factoryClaim,
   })
 }
