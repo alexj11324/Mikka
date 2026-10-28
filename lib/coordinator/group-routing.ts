@@ -1,4 +1,5 @@
 import type { DecisionAnswer, DecisionQuestion } from '@/lib/coordinator/decision'
+import type { DecisionExecution } from './decide'
 
 // Who answers a message in a group chat, decided once before any agent wakes,
 // so agents never each judge for themselves whether to speak. An @mention
@@ -31,7 +32,7 @@ export interface GroupMessage { text: string; mentions: readonly string[]; recen
  */
 export type GroupRoute =
   | { by: 'mention'; responders: string[] }
-  | { by: 'model'; responders: string[]; confidence: number }
+  | { by: 'model'; responders: string[]; confidence?: number; execution?: DecisionExecution }
   | { by: 'lead'; responders: [string]; ask?: string }
 
 export class MissingGroupLeadError extends Error {

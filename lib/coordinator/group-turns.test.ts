@@ -7,11 +7,14 @@ import { handleGroup, type GroupRequest } from '../group-conversations-store'
 import { GroupJudgmentPendingError, processGroupTurn, runGroupRounds, type GroupAgent, type GroupRuntime } from './group-turns'
 import { checkedCorrection, checkedRoute } from './group-correction'
 import { createGroupJudgment } from './group-judgment'
+import { DECISION_MODEL, type DecisionAnswer } from './decision'
+import type { DecisionExecution } from './decide'
 import { MissingGroupLeadError, routeFromAnswers, UnknownMentionError, routingInput } from './group-routing'
 
 const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
 const members: GroupAgent[] = [a,b].map((id,i) => ({ id, name: `Agent ${i}`, description: `role ${i}` }))
 const message = { text: 'everyone', mentions: [] }
+const receipt: DecisionExecution = {executionId:'synthetic-execution',modelId:DECISION_MODEL,providerGenerationId:'synthetic-generation',startedAt:'2026-01-01T00:00:00.000Z',completedAt:'2026-01-01T00:00:01.000Z',requestDigest:'synthetic',imageDigests:[],vision:'no-image-input'}
 test('serial engine: dedupes each round, caps reciprocal mentions at 3 rounds, later sees previous data', async () => {
   let generating = 0, peak = 0
   const calls: string[] = [], published: string[] = [], statuses: (string|null)[] = []
@@ -95,9 +98,13 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const routeCalls: string[] = [], generated: string[] = []
     const runtime: GroupRuntime = {
       async agents(_,ids,client) { assert.ok(client); await client.query('SELECT 1'); return members.filter(a => ids.includes(a.id)) }, async authorized(w,u) { return directory(w,u) },
-      correction: createGroupJudgment(async request => {
-        const data = request.data as { current: { text: string } }
-        return data.current.text === 'not you' ? {kind:'correction',rightId:b} : {kind:'not_correction',rightId:null}
+      correction: createGroupJudgment(async (_purpose, input) => {
+        const data = JSON.parse(typeof input === 'string' ? input : input.text)
+        const entries: [string, Exclude<DecisionAnswer, {type:'refusal'}>][] = [
+          ['correction',{type:'choice',name:'correction',choice:data.current.text === 'not you' ? 'yes' : 'no'}],
+          ['target',{type:'choice',name:'target',choice:b}],
+        ]
+        return {answers:new Map(entries),execution:receipt}
       }).correction,
       async route(input,_,__,corrections) {
         routeCalls.push(input.text)
@@ -145,6 +152,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.deepEqual(routeCalls,['first']) // direct mention never routes
     await send(id,'later'); assert.equal(await processGroupTurn(scoped,id,{...runtime}),true) // new runtime loads persisted correction
     assert.equal((await scoped.query('SELECT count(*)::int n FROM group_routing_corrections WHERE "conversationId"=$1',[id])).rows[0].n,1)
+    assert.deepEqual((await scoped.query('SELECT "decisionExecution" FROM group_routing_corrections WHERE "conversationId"=$1',[id])).rows[0].decisionExecution,receipt)
     const awaitingJudgment = await send(id, 'quoted denial', [b])
     await assert.rejects(processGroupTurn(scoped, id, {...runtime, async correction() { return {kind:'uncertain'} }}), GroupJudgmentPendingError)
     assert.equal((await scoped.query('SELECT count(*)::int n FROM group_routing_corrections WHERE "conversationId"=$1', [id])).rows[0].n, 1)
@@ -274,22 +282,23 @@ test('model route preserves its choice and rejects uncertain or non-member outpu
 })
 
 
-test('injected decision service carries context and fails closed on invalid or unavailable output', async () => {
-  const seen: {kind:string;instructions:string;data:unknown}[] = []
-  const judge = createGroupJudgment(async request => {
-    seen.push(request)
-    return request.kind === 'route'
-      ? {kind:'route',responders:[b],confidence:0.8}
-      : {kind:'correction',rightId:b}
+test('decision adapter retains host receipt and refuses missing, inconsistent or invalid answers', async () => {
+  const seen: { purpose: string; text: string; names: string[] }[] = []
+  const judge = createGroupJudgment(async (purpose, input, questions) => {
+    seen.push({purpose,text:typeof input === 'string' ? input : input.text,names:questions.map(q=>q.name)})
+    const entries: [string, Exclude<DecisionAnswer,{type:'refusal'}>][] = purpose === 'group-routing'
+      ? [['responder_0',{type:'choice',name:'responder_0',choice:b}],['responder_1',{type:'choice',name:'responder_1',choice:'end'}]]
+      : [['correction',{type:'choice',name:'correction',choice:'yes'}],['target',{type:'choice',name:'target',choice:b}]]
+    return {answers:new Map(entries),execution:receipt}
   })
-  assert.deepEqual(await judge.route(message,members,a,[]), {by:'model',responders:[b],confidence:0.8})
+  assert.deepEqual(await judge.route(message,members,a,[]), {by:'model',responders:[b],execution:receipt})
   const input = {previous:{message:'earlier',responderId:a},current:message,members}
-  assert.deepEqual(await judge.correction(input), {kind:'correction',rightId:b})
-  assert.equal(seen[1].kind, 'correction'); assert.match(seen[1].instructions, /quoted denial/); assert.deepEqual(seen[1].data, input)
-  const invalid = createGroupJudgment(async () => ({kind:'route',responders:[outsider],confidence:1}))
+  assert.deepEqual(await judge.correction(input), {kind:'correction',rightId:b,execution:receipt})
+  assert.match(seen[1].text, /untrusted data/); assert.deepEqual(seen[1].names,['correction','target'])
+  const invalid = createGroupJudgment(async () => ({answers:new Map([['responder_0',{type:'choice',name:'responder_0',choice:outsider}]]),execution:receipt}))
   await assert.rejects(invalid.route(message,members,a,[]),GroupJudgmentPendingError)
   assert.deepEqual(await invalid.correction(input), {kind:'uncertain'})
-  const unavailable = createGroupJudgment(async () => {throw new Error('offline')})
+  const unavailable = createGroupJudgment(async () => null)
   await assert.rejects(unavailable.route(message,members,a,[]),GroupJudgmentPendingError)
   assert.deepEqual(await unavailable.correction(input), {kind:'uncertain'})
 })

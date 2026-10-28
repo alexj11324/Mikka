@@ -1,9 +1,10 @@
 import type { GroupMessage, GroupRoute, RoutingCorrection, RoutingMember } from './group-routing'
+import type { DecisionExecution } from './decide'
 
 export class GroupJudgmentPendingError extends Error { constructor() { super('group_judgment_pending') } }
 
 export type CorrectionJudgment =
-  | { kind: 'correction'; rightId: string | null }
+  | { kind: 'correction'; rightId: string | null; execution?: DecisionExecution }
   | { kind: 'not_correction' }
   | { kind: 'uncertain' }
 

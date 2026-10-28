@@ -25,4 +25,5 @@ CREATE TABLE IF NOT EXISTS group_routing_corrections (
  message text NOT NULL, "wrongId" uuid NOT NULL, "rightId" uuid,
  "createdAt" timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE group_routing_corrections ADD COLUMN IF NOT EXISTS "decisionExecution" jsonb;
 CREATE INDEX IF NOT EXISTS group_routing_corrections_recent_idx ON group_routing_corrections ("conversationId","createdAt" DESC);

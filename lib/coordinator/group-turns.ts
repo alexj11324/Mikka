@@ -64,7 +64,8 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       const judgment = prior ? await runtime.correction({ previous: prior, current: input, members }) : null
       const correction = prior && judgment ? checkedCorrection(judgment, prior, await eligible()) : null
       if (correction === 'uncertain') throw new GroupJudgmentPendingError()
-      if (correction) await client.query(`INSERT INTO group_routing_corrections ("messageId","conversationId",message,"wrongId","rightId") VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`, [messageId, conversationId, correction.message, correction.wrongId, correction.rightId ?? null])
+      if (correction && judgment?.kind === 'correction' && judgment.execution) await client.query(`INSERT INTO group_routing_corrections ("messageId","conversationId",message,"wrongId","rightId","decisionExecution") VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, [messageId, conversationId, correction.message, correction.wrongId, correction.rightId ?? null, JSON.stringify(judgment.execution)])
+      else if (correction) throw new GroupJudgmentPendingError()
     }
     if (!members.length) throw new MissingGroupLeadError()
     {

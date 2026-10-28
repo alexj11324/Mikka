@@ -7,6 +7,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import type { GroupRuntime } from './group-turns'
 import { createGroupJudgment } from './group-judgment'
+import { invokeDecision } from './decide'
 
 /** Chat only: selected owner's public role description only, no private standing instructions, tools or agent sessions,
  * credentials or device/issue execution. Group messages are quoted untrusted data.
@@ -23,8 +24,7 @@ export const groupRuntime: GroupRuntime = {
     const rows = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).limit(1)
     return rows.length === 1
   },
-  // Fail closed until the shared vision-capable decision adapter is connected.
-  ...createGroupJudgment(async () => { throw new Error('group_judgment_unavailable') }),
+  ...createGroupJudgment(invokeDecision),
   async generate(agent, input) {
     const apiKey = process.env.OPENCODE_API_KEY
     if (!apiKey) throw new Error('Group chat provider not configured')

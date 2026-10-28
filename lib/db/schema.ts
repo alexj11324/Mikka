@@ -611,7 +611,7 @@ export const groupTurns = pgTable('group_turns', {
 export const groupRoutingCorrections = pgTable('group_routing_corrections', {
   messageId: uuid('messageId').primaryKey().references(() => conversationMessages.id, { onDelete: 'cascade' }),
   conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
-  message: text('message').notNull(), wrongId: uuid('wrongId').notNull(), rightId: uuid('rightId'),
+  message: text('message').notNull(), wrongId: uuid('wrongId').notNull(), rightId: uuid('rightId'), decisionExecution: jsonb('decisionExecution'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [index('group_routing_corrections_recent_idx').on(t.conversationId, t.createdAt.desc())])
 // --- Artifacts ---------------------------------------------------------------
