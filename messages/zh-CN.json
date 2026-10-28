@@ -2364,8 +2364,9 @@
     "started": "开始于 {time}",
     "steps": "交给 {harness} · 执行了 {count} 步",
     "composer": "告诉 {agent} 下一步做什么…",
-    "send": "发送",
-    "sendFailed": "没发出去，草稿还在"
+    "sendFailed": "没发出去，草稿还在",
+    "stopping": "正在停止…",
+    "stopFailed": "没停下来，再试一次"
   },
   "Computer": {
     "status": {

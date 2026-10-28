@@ -187,13 +187,13 @@ const handler = createMcpHandler(server => {
   server.registerTool('create_issue', {
     title: 'Create an issue',
     description: 'Create an issue for the person. Status defaults to todo and priority to normal.',
-    inputSchema: z.object({ title: z.string().trim().min(1).max(200), body: z.string().max(50_000).optional().describe('Plain text; one paragraph per line.'), ...issueChanges }),
+    inputSchema: z.object({ title: z.string().trim().min(1).max(200), body: z.string().max(50_000).optional().describe('Plain text; one paragraph per line.'), ...issueChanges }).strict(),
   }, async (input, ctx) => outcome(await actions.createIssue(mcpUserId(ctx.http?.authInfo), input, mcpActor(ctx.http?.authInfo))))
 
   server.registerTool('update_issue', {
     title: 'Update an issue',
-    description: 'Change an issue\'s title, status, priority, project, labels or assigned agent. Only the fields given change. The text is edited in the app, not here.',
-    inputSchema: z.object({ issueId: id, title: z.string().trim().min(1).max(200).optional(), ...issueChanges }),
+    description: 'Change an issue\'s title, status, priority, project, labels or assignee. Only the fields given change. The text is edited in the app, not here.',
+    inputSchema: z.object({ issueId: id, title: z.string().trim().min(1).max(200).optional(), ...issueChanges }).strict(),
     annotations: { idempotentHint: true },
   }, async (input, ctx) => outcome(await actions.updateIssue(mcpUserId(ctx.http?.authInfo), input, mcpActor(ctx.http?.authInfo))))
 

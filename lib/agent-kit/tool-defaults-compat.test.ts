@@ -80,6 +80,8 @@ test('conditional computer defaults keep the named Bot boundary and disabled cap
 })
 
 test('existing custom and legacy execution snapshots never acquire new capabilities from the host defaults', () => {
+  const priorFlag = process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  try {
   for (const definition of [
     parseDefinition({...DEFAULT_AGENT_DEFINITION, tools: ['web_search'], instructions: 'Keep my selected profile'}),
     parseDefinition({...DEFAULT_AGENT_DEFINITION, tools: DEFAULT_AGENT_DEFINITION.tools.filter(name => name !== 'read_gmail_message')}),
@@ -87,11 +89,17 @@ test('existing custom and legacy execution snapshots never acquire new capabilit
     const run = execution(definition), before = JSON.stringify(run.snapshot)
     assert.deepEqual(importDefinition(exportDefinition(definition)), definition)
     assert.equal(run.snapshot.definitionDigest, digest(definition))
-    for (const computerEnabled of [false, true]) {
+    for (const [computerEnabled, enabled] of [[false, false], [true, false], [false, true], [true, true]] as const) {
+      process.env.MIKKA_ISSUE_TOOLS_ENABLED = enabled ? '1' : '0'
       const tools = registry.coordinatorTools(owner, bot, undefined, {execution: run, computerEnabled})
-      assert.deepEqual(Object.keys(tools).sort(), [...definition.tools].sort())
+      const expected = enabled ? definition.tools : definition.tools.filter(name => name !== 'create_issue' && name !== 'update_issue')
+      assert.deepEqual(Object.keys(tools).sort(), [...expected].sort())
     }
     assert.equal(JSON.stringify(run.snapshot), before)
+  }
+  } finally {
+    if (priorFlag === undefined) delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+    else process.env.MIKKA_ISSUE_TOOLS_ENABLED = priorFlag
   }
 })
 

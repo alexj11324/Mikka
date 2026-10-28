@@ -19,12 +19,9 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
 import { ensureIssueNumbers } from '@/lib/issue-numbering'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
-import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
+import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
-import { wakeCoordinator } from '@/lib/coordinator/wake'
-import { after } from 'next/server'
-import { judgeIssueScope } from '@/lib/issue-scope-judge'
 import { TASK_SCOPES } from '@/lib/task-identifier'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { activityActor } from '@/lib/activity-actor'
@@ -117,9 +114,9 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
         return { issue: await issueView(issue, tx) }
       })
-      if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
-      if (!id && 'issue' in result && result.issue) { const created = result.issue.id; after(() => judgeIssueScope(created, 'the Mikka app')) }
-      if (doneEvent && 'issue' in result) after(() => wakeCoordinator(ownerId))
+      if ('issue' in result && result.issue) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
+      if (!id && 'issue' in result && result.issue) scheduleIssueEffect({ kind: 'scope', issueId: result.issue.id })
+      if (doneEvent && 'issue' in result) scheduleIssueEffect({ kind: 'wake', userId: ownerId })
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
@@ -181,7 +178,7 @@ export async function setIssueScope(input: { id: string; revision: number; scope
       await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })
       return { issue: await issueView(saved, tx) }
     })
-    if ('issue' in result && parsed.data.scope === 'workspace') dispatchLinearIssueSync(issue.id)
+    if ('issue' in result && parsed.data.scope === 'workspace') scheduleIssueEffect({ kind: 'sync', issueId: issue.id })
     return result
   })
 }
