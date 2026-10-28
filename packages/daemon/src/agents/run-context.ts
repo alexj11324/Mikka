@@ -1,3 +1,4 @@
+import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../../../../lib/personal-agent-message'
 // What every real harness adapter needs about one run: the sandbox policy,
 // the Mikka MCP server (hand-in tools) and the handoff file it writes, and
 // the instructions that tell the agent how a run ends.
@@ -74,6 +75,8 @@ export interface McpServerSpec {
 }
 
 export interface RunContextOptions {
+  /** Only the host may advertise this bound control-channel capability. */
+  mailboxEnabled?: boolean
   harness: Exclude<Harness, "mock">
   /** What the run is for; `plan` runs are told to write a spec (ADR ORV-205). */
   kind?: RunKind
@@ -288,6 +291,8 @@ export class RunContext {
       runInstructions(this.worktree, this.options.policy),
       this.options.kind === "plan" ? planInstructions() : "",
       skills,
+      PERSONAL_MESSAGE_INSTRUCTIONS,
+      this.options.mailboxEnabled ? 'The supplied mailbox tools use this run’s existing authority. Use stable keys, explicit inbox/ACK; queued or acknowledged never means executed. Do not poll or infer approval.' : '',
     ]
       .filter(Boolean)
       .join("\n\n")

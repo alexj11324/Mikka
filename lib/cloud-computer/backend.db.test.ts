@@ -7,6 +7,7 @@ import { SubagentStore } from './subagents'
 import { startSuggestion } from './suggestions'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { claimCloudRun } from '@/lib/computer/claim'
+import { recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
 test('real DB: additive migration, subagent owner isolation and separate thread claims', { skip: !databaseURL }, async () => {
@@ -22,8 +23,9 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
   const stranger = { ...alice, workspaceId: randomUUID() }
   try {
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY);INSERT INTO "user" VALUES('alice'),('bob');
-      CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"deviceId" uuid,status text,"stopRequestedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
+      CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"deviceId" uuid,status text,"stopRequestedAt" timestamptz,"finishedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
       CREATE TABLE devices(id uuid PRIMARY KEY,"ownerId" text,kind text,enabled boolean DEFAULT true);
+      CREATE TABLE device_tokens("boundDeviceId" uuid,"revokedAt" timestamptz);
       CREATE TABLE device_repos(id uuid PRIMARY KEY);
       CREATE TABLE suggestions(id uuid PRIMARY KEY);
       CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text,version integer);
@@ -33,7 +35,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     `)
     for (const name of ['20261027164501_cloud_computers.sql', '20261027164502_computer_run_bindings.sql']) await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
     await pool.query('ALTER TABLE cloud_machines ADD COLUMN "deviceId" uuid')
-    const migration = await readFile(new URL('../../drizzle/20261027224500_subagents_thread_machines.sql', import.meta.url), 'utf8')
+    const migration = await readFile(new URL('../../drizzle/20261028174000_subagents_thread_machines.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
     await pool.query(`ALTER TABLE suggestions ADD COLUMN "userId" text, ADD COLUMN shown boolean DEFAULT true, ADD COLUMN "dismissedAt" timestamptz, ADD COLUMN source text, ADD COLUMN actor text, ADD COLUMN url text, ADD COLUMN title text, ADD COLUMN action text, ADD COLUMN "actionTitle" text;
       CREATE TABLE coordinator_messages(id uuid PRIMARY KEY,"userId" text,"botId" uuid,position integer,message jsonb,UNIQUE NULLS NOT DISTINCT("userId","botId",position));
@@ -75,6 +77,18 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     assert.equal(JSON.stringify(events).includes('targetId'), false)
     const runA = randomUUID(), runB = randomUUID(), deviceA = randomUUID(), deviceB = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), bindingId = randomUUID()
     for (const device of [deviceA, deviceB, botDevice]) await pool.query('INSERT INTO devices(id,"ownerId",kind) VALUES ($1,\'alice\',\'cloud\')', [device])
+    const cancelledRun = randomUUID(), cancelledDevice = randomUUID(), lease = randomUUID(), operation = randomUUID()
+    await pool.query('INSERT INTO devices(id,"ownerId",kind) VALUES ($1,\'alice\',\'cloud\')', [cancelledDevice])
+    await pool.query('INSERT INTO agent_runs(id,"userId",status) VALUES ($1,\'alice\',\'queued\')', [cancelledRun])
+    await pool.query('INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","snapshotId","operationId",state,"deviceId","workerLeaseId") VALUES ($1,$2,\'alice\',$3,\'snapshot\',$4,\'starting\',$5,$6)', [cancelledRun, alice.workspaceId, botA, operation, cancelledDevice, lease])
+    await pool.query('INSERT INTO device_tokens("boundDeviceId") VALUES ($1)', [cancelledDevice])
+    await assert.rejects(threadMachineAction(pool, alice, cancelledRun, 'end'), { status: 409 }, 'do not report cleanup complete while create is in flight')
+    await assert.rejects(threadMachineAction(pool, alice, cancelledRun, 'end'), { status: 409 }, 'a retry must remain pending')
+    assert.equal(await recordThreadSandbox(pool, cancelledRun, 'late-sandbox', lease), false, 'late provider completion must not regain an ended lease')
+    const ended = (await pool.query('SELECT state,"sandboxId","workerLeaseId" FROM thread_machines WHERE "runId"=$1', [cancelledRun])).rows[0]
+    assert.deepEqual(ended, { state: 'ended', sandboxId: null, workerLeaseId: null })
+    assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE "boundDeviceId"=$1', [cancelledDevice])).rows[0].revokedAt)
+    assert.equal(await recordCancelledSandbox(pool, cancelledRun, 'late-sandbox', operation), true, 'late resource remains discoverable for cleanup retry')
     await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","deviceId") VALUES ($1,\'alice\',$2,$3)', [alice.workspaceId, randomUUID(), botDevice])
     for (const [runId, deviceId] of [[runA, deviceA], [runB, deviceB]]) {
       await pool.query('INSERT INTO agent_runs(id,"userId","agentId","deviceId",status) VALUES ($1,\'alice\',$2,$3,\'queued\')', [runId, agentId, deviceId])
@@ -86,6 +100,9 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch) VALUES ($1,'alice',$2,'codex','connected',1)`, [connectionId, alice.workspaceId])
     await pool.query(`UPDATE byos_bindings SET "connectionId"=$2,"connectionRevision"=1,route='codex_cli',"modelId"='fixture-model' WHERE id=$1`, [bindingId, connectionId])
     assert.equal((await nativeRunBinding(pool, 'alice', agentId, 'codex', alice.workspaceId))?.id, bindingId)
+    assert.equal((await nativeRunBinding(pool, 'alice', agentId, 'codex', alice.workspaceId, bindingId))?.id, bindingId)
+    assert.equal(await nativeRunBinding(pool, 'alice', randomUUID(), 'codex', alice.workspaceId, bindingId), null, 'pinned binding must belong to the agent')
+    assert.equal(await nativeRunBinding(pool, 'alice', agentId, 'claude_code', alice.workspaceId, bindingId), null, 'pinned route must match the harness')
     assert.equal(await nativeRunBinding(pool, 'bob', agentId, 'codex', alice.workspaceId), null)
     assert.equal(await nativeRunBinding(pool, 'alice', agentId, 'codex', stranger.workspaceId), null)
     assert.equal(await nativeRunBinding(pool, 'alice', agentId, 'claude_code', alice.workspaceId), null)

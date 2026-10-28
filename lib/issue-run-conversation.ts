@@ -7,6 +7,13 @@ export function runListRefreshInterval(runs: readonly { status: string }[] | und
   return runs?.some(run => runIsActive(run.status)) ? 5000 : 0
 }
 
+export const RUN_STOP_TIMEOUT_MS = 30_000
+
+/** A persisted request retains its deadline across polling and reloads. */
+export function runStopTimeoutRemaining(requestedAt: number, now = Date.now()) {
+  return Math.max(0, Math.min(RUN_STOP_TIMEOUT_MS, requestedAt + RUN_STOP_TIMEOUT_MS - now))
+}
+
 export function runStatusKey(status: string) {
   switch (status) {
     case 'queued': case 'preparing': case 'running': case 'waiting_input': case 'finishing':

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
-import { chatItems, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, SUMMARY_PREFIX, type StoredMessage } from './context'
+import { chatItems, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
 
 function stored(messages: ModelMessage[]): StoredMessage[] {
   return messages.map((message, index) => ({ position: index + 1, message }))
@@ -23,7 +23,8 @@ test('token estimate counts Chinese closer to a token a character', () => {
 test('the summary leads the prompt', () => {
   const prompt = promptMessages('they prefer Codex', stored([{ role: 'user', content: 'hi' }]))
   assert.equal(prompt[0].role, 'user')
-  assert.equal(prompt[0].content, `${SUMMARY_PREFIX}\n\nthey prefer Codex`)
+  assert.equal(JSON.parse(prompt[0].content as string).untrustedData.summary, 'they prefer Codex')
+  assert.equal(JSON.parse(prompt[0].content as string).authority, 'not_user_approval')
   assert.equal(prompt.length, 2)
 })
 

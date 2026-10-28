@@ -232,7 +232,8 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       // The actual hosted-device HTTP boundary uses the immutable run ledger,
       // actual service/private worker and real Postgres, not nativeAuth export.
       const deviceId=randomUUID(),agentId=randomUUID()
-      await pool.query('insert into devices(id,"ownerId",name) values($1,\'alice\',\'native fixture\')',[deviceId])
+      const nativeHarnesses = JSON.stringify([{ harness: provider === 'codex' ? 'codex' : 'claude_code', installed: true, subscriptionBroker: true }])
+      await pool.query('insert into devices(id,"ownerId",name,harnesses) values($1,\'alice\',\'native fixture\',$2::jsonb)',[deviceId,nativeHarnesses])
       await pool.query('insert into agents(id,"userId",harness,name,"deviceId") values($1,\'alice\',$2,$3,$4)',[agentId,provider==='codex'?'codex':'claude_code',`native-${agentId}`,deviceId])
       const agentBinding=await post({action:'bind',connectionId,revision,consumerId:agentId,route:nativeRoute,modelId:'fixture-model'})
       assert.equal(agentBinding.status,200)
@@ -250,6 +251,11 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
         const payload={path:provider==='codex'?'/responses':'/v1/messages',headers:{'user-agent':'Mikka/1.0',originator:'Mikka',authorization:'Bearer caller-placeholder'},body:provider==='codex'?{model:'fixture-model',stream:true,store:false,input:[{role:'user',content:'HELLO'}]}:{model:'fixture-model',stream:true,max_tokens:16,messages:[{role:'user',content:'HELLO'}]}}
         const nativeResponse=await nativePost(runId,{action:'request',payload});assert.equal(nativeResponse.status,200);const output=await nativeResponse.text();assert.ok(output.includes('subscription fixture'));assert.ok(!output.includes('fixture-access'))
         const before=providerCalls
+        await pool.query('update devices set enabled=false where id=$1',[deviceId])
+        assert.equal((await nativePost(runId,{action:'context'})).status,409)
+        await pool.query("update devices set enabled=true,harnesses='[]'::jsonb where id=$1",[deviceId])
+        assert.equal((await nativePost(runId,{action:'context'})).status,409)
+        await pool.query('update devices set harnesses=$2::jsonb where id=$1',[deviceId,nativeHarnesses])
         assert.equal((await nativePost(runId,{action:'context'},'fixture-other')).status,409)
         assert.equal((await nativePost(runId,{action:'context'},'fixture-device',randomUUID())).status,409)
         assert.equal((await nativePost(runId,{action:'request',payload:{...payload,body:{...payload.body,model:'another-model'}}})).status,409)

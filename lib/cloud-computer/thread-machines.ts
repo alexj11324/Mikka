@@ -13,6 +13,13 @@ function options() {
   return { apiKey: key, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
 }
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
+/** Register only while this provisioning lease still owns a non-ended row. */
+export async function recordThreadSandbox(pool: Pick<Pool, 'query'>, runId: string, sandboxId: string, leaseId: string) {
+  return Boolean((await pool.query('UPDATE thread_machines SET "sandboxId"=$2 WHERE "runId"=$1 AND "workerLeaseId"=$3 AND state<>\'ended\' RETURNING "runId"', [runId, sandboxId, leaseId])).rowCount)
+}
+export async function recordCancelledSandbox(pool: Pick<Pool, 'query'>, runId: string, sandboxId: string, operationId: string) {
+  return Boolean((await pool.query('UPDATE thread_machines SET "sandboxId"=$2,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND state=\'ended\' AND "operationId"=$3 AND "sandboxId" IS NULL RETURNING "runId"', [runId, sandboxId, operationId])).rowCount)
+}
 /** Capture filesystem only. A cloned memory image would duplicate live daemon
  * credentials/connections. Cache is always bound to one owner and workspace. */
 async function workspaceSnapshot(pool: Pool, actor: Actor, source: Sandbox, repoPath: string) {
@@ -60,7 +67,17 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await client.query('UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval \'15 minutes\' WHERE "runId"=$1', [runId, leaseId])
     await client.query('COMMIT')
     const sandbox = machine.sandboxId ? await connectComputer(machine.sandboxId) : await Sandbox.create(machine.snapshotId, { ...options(), idempotencyKey: machine.operationId, timeoutMs: 15 * 60_000, metadata: { application: 'mikka-thread', workspaceId: actor.workspaceId, runId }, lifecycle: { onTimeout: 'pause', autoResume: false } })
-    await pool.query('UPDATE thread_machines SET "sandboxId"=$2 WHERE "runId"=$1 AND "workerLeaseId"=$3', [runId, sandbox.sandboxId, leaseId])
+    const recorded = await recordThreadSandbox(pool, runId, sandbox.sandboxId, leaseId)
+    if (!recorded) {
+      // An end can win while Sandbox.create is in flight. The just-created
+      // sandbox is not in the row end observed, so this worker must clean it up.
+      if (!machine.sandboxId) {
+        // Record it even after end so a failed kill remains retryable. A newer
+        // lease may share the idempotent sandbox and must not have it killed.
+        if (await recordCancelledSandbox(pool, runId, sandbox.sandboxId, machine.operationId)) await Sandbox.kill(sandbox.sandboxId, options())
+      }
+      throw new ComputerError(409, 'Thread provisioning cancelled')
+    }
     if (!machine.sandboxId) {
       // Filesystem snapshots start no old worker process. Remove copied device
       // identity/capabilities before a new worker can make any network call.
@@ -77,7 +94,8 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     const sourceSha = (await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim()
     if (!expectedSha || sourceSha !== expectedSha) throw new Error('Worker version mismatch')
     await client.query('BEGIN')
-    await client.query('SELECT 1 FROM thread_machines WHERE "runId"=$1 AND "workerLeaseId"=$2 FOR UPDATE', [runId, leaseId])
+    const activeLease = await client.query('SELECT 1 FROM thread_machines WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\' FOR UPDATE', [runId, leaseId])
+    if (!activeLease.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
     await client.query('INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,$3,\'cloud\') ON CONFLICT(id) DO NOTHING', [deviceId, actor.userId, 'Thread computer'])
     await client.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch","verifyCommand") VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO NOTHING', [repoId, deviceId, actor.userId, run.repoPath, run.baseBranch, run.verifyCommand])
     await client.query('UPDATE thread_machines SET "deviceId"=$2,"repoId"=$3 WHERE "runId"=$1', [runId, deviceId, repoId])
@@ -96,7 +114,8 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       if (!ready) await new Promise(resolve => setTimeout(resolve, 500))
     } while (!ready && Date.now() < deadline)
     if (!ready) throw new Error('Thread worker did not register')
-    await pool.query('UPDATE thread_machines SET state=\'running\',"lastActiveAt"=now(),"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "workerLeaseId"=$2', [runId, leaseId])
+    const finished = await pool.query('UPDATE thread_machines SET state=\'running\',"lastActiveAt"=now(),"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\' RETURNING "runId"', [runId, leaseId])
+    if (!finished.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
     return { runId, state: 'running' }
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
 }
@@ -104,13 +123,25 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
   const machine = (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [runId, actor.userId, actor.workspaceId])).rows[0]
   if (!machine || (machine.state === 'ended' && action !== 'end')) throw new ComputerError(404, 'Thread unavailable')
   if (action === 'end') {
-    // Stop the run before destroying its worker. Provider retries must also
-    // finish cleanup when the first kill succeeded but its response was lost.
-    await pool.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=COALESCE("stopRequestedAt",now()),"finishedAt"=COALESCE("finishedAt",now())
-      WHERE id=$1 AND "userId"=$2 AND status NOT IN ('succeeded','failed','stopped','cancelled')`, [runId, actor.userId])
-    if (machine.sandboxId) await Sandbox.kill(machine.sandboxId, options())
-    await pool.query('UPDATE thread_machines SET state=\'ended\',"endedAt"=COALESCE("endedAt",now()),"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1', [runId])
-    await pool.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [machine.deviceId])
+    // Fence provisioning and revoke any existing token before provider I/O.
+    // Retain the sandbox ID so a failed or lost kill response can be retried.
+    const client = await pool.connect()
+    let sandboxId: string | null
+    let creationPending: boolean
+    try {
+      await client.query('BEGIN')
+      const locked = (await client.query('SELECT "sandboxId","deviceId","workerLeaseId","workerLeaseUntil" FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE', [runId, actor.userId, actor.workspaceId])).rows[0]
+      if (!locked) throw new ComputerError(404, 'Thread unavailable')
+      sandboxId = locked.sandboxId
+      creationPending = !sandboxId && Boolean(locked.workerLeaseId || locked.workerLeaseUntil)
+      await client.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=COALESCE("stopRequestedAt",now()),"finishedAt"=COALESCE("finishedAt",now())
+        WHERE id=$1 AND "userId"=$2 AND status NOT IN ('succeeded','failed','stopped','cancelled')`, [runId, actor.userId])
+      await client.query('UPDATE thread_machines SET state=\'ended\',"endedAt"=COALESCE("endedAt",now()),"workerLeaseId"=NULL,"workerLeaseUntil"=CASE WHEN $2 THEN COALESCE("workerLeaseUntil",now()) ELSE NULL END WHERE "runId"=$1', [runId, creationPending])
+      await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [locked.deviceId])
+      await client.query('COMMIT')
+    } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+    if (creationPending) throw new ComputerError(409, 'Thread creation cleanup pending')
+    if (sandboxId) await Sandbox.kill(sandboxId, options())
     return { runId, state: 'ended' }
   }
   if (action === 'resume') return ensureThreadMachine(pool, actor, runId)
