@@ -4,7 +4,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { handleGroup, type GroupRequest } from '../group-conversations-store'
-import { processGroupTurn, runGroupRounds, type GroupAgent, type GroupRuntime } from './group-turns'
+import { GroupJudgmentPendingError, processGroupTurn, runGroupRounds, type GroupAgent, type GroupRuntime } from './group-turns'
+import { checkedCorrection } from './group-correction'
 import { MissingGroupLeadError, routeFromAnswers, UnknownMentionError, routingInput } from './group-routing'
 
 const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
@@ -93,6 +94,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const routeCalls: string[] = [], generated: string[] = []
     const runtime: GroupRuntime = {
       async agents(_,ids,client) { assert.ok(client); await client.query('SELECT 1'); return members.filter(a => ids.includes(a.id)) }, async authorized(w,u) { return directory(w,u) },
+      async correction(input) { return input.current.text === 'not you' ? {kind:'correction',rightId:b} : {kind:'not_correction'} },
       async route(input,_,__,corrections) {
         routeCalls.push(input.text)
         if (input.text === 'later') {
@@ -139,6 +141,15 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.deepEqual(routeCalls,['first']) // direct mention never routes
     await send(id,'later'); assert.equal(await processGroupTurn(scoped,id,{...runtime}),true) // new runtime loads persisted correction
     assert.equal((await scoped.query('SELECT count(*)::int n FROM group_routing_corrections WHERE "conversationId"=$1',[id])).rows[0].n,1)
+    const awaitingJudgment = await send(id, 'quoted denial', [b])
+    await assert.rejects(processGroupTurn(scoped, id, {...runtime, async correction() { return {kind:'uncertain'} }}), GroupJudgmentPendingError)
+    assert.equal((await scoped.query('SELECT count(*)::int n FROM group_routing_corrections WHERE "conversationId"=$1', [id])).rows[0].n, 1)
+    assert.equal((await scoped.query('SELECT error FROM group_turns WHERE "messageId"=$1', [awaitingJudgment])).rows[0].error, 'group_judgment_pending')
+    // A different topic with a new @ is not a correction just because it mentions another agent.
+    const unrelatedTopic = await send(id, 'new topic', [b])
+    await processGroupTurn(scoped, id, runtime)
+    assert.equal((await scoped.query('SELECT count(*)::int n FROM group_routing_corrections WHERE "conversationId"=$1', [id])).rows[0].n, 1)
+    assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1', [unrelatedTopic])).rows[0].status, 'complete')
     assert.equal((await scoped.query('SELECT "replyToId" FROM conversation_messages WHERE "authorType"=\'agent\' AND "conversationId"=$1 ORDER BY position',[id])).rows[0].replyToId,root)
     const invalid = await handleGroup(scoped,directory,{...base,resource:'messages',id,body:JSON.stringify({body:'unknown',mentions:[{memberType:'agent',memberId:outsider}]})},true)
     assert.equal(invalid.status,422)
@@ -243,4 +254,14 @@ test('missing or ineligible lead never silently selects first-joined agent; conf
   assert.throws(()=>routeFromAnswers(null,members,outsider),MissingGroupLeadError)
   assert.equal(routeFromAnswers(null,members,b).responders[0],b)
   assert.equal(routeFromAnswers(new Map([['responder',{type:'choice' as const,name:'responder',choice:a,confidence:1}]]),members,null).responders[0],a)
+})
+
+
+test('correction facts come from model judgment and reject uncertain or invalid members', () => {
+  const prior = { message: 'previous', responderId: a }
+  assert.equal(checkedCorrection({ kind: 'not_correction' }, prior, members), null)
+  assert.equal(checkedCorrection({ kind: 'uncertain' }, prior, members), 'uncertain')
+  assert.equal(checkedCorrection({ kind: 'correction', rightId: outsider }, prior, members), 'uncertain')
+  assert.equal(checkedCorrection({ kind: 'correction', rightId: a }, prior, members), 'uncertain')
+  assert.deepEqual(checkedCorrection({ kind: 'correction', rightId: b }, prior, members), { message: 'previous', wrongId: a, rightId: b })
 })

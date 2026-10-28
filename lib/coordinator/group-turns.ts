@@ -1,14 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { addsNothing, correctionFrom, followUpInstructions, mentionRoute, MissingGroupLeadError, UnknownMentionError, type GroupMessage, type GroupRoute, type RoutingCorrection, type RoutingMember } from './group-routing'
+import { checkedCorrection, type CorrectionInput, type CorrectionJudgment } from './group-correction'
+import { addsNothing, followUpInstructions, mentionRoute, MissingGroupLeadError, UnknownMentionError, type GroupMessage, type GroupRoute, type RoutingCorrection, type RoutingMember } from './group-routing'
 
 export const GROUP_MAX_ROUNDS = 3
+export class GroupJudgmentPendingError extends Error { constructor() { super('group_judgment_pending') } }
 export type GroupAgent = RoutingMember
 export type GroupReply = { text: string; mentions: string[] }
 export type GroupRuntime = {
   agents(ownerId: string, ids: string[], client: PoolClient): Promise<GroupAgent[]>
   authorized(workspaceId: string, userId: string): Promise<boolean>
   route(message: GroupMessage, members: GroupAgent[], leadId: string | null, corrections: RoutingCorrection[]): Promise<GroupRoute>
+  correction(input: CorrectionInput): Promise<CorrectionJudgment>
   generate(agent: GroupAgent, input: { message: GroupMessage; earlier: { author: string; text: string }[]; followUp: string; members: RoutingMember[]; ask?: string }): Promise<GroupReply>
 }
 export async function enqueueGroupTurn(client: PoolClient, conversationId: string, messageId: string, userId: string) {
@@ -57,7 +60,10 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     const previous = await client.query(`SELECT m.body,t.route FROM group_turns t JOIN conversation_messages m ON m.id=t."messageId" WHERE t."conversationId"=$1 AND m.position<$2 AND t.route IS NOT NULL AND t.status='complete' ORDER BY m.position DESC LIMIT 1`, [conversationId, root.position])
     if (previous.rows[0]) {
       const route = previous.rows[0].route as GroupRoute
-      const correction = route.responders.length === 1 ? correctionFrom({ message: previous.rows[0].body, responderId: route.responders[0], by: route.by }, input) : null
+      const prior = route.responders.length === 1 && route.by !== 'mention' ? { message: previous.rows[0].body as string, responderId: route.responders[0] } : null
+      const judgment = prior ? await runtime.correction({ previous: prior, current: input, members }) : null
+      const correction = prior && judgment ? checkedCorrection(judgment, prior, await eligible()) : null
+      if (correction === 'uncertain') throw new GroupJudgmentPendingError()
       if (correction) await client.query(`INSERT INTO group_routing_corrections ("messageId","conversationId",message,"wrongId","rightId") VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`, [messageId, conversationId, correction.message, correction.wrongId, correction.rightId ?? null])
     }
     if (!members.length) throw new MissingGroupLeadError()
@@ -108,7 +114,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     return true
   } catch (error) {
     if (!messageId) throw error
-    await client.query(`UPDATE group_turns SET status='failed',"agentId"=NULL,error=$2,"updatedAt"=now() WHERE "messageId"=$1`, [messageId, error instanceof UnknownMentionError ? 'unknown_mention' : error instanceof MissingGroupLeadError ? 'group_lead_required' : 'generation_failed_not_replayed'])
+    await client.query(`UPDATE group_turns SET status='failed',"agentId"=NULL,error=$2,"updatedAt"=now() WHERE "messageId"=$1`, [messageId, error instanceof GroupJudgmentPendingError ? 'group_judgment_pending' : error instanceof UnknownMentionError ? 'unknown_mention' : error instanceof MissingGroupLeadError ? 'group_lead_required' : 'generation_failed_not_replayed'])
     throw error
   } finally {
     try { if (locked) await client.query(`SELECT pg_advisory_unlock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0))`, [conversationId]) }
