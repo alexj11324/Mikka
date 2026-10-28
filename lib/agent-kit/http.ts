@@ -6,6 +6,7 @@ import { writePolicySettingsSchema, type createWritePolicySettings } from '@/lib
 const version = z.number().int().positive()
 const requestId = z.uuid()
 const commandSchema = z.discriminatedUnion('action',[
+  z.strictObject({ action:z.literal('set_workspace_write_policy'),permissions:writePolicySettingsSchema,expectedVersion:z.string().regex(/^(0|[1-9]\d*)$/) }),
   z.strictObject({ action:z.literal('set_write_policy'),permissions:writePolicySettingsSchema,expectedVersion:z.string().regex(/^(0|[1-9]\d*)$/) }),
   z.strictObject({ action:z.literal('save'),definition:agentDefinitionSchema,expectedVersion:version,requestId }),
   z.strictObject({ action:z.literal('import'),document:z.unknown(),expectedVersion:version,requestId }),
@@ -61,6 +62,10 @@ export function createAgentDefinitionHandler(deps: {
       if (request.method==='GET') {
         const url=new URL(request.url)
         const view=url.searchParams.get('view') ?? 'active'
+        if (view==='workspace_write_policy') {
+          if (!deps.writePolicy?.enabled()) return response({ error:'notEnabled' },404)
+          return response(await deps.writePolicy.settings.readWorkspace(scope))
+        }
         if (view==='write_policy') {
           if (!deps.writePolicy?.enabled()) return response({ error:'notEnabled' },404)
           return response(await deps.writePolicy.settings.read(scope))
@@ -79,6 +84,9 @@ export function createAgentDefinitionHandler(deps: {
       }
       const command=commandSchema.parse(await boundedJSON(request))
       switch(command.action) {
+        case 'set_workspace_write_policy':
+          if (!deps.writePolicy?.enabled()) return response({ error:'notEnabled' },404)
+          return response(await deps.writePolicy.settings.setWorkspace(scope,command.permissions,command.expectedVersion))
         case 'set_write_policy':
           if (!deps.writePolicy?.enabled()) return response({ error:'notEnabled' },404)
           return response(await deps.writePolicy.settings.set(scope,command.permissions,command.expectedVersion))

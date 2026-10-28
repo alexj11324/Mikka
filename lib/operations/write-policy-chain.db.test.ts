@@ -9,6 +9,7 @@ import type { WriteProvider } from './write-contract'
 import { validateTarget } from '../../scripts/run-db-tests.mjs'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { createWritePolicySettings } from './write-policy-settings'
 test('isolated PG and HTTP follow external-write policy and preserve one effect', { timeout:30000 }, async () => {
 validateTarget(process.env)
 assert.equal(process.env.REQUIRE_DB,'1')
@@ -25,10 +26,10 @@ try {
  create table agent_kit_heads (owner_id text, bot_key text, workspace_id uuid, active_version uuid, primary key (owner_id,bot_key));
  create table agent_kit_versions (owner_id text, bot_key text, id uuid, definition jsonb, digest text);
  create table agent_kit_executions (owner_id text, bot_key text, id uuid, status text, snapshot jsonb, version_id uuid)`)
- for (const name of ['20261025043000_pending_actions.sql','20261028143920_operation_ledger.sql','20261028143921_approved_write_binding.sql','20261028203000_agent_external_write_policy.sql']) await scopedPool.query(await readFile(new URL('../../drizzle/'+name,import.meta.url),'utf8'))
+ for (const name of ['20261025043000_pending_actions.sql','20261028143920_operation_ledger.sql','20261028143921_approved_write_binding.sql','20261027164515_workspace_computer_policy.sql','20261028203000_agent_external_write_policy.sql','20261028213000_workspace_external_write_policy.sql']) await scopedPool.query(await readFile(new URL('../../drizzle/'+name,import.meta.url),'utf8'))
 const owner='fixture-owner', runId=randomUUID(), revision=randomUUID(), action='append_notion_paragraph', actor={userId:owner,sessionId:'fixture-session'}
 const definition={...DEFAULT_AGENT_DEFINITION,tools:[action]}
-const snapshot=makeSnapshot(revision,1,definition,'host',{harness:'ai_sdk',model:'synthetic'})
+const snapshot=makeSnapshot(revision,1,definition,'host',{harness:'ai_sdk',model:'openai/gpt-6-luna'})
 let writes=0, prepares=0, uncertain=false
 const provider:WriteProvider={name:'synthetic',prepare:async()=>{prepares++;return {accountId:'account',version:'v1'}},execute:async ({beforeSend})=>{await beforeSend();writes++;if (uncertain) throw Error('synthetic transport lost');return {providerObjectId:'fixture',evidenceDigest:'a'.repeat(64)}},lookup:async()=>null}
 const input={page_id:randomUUID(),text:'fixture'}
@@ -70,6 +71,31 @@ const run={ownerId:owner,botId:null,workspaceId:null,runId}
  assert.equal(unknown.status,'running');assert.equal(writes,4)
  uncertain=false
  await service.proposeFromRun(input,unknownKey);assert.equal(writes,4)
+ const botId=randomUUID(),workspaceId=randomUUID(),botRun=randomUUID(),botRevision=randomUUID()
+ const botSnapshot=makeSnapshot(botRevision,1,definition,'host',{harness:'ai_sdk',model:'openai/gpt-6-luna'})
+ await scopedPool.query('insert into agent_kit_heads(owner_id,bot_key,workspace_id,active_version,external_write_permissions) values($1,$2,$3,$4,$5)',[owner,botId,workspaceId,botRevision,{[action]:'allow'}])
+ await scopedPool.query('insert into agent_kit_versions values($1,$2,$3,$4,$5)',[owner,botId,botRevision,definition,digest(definition)])
+ await scopedPool.query('insert into agent_kit_executions values($1,$2,$3,$4,$5,$6)',[owner,botId,botRun,'running',botSnapshot,botRevision])
+ const membership = async (_tx:unknown,signal:AbortSignal) => ({signal,workspaceClient:{query:async()=>({rows:[{role:'admin'}]})} as never,check:async()=>{},close:async()=>{}})
+ const botScope={ownerId:owner,botId,workspaceId}
+ const settings=createWritePolicySettings(scopedPool,()=>membership)
+ const nonAdmin=createWritePolicySettings(scopedPool,()=>async (_tx,signal)=>({signal,workspaceClient:{query:async()=>({rows:[{role:'member'}]})} as never,check:async()=>{},close:async()=>{}}))
+ await assert.rejects(nonAdmin.setWorkspace(botScope,{[action]:'allow'},'0'),/workspaceAccessDenied/)
+ assert.deepEqual(await settings.readWorkspace(botScope),{permissions:{},version:'0'})
+ assert.deepEqual(await settings.setWorkspace(botScope,{[action]:'deny'},'0'),{permissions:{[action]:'deny'},version:'1'})
+ const botService=createApprovedWrites(scopedPool,provider,action,{modelRun:{...botScope,runId:botRun},guard:membership,guardForRun:()=>membership})
+ await assert.rejects(botService.proposeFromRun(input,randomUUID()),/writeDenied/);assert.equal(writes,4)
+ await settings.setWorkspace(botScope,{[action]:'allow'},'1')
+ let release!:()=>void, entered!:()=>void
+ const started=new Promise<void>(resolve=>{entered=resolve}), proceed=new Promise<void>(resolve=>{release=resolve})
+ const slowProvider:WriteProvider={...provider,execute:async ({beforeSend})=>{await beforeSend();entered();await proceed;writes++;return {providerObjectId:'slow',evidenceDigest:'b'.repeat(64)}}}
+ const slow=createApprovedWrites(scopedPool,slowProvider,action,{modelRun:{...botScope,runId:botRun},guard:membership,guardForRun:()=>membership})
+ const effect=slow.proposeFromRun(input,randomUUID());await started
+ let workspaceRevoked=false
+ const change=settings.setWorkspace(botScope,{[action]:'deny'},'2').then(value=>{workspaceRevoked=true;return value})
+ await new Promise(resolve=>setTimeout(resolve,100));assert.equal(workspaceRevoked,false)
+ release();assert.equal((await effect).status,'done');assert.equal((await change).version,'3')
+ await assert.rejects(botService.proposeFromRun(input,randomUUID()),/writeDenied/);assert.equal(writes,5)
  console.log('isolated PG/HTTP: deny zero writes; allow once without pending; ask one decision; replay no resend; revoked denied')
 } finally { await pool?.end(); await admin.end() }
 })

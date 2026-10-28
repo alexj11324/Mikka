@@ -13,7 +13,7 @@ const intent = identity.extend({
   // Optional only for legacy proposals. New run-bound callers must supply the
   // actual host run ID, not the separately generated attempt token.
   executionRunId: z.uuid().optional(),
-  policyScope: z.object({ botId: z.uuid().nullable(), workspaceId: z.uuid().nullable(), version: z.string().regex(/^\d+$/) }).strict().optional(),
+  policyScope: z.object({ botId: z.uuid().nullable(), workspaceId: z.uuid().nullable(), version: z.string().regex(/^\d+(?::\d+)?$/) }).strict().optional(),
   approvalId: text, candidateSha: z.string().regex(/^[a-f0-9]{40,64}$/).optional(),
   proposalDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),

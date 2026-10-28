@@ -14,7 +14,7 @@ stub('../composio-actions.ts',{createComposioAITools:()=>({}),createGoogleAITool
 test('registered model tool binds host owner, bot, execution and native call scope',async()=>{
  const { coordinatorTools }=await import('../../workflows/coordinator/tools')
  const owner='owner',botId=randomUUID(),id=randomUUID(),scope={holder:'holder',turnId:'turn',callId:'native-call'}
- const execution={id,status:'running' as const,snapshot:makeSnapshot(randomUUID(),1,{...DEFAULT_AGENT_DEFINITION,tools:['append_notion_paragraph']},'host',{harness:'ai_sdk',model:'synthetic'})}
+ const execution={id,status:'running' as const,snapshot:makeSnapshot(randomUUID(),1,{...DEFAULT_AGENT_DEFINITION,tools:['append_notion_paragraph']},'host',{harness:'ai_sdk',model:'openai/gpt-6-luna'})}
  const tools=coordinatorTools(owner,botId,scope,{execution})
  const execute=tools.append_notion_paragraph.execute as unknown as (input:unknown,options:{toolCallId:string;messages:[]})=>Promise<unknown>
  const input={page_id:randomUUID(),text:'fixture'}
@@ -22,4 +22,10 @@ test('registered model tool binds host owner, bot, execution and native call sco
  assert.deepEqual(dispatch.mock.calls[0].arguments,[owner,botId,id,{action:'append_notion_paragraph',input,toolCallId:'model-call'},scope])
  await assert.rejects(execute({...input,allowed:true},{toolCallId:'model-call-2',messages:[]}))
  assert.equal(dispatch.mock.callCount(),1)
+})
+
+test('the default text-only route is not given effectful model tools',async()=>{
+ const { coordinatorTools }=await import('../../workflows/coordinator/tools')
+ const execution={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),1,{...DEFAULT_AGENT_DEFINITION,tools:['append_notion_paragraph']},'host',{harness:'ai_sdk',model:'nvidia/nemotron-3.5-lightning-free'})}
+ assert.equal(coordinatorTools('owner',null,undefined,{execution}).append_notion_paragraph,undefined)
 })

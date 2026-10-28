@@ -88,7 +88,7 @@ test('write policy settings use authenticated scope, gate, and strict request bo
   const handler = createAgentDefinitionHandler({
     enabled: () => true, authenticate: async () => 'owner-a', scope: async (ownerId, bot) => ({ ownerId, botId: bot, workspaceId: bot ? randomUUID() : null }),
     store: {} as AgentKitStore, defaults: DEFAULT_AGENT_DEFINITION, evaluate: async () => null,
-    writePolicy: { enabled: () => true, settings: { read: async scope => { calls.push(scope); return { permissions: {}, version: '0' } }, set: async (scope, permissions, version) => { calls.push({ scope, permissions, version }); return { permissions: permissions as Record<string, 'allow' | 'ask' | 'deny'>, version: '1' } } } },
+    writePolicy: { enabled: () => true, settings: { readWorkspace: async () => ({ permissions: {}, version: '0' }), setWorkspace: async (_scope,permissions) => ({ permissions: permissions as Record<string, 'allow' | 'ask' | 'deny'>, version: '1' }), read: async scope => { calls.push(scope); return { permissions: {}, version: '0' } }, set: async (scope, permissions, version) => { calls.push({ scope, permissions, version }); return { permissions: permissions as Record<string, 'allow' | 'ask' | 'deny'>, version: '1' } } } },
   })
   assert.equal((await handler(f.request({ action:'set_write_policy', permissions:{send_slack_message:'allow'}, expectedVersion:'0', ownerId:'other' }), botId)).status, 400)
   assert.equal(calls.length, 0)

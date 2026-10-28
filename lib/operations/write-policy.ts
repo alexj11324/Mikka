@@ -18,3 +18,10 @@ export function resolveWritePermission(action: string, layers: readonly unknown[
   }
   return result
 }
+
+/** A missing workspace entry is no override; a present one may only narrow the agent choice. */
+export function resolveScopedWritePermission(action: string, agent: unknown, workspace: unknown): 'allow' | 'ask' | 'deny' {
+  const parsed = settings.safeParse(workspace)
+  if (!parsed.success) throw new OperationError('writePolicyUnavailable')
+  return Object.hasOwn(parsed.data, action) ? resolveWritePermission(action, [agent, parsed.data]) : resolveWritePermission(action, [agent])
+}

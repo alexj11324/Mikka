@@ -10,7 +10,7 @@ export const sourceSlotSchema = z.object({
 export const writeBindingSchema = z.object({
   accountId: z.string().min(1), version: z.string().min(1), provider: z.string().min(1),
   payloadDigest: hash, contextDigest: hash, source: sourceSlotSchema.optional(),
-  run: z.object({ runId: z.uuid(), botId: z.uuid().nullable(), workspaceId: z.uuid().nullable(), policyVersion: z.string().regex(/^\d+$/), decision: z.enum(['allow', 'ask']) }).strict().optional(),
+  run: z.object({ runId: z.uuid(), botId: z.uuid().nullable(), workspaceId: z.uuid().nullable(), policyVersion: z.string().regex(/^\d+(?::\d+)?$/), decision: z.enum(['allow', 'ask']) }).strict().optional(),
 }).strict().refine(({ source, ...binding }) => !source || source.slotDigest === snapshotDigest(binding), 'host slot selection changed')
 
 export function prepareWriteBinding(provider: string, selected: { accountId: string; version: string; context?: Record<string, unknown> | null }, input: Record<string, unknown>) {
