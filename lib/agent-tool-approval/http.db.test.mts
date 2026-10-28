@@ -54,7 +54,7 @@ before(async () => {
   execFileSync('git', ['init', '-q', dir])
 })
 after(async () => { if (server) await new Promise<void>(r => server.close(() => r())); if (dir) await rm(dir,{recursive:true,force:true}); await pool.end() })
-test('real HTTP routes carry a pending CLI request to owner approval and one response', async () => {
+test('real HTTP claim carries policy and unavailable CLI callbacks do not create approvals', async () => {
   const { HttpServerLink } = await import('../../packages/daemon/src/server-link-http')
   const { CodexAdapter } = await import('../../packages/daemon/src/adapters/codex')
   const { NoSandbox } = await import('../../packages/daemon/src/agents/sandbox')
@@ -92,13 +92,11 @@ test('real HTTP routes carry a pending CLI request to owner approval and one res
   const adapter = new CodexAdapter({ sandbox: new NoSandbox(), stateDir: dir, userHome: dir, binary: resolve('packages/daemon/test/fakes/fake-codex.mjs') })
   const session = await adapter.start({ runId, cwd: dir, prompt: assignment.prompt, env: { PATH: process.env.PATH ?? '' }, log: createLogger(), toolApproval: gate })
   const browser = async (cookie: string, payload: object) => fetch(`${origin}/api/agent-tool-approvals`, { method: 'POST', headers: { cookie, origin, 'content-type': 'application/json' }, body: JSON.stringify(payload) })
-  let request: { id:string; digest:string } | undefined
-  for (let n=0; n<50 && !request; n++) { const response=await browser('owner=1',{ operation:'list',runId }); const body=await response.json() as {requests: Array<{id:string;digest:string}>}; request=body.requests[0]; if (!request) await new Promise(r=>setTimeout(r,50)) }
-  assert.ok(request)
-  assert.equal((await browser('other=1',{ operation:'decide',runId,id:request.id,digest:request.digest,decision:'approve' })).status,409)
-  assert.equal((await browser('owner=1',{ operation:'decide',runId,id:request.id,digest:request.digest,decision:'approve' })).status,200)
   let output=''; for await (const event of session.events()) if (event.type === 'chunk' && event.chunk.type === 'text-delta') output+=event.chunk.delta
-  const result=JSON.parse(output); assert.equal(result.first.decision,'accept'); assert.equal(result.replay.decision,'decline'); assert.equal(result.foreign.decision,'decline')
+  const result=JSON.parse(output); assert.equal(result.first.decision,'decline'); assert.equal(result.replay.decision,'decline'); assert.equal(result.foreign.decision,'decline')
+  const response = await browser('owner=1',{ operation:'list',runId })
+  const body = await response.json() as { requests: unknown[] }
+  assert.deepEqual(body.requests, [])
 })
 
 test('policy revocation invalidates an old assignment before CLI approval', async () => {

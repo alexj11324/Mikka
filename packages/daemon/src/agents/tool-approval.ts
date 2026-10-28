@@ -12,7 +12,7 @@ export interface ToolApprovalRequest {
 }
 export interface ToolApprovalHost {
   /** Must derive the decision from trusted effective policy, not model input. */
-  permission(request: Readonly<ToolApprovalRequest>): PermissionDecision | Promise<PermissionDecision>
+  permission(request: Readonly<ToolApprovalRequest>): PermissionDecision | 'unavailable' | Promise<PermissionDecision | 'unavailable'>
   /** Authenticated host flow, bound to the exact request and this signal. */
   ask(request: Readonly<ToolApprovalRequest>, signal: AbortSignal): Promise<'allow' | 'deny'>
   /** Must reflect current run lease, owner, and revocation state. */

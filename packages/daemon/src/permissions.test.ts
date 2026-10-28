@@ -109,7 +109,7 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(runDomains(policy({ network: "deny" }), ["npmjs.org"])).toEqual([])
     expect(
       runDomains(policy({ network: "deny", install_dependency: "allow" }))
-    ).toEqual([...PACKAGE_REGISTRY_DOMAINS])
+    ).toEqual([])
     expect(runDomains(policy({ install_dependency: "allow" }))).toEqual([
       "github.com",
       ...PACKAGE_REGISTRY_DOMAINS,

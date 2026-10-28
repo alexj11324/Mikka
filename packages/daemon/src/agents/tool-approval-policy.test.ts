@@ -2,16 +2,14 @@ import { expect, it } from 'vitest'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { toolApprovalDecision } from './tool-approval-policy'
 import type { ToolApprovalRequest } from './tool-approval'
-const request = (command: string): ToolApprovalRequest => ({ runId:'r', requestId:'i', harness:'codex', method:'item/commandExecution/requestApproval', input:{ command } })
-it('uses trusted allow and deny only for recognized commands and asks on ambiguity', () => {
+
+it('does not infer action authority from callback text or automatically ask', () => {
+  const request: ToolApprovalRequest = { runId:'r', requestId:'i', harness:'codex', method:'item/commandExecution/requestApproval', input:{ command:'npm install example' } }
   const base = defaultRunPolicy()
-  expect(toolApprovalDecision(request('npm install example'), base)).toBe('ask')
-  expect(toolApprovalDecision(request('npm install example'), { ...base, permissions:{ ...base.permissions, install_dependency:'allow' } })).toBe('allow')
-  expect(toolApprovalDecision(request('npm install'), { ...base, permissions:{ ...base.permissions, install_dependency:'allow' } })).toBe('allow')
-  expect(toolApprovalDecision(request('npm install example && echo unsafe'), { ...base, permissions:{ ...base.permissions, install_dependency:'allow' } })).toBe('ask')
-  expect(toolApprovalDecision(request('npm install example'), { ...base, permissions:{ ...base.permissions, install_dependency:'deny' } })).toBe('deny')
-  expect(toolApprovalDecision(request('echo unknown'), base)).toBe('ask')
-  const inputRequest = { ...request('npm install example'), input: { kind:'writeStdin', command:'npm install example' } }
-  expect(toolApprovalDecision(inputRequest, { ...base, permissions:{ ...base.permissions, install_dependency:'allow' } })).toBe('ask')
-  expect(toolApprovalDecision(request('echo unknown'), { ...base, readOnly: true })).toBe('deny')
+  for (const decision of ['allow', 'ask', 'deny'] as const) {
+    const policy = { ...base, permissions:{ ...base.permissions, install_dependency:decision } }
+    expect(toolApprovalDecision(request, policy)).toBe('unavailable')
+    expect(toolApprovalDecision({ ...request, input:{ command:'echo unrelated' } }, policy)).toBe('unavailable')
+    expect(toolApprovalDecision({ ...request, method:'unknown' }, policy)).toBe('unavailable')
+  }
 })

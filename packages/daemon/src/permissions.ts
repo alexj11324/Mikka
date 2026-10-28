@@ -61,8 +61,8 @@ export function runPolicy(sent: RunPolicy | undefined): RunPolicy {
 
 /**
  * Domains a run may reach on top of its harness's model API (which is
- * always reachable). `allow` opens every host; `deny` keeps only the
- * package registries when installs are allowed; `ask` is the workspace's
+ * always reachable). `allow` opens every host; `deny` closes non-model hosts
+ * even when installs are allowed; `ask` is the workspace's
  * and the repo's lists, and any other host goes to the sandbox's ask
  * callback (denied until approval cards exist).
  */
@@ -75,7 +75,7 @@ export function runDomains(
       ? PACKAGE_REGISTRY_DOMAINS
       : []
   if (policy.permissions.network === "allow") return ["*"]
-  if (policy.permissions.network === "deny") return [...registries]
+  if (policy.permissions.network === "deny") return []
   return [...new Set([...policy.networkAllow, ...repoAllow, ...registries])]
 }
 
