@@ -7,6 +7,8 @@ import { ArrowUpRight, Puzzle, Search } from 'lucide-react'
 
 import { Link } from '@/i18n/navigation'
 import { withBasePath } from '@/lib/base-path'
+import { cn } from '@/lib/utils'
+import type { ComposioAppId } from '@/lib/composio-accounts'
 import type { SkillsSearchResult } from '@/lib/skills-search'
 import { IntegrationsSettings } from '@/components/settings/integrations-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
@@ -32,6 +34,7 @@ async function fetchSkills([path, query]: readonly [string, string]): Promise<Sk
 export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean }) {
   const t = useTranslations('Plugins')
   const [tab, setTab] = useState<'plugins' | 'skills'>('plugins')
+  const [app, setApp] = useState<ComposioAppId | null>(null)
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const trimmedQuery = query.trim()
@@ -56,20 +59,22 @@ export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean })
         <Tabs value={tab} onValueChange={value => {
           if (value === 'plugins' || value === 'skills') setTab(value)
         }}>
-          <TabsList variant="line">
+          <TabsList variant="line" className={cn(app && 'hidden')}>
             <TabsTrigger value="plugins">{t('pluginsTab')}</TabsTrigger>
             <TabsTrigger value="skills">{t('skillsTab')}</TabsTrigger>
           </TabsList>
           <TabsContent value="plugins" className="flex flex-col gap-6 pt-4">
-            <SettingsSection id="agent-runtime-heading" title={t('agentRuntime')}>
-              <SettingRow title={t('agentDevices')} description={t('agentRuntimeDescription')}>
-                <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/devices" />}>
-                  {t('manageDevices')}
-                </Button>
-              </SettingRow>
-            </SettingsSection>
-            <GoogleSignInSettings googleEnabled={googleEnabled} />
-            <IntegrationsSettings showWebhookDetails={false} />
+            {!app && <>
+              <SettingsSection id="agent-runtime-heading" title={t('agentRuntime')}>
+                <SettingRow title={t('agentDevices')} description={t('agentRuntimeDescription')}>
+                  <Button variant="secondary" size="sm" nativeButton={false} render={<Link href="/devices" />}>
+                    {t('manageDevices')}
+                  </Button>
+                </SettingRow>
+              </SettingsSection>
+              <GoogleSignInSettings googleEnabled={googleEnabled} />
+            </>}
+            <IntegrationsSettings showWebhookDetails={false} rootLabel={t('pluginsTab')} app={app} onAppChange={setApp} />
           </TabsContent>
           <TabsContent value="skills" className="flex flex-col gap-5 pt-4">
             <div className="flex flex-col gap-3">
@@ -96,7 +101,7 @@ export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean })
                   <EmptyDescription>{t('loadFailedDescription')}</EmptyDescription>
                 </EmptyHeader>
                 <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => void mutate()}>{t('retry')}</Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => void mutate()}>{t('retry')}</Button>
                 <Button variant="ghost" size="sm" nativeButton={false} render={<a href="https://skills.sh/" target="_blank" rel="noopener noreferrer" />}>
                     {t('browseSkills')}<ArrowUpRight data-icon="inline-end" />
                   </Button>

@@ -2,7 +2,9 @@ import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { after, NextRequest, NextResponse } from 'next/server'
 import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
-import { getComposio } from '@/lib/composio'
+import { cannotRevokeComposioAccount, getComposio, isComposioToolkit } from '@/lib/composio'
+import { COMPOSIO_REPLACE_COOKIE, disconnectComposioAccount } from '@/lib/composio-accounts'
+import { listComposioPages } from '@/lib/composio-pagination'
 import { isComposioCallbackVerifierConfigured } from '@/lib/composio-config'
 import { COMPOSIO_AUTH_CALLBACK_PATH } from '@/lib/auth-return'
 import { bootstrapSuggestions } from '@/lib/suggestions/sources'
@@ -12,7 +14,9 @@ const CALLBACK_PATH = withBasePath(COMPOSIO_AUTH_CALLBACK_PATH)
 const noStore = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }
 
 function clearSessionCookie(response: NextResponse) {
-  response.cookies.set(SESSION_COOKIE, '', { path: CALLBACK_PATH, maxAge: 0, httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' })
+  for (const name of [SESSION_COOKIE, COMPOSIO_REPLACE_COOKIE]) {
+    response.cookies.set(name, '', { path: CALLBACK_PATH, maxAge: 0, httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' })
+  }
   return response
 }
 
@@ -58,7 +62,19 @@ async function handleGET(request: NextRequest) {
   }
 
   try {
-    await composio.connectedAccounts.completeAuth({ userId: session.user.id, sessionUri })
+    const completed = await composio.connectedAccounts.completeAuth({ userId: session.user.id, sessionUri })
+    // A reconnect: retire the account this connection replaces, only if it is
+    // the person's own account on the same toolkit.
+    const replaced = request.cookies.get(COMPOSIO_REPLACE_COOKIE)?.value
+    if (replaced && replaced !== completed.connectedAccountId) {
+      try {
+        const items = await listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [session.user.id], cursor }))
+        const old = items.find(item => item.id === replaced && item.toolkit.slug === completed.toolkitSlug && isComposioToolkit(item.toolkit.slug))
+        if (old) await disconnectComposioAccount(composio.connectedAccounts, old.id, cannotRevokeComposioAccount)
+      } catch (error) {
+        console.error('Composio reconnect could not retire the old account', { error: error instanceof Error ? error.name : 'unknown' })
+      }
+    }
     // Subscribe the new account's triggers and write the first briefing from what is there now.
     const userId = session.user.id
     const timeZone = request.headers.get('x-vercel-ip-timezone')

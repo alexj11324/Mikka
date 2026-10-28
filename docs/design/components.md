@@ -24,6 +24,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Bot avatars | `BotAvatar` (bloub, Figma `196:3571`) | R-36. Not on main yet: it lands with the bot list PR |
 | Buttons, badges, dialogs, menus, tabs, switches | reUI first, then `components/ui/*` | Figma style guide rule 4 |
 | Brand mark | inline SVG per `brand.md` | |
+| Plugin (connected app) list, detail page and brand icons | `components/plugins/connected-apps.tsx`, `components/plugins/app-icons.tsx` | Codex Settings › 插件 precedent (R-70, R-71): brand tile, switch, ⋯ menu per account |
 | Agent outputs (documents, web pages) | `components/artifacts/`: `ArtifactCard` (in chat), `ArtifactChip` (chat beside the reader), `ArtifactViewer` (reader), `ArtifactQuoteChip` / `ArtifactQuoteLine` | Figma `178:11626`. Quoted text is marked by `remarkMarks`, never by touching the DOM |
 
 ## Do not use
