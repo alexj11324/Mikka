@@ -1,4 +1,9 @@
 import { preserveMessageSources } from '@/lib/coordinator/message-safety'
+import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
+import { personalMailboxInstructions } from '@/lib/personal-mailbox-instructions'
+import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
+import type { MailboxToolRequest } from '@/lib/mailbox-tools'
+import type { MailboxToolName } from '@mikka/protocol/mailbox'
 import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
 import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
 import type { AgentExecution } from '@/lib/agent-kit/store'
@@ -133,7 +138,7 @@ export async function pushToPhones(userId: string, botId: string | null, text: s
  * token budget, then returns the prompt for this turn: the instructions with
  * the person's memory, and the messages.
  */
-export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot): Promise<{ instructions: string; messages: ModelMessage[] }> {
+export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
   let { summary, memory, messages } = await store.loadConversation(userId, botId)
   const summaryTrust = { key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) }
@@ -151,7 +156,25 @@ export async function preparePrompt(userId: string, botId: string | null = null,
     await store.saveSummary(userId, summary, cut, botId)
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages, summaryTrust) }
+  const base = snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS)
+  const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
+  return { instructions: instructionsWithMemory(instructions, memory), messages: promptMessages(summary, messages, summaryTrust) }
+}
+
+export async function mailboxToolsEnabled() { 'use step'; return personalMailboxEnabled() }
+export async function mailboxCatalogue(userId: string, botId: string | null, executionId?: string) {
+  'use step'
+  if (!personalMailboxEnabled()) return []
+  const { personalConversationMailboxAdvertised } = await import('@/lib/personal-mailbox-runtime')
+  return personalConversationMailboxAdvertised(userId, botId, executionId)
+}
+export async function personalMailbox(userId: string, botId: string | null, request: MailboxToolRequest, scope?: NativeToolScope, executionId?: string) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (!personalMailboxEnabled()) return { error: 'personal_mailbox_unavailable' }
+  const { personalConversationMailbox } = await import('@/lib/personal-mailbox-runtime')
+  const result = await personalConversationMailbox(userId, botId, request, scope, executionId)
+  return result.body
 }
 
 export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope, botId: string | null = null) {

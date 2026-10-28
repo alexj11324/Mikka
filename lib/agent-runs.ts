@@ -1,4 +1,5 @@
 import 'server-only'
+import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
 import { freezeWorkerDefinition } from '@/lib/agent-kit/worker'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
@@ -6,7 +7,7 @@ import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db, pool } from '@/lib/db'
 import { SubscriptionRepository } from '@/lib/subscription-repository'
-import { agents, agentRuns, devices, issues, repositorySettings, runPublications, taskRequestBindings, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { agents, agentRuns, bots, devices, issues, repositorySettings, runPublications, taskRequestBindings, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
@@ -79,14 +80,22 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = process.env.MIKKA_AGENT_KIT === '1' || Boolean(execution)
   const subscription = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
+  const mailboxEnabled = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1'
+  let mailboxScope: { botId: string | null; workspaceId: string } | undefined
+  if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
+    const [bot] = botId ? await db.select({ workspaceId: bots.workspaceId }).from(bots)
+      .where(and(eq(bots.id, botId), eq(bots.ownerId, userId))).limit(1) : []
+    if (botId && !bot) throw new ActionFailureError('runInvalid')
+    mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
+  }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, mailboxEnabled, mailboxScope })
     : null
   await db.transaction(async tx => {
     const [request] = await tx.select().from(taskRequestBindings).where(eq(taskRequestBindings.issueId, issue.id)).limit(1)
     if (request && (request.userId !== userId || request.deviceId !== agent.deviceId)) throw new ActionFailureError('runInvalid')
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['repository-approval', userId, repo.repoPath])}, 0))`)
-    const [setting] = await tx.select().from(repositorySettings).where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, repo.repoPath)))
+    const [setting] = await tx.select().from(repositorySettings).where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, repo.repoPath))).limit(1)
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-publication:' + issue.id}, 0))`)
     const [previous] = await tx.select().from(runPublications).where(and(eq(runPublications.issueId, issue.id), eq(runPublications.remoteKey, repo.repoPath), sql`${runPublications.branch} is not null`)).orderBy(asc(runPublications.createdAt)).limit(1)
     const identifiers = await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: readIssueMetadata(issue.content).number }], tx)

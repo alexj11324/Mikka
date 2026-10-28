@@ -43,6 +43,8 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const migration = await readFile(new URL('../../drizzle/20261027164501_cloud_computers.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
     await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, "botId" uuid REFERENCES bots(id), status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "finishedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
+    // This private schema models the issue-target binding consulted by cloud dispatch.
+    await pool.query('CREATE TABLE task_request_bindings ("issueId" uuid PRIMARY KEY)')
     const bindingMigration = await readFile(new URL('../../drizzle/20261027164502_computer_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
     await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', enabled boolean NOT NULL DEFAULT true, harnesses jsonb NOT NULL DEFAULT \'[]\', "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz, "createdAt" timestamptz NOT NULL DEFAULT now())')
@@ -168,6 +170,9 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.deepEqual(linked[0], linked[1], 'a retried bind selects the same subscription binding')
     await assert.rejects(bindBotSubscription(pool, actor, { ...botBinding, modelId: 'changed-model' }), /unavailable/)
     const managedCodex = setups[0].find(row => row.harness === 'codex')!
+    const localTargetIssue = randomUUID()
+    await pool.query('insert into task_request_bindings ("issueId") values ($1)', [localTargetIssue])
+    await assert.rejects(queueCloudRun(pool, actor, { botId: bot.id, issueId: localTargetIssue, agentId: managedCodex.agentId, deviceRepoId: managedCodex.repoId, title: 'Local-only task', body: '' }), { status: 409 })
     const managedRun = await queueCloudRun(pool, actor, { botId: bot.id, issueId: randomUUID(), agentId: managedCodex.agentId, deviceRepoId: managedCodex.repoId, title: 'Computer task', body: '' })
     assert.equal((await pool.query('SELECT "botId" FROM computer_run_bindings WHERE "runId"=$1', [managedRun.runId])).rows[0].botId, bot.id)
     assert.equal((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [managedRun.runId])).rows[0].botId, bot.id, 'the cloud thread belongs to its Bot in the product chat')
