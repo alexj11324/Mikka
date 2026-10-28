@@ -159,9 +159,15 @@ verified lifecycle action.
 
 The existing settings-surface browser test now acquires its two accounts through
 `tests/e2e/test-account-fixtures.ts`. Cookie storage is bound to an environment,
-account and origin. The first adapter uses Chromium: initial request routing and
-a response-header CDP gate enforce the full origin, including port, before every
-redirect hop. Popup requests receive the same gate before their first response.
+account and origin. The first adapter uses Chromium: `context.newPage()` waits
+for its CDP request gate before returning. Initial routing and that gate validate
+the complete origin before each request, including every redirect hop, without
+buffering SSE bodies or replacing the browser cookie jar. An initial popup whose
+Page is not yet available is rejected before contacting any server; popup flows
+need a separate target-initialization adapter and are not supported in this phase.
+Protocol interception failures or unexpected protection-session detachment close
+the context and fail acceptance; a blocked
+counter alone is not evidence that a request was stopped.
 Browser cookies themselves do not distinguish ports. WebSockets are not supported
 by this adapter and are closed locally without opening an upstream connection.
 Browser traffic stops

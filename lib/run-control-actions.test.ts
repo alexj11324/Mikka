@@ -131,10 +131,16 @@ test('actual stop action is idempotent for the owner and rejects ended/stopping 
   await actions.stopRun(runId)
   const stoppedAt = current.run.stopRequestedAt
   assert.ok(stoppedAt instanceof Date)
+  const detail = await actions.getIssueThread(issueId, runId)
+  assert.equal(detail.thread.stopping, true)
+  assert.equal(detail.thread.stopRequestedAt, stoppedAt)
+  const [listed] = await actions.listIssueThreads(issueId)
+  assert.equal(listed.stopping, true)
   await actions.stopRun(runId)
   assert.equal(current.run.stopRequestedAt, stoppedAt); assert.equal(current.updates, 1)
   await assert.rejects(actions.sendIssueThreadMessage({ issueId, runId, text: 'after stop' }), rejected('runNotFound'))
   current.run.status = 'succeeded'
+  assert.equal((await actions.getIssueThread(issueId, runId)).thread.stopping, false)
   await assert.rejects(actions.stopRun(runId), rejected('runNotFound'))
   assert.equal(current.messages.length, 0); assert.equal(current.updates, 1)
 })
