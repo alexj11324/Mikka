@@ -21,7 +21,8 @@ only with evidence from the exact reviewed commit.
 ## Deterministic CI gate
 
 The `Browser tests (before merge)` job runs `pnpm test:e2e:mvp` after the
-production build and the existing browser suite. It uses the job's disposable
+production build and performance gate, before the existing functional browser
+suite. It uses the job's disposable
 Postgres 17 service, with tracked migrations applied before the existing setup.
 No test points at a developer, Preview or production database. The source-only
 fixture checks run under `pnpm test:mvp-fixtures` and `pnpm check`.
