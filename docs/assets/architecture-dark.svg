@@ -10,10 +10,10 @@
   <text x="285" y="245" text-anchor="middle" font-size="14" fill="#ffffff">webhook</text>
   <rect x="207.5" y="307" width="155" height="26" fill="#4d82ff"/>
   <text x="285" y="325" text-anchor="middle" font-size="14" fill="#ffffff">webhooks, triggers</text>
-  <path d="M420 270 L420 368 L110 368 L110 350" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
+  <path d="M420 270 L420 368 L110 368 L110 350" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-dasharray="7 5"/>
   <path d="M102 366 L110 358 L118 366" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <rect x="197.5" y="355" width="185" height="26" fill="#4d82ff"/>
-  <text x="290" y="373" text-anchor="middle" font-size="14" fill="#ffffff">actions after approval</text>
+  <rect x="190" y="355" width="200" height="26" fill="#0d1117" stroke="#4d82ff" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="290" y="373" text-anchor="middle" font-size="14" fill="#4d82ff">mail / calendar approval</text>
   <path d="M200 520 L400 520" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
   <path d="M380 512 L388 520 L380 528" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <rect x="279.5" y="507" width="41" height="26" fill="#4d82ff"/>
@@ -53,17 +53,19 @@
   <path d="M940 262 L932 270 L940 278" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M920 380 L1000 380" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
   <path d="M980 372 L988 380 L980 388" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
+  <rect x="936" y="367" width="48" height="26" fill="#4d82ff"/>
+  <text x="960" y="385" text-anchor="middle" font-size="14" fill="#ffffff">wake</text>
   <path d="M830 410 L830 490" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
   <path d="M822 474 L830 482 L838 474" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <rect x="771.5" y="433" width="117" height="26" fill="#4d82ff"/>
-  <text x="830" y="451" text-anchor="middle" font-size="14" fill="#ffffff">runs, answers</text>
+  <rect x="806" y="433" width="48" height="26" fill="#4d82ff"/>
+  <text x="830" y="451" text-anchor="middle" font-size="14" fill="#ffffff">runs</text>
   <path d="M920 520 L1000 520" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
   <path d="M980 512 L988 520 L980 528" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <path d="M1100 410 L1100 490" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
+  <path d="M1100 410 L1100 490" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-dasharray="7 5"/>
   <path d="M1092 430 L1100 422 L1108 430" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M1092 470 L1100 478 L1108 470" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <rect x="1057" y="437" width="86" height="26" fill="#4d82ff"/>
-  <text x="1100" y="455" text-anchor="middle" font-size="14" fill="#ffffff">cloud run</text>
+  <rect x="1053" y="437" width="94" height="26" fill="#0d1117" stroke="#4d82ff" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="1100" y="455" text-anchor="middle" font-size="14" fill="#4d82ff">hosted run</text>
   <path d="M1150 550 L1150 650" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-dasharray="7 5"/>
   <path d="M1142 634 L1150 642 L1158 634" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M1050 550 L1050 600 L500 600 L500 550" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
@@ -127,11 +129,11 @@
   <rect x="20" y="758" width="100" height="36" fill="#0d1117" stroke="#e6edf3" stroke-width="2.5"/>
   <text x="70" y="781" text-anchor="middle" font-size="15" fill="#e6edf3">Shipped</text>
   <rect x="140" y="758" width="100" height="36" fill="#0d1117" stroke="#e6edf3" stroke-width="2.5" stroke-dasharray="7 5"/>
-  <text x="190" y="781" text-anchor="middle" font-size="15" fill="#e6edf3">Planned</text>
+  <text x="190" y="781" text-anchor="middle" font-size="15" fill="#e6edf3">Pending</text>
   <path d="M280 776 L340 776" fill="none" stroke="#e6edf3" stroke-width="2.5"/>
   <path d="M310 768 L318 776 L310 784" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <text x="352" y="781" font-size="14" fill="#9198a1">Data flow</text>
   <path d="M456 776 L516 776" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-dasharray="7 5"/>
   <path d="M486 768 L494 776 L486 784" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <text x="528" y="781" font-size="14" fill="#9198a1">Planned flow</text>
+  <text x="528" y="781" font-size="14" fill="#9198a1">Pending flow</text>
 </svg>
