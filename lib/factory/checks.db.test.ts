@@ -144,11 +144,14 @@ test("actual migrated PG/HTTP: review/verify receipt consumers and bounded repai
         if(phase==="verify") {await terminal(d.runId,`review-${r.task.id}`);await reconcile("owner");d=await start((await state(r.task.id)).task);}
         const session=`question-${r.task.id}`,questionId=randomUUID();
         await db.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"=$2,report=$3 WHERE id=$1`,[d.runId,session,JSON.stringify({question:{questionId,kind:"decision",question:"Which acceptance path?",options:["A","B"]}})]);
-        const q=await questions.record("owner",d.runId);
+        const q=await questions.record("owner",d.runId),browserSessionId=randomUUID();
+        // The real human-answer guard requires its persisted, unexpired session.
+        // This row/token is confined to this disposable test database, not OAuth.
+        await db.query(`INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES ($1,'owner',$2,now()+interval '1 hour',now(),now())`,[browserSessionId,randomUUID()]);
         const server=createServer(async(req,res)=>{
           try {let body="";for await(const chunk of req)body+=chunk;
             const origin=`http://127.0.0.1:${(server.address() as import("node:net").AddressInfo).port}`;
-            const result=await handleFactoryQuestion(questions,{actor:{userId:"owner",sessionId:"synthetic-browser-session"},authorization:null,method:req.method!,questionId:q.id,origin:req.headers.origin??null,url:origin,body:JSON.parse(body)});
+            const result=await handleFactoryQuestion(questions,{actor:{userId:"owner",sessionId:browserSessionId},authorization:null,method:req.method!,questionId:q.id,origin:req.headers.origin??null,url:origin,body:JSON.parse(body)});
             res.writeHead(result.status,{"content-type":"application/json"});res.end(JSON.stringify(result.body));
           }catch(error){res.writeHead(500);res.end(String(error));}
         });
