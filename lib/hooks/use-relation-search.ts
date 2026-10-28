@@ -3,41 +3,46 @@
 import { useEffect, useState } from "react";
 import { withBasePath } from "@/lib/base-path";
 import type { RelationKind, SearchResultItem } from "@/lib/issue-search";
-import { RELATION_SEARCH_DEBOUNCE_MS, relationCandidates, relationSearchParams, relationSearchQuery } from "@/lib/issue-relation-search";
+import { RELATION_SEARCH_DEBOUNCE_MS, collectRelationPages, relationCandidates, relationSearchParams, relationSearchQuery } from "@/lib/issue-relation-search";
 import { useOnOpen } from "./use-on-open";
 
 /**
  * Relation picker search against GET /api/issues/search. Typing is debounced; a newer query or
  * closing the picker aborts the request in flight. Each opening starts empty (loading), so the
  * picker never shows rows from before the last relation change. While a newer query loads, the
- * previous rows stay so the list does not flash back to loading.
+ * previous rows are hidden until the new search completes.
  */
 export function useRelationSearch({ open, issueId, kind, query }: { open: boolean; issueId: string; kind: RelationKind; query: string }) {
   const search = relationSearchQuery(query);
-  const [q, setQ] = useState(search.q);
+  const searchKey = JSON.stringify(search);
+  const [key, setKey] = useState(searchKey);
   const [reloads, setReloads] = useState(0);
-  const [state, setState] = useState<{ items?: SearchResultItem[]; failed?: boolean }>({});
-  useOnOpen(open, () => { setState({}); setQ(search.q); });
+  const [state, setState] = useState<{ key?: string; items?: SearchResultItem[]; failed?: boolean }>({});
+  useOnOpen(open, () => { setState({}); setKey(searchKey); });
   useEffect(() => {
-    const timer = setTimeout(() => setQ(search.q), RELATION_SEARCH_DEBOUNCE_MS);
+    const timer = setTimeout(() => setKey(searchKey), RELATION_SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [search.q]);
-  const params = open ? relationSearchParams({ issueId, kind, q }).toString() : null;
+  }, [searchKey]);
+  const debouncedSearch = JSON.parse(key) as { q: string; identifier: string | null };
+  const params = open && key === searchKey ? relationSearchParams({ issueId, kind, q: debouncedSearch.q }).toString() : null;
   useEffect(() => {
     if (!params) return;
     const controller = new AbortController();
-    fetch(withBasePath(`/api/issues/search?${params}`), { cache: "no-store", signal: controller.signal })
-      .then(async response => {
-        if (!response.ok) throw new Error(`issue search ${response.status}`);
-        return (await response.json() as { items: SearchResultItem[] }).items;
-      })
-      .then(items => { if (!controller.signal.aborted) setState({ items }); }, () => { if (!controller.signal.aborted) setState(current => ({ ...current, failed: true })); });
+    setState({});
+    collectRelationPages(async cursor => {
+      const pageParams = new URLSearchParams(params);
+      if (cursor) pageParams.set("cursor", cursor);
+      const response = await fetch(withBasePath(`/api/issues/search?${pageParams}`), { cache: "no-store", signal: controller.signal });
+      if (!response.ok) throw new Error(`issue search ${response.status}`);
+      return await response.json() as { items: SearchResultItem[]; nextCursor: string | null };
+    }, { kind, identifier: debouncedSearch.identifier })
+      .then(items => { if (!controller.signal.aborted) setState({ key, items }); }, () => { if (!controller.signal.aborted) setState({ key, failed: true }); });
     return () => controller.abort();
-  }, [params, reloads]);
+  }, [params, reloads, kind, debouncedSearch.identifier, key]);
   return {
-    items: state.items,
-    rows: state.items ? relationCandidates(state.items, { kind, identifier: search.identifier }) : [],
-    failed: Boolean(state.failed),
-    reload: () => { setState(current => ({ items: current.items })); setReloads(value => value + 1); },
+    items: params && state.key === key ? state.items : undefined,
+    rows: params && state.key === key && state.items ? relationCandidates(state.items, { kind, identifier: search.identifier }).slice(0, 50) : [],
+    failed: Boolean(params && state.key === key && state.failed),
+    reload: () => { setState({}); setReloads(value => value + 1); },
   };
 }

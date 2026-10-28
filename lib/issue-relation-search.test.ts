@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parseSearchParams } from '@/lib/issue-search'
 import type { SearchResultItem } from '@/lib/issue-search'
-import { relationCandidates, relationSearchParams, relationSearchQuery } from '@/lib/issue-relation-search'
+import { collectRelationPages, relationCandidates, relationSearchParams, relationSearchQuery } from '@/lib/issue-relation-search'
 
 const A = '00000000-0000-4000-8000-00000000000a'
 const item = (patch: Partial<SearchResultItem>): SearchResultItem => ({ id: A, identifier: 'MIK-1', title: 't', status: 'todo', priority: 'medium', ownerId: A, ownerName: null, parentId: null, revision: 1, updatedAt: '', existingRelation: null, canRelate: true, ...patch })
@@ -51,4 +51,21 @@ test('candidates: drop rows the server says cannot relate, existing sub-issues, 
   assert.deepEqual(relationCandidates(rows, { kind: 'child', identifier: null }).map(row => row.id), ['3', '4'])
   assert.deepEqual(relationCandidates(rows, { kind: 'related', identifier: null }).map(row => row.id), ['2', '3', '4'])
   assert.deepEqual(relationCandidates(rows, { kind: 'parent', identifier: 'ALEX-12' }).map(row => row.id), ['3'])
+})
+
+
+test('pagination searches beyond non-relatable first page and filters the exact identifier', async () => {
+  const calls: (string | null)[] = []
+  const items = await collectRelationPages(async cursor => {
+    calls.push(cursor)
+    return cursor === null
+      ? { items: Array.from({ length: 50 }, (_, i) => item({ id: String(i), canRelate: false })), nextCursor: 'next' }
+      : { items: [item({ id: 'target', identifier: 'ALEX-12' })], nextCursor: null }
+  }, { kind: 'related', identifier: 'ALEX-12' })
+  assert.deepEqual(calls, [null, 'next'])
+  assert.deepEqual(relationCandidates(items, { kind: 'related', identifier: 'ALEX-12' }).map(row => row.id), ['target'])
+})
+
+test('pagination rejects a repeated cursor', async () => {
+  await assert.rejects(collectRelationPages(async () => ({ items: [], nextCursor: 'same' }), { kind: 'related', identifier: null }), /Repeated/)
 })

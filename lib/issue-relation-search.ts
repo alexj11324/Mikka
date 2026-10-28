@@ -39,3 +39,21 @@ export function relationCandidates(items: SearchResultItem[], input: { kind: Rel
     && !(input.kind === 'child' && item.existingRelation === 'child')
     && (!input.identifier || item.identifier?.toUpperCase() === input.identifier))
 }
+
+/** Follow cursors until a full page of selectable results or the server is exhausted. */
+export async function collectRelationPages(
+  read: (cursor: string | null) => Promise<{ items: SearchResultItem[]; nextCursor: string | null }>,
+  input: { kind: RelationKind; identifier: string | null },
+) {
+  const items: SearchResultItem[] = []
+  let cursor: string | null = null
+  const seen = new Set<string>()
+  do {
+    const page = await read(cursor)
+    items.push(...page.items)
+    cursor = page.nextCursor
+    if (cursor && seen.has(cursor)) throw new Error('Repeated issue search cursor')
+    if (cursor) seen.add(cursor)
+  } while (cursor && relationCandidates(items, input).length < RELATION_SEARCH_LIMIT)
+  return items
+}
