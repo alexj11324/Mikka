@@ -165,7 +165,7 @@ test('broker reports mechanical session application or submission without judgin
     }
     const pool = { async query() { return { rows: [claimed] } }, async connect() { return client } }
     const cdp = {
-      async attach() {}, async origin() {}, async safeToResume() { return true }, close() {},
+      async attach() {}, async origin() {}, async safeToResume() { return true }, close() { calls.push('close') },
       async insertAtObservedInput(origin: string, loader: string, node: number, role: string, value: string) {
         assert.deepEqual([origin, loader, node, role], [owner.origin, 'loader', 7, 'password'])
         assert.equal(value, 'fixture-password')
@@ -185,6 +185,11 @@ test('broker reports mechanical session application or submission without judgin
     assert.equal(calls.includes('insertAtObservedInput'), forcePassword)
     assert.equal(calls.includes('Page.reload'), !forcePassword)
     assert.equal(guardEnded, !forcePassword)
+    assert(calls.includes('close'))
+    if (forcePassword) {
+      assert(!calls.includes('Network.getCookies'))
+      assert(!calls.some(call => call.includes('Object.entries(localStorage)')))
+    }
     assert(!calls.some(call => /readyState|one-time-code|input\[type/.test(call)))
   }
 })

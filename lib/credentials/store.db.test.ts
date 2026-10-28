@@ -112,6 +112,7 @@ test('real PostgreSQL: observed credential lease inserts once and stays guarded'
     if (lease.status !== 'ready') throw new Error('fixture lease not issued')
     assert.deepEqual(await fillCredential(pool, lease.lease, { kms, guard, connect: (async () => cdp) as never }), { status: 'guarded', origin })
     assert.equal(inserted, 1); assert.equal(decrypts, 1); assert.equal(ended, false)
+    assert.equal((await pool.query('SELECT count(*)::int AS count FROM browser_sessions')).rows[0].count, 0)
     await assert.rejects(fillCredential(pool, lease.lease, { kms, guard, connect: (async () => cdp) as never }), CredentialError)
     const stale = await store.lease(actor, origin, target, undefined, true)
     if (stale.status !== 'ready') throw new Error('fixture lease not issued')
