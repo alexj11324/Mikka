@@ -67,6 +67,7 @@ export function pickDefaultAccountId(accounts: DefaultCandidate[], chosenId: str
 
 export type ComposioAccountRecord = {
   accountId: string
+  toolkit?: string
   email: string | null
   /** The provider was asked for the email (found or not), so it is not asked again. */
   emailChecked: boolean
@@ -81,24 +82,10 @@ export function withAccountRecords(accounts: ConnectedAccountView[], records: Co
   const defaults = new Map<string, string | null>()
   for (const app of COMPOSIO_APP_IDS) {
     const own = accounts.filter(account => account.toolkit === app)
-    const chosen = own.find(account => byId.get(account.id)?.isDefault)?.id
+    const chosen = records.find(record => record.isDefault && (record.toolkit === app || own.some(account => account.id === record.accountId)))?.accountId
     defaults.set(app, pickDefaultAccountId(own.map(account => ({ ...account, isDisabled: !account.enabled })), chosen))
   }
   return accounts.map(account => ({ ...account, email: byId.get(account.id)?.email ?? null, isDefault: defaults.get(account.toolkit) === account.id }))
-}
-
-/**
- * When `leavingId` stops being usable (turned off or disconnected), whether
- * the bots were using it and which account of the same toolkit they use
- * next: `{ affectsBots: false }` when it was not the default, otherwise the
- * next account, or null when none is left.
- */
-export function takeoverAccount(accounts: ConnectedAccountView[], leavingId: string): { affectsBots: false } | { affectsBots: true; next: ConnectedAccountView | null } {
-  const leaving = accounts.find(account => account.id === leavingId)
-  if (!leaving?.isDefault) return { affectsBots: false }
-  const rest = accounts.filter(account => account.toolkit === leaving.toolkit && account.id !== leavingId)
-  const nextId = pickDefaultAccountId(rest.map(account => ({ ...account, isDisabled: !account.enabled })), null)
-  return { affectsBots: true, next: rest.find(account => account.id === nextId) ?? null }
 }
 
 const EMAIL = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/

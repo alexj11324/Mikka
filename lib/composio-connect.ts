@@ -38,7 +38,7 @@ function appOf(account: ComposioListedAccount | undefined): ComposioAppId | null
 /** The account the bots use for this toolkit now, chosen or not. */
 function effectiveDefault(items: ComposioListedAccount[], records: ComposioAccountRecord[], toolkit: string) {
   const own = items.filter(item => item.toolkit.slug === toolkit)
-  const chosen = records.find(record => record.isDefault && own.some(item => item.id === record.accountId))?.accountId
+  const chosen = records.find(record => record.isDefault && (record.toolkit === toolkit || own.some(item => item.id === record.accountId)))?.accountId
   return pickDefaultAccountId(own, chosen)
 }
 
@@ -143,8 +143,8 @@ export async function backfillComposioEmails(
   for (const answer of answers) {
     const record = records.get(answer.id)
     records.set(answer.id, answer.found
-      ? { accountId: answer.id, isDefault: record?.isDefault ?? false, email: answer.email, emailChecked: true, lastAttemptAt: new Date(now) }
-      : { accountId: answer.id, isDefault: record?.isDefault ?? false, email: null, emailChecked: false, lastAttemptAt: new Date(now) })
+      ? { ...record, accountId: answer.id, isDefault: record?.isDefault ?? false, email: answer.email, emailChecked: true, lastAttemptAt: new Date(now) }
+      : { ...record, accountId: answer.id, isDefault: record?.isDefault ?? false, email: null, emailChecked: false, lastAttemptAt: new Date(now) })
   }
   return [...records.values()]
 }

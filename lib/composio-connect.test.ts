@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ComposioEmailLookupError, providerAnswer, takeoverAccount, toConnectedAccountView, withAccountRecords, type ComposioAccountRecord } from './composio-accounts'
+import { ComposioEmailLookupError, providerAnswer, toConnectedAccountView, withAccountRecords, type ComposioAccountRecord } from './composio-accounts'
 import { backfillComposioEmails, followUpComposioConnect, reconnectHandover, type ComposioListedAccount } from './composio-connect'
 
 const gmail = (id: string, createdAt: string, extra: Partial<ComposioListedAccount> = {}): ComposioListedAccount =>
@@ -122,14 +122,12 @@ test('old accounts get their email on load: at most five, in parallel, each aske
   assert.deepEqual(later.calls.filter(call => call.startsWith('read')), ['read a4'])
 })
 
-test('turning off or disconnecting the default names the account that takes over', () => {
-  const view = (id: string, createdAt: string, extra: Partial<ComposioListedAccount> = {}) => toConnectedAccountView(gmail(id, createdAt, extra))!
-  const accounts = withAccountRecords([view('a', '2026-08-01T00:00:00Z'), view('b', '2026-09-01T00:00:00Z'), view('c', '2026-10-01T00:00:00Z', { isDisabled: true })], [record('b', { isDefault: true })])
-  assert.deepEqual(takeoverAccount(accounts, 'a'), { affectsBots: false })
-  const next = takeoverAccount(accounts, 'b')
-  assert.equal(next.affectsBots && next.next?.id, 'a')
-  const alone = withAccountRecords([view('a', '2026-08-01T00:00:00Z')], [])
-  assert.deepEqual(takeoverAccount(alone, 'a'), { affectsBots: true, next: null })
+test('a disabled or missing explicit default does not label another account as the default', () => {
+  const view = (id: string, extra: Partial<ComposioListedAccount> = {}) => toConnectedAccountView(gmail(id, '2026-09-01T00:00:00Z', extra))!
+  const chosen = record('old', { toolkit: 'gmail', isDefault: true })
+  for (const items of [[view('other'), view('old', { isDisabled: true })], [view('other')]]) {
+    assert.equal(withAccountRecords(items, [chosen]).some(account => account.isDefault), false)
+  }
 })
 
 test('only a 2xx without an email or a 403 is a final "no email"; 429, 5xx and 401 are tried again', () => {

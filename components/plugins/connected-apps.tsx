@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { routing } from '@/i18n/routing'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
-import { COMPOSIO_APP_IDS, composioConnectRedirect, takeoverAccount, type ComposioAppId, type ConnectedAccountView } from '@/lib/composio-accounts'
+import { COMPOSIO_APP_IDS, composioConnectRedirect, type ComposioAppId, type ConnectedAccountView } from '@/lib/composio-accounts'
 import { cn } from '@/lib/utils'
 
 type IntegrationState = { configured: boolean; callbackVerifierConfigured: boolean; webhookConfigured: boolean; accounts: ConnectedAccountView[] }
@@ -64,19 +64,12 @@ function useAccountName() {
   return (account: ConnectedAccountView) => account.alias ?? account.email ?? t('accountFallback', { name: t(account.toolkit) })
 }
 
-/**
- * What changes for the bots when an account is turned off or disconnected:
- * the account they use next, or that they can no longer use the app. Null
- * when the bots were not using it.
- */
+/** The selected account becomes unavailable; do not predict another identity. */
 function useTakeoverText() {
   const t = useTranslations('Settings.integrations')
-  const accountName = useAccountName()
   return (accounts: ConnectedAccountView[], leavingId: string) => {
-    const takeover = takeoverAccount(accounts, leavingId)
-    if (!takeover.affectsBots) return null
-    const leaving = accounts.find(account => account.id === leavingId)!
-    return takeover.next ? t('takeoverNext', { account: accountName(takeover.next) }) : t('takeoverNone', { name: t(leaving.toolkit) })
+    const leaving = accounts.find(account => account.id === leavingId)
+    return leaving?.isDefault ? t('disconnectConsequence', { name: t(leaving.toolkit) }) : null
   }
 }
 

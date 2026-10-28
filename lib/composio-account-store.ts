@@ -11,6 +11,7 @@ import type { ComposioAccountRecord } from '@/lib/composio-accounts'
 export async function listComposioAccountRecords(userId: string): Promise<ComposioAccountRecord[]> {
   return db.select({
     accountId: composioAccounts.accountId,
+    toolkit: composioAccounts.toolkit,
     email: composioAccounts.email,
     emailChecked: sql<boolean>`${composioAccounts.emailCheckedAt} is not null`,
     lastAttemptAt: composioAccounts.lastAttemptAt,
