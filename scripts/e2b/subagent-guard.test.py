@@ -1,9 +1,11 @@
 """Exercise the exact gateway JavaScript against synthetic DOM fields."""
 import ast
 import json
+import math
 from pathlib import Path
 import subprocess
 import unittest
+from urllib.parse import urlsplit
 
 
 module = ast.parse(Path(__file__).with_name('subagent-gateway.py').read_text())
@@ -14,9 +16,10 @@ constants = {node.targets[0].id: ast.literal_eval(node.value)
 safe_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'safe_resume_snapshot')
 inspect_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'inspect_mutation_expression')
 broker_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'broker_command_allowed')
-methods_node = next(node for node in module.body if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id == 'BROKER_METHODS')
-namespace = {'json': json}
-exec(compile(ast.Module(body=[methods_node, safe_node, inspect_node, broker_node], type_ignores=[]), str(__file__), 'exec'), namespace)
+origin_node = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'browser_origin')
+policy_nodes = [node for node in module.body if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id in ('BROKER_METHODS', 'BROKER_STORAGE_FUNCTION', 'BROKER_OTP_SELECTOR', 'BROKER_FOCUS_SELECTORS', 'BROKER_FOCUS_EXPRESSIONS', 'BROKER_EVALUATIONS')]
+namespace = {'json': json, 'math': math, 'urlsplit': urlsplit}
+exec(compile(ast.Module(body=[*policy_nodes, safe_node, inspect_node, origin_node, broker_node], type_ignores=[]), str(__file__), 'exec'), namespace)
 safe_resume_snapshot = namespace['safe_resume_snapshot']
 inspect_mutation_expression = namespace['inspect_mutation_expression']
 broker_command_allowed = namespace['broker_command_allowed']
@@ -43,11 +46,43 @@ class GuardTest(unittest.TestCase):
         self.assertTrue(broker_command_allowed(attach, 'target', set()))
         self.assertFalse(broker_command_allowed(attach, 'other-target', set()))
         self.assertFalse(broker_command_allowed({**attach, 'params': {}}, 'target', set()))
-        evaluate = {'id': 2, 'method': 'Runtime.evaluate', 'params': {}, 'sessionId': 'bound-session'}
+        evaluate = {'id': 2, 'method': 'Runtime.evaluate', 'params': {'expression': 'Object.entries(localStorage)', 'returnByValue': True}, 'sessionId': 'bound-session'}
         self.assertTrue(broker_command_allowed(evaluate, 'target', {'bound-session'}))
         self.assertFalse(broker_command_allowed(evaluate, 'target', {'other-session'}))
         self.assertFalse(broker_command_allowed({**evaluate, 'method': 'Target.createTarget'}, 'target', {'bound-session'}))
         self.assertFalse(broker_command_allowed({**evaluate, 'id': True}, 'target', {'bound-session'}))
+
+    def test_broker_rejects_script_injection_and_extra_arguments(self):
+        sessions={'bound'}; base={'id': 1, 'sessionId': 'bound'}
+        def check(method, params, **kwargs):
+            return broker_command_allowed({**base,'method':method,'params':params},'target',sessions,**kwargs)
+        self.assertTrue(check('Runtime.evaluate', {'expression':'globalThis','returnByValue':False}))
+        self.assertFalse(check('Runtime.evaluate', {'expression':'globalThis;fetch("https://evil.invalid")','returnByValue':False}))
+        self.assertFalse(check('Runtime.evaluate', {'expression':'Object.entries(localStorage)','returnByValue':True,'awaitPromise':True}))
+        self.assertFalse(check('Runtime.evaluate', {'expression':'Object.entries(localStorage);alert(1)','returnByValue':True}))
+        self.assertFalse(check('Runtime.evaluate', {'expression':['Object.entries(localStorage)'],'returnByValue':True}))
+        self.assertFalse(check('Runtime.compileScript', {'expression':'alert(1)'}))
+        params={'objectId':'known','functionDeclaration':namespace['BROKER_STORAGE_FUNCTION'],'arguments':[{'value':[['key','value']]}],'returnByValue':True}
+        self.assertTrue(check('Runtime.callFunctionOn', params, objects={'bound':'known'}))
+        self.assertFalse(check('Runtime.callFunctionOn', {**params,'objectId':'other'}, objects={'bound':'known'}))
+        self.assertFalse(check('Runtime.callFunctionOn', {**params,'functionDeclaration':'function(){return document.cookie}'}, objects={'bound':'known'}))
+        self.assertFalse(check('Runtime.callFunctionOn', {**params,'arguments':[{'value':[['key','value']],'objectId':'injected'}]}, objects={'bound':'known'}))
+        self.assertFalse(check('Runtime.callFunctionOn', {**params,'objectId':None}))
+        self.assertTrue(check('Network.getCookies', {'urls':['https://example.test']}, origin='https://example.test'))
+        self.assertFalse(check('Network.getCookies', {'urls':['https://other.test']}, origin='https://example.test'))
+        cookie={'name':'session','value':'synthetic','domain':'.example.test','path':'/'}
+        self.assertTrue(check('Network.setCookies', {'cookies':[cookie]}, origin='https://example.test'))
+        self.assertFalse(check('Network.setCookies', {'cookies':[{**cookie,'domain':'other.test'}]}, origin='https://example.test'))
+        self.assertFalse(check('Network.setCookies', {'cookies':[{**cookie,'extra':'injected'}]}, origin='https://example.test'))
+        self.assertFalse(check('Network.setCookies', {'cookies':[{**cookie,'secure':'true'}]}, origin='https://example.test'))
+        self.assertFalse(check('Network.setCookies', {'cookies':[{**cookie,'value':'synthetic\r\ninjected'}]}, origin='https://example.test'))
+        self.assertFalse(check('Network.setCookies', {'cookies':[{**cookie,'expires':float('inf')}]}, origin='https://example.test'))
+        self.assertTrue(check('Network.setCookies', {'cookies':[{**cookie,'partitionKey':{'topLevelSite':'https://example.test','hasCrossSiteAncestor':False}}]}, origin='https://example.test'))
+        self.assertFalse(check('Network.setCookies', {'cookies':[{**cookie,'partitionKey':{'topLevelSite':'https://other.test'}}]}, origin='https://example.test'))
+        self.assertFalse(check('Network.setCookies', {'cookies':[{**cookie,'partitionKey':{'topLevelSite':'https://example.test','extra':True}}]}, origin='https://example.test'))
+        self.assertFalse(check('Input.insertText', {'text':'synthetic','extra':True}))
+        self.assertIsNone(namespace['browser_origin']('http://outside.example/login'))
+        self.assertEqual(namespace['browser_origin']('http://127.0.0.1:6083/login'),'http://127.0.0.1:6083')
 
     def test_uninspectable_or_nested_documents_fail_closed(self):
         frames = {'frameTree': {'frame': {'id': 'main'}}}

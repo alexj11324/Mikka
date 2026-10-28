@@ -73,6 +73,13 @@ heuristics route detected actions through the existing pending_actions ledger.
 These heuristics cannot determine arbitrary page-script effects and are not a
 general guarantee that every irreversible operation is intercepted. Normal
 navigation does not request per-action approval.
+The credential broker's guarded CDP transport is a separate boundary: it only
+attaches to the bound target, accepts the broker's fixed login/session scripts,
+and rejects unknown methods, scripts, parameters and sessions. Cookie access is
+restricted to the guarded origin and compatible parent-domain cookies. Unknown
+cookie attributes or changed broker templates fail closed and require a
+coordinated gateway update; they are not evidence of an ordinary browsing
+approval sandbox. Local Chromium/WebSocket regression uses synthetic values.
 Joint acceptance must keep #180's actual login provider and #342's actual browser
 resolver; standalone seams intentionally fail closed without the other PR.
 

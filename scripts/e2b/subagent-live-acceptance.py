@@ -7,7 +7,7 @@ def cap(role,owner='probe-owner'):
  return p+'.'+base64.urlsafe_b64encode(hmac.new(KEY,p.encode(),hashlib.sha256).digest()).decode().rstrip('=')
 def url(path,role='runtime'):return f'http://127.0.0.1:6082/agents/{ID}{path}?token={cap(role)}'
 async def main():
- fixture=web.Application();fixture.router.add_get('/login',lambda _:web.Response(text='<input type=password id=password><input name=otp id=otp><button type=button id=delete>Delete account</button><a id=link href=/login>Read</a>',content_type='text/html'))
+ fixture=web.Application();fixture.router.add_get('/login',lambda _:web.Response(text='''<input type=password id=password><input name=otp id=otp><button type=button id=delete>Delete account</button><a id=link href=/login>Read</a><script>document.querySelectorAll('input').forEach(e=>e.addEventListener('input',()=>{history.pushState({},'','#fake-navigation');setTimeout(()=>{e.value=''},2500)}))</script>''',content_type='text/html'))
  runner=web.AppRunner(fixture);await runner.setup();await web.TCPSite(runner,'127.0.0.1',6083).start()
  async with aiohttp.ClientSession() as s:
   for _ in range(30):
@@ -39,16 +39,20 @@ async def main():
       if d.get('id')==seq:
        assert 'error' not in d,d;return d.get('result',{})
     a=await rpc('Target.attachToTarget',{'targetId':target,'flatten':True});session=a['sessionId']
-    await rpc('Runtime.evaluate',{'expression':"document.querySelector('#password').focus()"},session)
+    password_selector='input[type="password"]'
+    password_focus=f"(()=>{{const e=document.querySelector({json.dumps(password_selector)});if(!e||e.disabled||e.readOnly)return false;e.focus();e.value='';return document.activeElement===e}})()"
+    await rpc('Runtime.evaluate',{'expression':password_focus,'returnByValue':True},session)
     await rpc('Input.insertText',{'text':'synthetic-probe-password'},session)
     async with s.post(url('/credentials/end','broker'),json={'guardToken':g['guardToken']}) as r:assert r.status==409
-    await rpc('Runtime.evaluate',{'expression':"history.pushState({},'', '#fake-navigation')"},session)
+    assert (await rpc('Page.getFrameTree',{},session))['frameTree']['frame']['url'].endswith('#fake-navigation')
     async with s.post(url('/credentials/end','broker'),json={'guardToken':g['guardToken']}) as r:assert r.status==409
-    await rpc('Runtime.evaluate',{'expression':"document.querySelector('#password').value=''"},session)
-    await rpc('Runtime.evaluate',{'expression':"document.querySelector('#otp').value='123456'"},session)
+    await asyncio.sleep(3)
+    otp_focus='''(()=>{const e=document.querySelector('input[autocomplete="one-time-code"],input[name="code"],input[name="otp"]');if(!e||e.disabled||e.readOnly)return false;e.focus();e.value='';return document.activeElement===e})()'''
+    await rpc('Runtime.evaluate',{'expression':otp_focus,'returnByValue':True},session)
+    await rpc('Input.insertText',{'text':'123456'},session)
     async with s.post(url('/credentials/end','broker'),json={'guardToken':g['guardToken']}) as r:assert r.status==409
     async with s.post(url('/action'),json={'action':'observe'}) as r:assert r.status==409
-    await rpc('Runtime.evaluate',{'expression':"document.querySelector('#otp').value=''"},session)
+    await asyncio.sleep(3)
    async with s.post(url('/credentials/end','broker'),json={'guardToken':g['guardToken']}) as r:assert r.status==200,(r.status,await r.text())
   print('PASS: broker exclusive guard, fill, nonempty rejection, hash-navigation rejection, clear then resume',flush=True)
   async with s.post(url('/stop'),json={}) as r:assert r.status==200
