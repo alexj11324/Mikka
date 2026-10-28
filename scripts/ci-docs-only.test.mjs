@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, readFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -77,39 +77,65 @@ test('symlinks, gitlinks and unmerged entries fail closed', () => {
 })
 
 
-test('real git diffs handle rename, deletion, executable files and missing base safely', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'docs-gate-'))
+test('real git diffs retain all fixtures while testing rename, deletion and event boundaries', () => {
+  // Never check out, reset, remove, or clean a fixture. Deletions and renames
+  // are represented by new immutable tree objects, with all old objects kept.
+  const dir = mkdtempSync(join(tmpdir(), 'docs-gate-retained-'))
+  console.log(`Retained docs gate evidence: ${dir}`)
   const script = resolve('scripts/ci-docs-only.mjs')
-  const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' })
-  const classify = (base, head = 'HEAD') => execFileSync(process.execPath, [script, '--base', base, '--head', head], { cwd: dir, encoding: 'utf8' })
-  try {
-    git('init', '-q'); git('config', 'user.name', 'Test'); git('config', 'user.email', 'test@example.invalid')
-    mkdirSync(join(dir, 'docs')); writeFileSync(join(dir, 'code.js'), 'code\n'); writeFileSync(join(dir, 'docs', 'old.md'), 'docs\n')
-    git('add', '.'); git('commit', '-qm', 'base'); git('tag', 'base')
-    git('mv', 'code.js', 'docs/code.md'); git('commit', '-qm', 'move code')
-    assert.match(classify('base'), /docs_only=false/)
-    git('reset', '--hard', 'base'); git('rm', 'docs/old.md'); git('commit', '-qm', 'delete docs')
-    assert.match(classify('base'), /docs_only=true/)
-    mkdirSync(join(dir, 'docs'), { recursive: true }); writeFileSync(join(dir, 'docs', 'tool.md'), 'tool\n'); git('add', '.'); git('update-index', '--chmod=+x', 'docs/tool.md'); git('commit', '-qm', 'executable')
-    assert.match(classify('base'), /docs_only=false/)
-    assert.match(classify('missing'), /docs_only=false/)
-    git('reset', '--hard', 'base'); git('rm', 'code.js'); git('commit', '-qm', 'delete code')
-    assert.match(classify('base'), /docs_only=false/)
-    git('reset', '--hard', 'base'); git('mv', 'docs/old.md', 'moved.js'); git('commit', '-qm', 'move docs to code')
-    assert.match(classify('base'), /docs_only=false/)
-    git('reset', '--hard', 'base'); symlinkSync('old.md', join(dir, 'docs', 'link.md')); git('add', '.'); git('commit', '-qm', 'symlink')
-    assert.match(classify('base'), /docs_only=false/)
-    git('reset', '--hard', 'base'); writeFileSync(join(dir, 'docs', 'new.md'), 'docs\n'); git('add', '.'); git('commit', '-qm', 'docs')
-    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim()
-    const base = execFileSync('git', ['rev-parse', 'base'], { cwd: dir, encoding: 'utf8' }).trim()
-    const eventFile = join(dir, 'event.json')
-    writeFileSync(eventFile, JSON.stringify({ pull_request: { base: { sha: base }, head: { sha: head, repo: { full_name: 'fork/repo' } } } }))
-    const event = execFileSync(process.execPath, [script], { cwd: dir, encoding: 'utf8', env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: eventFile } })
-    assert.match(event, /docs_only=true/)
-    writeFileSync(eventFile, JSON.stringify({ pull_request: { base: { sha: '0'.repeat(40) }, head: { sha: head } } }))
-    const missing = execFileSync(process.execPath, [script], { cwd: dir, encoding: 'utf8', env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: eventFile } })
-    assert.match(missing, /docs_only=false/)
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+  const env = {
+    PATH: process.env.PATH,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.invalid',
+    GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.invalid',
+  }
+  const git = (args, input) => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', ...args], {
+    cwd: dir, env, input, encoding: 'utf8',
+  }).trim()
+  const record = (name, data) => writeFileSync(join(dir, name), JSON.stringify(data, null, 2), { flag: 'wx' })
+  const classify = (base, head) => execFileSync(process.execPath, [script, '--base', base, '--head', head], { cwd: dir, env, encoding: 'utf8' })
+  mkdirSync(join(dir, 'empty-template'))
+  git(['init', '--bare', '--template=empty-template', '.'])
+  const code = git(['hash-object', '-w', '--stdin'], 'code\n')
+  const docs = git(['hash-object', '-w', '--stdin'], 'docs\n')
+  const tree = entries => git(['mktree'], entries.map(([mode, type, oid, name]) => `${mode} ${type} ${oid}\t${name}\n`).join(''))
+  const root = (docsEntries, includeCode = true, extra = []) => tree([
+    ...(includeCode ? [['100644', 'blob', code, 'code.js']] : []),
+    ['040000', 'tree', tree(docsEntries), 'docs'], ...extra,
+  ])
+  const oldDocs = ['100644', 'blob', docs, 'old.md']
+  const base = git(['commit-tree', root([oldDocs]), '-m', 'base'])
+  record('base.json', { base })
+  const cases = [
+    ['rename-code-into-docs', root([oldDocs, ['100644', 'blob', code, 'code.md']], false), false],
+    ['delete-docs', root([]), true],
+    ['executable-docs', root([oldDocs, ['100755', 'blob', docs, 'tool.md']]), false],
+    ['delete-code', root([oldDocs], false), false],
+    ['rename-docs-into-code', root([], true, [['100644', 'blob', docs, 'moved.js']]), false],
+    ['symlink', root([oldDocs, ['120000', 'blob', docs, 'link.md']]), false],
+    ['add-docs', root([oldDocs, ['100644', 'blob', docs, 'new.md']]), true],
+  ]
+  let docsHead
+  for (const [name, treeId, expected] of cases) {
+    const head = git(['commit-tree', treeId, '-p', base, '-m', name])
+    const output = classify(base, head)
+    record(`${name}.json`, { base, head, treeId, expected, output })
+    assert.match(output, new RegExp(`docs_only=${expected}`), name)
+    if (name === 'add-docs') docsHead = head
+  }
+  const unavailable = classify('missing', docsHead)
+  record('missing-base.json', { output: unavailable })
+  assert.match(unavailable, /docs_only=false/)
+  for (const [name, baseSha, expected] of [['fork', base, true], ['empty-base', '0'.repeat(40), false]]) {
+    const eventFile = join(dir, `${name}-event.json`)
+    record(`${name}-event.json`, { pull_request: { base: { sha: baseSha }, head: { sha: docsHead, repo: { full_name: 'fork/repo' } } } })
+    const output = execFileSync(process.execPath, [script], {
+      cwd: dir, encoding: 'utf8', env: { ...env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: eventFile },
+    })
+    record(`${name}-result.json`, { output })
+    assert.match(output, new RegExp(`docs_only=${expected}`))
+  }
 })
 
 
@@ -121,7 +147,7 @@ test('all required gates reject failed classification and skipped full jobs', ()
     for (const [, block] of blocks) {
       const script = block.split('        run: |\n')[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
       const result = (changes, docs, full) => {
-        try { execFileSync('bash', ['-e', '-c', script], { env: { ...process.env, CHANGES_RESULT: changes, DOCS_ONLY: docs, FULL_RESULT: full }, stdio: 'ignore' }); return true } catch { return false }
+        try { execFileSync('bash', ['-e', '-c', script], { env: { PATH: process.env.PATH, CHANGES_RESULT: changes, DOCS_ONLY: docs, FULL_RESULT: full }, stdio: 'ignore' }); return true } catch { return false }
       }
       assert.equal(result('failure', 'true', 'skipped'), false)
       assert.equal(result('success', 'false', 'skipped'), false)
