@@ -62,13 +62,14 @@ export async function readComposioAccountEmail(composio: ComposioClient, userId:
  * Disconnects one of the person's accounts and forgets Mikka's notes on it.
  * Callers first verify ownership and an explicit disconnect/reconnect request.
  * The documented delete endpoint stops calls immediately, frees the alias,
- * and requests best-effort upstream revocation. Never infer deletion permission
- * from a revoke error. Upstream revocation may finish asynchronously.
+ * and optionally requests best-effort upstream revocation. Replacing a connection
+ * must preserve the provider grant the new connection may share. Never infer
+ * deletion permission from a revoke error. Revocation may finish asynchronously.
  */
-export async function retireComposioAccount(composio: ComposioClient, userId: string, accountId: string) {
+export async function retireComposioAccount(composio: ComposioClient, userId: string, accountId: string, intent: 'disconnect' | 'replace') {
   await disconnectAndForgetAccount({
     disconnect: async () => {
-      const result = await composio.getClient().connectedAccounts.delete(accountId, { revoke_on_delete: true })
+      const result = await composio.getClient().connectedAccounts.delete(accountId, { revoke_on_delete: intent === 'disconnect' })
       if (!result.success) throw new Error('integrationDisconnectFailed')
     },
     forget: () => forgetComposioAccount(userId, accountId),

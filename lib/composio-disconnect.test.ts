@@ -21,13 +21,17 @@ test('real SDK disconnect uses only the exact account delete endpoint and reques
     return Response.json(status === 200 ? { success } : { error: { message: 'synthetic refusal' } }, { status })
   })
   try {
-    await retireComposioAccount(client, 'owner', 'ca_exact')
+    await retireComposioAccount(client, 'owner', 'ca_exact', 'disconnect')
     assert.deepEqual(forgotten, [['owner', 'ca_exact']])
     assert.deepEqual(calls, [{ method: 'DELETE', url: 'https://composio.test.invalid/api/v3.1/connected_accounts/ca_exact?revoke_on_delete=true' }])
+    calls.length = 0; forgotten.length = 0
+    await retireComposioAccount(client, 'owner', 'ca_old', 'replace')
+    assert.deepEqual(calls, [{ method: 'DELETE', url: 'https://composio.test.invalid/api/v3.1/connected_accounts/ca_old?revoke_on_delete=false' }])
+    assert.deepEqual(forgotten, [['owner', 'ca_old']])
     forgotten.length = 0
     for (const response of [{ status: 400, success: false }, { status: 200, success: false }]) {
       status = response.status; success = response.success; calls.length = 0
-      await assert.rejects(retireComposioAccount(client, 'owner', 'ca_exact'))
+      await assert.rejects(retireComposioAccount(client, 'owner', 'ca_exact', 'disconnect'))
       assert.deepEqual(forgotten, [])
       assert.equal(calls.length, 1)
       assert.equal(calls[0].method, 'DELETE')

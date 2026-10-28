@@ -106,7 +106,7 @@ async function handleDELETE(request: Request) {
   try {
     const account = await findOwnAccount(composio, session.user.id, parsed.data.accountId)
     if (!account) return NextResponse.json({ error: 'integrationNotFound' }, { status: 404 })
-    await retireComposioAccount(composio, session.user.id, account.id)
+    await retireComposioAccount(composio, session.user.id, account.id, 'disconnect')
     return new Response(null, { status: 204 })
   } catch {
     return NextResponse.json({ error: 'integrationDisconnectFailed' }, { status: 502 })
