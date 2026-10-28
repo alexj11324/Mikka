@@ -93,9 +93,24 @@ export class Cdp {
   async safeToResume(_initialUrl: string) {
     // A URL change can be pushState/hash rather than navigation. Check every
     // time, including after redirects, before allowing any image or DOM read.
-    // Match the gateway's conservative guard: an OTP may have any name.
-    // Hidden and non-text controls often contain ordinary fixed values.
-    return await this.evaluate(`![...document.querySelectorAll('input,textarea')].some(e=>e.value && (e.tagName==='TEXTAREA'||!['hidden','checkbox','radio','button','submit','reset','image','file','range','color'].includes(e.type)))`) === true
+    // Match the gateway: nested frames and author shadow trees are not covered
+    // by the top-level evaluator, so fail closed until they can be inspected.
+    try {
+      const tree = await this.call('Page.getFrameTree')
+      const document = await this.call('DOM.getDocument', { depth: -1, pierce: true })
+      if (!tree.frameTree || typeof tree.frameTree !== 'object' || Array.isArray(tree.frameTree) || (tree.frameTree.childFrames != null && (!Array.isArray(tree.frameTree.childFrames) || tree.frameTree.childFrames.length > 0)) || !document.root || typeof document.root !== 'object' || Array.isArray(document.root)) return false
+      const unsafe = (value: unknown): boolean => {
+        if (Array.isArray(value)) return value.some(unsafe)
+        if (!value || typeof value !== 'object') return false
+        const node = value as Record<string, any>
+        if (['IFRAME', 'FRAME'].includes(String(node.nodeName ?? '').toUpperCase())) return true
+        if (node.shadowRoots != null && (!Array.isArray(node.shadowRoots) || node.shadowRoots.some((root: unknown) => !root || typeof root !== 'object' || (root as { shadowRootType?: string }).shadowRootType !== 'user-agent'))) return true
+        return Object.values(node).some(unsafe)
+      }
+      if (unsafe(document.root)) return false
+      // An OTP may have any name. Hidden and non-text controls often hold fixed values.
+      return await this.evaluate(`![...document.querySelectorAll('input,textarea')].some(e=>e.value && (e.tagName==='TEXTAREA'||!['hidden','checkbox','radio','button','submit','reset','image','file','range','color'].includes(e.type)))`) === true
+    } catch { return false }
   }
   async fillOtp(origin: string, code: string) {
     await this.origin(origin)

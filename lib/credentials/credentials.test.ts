@@ -76,7 +76,7 @@ test('actual streaming payload limit applies without content-length', async () =
 })
 test('pushState/hash changes cannot resume screenshots while fields remain populated', async () => {
   const cdp = Object.create(Cdp.prototype) as Cdp
-  cdp.call = async () => ({ frameTree: { frame: { url: 'https://example.com/changed#hash' } } })
+  cdp.call = async method => method === 'DOM.getDocument' ? { root: { nodeName: '#document' } } : { frameTree: { frame: { url: 'https://example.com/changed#hash' } } }
   cdp.evaluate = async () => false
   assert.equal(await cdp.safeToResume('https://example.com/login'), false)
   cdp.evaluate = async () => true
@@ -85,6 +85,7 @@ test('pushState/hash changes cannot resume screenshots while fields remain popul
 
 test('viewer stays locked for every supported nonempty OTP input', async () => {
   const cdp = Object.create(Cdp.prototype) as Cdp
+  cdp.call = async method => method === 'DOM.getDocument' ? { root: { nodeName: '#document' } } : { frameTree: {} }
   for (const field of [
     { tagName: 'INPUT', type: 'password', autocomplete: '', name: 'password' },
     { tagName: 'INPUT', type: 'text', autocomplete: 'one-time-code', name: 'verification' },
@@ -101,6 +102,26 @@ test('viewer stays locked for every supported nonempty OTP input', async () => {
   }
   cdp.evaluate = async expression => runInNewContext(expression, { document: { querySelectorAll: () => [{ tagName: 'INPUT', type: 'hidden', value: 'fixed' }] } })
   assert.equal(await cdp.safeToResume('https://example.com/login'), true)
+})
+
+test('viewer stays locked when nested documents or author shadow roots cannot be inspected', async () => {
+  const cdp = Object.create(Cdp.prototype) as Cdp
+  cdp.evaluate = async () => true
+  for (const [tree, root, expected] of [
+    [{ frameTree: {} }, { nodeName: '#document' }, true],
+    [{ frameTree: { childFrames: [{}] } }, { nodeName: '#document' }, false],
+    [{ frameTree: { childFrames: {} } }, { nodeName: '#document' }, false],
+    [{ frameTree: {} }, { nodeName: '#document', children: [{ nodeName: 'IFRAME' }] }, false],
+    [{ frameTree: {} }, { nodeName: '#document', children: [{ shadowRoots: [{ shadowRootType: 'open' }] }] }, false],
+    [{ frameTree: {} }, { nodeName: '#document', children: [{ shadowRoots: [{ shadowRootType: 'closed' }] }] }, false],
+    [{ frameTree: {} }, { nodeName: '#document', children: [{ shadowRoots: [{ shadowRootType: 'user-agent' }] }] }, true],
+    [{}, { nodeName: '#document' }, false],
+  ] as const) {
+    cdp.call = async method => method === 'DOM.getDocument' ? { root } : tree
+    assert.equal(await cdp.safeToResume('https://example.com/login'), expected)
+  }
+  cdp.call = async () => { throw new Error('CDP unavailable') }
+  assert.equal(await cdp.safeToResume('https://example.com/login'), false)
 })
 
 test('HMAC scanner rejects nested chat/tool secret copies without retaining values', () => {
