@@ -19,7 +19,7 @@ export function frozenScopeModule(path, bytes) {
 }
 export function scopeNativeRuntime(pg, rpc, phase, mode) {
   const clients = new Set(), pools = new Set(), servers = new Set(), ports = new Set()
-  const wrapped = new WeakSet()
+  const wrapped = new WeakSet(), patches = []
   let stopped = false, listenerCount = 0, cleanupCount = 0
   const bucket = phase + (mode === 'migrate' ? ':migrate' : '')
   const options = input => {
@@ -32,7 +32,7 @@ export function scopeNativeRuntime(pg, rpc, phase, mode) {
   async function instrument(client, input) {
     if (wrapped.has(client)) return client
     const url = input.connectionString, database = checkedScopeUrl(url, phase)
-    const original = client.query.bind(client)
+    const original = (client.query === guardedClientQuery ? originalClientQuery : client.query).bind(client)
     clients.add(client);wrapped.add(client)
     const permit = await rpc('query', { bucket, url, text: SCOPE_IDENTITY_SQL, handshake: true })
     try {
@@ -41,57 +41,142 @@ export function scopeNativeRuntime(pg, rpc, phase, mode) {
       if (identity?.database !== database || identity?.role !== 'postgres') throw Error('scope connection identity mismatch')
       await rpc('query-result', { id: permit.id, ok: true, rowCount: answer.rowCount ?? 0, identity })
     } catch (error) { await rpc('query-result', { id: permit.id, ok: false, code: error?.code ?? null }); throw error }
-    client.query = (...args) => {
-      const callback = typeof args.at(-1) === 'function' ? args.pop() : null
-      const work = (async () => {
-        const config = args[0], text = typeof config === 'string' ? config : config?.text
+    const query = function (...args) {
+      const config = args[0]
+      if (config == null) throw new TypeError('Client was passed a null or undefined query')
+      const submitted = typeof config.submit === 'function'
+      if (submitted && !(config instanceof pg.Query)) throw Error('scope custom streaming queries are not supported')
+      const callback = typeof args.at(-1) === 'function' ? args.at(-1) : typeof config.callback === 'function' ? config.callback : null
+      const PromiseImpl = client._Promise ?? Promise
+      let permit, complete
+      const terminal = new PromiseImpl(resolve => { complete = resolve })
+      let completion
+      const finish = (error, value) => completion ??= (async () => {
+        if (permit) {
+          const results = Array.isArray(value) ? value : [value]
+          await rpc('query-result', error ? { id: permit.id, ok: false, code: error.code ?? null } : { id: permit.id, ok: true, rowCount: results.reduce((n, result) => n + (result?.rowCount ?? 0), 0), commands: results.map(result => result?.command ?? null) })
+        }
+        return { error, value }
+      })().catch(failure => ({ error: failure })).then(outcome => { complete(outcome);return outcome })
+      if (submitted) {
+        const emit = config.emit
+        let errorReported = false
+        const reportError = error => { if (!errorReported) { errorReported = true;emit.call(config, 'error', error) } }
+        config.emit = function (event, ...values) {
+          if (!['end','error'].includes(event)) return emit.call(this, event, ...values)
+          const observed = this.listenerCount(event) > 0
+          void finish(event === 'error' ? values[0] : null, values[0]).then(outcome => {
+            if (outcome.error) { if (!callback) reportError(outcome.error) }
+            else emit.call(this, event, ...values)
+          })
+          return observed
+        }
+        // Native pg also installs a callback when query_timeout is enabled.
+        // Retain event-style errors, and never emit end after a failed result
+        // acknowledgement or report the original successful value instead.
+        config.callback = (error, value) => { void finish(error, value).then(outcome => {
+          if (callback) callback(outcome.error, outcome.value)
+          else if (outcome.error) reportError(outcome.error)
+        }) }
+      }
+      void (async () => {
+        const text = typeof config === 'string' ? config : config.text
         if (typeof text !== 'string') throw Error('scope query requires text')
-        // A cancelled/aborted transaction still needs its own bounded ROLLBACK.
+        const values = typeof config === 'object' ? config.values : args[1]
         if (stopped) {
           if (text.trim().toUpperCase() !== 'ROLLBACK' || ++cleanupCount > 64) throw Error('scope acceptance stopped')
-          const permit=await rpc('cleanup',{bucket,url,text})
-          try { const answer=await original(...args);await rpc('query-result',{id:permit.id,ok:true,rowCount:answer.rowCount??0,cleanup:true});return answer }
-          catch(error){await rpc('query-result',{id:permit.id,ok:false,code:error?.code??null,cleanup:true});throw error}
+          permit = await rpc('cleanup', { bucket, url, text })
+        } else {
+          permit = await rpc('query', { bucket, url, text, ledgerName: text === 'insert into schema_migrations (name) values ($1)' ? values?.[0] : undefined })
+          if (stopped) throw Object.assign(Error('scope cancelled before native submission'), { code: 'CANCELLED_BEFORE_SUBMIT' })
         }
-        const values = typeof config === 'object' ? config.values : args[1]
-        const permit = await rpc('query', { bucket, url, text, ledgerName: text === 'insert into schema_migrations (name) values ($1)' ? values?.[0] : undefined })
-        if(stopped){await rpc('query-result',{id:permit.id,ok:false,code:'CANCELLED_BEFORE_SUBMIT',rowCount:0});throw Error('scope cancelled before native submission')}
-        try {
-          const answer = await original(...args), results = Array.isArray(answer) ? answer : [answer]
-          await rpc('query-result', { id: permit.id, ok: true, rowCount: results.reduce((n, result) => n + (result?.rowCount ?? 0), 0), commands: results.map(result => result?.command ?? null) })
-          return answer
-        } catch (error) {
-          await rpc('query-result', { id: permit.id, ok: false, code: error?.code ?? null })
-          throw error
+        if (submitted) original(config)
+        else {
+          const input = typeof config === 'object' ? { ...config, callback: undefined } : config
+          const parameters = typeof args[1] === 'function' ? undefined : args[1]
+          // Use the real driver's callback path, including QueryConfig.types,
+          // rowMode and serialization; do not reconstruct Result or parsers.
+          const result = original(input, parameters, (error, value) => { void finish(error, value) })
+          if (result?.then) result.then(value => finish(null, value), error => finish(error))
         }
-      })()
-      if (callback) { work.then(result => callback(null, result), error => callback(error));return }
-      return work
+      })().catch(error => {
+        if (submitted) {
+          if (callback) config.callback(error)
+          else config.emit('error', error)
+        } else void finish(error)
+      })
+      if (submitted) return config
+      if (callback) { terminal.then(({error,value}) => callback(error, value));return }
+      return terminal.then(({error,value}) => { if (error) throw error;return value })
     }
+    Object.defineProperties(query, Object.getOwnPropertyDescriptors(client.query))
+    client.query = query
     return client
   }
-  class Pool extends pg.Pool {
-    constructor(input) { super(options(input)); this.scopeInput = options(input);pools.add(this) }
-    connect(callback) {
-      const work = (async () => {
-        if (stopped) throw Error('scope acceptance stopped')
-        await rpc('connect', { bucket, url: this.scopeInput.connectionString })
-        if(stopped)throw Error('scope cancelled before connect')
-        const client = await new Promise((resolve, reject) => super.connect((error, value) => error ? reject(error) : resolve(value)))
-        try { return await instrument(client, this.scopeInput) }
-        catch (error) { client.release(true);throw error }
-      })()
-      if (callback) { work.then(client => callback(null, client, client.release), error => callback(error));return }
-      return work
-    }
+  // Keep the installed pg module, constructor identities, exports, descriptors,
+  // symbols and native pool release bookkeeping. Only connection/query methods
+  // are gated; ESM and CJS callers therefore use the same real driver objects.
+  const { Pool, Client } = pg
+  const originalClientQuery = Client.prototype.query
+  let guardedClientQuery
+  function patch(prototype, name, replacement) {
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, name)
+    const original = prototype[name]
+    Object.defineProperties(replacement, Object.getOwnPropertyDescriptors(original))
+    Object.defineProperty(prototype, name, { ...descriptor, value: replacement, configurable: true, writable: true })
+    patches.push(() => descriptor ? Object.defineProperty(prototype, name, descriptor) : delete prototype[name])
+    return original
   }
-  class Client extends pg.Client {
-    constructor(input) { super(options(input));this.scopeInput = options(input) }
-    connect(callback) {
-      const work = (async () => { await rpc('connect', { bucket, url: this.scopeInput.connectionString });if(stopped)throw Error('scope cancelled before connect');await super.connect();await instrument(this, this.scopeInput) })()
-      if (callback) { work.then(() => callback(null), callback);return }
-      return work
+  function connectResult(receiver, callback, run) {
+    const PromiseImpl = receiver.Promise ?? receiver._Promise ?? Promise
+    const work = new PromiseImpl(resolve => run((error, value, release) => resolve({ error, value, release })))
+    if (callback) {
+      work.then(({ error, value, release }) => callback(error, value, release))
+      return
     }
+    return work.then(({ error, value }) => { if (error) throw error;return value })
+  }
+  if (typeof originalClientQuery === 'function') {
+    guardedClientQuery = function () { throw Error('scope query before approved connection') }
+    patch(Client.prototype, 'query', guardedClientQuery)
+  }
+  const originalPoolConnect = patch(Pool.prototype, 'connect', function (callback) {
+    return connectResult(this, callback, done => {
+      Promise.resolve().then(async () => {
+        if (stopped) throw Error('scope acceptance stopped')
+        // pg-pool retains its own options object and Client constructor.
+        Object.assign(this.options, options(this.options));pools.add(this)
+        await rpc('connect', { bucket, url: this.options.connectionString })
+        if (stopped) throw Error('scope cancelled before connect')
+        originalPoolConnect.call(this, (error, client, release) => {
+          if (error) return done(error, client, release)
+          instrument(client, this.options).then(value => done(null, value, release), failure => { release(failure);done(failure, undefined, () => {}) })
+        })
+      }).catch(done)
+    })
+  })
+  if (typeof Client.prototype.connect === 'function') {
+    const originalClientConnect = patch(Client.prototype, 'connect', function (callback) {
+      return connectResult(this, callback ? (error, value) => error ? callback(error) : callback(null, value) : undefined, done => {
+        Promise.resolve().then(async () => {
+          if (stopped) throw Error('scope acceptance stopped')
+          const params = this.connectionParameters
+          const connectionString = `postgresql://${params.user}@${params.host}:${params.port}/${params.database}`
+          checkedScopeUrl(connectionString, phase)
+          if (this.host !== params.host || this.port !== params.port || this.user !== params.user || this.database !== params.database || this.password || params.password || params.options || params.ssl) throw Error('scope effective pg connection mismatch')
+          const input = options({ connectionString })
+          Object.assign(params, { statement_timeout: input.statement_timeout, lock_timeout: input.lock_timeout, idle_in_transaction_session_timeout: input.idle_in_transaction_session_timeout, query_timeout: input.query_timeout, application_name: input.application_name })
+          this._connectionTimeoutMillis = input.connectionTimeoutMillis
+          clients.add(this)
+          await rpc('connect', { bucket, url: connectionString })
+          if (stopped) throw Error('scope cancelled before connect')
+          originalClientConnect.call(this, error => {
+            if (error) return done(error)
+            instrument(this, input).then(() => done(null, this), failure => { void this.end();done(failure) })
+          })
+        }).catch(done)
+      })
+    })
   }
   async function close() {
     stopped = true
@@ -100,15 +185,14 @@ export function scopeNativeRuntime(pg, rpc, phase, mode) {
     // cancellation/termination of unrelated sessions, server or container.
     await Promise.allSettled([...clients].filter(client => !client._ending).map(client => client.end()))
     await Promise.allSettled([...pools].filter(pool => !pool.ending).map(pool => pool.end()))
+    for (const restore of patches.reverse()) restore()
   }
   function cancel() { stopped=true;for(const server of servers){server.closeAllConnections?.();server.close()} }
   function abort(error) { cancel();void rpc('failure', { reason: error?.message ?? 'scope subtest failed' }).catch(() => {}) }
   function install(frozenSources = new Map(), resumeScope = false) {
     globalThis.scopeAcceptance = { Pool, Client, abort, ...(resumeScope?{resumeScope:database=>rpc('resume-scope',{database})}:{}) }
     registerHooks({
-      resolve(specifier, context, next) { return specifier === 'pg' ? { url: 'scope-acceptance:pg', shortCircuit: true } : next(specifier, context) },
       load(url, context, next) {
-        if(url==='scope-acceptance:pg')return {format:'module',source:'export const Pool=globalThis.scopeAcceptance.Pool;export const Client=globalThis.scopeAcceptance.Client;export default {Pool,Client}',shortCircuit:true}
         if(url.startsWith('file:')){const path=fileURLToPath(new URL(url));const bytes=frozenSources.get(path);if(bytes){const loaded=frozenScopeModule(path,bytes);if(loaded)return loaded}}
         return next(url,context)
       },

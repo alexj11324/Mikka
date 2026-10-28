@@ -11,9 +11,12 @@ const policy=()=>{const events=[];return {events,p:scopePolicy([],event=>events.
 test('target mismatch fails before any native connection and aliases/credentials/options are refused', async()=>{
   for(const value of [scopeUrl('production'),phaseUrl+'?options=x',phaseUrl.replace('127.0.0.1','localhost'),phaseUrl.replace('postgres@','postgres:guess@'),scopeUrl(names.app)])assert.throws(()=>checkedScopeUrl(value,'scope'),/mismatch/)
   let constructions=0
-  const runtime=scopeNativeRuntime({Pool:class {constructor(){constructions++}},Client:class {}},()=>{},'scope','suite')
-  assert.throws(()=>new runtime.Pool({connectionString:scopeUrl(names.app)}),/mismatch/)
-  assert.equal(constructions,0)
+  const runtime=scopeNativeRuntime({Pool:class {constructor(){constructions++} connect(){throw Error('native connection forbidden')}},Client:class {}},()=>{},'scope','suite')
+  const pool = new runtime.Pool({connectionString:scopeUrl(names.app)})
+  pool.options={connectionString:scopeUrl(names.app)}
+  await assert.rejects(pool.connect(),/mismatch/)
+  assert.equal(constructions,1,'constructor remains the actual native constructor; connection is denied')
+  await runtime.close()
 })
 
 test('global application/migration budgets count failed attempts and deny work after exhaustion',()=>{
@@ -98,7 +101,7 @@ test('native facade applies per-connection timeouts, logs SQL failure and closes
     async end(){this._ending=true;trace.push('client-end')}
   }
   class NativePool {
-    constructor(input){options.push(input)}
+    constructor(input){this.options=input;options.push(input)}
     connect(callback){const client=new NativeClient();client.release=()=>{};callback(null,client)}
     async end(){this.ending=true;trace.push('pool-end')}
   }
@@ -172,7 +175,7 @@ test('application and migration native adapters do not submit SQL after a denied
   for(const mode of ['suite','migrate']){
     let nativeQueries=0
     class NativeClient {async query(){nativeQueries++;return {rows:[{database:names.scope,role:'postgres',oid:'1'}],rowCount:1}} async end(){this._ending=true}}
-    class NativePool {connect(callback){const client=new NativeClient();client.release=()=>{};callback(null,client)} async end(){this.ending=true}}
+    class NativePool {constructor(input){this.options=input} connect(callback){const client=new NativeClient();client.release=()=>{};callback(null,client)} async end(){this.ending=true}}
     const rpc=async(kind,input)=>{
       if(kind==='query'){assert.equal(input.bucket,'scope'+(mode==='migrate'?':migrate':''));if(!input.handshake)throw Error('budget exhausted');return {id:'handshake'}}
     }
@@ -189,7 +192,7 @@ test('cancellation while awaiting a granted query is rechecked before native sub
   let nativeQueries=0,runtime
   const results=[]
   class NativeClient {async query(){nativeQueries++;return {rows:[{database:names.scope,role:'postgres',oid:'1'}],rowCount:1}} async end(){this._ending=true}}
-  class NativePool {connect(callback){const client=new NativeClient();client.release=()=>{};callback(null,client)} async end(){this.ending=true}}
+  class NativePool {constructor(input){this.options=input} connect(callback){const client=new NativeClient();client.release=()=>{};callback(null,client)} async end(){this.ending=true}}
   const rpc=async(kind,input)=>{
     if(kind==='query'){if(!input.handshake)runtime.cancel();return {id:input.handshake?'identity':'cancelled'}}
     if(kind==='query-result')results.push(input)
