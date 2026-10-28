@@ -1,6 +1,6 @@
-import { spawn, execFile, type ChildProcess } from 'node:child_process'
+import { spawn, execFile } from 'node:child_process'
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -11,7 +11,7 @@ import { test, expect, register, openCreateIssue } from '../e2e/fixtures'
 import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 import { assertMvpEnvironment, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from './isolated-env.mjs'
 import { RepositoryCache } from '../../packages/daemon/src/repositories'
-import { finishMvpResources, indexMvpResource, retainMvpResources } from './retention.mjs'
+import { finishMvpResources, indexMvpResource } from './retention.mjs'
 
 const execute = promisify(execFile)
 type Device = { id: string; name: string; protocolVersion: number }
@@ -27,15 +27,6 @@ async function service<T>(path: string, input?: object): Promise<T> {
   const response = await fetch(`${MVP_SERVICES}${path}`, input ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) } : undefined)
   expect(response.ok, `fixture ${path} must succeed`).toBe(true)
   return response.json() as Promise<T>
-}
-
-async function stopProcess(child: ChildProcess) {
-  if (child.exitCode !== null || child.signalCode !== null) return
-  await new Promise<void>(resolve => {
-    const timer = setTimeout(() => { child.kill('SIGKILL') }, 5_000)
-    child.once('exit', () => { clearTimeout(timer); resolve() })
-    child.kill('SIGTERM')
-  })
 }
 
 async function setup(page: Page, testInfo: TestInfo) {
@@ -103,7 +94,7 @@ async function setup(page: Page, testInfo: TestInfo) {
   const checkpoints: { at: string; step: string }[] = []
   const checkpoint = (step: string) => { checkpoints.push({ at: new Date().toISOString(), step }) }
   const cleanup = async () => {
-    await finishMvpResources({ retain: retainMvpResources(), stop: async () => { await stopProcess(daemon) },
+    await finishMvpResources({
       revoke: async () => { await pool.query('UPDATE device_tokens SET "revokedAt" = now() WHERE id = $1 AND "userId" = $2', [tokenId, user.id]) },
     })
     const services = await service<ServiceEvidence>('/observations').catch(() => ({ observations: [], errors: ['Fixture service unavailable'], pullRequests: [] }))
@@ -115,7 +106,6 @@ async function setup(page: Page, testInfo: TestInfo) {
     await testInfo.attach('mvp-acceptance-evidence.json', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' })
     if (daemonOutput) await testInfo.attach('daemon-output', { body: daemonOutput, contentType: 'text/plain' })
     // Credentials, daemon.secret, device.json and Workflow storage are never artifacts.
-    await finishMvpResources({ retain: retainMvpResources(), stop: async () => {}, cleanup: async () => { await rm(dataDir, { recursive: true, force: true }) } })
   }
   try {
     await expect.poll(async () => {

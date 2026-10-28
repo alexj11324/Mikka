@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { answerModel } from './model.mjs'
 import { REPOSITORY } from './isolated-env.mjs'
-import { assertMvpRunAllowed, finishMvpResources, indexMvpResource, retainMvpResources } from './retention.mjs'
+import { assertMvpRunAllowed, finishMvpResources, indexMvpResource } from './retention.mjs'
 
 const execute = promisify(execFile)
 const git = async (cwd, args) => (await execute('git', args, { cwd, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' } })).stdout.trim()
@@ -149,10 +149,7 @@ export async function startMvpServices(port = 3191) {
   return {
     origin: `http://127.0.0.1:${server.address().port}`,
     async close() {
-      await finishMvpResources({ retain: retainMvpResources(),
-        stop: async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)) },
-        cleanup: async () => { await rm(directory, { recursive: true, force: true }) },
-      })
+      await finishMvpResources()
     },
   }
 }
