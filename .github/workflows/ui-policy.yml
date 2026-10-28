@@ -80,6 +80,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:factory-check-independence
+      - run: pnpm test:factory-check-recovery
       - run: pnpm test:ui-policy
       - run: pnpm test:motion
       - run: pnpm test:i18n

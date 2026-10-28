@@ -96,7 +96,8 @@
     "test:approved-writes-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-legacy-schema.db.test.ts",
     "test:factory-routing": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/intake.test.ts lib/factory/tools.test.ts",
     "test:factory-routing-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/routing.db.test.ts",
-    "test:factory-checks-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/checks.db.test.ts"
+    "test:factory-checks-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/checks.db.test.ts",
+    "test:factory-check-recovery": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/check-recovery-tools.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

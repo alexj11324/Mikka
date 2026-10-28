@@ -1,4 +1,6 @@
 import { FACTORY_QUESTION_INSTRUCTIONS } from '@/lib/factory/instructions'
+import { FACTORY_CHECK_RECOVERY_INSTRUCTIONS } from '@/lib/factory/check-recovery'
+import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { FactoryError } from '@/lib/factory/contract'
 import { preserveMessageSources } from '@/lib/coordinator/message-safety'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
@@ -166,7 +168,7 @@ export async function preparePrompt(userId: string, botId: string | null = null,
   }
   const base = snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS)
   const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
-  const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS : ''
+  const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
   return { instructions: instructionsWithMemory(instructions, memory) + factoryPolicy, messages: promptMessages(summary, messages, summaryTrust) }
 }
 
@@ -460,6 +462,12 @@ export async function dispatchFactoryTask(userId:string,input:import('@/lib/fact
   'use step'
   await assertNativeToolScope(userId,scope)
   return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).dispatch(userId,input))
+}
+export async function recoverFactoryCheck(userId:string,input:import('@/lib/factory/check-recovery').FactoryCheckRecoveryInput,judge:import('@/lib/factory/check-recovery').FactoryRecoveryJudge|undefined,scope?:NativeToolScope,botId:string|null=null) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  if (!issueMutationsEnabled()) return {error:'issue_mutations_unavailable'}
+  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).recoverCheck(userId,input,judge))
 }
 export async function listFactoryQuestions(userId:string,taskId:string,scope?:NativeToolScope,botId:string|null=null) {
   'use step'

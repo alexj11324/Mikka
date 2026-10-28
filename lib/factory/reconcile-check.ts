@@ -1,6 +1,5 @@
 import type { PoolClient } from "pg";
 import type { RunReport } from "@mikka/protocol/run";
-import { orchestratorSettings } from "@mikka/protocol/orchestrator";
 import {
   FactoryError,
   type FactoryBinding,
@@ -90,6 +89,7 @@ export async function reconcileFactoryCheck(
       .slice(0, 3)
       .map((c) => ({ ...c, evidence: c.evidence?.slice(0, 8000) })),
     knownIssues: run.report?.knownIssues?.slice(0, 5),
+    trustedFailureProvenance: false,
   };
   // Keep the frozen check assignment for gate revalidation and audit.
   const {
@@ -134,7 +134,7 @@ export async function reconcileFactoryCheck(
     reason = `Independent check blocked: ${run.error ?? run.report?.blockedOn ?? run.stopReason ?? "missing session/report/candidate"}`;
   } else if (run.stopReason === "asked_human") {
     status = "waiting";
-    reason = "Independent check requires a human answer; gate remains closed";
+    reason = "Independent check awaits question assessment; gate remains closed";
   } else if (
     run.status !== "succeeded" ||
     run.report.verify?.status === "failed" ||
@@ -145,7 +145,7 @@ export async function reconcileFactoryCheck(
   }
   // Failed results must be bound to the same independent session/candidate too.
   // Missing auth, old daemons or corrupted provenance need recovery, not an automatic repair.
-  if (status === "failed") {
+  if (status === "failed" || status === "blocked") {
     try {
       const assignment = await factoryCheckAssignment(tx, task.userId, run.id);
       if (
@@ -153,26 +153,23 @@ export async function reconcileFactoryCheck(
         run.report?.check?.sha !== assignment.baseBranch ||
         run.report.check.readOnly !== true ||
         run.report.verify.command !== assignment.verifyCommand ||
-        typeof run.report.verify.exitCode !== "number"
+        run.report.filesChanged?.length !== 0 ||
+        !run.startedAt || !run.finishedAt ||
+        !Number.isFinite(new Date(run.startedAt).getTime()) || !Number.isFinite(new Date(run.finishedAt).getTime()) ||
+        new Date(run.finishedAt).getTime() < new Date(run.startedAt).getTime() ||
+        !(Number.isFinite(run.report.verify.exitCode) || run.report.verify.exitCode === null) ||
+        typeof run.report.verify.timedOut !== "boolean" ||
+        !(run.report.verify.signal === null || typeof run.report.verify.signal === "string")
       )
         throw new FactoryError("factoryCheckBindingMismatch");
+      output.trustedFailureProvenance = true;
     } catch (error) {
       if (!(error instanceof FactoryError)) throw error;
-      status = "blocked";
-      reason = `Independent check failure provenance rejected: ${error.code}; trusted recovery required`;
+      if (status === "failed") {
+        status = "blocked";
+        reason = `Independent check failure provenance rejected: ${error.code}; trusted recovery required`;
+      }
     }
-  }
-  let canRepair = false;
-  if (status === "failed") {
-    const {
-      rows: [count],
-    } = await tx.query(
-      `SELECT count(*)::int AS count FROM factory_attempts WHERE "taskId"=$1 AND stage='execute'`,
-      [task.id],
-    );
-    canRepair = count.count <= orchestratorSettings({}).maxFixAttempts;
-    if (!canRepair)
-      reason += "; repair limit reached; manual takeover required";
   }
   const event = factoryEventId("check-completion", run.id);
   let finished;
@@ -232,20 +229,12 @@ export async function reconcileFactoryCheck(
         reason:
           task.stage === "review"
             ? "Candidate awaits a separate verification session"
-            : "Independent review and verification passed; human approval pending",
-      },
-      tx,
-    );
-  } else if (status === "failed" && canRepair) {
-    await store.apply(
-      task.userId,
-      binding(finished.task),
-      factoryEventId("check-repair", run.id),
-      {
-        action: "repair",
-        reason: `Repair failed ${task.stage} run ${run.id}; original command/exit/log evidence retained in attempt ${task.attemptId}`,
+            : "Independent review and verification passed; existing authorization gate pending",
       },
       tx,
     );
   }
+  // Recovery strategy belongs to the Coordinator model via recover_factory_check.
+  // A failed observation is retained here; no program classifies it as transient
+  // or as requiring a source edit, and no executor is opened automatically.
 }
