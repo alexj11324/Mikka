@@ -29,9 +29,7 @@ function ciTarget() {
 
 function schemaURL(target, schema) {
   const url = new URL(target)
-  // pg_trgm is shared by retained schemas and lives in public. The test below
-  // first proves public has no application tables, so it cannot mask omissions.
-  url.searchParams.set('options', `-c search_path=${schema},public`)
+  url.searchParams.set('options', `-c search_path=${schema}`)
   return url.toString()
 }
 
@@ -72,7 +70,18 @@ for (const separateTargets of [false, true]) {
   test(`pnpm migrate bootstraps empty ${separateTargets ? 'separate targets' : 'shared target'} and safely reruns`, {
     skip: !enabled, timeout: 180000,
   }, async () => {
-    const target = ciTarget()
+    const rootTarget = ciTarget()
+    const rootAdmin = new Pool({ connectionString: rootTarget.toString(), max: 1 })
+    const fixtureDatabase = `bootstrap_${randomUUID().replaceAll('-', '')}`
+    try {
+      assert.equal((await rootAdmin.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+      // Each scenario needs its own catalog: historical SQL checks some
+      // constraint names database-wide. Never rewrite that executed SQL.
+      await rootAdmin.query(`create database "${fixtureDatabase}"`)
+      console.error(`Created retained migration test database: ${fixtureDatabase}`)
+    } finally { await rootAdmin.end() }
+    const target = new URL(rootTarget)
+    target.pathname = `/${fixtureDatabase}`
     const admin = new Pool({ connectionString: target.toString(), max: 1 })
     const applicationSchema = `bootstrap_app_${randomUUID().replaceAll('-', '')}`
     const workspaceSchemaName = separateTargets ? `bootstrap_ws_${randomUUID().replaceAll('-', '')}` : applicationSchema
@@ -84,8 +93,6 @@ for (const separateTargets of [false, true]) {
     const workspace = new Pool({ connectionString: workspaceURL, max: 1 })
     try {
       assert.equal((await admin.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
-      assert.deepEqual((await admin.query("select tablename from pg_tables where schemaname='public'")).rows, [], 'bootstrap must precede all public application fixtures')
-      await admin.query('create extension if not exists pg_trgm with schema public')
       for (const schema of schemas) {
         await admin.query(`create schema "${schema}"`)
         createdSchemas.push(schema)
@@ -96,6 +103,9 @@ for (const separateTargets of [false, true]) {
       assert.match(await migrate(applicationURL, workspaceURL), new RegExp(`applied ${APPLICATION_BASELINE}`))
       await assertSchema(app, [issueSchema])
       await assertSchema(workspace, [workspaceSchema, projectSchema, teamSchema])
+      for (const [table, constraint] of [['coordinator_sessions', 'coordinator_sessions_chat_key'], ['coordinator_messages', 'coordinator_messages_position_key']]) {
+        assert.equal((await app.query('select 1 from pg_constraint where conrelid=to_regclass($1) and conname=$2', [table, constraint])).rowCount, 1, `Missing isolated ${constraint}`)
+      }
       for (const name of ['session', 'account', 'verification', 'oauthRefreshToken', 'oauthAccessToken', 'oauthConsent', 'chat_state_locks', 'chat_state_queues']) {
         assert.ok((await app.query('select to_regclass($1) as relation', [`"${name}"`])).rows[0].relation, `Missing ${name}`)
       }
