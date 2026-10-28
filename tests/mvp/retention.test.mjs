@@ -9,12 +9,12 @@ test('all environments retain resources while cleanup is paused', () => {
   assert.equal(retainMvpResources({ CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_RETAIN: '1' }), true)
 })
 
-test('retention invokes neither stop nor persistent cleanup', async () => {
+test('retention revokes credentials without invoking stop or resource cleanup', async () => {
   const calls = []
-  await finishMvpResources({ retain: true, stop: async () => calls.push('stop'), cleanup: async () => calls.push('cleanup') })
-  assert.deepEqual(calls, [])
+  await finishMvpResources({ retain: true, stop: async () => calls.push('stop'), cleanup: async () => calls.push('cleanup'), revoke: async () => calls.push('revoke') })
+  assert.deepEqual(calls, ['revoke'])
   await finishMvpResources({ retain: false, stop: async () => calls.push('ci-stop'), cleanup: async () => calls.push('ci-cleanup') })
-  assert.deepEqual(calls, [])
+  assert.deepEqual(calls, ['revoke'])
   assert.throws(() => assertMvpRunAllowed(), /paused/)
 })
 

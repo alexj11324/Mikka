@@ -5,8 +5,11 @@ import { isAbsolute, dirname } from 'node:path'
 // Preservation is mandatory in every environment until cleanup is authorized.
 export function retainMvpResources(_env = process.env) { return true }
 
-// Do not stop processes: their own signal handlers may remove resources.
-export async function finishMvpResources(_options) {}
+// Credential revocation is distinct from deleting resources or stopping a
+// process whose signal handlers may delete them. Execution remains paused.
+export async function finishMvpResources({ revoke, retain: _retain, stop: _stop, cleanup: _cleanup } = {}) {
+  if (revoke) await revoke()
+}
 
 // Playwright and shared fixtures have their own teardown paths outside the MVP
 // runner. Fail before starting them until the complete chain is audited.

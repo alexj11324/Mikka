@@ -104,7 +104,7 @@ async function setup(page: Page, testInfo: TestInfo) {
   const checkpoint = (step: string) => { checkpoints.push({ at: new Date().toISOString(), step }) }
   const cleanup = async () => {
     await finishMvpResources({ retain: retainMvpResources(), stop: async () => { await stopProcess(daemon) },
-      cleanup: async () => { await pool.query('UPDATE device_tokens SET "revokedAt" = now() WHERE id = $1 AND "userId" = $2', [tokenId, user.id]) },
+      revoke: async () => { await pool.query('UPDATE device_tokens SET "revokedAt" = now() WHERE id = $1 AND "userId" = $2', [tokenId, user.id]) },
     })
     const services = await service<ServiceEvidence>('/observations').catch(() => ({ observations: [], errors: ['Fixture service unavailable'], pullRequests: [] }))
     const sha = (await execute('git', ['rev-parse', 'HEAD'])).stdout.trim()
