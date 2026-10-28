@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto'
+import { Pool } from 'pg'
+import { splitBrowserNotes } from '../../lib/browser/note'
 import { test, expect, register, app } from './fixtures'
 
 // The app-wide browser (Figma 412:8066): the top bar's globe opens it in place
@@ -5,7 +8,7 @@ import { test, expect, register, app } from './fixtures'
 // as a removable chip.
 test('The globe opens the browser in place of the right panel; notes on a page go into the chat composer', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 960 })
-  await register(page)
+  const { email } = await register(page)
 
   const globe = page.getByRole('button', { name: '浏览器', exact: true })
   await expect(globe).toHaveAttribute('aria-pressed', 'false')
@@ -61,6 +64,68 @@ test('The globe opens the browser in place of the right panel; notes on a page g
 
   await page.getByRole('button', { name: '移除备注 1', exact: true }).click()
   await expect(chips).toHaveCount(1)
+
+  const message = `浏览器备注验收 ${randomUUID()}`
+  const storedResponse = Promise.withResolvers<void>()
+  const releaseResponse = Promise.withResolvers<void>()
+  await page.route('**/*', async route => {
+    const request = route.request()
+    if (request.method() !== 'POST' || !request.headers()['next-action'] || !request.postData()?.includes(message)) return route.continue()
+    // Let the actual action commit. Delay only delivery of its response to reproduce a send in flight.
+    const response = await route.fetch()
+    storedResponse.resolve()
+    await releaseResponse.promise
+    await route.fulfill({ response })
+  })
+  await composer.fill(message)
+  await composer.press('Enter')
+  try {
+    await storedResponse.promise
+    await page.getByRole('button', { name: '移除备注 2', exact: true }).click()
+    await pick.click()
+    const currentBox = (await stage.boundingBox())!
+    await page.mouse.move(currentBox.x + 45, currentBox.y + 45)
+    await page.mouse.down()
+    await page.mouse.move(currentBox.x + 245, currentBox.y + 165, { steps: 4 })
+    await page.mouse.up()
+    await browser.getByRole('textbox', { name: '给 example.com/pricing 写备注', exact: true }).fill('发送期间的新备注')
+    await browser.getByRole('button', { name: '放进对话', exact: true }).click()
+  } finally { releaseResponse.resolve() }
+  await expect(composer).toBeEnabled()
+  await expect(chips).toHaveCount(1)
+  await expect(chips).toHaveText('3 · example.com/pricing · 发送期间的新备注')
+  await expect(page.locator('[data-slot="browser-note"]')).toHaveText('2 · example.com/pricing · 价格不对')
+
+  // Real server action, authenticated session and PostgreSQL event. No model or provider call is required to persist a person's note.
+  const connectionString = process.env.E2E_DATABASE_URL
+  if (!connectionString) throw new Error('Browser note acceptance requires an isolated E2E_DATABASE_URL')
+  const target = new URL(connectionString)
+  if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pathname.endsWith('_e2e')) throw new Error('Refusing to read a business database')
+  const pool = new Pool({ connectionString, max: 1 })
+  try {
+    const { rows: [owner] } = await pool.query('SELECT id FROM "user" WHERE email = $1', [email])
+    const { rows } = await pool.query(`SELECT "userId", "botId", payload FROM coordinator_events WHERE "userId" = $1 AND kind = $2 AND payload->>'text' LIKE $3`, [owner.id, 'user_message', `%${message}`])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].userId).toBe(owner.id)
+    expect(rows[0].botId).toBeNull()
+    const stored = splitBrowserNotes(rows[0].payload.text)
+    expect(stored.text).toBe(message)
+    expect(stored.notes).toHaveLength(1)
+    expect(stored.notes[0]).toMatchObject({ n: 2, kind: 'region', url: 'https://example.com/pricing', note: '价格不对' })
+  } finally { await pool.end() }
+  await page.reload()
+  await expect(page.locator('[data-slot="browser-note"]')).toHaveText('2 · example.com/pricing · 价格不对')
+  await expect(page.getByText(message)).toBeVisible()
+
+  // An independently registered owner must not receive the first owner's note on the real chat read path.
+  const foreign = await page.context().browser()!.newContext()
+  try {
+    const other = await foreign.newPage()
+    await register(other)
+    await expect(other.getByRole('textbox', { name: '给 Coordinator 发消息' })).toBeVisible()
+    await expect(other.locator('[data-slot="browser-note"]')).toHaveCount(0)
+    await expect(other.getByText(message, { exact: true })).toHaveCount(0)
+  } finally { await foreign.close() }
 
   await browser.getByRole('button', { name: '关闭浏览器', exact: true }).click()
   await expect(globe).toHaveAttribute('aria-pressed', 'false')
