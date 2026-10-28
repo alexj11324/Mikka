@@ -29,6 +29,17 @@ export const gatewayGuard: BrowserGuard = {
 
 export const CREDENTIAL_SUBMIT_FUNCTION = 'function(){if(!this.isConnected||this.ownerDocument!==document||!this.form||this.disabled)return false;const f=this.form;const method=(this.getAttribute("formmethod")||f.getAttribute("method")||"get").toLowerCase();const target=this.getAttribute("formtarget")||f.getAttribute("target")||"";const url=new URL(this.getAttribute("formaction")||f.getAttribute("action")||location.href,document.baseURI);if(method!=="post"||url.origin!==location.origin||url.username||url.password||!["","_self"].includes(target))return false;HTMLFormElement.prototype.requestSubmit.call(f,this);return true}'
 
+/** Server-only continuation after the already-authorized host operation. The
+ * token remains inside trusted services and is never returned to the model.
+ * This is a safety check, not an authorization or an instruction to submit. */
+export async function endCredentialGuardWhenSafe(cdp: Pick<Cdp, 'origin' | 'safeToResume'>, guard: BrowserGuard, target: BrowserTarget, guardToken: string, origin: string, initialUrl: string) {
+  if (!guardToken) throw new CredentialError('credential_denied', 404)
+  await cdp.origin(origin)
+  if (!await cdp.safeToResume(initialUrl)) throw new CredentialError('credential_login_pending', 409)
+  await cdp.origin(origin)
+  await guard.end(target, guardToken)
+}
+
 /** Deliberately no CDP logger, remote exception, message body or console handler. */
 export class Cdp {
   private id = 0

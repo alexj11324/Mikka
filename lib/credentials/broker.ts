@@ -2,7 +2,7 @@ import type { Pool } from 'pg'
 import { CredentialError } from './contracts'
 import { awsKms, open, sealSession, type Kms } from './kms'
 import { CredentialStore, hashNonce, rowEnvelope, type BrowserTarget } from './store'
-import { Cdp, gatewayGuard, type BrowserGuard } from './browser'
+import { Cdp, gatewayGuard, endCredentialGuardWhenSafe, type BrowserGuard } from './browser'
 import { assertCredentialPageBinding } from './page-binding'
 import { runPolicySchema } from '@mikka/protocol/agent-policy'
 
@@ -20,7 +20,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
   if (!claimed) throw new CredentialError('credential_denied', 404)
   const caller = { userId: claimed.user_id, workspaceId: claimed.workspace_id, botId: claimed.bot_id, subagentId: claimed.subagent_id, runId: claimed.run_id }
   const context = { userId: caller.userId, credentialId: claimed.credential_id, origin: claimed.origin }
-  const target = claimed.target as BrowserTarget & { credentialMode?: 'password' | 'session-first' }
+  const target = claimed.target as BrowserTarget & { credentialMode?: 'password' | 'session-first'; credentialRevision?: string }
   // Consume the exact host receipt durably before obtaining any I/O locks.
   // Unknown outcomes remain consumed even if the transaction below rolls back.
   const action = target.credentialAction
@@ -28,7 +28,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
   const started = await pool.query(`UPDATE pending_actions SET context='{"credentialExecuting":true}'::jsonb WHERE id=$1 AND "userId"=$2 AND action='browser_operation' AND status='running' AND context IS NULL AND input=$3::jsonb AND "createdAt">clock_timestamp()-interval '5 minutes' RETURNING id`, [action.actionId, caller.userId, JSON.stringify(action)])
   if (!started.rowCount) throw new CredentialError('credential_denied', 404)
   const client = await pool.connect()
-  let cdp: Cdp | undefined, guardToken: string | undefined, completed = false
+  let cdp: Cdp | undefined, guardToken: string | undefined, completed = false, effectStarted = false
   let plaintext: Buffer | undefined
   try {
     await client.query('BEGIN')
@@ -58,7 +58,8 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     assertCredentialPageBinding({ ...common, targetId: target.targetId, epoch: observed.epoch, permissionVersion: observed.permissionVersion, expiresAt: target.expiresAt }, { ...common, targetId: bound.targetId, epoch: bound.epoch, permissionVersion: bound.permissionVersion })
     if (target.origin !== context.origin) throw new CredentialError('credential_denied', 404)
     const credential = (await client.query(`SELECT s.*,c.username FROM credentials c JOIN credential_secrets s ON s.credential_id=c.id WHERE c.id=$1 AND c.user_id=$2 AND c.origin=$3 AND c.revoked_at IS NULL AND c.unattended_allowed=true FOR UPDATE OF c`, [context.credentialId, context.userId, context.origin])).rows[0]
-    if (!credential || target.expiresAt <= Date.now()) throw new CredentialError('credential_denied', 404)
+    if (!credential || typeof target.credentialRevision !== 'string' || target.credentialRevision !== credential.nonce || target.expiresAt <= Date.now()) throw new CredentialError('credential_denied', 404)
+    effectStarted = true
     const guarded = await guard.begin(target)
     guardToken = guarded.guardToken
     cdp = await (options.connect ?? Cdp.connect)(guarded.cdpUrl)
@@ -133,7 +134,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     await client.query('UPDATE credentials SET last_used_at=now() WHERE id=$1', [context.credentialId])
     await client.query(`INSERT INTO credential_access_events(credential_id,user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,$6,$7)`, [context.credentialId, context.userId, caller.botId, caller.runId, caller.subagentId, context.origin, sessionApplied ? 'session_applied' : claimed.input_kind === 'otp' ? 'otp_submitted' : 'password_submitted'])
     await client.query('COMMIT'); completed = true
-    await guard.end(target, guardToken)
+    await endCredentialGuardWhenSafe(cdp, guard, target, guardToken, context.origin, initialUrl)
     if (caller.subagentId) {
       // Resume the caller to observe the page after the guard ends. The
       // broker does not decide whether login succeeded or MFA is required.
@@ -146,8 +147,9 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     }
     return { status: sessionApplied ? 'session_applied' as const : 'submitted' as const, origin: context.origin }
   } catch (error) {
-    if (!completed) await client.query('ROLLBACK')
-    await pool.query(`INSERT INTO credential_access_events(user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,'denied_or_failed')`, [context.userId, caller.botId, caller.runId, caller.subagentId, context.origin])
+    if (!completed) await client.query('ROLLBACK').catch(() => undefined)
+    await pool.query(`INSERT INTO credential_access_events(user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,'denied_or_failed')`, [context.userId, caller.botId, caller.runId, caller.subagentId, context.origin]).catch(() => undefined)
+    if (effectStarted) throw new CredentialError('credential_outcome_unknown', 409)
     if (error instanceof CredentialError) throw error
     throw new CredentialError()
   } finally { plaintext?.fill(0); cdp?.close(); client.release() }
