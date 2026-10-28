@@ -49,6 +49,8 @@ describe("permission policy (ADR 0009)", () => {
   it("asks for unknown actions", () => {
     expect(decide("format_disk")).toBe("ask")
     expect(decide("__proto__")).toBe("ask")
+    expect(decide("format_disk", { policy: { ...policy({}), readOnly: true } })).toBe("deny")
+    expect(decide("__proto__", { policy: { ...policy({}), readOnly: true } })).toBe("deny")
   })
 
   it("classifies writes by worktree boundary", () => {
