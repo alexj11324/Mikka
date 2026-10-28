@@ -1,6 +1,6 @@
 import { test, expect, register, app } from './fixtures'
 
-test('a device grant is reviewed in the browser and exchanged for a daemon credential', async ({ page }, testInfo) => {
+test('a device grant is reviewed in the browser and exchanged for a daemon credential', async ({ page, request }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   await register(page, '/settings?section=devices')
   await page.getByRole('button', { name: '连接设备', exact: true }).click()
@@ -21,7 +21,9 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   await dialog.getByRole('button', { name: '完成', exact: true }).click()
 
   const before = await (await page.request.get(app('/api/auth/get-session'))).json()
-  const grantResponse = await page.request.post(app('/api/auth/device/code'), { data: { client_id: 'mikka-daemon' } })
+  // The daemon has its own cookie-free HTTP client. page.request shares the
+  // browser's session cookies, so its missing Origin correctly fails CSRF.
+  const grantResponse = await request.post(app('/api/auth/device/code'), { data: { client_id: 'mikka-daemon' } })
   expect(grantResponse.status()).toBe(200)
   const grant = await grantResponse.json()
   expect(new URL(grant.verification_uri).pathname).toBe(app('/device'))
@@ -52,26 +54,27 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   await page.unroute(approvalPath)
   await testInfo.attach('device-code-approved', { body: await page.screenshot(), contentType: 'image/png' })
 
-  const tokenResponse = await page.request.post(app('/api/auth/device/token'), {
+  const tokenResponse = await request.post(app('/api/auth/device/token'), {
     data: { client_id: 'mikka-daemon', device_code: grant.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' },
   })
   expect(tokenResponse.status()).toBe(200)
   const credential = await tokenResponse.json()
   expect(credential.access_token).toMatch(/^orv_[A-Za-z0-9_-]{43}$/)
   expect(credential.scope).toBe('device')
+  expect((await request.storageState()).cookies).toEqual([])
   const after = await (await page.request.get(app('/api/auth/get-session'))).json()
   expect(after.session.id).toBe(before.session.id)
-  const replay = await page.request.post(app('/api/auth/device/token'), {
+  const replay = await request.post(app('/api/auth/device/token'), {
     data: { client_id: 'mikka-daemon', device_code: grant.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' },
   })
   expect(replay.status()).toBe(400)
 
-  const denied = await (await page.request.post(app('/api/auth/device/code'), { data: { client_id: 'mikka-daemon' } })).json()
+  const denied = await (await request.post(app('/api/auth/device/code'), { data: { client_id: 'mikka-daemon' } })).json()
   await page.goto(denied.verification_uri_complete)
   await page.getByRole('button', { name: '拒绝', exact: true }).click()
   await expect(page.getByRole('heading', { name: '已拒绝', exact: true })).toBeVisible()
   await testInfo.attach('device-code-denied', { body: await page.screenshot(), contentType: 'image/png' })
-  const denial = await page.request.post(app('/api/auth/device/token'), {
+  const denial = await request.post(app('/api/auth/device/token'), {
     data: { client_id: 'mikka-daemon', device_code: denied.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' },
   })
   expect((await denial.json()).error).toBe('access_denied')
