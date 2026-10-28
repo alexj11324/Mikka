@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { BoxSelect, SquareDashedMousePointer, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
-import { NOTES_MAX, noteChipText, type BrowserNote } from '@/lib/browser/note'
+import { addBrowserNote, removeBrowserNotes, noteChipText, type BrowserNote } from '@/lib/browser/note'
 
 interface BrowserNotes {
   notes: readonly BrowserNote[]
@@ -27,11 +27,12 @@ const Context = createContext<BrowserNotes | null>(null)
  * chips and sends them with the next message, then drops the ones it sent.
  */
 export function BrowserNotesProvider({ children }: { children: ReactNode }) {
-  const [notes, setNotes] = useState<BrowserNote[]>([])
+  const [state, setState] = useState({ notes: [] as BrowserNote[], nextNumber: 1 })
+  const { notes } = state
   const [composers, setComposers] = useState(0)
-  const add = useCallback((note: Omit<BrowserNote, 'n'>) => setNotes(current => current.length >= NOTES_MAX ? current : [...current, { ...note, n: Math.max(0, ...current.map(item => item.n)) + 1 }]), [])
-  const remove = useCallback((n: number) => setNotes(current => current.filter(item => item.n !== n)), [])
-  const removeMany = useCallback((ns: readonly number[]) => setNotes(current => current.filter(item => !ns.includes(item.n))), [])
+  const add = useCallback((note: Omit<BrowserNote, 'n'>) => setState(current => addBrowserNote(current, note)), [])
+  const remove = useCallback((n: number) => setState(current => removeBrowserNotes(current, [n])), [])
+  const removeMany = useCallback((ns: readonly number[]) => setState(current => removeBrowserNotes(current, ns)), [])
   const attachComposer = useCallback(() => {
     setComposers(count => count + 1)
     return () => setComposers(count => count - 1)

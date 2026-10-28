@@ -32,6 +32,18 @@ export interface BrowserNote {
 export const NOTE_MAX = 500
 export const NOTES_MAX = 20
 
+/** Keep numbers unique for the provider's lifetime, including after removal. */
+export interface BrowserNotesState { notes: BrowserNote[]; nextNumber: number }
+export function addBrowserNote(state: BrowserNotesState, note: Omit<BrowserNote, 'n'>): BrowserNotesState {
+  if (state.notes.length >= NOTES_MAX || !Number.isSafeInteger(state.nextNumber)) return state
+  return { notes: [...state.notes, { ...note, n: state.nextNumber }], nextNumber: state.nextNumber + 1 }
+}
+
+/** Remove only the numbers captured by the completed send (or explicitly removed). */
+export function removeBrowserNotes(state: BrowserNotesState, numbers: readonly number[]): BrowserNotesState {
+  return { ...state, notes: state.notes.filter(note => !numbers.includes(note.n)) }
+}
+
 /** The words on a note's chip: 「1 · 周会 · 删除 · 删了，刷新又回来了」. */
 export function noteChipText(note: Pick<BrowserNote, 'n' | 'label' | 'note'>): string {
   return [String(note.n), note.label, note.note].filter(Boolean).join(' · ')

@@ -256,7 +256,16 @@ test('actual action puts validated browser notes after the quote and rejects bad
   for (const bad of [{ ...note, url: 'javascript:alert(1)' }, { ...note, note: ' ' }, { ...note, extra: true }, { ...note, text: 'page text is never sent' }]) {
     assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, [bad as typeof note]), { error: 'messageRequired', params: undefined })
   }
+  for (const bad of [{}, 'not an array', [null]]) {
+    assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, bad as unknown as typeof note[]), { error: 'messageRequired', params: undefined })
+  }
   assert.equal(current.rows.size, 0)
+  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, [{ ...note, n: 102 }]), { queued: true })
+  current = fixture()
+  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, [{ ...note, n: Number.MAX_SAFE_INTEGER + 1 }]), { error: 'messageRequired', params: undefined })
+  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, Array.from({ length: 21 }, (_, i) => ({ ...note, n: i + 1 }))), { error: 'messageRequired', params: undefined })
+  assert.equal(current.rows.size, 0)
+  current = fixture()
   assert.deepEqual(await sendCoordinatorMessage('x'.repeat(9_990), null, null, undefined, [note]), { error: 'messageTooLong', params: undefined })
   assert.equal(current.rows.size, 0)
 })

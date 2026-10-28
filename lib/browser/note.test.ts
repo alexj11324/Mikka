@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { withQuote } from '@/lib/artifacts/quote'
 import { chatItems } from '@/lib/coordinator/context'
 import { MESSAGE_MAX } from '@/lib/message-limits'
-import { elementLabel, normalizeAddress, noteChipText, pageLabel, sameOrigin, splitBrowserNotes, withBrowserNotes, type BrowserNote } from './note'
+import { addBrowserNote, removeBrowserNotes, NOTES_MAX, elementLabel, normalizeAddress, noteChipText, pageLabel, sameOrigin, splitBrowserNotes, withBrowserNotes, type BrowserNote } from './note'
 
 const ORIGIN = 'https://mikka.example.com'
 const element: BrowserNote = { n: 1, kind: 'element', url: `${ORIGIN}/mikka/memories`, label: '周会 · 删除', note: '删了，刷新又回来了 a < b & "c"', selector: 'body > main > table > tr:nth-of-type(2) > td > button' }
@@ -52,4 +52,33 @@ test('only the app origin counts as reachable', () => {
   assert.equal(sameOrigin('nonsense', ORIGIN), false)
   assert.equal(pageLabel('https://example.org/'), 'example.org')
   assert.equal(pageLabel('https://example.org/a/b?q=1'), 'example.org/a/b')
+})
+
+test('new notes retain unique numbers when an in-flight note is removed', () => {
+  const { n: _n, ...draft } = element
+  let state = addBrowserNote({ notes: [], nextNumber: 1 }, draft)
+  const sent = state.notes.map(note => note.n)
+  state = removeBrowserNotes(state, sent) // removed while the send is in flight
+  state = addBrowserNote(state, draft)
+  state = removeBrowserNotes(state, sent)
+  assert.equal(state.notes[0].n, 2)
+  for (let i = 0; i < 100; i++) {
+    state = { ...state, notes: [] }
+    state = addBrowserNote(state, draft)
+  }
+  assert.equal(state.notes[0].n, 102)
+})
+
+test('a send snapshot clears only the notes it captured and the pending list stays bounded', () => {
+  const { n: _n, ...draft } = element
+  let state = { notes: [] as BrowserNote[], nextNumber: 1 }
+  state = addBrowserNote(state, draft)
+  state = addBrowserNote(state, draft)
+  const sent = state.notes.map(note => note.n)
+  state = removeBrowserNotes(state, [sent[0]])
+  state = addBrowserNote(state, draft)
+  state = removeBrowserNotes(state, sent)
+  assert.deepEqual(state.notes.map(note => note.n), [3])
+  for (let i = 0; i < NOTES_MAX + 1; i++) state = addBrowserNote(state, draft)
+  assert.equal(state.notes.length, NOTES_MAX)
 })
