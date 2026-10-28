@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { RUN_LEASE_MS } from '@mikka/protocol/device'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
@@ -95,7 +96,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
     ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
-    ...(computer ? { computer } : {}),
+    ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion },
+      policy: { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: computer.permission } } } : {}),
     ...retry,
   })
 }

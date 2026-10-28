@@ -22,17 +22,18 @@ export class ComputerBroker {
     Object.assign(this, { driver, socketPath, permitted, execute, now, ttl });
   }
   spec(runId, permission, { display } = {}) {
+    // A new policy or session invalidates every previous grant for this run,
+    // including when the new choice is deny or absent.
+    for (const [old, grant] of this.grants)
+      if (grant.runId === runId) this.grants.delete(old);
     // Cloud desktops must be bound by the trusted caller, never the model.
     if (display !== undefined && !/^:[1-9][0-9]{0,2}$/.test(display))
       throw new Error("Invalid desktop display");
-    // No permission object means no injection. Default ask inside a supplied
-    // run policy is still safe: every call waits for an authenticated review.
+    // Missing or unknown policy never grants access.
     if (!this.driver || !permission || !["ask", "allow"].includes(permission))
       return undefined;
-    for (const [old, grant] of this.grants)
-      if (grant.runId === runId) this.grants.delete(old);
     const token = randomBytes(32).toString("hex");
-    this.grants.set(token, { runId, fingerprint: this.driver.fingerprint, display });
+    this.grants.set(token, { runId, fingerprint: this.driver.fingerprint, display, permission });
     return { socketPath: this.socketPath, token };
   }
   async listen() {
@@ -77,9 +78,20 @@ export class ComputerBroker {
   }
   request(token, value, signal) {
     const grant = this.grants.get(token);
-    if (!grant || signal?.aborted || !this.permitted(grant.runId) || this.pending.size >= 20)
+    if (!grant || signal?.aborted || !this.permitted(grant.runId))
       return Promise.reject(new Error("Not permitted"));
     const call = normalizeCall(value);
+    if (grant.permission === "allow") {
+      // Recheck at execution admission. The trusted execute callback also
+      // enforces the live run, owner, display and policy-version fence.
+      return Promise.resolve().then(() => {
+        if (signal?.aborted || this.grants.get(token) !== grant ||
+            this.driver?.fingerprint !== grant.fingerprint || !this.permitted(grant.runId))
+          throw new Error("Not permitted");
+        return this.execute(this.driver, call, grant.display, grant.runId);
+      });
+    }
+    if (this.pending.size >= 20) return Promise.reject(new Error("Not permitted"));
     const request = {
       id: randomUUID(),
       runId: grant.runId,
