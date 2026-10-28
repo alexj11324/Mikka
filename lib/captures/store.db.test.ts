@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
+import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
@@ -32,7 +33,7 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
   const alice = `test-captures-alice-${randomUUID()}`
   const bob = `test-captures-bob-${randomUUID()}`
   const workspaceId = randomUUID(), botId = randomUUID(), agentId = randomUUID(), bobAgentId = randomUUID()
-  const cloudDevice = randomUUID(), localDevice = randomUUID(), bobDevice = randomUUID()
+  const cloudDevice = randomUUID(), localDevice = randomUUID(), bobDevice = randomUUID(), cloudToken = randomUUID()
   const cloudRun = randomUUID(), localRun = randomUUID(), bobRun = randomUUID(), artifactId = randomUUID()
   const runs = [cloudRun, localRun, bobRun]
   t.after(async () => {
@@ -57,12 +58,14 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     await pool.query(migration); await pool.query(migration)
     for (const id of [alice, bob]) await pool.query(`INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [id, `${id}@example.com`])
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'cloud','cloud'),($3,$2,'mac','local'),($4,$5,'bob','local')`, [cloudDevice, alice, localDevice, bobDevice, bob])
+    await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,'synthetic',$3,$4,$5,now()+interval '5 minutes')`, [cloudToken, alice, `test-${cloudToken}`, cloudDevice, workspaceId])
     await pool.query(`INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,'codex',$3,$4),($5,$6,'codex',$7,$8)`, [agentId, alice, `Codex ${agentId}`, cloudDevice, bobAgentId, bob, `Codex ${bobAgentId}`, bobDevice])
     await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)`, [botId, workspaceId, alice, `Captures ${botId}`])
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","sandboxId","operationId","runtimeReady",state,"deviceId") VALUES ($1,$2,$3,$4,true,'running',$5)`, [workspaceId, alice, `sandbox-${workspaceId}`, randomUUID(), cloudDevice])
     await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display,control) VALUES ($1,$2,$3,3,'agent')`, [botId, workspaceId, alice])
     await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","botId","deviceId",status) VALUES ($1,$2,$3,$4,$5,'running'),($6,$2,$3,null,$7,'running'),($8,$9,$10,null,$11,'running')`,
       [cloudRun, alice, agentId, botId, cloudDevice, localRun, localDevice, bobRun, bob, bobAgentId, bobDevice])
+    await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [cloudRun])
     await pool.query(`INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)`, [cloudRun, botId, workspaceId, alice])
     await pool.query(`INSERT INTO artifacts (id,"userId",kind,title,"runId") VALUES ($1,$2,'markdown','Acceptance notes',$3)`, [artifactId, alice, cloudRun])
 
@@ -221,13 +224,176 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
       async discardScreenRecording(_sandbox: unknown, display: number, id: string) { calls.push(`discard :${display} ${id}`) },
     } as unknown as ConstructorParameters<typeof ScreenCaptures>[0]
     const screen = new ScreenCaptures(runtime)
-    const worker = { userId: alice, workspaceId, deviceId: cloudDevice }
+    const worker = { userId: alice, workspaceId, deviceId: cloudDevice, tokenId: cloudToken }
 
     const shot = await screen.screenshot(worker, cloudRun, 'Dashboard')
     assert.ok(!('error' in shot))
     assert.equal(shot.source, 'cloud_computer')
     assert.deepEqual(calls, [`connect sandbox-${workspaceId}`, 'shot :3'])
     assert.equal((await pool.query('SELECT "botId" FROM run_captures WHERE id=$1', [shot.id])).rows[0].botId, botId)
+    // A revoke that wins the common policy lock must be observed before capture.
+    const revoker = await pool.connect()
+    await revoker.query('BEGIN')
+    await revoker.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${workspaceId}`])
+    await revoker.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version) VALUES ($1,'deny',1)` , [workspaceId])
+    const beforeRevokeCalls = calls.length
+    const racingShot = screen.screenshot(worker, cloudRun, 'Racing revoke')
+    const racingStart = screen.startRecording(worker, cloudRun, 'Racing revoke', 5)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    const duringRevokeCalls = calls.length
+    await revoker.query('COMMIT')
+    revoker.release()
+    assert.equal(duringRevokeCalls, beforeRevokeCalls, 'capture waits while the revocation owns the policy lock')
+    assert.equal((await racingShot as { error: string }).error, 'unavailable')
+    assert.equal((await racingStart as { error: string }).error, 'unavailable')
+    assert.equal(calls.length, beforeRevokeCalls, 'a denied capture never reaches the runtime')
+    await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])
+    await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [cloudRun])
+    assert.equal((await screen.screenshot(worker, cloudRun, 'Expired') as { error: string }).error, 'not_found')
+    assert.equal(calls.length, beforeRevokeCalls, 'an expired lease never reaches the runtime')
+    await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [cloudRun])
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [cloudDevice])
+    assert.equal((await screen.screenshot(worker, cloudRun, 'Disabled device') as { error: string }).error, 'not_found')
+    await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [cloudDevice])
+    await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [cloudToken])
+    assert.equal((await screen.screenshot(worker, cloudRun, 'Revoked token') as { error: string }).error, 'not_found')
+    await pool.query('UPDATE device_tokens SET "revokedAt"=null WHERE id=$1', [cloudToken])
+    const alreadyCancelled = new AbortController(); alreadyCancelled.abort()
+    assert.ok('error' in await screen.screenshot(worker, cloudRun, 'Cancelled', alreadyCancelled.signal))
+    assert.equal(calls.length, beforeRevokeCalls, 'disabled or cancelled work never reaches the runtime')
+    let releaseCapture!: () => void, enteredCapture!: () => void
+    const entered = new Promise<void>(resolve => { enteredCapture = resolve })
+    const release = new Promise<void>(resolve => { releaseCapture = resolve })
+    const fenced = new ScreenCaptures({ ...runtime, async connectComputer() { enteredCapture(); await release; return {} } } as unknown as ConstructorParameters<typeof ScreenCaptures>[0])
+    const inFlight = fenced.screenshot(worker, cloudRun, 'Before revoke')
+    await entered
+    let revokeAcquired = false
+    const revokeAfter = (async () => {
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${workspaceId}`])
+        revokeAcquired = true
+        await client.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version) VALUES ($1,'deny',1)`, [workspaceId])
+        await client.query('COMMIT')
+      } finally { client.release() }
+    })()
+    try {
+      await new Promise(resolve => setTimeout(resolve, 30))
+      assert.equal(revokeAcquired, false, 'revocation waits for the in-flight capture')
+    } finally { releaseCapture() }
+    const beforeRevoke = await inFlight
+    assert.ok(!('error' in beforeRevoke))
+    await revokeAfter
+    assert.equal((await screen.screenshot(worker, cloudRun, 'After revoke') as { error: string }).error, 'unavailable')
+    await pool.query('DELETE FROM run_captures WHERE id=$1', [beforeRevoke.id])
+    await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])
+
+    // An actual synthetic subprocess stands in for a hung provider call.
+    // STOP waits for at most the bounded window, then the signal kills the
+    // subprocess and the database lock is released. No screen is captured.
+    let captureEntered!: () => void
+    const captureReady = new Promise<void>(resolve => { captureEntered = resolve })
+    let processExited!: () => void
+    const exited = new Promise<void>(resolve => { processExited = resolve })
+    const hanging = new ScreenCaptures({ ...runtime,
+      async captureScreenshot(_sandbox: unknown, _display: number, _id: string, signal: AbortSignal) {
+        const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+        child.once('exit', processExited)
+        signal.addEventListener('abort', () => child.kill('SIGTERM'), { once: true })
+        captureEntered()
+        return new Promise<Uint8Array>((_resolve, reject) => child.once('exit', () => reject(new Error('cancelled'))))
+      },
+    } as unknown as ConstructorParameters<typeof ScreenCaptures>[0], Date.now, 200)
+    const waitingCapture = hanging.screenshot(worker, cloudRun, 'Hung synthetic operation')
+    await captureReady
+    let stopFinished = false
+    const stop = pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [cloudRun]).then(() => { stopFinished = true })
+    await new Promise(resolve => setTimeout(resolve, 30))
+    assert.equal(stopFinished, false, 'STOP serializes behind an in-flight request')
+    const timedOut = await waitingCapture
+    assert.ok('error' in timedOut && /unknown/.test(timedOut.message), 'a timed out request has an uncertain outcome')
+    await stop
+    await exited
+    assert.equal(stopFinished, true, 'STOP acquires the released lock')
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=null WHERE id=$1', [cloudRun])
+
+    let enteredCancellation!: () => void
+    const cancellationReady = new Promise<void>(resolve => { enteredCancellation = resolve })
+    const cancellable = new ScreenCaptures({ ...runtime,
+      async captureScreenshot(_sandbox: unknown, _display: number, _id: string, signal: AbortSignal) {
+        enteredCancellation()
+        return new Promise<Uint8Array>((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true }))
+      },
+    } as unknown as ConstructorParameters<typeof ScreenCaptures>[0], Date.now, 5000)
+    const abort = new AbortController()
+    const cancelled = cancellable.screenshot(worker, cloudRun, 'Cancelled synthetic request', abort.signal)
+    await cancellationReady
+    const cancelledAt = Date.now()
+    abort.abort()
+    const cancelResult = await cancelled
+    assert.ok('error' in cancelResult && /unknown/.test(cancelResult.message))
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [cloudRun])
+    assert.ok(Date.now() - cancelledAt < 2000, 'cancellation releases STOP without waiting for the five-second deadline')
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=null WHERE id=$1', [cloudRun])
+
+    // A provider can ignore cancellation. Its late response is not evidence
+    // and cannot delay policy revocation after the bounded window.
+    let lateEntered!: () => void, resolveLate!: (bytes: Uint8Array) => void
+    const lateReady = new Promise<void>(resolve => { lateEntered = resolve })
+    const lateBytes = new Promise<Uint8Array>(resolve => { resolveLate = resolve })
+    const ignoringAbort = new ScreenCaptures({ ...runtime, async captureScreenshot() { lateEntered(); return lateBytes } } as unknown as ConstructorParameters<typeof ScreenCaptures>[0], Date.now, 200)
+    const beforeLate = (await pool.query('SELECT count(*)::int AS n FROM run_captures WHERE "runId"=$1', [cloudRun])).rows[0].n
+    const lateResult = ignoringAbort.screenshot(worker, cloudRun, 'Late response')
+    await lateReady
+    let policyDone = false
+    let tokenRevoked = false
+    const revokeToken = pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [cloudToken]).then(() => { tokenRevoked = true })
+    const lateRevoke = (async () => {
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${workspaceId}`])
+        await client.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version) VALUES ($1,'deny',1)`, [workspaceId])
+        await client.query('COMMIT')
+        policyDone = true
+      } finally { client.release() }
+    })()
+    await new Promise(resolve => setTimeout(resolve, 30))
+    assert.equal(policyDone, false)
+    assert.equal(tokenRevoked, false, 'credential revocation serializes against the issued request')
+    const lateOutcome = await lateResult
+    assert.ok('error' in lateOutcome && /unknown/.test(lateOutcome.message))
+    await lateRevoke
+    await revokeToken
+    resolveLate(PNG)
+    await new Promise(resolve => setTimeout(resolve, 30))
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_captures WHERE "runId"=$1', [cloudRun])).rows[0].n, beforeLate, 'late bytes are not saved')
+    await pool.query('UPDATE device_tokens SET "revokedAt"=null WHERE id=$1', [cloudToken])
+    assert.equal((await screen.screenshot(worker, cloudRun, 'After timeout revoke') as { error: string }).error, 'unavailable')
+    await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])
+
+    let enteredStart!: () => void, starts = 0
+    const startReady = new Promise<void>(resolve => { enteredStart = resolve })
+    const uncertainStart = new ScreenCaptures({ ...runtime,
+      async startScreenRecording(_sandbox: unknown, _display: number, _id: string, _seconds: number, signal: AbortSignal) {
+        starts++; enteredStart()
+        return new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true }))
+      },
+    } as unknown as ConstructorParameters<typeof ScreenCaptures>[0], Date.now, 200)
+    const uncertainRecording = uncertainStart.startRecording(worker, cloudRun, 'Unknown synthetic start', 5)
+    await startReady
+    const stoppingStart = pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [cloudRun])
+    const startOutcome = await uncertainRecording
+    assert.ok('error' in startOutcome && /unknown/.test(startOutcome.message))
+    await stoppingStart
+    assert.equal(starts, 1, 'an uncertain start is not automatically retried')
+    const unresolved = await store.currentRecording(cloudRun)
+    assert.ok(unresolved, 'keep the slot because a remote start may have happened')
+    await uncertainStart.stopRunRecordings([cloudRun])
+    assert.equal(await store.currentRecording(cloudRun), null)
+    await pool.query('DELETE FROM run_captures WHERE id=$1', [unresolved.id])
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=null WHERE id=$1', [cloudRun])
     for (const caller of [{ ...worker, deviceId: localDevice }, { ...worker, workspaceId: randomUUID() }, { ...worker, userId: bob }])
       assert.equal((await screen.screenshot(caller, cloudRun, 'x') as { error: string }).error, 'not_found')
     assert.equal((await screen.screenshot(worker, localRun, 'x') as { error: string }).error, 'not_found', 'a run with no cloud computer')
@@ -244,15 +410,20 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.ok(!('error' in started))
     assert.ok(calls.includes(`record :3 ${started.recordingId} 300`), 'the limit is clamped')
     assert.equal((await screen.startRecording(worker, cloudRun, 'Again') as { error: string }).error, 'conflict')
+    await pool.query(`UPDATE bot_desktops SET control='user',"controlledBy"=$2,"controlUntil"=now()+interval '5 minutes' WHERE "botId"=$1`, [botId, alice])
+    assert.ok(await store.currentRecording(cloudRun), 'takeover does not automatically stop an existing recording')
     const stopped = await screen.stopRecording(worker, cloudRun)
     assert.ok(!('error' in stopped))
+    await pool.query(`UPDATE bot_desktops SET control='agent',"controlledBy"=null,"controlUntil"=null WHERE "botId"=$1`, [botId])
     assert.deepEqual([stopped.id, stopped.kind, stopped.durationMs], [started.recordingId, 'video', 4200])
     assert.equal((await screen.stopRecording(worker, cloudRun) as { error: string }).error, 'not_found')
 
     failStart = true
     assert.equal((await screen.startRecording(worker, cloudRun, 'Broken') as { error: string }).error, 'unavailable')
     failStart = false
-    assert.equal(await store.currentRecording(cloudRun), null, 'a recording that did not start frees its slot')
+    assert.ok(await store.currentRecording(cloudRun), 'a failed start keeps its slot because the remote outcome is unknown')
+    await screen.stopRunRecordings([cloudRun])
+    assert.equal(await store.currentRecording(cloudRun), null)
 
     // A recording past its limit is kept when the next one starts.
     const late = await screen.startRecording(worker, cloudRun, 'Late')
@@ -278,7 +449,7 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.equal(await store.currentRecording(cloudRun), null)
 
     const listed = await store.runEvidence(alice, cloudRun)
-    assert.deepEqual(listed?.captures.map(capture => capture.title), ['Dashboard', 'Checkout flow', 'Late', 'After'])
+    assert.deepEqual(listed?.captures.map(capture => capture.title), ['Dashboard', 'Checkout flow', 'Broken', 'Late', 'After'])
     assert.equal(listed?.recording, false)
   })
 })

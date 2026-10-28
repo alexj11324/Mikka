@@ -12,8 +12,8 @@ const options = () => {
   return { apiKey: process.env.E2B_API_KEY, timeoutMs: lifetime, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
 }
 
-export async function connectComputer(id: string) {
-  return Sandbox.connect(id, options())
+export async function connectComputer(id: string, signal?: AbortSignal) {
+  return Sandbox.connect(id, { ...options(), ...(signal ? { signal, retries: 0 } : {}) })
 }
 
 export async function computerState(id: string) {
@@ -98,45 +98,53 @@ const CAPTURE_SCRIPT = '/opt/mikka/computer/screen-capture.sh'
 const captureId = (id: string) => { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) throw new Error('Invalid capture id'); return id }
 const captureDisplay = (display: number) => { if (!Number.isInteger(display) || display < 1 || display > 999) throw new Error('Invalid display'); return display }
 
-async function installCaptureScript(sandbox: Sandbox) {
+async function installCaptureScript(sandbox: Sandbox, signal?: AbortSignal) {
   // Machines provisioned by an older deployment lack it; writing it each time keeps them current.
   // Bundled for the /v1/runs/*/screen route (next.config.mjs).
-  const script = await readFile(join(process.cwd(), 'scripts/e2b/screen-capture.sh'), 'utf8')
-  await sandbox.files.write(CAPTURE_SCRIPT, script, { user: 'root' })
-  await sandbox.commands.run(`chmod 0755 ${CAPTURE_SCRIPT}`, { user: 'root', timeoutMs: 10_000 })
+  const script = await readFile(join(process.cwd(), 'scripts/e2b/screen-capture.sh'), { encoding: 'utf8', signal })
+  signal?.throwIfAborted()
+  await sandbox.files.write(CAPTURE_SCRIPT, script, { user: 'root', signal })
+  signal?.throwIfAborted()
+  await sandbox.commands.run(`chmod 0755 ${CAPTURE_SCRIPT}`, { user: 'root', timeoutMs: 10_000, signal })
 }
 
-async function takeFile(sandbox: Sandbox, display: number, id: string, name: string) {
+async function takeFile(sandbox: Sandbox, display: number, id: string, name: string, signal?: AbortSignal) {
   try {
-    return await sandbox.files.read(`${CAPTURE_DIR}/${name}`, { user: 'user', format: 'bytes' })
+    signal?.throwIfAborted()
+    return await sandbox.files.read(`${CAPTURE_DIR}/${name}`, { user: 'user', format: 'bytes', signal })
   } finally {
-    await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} discard ${display} ${id}`, { user: 'user', timeoutMs: 10_000 }).catch(() => undefined)
+    if (!signal?.aborted) await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} discard ${display} ${id}`, { user: 'user', timeoutMs: 10_000, signal }).catch(() => undefined)
   }
 }
 
-export async function captureScreenshot(sandbox: Sandbox, display: number, id: string): Promise<Uint8Array> {
+export async function captureScreenshot(sandbox: Sandbox, display: number, id: string, signal?: AbortSignal): Promise<Uint8Array> {
   captureDisplay(display); captureId(id)
-  await installCaptureScript(sandbox)
-  await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} shot ${display} ${id}`, { user: 'user', timeoutMs: 20_000 })
-  return takeFile(sandbox, display, id, `${id}.png`)
+  await installCaptureScript(sandbox, signal)
+  signal?.throwIfAborted()
+  await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} shot ${display} ${id}`, { user: 'user', timeoutMs: 20_000, signal })
+  signal?.throwIfAborted()
+  return takeFile(sandbox, display, id, `${id}.png`, signal)
 }
 
-export async function startScreenRecording(sandbox: Sandbox, display: number, id: string, seconds: number) {
+export async function startScreenRecording(sandbox: Sandbox, display: number, id: string, seconds: number, signal?: AbortSignal) {
   captureDisplay(display); captureId(id)
   if (!Number.isInteger(seconds) || seconds < 5 || seconds > 300) throw new Error('Invalid recording length')
-  await installCaptureScript(sandbox)
-  await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} record ${display} ${id} ${seconds}`, { user: 'user', background: true, timeoutMs: 0 })
-  await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} started ${display} ${id}`, { user: 'user', timeoutMs: 10_000 })
+  await installCaptureScript(sandbox, signal)
+  signal?.throwIfAborted()
+  await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} record ${display} ${id} ${seconds}`, { user: 'user', background: true, timeoutMs: 0, signal })
+  signal?.throwIfAborted()
+  await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} started ${display} ${id}`, { user: 'user', timeoutMs: 10_000, signal })
 }
 
 /** Ends the recording and returns the mp4 with its length; the file leaves the machine. */
-export async function stopScreenRecording(sandbox: Sandbox, display: number, id: string): Promise<{ bytes: Uint8Array; durationMs: number }> {
+export async function stopScreenRecording(sandbox: Sandbox, display: number, id: string, signal?: AbortSignal): Promise<{ bytes: Uint8Array; durationMs: number }> {
   // The script the recording started with is on the machine; a run ending
   // elsewhere (heartbeat, completion) need not bundle it.
   captureDisplay(display); captureId(id)
-  const stopped = await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} stop ${display} ${id}`, { user: 'user', timeoutMs: 30_000 })
+  signal?.throwIfAborted()
+  const stopped = await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} stop ${display} ${id}`, { user: 'user', timeoutMs: 30_000, signal })
   const seconds = Number.parseFloat(stopped.stdout.trim().split('\n').at(-1) ?? '')
-  const bytes = await takeFile(sandbox, display, id, `${id}.mp4`)
+  const bytes = await takeFile(sandbox, display, id, `${id}.mp4`, signal)
   return { bytes, durationMs: Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 0 }
 }
 

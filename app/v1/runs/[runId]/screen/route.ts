@@ -17,14 +17,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   if (!found.caller.scopeWorkspaceId) return captureJson({ error: 'Cloud computer worker required.' }, 403)
   const parsed = screenCaptureRequest.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return captureJson({ error: 'Invalid request.' }, 400)
-  const caller = { userId: found.owner.userId, workspaceId: found.caller.scopeWorkspaceId, deviceId: found.deviceId }
+  const caller = { userId: found.owner.userId, workspaceId: found.caller.scopeWorkspaceId, deviceId: found.deviceId, tokenId: found.caller.tokenId }
   const input = parsed.data
   if (input.action === 'screenshot') {
-    const result = await screenCaptures.screenshot(caller, found.owner.runId, input.title)
+    const result = await screenCaptures.screenshot(caller, found.owner.runId, input.title, request.signal)
     return 'error' in result ? captureFailure(result) : captureJson({ action: input.action, capture: result })
   }
   if (input.action === 'start_recording') {
-    const result = await screenCaptures.startRecording(caller, found.owner.runId, input.title, input.maxSeconds)
+    const result = await screenCaptures.startRecording(caller, found.owner.runId, input.title, input.maxSeconds, request.signal)
     return 'error' in result ? captureFailure(result) : captureJson({ action: input.action, ...result })
   }
   const result = await screenCaptures.stopRecording(caller, found.owner.runId)

@@ -45,5 +45,23 @@ test('the provider checks the display and id before it touches the sandbox', asy
   await assert.rejects(captureScreenshot(sandbox, 2, 'x; reboot'))
   await assert.rejects(startScreenRecording(sandbox, 2, '6f1d8c0e-1b2a-4c3d-8e9f-0a1b2c3d4e5f', 3600))
   await assert.rejects(stopScreenRecording(sandbox, 1000, '6f1d8c0e-1b2a-4c3d-8e9f-0a1b2c3d4e5f'))
+  const cancelled = new AbortController(); cancelled.abort()
+  await assert.rejects(captureScreenshot(sandbox, 2, '6f1d8c0e-1b2a-4c3d-8e9f-0a1b2c3d4e5f', cancelled.signal))
+  await assert.rejects(startScreenRecording(sandbox, 2, '6f1d8c0e-1b2a-4c3d-8e9f-0a1b2c3d4e5f', 5, cancelled.signal))
   assert.deepEqual(touched, [])
+})
+
+test('capture provider propagates cancellation to file and command requests', async () => {
+  const controller = new AbortController()
+  const signals: (AbortSignal | undefined)[] = []
+  const sandbox = {
+    files: {
+      write: async (_path: string, _data: string, options: { signal?: AbortSignal }) => { signals.push(options.signal) },
+      read: async (_path: string, options: { signal?: AbortSignal }) => { signals.push(options.signal); return new Uint8Array([1]) },
+    },
+    commands: { run: async (_command: string, options: { signal?: AbortSignal }) => { signals.push(options.signal); return { stdout: '' } } },
+  } as unknown as Parameters<typeof captureScreenshot>[0]
+  await captureScreenshot(sandbox, 2, '6f1d8c0e-1b2a-4c3d-8e9f-0a1b2c3d4e5f', controller.signal)
+  assert.equal(signals.length, 5)
+  assert.ok(signals.every(signal => signal === controller.signal))
 })

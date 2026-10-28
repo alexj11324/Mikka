@@ -115,6 +115,10 @@ by default and at most 300; ffmpeg's `-t` and `timeout` end it on the machine
 even if nobody calls stop, and the run's end (completion or lease loss) stops
 and keeps whatever is still recording. A later capture operation removes
 uncollected files older than an hour; there is no independent cleanup timer.
+Screenshot and recording starts serialize with revocation and STOP, with a
+bounded wait and cancellation. If an issued provider request times out or
+is cancelled, its outcome is unknown; it is not automatically retried and
+the caller must not assume the remote operation was undone.
 
 The daemon can resume an upload it registered while the run was active, even
 after that run ends, while its 15-minute reservation is valid. A stop request
