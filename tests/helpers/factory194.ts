@@ -6,6 +6,7 @@ import {
   approvalGate,
   publishGate,
   createFactoryApprovals,
+  type PublicationAdapter,
 } from "../../lib/factory/approval";
 import type {
   FactoryApprovalStore,
@@ -131,8 +132,8 @@ export async function factory194Fixture(connectionString: string) {
       { ...MIKKA_VERCEL, environment: "preview" },
       provider.client,
     );
-  const service = () =>
-    createFactoryApprovals(pool, authorize, store, [adapter]);
+  const service = (adapters: PublicationAdapter[] = [adapter]) =>
+    createFactoryApprovals(pool, authorize, store, adapters);
   async function prepare() {
     const task: FactoryTask = {
       id: randomUUID(),

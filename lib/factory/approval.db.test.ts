@@ -6,6 +6,10 @@ import { FactoryError } from "./approval-contract";
 import { handleFactoryApproval } from "./approval-http";
 import { PublicationDeferred } from "./publication-operation";
 import {
+  createVercelPublicationAdapter,
+  MIKKA_VERCEL,
+} from "./vercel-publication";
+import {
   readFactoryPublicationReceiptV2,
   readFactoryPublicationReceipt,
 } from "./publication-receipt";
@@ -38,6 +42,14 @@ test(
         async () => {
           const x = await f.prepare(),
             s = f.service();
+          await rejects(
+            () =>
+              s.approve(actor, {
+                ...x.approval,
+                actor: { userId: actor.userId, sessionId: actor.sessionId },
+              }),
+            "factoryInvalid",
+          );
           for (const patch of [
             { candidate: { ...x.candidate, sha: "b".repeat(40) } },
             { candidate: { ...x.candidate, scope: "expanded" } },
@@ -154,6 +166,113 @@ test(
           );
           await rejects(() => s.publish(actor, p), "factoryStale");
           assert.equal(provider.posts(), before + 1);
+        },
+      );
+      await t.test(
+        "V2 production envelope and missing/uncertain receipts for #195",
+        async () => {
+          const x = await f.prepare(),
+            adapter = createVercelPublicationAdapter(
+              { ...MIKKA_VERCEL, environment: "production" },
+              provider.client,
+            ),
+            s = f.service([adapter]);
+          provider.state.readyState = "READY";
+          const a = await s.approve(actor, {
+            ...x.approval,
+            action: "deploy_production",
+            target: adapter.target,
+            targetEnvironment: "production",
+          });
+          const result = await s.publish(actor, {
+            ...a,
+            eventId: randomUUID(),
+            action: "deploy_production",
+            target: adapter.target,
+            targetEnvironment: "production",
+          });
+          assert.ok(result);
+          const tx = await pool.connect();
+          try {
+            const receipt = await readFactoryPublicationReceiptV2(
+              tx,
+              actor.userId,
+              x.task.id,
+              x.task.candidateId!,
+            );
+            assert.equal(receipt.action, "deploy_production");
+            assert.equal(receipt.targetEnvironment, "production");
+            assert.equal(receipt.verifiedTarget.kind, "production-deployment");
+            assert.equal(receipt.verifiedTarget.environment, "production");
+            assert.equal(
+              receipt.candidate.environment,
+              x.candidate.environment,
+            );
+            assert.equal(
+              receipt.verifiedTarget.operationId,
+              receipt.verifiedTarget.provider?.deploymentId,
+            );
+            assert.equal(
+              receipt.verifiedTarget.provider?.publicationId,
+              result.publicationId,
+            );
+            assert.equal(
+              receipt.verifiedTarget.provider?.teamId,
+              MIKKA_VERCEL.teamId,
+            );
+            assert.equal(
+              receipt.verifiedTarget.provider?.projectId,
+              MIKKA_VERCEL.projectId,
+            );
+            assert.match(
+              receipt.verifiedTarget.provider!.bindingHash,
+              /^[a-f0-9]{64}$/,
+            );
+            assert.ok(
+              Date.parse(receipt.publishedAt) >=
+                Date.parse(receipt.verifiedTarget.observedAt),
+            );
+            await rejects(
+              () =>
+                readFactoryPublicationReceipt(
+                  tx,
+                  actor.userId,
+                  x.task.id,
+                  x.task.candidateId!,
+                ),
+              "factoryPublicationReceiptRequired",
+            );
+            await pool.query(
+              "UPDATE factory_publications SET status='uncertain' WHERE id=$1",
+              [result.publicationId],
+            );
+            await rejects(
+              () =>
+                readFactoryPublicationReceiptV2(
+                  tx,
+                  actor.userId,
+                  x.task.id,
+                  x.task.candidateId!,
+                ),
+              "factoryPublicationReceiptRequired",
+            );
+            await pool.query(
+              "UPDATE factory_publications SET status='succeeded',receipt=receipt #- '{verifiedTarget,provider}' WHERE id=$1",
+              [result.publicationId],
+            );
+            await assert.rejects(
+              () =>
+                readFactoryPublicationReceiptV2(
+                  tx,
+                  actor.userId,
+                  x.task.id,
+                  x.task.candidateId!,
+                ),
+              /factoryPublicationReceipt/,
+            );
+          } finally {
+            tx.release();
+          }
         },
       );
       for (const window of ["queued", "lost-response", "sql-rollback"] as const)
