@@ -20,7 +20,7 @@ async function fixture(use) {
     await writeFile(join(stateDirectory, 'secret-audit.jsonl'), `${JSON.stringify({ values: [cookie] })}\n`, { mode: 0o600 })
     const audit = paths => auditEvidence(paths, { environment: { instanceId: 'synthetic' }, stateDirectory })
     await use({ audit, evidence, password, cookie, credentialFile, root })
-  } finally { await rm(root, { recursive: true, force: true }) }
+  } finally { if (process.env.MIKKA_RETAIN_TEST_FILES === '1') console.log('Retained private test-account fixture'); else await rm(root, { recursive: true, force: true }) }
 }
 
 test('evidence scanner accepts an explicit secret-free report and binary file', async () => {

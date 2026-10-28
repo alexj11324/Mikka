@@ -61,7 +61,7 @@ test('descriptor files must be private regular files; reading does not modify th
     await symlink(file, alias)
     await assert.rejects(loadEnvironment({ ...env, MIKKA_TEST_ENVIRONMENT_FILE: alias }), /ENVIRONMENT_FILE_UNSAFE/)
     await assert.rejects(loadEnvironment(env), /ENVIRONMENT_FILE_REQUIRED/)
-  } finally { await rm(directory, { recursive: true, force: true }) }
+  } finally { if (process.env.MIKKA_RETAIN_TEST_FILES === '1') console.log('Retained private test-account fixture'); else await rm(directory, { recursive: true, force: true }) }
 })
 
 test('database check is SELECT-only and rejects actual identity, missing marker and copied binding', async () => {

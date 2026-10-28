@@ -161,5 +161,5 @@ test('the actual evidence CLI exits one with a safe code for missing evidence an
     await check('EVIDENCE_MISSING')
     await symlink('playwright-report', join(directory, 'playwright-report'))
     await check('EVIDENCE_AUDIT_FAILED')
-  } finally { await rm(directory, { recursive: true, force: true }) }
+  } finally { if (process.env.MIKKA_RETAIN_TEST_FILES === '1') console.log('Retained private test-account fixture'); else await rm(directory, { recursive: true, force: true }) }
 })
