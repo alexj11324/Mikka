@@ -22,7 +22,7 @@ export function planMonitorIssueAssociation(
   const unique = new Map(matches.map(link => [JSON.stringify([link.issueId, link.incidentId]), link]));
   if (unique.size > 1) return { action: "blocked", reason: "ambiguous-incident" };
   const match = unique.values().next().value;
-  if (match) return match.issueId && match.incidentId ? { action: "append", issueId: match.issueId, incidentId: match.incidentId } : { action: "blocked", reason: "missing-link" };
+  if (match) return match.issueId.trim() && match.incidentId.trim() ? { action: "append", issueId: match.issueId, incidentId: match.incidentId } : { action: "blocked", reason: "missing-link" };
   if (originalIssue) {
     if (originalIssue.userId !== identity.userId || originalIssue.workspaceKey !== identity.workspaceKey || !originalIssue.issueId.trim())
       return { action: "blocked", reason: "original-issue-scope-mismatch" };

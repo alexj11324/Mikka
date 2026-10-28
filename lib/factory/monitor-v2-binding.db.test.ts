@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { randomUUID } from "node:crypto";
+import { createVercelPublicationAdapter, MIKKA_VERCEL } from "./vercel-publication";
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { readFactoryPublicationReceiptV2 } from "./publication-receipt";
 import { validateMonitorV2Observation } from "./monitor-v2-binding";
@@ -9,8 +11,11 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
   const u = new URL(db!); assert.equal(u.hostname, "127.0.0.1"); assert.equal(u.port, "5432"); assert.equal(u.pathname, "/mikka_e2e");
   const f = await factory194Fixture(db!);
   try {
-    const x = await f.prepare(), p = await x.publication();
-    await f.service().publish(f.actor, p);
+    const x = await f.prepare();
+    const adapter = createVercelPublicationAdapter({ ...MIKKA_VERCEL, environment: "production" }, f.provider.client);
+    const service = f.service([adapter]);
+    const approved = await service.approve(f.actor, { ...x.approval, action: "deploy_production", target: adapter.target, targetEnvironment: "production" });
+    await service.publish(f.actor, { ...approved, eventId: randomUUID(), action: "deploy_production", target: adapter.target, targetEnvironment: "production" });
     const tx = await f.pool.connect();
     try {
       await tx.query("BEGIN");
@@ -18,7 +23,7 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
       const read = () => readFactoryPublicationReceiptV2(tx, f.actor.userId, x.task.id, x.task.candidateId!);
       const r = await read();
       const at = new Date().toISOString();
-      const o = { startedAt: at, finishedAt: at, target: { ...r.verifiedTarget, observedAt: at }, health: { immutableStatus: 200, immutableBodyValid: true, aliasStatus: null, aliasBodyValid: null }, alias: null };
+      const o = { startedAt: at, finishedAt: at, target: { ...r.verifiedTarget, observedAt: at }, health: { immutableStatus: 200, immutableBodyValid: true, aliasStatus: 200, aliasBodyValid: true }, alias: { origin: "https://app.example.com", before: r.verifiedTarget.operationId, after: r.verifiedTarget.operationId } };
       assert.equal(validateMonitorV2Observation(r, o, "https://app.example.com"), "healthy");
       assert.equal(validateMonitorV2Observation(r, { ...o, startedAt: "2000-01-01T00:00:00Z" }, "https://app.example.com"), "blocked");
       const mutations = [
