@@ -14,7 +14,7 @@
     "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && pnpm lint && next build",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
-    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-targets.test.mjs",
+    "test:migrations": "node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-steps.test.mjs scripts/migration-targets.test.mjs",
     "dev": "node scripts/dev-preview.mjs",
     "test:preview": "node --test tests/preview-ready.test.mjs",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
@@ -29,7 +29,7 @@
     "test:ssh-target": "node --import tsx --test lib/ssh-target.test.ts",
     "test:linear-sync": "node --import tsx --test lib/db/request-scope.test.ts lib/linear-sync/mapping.test.ts lib/linear-sync/markdown.test.ts lib/linear-sync/webhook.test.ts cloudflare/linear-sync/src/index.test.ts",
     "test:coordinator-events": "node --import tsx --test lib/run-retry.test.ts lib/coordinator-events.test.ts lib/coordinator/context.test.ts lib/coordinator/model.test.ts lib/coordinator/triage.test.ts lib/coordinator/decision.test.ts lib/coordinator/group-routing.test.ts lib/coordinator/citations.test.ts lib/link-preview-parse.test.ts lib/push-reasons.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator-submission.test.ts && pnpm test:personal-message-safety",
-    "test:integrations": "pnpm test:write-transactions && node --import tsx --test lib/auth-callback.test.ts lib/composio-actions.test.ts lib/pending-action-view.test.ts lib/composio-pagination.test.ts lib/issue-owner-scope.test.ts lib/skills-search.test.ts lib/search/search.test.ts lib/federated-search/input.test.ts",
+    "test:integrations": "pnpm test:approved-writes && pnpm test:write-transactions && node --import tsx --test lib/auth-callback.test.ts lib/composio-actions.test.ts lib/pending-action-view.test.ts lib/composio-pagination.test.ts lib/issue-owner-scope.test.ts lib/skills-search.test.ts lib/search/search.test.ts lib/federated-search/input.test.ts",
     "test:e2e": "playwright test",
     "test:performance": "playwright test tests/e2e/navigation-performance.spec.ts tests/e2e/agent-performance.spec.ts --grep @performance",
     "test:e2e:setup": "node --experimental-strip-types scripts/setup-e2e-db.mjs",
@@ -86,9 +86,12 @@
     "check:agent-definitions": "tsx scripts/agent-kit.mts validate agents/default && tsx scripts/agent-kit.mts validate agents/research-example",
     "test:agent-kit-compat": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-kit/main-compat.test.ts lib/agent-kit/registry-compat.test.ts && pnpm test:agent-kit-model",
     "test:agent-kit-model": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-execution-model.test.ts lib/subscription-model-snapshot.test.ts lib/subscription-workflow-model.test.ts lib/subscription-workflow-turn.test.ts lib/agent-kit/hosted-replay.test.ts lib/agent-kit/live-eval-disabled.test.ts lib/agent-kit/core-entry.test.ts lib/agent-kit/disabled-entry.test.ts lib/agent-kit/message-safety-compat.test.ts lib/agent-kit/tool-defaults-compat.test.ts lib/agent-kit/defaults-consumers.test.ts",
+    "test:migration-steps-db": "node --test tests/migration-steps.db.test.mjs",
     "test:coordinator-issue-tools": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/issue-tools.test.ts lib/mcp/issue-mutation.test.ts",
     "test:coordinator-issue-tools-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/issue-tool-calls.db.test.ts",
-    "test:write-transactions": "node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-transaction.test.ts"
+    "test:write-transactions": "node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-transaction.test.ts",
+    "test:approved-writes": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-preparation.test.ts lib/operations/write-discovery.test.ts lib/operations/write-http.test.ts lib/operations/write-provider.test.ts lib/operations/write-route.test.ts lib/operations/write-view.test.ts",
+    "test:approved-writes-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/operations/write-legacy-schema.db.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",
