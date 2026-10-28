@@ -159,8 +159,12 @@ test("real nonproduction target write/readback, exact SHA/repository/environment
         }),
       FactoryError,
     );
-    await writeFile(join(root, `${input.idempotencyKey}.json`), "corrupt");
-    await assert.rejects(() => adapter.execute(input), FactoryError);
+    const corrupt = { ...input, idempotencyKey: randomUUID() };
+    await writeFile(join(root, `${corrupt.idempotencyKey}.json`), "corrupt", {
+      flag: "wx",
+      mode: 0o600,
+    });
+    await assert.rejects(() => adapter.execute(corrupt), FactoryError);
   } finally {
     console.info("Factory194 retained artifact directory", root);
   }

@@ -28,6 +28,7 @@ import {
   MIKKA_VERCEL,
 } from "../../lib/factory/vercel-publication";
 import { vercelProtocolFixture } from "./factory-vercel";
+import { factory194Target } from "./factory194-target";
 
 export const binding = (t: FactoryTask): FactoryBinding => ({
   taskId: t.id,
@@ -39,15 +40,21 @@ export const binding = (t: FactoryTask): FactoryBinding => ({
 /** A test-only #192 port substitute. It is not an alternative production store,
  * independent Harness evidence, real OAuth approval or cloud provider acceptance. */
 export async function factory194Fixture(connectionString: string) {
-  const admin = new Pool({ connectionString, max: 1 }),
+  const config = factory194Target(
+    connectionString,
+    process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true",
+  );
+  const admin = new Pool({ ...config, max: 1 }),
     schema = `factory194_${randomUUID().replaceAll("-", "")}`;
   await admin.query(`CREATE SCHEMA "${schema}"`);
   const pool = new Pool({
-    connectionString,
+    ...config,
     max: 12,
     options: `-c search_path=${schema}`,
   });
   await pool.query(`
+    CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,title text,content jsonb,revision integer);
+    CREATE TABLE coordinator_events (id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,kind text,payload jsonb);
     CREATE TABLE "session" (id text PRIMARY KEY,"userId" text,"expiresAt" timestamptz);
     CREATE TABLE account (id text,"userId" text,"providerId" text);
     CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"attemptId" uuid,"candidateId" uuid,revision integer,stage text,status text,"botId" uuid,"sourceEventId" uuid);
@@ -243,6 +250,30 @@ export async function factory194Fixture(connectionString: string) {
       environment: `device:${randomUUID()}`,
       scope: "synthetic upstream approval contract",
     };
+    const sourceEventId = randomUUID();
+    await pool.query("INSERT INTO issues VALUES($1,$2,$3,$4,1)", [
+      task.issueId,
+      task.userId,
+      "Synthetic publication task",
+      JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "text",
+            text: "Validate explicit isolated backend behavior, no live provider",
+          },
+        ],
+      }),
+    ]);
+    await pool.query(
+      "INSERT INTO coordinator_events VALUES($1,$2,NULL,$3,'user_message',$4)",
+      [
+        sourceEventId,
+        task.userId,
+        task.issueId,
+        JSON.stringify({ text: "Synthetic authorized originating request" }),
+      ],
+    );
     await pool.query(
       'INSERT INTO factory_tasks (id,"userId","issueId","attemptId","candidateId",revision,stage,status,"sourceEventId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
       [
@@ -254,7 +285,7 @@ export async function factory194Fixture(connectionString: string) {
         task.revision,
         task.stage,
         task.status,
-        randomUUID(),
+        sourceEventId,
       ],
     );
     await pool.query(

@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { createHash, generateKeyPairSync, randomUUID, sign } from "node:crypto";
+import {
+  createHash,
+  generateKeyPairSync,
+  randomUUID,
+  sign,
+  verify,
+} from "node:crypto";
 import { mkdtemp, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { factoryPublicationJudgment } from "../../lib/factory/decision-execution";
@@ -18,6 +24,9 @@ import {
   type FactoryPublicationHost,
 } from "../../lib/factory/run-decision-authority";
 import type { factory194Fixture } from "./factory194";
+import { createFactoryRunReviewIssuer } from "../../lib/factory/run-review-issuer";
+import { readFactoryPublicationRequirements } from "../../lib/factory/publication-requirements";
+import { invokeFactoryPublicationDecision } from "../../lib/factory/publication-invocation";
 
 /** Synthetic Ed25519 materials exist only in this isolated test process.
  * Every signed scope targets a disposable local artifact, never a cloud target.
@@ -34,7 +43,9 @@ export async function factoryRunAuthorityCases(
     CREATE TABLE factory_confirmation_fixture ("credentialId" uuid PRIMARY KEY,body jsonb);`);
   const rejects = (fn: () => Promise<unknown>, code: string) =>
     assert.rejects(fn, (e) => e instanceof FactoryError && e.code === code);
-  async function fixture() {
+  async function fixture(
+    options: { checkEvents?: boolean; sourceIssueNull?: boolean } = {},
+  ) {
     const x = await f.prepare(actor),
       runId = randomUUID(),
       credentialId = randomUUID(),
@@ -61,6 +72,11 @@ export async function factoryRunAuthorityCases(
         [x.task.id],
       )
     ).rows[0];
+    if (options.sourceIssueNull)
+      await pool.query(
+        'UPDATE coordinator_events SET "issueId"=NULL WHERE id=$1',
+        [metadata.sourceEventId],
+      );
     for (const stage of ["review", "verify"] as const) {
       const a = (
         await pool.query(
@@ -74,6 +90,16 @@ export async function factoryRunAuthorityCases(
           attemptId: a.id,
           revision: stage === "review" ? 4 : 6,
         };
+      // Keep signed references even when the fresh missing-event task never
+      // establishes the corresponding persisted finish events.
+      checks.push({
+        stage,
+        attemptId: a.id,
+        runId: a.runId,
+        sessionId: a.sessionId,
+        eventId,
+      });
+      if (options.checkEvents === false) continue;
       await pool.query(
         'INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',
         [
@@ -103,13 +129,6 @@ export async function factoryRunAuthorityCases(
           }),
         ],
       );
-      checks.push({
-        stage,
-        attemptId: a.id,
-        runId: a.runId,
-        sessionId: a.sessionId,
-        eventId,
-      });
     }
     // Signed scope is intentionally a synthetic repository and local target.
     const candidate = { ...x.candidate, repository: "fixture/Factory194" };
@@ -230,6 +249,18 @@ export async function factoryRunAuthorityCases(
     );
     const now = (await pool.query("SELECT clock_timestamp() AS now")).rows[0]
       .now as Date;
+    const requirementTx = await pool.connect();
+    const requirements = await (async () => {
+      try {
+        return await readFactoryPublicationRequirements(
+          requirementTx,
+          { ...x.task, ...metadata },
+          definition,
+        );
+      } finally {
+        requirementTx.release();
+      }
+    })();
     const payload: z.infer<typeof factoryRunReview> = {
       version: 1,
       purpose: "factory-publication-review",
@@ -238,6 +269,7 @@ export async function factoryRunAuthorityCases(
       executionRunId: runId,
       executionSessionId: "synthetic-executor-session",
       assignmentDigest: digest(definition),
+      instructionsDigest: digest(requirements),
       policyId: "synthetic-explicit-publication",
       policyRevision: "1",
       permissionAction: "deploy_preview",
@@ -380,6 +412,197 @@ export async function factoryRunAuthorityCases(
         );
       },
     );
+    async function sourceInvocation(c: Awaited<ReturnType<typeof fixture>>) {
+      const issuer = createFactoryRunReviewIssuer(f.store, c.host, {
+        issuer: c.envelope.issuer,
+        keyId: c.envelope.keyId,
+        privateKey: () => privateKey,
+      });
+      const tx = await pool.connect();
+      const prepared = await (async () => {
+        try {
+          await tx.query("BEGIN");
+          const result = await issuer.prepare(tx, c.scope);
+          await tx.query("COMMIT");
+          return result;
+        } catch (error) {
+          await tx.query("ROLLBACK");
+          throw error;
+        } finally {
+          tx.release();
+        }
+      })();
+      assert.ok(
+        prepared.observations.text.includes("Synthetic upstream result"),
+      );
+      const invocation = await invokeFactoryPublicationDecision(
+        c.scope,
+        prepared.executor,
+        prepared.observations,
+        {
+          modelId: c.host.decisionModelId,
+          serializeInput: (input) => input,
+          invokeDecision: async (_purpose, input, questions) => {
+            const now = new Date().toISOString();
+            return {
+              answers: new Map([
+                [
+                  "publication",
+                  {
+                    type: "choice",
+                    name: "publication",
+                    choice: "publish_current",
+                  },
+                ],
+                [
+                  "evidence_requirement",
+                  {
+                    type: "choice",
+                    name: "evidence_requirement",
+                    choice: "text_sufficient",
+                  },
+                ],
+              ]),
+              execution: {
+                executionId: randomUUID(),
+                modelId: c.host.decisionModelId,
+                providerGenerationId: "synthetic-invocation",
+                startedAt: now,
+                completedAt: now,
+                requestDigest: createHash("sha256")
+                  .update(
+                    JSON.stringify({
+                      model: c.host.decisionModelId,
+                      input,
+                      questions,
+                    }),
+                  )
+                  .digest("hex"),
+                imageDigests: [],
+                vision: "no-image-input",
+              },
+            };
+          },
+        },
+      );
+      assert.ok(invocation);
+      return invocation;
+    }
+    await t.test(
+      "concrete issuer signs the canonical current scope; verifier consumes its nonce through the existing event stream once (synthetic policy/model)",
+      async () => {
+        const c = await fixture({ sourceIssueNull: true });
+        const issuer = createFactoryRunReviewIssuer(f.store, c.host, {
+          issuer: c.envelope.issuer,
+          keyId: c.envelope.keyId,
+          privateKey: () => privateKey,
+        });
+        const invocation = await sourceInvocation(c);
+        const tx = await pool.connect();
+        let chunk: Awaited<ReturnType<typeof issuer.issue>>;
+        try {
+          await tx.query("BEGIN");
+          chunk = await issuer.issue(tx, c.scope, invocation);
+          await tx.query("COMMIT");
+        } finally {
+          await tx.query("ROLLBACK");
+          tx.release();
+        }
+        assert.notEqual(chunk.data.payload.credentialId, c.credentialId);
+        assert.equal(
+          verify(
+            null,
+            factoryRunReviewSignatureInput(chunk.data.payload, chunk.data),
+            publicKey,
+            Buffer.from(chunk.data.signature, "base64url"),
+          ),
+          true,
+        );
+        assert.equal("decision" in chunk.data.payload, false);
+        await pool.query(
+          'INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,2,$3,clock_timestamp())',
+          [randomUUID(), c.runId, JSON.stringify(chunk)],
+        );
+        const granted = await c.runtime.approvals.approve(actor, {
+          ...c.request,
+          decisionCredentialId: chunk.data.payload.credentialId,
+        });
+        const p = {
+          ...granted,
+          eventId: randomUUID(),
+          action: c.request.action,
+          target: c.request.target,
+          targetEnvironment: c.request.targetEnvironment,
+        };
+        const published = await c.runtime.approvals.publish(actor, p);
+        assert.ok(published);
+        assert.equal(
+          (await c.runtime.approvals.publish(actor, p))?.publicationId,
+          published.publicationId,
+        );
+        assert.equal((await readdir(c.root)).length, 1);
+      },
+    );
+    await t.test(
+      "issuer deny reads no private key; ask review remains ungranted without its existing exact confirmation (synthetic policy/model)",
+      async () => {
+        const c = await fixture();
+        let keyReads = 0;
+        const invocation = await sourceInvocation(c);
+        const issuer = createFactoryRunReviewIssuer(f.store, c.host, {
+          issuer: c.envelope.issuer,
+          keyId: c.envelope.keyId,
+          privateKey: () => {
+            keyReads++;
+            return privateKey;
+          },
+        });
+        const invoke = async () => {
+          const tx = await pool.connect();
+          try {
+            await tx.query("BEGIN");
+            return await issuer.issue(tx, c.scope, invocation);
+          } finally {
+            await tx.query("ROLLBACK");
+            tx.release();
+          }
+        };
+        await pool.query(
+          "UPDATE factory_policy_fixture SET decision='deny' WHERE \"runId\"=$1",
+          [c.runId],
+        );
+        await rejects(invoke, "factoryPolicyDenied");
+        assert.equal(keyReads, 0);
+        await pool.query(
+          "UPDATE factory_policy_fixture SET decision='ask' WHERE \"runId\"=$1",
+          [c.runId],
+        );
+        const chunk = await invoke();
+        assert.equal("decision" in chunk.data.payload, false);
+        await pool.query(
+          'INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,2,$3,clock_timestamp())',
+          [randomUUID(), c.runId, JSON.stringify(chunk)],
+        );
+        await rejects(
+          () =>
+            c.runtime.approvals.approve(actor, {
+              ...c.request,
+              decisionCredentialId: chunk.data.payload.credentialId,
+            }),
+          "factoryPolicyConfirmationRequired",
+        );
+        assert.equal((await readdir(c.root)).length, 0);
+        assert.equal(
+          (
+            await pool.query(
+              'SELECT count(*)::int AS n FROM factory_approvals WHERE "taskId"=$1',
+              [c.x.task.id],
+            )
+          ).rows[0].n,
+          0,
+        );
+      },
+    );
     await t.test(
       "tampered signature/scope/issuer, revoked token, STOP, expired lease, changed assignment/current policy and missing check receipt deny before effects",
       async () => {
@@ -395,6 +618,8 @@ export async function factoryRunAuthorityCases(
           "candidate",
           "token-expiry",
           "scope",
+          "instructions",
+          "source-kind",
           "issuer",
           "trusted-alias",
           "token",
@@ -405,6 +630,7 @@ export async function factoryRunAuthorityCases(
           "registration",
           "policy-target",
           "check",
+          "check-result",
           "readonly",
           "readonly-run",
           "device",
@@ -416,8 +642,34 @@ export async function factoryRunAuthorityCases(
           "model-receipt",
           "model-defer",
         ]) {
-          const c = await fixture();
+          const c = await fixture({ checkEvents: scenario !== "check" });
+          if (scenario === "check") {
+            assert.equal(
+              (
+                await pool.query(
+                  'SELECT count(*)::int AS n FROM factory_events WHERE "taskId"=$1',
+                  [c.x.task.id],
+                )
+              ).rows[0].n,
+              0,
+            );
+          }
           if (scenario === "signature") c.envelope.signature = "A".repeat(86);
+          if (scenario === "instructions")
+            await pool.query(
+              "UPDATE issues SET content=$2,revision=revision+1 WHERE id=$1",
+              [
+                c.x.task.issueId,
+                JSON.stringify({
+                  text: "Changed task requirements after review",
+                }),
+              ],
+            );
+          if (scenario === "source-kind")
+            await pool.query(
+              "UPDATE coordinator_events SET kind='run_report' WHERE id=(SELECT \"sourceEventId\" FROM factory_tasks WHERE id=$1)",
+              [c.x.task.id],
+            );
           if (scenario === "scope")
             c.envelope.payload.scopeDigest = "f".repeat(64);
           if (scenario === "issuer") c.envelope.issuer = "untrusted-model";
@@ -547,7 +799,7 @@ export async function factoryRunAuthorityCases(
               'UPDATE factory_policy_fixture SET "permissionAction"=\'network\' WHERE "runId"=$1',
               [c.runId],
             );
-          if (scenario === "check")
+          if (scenario === "check-result")
             await pool.query(
               `UPDATE factory_events SET result='{"invalidSyntheticCheck":true}'::jsonb WHERE "taskId"=$1`,
               [c.x.task.id],
@@ -574,7 +826,9 @@ export async function factoryRunAuthorityCases(
               e instanceof FactoryError &&
               (scenario === "candidate"
                 ? e.code === "factoryEvidenceMismatch"
-                : e.code.startsWith("factoryPolicy")),
+                : e.code.startsWith("factoryPolicy")) &&
+              (scenario !== "check" ||
+                e.code === "factoryPolicyCheckReceiptRequired"),
           );
           assert.equal((await readdir(c.root)).length, 0);
           assert.equal(
@@ -624,6 +878,56 @@ export async function factoryRunAuthorityCases(
         );
         await rejects(() => d.publication(), "factoryPolicyDenied");
         assert.equal((await readdir(d.root)).length, 0);
+      },
+    );
+    await t.test(
+      "issue/source requirements changed after grant cannot reuse the old model judgment for publication",
+      async () => {
+        for (const field of ["issue", "source"] as const) {
+          const c = await fixture();
+          const granted = await c.runtime.approvals.approve(actor, c.request);
+          if (field === "issue")
+            await pool.query(
+              "UPDATE issues SET content=$2,revision=revision+1 WHERE id=$1",
+              [
+                c.x.task.issueId,
+                JSON.stringify({
+                  text: "Changed acceptance criteria after grant",
+                }),
+              ],
+            );
+          else
+            await pool.query(
+              'UPDATE coordinator_events SET payload=$2 WHERE id=(SELECT "sourceEventId" FROM factory_tasks WHERE id=$1)',
+              [
+                c.x.task.id,
+                JSON.stringify({
+                  text: "Changed originating request after grant",
+                }),
+              ],
+            );
+          const p = {
+            ...granted,
+            eventId: randomUUID(),
+            action: c.request.action,
+            target: c.request.target,
+            targetEnvironment: c.request.targetEnvironment,
+          };
+          await rejects(
+            () => c.runtime.approvals.publish(actor, p),
+            "factoryPolicyDecisionMismatch",
+          );
+          assert.equal((await readdir(c.root)).length, 0);
+          assert.equal(
+            (
+              await pool.query(
+                'SELECT count(*)::int AS n FROM factory_publications WHERE "taskId"=$1',
+                [c.x.task.id],
+              )
+            ).rows[0].n,
+            0,
+          );
+        }
       },
     );
     await t.test(

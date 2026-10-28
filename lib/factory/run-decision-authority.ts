@@ -17,6 +17,7 @@ import {
   createFactoryApprovals,
   type PublicationAdapter,
 } from "./approval";
+import { readFactoryPublicationRequirements } from "./publication-requirements";
 import { approvalEvidence, digest } from "./evidence";
 import {
   verifiedFactoryDecision,
@@ -50,6 +51,7 @@ export const factoryRunReview = z
     executionRunId: z.uuid(),
     executionSessionId: id,
     assignmentDigest: hash,
+    instructionsDigest: hash,
     policyId: id,
     policyRevision: id,
     permissionAction: publicationAction,
@@ -123,6 +125,8 @@ const currentPolicy = z
   })
   .strict();
 export type FactoryCurrentPublicationPolicy = z.infer<typeof currentPolicy>;
+/** Shared exact schema for the owned review issuer; no policy selection. */
+export const factoryCurrentPublicationPolicy = currentPolicy;
 export interface FactoryPublicationHost {
   /** Supplied by authenticated existing host transport, never request/model JSON. */
   ownerId: string;
@@ -235,6 +239,8 @@ async function passedChecks(tx: PoolClient, task: FactoryTask) {
   }
   return receipts;
 }
+/** The issuer and verifier consume the same canonical committed receipts. */
+export { passedChecks as readFactoryPassedCheckReceipts };
 
 /** Same transaction guard for worker evidence reads and publication I/O.
  * Called after the existing task/issue locks; current token/STOP/lease/device
@@ -345,6 +351,14 @@ export function createFactoryRunDecisionAuthority(
         body.executionRunId !== run.id ||
         body.executionSessionId !== run.sessionId ||
         body.assignmentDigest !== digest(run.agentDefinition) ||
+        body.instructionsDigest !==
+          digest(
+            await readFactoryPublicationRequirements(
+              tx,
+              task,
+              run.agentDefinition,
+            ),
+          ) ||
         body.scopeDigest !== digest(expected) ||
         body.permissionAction !== expected.action ||
         !run.startedAt ||

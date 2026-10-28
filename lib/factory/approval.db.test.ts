@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { factoryRunAuthorityCases } from "../../tests/helpers/factory194-run-authority";
+import { factory194Target } from "../../tests/helpers/factory194-target";
 import { FactoryError } from "./approval-contract";
 import { handleFactoryApproval } from "./approval-http";
 import {
@@ -27,10 +28,7 @@ if (process.env.REQUIRE_DB === "1" && !db)
     "Factory approval DB test requires an explicit disposable database",
   );
 if (db) {
-  const u = new URL(db);
-  assert.equal(u.hostname, "127.0.0.1");
-  assert.equal(u.pathname, ci ? "/mikka_e2e" : "/factory194_test");
-  assert.equal(u.port, ci ? "5432" : "55594");
+  factory194Target(db, ci);
 }
 const rejects = (fn: () => Promise<unknown>, code: string) =>
   assert.rejects(fn, (e) => e instanceof FactoryError && e.code === code);
@@ -108,10 +106,7 @@ test(
               "factoryPublicationReceiptRequired",
             );
           } finally {
-            await pool.query(
-              'UPDATE factory_approvals SET "decisionEvidence"=$2 WHERE id=$1',
-              [p.approvalId, JSON.stringify(grant.decisionEvidence)],
-            );
+            // Keep the invalid synthetic evidence for inspection; never restore.
             tx.release();
           }
         },

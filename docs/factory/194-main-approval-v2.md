@@ -147,6 +147,56 @@ predicate for committed check passes; semantic validators, model invocation and
 current policy data remain explicitly synthetic. No real deployment authorization
 is signed and no real provider is called.
 
+### Canonical preparation, invocation and issuer
+
+`createFactoryRunReviewIssuer(store, host, signer)` exports `prepare(tx, scope)`
+and `issue(tx, scope, invocation)`. Preparation locks the current task/executor,
+checks current registered policy and expiry before any model call, reads canonical
+issue title/content/revision, originating user event and frozen assignment, then
+reads and hashes the existing report/chunk artifacts. Only redacted canonical
+content enters observations. No client/model observations are accepted by the
+worker composition. Unsupported image artifacts still fail; arbitrary URLs
+cannot substitute for stored pixels.
+
+`invokeFactoryPublicationDecision(scope, executor, observations, transport)`
+freezes the complete request before calling the injected actual shared serializer
+and invoker. Executor includes run/session/assignment, canonical instructions
+digest and policy ID/revision. The fixed questions ask the vision-capable model
+to choose `text_sufficient|visual_required` and `publish_current|defer`. Missing
+answers fail; a visual requirement without actual submitted images fails. The
+program does not infer task semantics from absent images or apply confidence
+thresholds. Result model/request/image/time provenance must match the original
+request; an opaque process-local handle prevents post-call scope rebinding.
+
+Issuance relocks/rechecks canonical state and original invocation, then signs a
+server-generated nonce using an injected existing Ed25519 key only when its public
+key matches the current trusted identity. The signed payload includes
+`instructionsDigest`; the verifier rereads issue/source/assignment requirements
+at every grant/gate/pre-publication authority check, so later edits invalidate
+stale judgments. Unscoped originating user events follow #192's null-or-matching
+issue rule. No key loader, permission registration, endpoint, parallel ledger or
+event-sequence writer is added. Returned chunks use the existing run event writer.
+
+`factoryPublicationForWorker` derives owner/run from existing worker transport.
+When trusted server dependencies supply `reviewSigner` and `reviewTransport`,
+`review(scope)` performs prepare transaction → shared invocation → issue
+transaction. It clones the scope before its first await. No model call occurs
+inside the database transaction. The returned chunk is not itself persisted or
+an execution grant; request JSON cannot install dependencies.
+
+Policy deny/read-only stops before signing-key access. For ask, the signed review
+is semantic evidence only: the existing exact confirmation after issuance remains
+necessary. No blanket human confirmation or backdated confirmation is introduced.
+The isolated issuer/verifier tests use synthetic model/policy/key materials and a
+real local artifact. Actual #192/#193 source composition verifies transaction and
+ancestry contracts; semantic validators remain synthetic.
+
+Live installation still needs the actual registered publication policy/version
+resolver, an existing authorized signing identity/key binding, the real shared
+model transport and existing exact ask-confirmation source. None is silently
+substituted by test fixtures, desktop/network permissions or repository merge
+permission. Real provider/user-flow acceptance is outstanding.
+
 ### Actual shared model receipt consumer
 
 The shared #193 source `7760bcb7556ae918948aba58a377e4359b91ea5c`
@@ -264,19 +314,28 @@ reference and actual production-domain routing. Provider READY is not user-flow
 health. No real-user acceptance video is claimed until that chain is exercised on
 an authorized real target with real evidence.
 
-## Test resource retention
+## Test resource lifecycle
 
-The #194 fixture teardown retains database schemas and rows, artifact directories
-and protocol audit JSON by default. It has no schema/record/directory/container
-deletion option. Fault injection invalidates a synthetic check without deleting
-its event. Its scoped rollback trigger and function remain installed in the
-isolated schema. HTTP substitutes persist request/deployment audit data and
-unref their listener rather than destroy connections. PostgreSQL client shutdown
-does not remove the database or container. These changes do not retroactively
-authorize or establish retention for earlier runs.
+Owned PostgreSQL fixtures create a fresh UUID schema and retain its tables/rows;
+local publication fixtures retain fresh private artifact directories. No fixture
+cleanup selects a prior schema, container, directory or log. Database URL guards
+run before pool construction, require the exact isolated loopback target and
+reject URL options/fragments. Explicit pool configuration prevents connection URL
+or PGOPTIONS overrides from escaping the new schema.
 
-Shared CI startup/teardown scripts outside #194 still include destructive paths
-(including migration-fixture schema drops and Docker `--rm`/`rm -f`). They must be
-coordinated with their owners before a new ref update automatically runs those
-jobs. Do not treat the older head's CI as acceptance of this source or launch a
-build/test cleanup path merely because the Factory feature is disabled.
+The missing-event negative uses a fresh task for which finish events were never
+inserted. Invalid result content is a separate negative. Corrupt local receipts
+use a fresh UUID and exclusive creation rather than replacing a successful file.
+Security invalidation/revocation checks remain intact.
+
+Loopback HTTP substitutes record protocol audit data in a fresh private directory
+and close only the listener captured by that invocation, within authorized
+recycling of newly created managed test resources. Audit JSON is data, not a
+claim that its listener survives teardown. Existing resources expressly preserved
+by the user are not targeted. Client pool shutdown does not stop the retained
+PostgreSQL service or delete its schema.
+
+Full CI may recycle its own newly created hosted test resources within the same
+authorization. A ref update must not cancel a protected older run through workflow
+concurrency. Historical green jobs are not evidence for later source changes,
+and isolated contracts are not real provider/model acceptance.

@@ -97,9 +97,9 @@ export async function vercelProtocolFixture() {
     }),
     posts: () => requests.filter((r) => r.method === "POST").length,
     async close() {
-      // Retain audit data by default. Do not destroy a fixture listener or any
-      // database/container/directory in test teardown. unref only lets the test
-      // runner finish; the listener remains available for this process's life.
+      // This closure owns ONLY the loopback listener created by this invocation.
+      // User authorized recycling newly created managed test resources; no
+      // pre-existing listener/container/schema/log is selected or removed.
       const audit = await mkdtemp(join(tmpdir(), "factory194-protocol-"));
       await writeFile(
         join(audit, "protocol.json"),
@@ -116,7 +116,9 @@ export async function vercelProtocolFixture() {
         { mode: 0o600 },
       );
       console.info("Factory194 retained protocol audit", audit, origin);
-      server.unref();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
     },
   };
 }

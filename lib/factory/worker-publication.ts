@@ -16,6 +16,18 @@ import {
   lockFactoryPublicationExecutor,
   type FactoryPublicationHost,
 } from "./run-decision-authority";
+import {
+  createFactoryRunReviewIssuer,
+  type FactoryRunReviewSigner,
+} from "./run-review-issuer";
+import {
+  invokeFactoryPublicationDecision,
+  type FactoryPublicationDecisionTransport,
+} from "./publication-invocation";
+import {
+  factoryDecisionScope,
+  type FactoryDecisionScope,
+} from "./policy-authorization";
 
 /** Backend call point only; not a route/tool registration or permission grant.
  * Reuse the real worker-token authentication, derive owner/run/Bot on the server,
@@ -38,6 +50,11 @@ export async function factoryPublicationForWorker<
       "ownerId" | "executionRunId" | "tokenHash"
     >;
     adapters?: PublicationAdapter[];
+    /** Optional trusted SERVER dependency; never supplied by request/model JSON.
+     * Absent until an existing signing identity/policy binding is authorized. */
+    reviewSigner?: FactoryRunReviewSigner;
+    /** Actual shared #193 serializer/invoker, installed by trusted host code. */
+    reviewTransport?: FactoryPublicationDecisionTransport;
   },
 ) {
   const authorization = request.headers.get("authorization") ?? "";
@@ -72,5 +89,67 @@ export async function factoryPublicationForWorker<
     },
     deps.adapters,
   );
-  return { ...runtime, actor: { userId: identity.userId } };
+  const reviewIssuer = deps.reviewSigner
+    ? createFactoryRunReviewIssuer(
+        runtime.store,
+        {
+          ...deps.host,
+          ...principal,
+        },
+        deps.reviewSigner,
+      )
+    : undefined;
+  async function review(scopeInput: FactoryDecisionScope) {
+    // Parse clones nested fields before the first await. The caller retains no
+    // reference that can swap scope between prepare/invoke/issue.
+    const scope = factoryDecisionScope.parse(scopeInput);
+    const transport = deps.reviewTransport;
+    if (
+      !reviewIssuer ||
+      !transport ||
+      transport.modelId !== deps.host.decisionModelId
+    )
+      throw new FactoryError("factoryPolicyModelEvidenceUnavailable");
+    const prepareTx = await deps.pool.connect();
+    const prepared = await (async () => {
+      try {
+        await prepareTx.query("BEGIN");
+        const result = await reviewIssuer.prepare(prepareTx, scope);
+        await prepareTx.query("COMMIT");
+        return result;
+      } catch (error) {
+        await prepareTx.query("ROLLBACK");
+        throw error;
+      } finally {
+        prepareTx.release();
+      }
+    })();
+    const invocation = await invokeFactoryPublicationDecision(
+      scope,
+      prepared.executor,
+      prepared.observations,
+      transport,
+    );
+    if (!invocation)
+      throw new FactoryError("factoryPolicyModelEvidenceUnavailable");
+    const issueTx = await deps.pool.connect();
+    try {
+      await issueTx.query("BEGIN");
+      const chunk = await reviewIssuer.issue(issueTx, scope, invocation);
+      await issueTx.query("COMMIT");
+      // The existing authenticated run-event writer owns append/sequence.
+      // Returning this chunk does not persist it or authorize an operation.
+      return chunk;
+    } catch (error) {
+      await issueTx.query("ROLLBACK");
+      throw error;
+    } finally {
+      issueTx.release();
+    }
+  }
+  return {
+    ...runtime,
+    actor: { userId: identity.userId },
+    ...(reviewIssuer ? { reviewIssuer, review } : {}),
+  };
 }
