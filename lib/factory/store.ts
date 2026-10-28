@@ -195,7 +195,7 @@ export function createFactoryStore(
       'SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "issueId"=$3 FOR UPDATE',
       [runId, task.userId, task.issueId],
     );
-    if (!run || run.stopRequestedAt) fail("factoryRunMismatch");
+    if (!run || run.stopRequestedAt || run.botId !== task.botId) fail("factoryRunMismatch");
     return run;
   }
   async function freshAttempt(
@@ -354,6 +354,8 @@ export function createFactoryStore(
             AND status IN ('queued','preparing','running','waiting_input','finishing')`,
             [task.id, userId, task.issueId],
           );
+          await tx.query(`UPDATE run_tokens SET "revokedAt"=coalesce("revokedAt",now())
+            WHERE "userId"=$2 AND "runId" IN (SELECT a."runId" FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" AND r."userId"=$2 AND r."issueId"=$3 WHERE a."taskId"=$1)`,[task.id,userId,task.issueId]);
         } else if (change.action === "resolve") {
           if (task.stage !== "clarify" || task.status !== "waiting")
             fail("factoryTransition");
@@ -413,7 +415,9 @@ export function createFactoryStore(
           if (
             prior.stopReason !== "device_lost" ||
             prior.status !== "failed" ||
-            retry.retryOf !== prior.id
+            retry.retryOf !== prior.id || retry.agentId !== prior.agentId ||
+            retry.kind !== prior.kind || retry.baseBranch !== prior.baseBranch ||
+            retry.agentDefinition?.definitionDigest !== prior.agentDefinition?.definitionDigest
           )
             fail("factoryRunMismatch");
           await tx.query(
@@ -436,6 +440,8 @@ export function createFactoryStore(
           if (task.status !== "pending" || attempt.runId)
             fail("factoryTransition");
           const run = await runFor(tx, task, change.runId);
+          const expectedKind = task.stage === "spec" ? "plan" : task.stage === "execute" ? "implement" : ["review", "verify", "monitor"].includes(task.stage) ? "acceptance" : null;
+          if (!expectedKind || run.kind !== expectedKind) fail("factoryRunMismatch");
           if (
             ![
               "queued",
@@ -498,11 +504,13 @@ export function createFactoryStore(
             );
             if (!provenance && change.status !== "blocked")
               fail("factoryRunMismatch");
-            if (provenance)
+            if (provenance) {
               await tx.query(
                 'UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1',
                 [attempt.id, provenance.sessionId],
               );
+              attempt.sessionId = provenance.sessionId;
+            }
           }
           if (["review", "verify", "monitor"].includes(task.stage) &&
               ["passed", "failed"].includes(change.status)) {
@@ -594,7 +602,7 @@ export function createFactoryStore(
             "UPDATE factory_attempts SET output=$2,evidence=$3 WHERE id=$1",
             [
               attempt.id,
-              JSON.stringify(change.output),
+              JSON.stringify({ ...attempt.output, ...change.output }),
               JSON.stringify(change.evidence),
             ],
           );

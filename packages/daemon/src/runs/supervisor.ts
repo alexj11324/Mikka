@@ -367,6 +367,7 @@ export class RunSupervisor {
       if (e.assignment.runId === cancelledRunId) return true
       // A verified hand-in is under review; its work is published.
       if (e.state === "succeeded") return false
+      if (e.assignment.preserveQuestionWorktree && e.stopReason === "blocked") return false
       return !e.stopReason || !KEEP_WORKTREE.includes(e.stopReason)
     })
     if (!discardable) return false

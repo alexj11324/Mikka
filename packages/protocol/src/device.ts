@@ -312,6 +312,7 @@ export const runAssignmentSchema = z.object({
    */
   resumeSessionId: z.string().max(500).optional(),
   requireSessionResume: z.boolean().optional(),
+  preserveQuestionWorktree: z.boolean().optional(),
   questionId: z.uuid().optional(),
   /**
    * What this run adds on top of the brief (a person's message, an answer,

@@ -503,6 +503,16 @@ describe("follow-up runs", () => {
     expect(mockSession(dataDir, sessionId).messages).toHaveLength(3)
   })
 
+  it("Factory external blockers retain their empty worktree for a later exact-session answer", async () => {
+    const {server,dataDir}=await setup()
+    const daemon=await boot(server,dataDir)
+    const first=server.queueRun(DEVICE,{issueId:"issue-blocked",repoId:"repo-1",baseBranch:"main",harness:"mock",prompt:"do it",fixture:"quota",preserveQuestionWorktree:true})
+    const run=await runToEnd(daemon,server,first)
+    expect(run.stopReason).toBe("blocked")
+    expect(await daemon.supervisor.discardIfEmpty(first)).toBe(false)
+    expect(existsSync(run.worktree!)).toBe(true)
+  })
+
   it("required question continuation retains its exact earlier session", async () => {
     const { server, dataDir } = await setup()
     const daemon = await boot(server, dataDir)

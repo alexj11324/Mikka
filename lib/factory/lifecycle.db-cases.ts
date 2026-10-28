@@ -11,6 +11,8 @@ import { createFactoryStore, type FactoryAuthorize } from './store';
 import { createFactoryDispatch, factoryBinding, type FactoryQueue } from './dispatch';
 import { createFactoryQuestions, questionReference } from './questions/store';
 import { createFactoryClaim } from './claim';
+import { claimLocalRun } from '../computer/claim';
+import { factoryCheckIndependent } from './check-independence';
 import { createFactoryReconciler } from './reconcile';
 
 export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAuthorize,fixture:()=>Promise<FactoryRoute>) {
@@ -46,6 +48,25 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
     await denies(()=>dispatch('other',request),'factoryNotFound');
     assert.equal(dispatched.binding.revision,request.binding.revision+1);
   });
+  await t.test('actual local claim and token callback commit atomically; cancellation revokes before further claim',async()=>{
+    const r=await store.route('owner',await fixture());
+    const d=await dispatch('owner',{binding:factoryBinding(r.task),agentId,deviceRepoId:repoId});
+    const lease=new Date(Date.now()+60000),tokenId=randomUUID();
+    const before=async(tx:import('pg').PoolClient)=>{
+      try{await claim(tx,'owner',deviceId,d.runId,lease.toISOString());return true;}
+      catch(error){if(error instanceof FactoryError)return false;throw error;}
+    };
+    const token=async(tx:import('pg').PoolClient)=>{await tx.query('INSERT INTO run_tokens(id,"runId","userId","tokenHash","expiresAt") VALUES ($1,$2,$3,$4,$5)',[tokenId,d.runId,'owner',randomUUID(),lease]);};
+    await assert.rejects(claimLocalRun(pool,d.runId,deviceId,lease,undefined,before,async tx=>{await token(tx);throw new Error('token callback interrupted');}),/interrupted/);
+    assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[d.runId])).rows[0].status,'queued');
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_tokens WHERE id=$1',[tokenId])).rows[0].n,0);
+    assert.equal(await claimLocalRun(pool,d.runId,deviceId,lease,undefined,before,token),'claimed');
+    await store.apply('owner',d.binding,randomUUID(),{action:'cancel',reason:'Cancel before worker proceeds'});
+    assert.ok((await pool.query('SELECT "revokedAt" FROM run_tokens WHERE id=$1',[tokenId])).rows[0].revokedAt);
+    let issuedAgain=false;
+    assert.equal(await claimLocalRun(pool,d.runId,deviceId,lease,undefined,before,async()=>{issuedAgain=true;}),'unavailable');
+    assert.equal(issuedAgain,false);
+  });
   await t.test('question context facts, persisted waiting, continuation CAS and session fence',async()=>{
     await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"='original-session',report=$2 WHERE id=$1`,[dispatched.runId,JSON.stringify({question:{questionId:randomUUID(),kind:'context',question:'Which request?',options:[]}})]);
     const q=await questions.record('owner',dispatched.runId);
@@ -65,6 +86,7 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
       const assignment=await claim(tx,'owner',deviceId,result.continuationRunId,new Date(Date.now()+60000).toISOString());
       assert.equal(assignment.resumeSessionId,'original-session');
       assert.equal(assignment.requireSessionResume,true);
+      assert.equal(assignment.preserveQuestionWorktree,true);
       await tx.query('ROLLBACK');
     } finally {tx.release();}
     await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"='different-session' WHERE id=$1`,[result.continuationRunId]);
@@ -166,6 +188,29 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
     assert.deepEqual(await store.apply('owner',binding,id,{action:'retry',reason:'next'}),next);
     await denies(()=>store.apply('owner',binding,randomUUID(),{action:'retry',reason:'next'}),'factoryStale');
     await denies(()=>store.apply('owner',factoryBinding(next.task),randomUUID(),{action:'finish',status:'passed',reason:'model says passed',evidence:[],output:{}}),'factoryIndependentRunRequired');
+  });
+  await t.test('actual v2 predicate accepts persisted monitor question ancestry for pass and failure',async()=>{
+    for(const verdict of ['passed','failed'] as const) {
+      const phaseStore=createFactoryStore(pool,authorize,null,{independent:factoryCheckIndependent,gates:{monitor:async(_tx,_task,attempt,change)=>attempt.sessionId==='monitor-question-session'&&change.output.fixtureReceipt===true}});
+      const phaseDispatch=createFactoryDispatch(pool,phaseStore,queue,{configure:{monitor:async(tx,_task,id)=>{await tx.query("UPDATE agent_runs SET kind='acceptance',\"baseBranch\"=$2 WHERE id=$1",[id,'a'.repeat(40)]);}},freeze:async(tx,_task,id)=>{await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1',[id,JSON.stringify({schemaVersion:1,definitionDigest:'monitor-fixture',harness:'codex'})]);}});
+      const phaseQuestions=createFactoryQuestions(pool,authorize,phaseStore,phaseDispatch);
+      const route=await fixture(),r=await phaseStore.route('owner',route),candidateId=randomUUID();
+      await pool.query(`INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,$3,'fixture','test','fixture',$4)`,[candidateId,r.task.id,'a'.repeat(40),randomUUID()]);
+      await pool.query(`UPDATE factory_tasks SET stage='monitor',"candidateId"=$2 WHERE id=$1`,[r.task.id,candidateId]);
+      await pool.query(`UPDATE factory_attempts SET stage='monitor',"candidateId"=$2 WHERE id=$1`,[r.task.attemptId,candidateId]);
+      const pending=await phaseStore.read('owner',r.task.id);
+      const first=await phaseDispatch('owner',{binding:factoryBinding(pending.task),agentId,deviceRepoId:repoId});
+      await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"='monitor-question-session',report=$2 WHERE id=$1`,[first.runId,JSON.stringify({question:{questionId:randomUUID(),kind:'context',question:'Need original context?',options:[]}})]);
+      const q=await phaseQuestions.record('owner',first.runId);
+      const resumed=await phaseQuestions.answer({source:'orchestrator',userId:'owner'},{reference:questionReference(q),answerId:randomUUID(),facts:[{kind:'request',sourceEventId:route.sourceEventId,quote:'Actual synthetic personal request'}]});
+      await pool.query(`UPDATE agent_runs SET status=$2,"stopReason"='submitted',"sessionId"='monitor-question-session',report='{"fixture":true}' WHERE id=$1`,[resumed.continuationRunId,verdict==='passed'?'succeeded':'failed']);
+      await phaseQuestions.settle('owner',resumed.continuationRunId);
+      const current=await phaseStore.read('owner',r.task.id);
+      const result=await phaseStore.apply('owner',factoryBinding(current.task),randomUUID(),{action:'finish',status:verdict,reason:'Synthetic receipt fixture, no provider',evidence:[{kind:'report',artifact:`run-report:${resumed.continuationRunId}`,runId:resumed.continuationRunId,sessionId:'monitor-question-session',candidateId,sha:'a'.repeat(40),environment:'test',recordedAt:new Date().toISOString()}],output:{fixtureReceipt:true}});
+      assert.equal(result.task.status,verdict);
+      assert.equal(result.attempts[0].status,'waiting');
+      assert.equal(result.attempts[1].sessionId,'monitor-question-session');
+    }
   });
   await t.test('missing consumer blocks only its task and does not stall another question',async()=>{
     const r=await store.route('owner',await fixture());

@@ -24,11 +24,16 @@ export function createFactoryClaim(store: ReturnType<typeof createFactoryStore>,
     if(task.status!=='running'||!attempt||attempt.status!=='running'||attempt.runId!==runId||attempt.candidateId!==task.candidateId) throw new FactoryError('factoryClaimStale');
     const {rows:[run]}=await tx.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE',[runId]);
     if(!run||run.userId!==userId||run.issueId!==task.issueId||run.botId!==task.botId||run.deviceId!==deviceId||run.status!=='queued'||run.stopRequestedAt) throw new FactoryError('factoryRunMismatch');
-    if(run.questionContinuation) return questions.claimContinuation(userId,deviceId,runId,leaseExpiresAt,tx);
+    const authorized = await tx.query(`SELECT a.id FROM agents a
+      JOIN device_repos repo ON repo.id=$2 AND repo."deviceId"=$3 AND repo."userId"=$4
+      JOIN devices d ON d.id=$3 AND d."ownerId"=$4 AND d.enabled=true
+      WHERE a.id=$1 AND a."userId"=$4 FOR SHARE OF a,repo,d`,[run.agentId,run.deviceRepoId,deviceId,userId]);
+    if (!authorized.rowCount) throw new FactoryError('factoryRunMismatch');
+    if(run.questionContinuation) return {...await questions.claimContinuation(userId,deviceId,runId,leaseExpiresAt,tx),preserveQuestionWorktree:true};
     if(['review','verify','monitor'].includes(task.stage)) {
       if(!validateCheck) throw new FactoryError('factoryDispatchAdapterRequired');
-      return validateCheck(tx,task,runId);
+      return {...await validateCheck(tx,task,runId),preserveQuestionWorktree:true};
     }
-    return {};
+    return {preserveQuestionWorktree:true};
   };
 }
