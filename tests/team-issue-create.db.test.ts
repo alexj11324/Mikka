@@ -1,3 +1,4 @@
+import { scopeSubtest } from './support/scope-acceptance.mjs'
 import 'next/dist/server/node-environment-baseline'
 import './fixtures/team-auth-runtime.mjs'
 import assert from 'node:assert/strict'
@@ -74,7 +75,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     if exists(select 1 from team184_controls where "teamId"=new."teamId" and pause) then perform pg_advisory_xact_lock(hashtextextended('team184-barrier',0)); end if;
     return new; end $$`)
   await workspace.query('create trigger team184_inject before insert on mikka_team_issues for each row execute function team184_inject()')
-  await t.test('save, legacy scope click, title/document writes and manual retry keep personal data out of Linear',async()=>{
+  await scopeSubtest(t, 'save, legacy scope click, title/document writes and manual retry keep personal data out of Linear',async()=>{
     const created=await withAfter(()=>actAs(owner,()=>saveIssue({title:'Legacy UI task',content,status:'todo',priority:'normal'})))
     assert.ok('issue' in created && created.issue);const id=created.issue.id
     await workspace.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,teamId,workspaceId,owner])
@@ -95,7 +96,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     }
     assert.equal(externalCalls,0)
   })
-  await t.test('existing personal task requires explicit authorized team, preserves identity and never publishes',async()=>{
+  await scopeSubtest(t, 'existing personal task requires explicit authorized team, preserves identity and never publishes',async()=>{
     testGlobals.teamCreateTestUser=owner
     const created=await withAfter(()=>saveIssue({title:'Promote existing private task',content,status:'todo',priority:'normal'}))
     assert.ok('issue' in created && created.issue)
@@ -119,7 +120,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.equal((await workspace.query('select "teamId" from mikka_team_issues where "issueId"=$1',[original.id])).rows[0].teamId,badTeam)
     assert.equal(externalCalls,0)
   })
-  await t.test('existing task lost workspace commit response retains personal state and resumes same receipt',async()=>{
+  await scopeSubtest(t, 'existing task lost workspace commit response retains personal state and resumes same receipt',async()=>{
     testGlobals.teamCreateTestUser=owner
     const created=await withAfter(()=>saveIssue({title:'Existing task lost response',content,status:'todo',priority:'normal'}))
     assert.ok('issue' in created && created.issue);const id=created.issue.id
@@ -137,7 +138,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
     } finally {target.transaction=original}
   })
-  await t.test('lost app promotion response with unavailable reconciliation reports unknown and replays once',async()=>{
+  await scopeSubtest(t, 'lost app promotion response with unavailable reconciliation reports unknown and replays once',async()=>{
     testGlobals.teamCreateTestUser=owner
     const created=await withAfter(()=>saveIssue({title:'Existing task app commit response lost',content,status:'todo',priority:'normal'}))
     assert.ok('issue' in created && created.issue);const id=created.issue.id
@@ -153,7 +154,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.equal((await workspace.query('select count(*)::int n from team_issue_promotion_receipts where "requestId"=$1',[request.requestId])).rows[0].n,1)
     assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
   })
-  await t.test('revocation after existing-task relation commit prevents promotion',async()=>{
+  await scopeSubtest(t, 'revocation after existing-task relation commit prevents promotion',async()=>{
     const revoked=`promotion-owner-${randomUUID()}`
     await app.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Synthetic\',$2,true,now(),now())',[revoked,`${revoked}@example.invalid`])
     await workspace.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Synthetic\',$3,\'member\',\'active\')',[workspaceId,revoked,`${revoked}@example.invalid`])
@@ -171,7 +172,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
     } finally {target.transaction=original}
   })
-  await t.test('MCP creation ignores a spoofed scope or team context and stays personal',async()=>{
+  await scopeSubtest(t, 'MCP creation ignores a spoofed scope or team context and stays personal',async()=>{
     const {createIssue}=await import('../lib/mcp/actions')
     const input={title:'MCP scope spoof',body:'ambiguous work',scope:'workspace',teamId} as Parameters<typeof createIssue>[1]
     const created=await withAfter(()=>createIssue(owner,input,agentActor(randomUUID())))
@@ -181,7 +182,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     for(const table of ['linear_sync_outbox','linear_issue_publications','linear_issue_links']) assert.equal((await app.query(`select count(*)::int n from ${table} where "issueId"=$1`,[created.id])).rows[0].n,0)
     assert.equal(externalCalls,0)
   })
-  await t.test('legacy scope UI/action cannot promote even when a team relation or active Linear team exists',async()=>{
+  await scopeSubtest(t, 'legacy scope UI/action cannot promote even when a team relation or active Linear team exists',async()=>{
     const id=randomUUID()
     await app.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Legacy scope action\',$3,\'todo\',\'normal\',\'personal\')',[id,owner,JSON.stringify(content)])
     // An existing association is context, not proof that this call explicitly
@@ -207,7 +208,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.equal((await app.query('select scope from issues where id=$1',[id])).rows[0].scope,'personal')
     assert.equal(externalCalls,0)
   })
-  await t.test('an unlinked legacy workspace task never infers the owner active Linear team',async()=>{
+  await scopeSubtest(t, 'an unlinked legacy workspace task never infers the owner active Linear team',async()=>{
     const id=randomUUID()
     await app.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Unlinked legacy workspace\',$3,\'todo\',\'normal\',\'workspace\')',[id,owner,JSON.stringify(content)])
     await app.query('update issues set title=\'Unlinked legacy update\' where id=$1',[id])
@@ -234,7 +235,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.equal((await app.query('select count(*)::int n from linear_issue_publications where id=$1',[publication])).rows[0].n,1)
     assert.equal(externalCalls,0)
   })
-  await t.test('unverified historical issue and comment removal webhooks cannot mutate retained links',async()=>{
+  await scopeSubtest(t, 'unverified historical issue and comment removal webhooks cannot mutate retained links',async()=>{
     const id=randomUUID(),remoteId=randomUUID(),linkId=randomUUID(),commentId=randomUUID(),commentLinkId=randomUUID()
     const team=(await app.query('select id from linear_team_syncs where "ownerId"=$1',[owner])).rows[0].id
     await app.query('insert into linear_connections ("userId","linearUserId","organizationId","organizationName","accessToken","refreshToken","expiresAt") values ($1,\'synthetic\',\'synthetic-unknown\',\'Synthetic\',\'unused\',\'unused\',now()+interval \'1 hour\')',[owner])
@@ -250,7 +251,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.equal((await app.query('select "syncStatus" from linear_comment_links where id=$1',[commentLinkId])).rows[0].syncStatus,'pending')
     assert.equal(externalCalls,0)
   })
-  await t.test('an explicitly imported external task retains its verified link and can enqueue',async()=>{
+  await scopeSubtest(t, 'an explicitly imported external task retains its verified link and can enqueue',async()=>{
     const remoteId=randomUUID()
     const {linearTeamSyncs}=await import('../lib/db/schema')
     const {eq}=await import('drizzle-orm')
@@ -274,7 +275,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.equal((await app.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,1)
     assert.equal(externalCalls,0)
   })
-  await t.test('explicit authorized team succeeds once with durable provider gate and no outbox',async()=>{
+  await scopeSubtest(t, 'explicit authorized team succeeds once with durable provider gate and no outbox',async()=>{
     const value=input(teamId), result=await query(owner,value)
     assert.ok('issue' in result && result.issue);assert.equal(result.issue.scope,'workspace');assert.deepEqual(result.linearSync,{enabled:false,reason:'no_explicit_target'});assert.equal(result.issue.linearSyncBlocked,true)
     const id=result.issue.id
@@ -299,7 +300,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.deepEqual(await query(owner,value),{error:'teamIssueChanged',requestId:value.requestId})
     assert.equal((await workspace.query('select "teamId" from mikka_team_issues where "issueId"=$1',[id])).rows[0].teamId,badTeam)
   })
-  await t.test('concurrent replays create one issue and one team association',async()=>{
+  await scopeSubtest(t, 'concurrent replays create one issue and one team association',async()=>{
     const value=input(teamId)
     const results=await Promise.all([query(owner,value),query(owner,value),query(owner,value)])
     for(const result of results) assert.ok('issue' in result && result.issue)
@@ -308,7 +309,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.equal((await app.query('select count(*)::int n from team_issue_create_requests where "requestId"=$1',[value.requestId])).rows[0].n,1)
     assert.equal((await workspace.query('select count(*)::int n from team_issue_create_receipts where "requestId"=$1',[value.requestId])).rows[0].n,1)
   })
-  await t.test('failed initial app transaction creates no partial issue or association',async()=>{
+  await scopeSubtest(t, 'failed initial app transaction creates no partial issue or association',async()=>{
     const value={...input(teamId),title:`creation-failure-${randomUUID()}`}
     await app.query('insert into team184_app_controls (title,fail,"failCreate") values ($1,false,true)',[value.title])
     assert.deepEqual(await query(owner,value),{error:'teamIssueRetry',requestId:value.requestId})
@@ -318,7 +319,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     await app.query('update team184_app_controls set "failCreate"=false where title=$1',[value.title])
     const retried=await query(owner,value);assert.ok('issue' in retried && retried.issue);assert.equal(retried.issue.scope,'workspace')
   })
-  await t.test('actual loopback HTTP invokes the public action and returns the blocked sync status',async()=>{
+  await scopeSubtest(t, 'actual loopback HTTP invokes the public action and returns the blocked sync status',async()=>{
     const server=createServer(async(req,res)=>{
       try {
         const parts:Buffer[]=[];for await(const part of req) parts.push(Buffer.from(part))
@@ -336,12 +337,12 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[result.issue.id])).rows[0].n,0)
     } finally {await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()))}
   })
-  await t.test('unauthorized team is rejected before an issue or request is created',async()=>{
+  await scopeSubtest(t, 'unauthorized team is rejected before an issue or request is created',async()=>{
     const value=input(teamId)
     assert.deepEqual(await query(stranger,value),{error:'teamIssueAccessDenied',requestId:value.requestId})
     assert.equal((await app.query('select count(*)::int n from team_issue_create_requests where "requestId"=$1',[value.requestId])).rows[0].n,0)
   })
-  await t.test('failed workspace relation leaves a retained private issue and retry completes without duplication',async()=>{
+  await scopeSubtest(t, 'failed workspace relation leaves a retained private issue and retry completes without duplication',async()=>{
     await workspace.query('insert into team184_controls ("teamId",fail) values ($1,true)',[badTeam])
     const value=input(badTeam), failed=await query(owner,value)
     assert.deepEqual(failed,{error:'teamIssueRetry',requestId:value.requestId})
@@ -352,7 +353,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     const retried=await query(owner,value);assert.ok('issue' in retried && retried.issue);assert.equal(retried.issue.id,before.id);assert.equal(retried.issue.scope,'workspace')
     assert.equal((await app.query('select count(*)::int n from team_issue_create_requests where "requestId"=$1',[value.requestId])).rows[0].n,1)
   })
-  await t.test('failed promotion after association remains private and resumes the same request',async()=>{
+  await scopeSubtest(t, 'failed promotion after association remains private and resumes the same request',async()=>{
     const value={...input(teamId),title:`promotion-failure-${randomUUID()}`}
     await app.query('insert into team184_app_controls (title,fail) values ($1,true)',[value.title])
     assert.deepEqual(await query(owner,value),{error:'teamIssueOutcomeUnknown',requestId:value.requestId})
@@ -366,7 +367,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     const replay=await query(owner,value);assert.ok('issue' in replay && replay.issue);assert.equal(replay.issue.scope,'personal')
     assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[row.id])).rows[0].n,0)
   })
-  await t.test('a changed relation while pending is not restored by retry',async()=>{
+  await scopeSubtest(t, 'a changed relation while pending is not restored by retry',async()=>{
     const value={...input(teamId),title:`changed-pending-${randomUUID()}`}
     await app.query('insert into team184_app_controls (title,fail) values ($1,true)',[value.title])
     assert.deepEqual(await query(owner,value),{error:'teamIssueOutcomeUnknown',requestId:value.requestId})
@@ -377,7 +378,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.equal((await workspace.query('select "teamId" from mikka_team_issues where "issueId"=$1',[row.id])).rows[0].teamId,badTeam)
     assert.equal((await app.query('select scope from issues where id=$1',[row.id])).rows[0].scope,'personal')
   })
-  await t.test('lost workspace commit response retries one request and preserves private visibility until promotion',async()=>{
+  await scopeSubtest(t, 'lost workspace commit response retries one request and preserves private visibility until promotion',async()=>{
     const value=input(teamId)
     const target=workspaceDb as unknown as {transaction:(...args:unknown[])=>Promise<unknown>}
     const original=target.transaction
@@ -407,7 +408,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal((await workspace.query('select count(*)::int n from team_issue_create_receipts where "requestId"=$1',[value.requestId])).rows[0].n,1)
     } finally {target.transaction=original}
   })
-  await t.test('a durable receipt with an absent relation is not restored on retry',async()=>{
+  await scopeSubtest(t, 'a durable receipt with an absent relation is not restored on retry',async()=>{
     // Construct the state after a later removal without deleting any fixture.
     const value=input(teamId), {requestId,teamId:selectedTeam,...fields}=value
     const fingerprint=createHash('sha256').update(JSON.stringify({teamId:selectedTeam,...fields})).digest('hex')
@@ -422,7 +423,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.equal((await app.query('select scope from issues where id=$1',[id])).rows[0].scope,'personal')
     assert.ok(await issueForUser(owner,id));assert.equal(await issueForUser(racer,id),null)
   })
-  await t.test('membership revoked after a lost association commit cannot promote on retry',async()=>{
+  await scopeSubtest(t, 'membership revoked after a lost association commit cannot promote on retry',async()=>{
     const lostOwner=`team-lost-owner-${randomUUID()}`,value=input(teamId)
     await app.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Synthetic\',$2,true,now(),now())',[lostOwner,`${lostOwner}@example.invalid`])
     await workspace.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Synthetic\',$3,\'member\',\'active\')',[workspaceId,lostOwner,`${lostOwner}@example.invalid`])
@@ -443,7 +444,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[row.id])).rows[0].n,0)
     } finally {target.transaction=original}
   })
-  await t.test('revocation between association and promotion leaves the task personal',async()=>{
+  await scopeSubtest(t, 'revocation between association and promotion leaves the task personal',async()=>{
     await workspace.query('insert into team184_controls ("teamId",pause) values ($1,true)',[raceTeam])
     const gate=await workspace.connect(), revoke=await workspace.connect();const value=input(raceTeam)
     let create:ReturnType<typeof query>|undefined, revocation:Promise<unknown>|undefined

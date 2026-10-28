@@ -1,3 +1,4 @@
+import { scopeSubtest } from './support/scope-acceptance.mjs'
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -164,7 +165,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     try { await check(`http://127.0.0.1:${(server.address() as {port:number}).port}`) }
     finally { await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve())) }
   }
-  await t.test('context and stale classifier cannot publish a personal task without a user choice', async () => {
+  await scopeSubtest(t, 'context and stale classifier cannot publish a personal task without a user choice', async () => {
     const id=randomUUID();fixtureIds.push(id)
     await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Ship team work urgently\',$3,\'todo\',\'normal\',\'personal\')',[id,owner,doc])
     await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,owner])
@@ -177,7 +178,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.ok('issue' in await promoteExistingIssueForUser(owner,{requestId:randomUUID(),issueId:id,revision:1,teamId:team,expectedTeamId:team}))
     assert.deepEqual((await pool.query('select scope,"scopeSetBy" from issues where id=$1',[id])).rows[0],{scope:'workspace',scopeSetBy:'user'})
   })
-  await t.test('owner preview detects external state changes and confirmation remains fail closed',async()=>{
+  await scopeSubtest(t, 'owner preview detects external state changes and confirmation remains fail closed',async()=>{
     const id=randomUUID();await seed(id,id,false)
     const first=await actAs(owner,()=>previewIssuePersonalScope(id))
     assert.ok('preview' in first && first.preview);assert.equal(first.preview.externalCopyPossible,false)
@@ -197,7 +198,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     const accepted=await actAs(owner,()=>confirmIssuePersonalScope({id:safe,revision:safePreview.preview.revision,confirmation:safePreview.preview.confirmation}))
     assert.ok('issue' in accepted && accepted.issue);assert.equal(accepted.issue.scope,'personal')
   })
-  await t.test('pending disposition gate, owner check and stale revisions leave no partial state', async () => {
+  await scopeSubtest(t, 'pending disposition gate, owner check and stale revisions leave no partial state', async () => {
     assert.ok(await issueForUser(member,issue))
     assert.ok(await readRun(member,memberRun))
     assert.ok(await verifyRunToken(new Request('http://127.0.0.1/'),memberToken))
@@ -207,7 +208,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.deepEqual(await localFlip(issue,99),{error:'issueStale'})
     assert.equal((await pool.query('select count(*)::int n from linear_issue_detachments where "issueId"=$1',[issue])).rows[0].n,0)
   })
-  await t.test('the same native claim route succeeds while workspace access is still active', async () => {
+  await scopeSubtest(t, 'the same native claim route succeeds while workspace access is still active', async () => {
     await withClaimServer(async origin=>{
       const response=await fetch(`${origin}/claim`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`}})
       assert.equal(response.status,200)
@@ -216,7 +217,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.ok(await verifyRunToken(new Request(`${origin}/`),claimed.mcp.token))
     })
   })
-  await t.test('claim paused after commit returns no prompt when retirement wins before token issuance', async () => {
+  await scopeSubtest(t, 'claim paused after commit returns no prompt when retirement wins before token issuance', async () => {
     const id=randomUUID(),run=randomUUID(),barrier=18430127
     await seed(id,id,false)
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt) values ($1,$2,$3,$4,$5,$6,\'queued\',\'private claim race instructions\')',[run,member,id,agent,device,repo])
@@ -258,7 +259,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       if(responsePromise)await Promise.allSettled([responsePromise])
     }
   })
-  await t.test('claim response tolerates a heartbeat holding its run before the issue fence',async()=>{
+  await scopeSubtest(t, 'claim response tolerates a heartbeat holding its run before the issue fence',async()=>{
     const id=randomUUID(),run=randomUUID(),lease=new Date(Date.now()+600_000).toISOString()
     await seed(id,id,false)
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,$6,\'preparing\',$7)',[run,member,id,agent,device,repo,lease])
@@ -276,7 +277,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'preparing')
     } finally {await writer.query('rollback');writer.release();if(responding)await Promise.allSettled([responding])}
   })
-  await t.test('concurrent clicks commit one revision, one tombstone, and cancel old outbox work', async () => {
+  await scopeSubtest(t, 'concurrent clicks commit one revision, one tombstone, and cancel old outbox work', async () => {
     const results = await Promise.all([localFlip(issue),localFlip(issue)])
     assert.equal(results.filter(result=>'issue' in result).length,1)
     assert.equal(results.filter(result=>'error' in result && result.error==='issueStale').length,1)
@@ -290,7 +291,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[issue])).rows[0].n,0)
     assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status<>\'done\'',[issue])).rows[0].n,0)
   })
-  await t.test('scope commit removes teammate task and own-run access and revokes execution immediately', async () => {
+  await scopeSubtest(t, 'scope commit removes teammate task and own-run access and revokes execution immediately', async () => {
     assert.equal(await issueForUser(member,issue),null)
     assert.equal(await readRun(member,memberRun),null)
     assert.deepEqual(await visibleRuns(member,{issueId:issue}),[])
@@ -308,7 +309,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     await assert.rejects(pool.query('insert into run_chunks (id,"runId",seq,chunk) values ($1,$2,1,$3)',[randomUUID(),memberRun,JSON.stringify({type:'text-delta',delta:'late'})]),(error:unknown)=>(error as {code:string}).code==='23514')
     await assert.rejects(pool.query('update agent_runs set status=\'running\' where id=$1',[memberRun]),(error: unknown)=>(error as {code:string}).code==='23514')
   })
-  await t.test('native claim route rejects the revoked run over real loopback HTTP', async () => {
+  await scopeSubtest(t, 'native claim route rejects the revoked run over real loopback HTTP', async () => {
     await withClaimServer(async origin=>{
       assert.equal((await fetch(`${origin}/claim`,{method:'POST'})).status,401)
       const response=await fetch(`${origin}/claim`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`}})
@@ -316,7 +317,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await response.text()).includes('prompt'),false)
     })
   })
-  await t.test('replayed imports, forced snapshots and outbox retries cannot resurrect personal scope', async () => {
+  await scopeSubtest(t, 'replayed imports, forced snapshots and outbox retries cannot resurrect personal scope', async () => {
     for (let index=0;index<2;index++) assert.equal(await createAppIssueFromLinear(teamSync,remote(issue)),null)
     assert.equal(await applyLinearIssueToApp(teamSync,remote(issue),true),null)
     await pool.query('insert into linear_sync_outbox (id,"issueId") values ($1,$2)',[randomUUID(),issue])
@@ -326,7 +327,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status<>\'done\'',[issue])).rows[0].n,0)
     await assert.rejects(pool.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$5,\'MIK-184\')',[randomUUID(),issue,owner,sync,issue]),(error:unknown)=>(error as {code:string}).code==='23514')
   })
-  await t.test('delayed issue and comment deliveries finish without fetching the external provider', async () => {
+  await scopeSubtest(t, 'delayed issue and comment deliveries finish without fetching the external provider', async () => {
     for (const type of ['Issue','Comment']) {
       const deliveryId=`scope-${randomUUID()}`
       const data=type==='Issue'?{id:issue,teamId:team}:{id:randomUUID(),issueId:issue,issue:{id:issue,teamId:team}}
@@ -342,13 +343,13 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     await applyLinearCommentToApp({issue:oldIssue,issueLink:originalLink,id:randomUUID(),body:'late external comment',author:'Synthetic',parentId:null,createdAt:new Date().toISOString(),action:'update'})
     assert.equal((await pool.query('select state from issue_documents where "issueId"=$1',[issue])).rows[0]?.state,beforeDocument)
   })
-  await t.test('a detached remote UUID different from the local UUID cannot create a second workspace task', async () => {
+  await scopeSubtest(t, 'a detached remote UUID different from the local UUID cannot create a second workspace task', async () => {
     const id = randomUUID(),remoteId=randomUUID()
     await seed(id,remoteId);await localFlip(id)
     assert.equal(await createAppIssueFromLinear(teamSync,remote(remoteId)),null)
     assert.equal((await pool.query('select count(*)::int n from issues where id=$1',[remoteId])).rows[0].n,0)
   })
-  await t.test('version write failure rolls back scope, tombstone, link, outbox and run cancellation', async () => {
+  await scopeSubtest(t, 'version write failure rolls back scope, tombstone, link, outbox and run cancellation', async () => {
     const id=randomUUID();await seed(id)
     const constraint=`scope_rollback_${id.replaceAll('-','')}`
     // Additive, fixture-specific failure injection; no existing row is changed.
@@ -359,7 +360,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.equal((await pool.query('select count(*)::int n from linear_issue_detachments where "issueId"=$1',[id])).rows[0].n,0)
     assert.equal((await pool.query('select status from linear_sync_outbox where "issueId"=$1',[id])).rows[0].status,'queued')
   })
-  await t.test('queue racing a locked scope conversion fails after the conversion commits', async () => {
+  await scopeSubtest(t, 'queue racing a locked scope conversion fails after the conversion commits', async () => {
     const id=randomUUID();await seed(id)
     const lock=await pool.connect()
     try {
@@ -375,7 +376,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       await lock.query('update issues set scope=\'personal\' where id=$1',[id]);await lock.query('commit');assert.equal((await raced).error?.code,'23514')
     } finally { await lock.query('rollback');lock.release() }
   })
-  await t.test('a real run-row/scope deadlock is safely retried without a duplicate transition', async () => {
+  await scopeSubtest(t, 'a real run-row/scope deadlock is safely retried without a duplicate transition', async () => {
     const id=randomUUID(),run=randomUUID();await seed(id)
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId",status) values ($1,$2,$3,$4,\'running\')',[run,member,id,agent])
     const writer=await pool.connect()
@@ -403,7 +404,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await pool.query('select count(*)::int n from issue_versions where "issueId"=$1',[id])).rows[0].n,2)
     } finally { await writer.query('rollback');writer.release();if(transition) await Promise.allSettled([transition]) }
   })
-  await t.test('HTTP completion paused after live read cannot write or dispatch after an unlinked task becomes personal', async () => {
+  await scopeSubtest(t, 'HTTP completion paused after live read cannot write or dispatch after an unlinked task becomes personal', async () => {
     const localOwner=`complete-owner-${randomUUID()}`,id=randomUUID(),run=randomUUID()
     fixtureIds.push(id)
     await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Complete owner\',$2,true,now(),now())',[localOwner,`${localOwner}@example.invalid`])
@@ -452,7 +453,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId",status,kind) values ($1,$2,$3,$4,$5,\'running\',$6)',[run,actor,withIssue?id:null,actor===owner?ownerAgent:agent,actor===owner?ownerDevice:device,kind])
     return {id,run,issueId:withIssue?id:null}
   }
-  await t.test('completion and review commit before retirement; deferred dispatch is rejected after retirement and republishing', async()=>{
+  await scopeSubtest(t, 'completion and review commit before retirement; deferred dispatch is rejected after retirement and republishing', async()=>{
     const fixture=await completionFixture(member,owner)
     const locker=await pool.connect()
     let finishing:ReturnType<typeof completeRunForDevice>|undefined,privatizing:ReturnType<typeof changeIssueScopeLocally>|undefined
@@ -486,7 +487,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await pool.query('select status from issues where id=$1',[fixture.id])).rows[0].status,'doing')
     } finally {await locker.query('rollback');locker.release();await Promise.allSettled([finishing,privatizing].filter(Boolean))}
   })
-  await t.test('completion preserves member, owner-personal, plan, not-run, failed-verify and null-task behavior with idempotent replay',async()=>{
+  await scopeSubtest(t, 'completion preserves member, owner-personal, plan, not-run, failed-verify and null-task behavior with idempotent replay',async()=>{
     for(const control of [
       {issueOwner:owner,actor:member,scope:'workspace',kind:'implement',verify:'passed' as const,status:'succeeded',review:true,dispatch:1},
       {issueOwner:owner,actor:member,scope:'workspace',kind:'implement',verify:'not_run' as const,status:'stopped',review:true,dispatch:1},
@@ -511,7 +512,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.ok(completed);assert.equal(completed.review,null)
     assert.equal((await pool.query('select status from agent_runs where id=$1',[orphan.run])).rows[0].status,'failed')
   })
-  await t.test('completion retries a real heartbeat lock-order deadlock and commits one event',async()=>{
+  await scopeSubtest(t, 'completion retries a real heartbeat lock-order deadlock and commits one event',async()=>{
     const fixture=await completionFixture(owner,member),writer=await pool.connect()
     let finishing:Promise<{result:Awaited<ReturnType<typeof completeRunForDevice>>;error:unknown}>|undefined
     try {
@@ -532,7 +533,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await pool.query('select count(*)::int n from coordinator_events where "runId"=$1',[fixture.run])).rows[0].n,1)
     } finally {await writer.query('rollback');writer.release();if(finishing) await Promise.allSettled([finishing])}
   })
-  await t.test('completion rolls back run, token, event and task together when persistence fails',async()=>{
+  await scopeSubtest(t, 'completion rolls back run, token, event and task together when persistence fails',async()=>{
     const fixture=await completionFixture(owner,member)
     const token=(await issueRunToken({id:fixture.run,userId:member})).token
     await pool.query(`alter table coordinator_events add constraint completion_failure_${fixture.run.replaceAll('-','')} check ("runId" <> '${fixture.run}'::uuid)`)
@@ -580,7 +581,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[id])).rows[0].n,0)
     return result.issue
   }
-  await t.test('public app and MCP task creation remain personal without Linear requests',async()=>{
+  await scopeSubtest(t, 'public app and MCP task creation remain personal without Linear requests',async()=>{
     const calls=provider.requests.length
     const app=await action(()=>saveIssue({title:'Team context alone',content:JSON.parse(doc),status:'todo',priority:'normal'}))
     assert.ok('issue' in app);fixtureIds.push(app.issue.id)
@@ -600,7 +601,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     await processLinearInboxDelivery(deliveryId)
     assert.equal((await pool.query('select status from linear_sync_inbox where "deliveryId"=$1',[deliveryId])).rows[0].status,'done')
   }
-  await t.test('verified issue and comment removal events preserve links and acknowledge the remote removal',async()=>{
+  await scopeSubtest(t, 'verified issue and comment removal events preserve links and acknowledge the remote removal',async()=>{
     const id=randomUUID();await seed(id)
     const link=(await pool.query('select id from linear_issue_links where "issueId"=$1',[id])).rows[0]
     const commentId=randomUUID(),commentLinkId=randomUUID()
@@ -613,7 +614,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.deepEqual(current,{externalTargetVerified:true,syncStatus:'remote_removed',removed:true})
     assert.equal(provider.requests.length,calls)
   })
-  await t.test('removal waiting for the issue lock cannot write after retirement commits',async()=>{
+  await scopeSubtest(t, 'removal waiting for the issue lock cannot write after retirement commits',async()=>{
     const id=randomUUID();await seed(id)
     const locker=await pool.connect();let delivery:Promise<void>|undefined
     const beforeCalls=provider.requests.length
@@ -630,7 +631,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal(provider.requests.length,beforeCalls)
     } finally {await locker.query('rollback');locker.release();if(delivery) await Promise.allSettled([delivery])}
   })
-  await t.test('external UUID collision with personal task cannot clear diagnostics or change personal data',async()=>{
+  await scopeSubtest(t, 'external UUID collision with personal task cannot clear diagnostics or change personal data',async()=>{
     const result=await action(()=>saveIssue({title:'Personal external collision',content:JSON.parse(doc),status:'todo',priority:'normal'}))
     assert.ok('issue' in result && result.issue);const id=result.issue.id;fixtureIds.push(id)
     provider.issues.set(id,remote(id))
@@ -644,7 +645,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.ok(provider.requests.length>calls)
     assert.ok(provider.requests.slice(calls).every(call=>call.operation==='MikkaLinearIssue'))
   })
-  await t.test('blocked workspace reservation cannot let an incoming snapshot clear later diagnostics',async()=>{
+  await scopeSubtest(t, 'blocked workspace reservation cannot let an incoming snapshot clear later diagnostics',async()=>{
     const id=randomUUID();await seed(id,id,false);await privatize(id);const promoted=await republish(id)
     const remoteId=randomUUID()
     await pool.query('insert into linear_issue_publications (id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId") values ($1,$2,$3,$4,$5,$6)',[randomUUID(),id,owner,sync,promoted.scopeVersion,remoteId])
@@ -659,7 +660,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.ok(provider.requests.length>calls)
     assert.ok(provider.requests.slice(calls).every(call=>call.operation==='MikkaLinearIssue'))
   })
-  await t.test('a genuinely new remote task still imports through the authorized team and clears its diagnostic',async()=>{
+  await scopeSubtest(t, 'a genuinely new remote task still imports through the authorized team and clears its diagnostic',async()=>{
     const id=randomUUID();fixtureIds.push(id);provider.issues.set(id,remote(id))
     await pool.query('update linear_team_syncs set "lastError"=\'new-remote-control\' where id=$1',[sync])
     const calls=provider.requests.length
@@ -670,7 +671,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.ok(provider.requests.length>calls)
     assert.ok(provider.requests.slice(calls).every(call=>call.operation==='MikkaLinearIssue'))
   })
-  await t.test('an in-flight old update cannot write personal state or upload its captured comments',async()=>{
+  await scopeSubtest(t, 'an in-flight old update cannot write personal state or upload its captured comments',async()=>{
     const id=randomUUID();await seed(id)
     provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
     await setDiscussion(id,'old-publication-comment')
@@ -692,7 +693,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal([...provider.comments.values()].some(comment=>comment.issue.id===id),false)
     } finally {hold.release();await request}
   })
-  await t.test('old in-flight update cannot attach, publish edits or upload comments after explicit Mikka promotion',async()=>{
+  await scopeSubtest(t, 'old in-flight update cannot attach, publish edits or upload comments after explicit Mikka promotion',async()=>{
     const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
     await setDiscussion(id,'old-publication-comment')
     const hold=provider.hold('MikkaLinearUpdateIssue'),old=processLinearIssueOutbox(id)
@@ -723,7 +724,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal([...provider.comments.values()].some(comment=>comment.issue.id===id),false)
     } finally {hold.release();await old}
   })
-  await t.test('late retired provider failure cannot attach a link or change later diagnostics',async()=>{
+  await scopeSubtest(t, 'late retired provider failure cannot attach a link or change later diagnostics',async()=>{
     const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
     const hold=provider.hold('MikkaLinearUpdateIssue','after',true),old=processLinearIssueOutbox(id)
     try {
@@ -735,7 +736,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,1)
     } finally {hold.release();await old}
   })
-  await t.test('webhook paused in HTTP cannot mutate promoted task or later diagnostics',async()=>{
+  await scopeSubtest(t, 'webhook paused in HTTP cannot mutate promoted task or later diagnostics',async()=>{
     const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
     const deliveryId=`held-webhook-${randomUUID()}`
     await pool.query('insert into linear_sync_inbox ("deliveryId","organizationId","eventType",payload) values ($1,\'synthetic\',\'Issue\',$2)',[deliveryId,JSON.stringify({type:'Issue',action:'update',organizationId:'synthetic',data:{id,teamId:team}})])
@@ -749,7 +750,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await pool.query('select title from issues where id=$1',[id])).rows[0].title,'new-publication-title')
     } finally {hold.release();await inbox}
   })
-  await t.test('no verified Linear target means promotion, editing, old claims and manual retry cannot publish',async()=>{
+  await scopeSubtest(t, 'no verified Linear target means promotion, editing, old claims and manual retry cannot publish',async()=>{
     const id=randomUUID();fixtureIds.push(id)
     await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Explicit team control\',$3,\'todo\',\'normal\',\'personal\')',[id,owner,doc])
     const before=provider.requests.length
@@ -767,7 +768,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[id])).rows[0].n,0)
     assert.equal(provider.requests.length,before)
   })
-  await t.test('public retry revalidates retirement while waiting and makes no provider call',async()=>{
+  await scopeSubtest(t, 'public retry revalidates retirement while waiting and makes no provider call',async()=>{
     const id=randomUUID();await seed(id)
     const lock=await pool.connect();let retry:Promise<unknown>|undefined
     try {
@@ -780,7 +781,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status<>\'done\'',[id])).rows[0].n,0)
     } finally {await lock.query('rollback');lock.release();if(retry) await retry}
   })
-  await t.test('a retained uncertain publication independently gates public retirement',async()=>{
+  await scopeSubtest(t, 'a retained uncertain publication independently gates public retirement',async()=>{
     const id=randomUUID();await seed(id,id,false)
     const publication=randomUUID()
     await pool.query('insert into linear_issue_publications (id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId") values ($1,$2,$3,$4,1,$5)',[publication,id,owner,sync,randomUUID()])
@@ -790,13 +791,13 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.deepEqual((await pool.query('select scope,revision from issues where id=$1',[id])).rows[0],{scope:'workspace',revision:1})
     assert.equal(provider.requests.length,calls)
   })
-  await t.test('retained failed outbox alone gates retirement without a link or publication',async()=>{
+  await scopeSubtest(t, 'retained failed outbox alone gates retirement without a link or publication',async()=>{
     assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[legacyFailed])).rows[0].n,0)
     assert.equal((await pool.query('select count(*)::int n from linear_issue_publications where "issueId"=$1',[legacyFailed])).rows[0].n,0)
     assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status=\'failed\'',[legacyFailed])).rows[0].n,1)
     assert.deepEqual(await actAs(owner,()=>setIssueScope({id:legacyFailed,revision:1,scope:'personal'})),{error:'issueScopeInLinear'})
   })
-  await t.test('legacy generation 2 verified import is retried by the public action with generation 2',async()=>{
+  await scopeSubtest(t, 'legacy generation 2 verified import is retried by the public action with generation 2',async()=>{
     provider.issues.set(legacyImported,{...remote(legacyImported),title:'Legacy imported task',updatedAt:'2020-01-01T00:00:00.000Z'})
     assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status in (\'queued\',\'processing\',\'failed\')',[legacyImported])).rows[0].n,0)
     const calls=provider.requests.length
@@ -809,7 +810,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.deepEqual(link,{linearIssueId:legacyImported,externalTargetVerified:true,syncStatus:'synced'})
     assert.equal((await pool.query('select "scopeVersion" from linear_issue_publications where "issueId"=$1',[legacyImported])).rows[0].scopeVersion,2)
   })
-  await t.test('manual retry reaches the explicitly imported verified target and retains its generation',async()=>{
+  await scopeSubtest(t, 'manual retry reaches the explicitly imported verified target and retains its generation',async()=>{
     const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
     await pool.query('update linear_sync_outbox set status=\'done\' where "issueId"=$1',[id])
     const calls=provider.requests.length
@@ -821,7 +822,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     const link=(await pool.query('select "linearIssueId","externalTargetVerified","syncStatus" from linear_issue_links where "issueId"=$1',[id])).rows[0]
     assert.deepEqual(link,{linearIssueId:id,externalTargetVerified:true,syncStatus:'synced'})
   })
-  await t.test('a reclaimed outbox claim fences the old response and refreshes its snapshot after the writer lock',async()=>{
+  await scopeSubtest(t, 'a reclaimed outbox claim fences the old response and refreshes its snapshot after the writer lock',async()=>{
     const id=randomUUID();await seed(id);provider.issues.set(id,{...remote(id),updatedAt:'2020-01-01T00:00:00.000Z'})
     await pool.query('update linear_issue_links set "linearUpdatedAt"=\'2020-01-01T00:00:00Z\' where "issueId"=$1',[id])
     const hold=provider.hold('MikkaLinearUpdateIssue'),old=processLinearIssueOutbox(id)
