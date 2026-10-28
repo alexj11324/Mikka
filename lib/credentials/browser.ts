@@ -27,7 +27,7 @@ export const gatewayGuard: BrowserGuard = {
   },
 }
 
-export const CREDENTIAL_SUBMIT_FUNCTION = 'function(){if(!this.isConnected||this.ownerDocument!==document||!this.form||this.disabled)return false;HTMLFormElement.prototype.requestSubmit.call(this.form,this);return true}'
+export const CREDENTIAL_SUBMIT_FUNCTION = 'function(){if(!this.isConnected||this.ownerDocument!==document||!this.form||this.disabled)return false;const f=this.form;const method=(this.getAttribute("formmethod")||f.getAttribute("method")||"get").toLowerCase();const target=this.getAttribute("formtarget")||f.getAttribute("target")||"";const url=new URL(this.getAttribute("formaction")||f.getAttribute("action")||location.href,document.baseURI);if(method!=="post"||url.origin!==location.origin||url.username||url.password||!["","_self"].includes(target))return false;HTMLFormElement.prototype.requestSubmit.call(f,this);return true}'
 
 /** Deliberately no CDP logger, remote exception, message body or console handler. */
 export class Cdp {

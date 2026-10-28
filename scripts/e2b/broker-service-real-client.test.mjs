@@ -101,6 +101,18 @@ try {
   await pool.query('UPDATE workspace_computer_policies SET permission=\'unknown\'')
   await assert.rejects(fillCredential(pool,unknownPolicy,{kms,guard}))
   assert.equal(decrypts,1,'invalid policy must not decrypt')
+  await pool.query('UPDATE workspace_computer_policies SET permission=\'allow\'')
+  const wrongReview = await leaseFor('ask')
+  await pool.query('UPDATE pending_actions SET status=\'running\' WHERE status=\'pending\'')
+  await pool.query('UPDATE bot_subagents SET status=\'needs_you\',needs=$1',[{kind:'approval',actionId:randomUUID()}])
+  await assert.rejects(fillCredential(pool,wrongReview,{kms,guard}))
+  assert.equal(decrypts,1,'a different current review must not decrypt')
+  const approved = await leaseFor('ask')
+  const exactReview = (await pool.query('SELECT input FROM pending_actions WHERE status=\'pending\'')).rows[0].input
+  await pool.query('UPDATE bot_subagents SET needs=$1',[{kind:'approval',actionId:exactReview.actionId}])
+  await pool.query('UPDATE pending_actions SET status=\'running\' WHERE id=$1 AND status=\'pending\'',[exactReview.actionId])
+  assert.deepEqual(await fillCredential(pool,approved,{kms,guard}),{status:'guarded',origin})
+  assert.equal(decrypts,2,'only the exact existing approved action may decrypt')
   console.log(`PASS: real PG and broker service + actual CDP insertion; replay/pending/stale-policy/STOP denied; retained schema ${schema}; KMS synthetic`)
   }
   key.fill(0)

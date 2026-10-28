@@ -25,7 +25,7 @@ combined dependency tree.
 
 All of the following ran in the cloud Linux workspace, using synthetic data.
 
-- 52 focused Node tests passed without skips: authority/receipt, approval
+- 53 focused Node tests passed without skips: authority/receipt, approval
   dispatch, credential consumer and broker, workflow, visual-message and
   process-version regressions.
 - Ten guard tests and three STOP/revocation tests passed. The guard tests
@@ -75,6 +75,8 @@ an exemption from the final real-function acceptance gate.
 
 ## Cloud CI
 
-Candidate branch: candidate/pr346-acceptance. Source 8acd5b54b1c0e4704ec709a44b5e7ffc3bce5d31 passed backend CI 40784881561. Full CI 40784881672 exposed missing ledger-suite enrollment, corrected in the next candidate. Browser workflow 40784948862 was allowed to finish independently; it does not attest to later source changes. No PR was merged. The Vercel Git configuration disables non-main previews; it has not been silently changed while the intended team connection is unresolved.
+Candidate branch: candidate/pr346-acceptance. Source 8acd5b54b1c0e4704ec709a44b5e7ffc3bce5d31 passed backend CI 40784881561. Full CI 40784881672 exposed missing ledger-suite enrollment, corrected in the next candidate. Browser workflow 40784948862 was allowed to finish independently; it does not attest to later source changes. No PR was merged. Source 13fcf700c59612b364bbb5f415d3f466b7d99871 passed both full CI 40786691768 and backend CI 40786691740 after the enrollment fix. These are intermediate receipts; subsequent credential-transport guards require their own final-SHA CI. The Vercel Git configuration disables non-main previews; it has not been silently changed while the intended team connection is unresolved.
 
 The live AI Gateway catalog was read without inference. The existing free Coordinator model reports text-only input. openai/gpt-6.1-sol reports image input and tools, with base input/output rates of US$2/US$10 per million tokens. A maximum three-request, Standard/High functional probe with a US$0.15 ceiling was requested separately; no paid request has run. No benchmark or live-eval was enabled.
+
+Credential submission additionally requires the selected form to POST to its current origin in the same browsing context. GET, cross-origin, URL userinfo and alternate-context transports are rejected before submission. A current ask decision must still match the web run's exact approval record when the broker opens a secret. These are credential-protection checks, not ordinary-page business classifiers. The latest real gateway/DB fixture also executed one exact approved ask and rejected a different current review before decryption.

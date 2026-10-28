@@ -9,7 +9,7 @@ from aiohttp import web, WSMsgType
 ROOT = Path('/run/mikka-subagents')
 AGENTS = {}
 BROKER_METHODS = frozenset(('Page.getFrameTree', 'DOM.getDocument', 'DOM.focus', 'DOM.describeNode', 'DOM.resolveNode', 'Runtime.evaluate', 'Runtime.callFunctionOn', 'Input.insertText', 'Input.dispatchKeyEvent', 'Network.setCookies', 'Network.getCookies', 'Page.reload'))
-BROKER_SUBMIT_FUNCTION = 'function(){if(!this.isConnected||this.ownerDocument!==document||!this.form||this.disabled)return false;HTMLFormElement.prototype.requestSubmit.call(this.form,this);return true}'
+BROKER_SUBMIT_FUNCTION = 'function(){if(!this.isConnected||this.ownerDocument!==document||!this.form||this.disabled)return false;const f=this.form;const method=(this.getAttribute("formmethod")||f.getAttribute("method")||"get").toLowerCase();const target=this.getAttribute("formtarget")||f.getAttribute("target")||"";const url=new URL(this.getAttribute("formaction")||f.getAttribute("action")||location.href,document.baseURI);if(method!=="post"||url.origin!==location.origin||url.username||url.password||!["","_self"].includes(target))return false;HTMLFormElement.prototype.requestSubmit.call(f,this);return true}'
 BROKER_STORAGE_FUNCTION = 'function(entries){localStorage.clear();for(const [k,v] of entries)localStorage.setItem(k,v)}'
 BROKER_OTP_SELECTOR = 'input[autocomplete="one-time-code"],input[name="code"],input[name="otp"]'
 BROKER_FOCUS_SELECTORS = ('input[autocomplete="username"],input[type="email"],input[name="username"]', 'input[type="password"]')

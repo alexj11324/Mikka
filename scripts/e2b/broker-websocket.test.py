@@ -1,5 +1,5 @@
 """Real local Chromium and WebSocket regression; all data is synthetic."""
-import asyncio, contextlib, importlib.util, json, shutil, ssl, subprocess, tempfile
+import asyncio, contextlib, importlib.util, json, os, shutil, ssl, subprocess, tempfile
 from pathlib import Path
 from aiohttp import ClientSession, WSMsgType, WSServerHandshakeError, web
 from aiohttp.test_utils import TestClient, TestServer
@@ -8,6 +8,7 @@ spec=importlib.util.spec_from_file_location('gateway',Path(__file__).with_name('
 gateway=importlib.util.module_from_spec(spec);spec.loader.exec_module(gateway)
 
 async def main():
+    if (os.environ.get('REQUIRE_DB')=='1' or os.environ.get('GITHUB_ACTIONS')=='true') and not os.environ.get('COMPUTER_TEST_DATABASE_URL'):raise RuntimeError('Isolated PostgreSQL required for broker service CI')
     chromium=shutil.which('google-chrome') or shutil.which('chromium') or shutil.which('chromium-browser')
     if not chromium:raise RuntimeError('Chromium is required')
     with contextlib.nullcontext(tempfile.mkdtemp(prefix='pr346-broker-')) as directory:
@@ -185,7 +186,7 @@ async def main():
                     stdout,stderr=await asyncio.wait_for(node.communicate(),30)
                     if node.returncode:raise RuntimeError('Actual broker client failed: '+stderr.decode())
                     assert stdout.decode().startswith('PASS: actual broker client')
-                    if __import__('os').environ.get('COMPUTER_TEST_DATABASE_URL'):
+                    if os.environ.get('COMPUTER_TEST_DATABASE_URL'):
                         for _ in range(100):
                             if not browser.broker_active:break
                             await asyncio.sleep(.01)
@@ -331,7 +332,7 @@ async def main():
                         if gateway.browser_origin(await browser.url())==origin:break
                         await asyncio.sleep(.05)
                     else:raise AssertionError('synthetic return navigation did not complete')
-                    if __import__('os').environ.get('COMPUTER_TEST_DATABASE_URL'):
+                    if os.environ.get('COMPUTER_TEST_DATABASE_URL'):
                         async with client.post('/agents/case/credentials/end?token=synthetic',json={'guardToken':token}) as ended:assert ended.status==200
                         async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as seen:
                             assert seen.status==200

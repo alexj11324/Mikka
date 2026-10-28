@@ -6,7 +6,7 @@ import { runInNewContext } from 'node:vm'
 import { canonicalOrigin, assertSameOrigin, submitSchema, otpSchema, CredentialError, type EncryptionContext } from './contracts'
 import { seal, open, sealSession, type Kms } from './kms'
 import { checkCredentialRequest, credentialBody, credentialFailure } from './http'
-import { Cdp } from './browser'
+import { Cdp, CREDENTIAL_SUBMIT_FUNCTION } from './browser'
 import { fillCredential } from './broker'
 import { CredentialStore } from './store'
 import { assertCredentialPageBinding, type CredentialPageBinding } from './page-binding'
@@ -166,7 +166,7 @@ test('broker reports mechanical session application or submission without judgin
     const client = {
       async query(sql: string) {
         if (sql.includes('FROM bots ') || sql.includes('FROM agent_runs ')) return { rows: [{ id: 'ok' }] }
-        if (sql.includes('FROM bot_subagents s JOIN')) return { rows: [{ targetId: 'target', epoch: 1, permissionVersion: 0, permission: 'ask', sandboxId: 'synthetic-sandbox', runPolicy: defaultRunPolicy() }] }
+        if (sql.includes('FROM bot_subagents s JOIN')) return { rows: [{ targetId: 'target', epoch: 1, permissionVersion: 0, permission: 'ask', status: 'needs_you', needs: { kind: 'approval', actionId: '11111111-1111-4111-8111-111111111111' }, sandboxId: 'synthetic-sandbox', runPolicy: defaultRunPolicy() }] }
         if (sql.includes('FROM bot_subagents ')) return { rows: [{ id: 'ok' }] }
         if (sql.includes('JOIN credential_secrets')) return { rows: [credential] }
         if (sql.includes('FROM pending_actions')) return { rows: [{ id: 'synthetic' }], rowCount: 1 }
@@ -239,7 +239,7 @@ test('broker rejects changed epoch, policy, target, origin and loader before dec
     const target = { targetId: 'target', origin: failure === 'origin' ? 'https://other.example' : origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, observedInput }
     const claimed = { user_id: 'owner', workspace_id: 'workspace', bot_id: 'bot', subagent_id: 'subagent', run_id: null, credential_id: 'credential', origin, target }
     bindFixtureAction(claimed)
-    const bound = { sandboxId: 'synthetic-sandbox', targetId: failure === 'target' ? 'other' : 'target', epoch: failure === 'epoch' ? 2 : 1, permissionVersion: failure === 'policy' ? 2 : 1, permission: failure === 'deny' ? 'deny' : 'ask', runPolicy: defaultRunPolicy() }
+    const bound = { status: 'needs_you', needs: { kind: 'approval', actionId: '11111111-1111-4111-8111-111111111111' }, sandboxId: 'synthetic-sandbox', targetId: failure === 'target' ? 'other' : 'target', epoch: failure === 'epoch' ? 2 : 1, permissionVersion: failure === 'policy' ? 2 : 1, permission: failure === 'deny' ? 'deny' : 'ask', runPolicy: defaultRunPolicy() }
     const client = { async query(sql: string) {
       if (sql.includes('FROM bot_subagents s JOIN')) return { rows: [bound] }
       if (sql.includes('FROM pending_actions')) return { rows: [{ id: 'synthetic' }], rowCount: 1 }
@@ -318,4 +318,21 @@ test('insertion uses only the observed node on the bound origin and document', a
   }
   await assert.rejects(cdp.fill('https://example.com', 'synthetic', 'synthetic'), CredentialError)
   await assert.rejects(cdp.fillOtp('https://example.com', '123456'), CredentialError)
+})
+
+test('credential submission keeps values in a same-origin POST and the bound page', () => {
+  const document = { baseURI: 'https://example.test/' }
+  let submissions = 0
+  const submit = runInNewContext(`(${CREDENTIAL_SUBMIT_FUNCTION})`, {
+    URL, document, location: { href: 'https://example.test/login', origin: 'https://example.test' },
+    HTMLFormElement: { prototype: { requestSubmit() { submissions++ } } },
+  })
+  const button = (action = '/complete', method = 'post', target = '') => ({
+    isConnected: true, ownerDocument: document, disabled: false,
+    getAttribute: () => null,
+    form: { getAttribute: (key: string) => ({ action, method, target } as Record<string, string>)[key] },
+  })
+  assert.equal(submit.call(button()), true)
+  for (const changed of [button('https://other.test/submit'), button('/complete', 'get'), button('/complete', 'post', '_blank'), button('https://user:pass@example.test/complete'), { ...button(), isConnected: false }, { ...button(), ownerDocument: {} }]) assert.equal(submit.call(changed), false)
+  assert.equal(submissions, 1, 'rejected transports must never submit the form')
 })
