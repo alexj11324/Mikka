@@ -314,6 +314,7 @@
     },
     "prState": {
       "open": "Open",
+      "draft": "Draft",
       "merged": "Merged",
       "closed": "Closed"
     },
@@ -2353,6 +2354,9 @@
     "createWorkspace": "Create workspace"
   },
   "IssueThreads": {
+    "pullRequest": "PR #{number}",
+    "moreOutputs": "+{count}",
+    "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}",
     "title": "Threads",
     "agent": "Bot",
     "hidden": "Thread",

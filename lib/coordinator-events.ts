@@ -1,5 +1,6 @@
 import type { RunReport } from '@mikka/protocol/run'
 import type { CoordinatorEventKind, RunStatus } from '@/lib/db/schema'
+import type { PublicationErrorCode, PublishedPullRequest } from '@/lib/run-publication-result'
 
 /** One row for `coordinator_events`, before it gets an id. */
 export interface CoordinatorEventInput {
@@ -65,7 +66,7 @@ export function telegramReplyTargets(events: ReadonlyArray<Pick<CoordinatorEvent
 }
 
 /** A run ended. One event per run, however often the daemon reports it. */
-export function runFinishedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null; kind: string; status: RunStatus; stopReason: string; report?: RunReport | null }): CoordinatorEventInput {
+export function runFinishedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null; kind: string; status: RunStatus; stopReason: string; report?: RunReport | null; publication?: { pullRequest?: PublishedPullRequest | null; errorCode?: PublicationErrorCode | null; branch?: string | null } }): CoordinatorEventInput {
   return {
     userId: run.userId,
     ...(run.botId ? { botId: run.botId } : {}),
@@ -73,7 +74,7 @@ export function runFinishedEvent(run: { id: string; userId: string; botId?: stri
     dedupeKey: `run_finished:${run.id}`,
     issueId: run.issueId,
     runId: run.id,
-    payload: { status: run.status, stopReason: run.stopReason, runKind: run.kind, summary: run.report?.summary ?? null },
+    payload: { status: run.status, stopReason: run.stopReason, runKind: run.kind, summary: run.report?.summary ?? null, ...(run.report?.verify?.status === 'not_run' && run.kind !== 'plan' ? { verification: 'not_run' } : {}), ...(run.publication ? { publication: run.publication } : {}) },
   }
 }
 

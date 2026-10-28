@@ -22,7 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
       path: repo.repoPath,
       ...(settings?.setup ? { setup: settings.setup } : {}),
       ...(settings?.networkAllow ? { networkAllow: settings.networkAllow } : {}),
-      ...(settings?.push ? { push: settings.push } : {}),
+      // Push approval is pinned in claim.policy, not cached between runs.
     }
   }))
   return NextResponse.json({ repos })

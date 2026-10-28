@@ -16,6 +16,8 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Messages | `components/ui/message.tsx`, `components/ui/bubble.tsx`, `MessageScroller*` | R-13, R-14 |
 | Task, run and source chips in chat | OpenUI `TaskChip`, `RunChip`, `SourceChip` (`components/workspace/agent-ui-library.tsx`, data from `agent-citations.tsx`) | R-15 |
 | Thread card under a Coordinator reply | `components/coordinator/thread-card.tsx`; opens `IssueThreadPanel` in the centre | R-66 |
+| GitHub PR state icons | `components/workspace/pull-request-icon.tsx` | Shared open/draft/merged/closed icons and Primer semantic colors; used in task properties, board and thread outputs |
+| Thread state icon | `components/workspace/thread-status-icon.tsx` | Shared by thread card, thread list and open-thread header; Bot avatars remain for actual Bot actors only (R-62/R-66) |
 | New task | `components/coordinator/new-task-dialog.tsx` | R-22, R-23 |
 | Search | reUI `CommandDialog` (⌘K), centred | |
 | Board | reUI `Kanban` (`components/reui/kanban.tsx`) | R-25 |

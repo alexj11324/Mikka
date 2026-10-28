@@ -203,7 +203,7 @@ export const repositorySettings = pgTable('repository_settings', {
   userId: text('userId').notNull(), remoteKey: text('remoteKey').notNull(),
   verifyCommand: text('verifyCommand'), setup: jsonb('setup').$type<SetupRecipe | null>(),
   networkAllow: jsonb('networkAllow').$type<string[] | null>(),
-  push: jsonb('push').$type<{ approved: boolean; remote?: string } | null>(),
+  push: jsonb('push').$type<import('@/lib/run-publication-policy').RepositoryPushApproval | null>(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.userId, table.remoteKey] })])
 
@@ -250,6 +250,33 @@ export const agentRuns = pgTable('agent_runs', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`)])
+
+/** A verified owner/repository binding. Installation tokens are never stored. */
+export const githubRepositoryInstallations = pgTable('github_repository_installations', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  remoteKey: text('remoteKey').notNull(),
+  githubAccountId: text('githubAccountId').notNull(),
+  installationId: bigint('installationId', { mode: 'number' }).notNull(),
+  repositoryId: bigint('repositoryId', { mode: 'number' }).notNull(),
+  verifiedAt: timestamp('verifiedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.remoteKey] })])
+
+/** Server-issued publication assignment and durable completion receipt (ADR 0024). */
+export const runPublications = pgTable('run_publications', {
+  runId: uuid('runId').primaryKey().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  remoteUrl: text('remoteUrl').notNull(), remoteKey: text('remoteKey').notNull(),
+  identifier: text('identifier'), branch: text('branch'), baseBranch: text('baseBranch'),
+  pushApproved: boolean('pushApproved').notNull().default(false),
+  status: text('status').$type<'assigned' | 'pending' | 'processing' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
+  workflowRunId: text('workflowRunId'), leaseToken: uuid('leaseToken'), leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
+  attempts: integer('attempts').notNull().default(0),
+  pullRequest: jsonb('pullRequest').$type<{ url: string; state: 'open' | 'draft' | 'merged' | 'closed' } | null>(),
+  errorCode: text('errorCode'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('run_publications_issue_repo_idx').on(table.issueId, table.remoteKey), index('run_publications_pending_idx').on(table.status, table.leaseExpiresAt)])
 
 /** The run's event stream, one row per chunk; `seq` dedupes re-sent batches. */
 export const runChunks = pgTable('run_chunks', {

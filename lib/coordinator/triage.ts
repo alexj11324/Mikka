@@ -25,6 +25,7 @@ export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
     case 'action_decided':
       return event.payload.status === 'failed' ? 'attention' : event.payload.status === 'done' ? 'result' : 'background'
     case 'run_finished':
+      if (event.payload.publication && typeof event.payload.publication === 'object' && 'errorCode' in event.payload.publication && event.payload.publication.errorCode) return 'attention'
       if (event.payload.status === 'failed') return 'attention'
       if (event.payload.status === 'stopped' || event.payload.status === 'cancelled') return 'background'
       // A success that says nothing needs no judgment.

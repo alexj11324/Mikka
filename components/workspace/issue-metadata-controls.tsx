@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useTranslations } from 'next-intl'
 import { moveIssueToProject } from '@/app/actions/projects'
 import useSWR from 'swr'
-import { Box, Check, Circle, GitMerge, GitPullRequest, Link2, Tag, X } from 'lucide-react'
+import { Box, Check, Circle, GitPullRequest, Link2, Tag, X } from 'lucide-react'
 import { getIssuePropertyOptions, updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issue-metadata'
 import { LABEL_COLORS, type IssueLabel, type IssueMetadata, type IssuePullRequest } from '@/lib/issue-metadata'
 import { useActionError } from '@/lib/use-action-error'
@@ -20,6 +20,8 @@ import { IssueAssigneeMenu } from './issue-assignee-menu'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { cn } from '@/lib/utils'
 import { ROW_VALUE } from './issue-property-row'
+import { PullRequestIcon } from './pull-request-icon'
+import { PULL_REQUEST_COLORS, PULL_REQUEST_ICONS } from '@/lib/pull-request-appearance'
 
 export type MetadataSavedIssue = Extract<Awaited<ReturnType<typeof updateIssueMetadata>>, { issue: unknown }>['issue']
 type Target = 'project' | 'labels' | 'pullRequests' | 'invite'
@@ -44,11 +46,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   const actionError = useActionError()
   const colorLabel = (value: IssueLabel['color']) => tColors.has(value as never) ? tColors(value as never) : value
   const prStateLabel = (value: IssuePullRequest['state']) => tPrState.has(value as never) ? tPrState(value as never) : value
-  const prStates = [
-    { value: 'open', label: tPrState('open'), icon: GitPullRequest },
-    { value: 'merged', label: tPrState('merged'), icon: GitMerge },
-    { value: 'closed', label: tPrState('closed'), icon: X },
-  ]
+  const prStates = (['open', 'draft', 'merged', 'closed'] as const).map(value => ({ value, label: tPrState(value), icon: PULL_REQUEST_ICONS[value] }))
   const titles: Record<Target, string> = { project: tProperty('setProject'), labels: tProperty('editLabels'), pullRequests: tProperty('managePullRequests'), invite: tProperty('invite') }
   const [target, setTarget] = useState<Target | null>(null)
   const [pending, setPending] = useState(false)
@@ -122,8 +120,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
       </>}
       {(section === 'all' || section === 'properties' || section === 'pullRequests') && <>
       {metadata.pullRequests.map(pr => {
-        const Icon = pr.state === 'merged' ? GitMerge : pr.state === 'closed' ? X : GitPullRequest
-        return <Badge key={pr.url} tone={pr.state === 'merged' ? 'focus' : pr.state === 'closed' ? 'destructive' : 'success'} variant="outline" className="h-6" render={<a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" title={tProperty('pullRequestTitle', { state: prStateLabel(pr.state), url: pr.url })} aria-label={tProperty('pullRequestAria', { number: pr.url.split('/').at(-1) ?? '', state: prStateLabel(pr.state) })} />}><Icon data-icon="inline-start" className={cn({ 'text-success-foreground': pr.state === 'open', 'text-info-foreground': pr.state === 'merged', 'text-destructive': pr.state === 'closed' })} />#{pr.url.split('/').at(-1)}</Badge>
+        return <Badge key={pr.url} variant="outline" className={cn('h-6 rounded-md px-2', PULL_REQUEST_COLORS[pr.state])} render={<a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" title={tProperty('pullRequestTitle', { state: prStateLabel(pr.state), url: pr.url })} aria-label={tProperty('pullRequestAria', { number: pr.url.split('/').at(-1) ?? '', state: prStateLabel(pr.state) })} />}><PullRequestIcon state={pr.state} />#{pr.url.split('/').at(-1)}</Badge>
       })}
       <Button variant={metadata.pullRequests.length ? 'ghost' : 'outline'} size={metadata.pullRequests.length ? 'icon-xs' : 'xs'} type="button" className="rounded-full" disabled={busy} onClick={() => open('pullRequests')} aria-label={tProperty('managePullRequestsAria')}><Link2 data-icon="inline-start" />{!metadata.pullRequests.length && tProperty('pullRequests')}</Button>
       </>}

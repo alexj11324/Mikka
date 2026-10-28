@@ -8,13 +8,13 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
 import { runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import type { IssueThread } from '@/lib/issue-threads'
-import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { ThreadStatus, harnessLabel } from './issue-threads'
+import { ThreadStatusIcon } from './thread-status-icon'
 import { cn } from '@/lib/utils'
 
 const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm whitespace-pre-wrap break-words'
@@ -91,7 +91,7 @@ function ThreadPanel({ issueId, runId, onClose, back }: IssueThreadPanelProps) {
         <Button variant="ghost" size="sm" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
         <span aria-hidden="true" className="text-muted-foreground">/</span>
       </>}
-      {detail && <BotAvatar color={colorFor(detail.agentName)} size="pill" still />}
+      {detail && data && <ThreadStatusIcon status={data.thread.status} />}
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{detail?.name ?? t('title')}</h2>
       {!back && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
     </header>

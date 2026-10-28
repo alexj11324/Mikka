@@ -135,3 +135,18 @@ behaviour. Preserve owner-scoped historical reads, shared Bot rendering/images,
 and Claude Code/Codex/Cursor task execution harnesses. Harness names describe
 execution layers, not extra user-facing Bots. This is a behavioural retirement,
 not a shell/layout redesign; source correction: Alex 2026-10-25 23:40 UTC.
+
+## MVP result closure · 2026-10-28
+
+R-66 implementation review frame, **待 Alex 确认** (not accepted):
+[Thread result cards, light/dark/narrow](https://www.figma.com/design/zPe5LKycb2XuT1ivCLRw07?node-id=356-4750).
+Status icon, thread title and real PR output chips only; no avatar or progress
+line. Show at most two PRs and fold additional or non-fitting outputs into `+N`.
+Use the existing Lucide icons and GitHub [Primer color states](https://primer.style/product/primitives/color/)
+through dedicated theme tokens, including draft gray and merged purple.
+
+| Status | Proposed decision | Behavior until Alex confirms |
+| --- | --- | --- |
+| 待 Alex 确认 | Repository push approval belongs to the signed-in repository owner and is requested in that person's chat. Approval follows `(userId, remoteKey)` across devices; it is not a device setting or a model decision. | No automatic approval. The authenticated backend records owner/time and claim sends the snapshot. No new chat approval entry point is exposed yet. Revocation prevents later claims and PR creation. |
+| 待 Alex 确认 | A submitted thread without a configured repository verification command may commit and push after explicit repository approval, then open a **draft** PR for human review. It retains `verify: not_run`; `succeeded` means the execution handed in its result, never that verification passed. An unverified continuation converts its own task-marked open PR to draft; a closed/merged PR is never reopened automatically. Failed verification cannot publish. | Coordinator explicitly reports “未配置验证，草稿 PR 待人工检查”. No command such as `true` is inserted and no test pass is fabricated. |
+| 待 Alex 确认 | Server PR creation uses a live-verified GitHub identity linked to the same Mikka user, plus an installation of the Mikka GitHub App with repository access. A Google-only session needs that GitHub connection before the server can open its PR. | Existing login methods remain unchanged. Missing linked identity, installation or permission is reported as incomplete setup; no App credential is borrowed from another owner. |

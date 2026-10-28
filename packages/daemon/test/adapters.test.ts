@@ -52,7 +52,7 @@ async function boot(server: MemoryServer, dataDir: string) {
   return daemon
 }
 
-async function setup() {
+async function setup(repoPushApproved = true) {
   const repo = await makeRepo()
   const origin = tempDir("orvo-")
   await execa("git", ["init", "-q", "--bare", origin])
@@ -66,7 +66,7 @@ async function setup() {
     // The fixture's upstream is cloned into the daemon cache. A user's
     // checkout is never the fetch/push target for a local thread.
     path: origin,
-    push: { approved: true },
+    ...(repoPushApproved ? { push: { approved: true } } : {}),
   })
   const dataDir = tempDir()
   return { repo, origin, server, dataDir, daemon: await boot(server, dataDir) }
@@ -195,7 +195,20 @@ describe("the issue branch", () => {
     GIT_COMMITTER_EMAIL: "person@mikka.invalid",
   }
 
-  function queueOnIssue(server: MemoryServer, pushBranch: string) {
+  it("hands in unverified changes for a draft PR without inventing a verify pass", async () => {
+    const { origin, server, daemon } = await setup(false)
+    const runId = server.queueRun(DEVICE, {
+      issueId: "issue-unverified", repoId: "repo", baseBranch: "main",
+      harness: "claude_code", prompt: "Please SUBMIT", pushBranch: "mikka/orv-4",
+      policy: resolveAgentSettings({ permissions: { git_push: "allow" } }).policy,
+    })
+    await started(daemon, runId)
+    expect(await ended(daemon, runId)).toMatchObject({ state: "succeeded" })
+    expect(server.runs.get(runId)?.completion?.report).toMatchObject({ verify: { status: "not_run" }, publish: { pushed: true, branch: "mikka/orv-4" } })
+    expect((await execa("git", ["--git-dir", origin, "show", "mikka/orv-4:NOTES.md"])).stdout).toBeTruthy()
+  })
+
+  function queueOnIssue(server: MemoryServer, pushBranch: string, claimApproved = false) {
     return server.queueRun(DEVICE, {
       issueId: "issue-orv-1",
       repoId: "repo",
@@ -204,6 +217,7 @@ describe("the issue branch", () => {
       prompt: "Please SUBMIT",
       verifyCommand: "test -f NOTES.md",
       pushBranch,
+      ...(claimApproved ? { policy: resolveAgentSettings({ permissions: { git_push: 'allow' } }).policy } : {}),
     })
   }
 
@@ -266,6 +280,28 @@ describe("the issue branch", () => {
     expect(parent.stdout).toBe(
       (await execa("git", ["rev-parse", "main"], { cwd: repo })).stdout
     )
+  })
+
+  it("continues an existing issue branch when push approval comes only from claim policy", async () => {
+    const { origin, server, daemon } = await setup(false)
+    const first = queueOnIssue(server, "mikka/orv-3", true)
+    await started(daemon, first)
+    await ended(daemon, first)
+    expect(server.runs.get(first)?.completion?.report.publish?.pushed).toBe(true)
+
+    const person = join(tempDir("mikka-person-"), "clone")
+    await execa("git", ["clone", "-q", "--branch", "mikka/orv-3", origin, person])
+    writeFileSync(join(person, "PERSON.md"), "A follow-up made by the person.\n")
+    await execa("git", ["add", "PERSON.md"], { cwd: person })
+    await execa("git", ["commit", "-q", "-m", "follow-up"], { cwd: person, env: PERSON })
+    await execa("git", ["push", "-q", "origin", "mikka/orv-3"], { cwd: person })
+    const personTip = (await execa("git", ["rev-parse", "HEAD"], { cwd: person })).stdout
+
+    const second = queueOnIssue(server, "mikka/orv-3", true)
+    await started(daemon, second)
+    await ended(daemon, second)
+    expect(server.runs.get(second)?.completion?.report.publish).toMatchObject({ pushed: true, branch: "mikka/orv-3", commit: personTip })
+    expect((await execa("git", ["--git-dir", origin, "show", "mikka/orv-3:PERSON.md"])).stdout).toBe("A follow-up made by the person.")
   })
 })
 

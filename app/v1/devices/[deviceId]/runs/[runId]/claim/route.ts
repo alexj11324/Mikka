@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { readRepositorySettings } from '@/lib/device-repositories'
@@ -14,6 +14,7 @@ import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
+import { PublicationError } from '@/lib/run-publication-result'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,11 +59,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let computer: Awaited<ReturnType<typeof claimCloudRun>> = null
+  let publication: Awaited<ReturnType<typeof import('@/lib/run-publications')['prepareRunPublication']>> | null = null
   if (device.kind === 'cloud') {
     if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id)
     if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
   } else {
+    const { prepareRunPublication, persistRunCompletion } = await import('@/lib/run-publications')
+    try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
+    catch (error) {
+      if (!(error instanceof PublicationError)) throw error
+      await persistRunCompletion(caller.userId, runId, { stopReason: 'error', report: { summary: error.message, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } })
+      after(async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 })
+    }
     const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id)
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
   }
@@ -88,6 +98,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     : {}
   const settings = device.kind === 'local' && repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
   return NextResponse.json({
+    ...publication,
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
     ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl } : {}),
     ...(run.baseBranch ? { baseBranch: run.baseBranch } : {}), harness, prompt: run.prompt,

@@ -26,7 +26,8 @@
 //
 // The handoff report's verify result is always the daemon's own: only the
 // agent's summary, open questions, next step and blocker are taken from the
-// agent. A submission is `succeeded` only when verify passed.
+// agent. A submitted execution can finish unverified; its report keeps
+// `not_run`, and the server may open only a draft PR for human review.
 import { randomUUID } from "node:crypto"
 import { resolve } from "node:path"
 
@@ -73,7 +74,7 @@ import {
 import { isSafeId } from "../ids"
 import type { Logger } from "../log"
 import type { Outbox } from "../outbox"
-import { runPolicy } from "../permissions"
+import { pushDecision, runPolicy } from "../permissions"
 import {
   DEFAULT_LEASE_MS,
   type DeviceRepo,
@@ -661,12 +662,12 @@ export class RunSupervisor {
     this.endMessage(runId)
     this.openParts.delete(runId)
     if (stopReason === "submitted") this.setState(runId, "finishing")
-    // Only a submission whose verify passed is a success: a failed verify
-    // fails the run, an unverified one just stops.
+    // Completion and verification are separate: absent verification stays
+    // not_run and is delivered as a draft PR, never a fabricated pass.
     let state = runStateForStop(stopReason)
     if (stopReason === "submitted" && report.verify.status !== "passed") {
       const failed = report.verify.status === "failed"
-      if (!planning) state = failed ? "failed" : "stopped"
+      if (!planning && failed) state = "failed"
       // A `plan` run writes no code, so a verify that did not run says
       // nothing about it.
       if (!failed && !planning)
@@ -741,10 +742,16 @@ export class RunSupervisor {
     const command = assignment.verifyCommand
     // A `plan` run writes no code: there is nothing for the issue's verify
     // command to check (ADR ORV-205).
-    if (stopReason !== "submitted" || !command || assignment.kind === "plan")
+    if (stopReason !== "submitted" || assignment.kind === "plan")
       return {
         report: { ...report, filesChanged, verify: { status: "not_run" } },
       }
+    if (!command) {
+      // No command was approved for this repository. Snapshot the submitted
+      // tree for an explicitly approved push, while retaining not_run.
+      const tree = await this.deps.publisher?.snapshot({ worktree, repo })
+      return { report: { ...report, filesChanged, verify: { status: "not_run" } }, tree }
+    }
     const failed = (output: string, verifyError: string) => ({
       report: {
         ...report,
@@ -808,11 +815,11 @@ export class RunSupervisor {
     if (resume && (await hasCommit(repo.path, resume))) return resume
     const branch = assignment.pushBranch
     const base = await this.deps.baseRef(assignment)
-    if (!branch || repo.push?.approved !== true) return base
+    if (!branch || !pushDecision(runPolicy(assignment.policy), repo.push?.approved === true).push) return base
     try {
       return await this.deps.worktrees.fetchBranch(
         repo.path,
-        repo.push.remote ?? "origin",
+        repo.push?.remote ?? "origin",
         branch,
         runId
       )
@@ -1094,7 +1101,7 @@ export class RunSupervisor {
         let report = outcome.report
         if (
           stopReason === "submitted" &&
-          report.verify.status === "passed" &&
+          report.verify.status !== "failed" &&
           tree &&
           // A read-only check (ADR 0046) never commits or pushes: it reports
           // on the commit the implementation run already pushed.

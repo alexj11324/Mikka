@@ -314,6 +314,7 @@
     },
     "prState": {
       "open": "进行中",
+      "draft": "草稿",
       "merged": "已合并",
       "closed": "已关闭"
     },
@@ -2353,6 +2354,9 @@
     "createWorkspace": "创建工作区"
   },
   "IssueThreads": {
+    "pullRequest": "PR #{number}",
+    "moreOutputs": "+{count}",
+    "moreOutputsAria": "还有 {count} 个输出",
     "title": "线程",
     "agent": "Bot",
     "hidden": "线程",

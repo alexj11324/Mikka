@@ -4,6 +4,8 @@ import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from 
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
 import { splitQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
+import { PUBLICATION_ERRORS, type PublicationErrorCode } from '@/lib/run-publication-result'
+import { pullRequestSchema } from '@/lib/issue-metadata'
 
 // What the Coordinator's model sees. Everything here depends only on the
 // stored conversation, never on time or on how long the person was away, so
@@ -96,6 +98,8 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         `[Event] Run ${event.runId} ended with status ${payload.status} (${payload.stopReason}).`,
         event.issueId ? `Issue: ${event.issueId}.` : null,
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
+        ...publicationPrompt(payload.publication),
+        payload.verification === 'not_run' ? 'Verification was not run. Tell the person that no verification command is configured and the draft PR needs human review. Never say the changes passed verification.' : null,
         note,
       ].filter(Boolean).join('\n')
     case 'run_retried':
@@ -161,6 +165,19 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
     case 'matter_handoff':
       return handoffPrompt(payload as unknown as HandoffPayload)
   }
+}
+
+function publicationPrompt(value: unknown): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+  const publication = value as Record<string, unknown>
+  const pr = pullRequestSchema.safeParse(publication.pullRequest)
+  const error = typeof publication.errorCode === 'string' && Object.hasOwn(PUBLICATION_ERRORS, publication.errorCode)
+    ? PUBLICATION_ERRORS[publication.errorCode as PublicationErrorCode] : null
+  return [
+    ...(pr.success ? [`Verified GitHub pull request: ${pr.data.url} (${pr.data.state}).`] : []),
+    ...(error ? [`Publication needs attention: ${error}`] : []),
+    'Report the result in this chat. The existing thread card updates in place. Only claim a pull request exists when this event includes its verified GitHub link.',
+  ]
 }
 
 /** Bookkeeping the chat leaves out: the Coordinator records its attention decisions with it. */

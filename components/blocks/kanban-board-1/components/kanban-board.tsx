@@ -3,7 +3,7 @@
 import { useState, type ComponentProps, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useTranslations } from 'next-intl'
-import { Box, CalendarDays, ChevronsLeftRight, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, GitMerge, GitPullRequest, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2, X } from 'lucide-react'
+import { Box, CalendarDays, ChevronsLeftRight, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
@@ -12,6 +12,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuRadioGroup
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { LabelDot, IssueMetadataControls, type MetadataRequest, type MetadataSavedIssue } from '@/components/workspace/issue-metadata-controls'
 import { IssuePropertyMenu } from '@/components/workspace/issue-property-menu'
+import { PullRequestIcon } from '@/components/workspace/pull-request-icon'
 import { CardControlBoundary, CardCreatedAt } from '@/components/workspace/issue-card-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier, type IssueStatus } from '@/components/workspace/issue-properties'
 import { BOARD_COLUMNS, type AgentState, type BoardColumns, type BoardTask, type CardProperty } from './data'
@@ -71,8 +72,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     ...(show('labels') ? metadata.labels.map(label => <Badge key={`label-${label.name}`} variant="outline" size="lg" className="border-transparent px-1 max-w-36"><LabelDot color={label.color} /><span className="truncate">{label.name}</span></Badge>) : []),
     show('project') && metadata.project && <Badge key="project" variant="outline" size="lg" className="border-transparent px-1 max-w-36"><Box /><span className="truncate">{metadata.project}</span></Badge>,
     ...(show('pullRequests') ? metadata.pullRequests.map(pr => {
-      const Icon = pr.state === 'merged' ? GitMerge : pr.state === 'closed' ? X : GitPullRequest
-      return <CardControlBoundary key={pr.url}><Badge variant="outline" size="lg" className="border-transparent px-1 tabular-nums" render={<a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" />}><Icon className={cn(pr.state === 'open' && 'text-success-foreground', pr.state === 'merged' && 'text-info-foreground', pr.state === 'closed' && 'text-destructive')} />#{pr.url.split('/').at(-1)}</Badge></CardControlBoundary>
+      return <CardControlBoundary key={pr.url}><Badge variant="outline" size="lg" className="border-transparent px-1 tabular-nums" render={<a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" />}><PullRequestIcon state={pr.state} />#{pr.url.split('/').at(-1)}</Badge></CardControlBoundary>
     }) : []),
     show('subtasks') && subtasks && subtasks.total > 0 && <Badge key="subtasks" variant="outline" size="lg" className="border-transparent px-1 tabular-nums" title={tCard('subtasks')}><ListChecks />{subtasks.done}/{subtasks.total}</Badge>,
     show('agentState') && agentState && <Badge key="agent" variant={AGENT_STATE_BADGES[agentState]} size="lg"><span aria-hidden="true" className={cn('size-1.5 rounded-full', AGENT_STATE_DOTS[agentState])} />{tCard(`agent.${agentState}`)}</Badge>,
