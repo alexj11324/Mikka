@@ -12,6 +12,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-28 | Profile facts (#353) keep a fourth state, `expired` (past its date or faded; revived when seen again), besides active, dismissed and deleted; 记忆 has one switch for web, mobile, the Coordinator prompt and extraction (`user_preferences."memoryEnabled"`); the 提问或更新 input on web 记忆 waits for later (Alex, accepting both questions on #353) | R-73, `proactive.md` § 2.2 | |
 | 2026-10-27 | Build the mobile app now in `apps/mobile` with Expo, and verify screens with Expo web screenshots in the cloud, not the iOS simulator. Alex: 「你做一下移动端 APP…直接开 Expo 的 web 模式进行截图验证就行，不需要本地跑 iOS 的 simulator」 | — | — |
 | 2026-10-27 | Mobile composer: the 「+」 sits inside the input field at its left end, not as a separate circle beside it (as in ChatGPT iOS). Alex: 「加号改在里边」 | — | — |
 | 2026-10-27 | The briefing stays one bubble; only Hark's tone is adopted, not its one-bubble-per-item format, and no date label (「我只让你学他的口气…简报应该要写到一块儿…写到一个气泡里边」) | R-46 | Hark-style one bubble per item and date label (same day) |
