@@ -80,3 +80,47 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
     await admin.end()
   }
 })
+
+test('real PostgreSQL: observed credential lease inserts once and stays guarded', { skip: !databaseURL }, async () => {
+  process.env.BETTER_AUTH_SECRET = 'isolated-credential-test-fingerprint-key'
+  const targetUrl = new URL(databaseURL!)
+  const isolated = targetUrl.pathname === '/credential_test' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && targetUrl.hostname === '127.0.0.1' && targetUrl.pathname === '/mikka_e2e')
+  if (!isolated) throw new Error('Use the isolated credential test database')
+  const schema = `credential_${randomBytes(8).toString('hex')}`, admin = new Pool({ connectionString: databaseURL })
+  await admin.query(`CREATE SCHEMA ${schema}`)
+  const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
+  try {
+    await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY); CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid); CREATE TABLE bot_subagents(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"botId" uuid,status text,"targetId" text,epoch integer); CREATE TABLE agent_runs(id uuid,"userId" text,"botId" uuid,"stopRequestedAt" timestamptz,status text,"leaseExpiresAt" timestamptz); CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY, permission text NOT NULL, version integer NOT NULL)`)
+    await pool.query(await readFile(new URL('../../drizzle/20261028174823_account_credential_vault.sql', import.meta.url), 'utf8'))
+    const actor = { userId: 'fixture-owner', workspaceId: randomUUID(), botId: randomUUID(), subagentId: randomUUID() }
+    await pool.query('INSERT INTO "user"(id) VALUES($1)', [actor.userId])
+    await pool.query('INSERT INTO bots VALUES($1,$2,$3)', [actor.botId, actor.userId, actor.workspaceId])
+    await pool.query(`INSERT INTO bot_subagents VALUES($1,$2,$3,$4,'running','fixture-target',1)`, [actor.subagentId, actor.userId, actor.workspaceId, actor.botId])
+    await pool.query(`INSERT INTO workspace_computer_policies VALUES($1,'ask',1)`, [actor.workspaceId])
+    let key: Buffer | undefined, decrypts = 0, ended = false, inserted = 0
+    const kms: Kms = {
+      async generate() { key = randomBytes(32); return { plaintext: Buffer.from(key), wrapped: 'synthetic-key' } },
+      async decrypt() { decrypts++; if (!key) throw new Error('missing fixture key'); return Buffer.from(key) },
+    }
+    const store = new CredentialStore(pool, kms), origin = 'https://example.com'
+    const challenge = await store.challenge(actor, origin)
+    await store.save(actor, { nonce: challenge.nonce, origin, username: 'fixture-user', password: 'synthetic-fixture' })
+    const target = { targetId: 'fixture-target', origin, endpoint: 'https://fixture.e2b.app/', expiresAt: Date.now() + 60000, observedInput: { loaderId: 'fixture-loader', backendNodeId: 7, credentialRole: 'password' as const, epoch: 1, permissionVersion: 1 } }
+    const cdp = { async attach() {}, async origin() {}, async call() { return { frameTree: { frame: { url: origin, loaderId: 'fixture-loader' } } } }, async insertAtObservedInput(_origin: string, _loader: string, _node: number, _role: string, value: string) { assert.equal(value, 'synthetic-fixture'); inserted++ }, close() {} }
+    const guard = { async begin() { return { cdpUrl: 'wss://fixture.e2b.app/', targetId: 'fixture-target', guardToken: 'fixture' } }, async end() { ended = true } }
+    const lease = await store.lease(actor, origin, target, undefined, true)
+    if (lease.status !== 'ready') throw new Error('fixture lease not issued')
+    assert.deepEqual(await fillCredential(pool, lease.lease, { kms, guard, connect: (async () => cdp) as never }), { status: 'guarded', origin })
+    assert.equal(inserted, 1); assert.equal(decrypts, 1); assert.equal(ended, false)
+    await assert.rejects(fillCredential(pool, lease.lease, { kms, guard, connect: (async () => cdp) as never }), CredentialError)
+    const stale = await store.lease(actor, origin, target, undefined, true)
+    if (stale.status !== 'ready') throw new Error('fixture lease not issued')
+    await pool.query('UPDATE workspace_computer_policies SET version=2 WHERE "workspaceId"=$1', [actor.workspaceId])
+    await assert.rejects(fillCredential(pool, stale.lease, { kms, guard, connect: (async () => cdp) as never }), CredentialError)
+    assert.equal(decrypts, 1); assert.equal(inserted, 1)
+  } finally {
+    await pool.end()
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`)
+    await admin.end()
+  }
+})
