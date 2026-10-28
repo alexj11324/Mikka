@@ -44,6 +44,9 @@ export class CredentialStore {
       // Serializes upserts, use and deletion for this account/site; no workspace credential sharing.
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${caller.userId}:${origin}`])
       const existing = (await client.query('SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND username=$3 FOR UPDATE', [caller.userId, origin, input.username])).rows[0]
+      // Retained sessions and already-claimed leases cannot yet be safely
+      // invalidated across an update. Refuse every existing account update.
+      if (existing) throw new CredentialError('credential_update_retention_hold', 409)
       const id = existing?.id ?? randomUUID()
       const leak = fingerprint(caller.userId, input.password)
       const envelope = await seal(this.kms, { userId: caller.userId, credentialId: id, origin }, Buffer.from(JSON.stringify({ username: input.username, password: input.password })))
@@ -84,10 +87,20 @@ export class CredentialStore {
       return value
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   }
-  async remove(_actor: Actor, _origin: string, _username: string): Promise<{ status: 'deleted' }> {
-    // Existing records and their sessions are retained until an exact deletion
-    // is explicitly authorized. No credential existence is revealed.
-    throw new CredentialError('credential_deletion_retention_hold', 409)
+  async remove(actor: Actor, origin: string, username: string) {
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      origin = canonicalOrigin(origin)
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${actor.userId}:${origin}`])
+      const row = (await client.query('UPDATE credentials SET revoked_at=now() WHERE user_id=$1 AND origin=$2 AND username=$3 RETURNING id', [actor.userId, origin, username])).rows[0]
+      if (row) {
+        await client.query('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now()) WHERE credential_id=$1', [row.id])
+        await client.query('UPDATE credential_fill_leases SET consumed_at=COALESCE(consumed_at,now()),input_envelope=NULL WHERE credential_id=$1', [row.id])
+      }
+      await client.query('COMMIT')
+      return { status: 'revoked' as const }
+    } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   }
 }
 

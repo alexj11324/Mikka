@@ -265,16 +265,21 @@ test('gateway failure after side effects begin reports unknown without exposing 
   await assert.rejects(fillCredential(pool as never, 'a'.repeat(43), { kms, guard }), (error: unknown) => error instanceof CredentialError && error.code === 'credential_outcome_unknown' && error.status === 409 && !error.message.includes('provider'))
 })
 
-test('retention hold refuses credential removal without touching the database', async () => {
-  let touched = false
-  const pool = { async connect() { touched = true; throw new Error('unexpected database access') } }
-  const store = new CredentialStore(pool as never, fixtureKms())
-  await assert.rejects(store.remove({ userId: 'fixture', workspaceId: 'workspace' }, owner.origin, 'fixture-user'), (error: unknown) => error instanceof CredentialError && error.code === 'credential_deletion_retention_hold')
-  assert.equal(touched, false)
+test('revocation retains rows and disables credential, session and leases', async () => {
+  const statements: string[] = []
+  const client = { async query(sql: string) {
+    statements.push(sql)
+    return { rows: sql.includes('UPDATE credentials SET revoked_at') ? [{ id: 'existing' }] : [] }
+  }, release() {} }
+  const store = new CredentialStore({ async connect() { return client } } as never, fixtureKms())
+  assert.deepEqual(await store.remove({ userId: 'fixture', workspaceId: 'workspace' }, owner.origin, 'fixture-user'), { status: 'revoked' })
+  assert(statements.some(sql => sql.includes('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now())')))
+  assert(statements.some(sql => sql.includes('UPDATE credential_fill_leases SET consumed_at=COALESCE(consumed_at,now()),input_envelope=NULL')))
+  assert(statements.includes('COMMIT'))
+  assert(!statements.some(sql => /\bDELETE\b/i.test(sql)))
 })
 
-test('saving an existing login retains session records', async () => {
-  process.env.BETTER_AUTH_SECRET = 'isolated-credential-test-fingerprint-key'
+test('saving an existing login fails closed and rolls back', async () => {
   const statements: string[] = []
   const client = { async query(sql: string) {
     statements.push(sql)
@@ -283,10 +288,10 @@ test('saving an existing login retains session records', async () => {
     if (sql.includes('SELECT id FROM credentials')) return { rows: [{ id: 'existing' }], rowCount: 1 }
     return { rows: [], rowCount: 0 }
   }, release() {} }
-  const pool = { async connect() { return client } }
-  const store = new CredentialStore(pool as never, fixtureKms())
-  await store.save({ userId: 'fixture', workspaceId: 'workspace', botId: 'bot', runId: 'run' }, { nonce: 'a'.repeat(43), origin: owner.origin, username: 'fixture', password: 'synthetic' })
-  assert(statements.includes('COMMIT'))
+  const store = new CredentialStore({ async connect() { return client } } as never, fixtureKms())
+  await assert.rejects(store.save({ userId: 'fixture', workspaceId: 'workspace', botId: 'bot', runId: 'run' }, { nonce: 'a'.repeat(43), origin: owner.origin, username: 'fixture', password: 'synthetic' }), (error: unknown) => error instanceof CredentialError && error.code === 'credential_update_retention_hold')
+  assert(statements.includes('ROLLBACK'))
+  assert(!statements.includes('COMMIT'))
   assert(!statements.some(sql => /\bDELETE\b/i.test(sql)))
 })
 

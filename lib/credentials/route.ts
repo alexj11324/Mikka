@@ -31,12 +31,11 @@ async function browserCredentialRoute(request: Request, identity: { botId: strin
       const target = await resolveCredentialBrowser(caller)
       if (canonicalOrigin(target.origin) !== canonicalOrigin(parsed.data.origin)) throw new CredentialError('credential_denied', 404)
       if ('code' in parsed.data) {
-        const lease = await credentialStore.otpLease(caller, parsed.data, target)
-        parsed.data.code = ''
+        let lease: string
+        try { lease = await credentialStore.otpLease(caller, parsed.data, target) } finally { parsed.data.code = '' }
         return Response.json(await executeCredentialLease(lease, target.origin), { headers: privateHeaders })
       }
-      await credentialStore.save(caller, parsed.data)
-      parsed.data.password = ''
+      try { await credentialStore.save(caller, parsed.data) } finally { parsed.data.password = '' }
       const result = await login(caller, target.origin, parsed.data.username)
       return Response.json(result, { headers: privateHeaders })
     }

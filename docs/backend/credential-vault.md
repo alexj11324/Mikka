@@ -40,11 +40,12 @@ the website accepted a login; a later visual observation must make that decision
 The server derives the user from an authenticated owner-bound bot/subagent or
 thread; workspace membership alone never authorizes a login. No API or model
 tool accepts or returns a credential ID. Multiple matching accounts require a
-new login choice instead of silently selecting one. Deletion revokes first,
-erases password/session ciphertexts and outstanding leases atomically, and
+new login choice instead of silently selecting one. While retention is in
+effect, revocation marks the login revoked, expires its saved session and
+consumes outstanding leases without deleting their records. Revocation
 serializes with an in-flight fill through an account/origin database lock.
-Deletion removes Mikka's saved ciphertext and leases; it does not log out an
-already running browser or revoke sessions at the third-party website.
+It does not log out an already running browser or revoke sessions at the
+third-party website. Updating an existing saved login is temporarily refused.
 
 ## API contract
 
@@ -65,7 +66,7 @@ prefix is `/api/threads/:runId/credentials`.
   succeeded, a password retry or a verification code is needed. It must not
   observe the page while the guard is active or expose credential material.
 - `GET /api/credentials` returns owner-only login metadata without IDs.
-- `DELETE /api/credentials` with `{origin,username}` revokes the saved login.
+- `DELETE /api/credentials` with `{origin,username}` revokes the saved login and returns `{status:'revoked'}`; it retains the saved records.
 - `POST /v1/devices/:deviceId/runs/:runId/credentials/login` is the coding
   runtime entry point with the same `site` and optional `forcePassword` body;
   device/run/user/workspace are all server-checked.

@@ -9,7 +9,7 @@ import { fillCredential } from './broker'
 import type { Kms } from './kms'
 
 const databaseURL = process.env.CREDENTIAL_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
-if (databaseURL) throw new Error('Credential database tests are on retention hold: their test operations include deletion')
+if (databaseURL) throw new Error('Credential database tests are on retention hold pending complete resource lifecycle review')
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Credential test database is required')
 test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation and opaque responses', { skip: !databaseURL }, async () => {
   process.env.BETTER_AUTH_SECRET = 'isolated-credential-test-fingerprint-key'
@@ -67,14 +67,20 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
     await pool.query('UPDATE credential_fill_leases SET expires_at=now()-interval \'1 second\'')
     if (expired.status !== 'ready') throw new Error()
     await assert.rejects(fillCredential(pool, expired.lease, { kms, guard }), CredentialError)
-    await store.remove(b, origin, input.username)
+    // Synthetic retained session; no broker may restore it in this test.
+    await pool.query(`INSERT INTO browser_sessions(credential_id,wrapped_dek,nonce,ciphertext,expires_at) SELECT credential_id,wrapped_dek,nonce,ciphertext,now()+interval '1 hour' FROM credential_secrets`)
+    const leasesBeforeRevocation = (await pool.query('SELECT count(*)::int AS count FROM credential_fill_leases')).rows[0].count
+    assert.deepEqual(await store.remove(b, origin, input.username), { status: 'revoked' })
     assert.equal((await store.list(a)).length, 1)
-    await store.remove(a, origin, input.username)
+    assert.equal((await pool.query('SELECT count(*)::int AS count FROM browser_sessions WHERE expires_at>now()')).rows[0].count, 1)
+    assert.deepEqual(await store.remove(a, origin, input.username), { status: 'revoked' })
     assert.equal((await store.list(a)).length, 0)
     assert.deepEqual(await store.lease(a, origin, browserTarget), { status: 'needs_login', origin })
-    assert.equal((await pool.query('SELECT * FROM credential_secrets')).rowCount, 0)
-    assert.equal((await pool.query('SELECT * FROM browser_sessions')).rowCount, 0)
-    assert.equal((await pool.query('SELECT * FROM credential_fill_leases')).rowCount, 0)
+    assert.equal((await pool.query('SELECT * FROM credential_secrets')).rowCount, 1)
+    assert.equal((await pool.query('SELECT * FROM browser_sessions')).rowCount, 1)
+    assert.equal((await pool.query('SELECT count(*)::int AS count FROM browser_sessions WHERE expires_at>now()')).rows[0].count, 0)
+    assert.equal((await pool.query('SELECT count(*)::int AS count FROM credential_fill_leases')).rows[0].count, leasesBeforeRevocation)
+    assert.equal((await pool.query('SELECT count(*)::int AS count FROM credential_fill_leases WHERE consumed_at IS NULL OR input_envelope IS NOT NULL')).rows[0].count, 0)
   } finally {
     await pool.end()
     await admin.end()
@@ -118,6 +124,11 @@ test('real PostgreSQL: observed credential lease inserts once and stays guarded'
     if (stale.status !== 'ready') throw new Error('fixture lease not issued')
     await pool.query('UPDATE workspace_computer_policies SET version=2 WHERE "workspaceId"=$1', [actor.workspaceId])
     await assert.rejects(fillCredential(pool, stale.lease, { kms, guard, connect: (async () => cdp) as never }), CredentialError)
+    assert.equal(decrypts, 1); assert.equal(inserted, 1)
+    const revocable = await store.lease(actor, origin, { ...target, observedInput: { ...target.observedInput, permissionVersion: 2 } }, undefined, true)
+    if (revocable.status !== 'ready') throw new Error('fixture lease not issued')
+    assert.deepEqual(await store.remove(actor, origin, 'fixture-user'), { status: 'revoked' })
+    await assert.rejects(fillCredential(pool, revocable.lease, { kms, guard, connect: (async () => cdp) as never }), CredentialError)
     assert.equal(decrypts, 1); assert.equal(inserted, 1)
   } finally {
     await pool.end()
