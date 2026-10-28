@@ -19,17 +19,19 @@ export function checkedScopeUrl(value, phase) {
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.hostname !== '127.0.0.1' || url.port !== '55484' || url.username !== 'postgres' || url.password || url.search || url.hash || !allowed.includes(url.pathname.slice(1))) throw Error('scope acceptance target mismatch')
   return url.pathname.slice(1)
 }
-export function scopePolicy(migrations, record = () => {}) {
-  const state = { failed: null, counts: {}, created: new Map(), createAttempts: new Set(), migrations: new Set(), replays: new Set(), migrationCalls: new Set(), pending: new Map(), results: 0, cleanup: 0, connections: {} }
+export function scopePolicy(migrations, record = () => {}, {allowResume=false} = {}) {
+  const state = { failed: null, counts: {}, created: new Map(), resumed: new Map(), resumeCalls:0, createAttempts: new Set(), migrations: new Set(), replays: new Set(), migrationCalls: new Set(), pending: new Map(), results: 0, cleanup: 0, connections: {} }
   const files = new Map(migrations.map(file => [file.sha256, file]))
   for (const file of migrations) if (file.beforeCommitSha256) files.set(file.beforeCommitSha256, file)
+  const owned=database=>state.created.has(database)||state.resumed.has(database)
+  function adoptRetainedScope(identity){active();if(!allowResume)throw Error('explicit resume policy required');if(identity.database!==SCOPE_DATABASES.scope||identity.oid!=='65537'||identity.role!=='postgres'||state.created.size||state.resumed.size)throw Error('invalid explicit scope adoption');state.resumed.set(identity.database,identity.oid);record({event:'resume-scope-adopted',...identity})}
   function active() { if (state.failed) throw Error('scope acceptance stopped') }
   function abort(reason) { if (!state.failed) { state.failed = reason;record({ event: 'abort', reason }) } }
   function connect(bucket,input) {
     active()
     if(!(bucket in SCOPE_LIMITS.queries))throw Error('unknown connection bucket')
     const database=checkedScopeUrl(input.url,bucket.split(':')[0])
-    if(database!=='issue184_e2e'&&!state.created.has(database))throw Error('unowned DB connection denied')
+    if(database!=='issue184_e2e'&&!owned(database))throw Error('unowned DB connection denied')
     state.connections[bucket]=(state.connections[bucket]??0)+1
     if(state.connections[bucket]>SCOPE_LIMITS.queries[bucket])throw Error('scope connection checkout budget exhausted')
     record({event:'connection-checkout-attempt',bucket,database,count:state.connections[bucket]})
@@ -44,13 +46,14 @@ export function scopePolicy(migrations, record = () => {}) {
     const create = /^create database "([a-z0-9_]+)"$/i.exec(input.text)
     if (database === 'issue184_e2e') {
       const names = phase === 'scope' ? [SCOPE_DATABASES.scope] : [SCOPE_DATABASES.app, SCOPE_DATABASES.workspace]
-      if (!handshake && (!create || !names.includes(create[1]) || state.createAttempts.has(create[1]))) throw Error('admin DB permits only its exact new CREATE DATABASE')
+      if (!handshake && (!create || !names.includes(create[1]) || (state.createAttempts.has(create[1])||state.resumed.has(create[1])))) throw Error('admin DB permits only its exact new CREATE DATABASE')
       if (create) state.createAttempts.add(create[1])
     } else {
-      if (!state.created.has(database)) throw Error('database ownership not established')
+      if (!owned(database)) throw Error('database ownership not established')
       if (/^\s*(?:create\s+(?:database|schema|role)|alter\s+(?:database|role)|drop\s+(?:database|schema)|truncate|delete\s+from)\b/i.test(input.text)) throw Error('scope SQL outside retained fixture boundary')
       const file = files.get(sqlHash(input.text))
       if (handshake) { /* Exact connection identity read; still budgeted. */ } else if (bucket.endsWith(':migrate')) {
+        if(state.resumed.has(database))throw Error('resumed scope bootstrap cannot rerun')
         if (file) {
           const expected = phase === 'scope' ? SCOPE_DATABASES.scope : file.target === 'DATABASE_URL' ? SCOPE_DATABASES.workspace : SCOPE_DATABASES.app
           const key = database + '/' + file.path
@@ -79,7 +82,7 @@ export function scopePolicy(migrations, record = () => {}) {
   }
   function cleanup(bucket, input) {
     const database=checkedScopeUrl(input.url,bucket.split(':')[0])
-    if(input.text.trim().toUpperCase()!=='ROLLBACK'||!state.created.has(database)||++state.cleanup>64)throw Error('cleanup scope/budget mismatch')
+    if(input.text.trim().toUpperCase()!=='ROLLBACK'||!owned(database)||++state.cleanup>64)throw Error('cleanup scope/budget mismatch')
     const id='cleanup:'+state.cleanup
     state.pending.set(id,{bucket,database})
     record({event:'cleanup-attempt',id,database})
@@ -90,7 +93,7 @@ export function scopePolicy(migrations, record = () => {}) {
     if ([...state.migrations].filter(key => phase === 'scope' ? key.startsWith(SCOPE_DATABASES.scope + '/') : !key.startsWith(SCOPE_DATABASES.scope + '/')).length !== expected) throw Error('incomplete migration file count')
   }
   function migrationCall(phase) { active(); if (state.migrationCalls.has(phase)) throw Error('migration child repeated'); state.migrationCalls.add(phase) }
-  return { state, active, abort, connect, grant, result, cleanup, migrated, migrationCall }
+  return { state, active, abort, adoptRetainedScope, connect, grant, result, cleanup, migrated, migrationCall }
 }
 
 // Own child only. A timeout/cancellation is terminal, never an automatic retry.
@@ -105,8 +108,8 @@ export function controlledChild(child, { timeoutMs, graceMs = SCOPE_LIMITS.grace
       soft = setTimeout(() => child.kill('SIGTERM'), Math.min(2000, graceMs / 2))
       grace = setTimeout(() => child.kill('SIGKILL'), graceMs)
     }
-    const timer = setTimeout(() => stop(Error('scope child timeout')), timeoutMs)
-    const cancel = () => stop(Error('scope child cancelled'))
+    const timer = setTimeout(() => stop(Object.assign(Error('scope child timeout'),{code:'ETIMEDOUT',killed:true})), timeoutMs)
+    const cancel = () => stop(Object.assign(Error('scope child cancelled'),{code:'ABORT_ERR',killed:true}))
     signal?.addEventListener('abort', cancel, { once: true })
     if (signal?.aborted) cancel()
     child.on('message', message => { Promise.resolve().then(() => onMessage(message, child)).catch(error => stop(error)) })
@@ -118,7 +121,7 @@ export function controlledChild(child, { timeoutMs, graceMs = SCOPE_LIMITS.grace
     child.once('error', error => stop(error))
     child.once('close', (code, signalName) => {
       settled = true;clearTimeout(timer);clearTimeout(grace);clearTimeout(soft);signal?.removeEventListener('abort', cancel)
-      if (failure || code !== 0) reject(failure ?? Error(`scope child failed: ${code ?? signalName}`))
+      if (failure || code !== 0) reject(failure ?? Object.assign(Error(`scope child failed: ${code ?? signalName}`),{code,signal:signalName,killed:Boolean(signalName)}))
       else resolve({ code, bytes })
     })
   })

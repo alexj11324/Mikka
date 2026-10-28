@@ -6,22 +6,31 @@ import { pathToFileURL } from 'node:url'
 import { execFileSync, fork } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { SCOPE_DATABASES, SCOPE_LIMITS, scopeUrl, checkedScopeUrl, scopePolicy, controlledChild } from './scope-acceptance-policy.mjs'
+import { verifyScopeResumeEvidence,scopeResumeSchema,validateScopeResumeState,SCOPE_RESUME_QUERIES } from './scope-resume.mjs'
+import { scopeWireOutput } from './scope-exec-file.mjs'
 import { SCOPE_IDENTITY_SQL } from './scope-acceptance-runtime.mjs'
 const digest = value => createHash('sha256').update(value).digest('hex')
 export function verifyScopeManifest(manifest, read = readFileSync) {
   if (manifest.migrations.length !== 70 || manifest.sources.length < 10) throw Error('scope manifest inventory mismatch')
   for (const file of [...manifest.sources, ...manifest.migrations]) if (digest(read(file.path)) !== file.sha256) throw Error('scope source/hash mismatch: ' + file.path)
+  if(manifest.mode==='resume-scope-after-bootstrap'){verifyScopeResumeEvidence(manifest,read);if(JSON.stringify(scopeResumeSchema(manifest.migrations,read))!==JSON.stringify(manifest.resume.schema))throw Error('resume schema expectation/source mismatch')}
   if (new Set(manifest.migrations.map(file => file.path)).size !== 70 || manifest.migrations.filter(file => file.target === 'DATABASE_URL').length !== 7) throw Error('scope migration targets mismatch')
 }
 export function scopeWorkerMode(mode) {
   if(!['suite','migrate'].includes(mode))throw Error('scope worker mode mismatch')
   return {MIGRATE:mode==='migrate'?'1':'0',VERCEL_ENV:''}
 }
+export function scopeExecutionMode(mode,manifest){
+  if(mode==='--plan')return
+  if((mode==='--run-resume')!==(manifest.mode==='resume-scope-after-bootstrap'))throw Error('fresh and resume execution modes cannot be interchanged')
+}
 export async function scopePhases(run) { for(const phase of ['scope','team'])await run(phase) }
 async function execute(manifest, manifestPath, manifestHash, output, approvalReference, started) {
   if(approvalReference&&Buffer.byteLength(approvalReference)>256)throw Error('scope approval reference too long')
   if (!approvalReference) throw Error('scope execution needs separately granted approval reference; this flag is not approval')
   if(resolve(output)!==manifest.evidenceDirectory)throw Error('scope evidence directory mismatch')
+  const isResume=manifest.mode==='resume-scope-after-bootstrap'
+  if(isResume&&approvalReference===manifest.resume.previousApprovalId)throw Error('previous approval cannot authorize resume')
   if (Object.keys(process.env).some(key => key.startsWith('PG') && process.env[key])) throw Error('ambient PG configuration is not permitted')
   const inspection = JSON.parse(execFileSync('docker', ['inspect','--format','{"id":"{{.Id}}","running":{{.State.Running}},"image":"{{.Image}}","mounts":{{json .Mounts}},"ports":{{json .NetworkSettings.Ports}}}','mikka-issue184-pg'], { encoding: 'utf8', timeout:5000 }))
   if (inspection.id !== manifest.resource.id || inspection.image !== manifest.resource.image || !inspection.running || !inspection.mounts.some(mount => mount.Name === manifest.resource.volume && mount.Destination === '/var/lib/postgresql/data') || inspection.ports['5432/tcp']?.[0]?.HostIp !== '127.0.0.1' || inspection.ports['5432/tcp']?.[0]?.HostPort !== '55484') throw Error('original scope server not running or identity changed; no start/replacement is authorized')
@@ -41,7 +50,7 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
   }
   const executionDeadline=started+SCOPE_LIMITS.totalMs
   let readDeadline=executionDeadline
-  const controller = new AbortController(), policy = scopePolicy(manifest.migrations,record)
+  const controller = new AbortController(), policy = scopePolicy(manifest.migrations,record,{allowResume:isResume})
   const all = new Set(), ended = new Set()
   let failed
   const abort = error => { if(!failed){failed=error;policy.abort(error.message);controller.abort()} }
@@ -66,7 +75,7 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
     return row.oid
   }
   async function snapshot(database,stage) {
-    const owned = policy.state.created.get(database)
+    const owned = policy.state.created.get(database)??policy.state.resumed.get(database)
     if (!owned || await inspectNew(database) !== owned) throw Error('readback ownership mismatch')
     const pool = new pg.Pool(poolOptions(database))
     try {
@@ -86,6 +95,29 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
       record({event:'snapshot',database,stage,counts,stats,statsMeaning:'server counters include rollbacks and may lag; exact row counts are net committed state, not gross trigger/cascade effects'})
       if (counts.reduce((sum,row)=>sum+row.rows,0) > SCOPE_LIMITS.snapshotLiveRows) throw Error('scope post-boundary live-row threshold exceeded; this does not bound prior trigger effects')
     } finally { await pool.end() }
+  }
+  async function validateRetainedScope() {
+    const resume=manifest.resume,expected=verifyScopeResumeEvidence(manifest)
+    const [entry]=await read(admin,'select oid::text as oid, pg_get_userbyid(datdba) as owner from pg_database where datname=$1',[resume.database])
+    if(entry?.oid!==resume.oid||entry.owner!==resume.owner)throw Error('retained scope OID/owner changed')
+    const pool=new pg.Pool(poolOptions(resume.database))
+    try {
+      await read(pool,'begin read only');await read(pool,'set transaction isolation level repeatable read')
+      const [identity]=await read(pool,SCOPE_IDENTITY_SQL)
+      const tables=expected.tables.map(row=>row.name)
+      const actualTables=await read(pool,"select c.relname as name from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' order by c.relname")
+      if(JSON.stringify(actualTables.map(row=>row.name))!==JSON.stringify(tables))throw Error('retained scope tables changed')
+      const quote=name=>'"'+name.replaceAll('"','""')+'"'
+      const counts=await read(pool,tables.map(name=>`select '${name.replaceAll("'","''")}'::text as name,count(*)::int as rows from public.${quote(name)}`).join(' union all '))
+      const ledger=await read(pool,'select name from schema_migrations order by name')
+      const workerConnections=await read(pool,"select pid,application_name,state from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid() and backend_type='client backend'")
+      const catalog={}
+      for(const [name,sql]of Object.entries(SCOPE_RESUME_QUERIES))catalog[name]=await read(pool,sql)
+      const proof=validateScopeResumeState(resume,expected,{identity,counts,ledger,workerConnections,...catalog})
+      await read(pool,'rollback')
+      record({event:'resume-precondition-verified',...proof,counts,ledgerSource:'previous executed hashes plus current exact ledger, not inferred from names alone'})
+      return identity
+    } finally {await pool.end()}
   }
   const baseEnv = { PATH:process.env.PATH, HOME:'/workspace', LANG:'C.UTF-8', TSX_DISABLE_CACHE:'1', NODE_DISABLE_COMPILE_CACHE:'1', NODE_ENV:'development', ISSUE184_LOCAL_TEST:'1', REQUIRE_DB:'1', MIGRATE:'0', VERCEL_ENV:'', NEXT_TELEMETRY_DISABLED:'1', BETTER_AUTH_URL:'http://127.0.0.1:3100', SCOPE_ACCEPTANCE_MANIFEST:manifestPath, SCOPE_ACCEPTANCE_MANIFEST_SHA256:manifestHash }
   async function child(phase,mode,databases) {
@@ -113,31 +145,36 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
             } else if(kind==='query-result') {
               const query=policy.result(input.id,input)
               if(input.identity&&input.ok) {
-                const expected=query.database==='issue184_e2e'?adminIdentity.oid:policy.state.created.get(query.database)
+                const expected=query.database==='issue184_e2e'?adminIdentity.oid:(policy.state.created.get(query.database)??policy.state.resumed.get(query.database))
                 if(input.identity.oid!==expected||input.identity.role!=='postgres'||input.identity.database!==query.database)throw Error('worker connection identity mismatch')
               }
               if(query.create&&input.ok)policy.state.created.set(query.create,await inspectNew(query.create))
+            } else if(kind==='resume-scope') {
+              if(!isResume||phase!=='scope'||mode!=='suite'||input.database!==SCOPE_DATABASES.scope||++policy.state.resumeCalls!==1)throw Error('explicit scope resume mismatch')
+              await validateRetainedScope();value={resumed:true,bootstrapReexecuted:false}
             } else if(kind==='migrate') {
+              if(isResume&&phase==='scope')throw Error('retained scope must not invoke bootstrap migration')
               if(mode==='migrate')throw Error('nested migration denied')
               checkedScopeUrl(input.app,phase);checkedScopeUrl(input.workspace,phase)
               const expected=phase==='scope'?{app:scopeUrl(SCOPE_DATABASES.scope),workspace:scopeUrl(SCOPE_DATABASES.scope)}:{app:scopeUrl(SCOPE_DATABASES.app),workspace:scopeUrl(SCOPE_DATABASES.workspace)}
               if(input.app!==expected.app||input.workspace!==expected.workspace)throw Error('migration child target mismatch')
               policy.migrationCall(phase);value=await child(phase,'migrate',expected);policy.migrated(phase)
               for(const db of new Set(Object.values(expected).map(url=>new URL(url).pathname.slice(1))))await snapshot(db,'after-migration')
-            } else if(kind==='failure') { throw Error('scope test failed') }
+            } else if(kind==='migration-cancel') { throw Object.assign(Error('migration child cancelled'),{code:'ABORT_ERR',killed:true}) }
+            else if(kind==='failure') { throw Error('scope test failed') }
             else if(kind==='finished') { ended.add(phase+':'+mode);record({event:'worker-finished',phase,mode,...input}) }
             else throw Error('unknown scope RPC')
             if(target.connected)target.send({id:message.id,value})
           } catch(error) {
             record({event:'rpc-denied-or-failed',phase,mode,kind:message.kind,reason:error.message})
-            if(target.connected)target.send({id:message.id,error:error.message})
+            if(target.connected)target.send({id:message.id,error:{message:error.message,code:error.code??null,signal:error.signal??null,killed:Boolean(error.killed),...scopeWireOutput(error)}})
             abort(error)
           }
         },
       })
       if(!ended.has(phase+':'+mode))throw Error('scope worker missing final resource record')
-      return {stdout:Buffer.concat(stdout).toString(),stderr:Buffer.concat(stderr).toString()}
-    } catch(error) { abort(error);throw error }
+      return scopeWireOutput({stdout:Buffer.concat(stdout),stderr:Buffer.concat(stderr)})
+    } catch(error) { error.stdout=Buffer.concat(stdout);error.stderr=Buffer.concat(stderr);abort(error);throw error }
     finally { all.delete(worker);closeSync(log) }
   }
   let adminIdentity
@@ -145,19 +182,22 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
     ;[adminIdentity]=await read(admin,SCOPE_IDENTITY_SQL)
     if(adminIdentity?.role!=='postgres'||adminIdentity.database!=='issue184_e2e')throw Error('original admin identity mismatch')
     const existing=await read(admin,'select datname from pg_database where datname=any($1::text[])',[Object.values(SCOPE_DATABASES)])
-    if(existing.length)throw Error('scope database already exists; never reuse')
-    record({event:'preflight',resource:{id:manifest.resource.id,image:manifest.resource.image,volume:manifest.resource.volume},adminIdentity,targetsAbsent:Object.values(SCOPE_DATABASES)})
+    if(isResume){
+      if(existing.length!==1||existing[0].datname!==SCOPE_DATABASES.scope)throw Error('resume requires only its retained scope DB and two absent team DBs')
+      policy.adoptRetainedScope(await validateRetainedScope())
+    }else if(existing.length)throw Error('scope database already exists; never reuse')
+    record({event:'preflight',resource:{id:manifest.resource.id,image:manifest.resource.image,volume:manifest.resource.volume},adminIdentity,targetsAbsent:isResume?[SCOPE_DATABASES.app,SCOPE_DATABASES.workspace]:Object.values(SCOPE_DATABASES),explicitResume:isResume})
     await scopePhases(async phase=>{
       await child(phase,'suite',{app:scopeUrl('issue184_e2e'),workspace:scopeUrl('issue184_e2e')})
       for(const database of phase==='scope'?[SCOPE_DATABASES.scope]:[SCOPE_DATABASES.app,SCOPE_DATABASES.workspace])await snapshot(database,'after-suite')
     })
-    if(policy.state.migrationCalls.size!==2||policy.state.replays.size!==3||policy.state.pending.size)throw Error('scope final execution count mismatch')
-    record({event:'success',queryCounts:policy.state.counts,rootQueries,databases:[...policy.state.created],migrationFiles:policy.state.migrations.size,replays:policy.state.replays.size})
+    if(policy.state.migrationCalls.size!==(isResume?1:2)||policy.state.replays.size!==3||policy.state.pending.size||(isResume&&policy.state.resumeCalls!==1))throw Error('scope final execution count mismatch')
+    record({event:'success',queryCounts:policy.state.counts,rootQueries,databases:[...policy.state.created],resumed:[...policy.state.resumed],migrationFiles:policy.state.migrations.size,replays:policy.state.replays.size})
   } catch(error) {
     abort(error)
     readDeadline=Date.now()+15000
     record({event:'failure',reason:error.message,pendingQueries:[...policy.state.pending.keys()],created:[...policy.state.created]})
-    for(const database of journalFull?[]:policy.state.created.keys()) {try{await snapshot(database,'failure-readback')}catch(readError){record({event:'readback-failed',database,reason:readError.message})}}
+    for(const database of journalFull?[]:[...policy.state.created.keys(),...policy.state.resumed.keys()]) {try{await snapshot(database,'failure-readback')}catch(readError){record({event:'readback-failed',database,reason:readError.message})}}
     // CREATE response loss permits metadata readback only, never inferred DB ownership.
     try{if(!journalFull)record({event:'attempted-db-catalog',rows:await read(admin,'select datname,oid::text,pg_get_userbyid(datdba) as owner from pg_database where datname=any($1::text[])',[[...policy.state.createAttempts]])})}catch{record({event:'catalog-readback-unavailable'})}
     throw error
@@ -165,13 +205,13 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
     clearTimeout(timer);controller.abort()
     for(const worker of all)worker.kill('SIGTERM')
     await admin.end();record({event:'stopped',failed:Boolean(failed),rootQueries,retained:true});
-    writeFileSync(resolve(output,'result.json'),JSON.stringify({candidate:manifest.candidate,manifestHash,failed:Boolean(failed),reason:failed?.message,queryCounts:policy.state.counts,rootQueries,created:[...policy.state.created],pendingCount:policy.state.pending.size,pendingIds:[...policy.state.pending.keys()].slice(0,64),journalFull,retained:true,outcomesMayBeUnknown:Boolean(failed)})+'\n',{flag:'wx',mode:0o600});closeSync(journal);clearTimeout(hardStop)
+    writeFileSync(resolve(output,'result.json'),JSON.stringify({candidate:manifest.candidate,manifestHash,failed:Boolean(failed),reason:failed?.message,queryCounts:policy.state.counts,rootQueries,created:[...policy.state.created],resumed:[...policy.state.resumed],pendingCount:policy.state.pending.size,pendingIds:[...policy.state.pending.keys()].slice(0,64),journalFull,retained:true,outcomesMayBeUnknown:Boolean(failed)})+'\n',{flag:'wx',mode:0o600});closeSync(journal);clearTimeout(hardStop)
   }
 }
 export async function main(args=process.argv.slice(2)) {
   const started=Date.now()
   const [mode,manifestInput,expectedHash,approvalReference,output]=args
-  if(!['--plan','--run'].includes(mode)||!manifestInput||!expectedHash)throw Error('usage: --plan|--run manifest sha256 [approval-reference output-new-directory]')
+  if(!['--plan','--run','--run-resume'].includes(mode)||!manifestInput||!expectedHash)throw Error('usage: --plan|--run|--run-resume manifest sha256 [approval-reference output-new-directory]')
   const manifestPath=resolve(manifestInput),bytes=readFileSync(manifestPath)
   if(digest(bytes)!==expectedHash)throw Error('scope manifest SHA mismatch')
   const manifest=JSON.parse(bytes);verifyScopeManifest(manifest)
@@ -179,6 +219,7 @@ export async function main(args=process.argv.slice(2)) {
   const git=(...argv)=>execFileSync('git',argv,{encoding:'utf8',timeout:5000}).trim()
   if(git('rev-parse','HEAD')!==manifest.candidate||git('rev-parse','HEAD^{tree}')!==manifest.tree||git('status','--porcelain'))throw Error('scope candidate/worktree mismatch')
   if(mode==='--plan'){console.log(JSON.stringify({candidate:manifest.candidate,manifestHash:expectedHash,limits:SCOPE_LIMITS,databases:SCOPE_DATABASES,executed:false}));return}
+  scopeExecutionMode(mode,manifest)
   if(!output)throw Error('scope requires a new retained evidence directory')
   await execute(manifest,manifestPath,expectedHash,resolve(output),approvalReference,started)
 }

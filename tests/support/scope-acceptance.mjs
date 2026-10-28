@@ -8,3 +8,10 @@ export async function scopeSubtest(context, name, callback) {
   })
   if (failed) { globalThis.scopeAcceptance?.abort(failure); throw failure }
 }
+
+export async function scopeResumeBootstrap(database) {
+  const resume=globalThis.scopeAcceptance?.resumeScope
+  if(!resume)return false
+  await resume(database)
+  return true
+}

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 import { after } from 'node:test'
+import { scopeRpcError } from './scope-exec-file.mjs'
 import { lostScopeSupervisor } from './scope-acceptance-policy.mjs'
 import { scopeNativeRuntime } from './scope-acceptance-runtime.mjs'
 if (!process.send || !['scope','team'].includes(process.env.SCOPE_ACCEPTANCE_PHASE)) throw Error('scope worker requires supervisor IPC')
@@ -22,7 +23,7 @@ process.on('message', message => {
   const request = pending.get(message.id)
   if (!request) return
   pending.delete(message.id)
-  if (message.error) request.reject(Error(message.error))
+  if (message.error) request.reject(scopeRpcError(message.error))
   else request.resolve(message.value)
 })
 const phase = process.env.SCOPE_ACCEPTANCE_PHASE, mode = process.env.SCOPE_ACCEPTANCE_MODE
@@ -30,7 +31,7 @@ const phase = process.env.SCOPE_ACCEPTANCE_PHASE, mode = process.env.SCOPE_ACCEP
 // connection; all subsequent constructors go through the target/timeouts gate.
 const pg = (await import('pg')).default
 runtime = scopeNativeRuntime(pg, rpc, phase, mode)
-runtime.install(frozenSources)
+runtime.install(frozenSources,manifest.mode==='resume-scope-after-bootstrap'&&phase==='scope'&&mode==='suite')
 if (mode !== 'migrate') after(async () => {
   try { await runtime.close();await rpc('finished', runtime.stats()) }
   finally { completed=true;if(process.connected)process.disconnect() }

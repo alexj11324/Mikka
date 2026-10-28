@@ -1,4 +1,4 @@
-import { scopeSubtest } from './support/scope-acceptance.mjs'
+import { scopeSubtest, scopeResumeBootstrap } from './support/scope-acceptance.mjs'
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -28,8 +28,11 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const database = process.env.ISSUE184_LOCAL_TEST === '1'
     ? 'scope184_f14235c6695547ae925d808ab35a399e_e2e'
     : `scope184_${randomUUID().replaceAll('-', '')}_e2e`
-  const admin = new Pool({ connectionString: url, max: 1 })
-  try { await admin.query(`create database "${database}"`) } finally { await admin.end() }
+  const resumed=await scopeResumeBootstrap(database)
+  if(!resumed){
+    const admin = new Pool({ connectionString: url, max: 1 })
+    try { await admin.query(`create database "${database}"`) } finally { await admin.end() }
+  }
   const target = new URL(url!)
   target.pathname = `/${database}`
   const connection = target.toString()
@@ -38,10 +41,12 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   process.env.MIKKA_DATABASE_URL = connection
   process.env.DATABASE_URL = connection
   t.after(() => { process.env.MIKKA_DATABASE_URL = originalApplication; process.env.DATABASE_URL = originalWorkspace })
+  if(!resumed){
   const migrated = await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], {
     env: { ...process.env, MIGRATE: '1', VERCEL_ENV: '' }, maxBuffer: 4 << 20,
   })
   assert.match(migrated.stdout, /applied 20261027183117_personal_scope_detachment.sql/)
+  }
   const pool = new Pool({ connectionString: connection, max: 5 })
   const { changeIssueScopeLocally } = await import('../lib/issue-scope-store')
   const { promoteExistingIssueForUser } = await import('../lib/team-issue-promotion')

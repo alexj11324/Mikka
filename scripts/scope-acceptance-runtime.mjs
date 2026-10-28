@@ -6,6 +6,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { transpileModule, ModuleKind, ScriptTarget, JsxEmit } from 'typescript'
 import fsp from 'node:fs/promises'
+import { scopeExecFile, scopeOutputFromWire } from './scope-exec-file.mjs'
 import { SCOPE_LIMITS, checkedScopeUrl } from './scope-acceptance-policy.mjs'
 export const SCOPE_IDENTITY_SQL = 'select current_database() as database, current_user as role, (select oid::text from pg_database where datname=current_database()) as oid'
 
@@ -102,8 +103,8 @@ export function scopeNativeRuntime(pg, rpc, phase, mode) {
   }
   function cancel() { stopped=true;for(const server of servers){server.closeAllConnections?.();server.close()} }
   function abort(error) { cancel();void rpc('failure', { reason: error?.message ?? 'scope subtest failed' }).catch(() => {}) }
-  function install(frozenSources = new Map()) {
-    globalThis.scopeAcceptance = { Pool, Client, abort }
+  function install(frozenSources = new Map(), resumeScope = false) {
+    globalThis.scopeAcceptance = { Pool, Client, abort, ...(resumeScope?{resumeScope:database=>rpc('resume-scope',{database})}:{}) }
     registerHooks({
       resolve(specifier, context, next) { return specifier === 'pg' ? { url: 'scope-acceptance:pg', shortCircuit: true } : next(specifier, context) },
       load(url, context, next) {
@@ -143,12 +144,10 @@ export function scopeNativeRuntime(pg, rpc, phase, mode) {
     }
     // The one frozen execFile call is migration only; the supervisor owns and
     // budgets that child directly, rather than losing it beneath the test.
-    childProcess.execFile = (executable, args, input, callback) => {
-      if (mode === 'migrate' || executable !== process.execPath || args?.length !== 1 || args[0] !== 'scripts/migrate.mjs') throw Error('scope child command denied')
-      const work = rpc('migrate', { app: input.env.MIKKA_DATABASE_URL, workspace: input.env.DATABASE_URL })
-      work.then(result => callback(null, result.stdout, result.stderr), error => callback(error))
-      return { kill() { abort(Error('migration child cancelled'));return true } }
-    }
+    childProcess.execFile = scopeExecFile((executable,args,input)=>{
+      if(mode==='migrate'||executable!==process.execPath||args?.length!==1||args[0]!=='scripts/migrate.mjs')throw Error('scope child command denied')
+      return {promise:rpc('migrate',{app:input.env.MIKKA_DATABASE_URL,workspace:input.env.DATABASE_URL}).then(scopeOutputFromWire),cancel:()=>{void rpc('migration-cancel').catch(()=>{})}}
+    })
     for(const name of ['spawn','spawnSync','fork','exec','execSync','execFileSync'])childProcess[name]=()=>{throw Error('unbudgeted scope subprocess denied')}
     const deny = () => { throw Error('scope filesystem cleanup denied') }
     for (const name of ['unlink','unlinkSync','rm','rmSync','rmdir','rmdirSync','rename','renameSync']) if (name in fs) fs[name] = deny
