@@ -526,8 +526,6 @@ importers:
 
 packages:
 
-  aws4fetch@1.0.20:
-    resolution: {integrity: sha512-/djoAN709iY65ETD6LKCtyyEI04XIBP5xVvfmNxsEP0uJB5tyaGBztSryRr4HqMStr9R06PisQE7m9zDTXKu6g==}
   2g@1.0.1:
     resolution: {integrity: sha512-+uViadKOS/wwR4pFu5g8TPn3QHpKqoX19JHCnp8k/3cLpImdcXozwvZA6Q/5PeW3AcU8neL8faaMidBcv7o8CA==}
     hasBin: true
@@ -10327,7 +10325,6 @@ packages:
 
 snapshots:
 
-  aws4fetch@1.0.20: {}
   2g@1.0.1(typescript@5.9.3):
     optionalDependencies:
       typescript: 5.9.3
