@@ -31,7 +31,7 @@ test('the sandbox capture script refuses anything but a display number, a captur
   const script = fileURLToPath(new URL('../../scripts/e2b/screen-capture.sh', import.meta.url))
   const id = '6f1d8c0e-1b2a-4c3d-8e9f-0a1b2c3d4e5f'
   for (const args of [['shot', '0', id], ['shot', ':2', id], ['shot', '2', '../../etc/passwd'], ['shot', '2', `${id};rm -rf /`], ['record', '2', id, '3600'], ['record', '2', id, '1'], ['exec', '2', id]]) {
-    await assert.rejects(run('bash', [script, ...args], { env: { PATH: process.env.PATH, MIKKA_CAPTURE_DIR: '/nonexistent/never-created' } }), (error: { code?: number }) => error.code === 2, args.join(' '))
+    await assert.rejects(run('bash', [script, ...args], { env: { ...process.env, MIKKA_CAPTURE_DIR: '/nonexistent/never-created' } }), (error: { code?: number }) => error.code === 2, args.join(' '))
   }
 })
 
