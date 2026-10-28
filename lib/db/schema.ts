@@ -615,3 +615,33 @@ export const nativeCoordinatorTools = pgTable('native_coordinator_tools', {
   status: text('status').notNull().default('pending'), output: jsonb('output'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.turnId, table.callId] })])
+
+/** One Expo push token per installed copy of the iOS app (apps/mobile); removed on sign-out. */
+export const mobilePushTokens = pgTable('mobile_push_tokens', {
+  id: uuid('id').primaryKey(),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: text('token').notNull(),
+  platform: text('platform').notNull(),
+  deviceName: text('deviceName'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('mobile_push_tokens_token_key').on(table.token), index('mobile_push_tokens_user_idx').on(table.userId)])
+
+export const PUSH_WHEN = ['always', 'away'] as const
+export type PushWhen = (typeof PUSH_WHEN)[number]
+
+/**
+ * The app's 通知 and 记忆 settings (docs/design/mobile.md). The push flags pick
+ * which of the Coordinator's own messages reach the phone; 主动消息 itself is
+ * attention_settings.enabled. No row means the defaults.
+ */
+export const userPreferences = pgTable('user_preferences', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  pushDecide: boolean('pushDecide').notNull().default(true),
+  pushReview: boolean('pushReview').notNull().default(true),
+  pushFinished: boolean('pushFinished').notNull().default(false),
+  pushBriefing: boolean('pushBriefing').notNull().default(true),
+  pushWhen: text('pushWhen').$type<PushWhen>().notNull().default('always'),
+  memoryEnabled: boolean('memoryEnabled').notNull().default(true),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})

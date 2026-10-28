@@ -26,6 +26,7 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
 import type { TelegramReplyTarget } from '@/lib/coordinator-events'
 import { postTelegramText } from '@/lib/telegram/client'
+import type { PushReason } from '@/lib/push-reasons'
 import { queueCloudRun } from '@/lib/computer/queue-run'
 import { ComputerStore } from '@/lib/computer/store'
 import { bindBotSubscription } from '@/lib/computer/bot-subscription'
@@ -116,6 +117,14 @@ export async function telegramReplyThreads(userId: string, targets: TelegramRepl
 export async function sendTelegramChunk(threadId: string, chunk: string) {
   'use step'
   await postTelegramText(threadId, chunk)
+}
+
+/** Pushes a reply the Coordinator raised on its own to the person's phones, as their 通知 settings allow (lib/mobile-push.ts). */
+export async function pushToPhones(userId: string, botId: string | null, text: string | null, reasons: PushReason[]) {
+  'use step'
+  // Loaded here, not at the top: only this step needs the push sender and its settings.
+  const { pushReply } = await import('@/lib/mobile-push')
+  await pushReply(userId, botId, text, reasons)
 }
 
 /**

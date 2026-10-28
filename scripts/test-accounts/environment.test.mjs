@@ -30,7 +30,7 @@ test('environment binds all explicit database aliases, origin, SHA and capabilit
     { BETTER_AUTH_URL: 'https://app.aspectlylabs.com' }, { E2E_BASE_URL: 'http://localhost:9999' },
     { MIKKA_TEST_DEPLOYMENT_SHA: 'b'.repeat(40) }, { RESEND_API_KEY: 'synthetic-mail-canary' }, { VERCEL_ENV: 'production' }, { VERCEL: '1' }, { MIKKA_NATIVE_COORDINATOR: '1' },
     { AI_GATEWAY_API_KEY: 'synthetic-model-canary' }, { OPENAI_API_KEY: 'synthetic-model-canary' },
-    { ANTHROPIC_API_KEY: 'synthetic-model-canary' }, { COMPOSIO_API_KEY: 'synthetic-service-canary' }, { E2B_API_KEY: 'synthetic-service-canary' },
+    { ANTHROPIC_API_KEY: 'synthetic-model-canary' }, { COMPOSIO_API_KEY: 'synthetic-service-canary' }, { E2B_API_KEY: 'synthetic-service-canary' }, { EXPO_ACCESS_TOKEN: 'synthetic-service-canary' },
   ]) assert.throws(() => validateEnvironment(descriptor, { ...env, ...change }))
 })
 

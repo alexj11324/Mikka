@@ -88,6 +88,7 @@ jobs:
       - run: pnpm test:agent-kit
       - run: pnpm test:agent-kit-compat
       - run: pnpm test:coordinator-events
+      - run: pnpm test:mobile-push
       - run: pnpm test:coordinator-native-relay
       - run: pnpm test:coordinator-native-scope
       - name: Prepare pinned hosted-runner test image
@@ -101,6 +102,7 @@ jobs:
           MIKKA_SANDBOX_ACCEPTANCE: '1'
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/protocol typecheck
+      - run: pnpm --filter @mikka/mobile typecheck
       - run: pnpm test:active-agents
         env:
           # Database regressions run against ephemeral Postgres in browser-tests below.
@@ -193,7 +195,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
-        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:

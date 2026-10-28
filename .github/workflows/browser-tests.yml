@@ -73,7 +73,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Generate ephemeral test-only auth secret
-        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
       - name: Install Chromium and official system dependencies
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium
