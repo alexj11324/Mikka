@@ -82,3 +82,15 @@ test('late guard cleanup is awaited once, including a delayed close rejection',a
  await closing.promise;await Promise.resolve();assert.equal(settled,false);assert.equal(f.releases.length,0)
  closed.reject(Error('synthetic close failed'));await assert.rejects(run);assert.equal(closes,1);assert.equal(f.releases.length,1);assert.ok(f.releases[0])
 })
+test('guarded effect runs with membership lease held through commit', async () => {
+ const order:string[]=[], f=fixture(async s=>{order.push(s);return {rows:[]}})
+ const result=await writeTransaction(f.pool,async tx=>{await tx.query('APP policy lock');return 1},{
+  guard:async()=>{order.push('WS lock');return {check:async()=>{order.push('WS check')},close:async()=>{order.push('WS close')}}},
+  guardedWork:async (_tx,value,lease)=>{assert.ok(lease);order.push('provider effect');return value+1},
+ })
+ assert.equal(result,2)
+ assert.deepEqual(order,['BEGIN','APP policy lock','WS lock','WS check','provider effect','WS check','COMMIT','WS close'])
+ const denied=fixture();let sent=false
+ await assert.rejects(writeTransaction(denied.pool,async()=>1,{guard:async()=>{throw Error('revoked')},guardedWork:async (_tx,value)=>{sent=true;return value}}),/revoked/)
+ assert.equal(sent,false);assert.ok(!denied.statements.includes('COMMIT'))
+})

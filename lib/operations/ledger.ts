@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
-import { writeTransaction, type WriteRequestContext } from './write-transaction'
+import { writeTransaction, type WriteRequestContext, type WriteTransactionOptions } from './write-transaction'
 import { OperationError } from './write-error'
 export { OperationError } from './write-error'
 
@@ -49,8 +49,8 @@ export async function lockOperation(tx: PoolClient, input: OperationIdentity) {
 }
 export function createOperationLedger(pool: Pool, authorize: OperationAuthorize, context: WriteRequestContext = {}) {
   if (typeof authorize !== 'function') throw new OperationError('operationAuthorizationRequired')
-  async function transaction<T>(input: OperationIdentity, work: (tx: PoolClient) => Promise<T>): Promise<T> {
-    return writeTransaction(pool, async tx => { await lockOperation(tx, input); return work(tx) }, { signal: context.signal })
+  async function transaction<T>(input: OperationIdentity, work: (tx: PoolClient) => Promise<T>, guardedWork?: WriteTransactionOptions<T>['guardedWork']): Promise<T> {
+    return writeTransaction(pool, async tx => { await lockOperation(tx, input); return work(tx) }, { signal: context.signal, guard: context.guard, guardedWork })
   }
 
   async function owned(tx: PoolClient, input: OperationIdentity): Promise<OperationRecord> {
@@ -89,7 +89,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
      * bounded provider call. A crash after the gate commits requires reconciliation.
      * Callers never receive an authority to invoke again after an unknown result.
      */
-    async invoke(input: OperationIdentity, attemptToken: string, execute: (record: Readonly<OperationRecord>, beforeSend: () => Promise<void>) => Promise<OperationReceipt>) {
+    async invoke(input: OperationIdentity, attemptToken: string, execute: (record: Readonly<OperationRecord>, beforeSend: () => Promise<void>, signal: AbortSignal) => Promise<OperationReceipt>) {
       z.uuid().parse(attemptToken)
       await transaction(input, async tx => {
         const row = await owned(tx, input)
@@ -104,7 +104,10 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
         if (row.attemptToken !== attemptToken || row.status !== 'executing') throw new OperationError('operationStaleAttempt')
         assertOperationRun(row.binding, row.runId)
         await authorize(tx, row.binding, row.runId, 'invoke')
-        const receipt = receiptSchema.parse(await execute(row, () => authorize(tx, row.binding, row.runId, 'invoke')))
+        return row
+      }, async (tx, row, lease, signal) => {
+        const beforeSend = async () => { await lease?.check(); await authorize(tx, row.binding, row.runId, 'invoke'); await lease?.check() }
+        const receipt = receiptSchema.parse(await execute(row, beforeSend, signal))
         const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=\'succeeded\',receipt=$2,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, receipt])
         return rows[0]
       })

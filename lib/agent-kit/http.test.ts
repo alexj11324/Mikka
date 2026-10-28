@@ -81,3 +81,20 @@ test('conflicts are distinct from infrastructure errors, and diagnostics stay pr
   assert.equal(response.status,500)
   assert.doesNotMatch(await response.text(),/secret-password|private-host/)
 })
+
+test('write policy settings use authenticated scope, gate, and strict request body', async () => {
+  const calls: unknown[] = []
+  const f = fixture()
+  const handler = createAgentDefinitionHandler({
+    enabled: () => true, authenticate: async () => 'owner-a', scope: async (ownerId, bot) => ({ ownerId, botId: bot, workspaceId: bot ? randomUUID() : null }),
+    store: {} as AgentKitStore, defaults: DEFAULT_AGENT_DEFINITION, evaluate: async () => null,
+    writePolicy: { enabled: () => true, settings: { read: async scope => { calls.push(scope); return { permissions: {}, version: '0' } }, set: async (scope, permissions, version) => { calls.push({ scope, permissions, version }); return { permissions: permissions as Record<string, 'allow' | 'ask' | 'deny'>, version: '1' } } } },
+  })
+  assert.equal((await handler(f.request({ action:'set_write_policy', permissions:{send_slack_message:'allow'}, expectedVersion:'0', ownerId:'other' }), botId)).status, 400)
+  assert.equal(calls.length, 0)
+  const result = await handler(f.request({ action:'set_write_policy', permissions:{send_slack_message:'allow'}, expectedVersion:'0' }), botId)
+  assert.equal(result.status, 200)
+  assert.equal((calls[0] as {scope:{ownerId:string}}).scope.ownerId, 'owner-a')
+  assert.equal((await handler(f.request({ action:'set_write_policy', permissions:{send_slack_message:'permit'}, expectedVersion:'0' }), botId)).status, 400)
+  assert.equal((await handler(f.request({ action:'set_write_policy', permissions:{send_slack_message:'allow'}, expectedVersion:'0' }, { origin:'https://evil.test' }), botId)).status, 403)
+})

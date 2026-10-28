@@ -184,7 +184,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         throw error
       }
       try {
-        const result = await ledger.invoke(identity(p), claimed.attemptToken!, (record, beforeSend) => bounded(signal => provider.execute({ signal, beforeSend, ownerId: p.userId, ...p.operationBinding, payload: p.input, approvalContext: p.context, idempotencyKey: record.idempotencyKey }), context.signal))
+        const result = await ledger.invoke(identity(p), claimed.attemptToken!, (record, beforeSend, leaseSignal) => bounded(signal => provider.execute({ signal: AbortSignal.any([signal, leaseSignal]), beforeSend, ownerId: p.userId, ...p.operationBinding, payload: p.input, approvalContext: p.context, idempotencyKey: record.idempotencyKey }), context.signal))
         return project(result)
       } catch {
         // The durable invoke gate survives provider/writeback failures. Never resend.
