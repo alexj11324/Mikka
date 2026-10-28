@@ -1481,7 +1481,8 @@ test(
     } finally {
       if (installedGatewayFixture) delete process.env.DECISION_GATEWAY_API_KEY;
       await pool?.end();
-      // Preserve this database until the existing disposable Actions service teardown.
+      // Retain this database. Closing clients does not delete the database.
+      // Runner/service teardown is separately blocked pending retention review.
       await admin.end();
     }
   },

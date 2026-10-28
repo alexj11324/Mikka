@@ -7,12 +7,14 @@ import { afterEach, expect, it } from "vitest"
 import { Daemon } from "../src/main"
 import { MemoryServer } from "../src/server-link"
 import { fixedCheckSnapshot } from "../src/runs/check"
-import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
+import { makeRepo, tempDir, waitFor } from "./helpers"
 
 const daemons: Daemon[] = []
-afterEach(async () => {
-  for (const d of daemons.splice(0)) await d.stop()
-  if (!process.env.FACTORY_EVIDENCE_OUT) cleanupTempDirs()
+// Retain running daemon fixtures and their directories by default. A runner
+// must preserve its process/host too; do not run under an auto-teardown job.
+// No stop/kill/rm fallback is authorized by a failed assertion or timeout.
+afterEach(() => {
+  // Keep references and all evidence; no daemon stop or directory removal.
 })
 const policy = {
   readOnly: true,
