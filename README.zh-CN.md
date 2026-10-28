@@ -60,7 +60,7 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
   <img src="docs/assets/task-flow-zh-light.svg" alt="任务在 Mikka 中的流转：请求经过分诊并派发；需求澄清路由、回答送回等待中的运行和 Factory 阶段仍待完成或验收。">
 </picture>
 
-实线表示已接入的路径；虚线包含规划中和仍待端到端验收的路径。人工回答送回等待中的运行仍待验证。Factory 虚线流程包括：独立的审查与验证（[#193](https://github.com/alexj11324/Mikka/issues/193)）、检查未通过时派发修复运行、由人工批准发布（[#194](https://github.com/alexj11324/Mikka/issues/194)），以及将故障转为 issue 的监控（[#195](https://github.com/alexj11324/Mikka/issues/195)）。按需求歧义程度进行系统分流在 [#192](https://github.com/alexj11324/Mikka/issues/192) 中跟踪。
+实线表示已接入的路径；虚线包含规划中和仍待端到端验收的路径。人工回答送回等待中的运行仍待验证。Factory 虚线流程包括：独立的审查与验证（[#193](https://github.com/alexj11324/Mikka/issues/193)）、检查未通过时派发修复运行、按适用策略决定发布（[#194](https://github.com/alexj11324/Mikka/issues/194)），以及将故障转为 issue 的监控（[#195](https://github.com/alexj11324/Mikka/issues/195)）。按需求歧义程度进行系统分流在 [#192](https://github.com/alexj11324/Mikka/issues/192) 中跟踪。
 
 ## 当前功能
 
@@ -72,12 +72,14 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 - **统一管理任务。** 任务支持看板和列表两种视图，包含关联关系、活动记录和个人任务编号，并与 Linear 双向同步。
 - **用 ⌘K 快速查找。** 可从键盘搜索 bot、对话、任务和项目。
 - **筛选重要通知。** Mikka 汇总来自 GitHub、Linear、Notion、Slack 和 Gmail 的通知，仅保留需要你关注的内容，并生成每日简报。
-- **在你批准后执行操作。** Coordinator 可以提出邮件和 Google 日历操作并等待批准。审批路径已有实现，真实外部写入仍待端到端验收。
+- **在已连接应用中操作。** Coordinator 可以提出邮件和 Google 日历操作。审批执行路径已有实现，真实外部写入和按策略 allow / ask / deny 执行仍待端到端验收。
 - **支持从其他工具调用。** 可在 Claude Code 或 Codex 中通过 [MCP server](https://aspectlylabs.com/mikka/docs/mcp) 操作 Mikka。
 - **支持团队协作。** 提供工作区、成员、邀请和团队管理，支持 Google 和 GitHub 登录。
 - **双语界面。** 应用提供英文和简体中文界面。
 
 ## 开发路线
+
+目标授权流程由具备视觉能力的模型判断业务语义与行动。已有 auto-review 或 MCP 策略为 allow 时直接执行，ask 时请求确认，deny 时停止；鉴权、凭据保护、幂等和机械检查继续生效。敏感删除、安全设置等仍遵守适用策略的确认要求。此流程仍需实现和验收。
 
 正在进行的工作在 [GitHub issues](https://github.com/alexj11324/Mikka/issues) 中跟踪，并与 Linear（`MIK-xx`）同步。
 
@@ -85,9 +87,9 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 | --- | --- | --- |
 | **iOS App** | 在 iPhone 上使用 Coordinator 对话、线程、任务和设置。App 已接入服务端，TestFlight 验收尚未完成。 | [PR #340](https://github.com/alexj11324/Mikka/pull/340) |
 | **群聊** | 支持多个 bot 与多名成员在同一对话中协作，提供轮流发言、@ 提及以及「正在工作」状态栏。 | [#105](https://github.com/alexj11324/Mikka/issues/105) |
-| **Factory** | 完整的交付流程：同一任务同一时间仅执行一次、阶段状态持久化、独立的审查与验证线程，以及基于实际证据的人工发布审批。 | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
+| **Factory** | 完整的交付流程：同一任务同一时间仅执行一次、阶段状态持久化、独立的审查与验证线程，以及基于实际证据和适用策略的发布决策。 | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
 | **定时任务** | Bot 可在指定时间或按周期执行任务，并将结果返回至对话。 | [#179](https://github.com/alexj11324/Mikka/issues/179) |
-| **Connected apps** | 文档与 Slack 操作，以及邮件和日历之外的更多工作流，同样遵循逐次审批。 | [#177](https://github.com/alexj11324/Mikka/issues/177) |
+| **Connected apps** | 文档与 Slack 操作，以及邮件和日历之外的更多工作流，按策略执行 allow / ask / deny。 | [#177](https://github.com/alexj11324/Mikka/issues/177) |
 | **安全凭据** | Agent 通过安全表单请求凭据。凭据由保管库存放，受控浏览器仅在获批操作中使用。 | [#180](https://github.com/alexj11324/Mikka/issues/180) |
 | **体验优化** | 新用户引导、跨页面与内容的全站搜索、知识库、agent 网页搜索，以及团队可见范围设置。 | [#129](https://github.com/alexj11324/Mikka/issues/129)、[#131](https://github.com/alexj11324/Mikka/issues/131)、[#134](https://github.com/alexj11324/Mikka/issues/134)、[#100](https://github.com/alexj11324/Mikka/issues/100)、[#127](https://github.com/alexj11324/Mikka/issues/127) |
 
@@ -126,7 +128,7 @@ Web 应用、Telegram、Slack 和 MCP 客户端均接入部署在 Vercel 上的�
 
 在你自己的设备上，Daemon 注册设备后通过设备 API 领取运行，并在独立的 git worktree 中启动对应的 agent CLI。Coordinator 可以唤醒 bot 的 E2B 桌面，用户可以查看、接管并交还。托管 worker 已有实现，但真实订阅支持的编码任务尚未验证。基于 checkpoint 的交接已有测试，真实双机交接仍待验证。
 
-Coordinator 可以提出邮件和日历操作并等待批准；真实外部写入仍待端到端验收。
+Coordinator 可以提出邮件和日历操作并等待批准；真实外部写入与按策略执行 allow / ask / deny 仍待端到端验收。
 
 Linear 同步运行在 Cloudflare Worker 上，通过持久化的 inbox 和 outbox 与 Postgres 交换变更。
 
@@ -138,7 +140,7 @@ Linear 同步运行在 Cloudflare Worker 上，通过持久化的 inbox 和 outb
 | --- | --- |
 | 应用 | Next.js 16、React 19、Tailwind CSS 4、shadcn/ui、ReUI |
 | Bot | Vercel AI SDK；Coordinator 是运行在 [Vercel Workflow](workflows/coordinator) 上的持久化循环 |
-| 分诊 | 优先按规则处理，必要时通过 Vercel AI Gateway 调用模型，并设置每月费用上限 |
+| 分诊 | 目标是由具备能力的模型判断业务语义，按策略执行 allow / ask / deny，并保留机械安全检查；现有规则优先路由仍待调整和验收 |
 | 数据 | Neon 托管的 Postgres，Drizzle 迁移位于 [`drizzle/`](drizzle) |
 | 认证 | Better Auth，支持 Google 和 GitHub 登录，并为 MCP 提供 OAuth 2.1 server |
 | 集成 | GitHub 与 Linear 使用 webhook；Gmail、Google 日历、Notion、Slack 通过 Composio 接入，邮件和日历审批写入仍待外部验收；Linear 同步与定时简报运行在 Cloudflare Worker 上；Telegram 与 Slack 基于 Vercel Chat SDK |

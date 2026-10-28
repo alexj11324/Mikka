@@ -84,7 +84,7 @@ review the results.
 Solid lines show connected paths; dashed lines include planned work and paths
 that still need end-to-end acceptance. Returning an answer to a waiting run
 needs verification. The dashed Factory loop includes independent review and verification
-([#193](https://github.com/alexj11324/Mikka/issues/193)), a fix run when a check fails, release approval by a person
+([#193](https://github.com/alexj11324/Mikka/issues/193)), a fix run when a check fails, release decisions under the applicable policy
 ([#194](https://github.com/alexj11324/Mikka/issues/194)), and monitoring that turns incidents into issues
 ([#195](https://github.com/alexj11324/Mikka/issues/195)). Systematic routing of ambiguous requests is tracked in
 [#192](https://github.com/alexj11324/Mikka/issues/192).
@@ -111,8 +111,9 @@ needs verification. The dashed Factory loop includes independent review and veri
 - **Filters notifications.** Mikka collects notifications from GitHub, Linear,
   Notion, Slack and Gmail, surfaces only those that need your attention, and
   writes a daily briefing.
-- **Acts in your apps, after your approval.** The Coordinator can propose email
-  and Google Calendar actions for approval. The approval path is implemented; real external writes still need end-to-end acceptance.
+- **Acts in your apps.** The Coordinator can propose email and Google Calendar
+  actions. Approval-based execution is implemented; real external writes and
+  policy-based allow / ask / deny behavior still need end-to-end acceptance.
 - **Works from other tools.** Operate Mikka from Claude Code or Codex through its
   [MCP server](https://aspectlylabs.com/mikka/docs/mcp).
 - **Supports teams.** Workspaces, members, invitations and teams, with Google
@@ -120,6 +121,13 @@ needs verification. The dashed Factory loop includes independent review and veri
 - **Bilingual interface.** The app is available in English and Simplified Chinese.
 
 ## What we're building
+
+The intended authorization flow uses a vision-capable model to judge business
+meaning and actions. An existing auto-review or MCP policy of allow permits
+execution; ask requests confirmation, and deny stops. Authentication,
+credential protection, idempotency and mechanical checks remain in force.
+Sensitive deletion and security settings still require confirmation when policy
+requires it. This flow remains subject to implementation and acceptance.
 
 Work in progress is tracked in
 [GitHub issues](https://github.com/alexj11324/Mikka/issues), mirrored from
@@ -129,9 +137,9 @@ Linear (`MIK-xx`).
 | --- | --- | --- |
 | **iOS app** | The Coordinator chat, threads, tasks and settings on iPhone. The app is wired to the server; TestFlight acceptance is pending. | [PR #340](https://github.com/alexj11324/Mikka/pull/340) |
 | **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
-| **Factory** | An end-to-end delivery process: one run per task at a time, durable stage state, independent review and verification threads, and human release approval based on recorded evidence. | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
+| **Factory** | An end-to-end delivery process: one run per task at a time, durable stage state, independent review and verification threads, and policy-based release decisions based on recorded evidence. | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
 | **Scheduled tasks** | Bots run tasks at a set time or on a recurring schedule and report the results in chat. | [#179](https://github.com/alexj11324/Mikka/issues/179) |
-| **Connected apps** | Documents and Slack actions, and workflows beyond mail and calendar, subject to the same per-action approval. | [#177](https://github.com/alexj11324/Mikka/issues/177) |
+| **Connected apps** | Documents and Slack actions, and workflows beyond mail and calendar, using policy-based allow / ask / deny decisions. | [#177](https://github.com/alexj11324/Mikka/issues/177) |
 | **Secure credentials** | Agents request credentials through a secure form. A vault holds them, and a controlled browser uses them only for approved actions. | [#180](https://github.com/alexj11324/Mikka/issues/180) |
 | **Usability** | Onboarding, site-wide search across pages and content, a knowledge base, web search for agents, and team visibility settings. | [#129](https://github.com/alexj11324/Mikka/issues/129), [#131](https://github.com/alexj11324/Mikka/issues/131), [#134](https://github.com/alexj11324/Mikka/issues/134), [#100](https://github.com/alexj11324/Mikka/issues/100), [#127](https://github.com/alexj11324/Mikka/issues/127) |
 
@@ -182,7 +190,8 @@ not yet been verified. Checkpoint-based handover has tests; a real two-machine
 handover remains to be verified.
 
 The Coordinator can propose mail and calendar actions for approval. Actual
-external writes still need end-to-end acceptance.
+external writes and policy-based allow / ask / deny behavior still need
+end-to-end acceptance.
 
 Linear sync runs in a Cloudflare Worker that exchanges changes with Postgres
 through a durable inbox and outbox.
@@ -201,7 +210,7 @@ items include the Scheduler
 | --- | --- |
 | App | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, ReUI |
 | Bots | Vercel AI SDK; the Coordinator is a durable loop on [Vercel Workflow](workflows/coordinator) |
-| Triage | Rules first, then a model call through Vercel AI Gateway with a monthly cost cap |
+| Triage | The intended flow uses a capable model for semantic judgment, with policy-based allow / ask / deny and mechanical safety checks; current rules-first routing remains to be updated and accepted |
 | Data | Postgres on Neon, Drizzle migrations in [`drizzle/`](drizzle) |
 | Auth | Better Auth, with Google and GitHub sign-in and an OAuth 2.1 server for MCP |
 | Integrations | GitHub and Linear webhooks; Composio for Gmail, Google Calendar, Notion and Slack, with approval-based mail and calendar writes awaiting external acceptance; Cloudflare Workers for Linear sync and scheduled briefings; Vercel Chat SDK for Telegram and Slack |
