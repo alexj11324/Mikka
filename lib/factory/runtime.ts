@@ -6,6 +6,8 @@ import { queueRun } from '@/lib/agent-runs';
 import { freezeWorkerDefinition, retryWorkerDefinition } from '@/lib/agent-kit/worker';
 import { factoryCheckIndependent } from './check-independence';
 import { createFactoryReconciler } from './reconcile';
+import { configureFactoryCheck, factoryCheckAssignment, factoryCheckGates, factoryRepairBrief } from './checks';
+import { reconcileFactoryCheck } from './reconcile-check';
 import { createFactoryClaim, factoryClaimTask } from './claim';
 import { FactoryError } from './contract';
 import { createFactoryStore, type FactoryLifecycle } from './store';
@@ -20,11 +22,14 @@ export const factoryAuthorize = (userId: string, issueId: string, tx: PoolClient
 /** Consumer owners supply their own actual validators/configurators; absent means denied. */
 export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLifecycle = {}, configure: FactoryDispatchAdapters['configure'] = {}, validateCheck?: Parameters<typeof createFactoryClaim>[2], consumers: Parameters<typeof createFactoryReconciler>[3] = {}) {
   if (!factoryLifecycleEnabled()) throw new FactoryError('factoryLifecycleUnavailable');
-  const store = createFactoryStore(pool,factoryAuthorize,botId,{independent:factoryCheckIndependent,...lifecycle});
+  const store = createFactoryStore(pool,factoryAuthorize,botId,{...lifecycle,independent:factoryCheckIndependent,gates:{...factoryCheckGates,...lifecycle.gates}});
+  const validate = validateCheck ?? ((tx:PoolClient,task:import('./store').FactoryTask,id:string) => factoryCheckAssignment(tx,task.userId,id));
   const dispatch = createFactoryDispatch(pool,store,
     (tx,userId,input,scopeBot) => withDatabaseClient(tx,()=>queueRun(userId,input,scopeBot)), {
       configure: {
-        execute: async () => {},
+        execute: factoryRepairBrief,
+        review: configureFactoryCheck,
+        verify: configureFactoryCheck,
         spec: async (tx,_task,id) => { await tx.query("UPDATE agent_runs SET kind='plan' WHERE id=$1",[id]); },
         ...configure,
       },
@@ -37,8 +42,8 @@ export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLif
         await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1',[id,JSON.stringify(snapshot)]);
       },
     });
-  const questions = createFactoryQuestions(pool,factoryAuthorize,store,dispatch,validateCheck);
-  return {store,dispatch,questions,reconcile:createFactoryReconciler(pool,store,questions,consumers,botId),claim:createFactoryClaim(store,questions,validateCheck)};
+  const questions = createFactoryQuestions(pool,factoryAuthorize,store,dispatch,validate);
+  return {store,dispatch,questions,reconcile:createFactoryReconciler(pool,store,questions,{review:reconcileFactoryCheck,verify:reconcileFactoryCheck,...consumers},botId),claim:createFactoryClaim(store,questions,validate)};
 }
 
 /** Returns before any Factory SQL when default-off; ordinary claims retain their path. */
