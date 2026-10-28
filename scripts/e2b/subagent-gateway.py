@@ -419,9 +419,22 @@ async def action(request):
             if u.scheme not in ('https','http') or not u.hostname or u.username or u.password:raise web.HTTPBadRequest()
             await b.rpc('Page.navigate',{'url':data['url']},b.session)
         elif name=='observe':
+            # Capture only while page scripts are frozen and all inspectable
+            # text fields are empty. Never forward credential-bearing frames
+            # or a page whose nested contexts cannot be inspected.
+            await b.rpc('Emulation.setScriptExecutionDisabled',{'value':True},b.session)
+            try:
+                tree=await b.rpc('Page.getFrameTree',session=b.session)
+                document=await b.rpc('DOM.getDocument',{'depth':-1,'pierce':True},b.session)
+                check=await b.rpc('Runtime.evaluate',{'expression':SAFE_TO_RESUME,'returnByValue':True},b.session)
+                if not safe_resume_snapshot(tree,document,check):raise web.HTTPConflict()
+                screenshot=await b.rpc('Page.captureScreenshot',{'format':'jpeg','quality':60},b.session)
+                if not isinstance(screenshot.get('data'),str) or not screenshot['data']:raise web.HTTPServiceUnavailable()
+            finally:
+                await b.rpc('Emulation.setScriptExecutionDisabled',{'value':False},b.session)
             # Exclude all form values, cookies, storage and raw HTML.
             text=await b.rpc('Runtime.evaluate',{'expression':'(() => { const copy=document.body.cloneNode(true); copy.querySelectorAll(\'input,textarea,select,script,style,noscript\').forEach(e=>e.remove()); const elements=Array.from(document.querySelectorAll(\'a,button,input,textarea,select\')).slice(0,150).map((e,i)=>{e.setAttribute(\'data-mikka-ref\',String(i));return {selector:\'[data-mikka-ref=\\"\'+i+\'\\"]\',tag:e.tagName,type:e.type||null,text:[\'INPUT\',\'TEXTAREA\',\'SELECT\'].includes(e.tagName)?null:e.innerText.slice(0,200),label:e.getAttribute(\'aria-label\')||e.getAttribute(\'placeholder\'),href:e.tagName===\'A\'?e.href:null}});return JSON.stringify({url:location.origin+location.pathname,title:document.title,text:(copy.innerText||copy.textContent||\'\').slice(0,16000),elements,needsLogin:Array.from(document.querySelectorAll(\'input[type=password]\')).some(e=>e.getClientRects().length>0)})})()','returnByValue':True},b.session)
-            return web.json_response({'observation':json.loads(text['result']['value'])})
+            return web.json_response({'observation':json.loads(text['result']['value']),'screenshot':screenshot['data']})
         elif name=='type':
             selector=json.dumps(str(data.get('selector',''))[:500])
             expression=f"(() => {{ const e=document.querySelector({selector}); if (!e || {SENSITIVE_FIELD} || !['INPUT','TEXTAREA'].includes(e.tagName)) return false; e.focus(); return true; }})()"
@@ -434,7 +447,7 @@ async def action(request):
             await b.rpc('Input.dispatchKeyEvent',{'type':'keyDown','key':key},b.session)
             await b.rpc('Input.dispatchKeyEvent',{'type':'keyUp','key':key},b.session)
         elif name=='click':
-            # The calling harness applies model and metadata-based approval checks.
+            # The calling harness applies the configured permission policy.
             selector=json.dumps(str(data.get('selector',''))[:500])
             await b.rpc('Runtime.evaluate',{'expression':f'document.querySelector({selector})?.click()'},b.session)
         else:raise web.HTTPBadRequest()

@@ -84,9 +84,24 @@ async def main():
                 else:raise AssertionError('synthetic HTTPS fixture did not finish loading')
                 gateway.authorize=lambda request,role:('synthetic',grant)
                 gateway.token=lambda raw,role:grant
-                app=web.Application();app.router.add_get('/agents/{id}/credentials/cdp',gateway.cdp);app.router.add_post('/agents/{id}/credentials/begin',gateway.begin);app.router.add_post('/agents/{id}/credentials/end',gateway.end)
+                app=web.Application();app.router.add_get('/agents/{id}/credentials/cdp',gateway.cdp);app.router.add_post('/agents/{id}/credentials/begin',gateway.begin);app.router.add_post('/agents/{id}/credentials/end',gateway.end);app.router.add_post('/agents/{id}/action',gateway.action)
                 async with TestClient(TestServer(app)) as client:
+                    async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as observed:
+                        assert observed.status==200
+                        observation=await observed.json()
+                        assert observation['screenshot'].startswith('/9j/'), 'real JPEG must accompany the observation'
+                        assert observation['observation']['url']==origin+'/login'
+                    await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[type=password]").value="synthetic-secret"','returnByValue':True})
+                    async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as secret:
+                        assert secret.status==409, 'never capture a populated sensitive field'
+                    await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[type=password]").value=""','returnByValue':True})
+                    await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value="ordinary-text"','returnByValue':True})
+                    async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as populated:
+                        assert populated.status==409, 'unknown text fields remain confidential until a safe masking strategy exists'
+                    await browser.rpc('Runtime.evaluate',{'expression':'document.querySelector("input[name=username]").value=""','returnByValue':True})
                     await browser.rpc('Runtime.evaluate',{'expression':"(()=>{const e=document.createElement('iframe');e.id='unsafe-test';document.body.append(e)})()",'returnByValue':True})
+                    async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as nested:
+                        assert nested.status==409, 'nested documents cannot be captured without inspection'
                     async with client.post('/agents/case/credentials/begin?token=synthetic') as denied_begin:assert denied_begin.status==409
                     assert browser.guard and browser.guard_file.exists(), 'failed begin must stay guarded'
                     await browser.rpc('Runtime.evaluate',{'expression':"document.querySelector('#unsafe-test').remove()",'returnByValue':True})

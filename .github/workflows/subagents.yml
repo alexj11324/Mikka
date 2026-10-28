@@ -39,6 +39,7 @@ jobs:
       - run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/integration.test.ts
       - run: node --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/runtime.test.ts
       - run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/action-reviews.test.ts
+      - run: node --import tsx --test lib/cloud-computer/visual-observation.test.ts
       - run: node scripts/check-migrations.mjs
       - run: node --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/backend.db.test.ts
         env:
