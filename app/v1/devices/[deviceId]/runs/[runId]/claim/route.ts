@@ -13,6 +13,7 @@ import { retryNote } from '@/lib/run-retry'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
+import { localComputerAuthority } from '@/lib/computer/local-authority'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +58,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let computer: Awaited<ReturnType<typeof claimCloudRun>> = null
+  let localComputer: Awaited<ReturnType<typeof localComputerAuthority>> = null
   if (device.kind === 'cloud') {
     if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id)
@@ -64,6 +66,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   } else {
     const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id)
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
+    if (device.computerUse?.installed) {
+      const current = await localComputerAuthority(pool, caller.userId, deviceId, runId)
+      if (current && (!caller.scopeWorkspaceId || caller.scopeWorkspaceId === current.workspaceId)) localComputer = current
+    }
   }
   // The worker tools of the MCP server for the agent in this run. A failure
   // here should not keep the run from starting.
@@ -97,6 +103,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion },
       policy: { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: computer.permission } } } : {}),
+    ...(localComputer ? { localComputer,
+      policy: { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: localComputer.permission } } } : {}),
     ...retry,
   })
 }

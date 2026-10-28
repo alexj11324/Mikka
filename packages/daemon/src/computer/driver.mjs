@@ -124,7 +124,7 @@ export function driverArguments(input, platform = process.platform) {
 }
 // Owned by the daemon, never by a harness. No shell, auto-update, host
 // credentials, arbitrary tool names, output paths or browser attachment tools.
-export async function executeDriver(driver, input, display, leaseGuard, assertLive = () => {}) {
+export async function executeDriver(driver, input, display, leaseGuard, assertLive = () => {}, beforeAction) {
   // Set the display per child, never process.env: concurrent bots must not race.
   if (display !== undefined && !/^:[1-9][0-9]{0,3}$/.test(display))
     throw new Error("Invalid desktop display");
@@ -223,6 +223,7 @@ export async function executeDriver(driver, input, display, leaseGuard, assertLi
       JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) +
         "\n",
     );
+    if (beforeAction) await beforeAction();
     assertLive();
     return await request("tools/call", { name: call.name, arguments: args });
   } finally {

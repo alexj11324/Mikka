@@ -6,9 +6,6 @@ import { decideLocalComputerReview, pendingLocalComputerReviews } from '@/lib/co
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
 async function owner(request: Request) {
-  // This route remains disabled until local runs have a verified workspace
-  // binding and revocation fencing; a partial integration must fail closed.
-  if (process.env.MIKKA_LOCAL_COMPUTER_REVIEWS !== '1') return null
   if (request.headers.get('sec-fetch-site') === 'cross-site') return null
   if (request.method !== 'GET' && request.headers.get('origin') !== new URL(request.url).origin) return null
   return (await auth.api.getSession({ headers: request.headers }))?.user.id ?? null

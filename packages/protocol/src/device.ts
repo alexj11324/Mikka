@@ -264,6 +264,12 @@ export const runAssignmentSchema = z.object({
     bindingId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
     consumerId: z.uuid(), route: z.enum(['codex_cli', 'claude_code_cli']),
   }).strict().optional(),
+  /** Local host authority comes only from the server's owner-bound Bot run. */
+  localComputer: z.object({
+    botId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
+    policyVersion: z.number().int().nonnegative().max(2147483647),
+    permission: z.enum(['allow', 'ask']),
+  }).strict().optional(),
   /** Trusted server assignment; the model cannot choose a Bot or display. */
   computer: z.object({
     botId: z.uuid(), ownerId: z.string().min(1).max(128),

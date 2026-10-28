@@ -85,6 +85,7 @@ export interface ServerLink {
   pendingRuns(deviceId: string): Promise<string[]>
   /** Fails with `RunNotPinnedHereError` for runs pinned elsewhere. */
   claimRun(deviceId: string, runId: string): Promise<RunAssignment>
+  localComputerAuthority?(deviceId: string, runId: string): Promise<NonNullable<RunAssignment['localComputer']>>
   /** Owner-reviewed computer requests; responses carry decisions only. */
   syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]>
   /** Private hosted-run channel; these methods never return provider tokens. */

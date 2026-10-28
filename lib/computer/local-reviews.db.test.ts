@@ -18,11 +18,15 @@ test('local decisions bind owner, device, live run and exact digest, and cannot 
   const digest = createHash('sha256').update('fixture').digest('hex')
   try {
     await pool.query(`CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text NOT NULL,name text NOT NULL,kind text NOT NULL,enabled boolean NOT NULL);
-      CREATE TABLE agent_runs (id uuid PRIMARY KEY,"deviceId" uuid,"userId" text,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz);
+      CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
+      CREATE TABLE workspace_computer_policies ("workspaceId" uuid PRIMARY KEY,permission text,version int);
+      CREATE TABLE agent_runs (id uuid PRIMARY KEY,"deviceId" uuid,"userId" text,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz,"botId" uuid);
       CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY);
       CREATE TABLE local_computer_reviews (id uuid PRIMARY KEY,"deviceId" uuid,"runId" uuid,"userId" text,target text,display text,call jsonb,digest text,"expiresAt" timestamptz,"seenAt" timestamptz,decision boolean)`)
     await pool.query("INSERT INTO devices VALUES ($1,'owner','fixture','local',true)", [device])
-    await pool.query("INSERT INTO agent_runs VALUES ($1,$2,'owner','running',NULL,now()+interval '1 minute')", [run, device])
+    const botId = randomUUID(), workspaceId = randomUUID()
+    await pool.query("INSERT INTO bots VALUES ($1,'owner',$2)", [botId, workspaceId])
+    await pool.query("INSERT INTO agent_runs VALUES ($1,$2,'owner','running',NULL,now()+interval '1 minute',$3)", [run, device, botId])
     await pool.query(`INSERT INTO local_computer_reviews VALUES ($1,$2,$3,'owner','target',NULL,'{"name":"click"}',$4,now()+interval '1 minute',now(),NULL)`, [id, device, run, digest])
     assert.equal((await pendingLocalComputerReviews(pool, 'other')).length, 0)
     assert.equal((await pendingLocalComputerReviews(pool, 'owner')).length, 1)
@@ -37,15 +41,18 @@ test('local decisions bind owner, device, live run and exact digest, and cannot 
       'UPDATE local_computer_reviews SET "seenAt"=now()-interval \'11 seconds\'',
       'UPDATE local_computer_reviews SET "expiresAt"=now()-interval \'1 second\'',
       'UPDATE devices SET kind=\'cloud\'',
-      `INSERT INTO computer_run_bindings VALUES ('${run}')`,
     ]) {
       await pool.query(update)
       assert.equal(await decideLocalComputerReview(pool, 'owner', id, digest, true), false)
-      await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=NULL,"leaseExpiresAt"=now()+interval '1 minute',"userId"='owner',"deviceId"='${device}'; UPDATE devices SET enabled=true,kind='local'; UPDATE local_computer_reviews SET "seenAt"=now(),"expiresAt"=now()+interval '1 minute'; DELETE FROM computer_run_bindings`)
+      await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=NULL,"leaseExpiresAt"=now()+interval '1 minute',"userId"='owner',"deviceId"='${device}'; UPDATE devices SET enabled=true,kind='local'; UPDATE local_computer_reviews SET "seenAt"=now(),"expiresAt"=now()+interval '1 minute'`)
     }
     const results = await Promise.all([decideLocalComputerReview(pool, 'owner', id, digest, true), decideLocalComputerReview(pool, 'owner', id, digest, true)])
     assert.equal(results.filter(Boolean).length, 1)
     assert.equal(await decideLocalComputerReview(pool, 'owner', id, digest, true), false)
+    const otherReview = randomUUID()
+    await pool.query(`INSERT INTO local_computer_reviews VALUES ($1,$2,$3,'owner','target',NULL,'{"name":"click"}',$4,now()+interval '1 minute',now(),NULL)`, [otherReview, device, run, digest])
+    await pool.query('INSERT INTO computer_run_bindings VALUES ($1)', [run])
+    assert.equal(await decideLocalComputerReview(pool, 'owner', otherReview, digest, true), false)
   } finally {
     await pool.end()
     console.log(`Retained local review test schema: ${schema}`)

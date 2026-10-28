@@ -267,15 +267,32 @@ export class Daemon {
     this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
     if (this.stopped) throw new Error("daemon stopped during startup")
     if (!this.options.hostedSubscriptions && this.sandbox) this.localComputerDriver = await detectComputerDriver()
-    if (this.localComputerDriver && this.options.link.syncComputerReviews) {
+    if (this.localComputerDriver && this.options.link.syncComputerReviews && this.options.link.localComputerAuthority) {
       this.localComputerBroker = new ComputerBroker({
         driver: this.localComputerDriver,
         socketPath: join(paths.dataDir, 'local-computer.sock'),
         permitted: runId => {
           const assignment = this.journal.get(runId)?.assignment
-          return Boolean(!this.stopped && this.registered && assignment && !assignment.computer &&
+          return Boolean(!this.stopped && this.registered && assignment?.localComputer && !assignment.computer &&
             assignment.deviceId === this.device.deviceId && assignment.policy?.permissions.computer_use &&
             decide('computer_use', { policy: assignment.policy }) !== 'deny' && this.supervisor?.computerRunAllowed(runId))
+        },
+        execute: async (driver, call, display, runId, context) => {
+          const initial = this.journal.get(runId)?.assignment.localComputer
+          if (!initial || display !== undefined) throw new Error('Local computer unavailable')
+          const recheck = async () => {
+            const current = await this.options.link.localComputerAuthority!(this.device.deviceId!, runId)
+            context.assertLive()
+            if (current.botId !== initial.botId || current.ownerId !== initial.ownerId || current.workspaceId !== initial.workspaceId || current.policyVersion !== initial.policyVersion || current.permission !== initial.permission)
+              throw new Error('Local computer authority changed')
+          }
+          try {
+            await recheck()
+            return await executeDriver(driver, call, undefined, undefined, context.assertLive, recheck)
+          } catch (error) {
+            this.localComputerBroker?.spec(runId, 'deny')
+            throw error
+          }
         },
       })
       await this.localComputerBroker.listen()
@@ -697,7 +714,7 @@ export class Daemon {
     const bin = this.options.harnessBinaries ?? {}
     const computerProvider = (runId: string) => {
       const assignment = this.journal.get(runId)?.assignment
-      if (!assignment || assignment.computer || !assignment.policy?.permissions.computer_use) return undefined
+      if (!assignment?.localComputer || assignment.computer || !assignment.policy?.permissions.computer_use) return undefined
       return localComputerMcp({ broker: this.localComputerBroker, runId,
         permission: decide('computer_use', { policy: assignment.policy }), readOnly: assignment.policy.readOnly,
         proxyPath: fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url)), nodeBinary: process.execPath })

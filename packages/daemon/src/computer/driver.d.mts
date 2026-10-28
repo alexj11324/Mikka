@@ -18,4 +18,5 @@ export function executeDriver(
   display?: string,
   leaseGuard?: { botId: string; ownerId: string; policyVersion: number },
   assertLive?: () => void,
+  beforeAction?: () => Promise<void>,
 ): Promise<unknown>;
