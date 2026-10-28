@@ -16,6 +16,7 @@ import type {
 
 import type { RunChunk } from "../chunks"
 import type { Logger } from "../log"
+import type { RunMailbox } from '../run-mailbox'
 
 /**
  * Terminal event of a session; the daemon turns it into the run's end state.
@@ -54,6 +55,8 @@ export interface AgentCapabilities {
 }
 
 export interface SessionOptions {
+  /** Host-created run-bound control callbacks; no serialized token/URL/model input. */
+  mailbox?: RunMailbox
   runId: string
   /**
    * What the orchestrator dispatched this run for (ADR 0023). A `plan` run
