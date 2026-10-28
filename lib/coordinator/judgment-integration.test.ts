@@ -47,18 +47,24 @@ test('actual pixels reach input_image; a visual request without pixels remains p
  await wake.wakeCoordinator('synthetic');assert.equal(requests.length,0);assert.equal(events[0].tier,null);assert.equal(starts,0)
  assert.throws(()=>decisionRequestInput({text:'visual',images:[{dataUrl:'https://private.example/secret'}]}),/decisionImageInvalid/)
 })
+const withoutExecution=(route: import('./route-group').GroupDecisionRoute)=>{
+ if(route.by==='mention')return route
+ const {execution,...choice}=route
+ assert.equal(execution.modelId,DECISION_MODEL);assert.equal(execution.providerGenerationId,'synthetic-generation')
+ return choice
+}
 test('a single member is still judged; low confidence alone never creates clarification',async()=>{
  response={answers:[{type:'choice',name:'responder',choice:'one',confidence:0.1},{type:'choice',name:'audience',choice:'selected'}]}
- assert.deepEqual(await group.routeGroupMessage({text:'task',mentions:[]},[{id:'one',name:'One',description:'role'}],'one'),{by:'model',responders:['one'],confidence:0.1});assert.equal(requests.length,1)
+ assert.deepEqual(withoutExecution(await group.routeGroupMessage({text:'task',mentions:[]},[{id:'one',name:'One',description:'role'}],'one')),{by:'model',responders:['one'],confidence:0.1});assert.equal(requests.length,1)
  response={answers:[{type:'choice',name:'responder',choice:'one'},{type:'choice',name:'audience',choice:'selected'}]}
- assert.deepEqual(await group.routeGroupMessage({text:'task',mentions:[]},[{id:'one',name:'One',description:''}],'one'),{by:'model',responders:['one']})
+ assert.deepEqual(withoutExecution(await group.routeGroupMessage({text:'task',mentions:[]},[{id:'one',name:'One',description:''}],'one')),{by:'model',responders:['one']})
  delete process.env.DECISION_GATEWAY_API_KEY
  await assert.rejects(group.routeGroupMessage({text:'task',mentions:[]},[{id:'one',name:'One',description:''}],'one'),group.GroupDecisionPendingError)
 })
 test('group clarification is model-selected; member identity guards remain enforced',async()=>{
  response={answers:[{type:'choice',name:'responder',choice:'one'},{type:'choice',name:'audience',choice:'clarify'}]}
  const members=[{id:'one',name:'same',description:''},{id:'lead',name:'same',description:''}]
- assert.deepEqual(await group.routeGroupMessage({text:'which?',mentions:[]},members,'lead'),{by:'lead',responders:['lead'],ask:'one'})
+ assert.deepEqual(withoutExecution(await group.routeGroupMessage({text:'which?',mentions:[]},members,'lead')),{by:'lead',responders:['lead'],ask:'one'})
  response={answers:[{type:'choice',name:'responder',choice:'foreign'},{type:'choice',name:'audience',choice:'selected'}]}
  await assert.rejects(group.routeGroupMessage({text:'x',mentions:[]},members,'lead'),group.GroupDecisionPendingError)
  requests.length=0;assert.deepEqual(await group.routeGroupMessage({text:'@one',mentions:['one']},members,'lead'),{by:'mention',responders:['one']});assert.equal(requests.length,0)

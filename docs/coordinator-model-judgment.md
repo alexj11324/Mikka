@@ -7,7 +7,7 @@ turn on a feature, run live evaluations, or permit a merge/deployment.
 | Responsibility | Consumer and behavior |
 | --- | --- |
 | Business judgment | `triage.ts` asks for an explicit model choice for runtime events; `wake.ts` retains an unavailable judgment as a nullable, undelivered tier. No failed/blocked status automatically means a person is needed. |
-| Group selection | `route-group.ts` calls the model even with one member. The model chooses selected/everyone/clarify. Missing answers stay pending. Confidence is optional metadata, never a confirmation threshold. Exact authorized mentions remain direct delivery. |
+| Group selection | `route-group.ts` calls the model even with one member. The model chooses selected/everyone/clarify. Missing answers stay pending. Confidence is optional metadata, never a confirmation threshold. Model-selected routes carry the host invocation receipt; mentions do not invent one. Exact authorized mentions remain direct delivery. |
 | Existing execution policy | `judgment-policy.ts`, `instructions.ts`, and `execution-instructions.ts` refer to authoritative allow/ask/deny. They add no universal manual confirmation. Historical snapshot bytes/digests remain intact under an explicit current host-policy overlay. |
 | Visual input | `decision.ts` sends real inline `input_image` parts through the existing Decisions route. Required pixels cannot be replaced by a text assertion, OCR summary, external URL or model-authored approval claim. |
 | Mechanical protection | Event ownership, delivery/tier compare-and-set, group membership, cancellation, request/image limits, execution scope, authorization and idempotency remain program checks. Pending runtime backlogs cannot take priority over new direct user input. |
@@ -44,7 +44,7 @@ Triage attempts an event at most twice per invocation within one ten-second inbo
 budget. No result leaves it untriaged/undelivered for a later wake. Direct user
 input remains direct delivery. The inbox excludes unclassified runtime events;
 `issue_done` is no longer silently consumed as background without judgment.
-Existing lease, scope and delivery guards remain in effect.
+Existing lease, scope and delivery guards remain in effect. Successful model observations log only event IDs and host invocation metadata, not report text, credentials or pixels; this does not claim that a concurrent tier compare-and-set succeeded.
 
 Live evaluation runner v4 does not use fixture prose regex. Missing judge,
 refusal, timeout, missing required pixels, mismatched receipt or old v3 reports
@@ -79,3 +79,11 @@ scope, admission, Factory/monitor and publication owners retain their files.
 do not establish deployed group behavior. The Factory monitor source supplied by
 its owner still needs replay-before-inference and transaction-duration review;
 this change does not edit or claim acceptance of those files.
+
+The current default generative Coordinator model in `lib/coordinator/model.ts`
+is still `nvidia/nemotron-3.5-lightning-free`. Public Gateway metadata declares
+text-only input. The shared decision-model correction does not establish that
+the entire generative/tool-planning path is vision-capable. No new paid default,
+provider or credential is selected by this patch. An authorized compatible model
+configuration and real acceptance remain required before treating that whole path
+as compliant. Frozen historical selections are not silently upgraded.

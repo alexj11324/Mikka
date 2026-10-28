@@ -2,7 +2,7 @@ import 'server-only'
 import { start } from 'workflow/api'
 import { releaseAttention } from '@/lib/attention/store'
 import { hasWakingEvents, setEventTier, untriagedEvents, wakingChats } from '@/lib/coordinator/store'
-import { decide } from '@/lib/coordinator/decide'
+import { invokeDecision } from '@/lib/coordinator/decide'
 import { ruleTier, tierFromDecision, triageQuestions, triageInput } from '@/lib/coordinator/triage'
 import { coordinatorTurn } from '@/workflows/coordinator/workflow'
 
@@ -24,8 +24,9 @@ export async function triageInbox(userId: string, botId: string | null = null): 
   for (const event of await untriagedEvents(userId, botId)) {
     let tier = ruleTier(event)
     for (let attempt = 0; tier === null && attempt < 2 && !budget.aborted; attempt++) {
-      const answers = await decide('triage', triageInput(event), triageQuestions(event), budget)
-      tier = tierFromDecision(answers?.get('tier'))
+      const result = await invokeDecision('triage', triageInput(event), triageQuestions(event), budget)
+      tier = tierFromDecision(result?.answers.get('tier'))
+      if (result && tier !== null) console.info('Coordinator model judgment observed', { eventId: event.id, ...result.execution })
     }
     if (tier === null) {
       console.error('Coordinator event judgment pending', { eventId: event.id })
