@@ -9,6 +9,7 @@ import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { claimCloudRun } from '@/lib/computer/claim'
 import { recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
 import { withWorkspaceComputerPermission } from './workspace-policy'
+import { bindSubagentRun } from './subagent-run-binding'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
 test('real DB: additive migration, subagent owner isolation and separate thread claims', { skip: !databaseURL }, async () => {
@@ -38,6 +39,8 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     await pool.query('ALTER TABLE cloud_machines ADD COLUMN "deviceId" uuid')
     const migration = await readFile(new URL('../../drizzle/20261028183208_subagents_thread_machines.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
+    const bindingMigration = await readFile(new URL('../../drizzle/20261028204000_subagent_run_bindings.sql', import.meta.url), 'utf8')
+    await pool.query(bindingMigration); await pool.query(bindingMigration)
     await pool.query(`ALTER TABLE suggestions ADD COLUMN "userId" text, ADD COLUMN shown boolean DEFAULT true, ADD COLUMN "dismissedAt" timestamptz, ADD COLUMN source text, ADD COLUMN actor text, ADD COLUMN url text, ADD COLUMN title text, ADD COLUMN action text, ADD COLUMN "actionTitle" text;
       CREATE TABLE coordinator_messages(id uuid PRIMARY KEY,"userId" text,"botId" uuid,position integer,message jsonb,UNIQUE NULLS NOT DISTINCT("userId","botId",position));
       CREATE TABLE coordinator_events(id uuid PRIMARY KEY,"userId" text,"botId" uuid,kind text,"dedupeKey" text UNIQUE,payload jsonb);
@@ -123,6 +126,39 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     const connectionId = randomUUID()
     await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch) VALUES ($1,'alice',$2,'codex','connected',1)`, [connectionId, alice.workspaceId])
     await pool.query(`UPDATE byos_bindings SET "connectionId"=$2,"connectionRevision"=1,route='codex_cli',"modelId"='fixture-model' WHERE id=$1`, [bindingId, connectionId])
+    const browser = await store.create(alice, botA, 'Synthetic browser task')
+    const browserRun = randomUUID()
+    await pool.query(`UPDATE bot_subagents SET status='running' WHERE id=$1`, [browser.id])
+    await pool.query(`UPDATE cloud_machines SET state='running' WHERE "workspaceId"=$1`, [alice.workspaceId])
+    await pool.query('INSERT INTO bot_desktops("botId","workspaceId","ownerId",display) VALUES ($1,$2,\'alice\',1)', [botA, alice.workspaceId])
+    await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,"leaseExpiresAt") VALUES ($1,'alice',$2,$3,'running',now()+interval '5 minutes')`, [browserRun, agentId, botDevice])
+    await pool.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,\'alice\')', [browserRun, botA, alice.workspaceId])
+    const claimed = { runId: browserRun, deviceId: botDevice, botId: botA, ownerId: 'alice', display: ':1', policyVersion: 0 }
+    await assert.rejects(bindSubagentRun(pool, alice, browser.id, claimed), { status: 403 }, 'unclaimed run cannot become authority')
+    await pool.query('INSERT INTO byos_native_runs("runId","bindingId") VALUES ($1,$2)', [browserRun, bindingId])
+    await assert.rejects(bindSubagentRun(pool, bob, browser.id, claimed), { status: 403 })
+    await assert.rejects(bindSubagentRun(pool, stranger, browser.id, claimed), { status: 403 })
+    await assert.rejects(bindSubagentRun(pool, alice, browser.id, { ...claimed, display: ':2' }), { status: 403 })
+    assert.deepEqual(await bindSubagentRun(pool, alice, browser.id, claimed), { runId: browserRun, deviceId: botDevice, display: ':1', policyVersion: 0, permission: 'ask' })
+    const otherBrowser = await store.create(alice, botA, 'Other synthetic browser task')
+    await pool.query(`UPDATE bot_subagents SET status='running' WHERE id=$1`, [otherBrowser.id])
+    await assert.rejects(bindSubagentRun(pool, alice, otherBrowser.id, claimed), { status: 409 }, 'one run cannot be attached to two subagents')
+    await pool.query('INSERT INTO workspace_computer_policies VALUES ($1,\'allow\',2)', [alice.workspaceId])
+    await assert.rejects(bindSubagentRun(pool, alice, browser.id, claimed), { status: 403 }, 'stale host policy version cannot authorize')
+    assert.equal((await bindSubagentRun(pool, alice, browser.id, { ...claimed, policyVersion: 2 })).policyVersion, 2, 'policy version comes from current workspace state')
+    await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [alice.workspaceId])
+    await pool.query('UPDATE byos_connections SET epoch=2 WHERE id=$1', [connectionId])
+    await assert.rejects(bindSubagentRun(pool, alice, browser.id, claimed), { status: 403 }, 'stale subscription cannot authorize')
+    await pool.query('UPDATE byos_connections SET epoch=1 WHERE id=$1', [connectionId])
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [browserRun])
+    await assert.rejects(bindSubagentRun(pool, alice, browser.id, claimed), { status: 403 }, 'stop revokes binding use')
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL,"leaseExpiresAt"=now()-interval \'1 second\' WHERE id=$1', [browserRun])
+    await assert.rejects(bindSubagentRun(pool, alice, browser.id, claimed), { status: 403 }, 'expired lease cannot authorize')
+    await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=now()+interval \'5 minutes\' WHERE id=$1', [browserRun])
+    await pool.query('INSERT INTO workspace_computer_policies VALUES ($1,\'deny\',1)', [alice.workspaceId])
+    await assert.rejects(bindSubagentRun(pool, alice, browser.id, claimed), { status: 403 }, 'deny revokes binding use')
+    await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [alice.workspaceId])
+    await pool.query('DELETE FROM subagent_run_bindings WHERE "subagentId"=$1', [browser.id])
     assert.equal((await nativeRunBinding(pool, 'alice', agentId, 'codex', alice.workspaceId))?.id, bindingId)
     assert.equal((await nativeRunBinding(pool, 'alice', agentId, 'codex', alice.workspaceId, bindingId))?.id, bindingId)
     assert.equal(await nativeRunBinding(pool, 'alice', randomUUID(), 'codex', alice.workspaceId, bindingId), null, 'pinned binding must belong to the agent')
