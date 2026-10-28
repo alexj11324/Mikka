@@ -157,3 +157,61 @@ test('all required gates reject failed classification and skipped full jobs', ()
     }
   }
 })
+
+test('the actual workflow bootstrap executes its trusted temporary ESM module', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'docs-gate-bootstrap-retained-'))
+  console.log(`Retained workflow bootstrap evidence: ${dir}`)
+  const env = {
+    PATH: process.env.PATH, TMPDIR: dir,
+    GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.invalid',
+    GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.invalid',
+  }
+  const git = args => execFileSync('git', args, { cwd: dir, env, encoding: 'utf8' }).trim()
+  mkdirSync(join(dir, 'empty-template'))
+  git(['init', '--initial-branch=main', '--template=empty-template'])
+  git(['config', 'gc.auto', '0'])
+  git(['config', 'maintenance.auto', 'false'])
+  mkdirSync(join(dir, 'scripts'))
+  writeFileSync(join(dir, 'scripts/ci-docs-only.mjs'), readFileSync('scripts/ci-docs-only.mjs'), { flag: 'wx' })
+  writeFileSync(join(dir, 'README.md'), 'base\n', { flag: 'wx' })
+  git(['add', '.'])
+  git(['commit', '-m', 'base'])
+  const base = git(['rev-parse', 'HEAD'])
+  // The remote is this new fixture itself; the real bootstrap cannot fetch the
+  // network or access a user's repository/credentials.
+  git(['remote', 'add', 'origin', dir])
+  git(['switch', '-c', 'candidate'])
+  mkdirSync(join(dir, 'docs'))
+  writeFileSync(join(dir, 'docs/new.md'), 'new documentation\n', { flag: 'wx' })
+  git(['add', 'docs/new.md'])
+  git(['commit', '-m', 'docs change'])
+  const docs = git(['rev-parse', 'HEAD'])
+  writeFileSync(join(dir, 'code.js'), 'export const fixture = true\n', { flag: 'wx' })
+  git(['add', 'code.js'])
+  git(['commit', '-m', 'code change'])
+  const code = git(['rev-parse', 'HEAD'])
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+    const workflow = readFileSync(file, 'utf8')
+    const block = workflow.split('      - id: docs\n')[1]?.split('        run: |\n')[1]
+    assert.ok(block, file)
+    const body = []
+    for (const line of block.split('\n')) {
+      if (line.trim() && !line.startsWith('          ')) break
+      body.push(line.startsWith('          ') ? line.slice(10) : line)
+    }
+    const script = body.join('\n')
+    for (const [name, head, expected] of [['docs', docs, true], ['code', code, false]]) {
+      const prefix = `${file.includes('ui-policy') ? 'ui' : 'browser'}-${name}`
+      const event = join(dir, `${prefix}-event.json`), output = join(dir, `${prefix}-output`)
+      writeFileSync(event, JSON.stringify({ before: base, after: head }), { flag: 'wx' })
+      writeFileSync(output, '', { flag: 'wx' })
+      const stdout = execFileSync('bash', ['-e', '-c', script], {
+        cwd: dir, encoding: 'utf8',
+        env: { ...env, GITHUB_EVENT_NAME: 'push', GITHUB_SHA: head, GITHUB_EVENT_PATH: event, GITHUB_OUTPUT: output },
+      })
+      writeFileSync(join(dir, `${prefix}-result.json`), JSON.stringify({ base, head, expected, stdout }), { flag: 'wx' })
+      assert.match(readFileSync(output, 'utf8'), new RegExp(`docs_only=${expected}`), `${file}: ${name}`)
+    }
+  }
+})
