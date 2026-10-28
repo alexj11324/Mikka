@@ -22,6 +22,7 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
   const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), issueId = randomUUID(), runId = randomUUID(), deviceTokenId = randomUUID()
   const deviceToken = `mkd_${randomBytes(32).toString('base64url')}`
   let runToken: string | undefined
+  let deviceTokenCreated = false
   const tokenHash = (value: string) => createHash('sha256').update(value).digest('hex')
   const request = (path: string, token?: string, body: unknown = {}) => new Request(`http://127.0.0.1:3100/mikka${path}`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) })
   try {
@@ -42,6 +43,7 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
     const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'No model runs in this test', prompt: 'Fixture', parent: null, executionId: null })
     await pool.query('insert into agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"agentDefinition") values($1,$2,$3,$4,$5,$6,\'queued\',$7)', [runId, owner, issueId, agentId, deviceId, repoId, JSON.stringify(definition)])
     await pool.query('insert into device_tokens(id,"userId",name,"tokenHash","lastUsedAt","expiresAt") values($1,$2,$3,$4,now(),now()+interval \'5 minutes\')', [deviceTokenId, owner, 'Mailbox default-off CI', tokenHash(deviceToken)])
+    deviceTokenCreated = true
     await t.test('actual device-authenticated claim keeps ordinary MCP and omits mailbox capability', async () => {
       const response = await claim(request(`/v1/devices/${deviceId}/runs/${runId}/claim`, deviceToken), { params: Promise.resolve({ deviceId, runId }) })
       assert.equal(response.status, 200)
@@ -80,7 +82,10 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
   } finally {
     // Retain all records; expire only this nonce's synthetic capabilities.
     try {
-      await revokeSyntheticMailboxCredentials(pool, { runId, owner, deviceTokenId })
+      const rows = await revokeSyntheticMailboxCredentials(pool, { runId, owner, deviceTokenId })
+      if (runToken) assert.equal(rows[0], 1, 'the claimed run token is revoked')
+      if (deviceTokenCreated) assert.equal(rows[1], 1, 'the inserted synthetic device token is revoked')
+      t.diagnostic(`Synthetic credential cleanup affected run=${rows[0]} device=${rows[1]} rows`)
     } finally { await Promise.all([pool.end(), workspacePool.end()]) }
   }
 })
