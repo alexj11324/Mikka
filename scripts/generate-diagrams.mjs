@@ -40,7 +40,7 @@ const ARCH_BOXES = {
 
 const ARCH_TEXT = {
   en: {
-    web: ['Web app'], tg: ['Telegram'], notify: ['GitHub, Gmail,', 'Notion, Slack'],
+    web: ['Web app'], tg: ['Telegram, Slack'], notify: ['GitHub, Gmail,', 'Calendar, Notion,', 'Slack'],
     sched: ['Scheduler', 'scheduled tasks'], mcpc: ['Claude Code, Codex', 'as MCP clients'],
     vault: ['Credential vault', 'controlled browser'],
     api: ['API and server actions', 'incl. device API /v1'], mcp: ['MCP server', 'OAuth 2.1'],
@@ -51,11 +51,11 @@ const ARCH_TEXT = {
     agents: ['Coding agent CLI', 'one worktree per run'], cu: ['Computer use', 'local cua-driver'],
     tWebhook: 'webhook', tNotify: 'webhooks, triggers', tMcp: 'MCP', tDb: 'reads, writes',
     tEvents: 'events', tDispatch: 'runs, answers', tTools: 'report, ask, blocked', tLinear: 'webhooks, API',
-    pActions: 'actions after approval', pWake: 'wake', pSecure: 'secure input', pHandoff: 'handoff',
+    pActions: 'actions after approval', pWake: 'wake', pSecure: 'secure input', pHandoff: 'cloud handoff',
     title: 'Mikka architecture',
   },
   zh: {
-    web: ['Web 应用'], tg: ['Telegram'], notify: ['GitHub、Gmail、', 'Notion、Slack'],
+    web: ['Web 应用'], tg: ['Telegram、Slack'], notify: ['GitHub、Gmail、', '日历、Notion、', 'Slack'],
     sched: ['Scheduler', '定时任务'], mcpc: ['Claude Code、Codex', '作为 MCP 客户端'],
     vault: ['凭据保管库', '受控浏览器'],
     api: ['API 与 server actions', '含设备 API /v1'], mcp: ['MCP server', 'OAuth 2.1'],
@@ -66,7 +66,7 @@ const ARCH_TEXT = {
     agents: ['Coding agent CLI', '每次运行独立 worktree'], cu: ['Computer use', '本机 cua-driver'],
     tWebhook: 'webhook', tNotify: 'webhook、触发器', tMcp: 'MCP', tDb: '读写',
     tEvents: '事件', tDispatch: '派发运行、回答', tTools: '汇报、提问、阻塞', tLinear: 'webhook、API',
-    pActions: '审批后执行操作', pWake: '唤醒', pSecure: '安全输入', pHandoff: '接续',
+    pActions: '审批后执行操作', pWake: '唤醒', pSecure: '安全输入', pHandoff: '接续到云端',
     title: 'Mikka 架构',
   },
 }
@@ -78,9 +78,9 @@ function archFlows(t, p) {
     ...line([[C1[1], 320], [BUS1, 320], [BUS1, 240]], p), ...chevron(BUS1, 272, 'up', p),
     ...line([[C1[1], 240], [C2[0], 240]], p), ...chevron(388, 240, 'right', p),
     ...tag(285, 240, t.tWebhook, p), ...tag(285, 320, t.tNotify, p),
-    // Planned: connected-app actions go back out after approval.
-    ...line([[420, 270], [420, 368], [110, 368], [110, 350]], p, true), ...chevron(110, 358, 'up', p),
-    ...tag(290, 368, t.pActions, p, true),
+    // Shipped: connected-app actions go back out after approval.
+    ...line([[420, 270], [420, 368], [110, 368], [110, 350]], p), ...chevron(110, 358, 'up', p),
+    ...tag(290, 368, t.pActions, p),
     // External MCP clients.
     ...line([[C1[1], 520], [C2[0], 520]], p), ...chevron(388, 520, 'right', p), ...tag(300, 520, t.tMcp, p),
     // Planned: credential requests from agents reach the vault through MCP.
@@ -107,7 +107,8 @@ function archFlows(t, p) {
     ...line([[C3[1], 380], [C4[0], 380]], p, true), ...chevron(988, 380, 'right', p),
     ...line([[830, 410], [830, 490]], p), ...chevron(830, 482, 'down', p), ...tag(830, 446, t.tDispatch, p),
     ...line([[C3[1], 520], [C4[0], 520]], p), ...chevron(988, 520, 'right', p),
-    // Planned: runs hand off between machines.
+    // Planned: runs hand off to the cloud computer. Handoff between the
+    // person's own machines ships today and is described in the README.
     ...line([[1100, 410], [1100, 490]], p, true), ...chevron(1100, 422, 'up', p), ...chevron(1100, 478, 'down', p),
     ...tag(1100, 450, t.pHandoff, p, true),
     // Planned: local computer use for the agent.
@@ -138,7 +139,7 @@ const RAIL = 1190
 
 // id: [x range, y center, height, planned]
 const FLOW_BOXES = {
-  request: [X1, 230, 48, false],
+  request: [X1, 230, 60, false],
   triage: [X2, 230, 48, false],
   dispatch: [X3, 230, 48, false],
   agent: [X4, 230, 60, false],
@@ -152,7 +153,7 @@ const FLOW_BOXES = {
 
 const FLOW_TEXT = {
   en: {
-    request: ['New request', 'chat, Telegram, Linear'], triage: ['Coordinator triages'],
+    request: ['New request', 'chat, Telegram,', 'Slack, Linear'], triage: ['Coordinator triages'],
     dispatch: ['Dispatch run'], agent: ['Coding agent runs'],
     asks: ['Coordinator asks', 'for clarification'], answer: ['Human provides input'],
     details: ['Human adds details'], review: ['Review and verification', 'agents run'],
@@ -163,7 +164,7 @@ const FLOW_TEXT = {
     title: 'How a task moves through Mikka',
   },
   zh: {
-    request: ['新请求', '对话、Telegram、Linear'], triage: ['Coordinator 分诊'],
+    request: ['新请求', '对话、Telegram、', 'Slack、Linear'], triage: ['Coordinator 分诊'],
     dispatch: ['派发运行'], agent: ['编码 agent 运行'],
     asks: ['Coordinator', '请求澄清'], answer: ['人工提供输入'],
     details: ['人工补充细节'], review: ['审查与验证', 'agent 运行'],
