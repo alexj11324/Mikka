@@ -38,12 +38,17 @@ test("actual migrated PG/HTTP: review/verify receipt consumers and bounded repai
   assert.equal(target.hash, "");
   assert.ok(["postgres:","postgresql:"].includes(target.protocol));
   const admin = new Pool({ connectionString: url });
-  const schema = `factory193_consumers_${randomUUID().replaceAll("-", "")}`;
+  const database = `factory193_consumers_${randomUUID().replaceAll("-", "")}`;
   let pool: Pool | undefined;
   try {
     assert.equal(Math.floor(Number((await admin.query("SHOW server_version_num")).rows[0].server_version_num) / 10000), 17);
-    await admin.query(`CREATE SCHEMA "${schema}"`);
-    pool = new Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 12 });
+    // Extensions are database-wide. A schema in shared mikka_e2e would install
+    // pg_trgm into that schema and break later isolated-schema suites.
+    // Use this same disposable Actions service, role and credentials; no DROP.
+    await admin.query(`CREATE DATABASE "${database}"`);
+    const isolated = new URL(url);
+    isolated.pathname = `/${database}`;
+    pool = new Pool({ connectionString: isolated.toString(), max: 12 });
     const db = pool;
     const directory = new URL("../../drizzle/", import.meta.url);
     for (const file of orderMigrations((await readdir(directory)).filter(f => f.endsWith(".sql"))))
@@ -72,7 +77,7 @@ test("actual migrated PG/HTTP: review/verify receipt consumers and bounded repai
     async function pendingReview() {
       const issueId=randomUUID(),sourceEventId=randomUUID();
       await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Check fixture','{}','todo','normal')`,[issueId]);
-      await db.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$1::text,'{"text":"Check original request"}')`,[sourceEventId]);
+      await db.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"Check original request"}')`,[sourceEventId,sourceEventId]);
       let state=await store.route("owner",{issueId,sourceEventId,eventId:randomUUID(),rationale:"Check fixture",missingInformation:[],missingPermissions:[],needsSpec:false});
       const execute=await dispatch("owner",{binding:factoryBinding(state.task),agentId,deviceRepoId:repoId});
       await db.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,"startedAt"=now()-interval '1 second',"finishedAt"=now(),report=$3 WHERE id=$1`,[execute.runId,`execute-${issueId}`,JSON.stringify({publish:{commit:sha},verify:{status:"passed"}})]);
@@ -185,7 +190,7 @@ test("actual migrated PG/HTTP: review/verify receipt consumers and bounded repai
     });
   } finally {
     await pool?.end();
-    // Preserve this schema until the existing disposable Actions service teardown.
+    // Preserve this database until the existing disposable Actions service teardown.
     await admin.end();
   }
 });
