@@ -79,7 +79,7 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
           </Field></FieldGroup>
           <Button type="submit" size="sm" className={primary + ' self-start'} disabled={!code.trim()}>{t('continue')}</Button>
         </form>}
-        {state === 'loading' && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />{t('loading')}</p>}
+        {state === 'loading' && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner aria-hidden="true" />{t('loading')}</p>}
         {(state === 'review' || state === 'approving' || state === 'denying') && <>
           <div className="flex flex-col gap-4">
             <p className="text-xs text-muted-foreground">{t('code')}</p>
@@ -87,8 +87,8 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
             <p className="text-sm">{t('scope')}</p>
           </div>
           <div className="flex gap-3">
-            <Button size="sm" variant="outline" disabled={pending} onClick={() => { void answer(false) }}>{state === 'denying' && <Spinner data-icon="inline-start" />}{t('deny')}</Button>
-            <Button size="sm" className={primary} disabled={pending} onClick={() => { void answer(true) }}>{state === 'approving' && <Spinner data-icon="inline-start" />}{state === 'approving' ? t('approving') : t('allow')}</Button>
+            <Button size="sm" variant="outline" disabled={pending} onClick={() => { void answer(false) }}>{state === 'denying' && <Spinner aria-hidden="true" data-icon="inline-start" />}{t('deny')}</Button>
+            <Button size="sm" className={primary} disabled={pending} onClick={() => { void answer(true) }}>{state === 'approving' && <Spinner aria-hidden="true" data-icon="inline-start" />}{state === 'approving' ? t('approving') : t('allow')}</Button>
           </div>
         </>}
         {state === 'approved' && <p className="text-sm">{t('returnToTerminal')}</p>}
