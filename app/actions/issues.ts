@@ -10,7 +10,7 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
-import { issues, issueVersions, issueMembers, linearIssueLinks, users } from '@/lib/db/schema'
+import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { issueChecklist } from '@/lib/issue-checklist'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
@@ -19,18 +19,20 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
 import { ensureIssueNumbers } from '@/lib/issue-numbering'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
+import { createTeamIssueForUser } from '@/lib/team-issue-create'
+import { promoteExistingIssueForUser } from '@/lib/team-issue-promotion'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { after } from 'next/server'
-import { judgeIssueScope } from '@/lib/issue-scope-judge'
+import { changeIssueScopeLocally, previewPersonalScope } from '@/lib/issue-scope-store'
 import { TASK_SCOPES } from '@/lib/task-identifier'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
-import { activityActor } from '@/lib/activity-actor'
+import { actingContext, activityActor } from '@/lib/activity-actor'
 
 type IssueRow = typeof issues.$inferSelect
-type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null }
+type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null; linearTargetVerified: boolean }
 
 async function getUserId() {
   const user = await currentUser()
@@ -117,8 +119,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
         return { issue: await issueView(issue, tx) }
       })
-      if ('issue' in result && result.issue) dispatchLinearIssueSync(result.issue.id)
-      if (!id && 'issue' in result && result.issue) { const created = result.issue.id; after(() => judgeIssueScope(created, 'the Mikka app')) }
+      if ('issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) dispatchLinearIssueSync(result.issue.id)
       if (doneEvent && 'issue' in result) after(() => wakeCoordinator(ownerId))
       return result
     } catch (error) {
@@ -126,6 +127,26 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
       console.error('Failed to save issue', error instanceof Error ? error.message : 'database error')
       return { error: 'issueSaveFailed' }
     }
+  })
+}
+
+/** Explicit local team choice. Use a stable requestId on retries. No Linear
+ * destination is inferred; the returned task is blocked from provider sync. */
+export async function createIssueForTeam(input: { requestId: string; teamId: string; title: string; content: JSONContent; status: string; priority: string }) {
+  return runAction(async () => {
+    // An actAs context can represent an agent or a trusted internal caller;
+    // neither is evidence of a signed-in human choosing this team.
+    if (actingContext.getStore()) return { error: 'teamIssueAccessDenied' as const }
+    const userId = await getUserId()
+    return createTeamIssueForUser(userId, input)
+  })
+}
+
+/** Explicitly move an existing personal issue to a Mikka team. */
+export async function promoteIssueToTeam(input: { requestId: string; issueId: string; revision: number; teamId: string; expectedTeamId: string | null }) {
+  return runAction(async () => {
+    if (actingContext.getStore()) return { error: 'teamIssueAccessDenied' as const }
+    return promoteExistingIssueForUser(await getUserId(), input)
   })
 }
 
@@ -151,6 +172,26 @@ export async function changeIssuePriority(input: { id: string; priority: string;
   })
 }
 
+/** Preview is owner-only and does not make a provider request. A positive
+ * externalCopyPossible means an old remote copy may still be team-visible. */
+export async function previewIssuePersonalScope(id: string) {
+  return runAction(async () => {
+    const userId = await getUserId()
+    if (!z.uuid().safeParse(id).success) return { error: 'issueScopeInvalid' as const }
+    return previewPersonalScope(userId, id)
+  })
+}
+
+/** The linked case remains closed until the archive/unlink policy is chosen. */
+export async function confirmIssuePersonalScope(input: { id: string; revision: number; confirmation: string }) {
+  return runAction(async () => {
+    const userId = await getUserId()
+    const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), confirmation: z.string().regex(/^[a-f0-9]{64}$/) }).safeParse(input)
+    if (!parsed.success) return { error: 'issueScopeInvalid' as const }
+    return changeIssueScopeLocally(userId, { id: parsed.data.id, revision: parsed.data.revision, scope: 'personal' }, { allowLinkedPersonal: false, confirmation: parsed.data.confirmation })
+  })
+}
+
 export async function listIssueVersions(id: string) {
   const { issue } = await requireIssueAccess(id)
   const userId = issue.userId
@@ -160,8 +201,8 @@ export async function listIssueVersions(id: string) {
 
 /**
  * The one-click scope change (MIK-47). The person's choice wins over the
- * agent's and becomes an example for its next judgment. A task already in
- * Linear stays a workspace task: it cannot be taken back out.
+ * agent's and becomes an example for its next judgment. Linked transitions
+ * await the archive/unlink decision in #184.
  */
 export async function setIssueScope(input: { id: string; revision: number; scope: string }): Promise<ActionResult<{ issue: IssueView }>> {
   return runAction(async () => {
@@ -170,18 +211,11 @@ export async function setIssueScope(input: { id: string; revision: number; scope
     const userId = await getUserId()
     const { issue } = await requireIssueAccess(parsed.data.id)
     if (issue.userId !== userId) return { error: 'issueScopeOwnerOnly' }
-    if (parsed.data.scope === 'personal') {
-      const [link] = await db.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(eq(linearIssueLinks.issueId, issue.id)).limit(1)
-      if (link) return { error: 'issueScopeInLinear' }
-    }
-    const result = await db.transaction(async tx => {
-      const [saved] = await tx.update(issues).set({ scope: parsed.data.scope, scopeSetBy: 'user', scopeConfidence: null, revision: parsed.data.revision + 1, updatedAt: new Date() })
-        .where(and(eq(issues.id, issue.id), eq(issues.userId, userId), eq(issues.revision, parsed.data.revision))).returning()
-      if (!saved) return { error: 'issueStale' as const }
-      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })
-      return { issue: await issueView(saved, tx) }
-    })
-    if ('issue' in result && parsed.data.scope === 'workspace') dispatchLinearIssueSync(issue.id)
-    return result
+    // This legacy action has no team target or team permission check. It must
+    // not infer the owner's active Linear team or publish an unassigned task.
+    if (parsed.data.scope === 'workspace') return { error: 'issueScopeTeamRequired' }
+    // #184 leaves archive vs unlink open. Keep linked transitions closed until
+    // the provider disposition is confirmed and reviewed.
+    return changeIssueScopeLocally(userId, parsed.data, { allowLinkedPersonal: false })
   })
 }

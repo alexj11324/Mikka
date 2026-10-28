@@ -13,9 +13,11 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
     const source = readFileSync(new URL('./migrate.mjs', import.meta.url), 'utf8')
       .replace("'pg'", "'./pg.mjs'")
       .replace("from './migration-order.mjs'", "from './order.mjs'")
+      .replace("from './scope-migration-history.mjs'", "from './scope.mjs'")
     writeFileSync(join(dir, 'migrate.mjs'), source)
     writeFileSync(join(dir, 'pg.mjs'), 'export class Pool { constructor() { throw new Error("DATABASE_ACCESS") } }')
     writeFileSync(join(dir, 'order.mjs'), 'export const orderMigrations = x => x; export const alreadyApplied = (name, applied) => applied.has(name)')
+    writeFileSync(join(dir, 'scope.mjs'), 'export const validateScopeMigrationHistory = () => {}; export const validateScopeMigrationSources = () => {}; export const scopeMigrationBeforeCommit = () => null')
     for (const environment of ['production', 'preview']) {
       const result = spawnSync(process.execPath, [join(dir, 'migrate.mjs')], {
         env: { ...process.env, MIGRATE: '0', VERCEL_ENV: environment }, encoding: 'utf8',

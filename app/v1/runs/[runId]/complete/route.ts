@@ -1,15 +1,12 @@
 import { after, NextResponse } from 'next/server'
-import { and, eq, inArray } from 'drizzle-orm'
-import { runStateForStop } from '@mikka/protocol/daemon'
-import { runCompleteRequest, reachesReview } from '@mikka/protocol/run'
+import { and, eq } from 'drizzle-orm'
+import { runCompleteRequest } from '@mikka/protocol/run'
 import { db } from '@/lib/db'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
-import { agentRuns, devices, issues, type RunStatus } from '@/lib/db/schema'
+import { agentRuns, devices } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
-import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
-import { runFinishedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
-import { revokeRunTokens } from '@/lib/mcp/worker'
+import { completeRunForDevice, dispatchCompletedIssue } from '@/lib/run-completion'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,28 +34,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   if (!(LIVE_STATUSES as readonly string[]).includes(run.status)) return new NextResponse(null, { status: 204 })
   const parsed = runCompleteRequest.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid completion.' }, { status: 400 })
-  const { stopReason, report } = parsed.data
-  // The daemon's own terminal mapping, not just the stop reason: a
-  // submission whose verify failed is a failure, and one with no verify
-  // result only stopped. A `plan` run writes no code, so its verify says
-  // nothing about it.
-  let status: RunStatus = runStateForStop(stopReason)
-  if (stopReason === 'submitted' && report?.verify.status !== 'passed' && run.kind !== 'plan') {
-    status = report?.verify.status === 'failed' ? 'failed' : 'stopped'
-  }
-  const ended = await db.update(agentRuns)
-    .set({ status, stopReason, report: report ?? null, finishedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATUSES])))
-    .returning({ id: agentRuns.id })
-  // Only the completion that ended the run tells the Coordinator.
-  if (ended.length) {
-    await revokeRunTokens(runId)
-    await recordCoordinatorEvent(db, runFinishedEvent({ ...run, status, stopReason, report }))
-    after(() => wakeCoordinator(run.userId))
-  }
-  if (run.issueId && reachesReview(stopReason, report)) {
-    await db.update(issues).set({ status: 'review', updatedAt: new Date() }).where(eq(issues.id, run.issueId))
-    dispatchLinearIssueSync(run.issueId)
+  const completed = await completeRunForDevice(caller.userId, run, parsed.data)
+  if (completed) {
+    await dispatchCompletedIssue(completed, dispatchLinearIssueSync)
+    after(() => wakeCoordinator(completed.userId))
   }
   return new NextResponse(null, { status: 204 })
 }

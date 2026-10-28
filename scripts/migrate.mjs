@@ -9,6 +9,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { alreadyApplied, orderMigrations } from './migration-order.mjs'
+import { scopeMigrationBeforeCommit, validateScopeMigrationHistory, validateScopeMigrationSources } from './scope-migration-history.mjs'
 
 const shouldRun = process.env.MIGRATE !== '0' && (process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production')
 if (!shouldRun) {
@@ -38,27 +39,43 @@ for (const name of files) {
   byTarget.get(target).push({ name, sql })
 }
 
-for (const [target, pending] of byTarget) {
-  const url = targets[target]
-  if (!url) throw new Error(`migrate: ${target} is not set`)
-  const pool = new Pool({ connectionString: url, max: 1 })
-  try {
+validateScopeMigrationSources([...byTarget.values()].flat())
+for (const target of byTarget.keys()) if (!targets[target]) throw new Error(`migrate: ${target} is not set`)
+const states = []
+try {
+  // Read and validate every target before any pending migration is executed.
+  // Commits remain per file/target: this is not a distributed transaction.
+  for (const [target, pending] of byTarget) {
+    const pool = new Pool({ connectionString: targets[target], max: 1 })
+    const state = { target, pending, pool }
+    states.push(state)
     await pool.query('create table if not exists schema_migrations (name text primary key, "appliedAt" timestamptz not null default now())')
     const { rows } = await pool.query('select name from schema_migrations')
-    const applied = new Set(rows.map((row) => row.name))
+    state.applied = new Set(rows.map((row) => row.name))
+  }
+  for (const { pending, applied } of states) validateScopeMigrationHistory(pending, applied)
+  for (const { target, pending, pool, applied } of states) {
     for (const { name, sql } of pending) {
       if (alreadyApplied(name, applied, sql)) continue
+      const scopeBeforeCommit = scopeMigrationBeforeCommit(name, sql)
       const client = await pool.connect()
       try {
-        // Files may manage their own transaction; the record is written after.
-        await client.query(sql)
+        // Only the hash-pinned scope files defer their outer COMMIT until the
+        // ledger is written. Other migrations retain main's execution rules.
+        await client.query(scopeBeforeCommit ?? sql)
         await client.query('insert into schema_migrations (name) values ($1)', [name])
+        if (scopeBeforeCommit !== null) await client.query('COMMIT')
         console.log(`migrate: applied ${name} to ${target}`)
+      } catch (error) {
+        if (scopeBeforeCommit !== null) {
+          try { await client.query('ROLLBACK') } catch { /* Preserve the original outcome; never retry here. */ }
+        }
+        throw error
       } finally {
         client.release()
       }
     }
-  } finally {
-    await pool.end()
   }
+} finally {
+  await Promise.all(states.map(({ pool }) => pool.end()))
 }

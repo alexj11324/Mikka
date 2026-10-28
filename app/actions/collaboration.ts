@@ -8,7 +8,7 @@ import type { JSONContent } from '@tiptap/core'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { db } from '@/lib/db'
-import { issues, issueDocuments, issueMembers, issueVersions, users } from '@/lib/db/schema'
+import { issues, issueDocuments, issueMembers, issueVersions, linearIssueLinks, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
@@ -21,7 +21,7 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>) {
   const parsed = syncSchema.parse(input)
   const { issue, user } = await requireIssueAccess(parsed.id)
   const result = await db.transaction(async tx => {
-    const [locked] = await tx.select({ id: issues.id, content: issues.content }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
+    const [locked] = await tx.select({ id: issues.id, content: issues.content, scope: issues.scope, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
     if (!locked) throw new Error('issue not found')
     const [stored] = await tx.select().from(issueDocuments).where(and(eq(issueDocuments.issueId, issue.id), eq(issueDocuments.userId, issue.userId))).limit(1)
     const doc = new Y.Doc()
@@ -41,10 +41,11 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>) {
         await tx.insert(issueDocuments).values({ issueId: issue.id, userId: issue.userId, state }).onConflictDoUpdate({ target: issueDocuments.issueId, set: { state, updatedAt: new Date() } })
         await tx.update(issues).set({ content, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId)))
       }
-      return { changed, update: Buffer.from(Y.encodeStateAsUpdate(doc, parsed.vector ? Buffer.from(parsed.vector, 'base64') : undefined)).toString('base64') }
+      const [link] = locked.scope === 'workspace' && !locked.linearSyncBlocked ? await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, locked.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1) : []
+      return { changed, syncEligible: Boolean(link), update: Buffer.from(Y.encodeStateAsUpdate(doc, parsed.vector ? Buffer.from(parsed.vector, 'base64') : undefined)).toString('base64') }
     } finally { doc.destroy() }
   })
-  if (result.changed) dispatchLinearIssueSync(issue.id)
+  if (result.changed && result.syncEligible) dispatchLinearIssueSync(issue.id)
   return { update: result.update }
 }
 export async function listMembers(id: string) {
@@ -83,7 +84,9 @@ export async function removeMember(id: string, memberId: string): Promise<Action
       if (metadata.assignee?.kind === 'member' && metadata.assignee.id === parsed.data) {
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, assignee: null }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, user.id))).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: user.id, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
-        return true
+        if (saved.scope !== 'workspace' || saved.linearSyncBlocked) return false
+        const [link] = await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, saved.id), eq(linearIssueLinks.ownerId, saved.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1)
+        return Boolean(link)
       }
       return false
     })

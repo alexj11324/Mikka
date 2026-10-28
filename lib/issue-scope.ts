@@ -3,8 +3,8 @@ import type { TaskScope } from '@/lib/task-identifier'
 
 // Whether a new task belongs to the workspace (and so goes to Linear) or to
 // the person (MIK-47). The decision model judges it; only a confident
-// "workspace" moves it, because a personal task can still be moved to Linear
-// later and a task written into the company's Linear cannot be taken back.
+// "workspace" moves it. Users can correct scope in either direction; the
+// decision model itself only promotes confident personal tasks to workspace.
 
 /** At or above this probability a task is a workspace task. */
 export const WORKSPACE_THRESHOLD = 0.8

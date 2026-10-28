@@ -208,7 +208,7 @@ export async function setIssueDeleted(input: { id: string; revision?: number; re
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, deletedAt: input.restore ? null : new Date().toISOString() }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, user.id))).returning()
         return { issue: await issueView(saved, tx) }
       })
-      if (input.restore && 'issue' in result) dispatchLinearIssueSync(issue.id)
+      if (input.restore && 'issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) dispatchLinearIssueSync(issue.id)
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error

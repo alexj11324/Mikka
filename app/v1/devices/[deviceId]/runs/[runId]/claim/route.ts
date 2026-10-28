@@ -11,6 +11,7 @@ import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
+import { authorizedClaimResponse } from '@/lib/run-claim-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,8 +57,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id)
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
   }
-  // The worker tools of the MCP server for the agent in this run. A failure
-  // here should not keep the run from starting.
+  // Tool provisioning is best effort, but it never authorizes the response.
+  // A retirement during this await must still suppress the prompt below.
   const mcp = await issueRunToken(run)
       .then(({ token }) => ({ url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token }))
       .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
@@ -76,14 +77,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       ...(resumeFrom ? { resumeFrom } : {}),
     }
     : {}
-  return NextResponse.json({
+  const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => NextResponse.json({
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
-    baseBranch: repo.baseBranch, harness: agent.harness, prompt: run.prompt,
-    kind: run.kind, leaseExpiresAt,
+    baseBranch: repo.baseBranch, harness: agent.harness, prompt: current.prompt,
+    kind: current.kind, leaseExpiresAt,
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
     ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...(computer ? { computer } : {}),
     ...retry,
-  })
+  }))
+  return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
 }
