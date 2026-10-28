@@ -1611,7 +1611,6 @@
       "description": "Connect your own subscription for authorized Bot tasks in this workspace.",
       "codex": "ChatGPT / Codex",
       "claude": "Claude",
-      "providerDescription": "Sign in and approve access on the provider's website.",
       "unavailable": "This connection is not available yet.",
       "connected": "Connected",
       "notConnected": "Not connected",
@@ -1630,7 +1629,15 @@
       "connectionFailed": "The connection could not be completed. Start a new attempt.",
       "disconnectFailed": "The subscription could not be disconnected.",
       "connectedNotice": "Subscription connected.",
-      "disconnectedNotice": "Disconnected from Mikka. The provider's authorization may still need to be revoked on its website."
+      "disconnectedNotice": "Disconnected from Mikka. The provider's authorization may still need to be revoked on its website.",
+      "codexProduct": "ChatGPT",
+      "claudeProduct": "Claude",
+      "codexPlan": "ChatGPT {plan}",
+      "quotaFiveHour": "5 hours",
+      "quotaWeekly": "Weekly",
+      "quotaLeft": "{percent}% left",
+      "quotaReset": "Resets {time}",
+      "quotaUnavailable": "Usage unavailable"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",

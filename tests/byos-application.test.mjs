@@ -15,7 +15,7 @@ import { streamText, isStepCount, tool, toUIMessageStream } from 'ai'
 import { z } from 'zod'
 import { SubscriptionRepository } from '../lib/subscription-repository.ts'
 import { SubscriptionService } from '../lib/subscription-service.ts'
-import { subscriptionHTTP, subscriptionCallback, subscriptionList } from '../lib/subscription-http.ts'
+import { subscriptionHTTP, subscriptionCallback, subscriptionList, subscriptionUsage } from '../lib/subscription-http.ts'
 import { subscriptionNativeHTTP } from '../lib/subscription-native-http.ts'
 import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-worker-client.ts'
 import { resolveAgentSubscription } from '../lib/agent-subscription.ts'
@@ -198,6 +198,13 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       assert.equal((await post(completion)).status, 409)
       const persisted = await pool.query('select "secretName",epoch,state from byos_connections where id=$1', [connectionId])
       assert.equal(persisted.rows[0].state, 'connected')
+      const usage = async user => { const response = await subscriptionUsage(new Request(`http://localhost/api/subscriptions/usage?workspace=${workspaceId}`, { headers: { cookie: `fixture=${user}` } }), dependencies); return { status: response.status, text: await response.text() } }
+      const read = await usage('alice')
+      assert.equal(read.status, 200)
+      assert.ok(!/fixture-|Bearer|access_token/.test(read.text), 'usage exported a credential')
+      const row = JSON.parse(read.text).connections.find(item => item.id === connectionId)
+      assert.deepEqual({ status: row.status, windows: row.windows }, { status: 'ok', windows: [{ kind: 'five_hour', remaining: 80, resetsAt: null }] })
+      assert.deepEqual(JSON.parse((await usage('bob')).text).connections, [], 'usage is owner-scoped')
       const stored = JSON.parse(secrets.get(persisted.rows[0].secretName))
       assert.equal(stored.ownerId, 'alice'); assert.equal(stored.payload.refresh_token, 'fixture-refresh')
       const consumerId = randomUUID()
@@ -333,7 +340,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
         else if (incoming.url.startsWith('/api/subscriptions')) {
           const chunks = []; for await (const chunk of incoming) chunks.push(chunk)
           const req = new Request(url, { method: incoming.method, headers: incoming.headers, ...(incoming.method === 'POST' ? { body: Buffer.concat(chunks) } : {}) })
-          response = incoming.url.startsWith('/api/subscriptions/callback') ? await subscriptionCallback(req, dependencies) : incoming.method === 'POST' ? await http(req) : await subscriptionList(req, dependencies)
+          response = incoming.url.startsWith('/api/subscriptions/callback') ? await subscriptionCallback(req, dependencies) : incoming.method === 'POST' ? await http(req) : incoming.url.startsWith('/api/subscriptions/usage') ? await subscriptionUsage(req, dependencies) : await subscriptionList(req, dependencies)
         } else response = new Response('<!doctype html><html><body><main id="root"></main><script src="/browser.js"></script></body></html>', { headers: { 'content-type': 'text/html' } })
         outgoing.writeHead(response.status, Object.fromEntries(response.headers)); outgoing.end(Buffer.from(await response.arrayBuffer()))
       } catch { outgoing.writeHead(500).end() }

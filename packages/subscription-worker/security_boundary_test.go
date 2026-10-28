@@ -502,3 +502,49 @@ func TestCleanupFailuresCannotStarveLaterArtifacts(t *testing.T) {
 		t.Fatal("four failed deletions starved the next artifact")
 	}
 }
+
+func TestUsageReadsOwnConnectionWithoutBindingOrToken(t *testing.T) {
+	for _, provider := range []string{"codex", "claude"} {
+		t.Run(provider, func(t *testing.T) {
+			w, _, _ := fixtureWorker(t, provider)
+			initial := mustAcquire(t, w)
+			w.QuotaClient = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				secret := request.Header.Get("Authorization")
+				body := map[string]any{"diagnostic": secret, "plan_type": "plus"}
+				if provider == "codex" {
+					body["rate_limit"] = map[string]any{"primary_window": map[string]any{"used_percent": 25, "limit_window_seconds": 18000, "reset_at": 1793000000}, "secondary_window": map[string]any{"used_percent": 60, "limit_window_seconds": 604800, "reset_at": 1793400000}}
+				} else {
+					body["five_hour"] = map[string]any{"utilization": 25, "resets_at": "2026-10-28T12:00:00Z"}
+					body["seven_day"] = map[string]any{"utilization": 60, "resets_at": "2026-11-02T08:00:00Z"}
+				}
+				raw, _ := json.Marshal(body)
+				return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(raw)), Header: make(http.Header)}, nil
+			})}
+			ctx := context.Background()
+			bound := w.Use
+			if _, err := w.Usage(ctx, initial.Revision); err != ErrUnsupported {
+				t.Fatal("usage ran under a model binding")
+			}
+			w.Use = nil
+			result, err := w.Usage(ctx, initial.Revision)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, _ := json.Marshal(result)
+			if bytes.Contains(raw, []byte("Bearer")) || bytes.Contains(raw, []byte("fixture-"+provider)) || bytes.Contains(raw, []byte("diagnostic")) {
+				t.Fatal("usage exported a credential")
+			}
+			if result.Status != 200 || result.Account != "fixture@example.invalid" || !bytes.Contains(raw, []byte("60")) {
+				t.Fatalf("usage lost its projection: %s", raw)
+			}
+			if _, err := w.Usage(ctx, initial.Revision+1); err == nil {
+				t.Fatal("usage read a stale revision")
+			}
+			w.ExecutionOnly = true
+			if _, err := w.Usage(ctx, initial.Revision); err != ErrUnsupported {
+				t.Fatal("execution role read usage")
+			}
+			w.ExecutionOnly, w.Use = false, bound
+		})
+	}
+}

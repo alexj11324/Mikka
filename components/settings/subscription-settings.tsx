@@ -1,18 +1,23 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Progress } from '@/components/ui/progress'
+import { Claude } from '@/components/ui/svgs/claude'
+import { OpenAI } from '@/components/ui/svgs/openai'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
-import { parseSubscriptionStart, subscriptionListSchema } from '@/lib/subscription-ui'
+import { parseSubscriptionStart, subscriptionListSchema, subscriptionUsageSchema, type SubscriptionUsageView } from '@/lib/subscription-ui'
+import { cn } from '@/lib/utils'
 
 type Provider = 'codex' | 'claude'
 type State = ReturnType<typeof subscriptionListSchema.parse>
 type Attempt = ReturnType<typeof parseSubscriptionStart> & { provider: Provider }
 const path = withBasePath('/api/subscriptions')
+const logos = { codex: OpenAI, claude: Claude } as const
 
 async function post(body: unknown, signal?: AbortSignal) {
   const response = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal })
@@ -30,6 +35,8 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [usage, setUsage] = useState<Map<string, SubscriptionUsageView> | 'failed' | null>(null)
+  const connectedKey = state?.connections.filter(item => item.state === 'connected').map(item => `${item.id}:${item.revision}`).join(',') ?? ''
   const refresh = useCallback(async () => {
     const response = await fetch(`${path}?workspace=${encodeURIComponent(workspaceId)}`, { cache: 'no-store', credentials: 'same-origin' })
     if (!response.ok) throw new Error('Subscription list unavailable')
@@ -37,6 +44,15 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   }, [workspaceId])
 
   useEffect(() => { void refresh().catch(() => { setState(null); setLoadFailed(true) }) }, [refresh])
+  useEffect(() => {
+    if (!connectedKey) return
+    const abort = new AbortController()
+    fetch(`${path}/usage?workspace=${encodeURIComponent(workspaceId)}`, { cache: 'no-store', credentials: 'same-origin', signal: abort.signal })
+      .then(async response => { if (!response.ok) throw new Error('Subscription usage unavailable'); return subscriptionUsageSchema.parse(await response.json()) })
+      .then(result => setUsage(new Map(result.connections.map(item => [item.id, item]))))
+      .catch(() => { if (!abort.signal.aborted) setUsage('failed') })
+    return () => abort.abort()
+  }, [connectedKey, workspaceId])
   useEffect(() => {
     if (!attempt || attempt.flow !== 'device' || !attempt.interval) return
     let stopped = false
@@ -90,17 +106,40 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
       {(['codex', 'claude'] as const).map(provider => {
         const available = state.providers.some(item => item.provider === provider && item.available)
         const connections = state.connections.filter(item => item.provider === provider)
-        return <SettingRow key={provider} title={t(provider)} description={available ? t('providerDescription') : t('unavailable')}>
-          <div className="flex flex-col items-end gap-2">
-            {connections.map(connection => <div key={connection.id} className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{connection.state === 'connected' ? t('connected') : t('notConnected')}</span>
-              {connection.state === 'connected'
-                ? <Button type="button" variant="outline" size="sm" disabled={pending || !!attempt} onClick={() => { void disconnect(connection) }}>{t('disconnect')}</Button>
-                : <><Button type="button" variant="outline" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider, connection) }}>{t('reconnect')}</Button><Button type="button" variant="ghost" size="sm" disabled={pending || !!attempt} onClick={() => { void disconnect(connection) }}>{t('disconnect')}</Button></>}
-            </div>)}
-            <Button type="button" variant="outline" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider) }}>{connections.some(item => item.state === 'connected') ? t('connectAnother') : t('connect')}</Button>
-          </div>
-        </SettingRow>
+        const Logo = logos[provider]
+        return <div key={provider} className="divide-y divide-border">
+          <SettingRow title={t(provider)} description={available ? undefined : t('unavailable')}>
+            <Button type="button" variant="secondary" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider) }}>{connections.some(item => item.state === 'connected') ? t('connectAnother') : t('connect')}</Button>
+          </SettingRow>
+          {connections.map(connection => {
+            const connected = connection.state === 'connected'
+            const read = connected && usage ? usage === 'failed' ? 'failed' : usage.get(connection.id) : undefined
+            const account = read && read !== 'failed' ? read.account : null
+            const plan = read && read !== 'failed' && read.plan ? t('codexPlan', { plan: read.plan }) : null
+            const product = provider === 'codex' ? plan ?? t('codexProduct') : t('claudeProduct')
+            return <div key={connection.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <Logo className="size-5 text-foreground" />
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-medium">{account ?? product}</span>
+                  {account && <span className="text-xs text-muted-foreground">{product}</span>}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span aria-hidden="true" className={cn('size-2 rounded-full', connected ? 'bg-success' : 'bg-muted-foreground')} />
+                  {connected ? t('connected') : t('notConnected')}
+                </span>
+                {read === 'failed' || (read && read.status === 'unavailable')
+                  ? <span className="text-xs text-muted-foreground">{t('quotaUnavailable')}</span>
+                  : read && <QuotaMeters windows={read.windows} />}
+                {connected
+                  ? <Button type="button" variant="secondary" size="sm" disabled={pending || !!attempt} onClick={() => { void disconnect(connection) }}>{t('disconnect')}</Button>
+                  : <span className="flex items-center gap-2"><Button type="button" variant="secondary" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider, connection) }}>{t('reconnect')}</Button><Button type="button" variant="ghost" size="sm" disabled={pending || !!attempt} onClick={() => { void disconnect(connection) }}>{t('disconnect')}</Button></span>}
+              </div>
+            </div>
+          })}
+        </div>
       })}
     </SettingsSection>
     {attempt && <div className="flex flex-col gap-2 px-1 text-sm">
@@ -118,4 +157,21 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     {notice && <p role="status" className="px-1 text-sm">{notice}</p>}
     {error && <p role="alert" className="px-1 text-sm text-destructive">{error}</p>}
   </div>
+}
+
+/** What is left of each window the provider returned, with its reset time on hover. */
+function QuotaMeters({ windows }: { windows: SubscriptionUsageView['windows'] }) {
+  const t = useTranslations('Settings.subscriptions')
+  const format = useFormatter()
+  return <span className="flex items-center gap-4">
+    {windows.map(window => {
+      const label = window.kind === 'five_hour' ? t('quotaFiveHour') : t('quotaWeekly')
+      const reset = window.resetsAt ? t('quotaReset', { time: format.dateTime(new Date(window.resetsAt), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }) : undefined
+      return <span key={window.kind} title={reset} className="flex items-center gap-1.5 text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <Progress value={window.remaining} aria-label={[label, t('quotaLeft', { percent: window.remaining }), reset].filter(Boolean).join(' · ')} className={cn('w-10', window.remaining <= 10 && '[&_[data-slot=progress-indicator]]:bg-destructive')} />
+        <span className="min-w-8 text-foreground tabular-nums">{window.remaining}%</span>
+      </span>
+    })}
+  </span>
 }

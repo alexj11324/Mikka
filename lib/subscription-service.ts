@@ -7,6 +7,7 @@ import { readSubscriptionQuota } from '../packages/daemon/src/subscription-quota
 import { SubscriptionRepository } from './subscription-repository'
 import { resolveSubscriptionModel } from './subscription-model'
 import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
+import { parseSubscriptionUsage, type WorkerUsage } from './subscription-usage'
 
 export interface SubscriptionCapabilities {
   ready(route: SubscriptionRoute): boolean
@@ -122,6 +123,13 @@ export class SubscriptionService {
     await this.check(use)
     const row = await this.repository.connection(ownerId, binding.connectionId)
     return run({ use, modelId: binding.modelId, access: () => this.access(use), worker: this.worker(this.repository.scope(row)).forUse(use) })
+  }
+  /** The owner's own Settings read: no binding, a connected revision only. */
+  async usage(ownerId: string, id: string, signal?: AbortSignal) {
+    const row = await this.repository.connection(ownerId, id)
+    if (row.state !== 'connected') throw new SubscriptionRefusal('disconnected')
+    const result = await this.worker(this.repository.scope(row)).call<WorkerUsage>('usage', { revision: Number(row.epoch) }, signal)
+    return parseSubscriptionUsage(row.id, row.provider, result)
   }
   async status(ownerId: string, id: string, signal?: AbortSignal) {
     const row = await this.repository.connection(ownerId, id)

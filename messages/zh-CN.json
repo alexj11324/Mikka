@@ -1611,7 +1611,6 @@
       "description": "连接你自己的订阅，供此工作区中获授权的 Bot 任务使用。",
       "codex": "ChatGPT / Codex",
       "claude": "Claude",
-      "providerDescription": "在服务商的网站登录并同意授权。",
       "unavailable": "此连接暂不可用。",
       "connected": "已连接",
       "notConnected": "未连接",
@@ -1630,7 +1629,15 @@
       "connectionFailed": "无法完成连接，请重新开始。",
       "disconnectFailed": "无法断开订阅连接。",
       "connectedNotice": "订阅已连接。",
-      "disconnectedNotice": "已从 Mikka 断开。你可能还需要在服务商网站撤销授权。"
+      "disconnectedNotice": "已从 Mikka 断开。你可能还需要在服务商网站撤销授权。",
+      "codexProduct": "ChatGPT",
+      "claudeProduct": "Claude",
+      "codexPlan": "ChatGPT {plan}",
+      "quotaFiveHour": "5 小时",
+      "quotaWeekly": "每周",
+      "quotaLeft": "剩余 {percent}%",
+      "quotaReset": "{time} 重置",
+      "quotaUnavailable": "额度暂时读不到"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",

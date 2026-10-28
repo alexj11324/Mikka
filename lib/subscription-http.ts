@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { SubscriptionRefusal, subscriptionRouteSchema } from '@mikka/protocol/subscription'
 import type { SubscriptionService } from './subscription-service'
+import { unavailableUsage, usageCache } from './subscription-usage'
 
 const id = z.uuid()
 const input = z.discriminatedUnion('action', [
@@ -71,6 +72,27 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
     return Response.json({ enabled: true, providers: ['codex', 'claude'].map(provider => ({ provider, available: Boolean(service.capabilities.oauth?.[provider as 'codex' | 'claude']) })), connections: rows.map(row => ({ id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch) })) }, { headers })
   } catch (error) {
     if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable') return Response.json({ enabled: false, providers: [], connections: [] }, { headers })
+    return Response.json({ error: 'subscription_unavailable' }, { status: 409, headers })
+  }
+}
+
+const cachedUsage = usageCache()
+/** Remaining 5-hour and weekly allowance of the owner's connected subscriptions.
+ * Each read is cached a minute and fails soft to `unavailable`; tokens stay in
+ * the worker. */
+export async function subscriptionUsage(request: Request, deps: SubscriptionHTTPDependencies) {
+  const session = await deps.session(request)
+  if (!session) return Response.json({ error: 'auth_required' }, { status: 401, headers })
+  try {
+    const service = deps.service(true)
+    const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
+    await deps.workspace(session.userId, workspaceId)
+    const { rows } = await service.repository.pool.query('select id,epoch from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and state=\'connected\' order by "createdAt" desc limit 20', [session.userId, workspaceId])
+    const connections = await Promise.all(rows.map(row => cachedUsage(`${session.userId}:${row.id}:${row.epoch}`, () =>
+      service.usage(session.userId, row.id, AbortSignal.timeout(15_000)).catch(() => unavailableUsage(row.id)))))
+    return Response.json({ connections }, { headers })
+  } catch (error) {
+    if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable') return Response.json({ connections: [] }, { headers })
     return Response.json({ error: 'subscription_unavailable' }, { status: 409, headers })
   }
 }

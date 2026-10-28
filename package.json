@@ -70,7 +70,7 @@
     "test:coordinator-native": "node --experimental-test-module-mocks --import tsx --test lib/coordinator/native-store.test.ts lib/coordinator/native-prompt.test.ts lib/coordinator/native-relay.db.test.ts",
     "test:coordinator-native-scope": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/native-coordinator-tool-scope.test.ts",
     "test:coordinator-native-relay": "pnpm --filter @mikka/daemon exec vitest run --root ../.. tests/native-coordinator-relay.test.mjs",
-    "test:byos": "node --import ./scripts/server-test.mjs --import tsx --test lib/infisical-workload.test.ts lib/subscription-access-snapshot.test.ts lib/subscription-model.test.ts lib/subscription-enrollment.test.ts lib/subscription-enrollment-bind.test.ts lib/subscription-enrollment-binding-proof.test.ts lib/subscription-enrollment-handoff.test.ts lib/subscription-enrollment-policy.test.ts lib/subscription-ui.test.ts",
+    "test:byos": "node --import ./scripts/server-test.mjs --import tsx --test lib/infisical-workload.test.ts lib/subscription-access-snapshot.test.ts lib/subscription-model.test.ts lib/subscription-enrollment.test.ts lib/subscription-enrollment-bind.test.ts lib/subscription-enrollment-binding-proof.test.ts lib/subscription-enrollment-handoff.test.ts lib/subscription-enrollment-policy.test.ts lib/subscription-ui.test.ts lib/subscription-usage.test.ts",
     "test:byos-worker": "node scripts/test-subscription-worker.mjs",
     "test:slack": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/slack/webhook.test.ts lib/slack/owner.test.ts tests/slack-bot.test.mjs",
     "test:accounts": "node scripts/test-accounts/cli.mjs",
