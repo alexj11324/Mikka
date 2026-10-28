@@ -220,9 +220,19 @@ test('observed input focus uses a top-document CDP node with a matching type', a
   const cdp = Object.create(Cdp.prototype) as Cdp
   const calls: string[] = []
   let root: unknown = { nodeName: '#document', children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password'] }] }
-  cdp.call = async (method, params) => { calls.push(method); return method === 'DOM.getDocument' ? { root } : { params } }
+  let focusedNode = 7
+  cdp.call = async (method, params) => {
+    calls.push(method)
+    if (method === 'DOM.getDocument') return { root }
+    if (method === 'Runtime.evaluate') return { result: { objectId: 'focused-fixture' } }
+    if (method === 'DOM.describeNode') return { node: { backendNodeId: focusedNode } }
+    return { params }
+  }
   await cdp.focusObservedInput(7, 'password')
-  assert.deepEqual(calls, ['DOM.getDocument', 'DOM.focus'])
+  assert.deepEqual(calls, ['DOM.getDocument', 'DOM.focus', 'Runtime.evaluate', 'DOM.describeNode'])
+  focusedNode = 8
+  await assert.rejects(cdp.focusObservedInput(7, 'password'), CredentialError)
+  focusedNode = 7
   await assert.rejects(cdp.focusObservedInput(7, 'username'), CredentialError)
   await assert.rejects(cdp.focusObservedInput(8, 'password'), CredentialError)
   root = { nodeName: '#document', children: [{ nodeName: 'INPUT', backendNodeId: 7, attributes: ['type', 'password', 'disabled', ''] }] }

@@ -109,6 +109,12 @@ export class Cdp {
     const allowed = role === 'password' ? ['password'] : role === 'username' ? ['text', 'email', 'tel'] : ['text', 'tel', 'number']
     if (attributes.has('disabled') || attributes.has('readonly') || !allowed.includes(type)) throw new CredentialError('credential_denied', 404)
     await this.call('DOM.focus', { backendNodeId })
+    // DOM.focus can be a no-op (for example inside a disabled fieldset).
+    // Verify actual focus before the caller attempts Input.insertText.
+    const active = await this.call('Runtime.evaluate', { expression: 'document.activeElement', returnByValue: false })
+    if (active.exceptionDetails || typeof active.result?.objectId !== 'string') throw new CredentialError('credential_denied', 404)
+    const focused = await this.call('DOM.describeNode', { objectId: active.result.objectId })
+    if (focused.node?.backendNodeId !== backendNodeId) throw new CredentialError('credential_denied', 404)
   }
   async fill(origin: string, username: string, password: string) {
     await this.origin(origin)
