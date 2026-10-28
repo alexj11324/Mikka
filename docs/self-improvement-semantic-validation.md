@@ -83,3 +83,11 @@ concurrent proposal/dispatch checks. No provider or external publication runs.
 Remote typecheck/full CI, real trusted comparison collection, actual authorized
 CLI baseline/candidate execution, merged Factory terminal/lineage fences,
 production user flow and sanitized playable PR video remain unverified here.
+
+The subsequent source push passed remote typecheck, semantic PG/HTTP (30 tests)
+and daemon transport (6 tests), but full CI stopped at migration ordering.
+The seven inherited SQL files were absent from current main and must be new
+there; they cannot be treated as applied just because related tables exist.
+The follow-up [migration compatibility record](factory/migration-compatibility-20261028.md)
+documents unchanged SQL, pinned historical-name recognition and actual PG
+upgrade/ledger tests. It does not establish production migration or acceptance.

@@ -1,6 +1,9 @@
 # Controlled improvement assignment and Factory wiring
 
 - Status: implementation candidate; actual CLI/production acceptance pending.
+- Migration names below describe the original checkpoint. The 2026-10-28
+  compatibility update preserves SQL and historical ledger IDs; see
+  [migration compatibility](../factory/migration-compatibility-20261028.md).
 - Tracking: #237 / MIK-103; minimal prerequisite of #232, not its enterprise registry.
 - Frozen baseline: #238 `62a6f710f454aa0860e09a5a941f2720657c96ef`.
 - Follow-up branch: `codex/skill-assignment-factory-237-20261025`.

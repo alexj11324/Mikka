@@ -3,7 +3,7 @@ import { readdirSync,readFileSync } from 'node:fs'
 import test from 'node:test'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { createHash } from 'node:crypto'
-const manifest=JSON.parse(readFileSync(new URL('../docs/factory/migration-manifest-7251bf2.json',import.meta.url)))
+const manifest=JSON.parse(readFileSync(new URL('../docs/factory/migration-manifest-dd6d8d4.json',import.meta.url)))
 const dir=new URL('../drizzle/',import.meta.url)
 const names=readdirSync(dir).filter(n=>n.endsWith('.sql'))
 test('one canonical Factory migration per component, after main and before consumers, with unchanged shared SQL',()=>{
