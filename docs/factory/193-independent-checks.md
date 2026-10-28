@@ -100,8 +100,24 @@ The migrated suite additionally executes the actual registered tool, durable rec
 
 The test uses the existing module-mocking runner flag and retains the local PG database and synthetic records. It does not enable native Coordinator, live-eval, real provider traffic, production SQL, flags or deployment. Real collector installation, model-account/budget scope and actual Factory UI/Harness acceptance remain open. #331's shared files and routing ownership are unchanged.
 
-## Resource preservation hold (2026-10-28)
+## Historical resource preservation hold (2026-10-28 21:48)
 
 The latest user instruction requires retaining running resources and audit logs, stopping automatic deletion/cleanup, and reviewing setup/teardown before any related rerun. The Factory daemon fixture no longer stops retained daemons or deletes fixture directories in `afterEach`, including when `FACTORY_EVIDENCE_OUT` is absent. The owned reader/consumer DB suites retain their schema/database; releasing clients is not resource deletion. This does not establish that the runner/host itself retains resources.
 
 Related existing shared CI paths still include destructive bootstrap/schema cleanup, routing-test deletion, account session/file cleanup, other daemon helpers, Docker `--rm`/forced removal and hosted service teardown. Those shared owners require coordinated fixes. A currently running job uses an immutable older checkout; changing this source cannot retroactively change that job. Do not cancel/kill a job to trigger cleanup, push a replacement that automatically cancels it, rerun these suites, or treat historical green results as resource-retention acceptance. No deletion, rebuild or restoration of existing resources is performed by this patch. The retention change is source-only and has not been runtime-tested under this hold.
+
+
+## Historical static entry block before the later authorization
+
+All three resource-owning Factory fixture modules now fail immediately at module entry, before their Pool/schema/database/HTTP/Daemon setup. This is an unconditional source guard, with no environment-variable bypass and no skipped-as-passed path. Original test assertions remain below it. The fixtures are blocked/unrun; no test, build or provider request was used to validate this patch.
+
+Removing only `afterEach` stop/rm was insufficient: normal daemon run completion still reaches `discardIfEmpty`, heartbeat reaches prune/sweep, signal/startup-error/lock-loss/drain paths reach stop, and stop can close/remove sockets, reset sandbox and remove PID/lock files. Broker startup also removes a pre-existing socket, and outbox delivery can remove journal/ack files. Read-only candidate policy controls execution/publish behavior, not fixture lifecycle retention. A non-deleting broker suspension and daemon/runner integration must be supplied by the existing owner before these entries can be reconsidered. No shared broker production code or existing resource is modified by this source patch.
+
+
+## Current hosted-CI authorization scope (2026-10-28 22:53–22:59)
+
+The later explicit user authorization covers existing CI reading Staging secrets and cleanup of this run's newly created hosted temporary test resources. Secret values must not be exposed to models, logs or third parties. It does not authorize production migrations, deletion of existing business data, preserved local resources or protected audit logs, new credentials/accounts or persistent access. Historical cleanup observations above are not retroactively converted into retention acceptance.
+
+The temporary unconditional fixture holds are removed. The two DB suites retain their original strict Actions/loopback-target checks and every test assertion. The daemon process fixture is restricted to the existing hosted CI environment before setup; it stops only the daemon instances it constructs, revoking their authority, and retains fixture directories/evidence. It does not call cleanupTempDirs or target the pre-existing preserved local PG service. Hosted job resource recycling is covered only for that job's new temporary resources. No operator is asked for another general engineering approval.
+
+Actual provider/Harness/UI acceptance still needs the correct existing account, permission and exact runtime, and specific denials are not bypassed. Tests must actually execute; a fail-fast, skip, mock transport or green historical run does not establish full Factory functional acceptance.

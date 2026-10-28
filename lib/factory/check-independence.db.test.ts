@@ -588,7 +588,7 @@ test(
       await pool.end();
       await admin.end();
       console.log(
-        "Retained isolated reader-projection fixtures; service teardown is not authorized by this test; no provider calls",
+        "Retained reader fixtures until authorized cleanup of this run's new hosted CI service; no provider calls",
       );
     }
   },

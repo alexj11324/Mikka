@@ -9,12 +9,17 @@ import { MemoryServer } from "../src/server-link"
 import { fixedCheckSnapshot } from "../src/runs/check"
 import { makeRepo, tempDir, waitFor } from "./helpers"
 
+// This process fixture runs only in the existing hosted CI test environment.
+// The user authorized cleanup of newly created hosted temporary resources;
+// preserved local containers/databases/directories are not test targets.
+if (process.env.CI !== "true" || process.env.GITHUB_ACTIONS !== "true")
+  throw new Error("Factory daemon process fixture requires isolated hosted CI")
+
 const daemons: Daemon[] = []
-// Retain running daemon fixtures and their directories by default. A runner
-// must preserve its process/host too; do not run under an auto-teardown job.
-// No stop/kill/rm fallback is authorized by a failed assertion or timeout.
-afterEach(() => {
-  // Keep references and all evidence; no daemon stop or directory removal.
+afterEach(async () => {
+  // Revoke authority and stop only these newly constructed fixture daemons.
+  // Keep their directories/evidence; never call cleanupTempDirs here.
+  for (const daemon of daemons.splice(0)) await daemon.stop()
 })
 const policy = {
   readOnly: true,

@@ -1482,7 +1482,7 @@ test(
       if (installedGatewayFixture) delete process.env.DECISION_GATEWAY_API_KEY;
       await pool?.end();
       // Retain this database. Closing clients does not delete the database.
-      // Runner/service teardown is separately blocked pending retention review.
+      // Only this run's new hosted CI service is covered by the temporary-resource cleanup authorization.
       await admin.end();
     }
   },
