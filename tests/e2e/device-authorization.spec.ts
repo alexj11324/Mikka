@@ -84,7 +84,7 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   await expect(page.getByRole('textbox', { name: '终端验证码', exact: true })).toBeVisible()
   await page.getByRole('textbox', { name: '终端验证码', exact: true }).fill('x')
   await page.getByRole('button', { name: '继续', exact: true }).click()
-  await expect(page.getByRole('alert')).toHaveText('验证码无效或已过期')
+  await expect(page.getByRole('region', { name: '连接这台电脑', exact: true }).getByRole('alert')).toHaveText('验证码无效或已过期')
   await testInfo.attach('device-code-invalid-narrow', { body: await page.screenshot(), contentType: 'image/png' })
   await page.getByRole('button', { name: '重新输入', exact: true }).click()
   await expect(page.getByRole('textbox', { name: '终端验证码', exact: true })).toHaveValue('')
