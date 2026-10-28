@@ -9,7 +9,7 @@ import { fillCredential } from './broker'
 import type { Kms } from './kms'
 
 const databaseURL = process.env.CREDENTIAL_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
-if (databaseURL) throw new Error('Credential database tests are on retention hold pending complete resource lifecycle review')
+if (databaseURL && process.env.CREDENTIAL_TEST_RETAIN_RESOURCES !== '1') throw new Error('Credential database tests require explicit resource retention')
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Credential test database is required')
 test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation and opaque responses', { skip: !databaseURL }, async () => {
   process.env.BETTER_AUTH_SECRET = 'isolated-credential-test-fingerprint-key'
@@ -120,6 +120,30 @@ test('real PostgreSQL: observed credential lease inserts once and stays guarded'
     assert.equal(inserted, 1); assert.equal(decrypts, 1); assert.equal(ended, false)
     assert.equal((await pool.query('SELECT count(*)::int AS count FROM browser_sessions')).rows[0].count, 0)
     await assert.rejects(fillCredential(pool, lease.lease, { kms, guard, connect: (async () => cdp) as never }), CredentialError)
+    // Pause after the lease is durably claimed on a real independent client.
+    // A password update must fence this already-claimed old revision too.
+    const beforeUpdate = await store.lease(actor, origin, target, undefined, true)
+    if (beforeUpdate.status !== 'ready') throw new Error('fixture lease not issued')
+    let signalClaimed!: () => void, resumeClaim!: () => void
+    const claimed = new Promise<void>(resolve => { signalClaimed = resolve })
+    const resume = new Promise<void>(resolve => { resumeClaim = resolve })
+    const delayedPool = {
+      async query(sql: string, values: unknown[]) {
+        const result = await pool.query(sql, values)
+        if (sql.startsWith('WITH candidate')) { signalClaimed(); await resume }
+        return result
+      },
+      connect: () => pool.connect(),
+    }
+    const oldFill = fillCredential(delayedPool as never, beforeUpdate.lease, { kms, guard, connect: (async () => cdp) as never })
+    const refused = assert.rejects(oldFill, CredentialError)
+    await claimed
+    try {
+      const updateChallenge = await store.challenge(actor, origin)
+      await store.save(actor, { nonce: updateChallenge.nonce, origin, username: 'fixture-user', password: 'replacement-synthetic' })
+    } finally { resumeClaim() }
+    await refused
+    assert.equal(decrypts, 1); assert.equal(inserted, 1)
     const stale = await store.lease(actor, origin, target, undefined, true)
     if (stale.status !== 'ready') throw new Error('fixture lease not issued')
     await pool.query('UPDATE workspace_computer_policies SET version=2 WHERE "workspaceId"=$1', [actor.workspaceId])

@@ -151,7 +151,7 @@ test('broker reports mechanical session application or submission without judgin
     const calls: string[] = []
     const locks: string[] = []
     let guardEnded = false
-    const claimed = { user_id: owner.userId, workspace_id: 'workspace', bot_id: 'bot', run_id: null, subagent_id: 'subagent', credential_id: owner.credentialId, origin: owner.origin, input_kind: 'password', target: { targetId: 'target', origin: owner.origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, credentialMode: forcePassword ? 'password' : 'session-first', observedInput: { loaderId: 'loader', backendNodeId: 7, credentialRole: 'password', epoch: 1, permissionVersion: 0 } } }
+    const claimed = { user_id: owner.userId, workspace_id: 'workspace', bot_id: 'bot', run_id: null, subagent_id: 'subagent', credential_id: owner.credentialId, origin: owner.origin, input_kind: 'password', target: { targetId: 'target', origin: owner.origin, endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, credentialMode: forcePassword ? 'password' : 'session-first', credentialRevision: password.nonce, observedInput: { loaderId: 'loader', backendNodeId: 7, credentialRole: 'password', epoch: 1, permissionVersion: 0 } } }
     const credential = { wrapped_dek: password.wrappedDek, nonce: password.nonce, ciphertext: password.ciphertext, username: 'fixture-user' }
     const session = { wrapped_dek: snapshot.wrappedDek, nonce: snapshot.nonce, ciphertext: snapshot.ciphertext }
     const client = {
@@ -203,7 +203,7 @@ test('password retry is bound to the server-authorized caller and its one-use ta
   const pool = { async query(sql: string, values: unknown[]) {
     if (sql.includes('FROM bots ')) return { rows: values[1] === caller.userId && values[2] === caller.workspaceId ? [{ id: caller.botId }] : [] }
     if (sql.includes('FROM agent_runs ')) return { rows: values[1] === caller.userId && values[2] === caller.botId ? [{ id: caller.runId }] : [] }
-    if (sql.includes('FROM credentials ')) return { rows: [{ id: 'credential-fixture' }] }
+    if (sql.includes('FROM credentials ')) return { rows: [{ id: 'credential-fixture', nonce: 'fixture-revision' }] }
     if (sql.includes('INSERT INTO credential_fill_leases')) { captured.values = values; return { rows: [] } }
     throw new Error('unexpected query')
   } }
@@ -252,11 +252,11 @@ test('broker rejects changed epoch, policy, target, origin and loader before dec
 })
 
 test('gateway failure after side effects begin reports unknown without exposing details', async () => {
-  const claimed = { user_id: 'owner', workspace_id: 'workspace', bot_id: 'bot', subagent_id: 'subagent', run_id: null, credential_id: 'credential', origin: 'https://example.com', target: { targetId: 'target', origin: 'https://example.com', endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, observedInput: { loaderId: 'loader', backendNodeId: 7, credentialRole: 'password', epoch: 1, permissionVersion: 0 } } }
+  const claimed = { user_id: 'owner', workspace_id: 'workspace', bot_id: 'bot', subagent_id: 'subagent', run_id: null, credential_id: 'credential', origin: 'https://example.com', target: { credentialRevision: 'fixture-revision', targetId: 'target', origin: 'https://example.com', endpoint: 'https://example.e2b.app/', expiresAt: Date.now() + 60000, observedInput: { loaderId: 'loader', backendNodeId: 7, credentialRole: 'password', epoch: 1, permissionVersion: 0 } } }
   const client = { async query(sql: string) {
     if (sql.includes('FROM bot_subagents s LEFT JOIN')) return { rows: [{ targetId: 'target', epoch: 1, permissionVersion: 0, permission: 'ask' }] }
     if (sql.includes('SELECT id FROM')) return { rows: [{ id: 'ok' }] }
-    if (sql.includes('JOIN credential_secrets')) return { rows: [{ wrapped_dek: 'fixture' }] }
+    if (sql.includes('JOIN credential_secrets')) return { rows: [{ wrapped_dek: 'fixture', nonce: 'fixture-revision' }] }
     return { rows: [] }
   }, release() {} }
   const pool = { async query() { return { rows: [claimed] } }, async connect() { return client } }
@@ -279,7 +279,8 @@ test('revocation retains rows and disables credential, session and leases', asyn
   assert(!statements.some(sql => /\bDELETE\b/i.test(sql)))
 })
 
-test('saving an existing login fails closed and rolls back', async () => {
+test('saving an existing login retains and expires sessions', async () => {
+  process.env.BETTER_AUTH_SECRET = 'synthetic-test-auth-secret'
   const statements: string[] = []
   const client = { async query(sql: string) {
     statements.push(sql)
@@ -289,9 +290,9 @@ test('saving an existing login fails closed and rolls back', async () => {
     return { rows: [], rowCount: 0 }
   }, release() {} }
   const store = new CredentialStore({ async connect() { return client } } as never, fixtureKms())
-  await assert.rejects(store.save({ userId: 'fixture', workspaceId: 'workspace', botId: 'bot', runId: 'run' }, { nonce: 'a'.repeat(43), origin: owner.origin, username: 'fixture', password: 'synthetic' }), (error: unknown) => error instanceof CredentialError && error.code === 'credential_update_retention_hold')
-  assert(statements.includes('ROLLBACK'))
-  assert(!statements.includes('COMMIT'))
+  assert.deepEqual(await store.save({ userId: 'fixture', workspaceId: 'workspace', botId: 'bot', runId: 'run' }, { nonce: 'a'.repeat(43), origin: owner.origin, username: 'fixture', password: 'synthetic' }), { status: 'saved', origin: owner.origin })
+  assert(statements.some(sql => sql.includes('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now())')))
+  assert(statements.includes('COMMIT'))
   assert(!statements.some(sql => /\bDELETE\b/i.test(sql)))
 })
 

@@ -19,7 +19,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
   if (!claimed) throw new CredentialError('credential_denied', 404)
   const caller = { userId: claimed.user_id, workspaceId: claimed.workspace_id, botId: claimed.bot_id, subagentId: claimed.subagent_id, runId: claimed.run_id }
   const context = { userId: caller.userId, credentialId: claimed.credential_id, origin: claimed.origin }
-  const target = claimed.target as BrowserTarget & { credentialMode?: 'password' | 'session-first' }
+  const target = claimed.target as BrowserTarget & { credentialMode?: 'password' | 'session-first'; credentialRevision?: string }
   const client = await pool.connect()
   let cdp: Cdp | undefined, guardToken: string | undefined, completed = false, effectStarted = false
   let plaintext: Buffer | undefined
@@ -45,7 +45,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     assertCredentialPageBinding({ ...common, targetId: target.targetId, epoch: observed.epoch, permissionVersion: observed.permissionVersion, expiresAt: target.expiresAt }, { ...common, targetId: bound.targetId, epoch: bound.epoch, permissionVersion: bound.permissionVersion })
     if (target.origin !== context.origin) throw new CredentialError('credential_denied', 404)
     const credential = (await client.query(`SELECT s.*,c.username FROM credentials c JOIN credential_secrets s ON s.credential_id=c.id WHERE c.id=$1 AND c.user_id=$2 AND c.origin=$3 AND c.revoked_at IS NULL AND c.unattended_allowed=true FOR UPDATE OF c`, [context.credentialId, context.userId, context.origin])).rows[0]
-    if (!credential || target.expiresAt <= Date.now()) throw new CredentialError('credential_denied', 404)
+    if (!credential || typeof target.credentialRevision !== 'string' || target.credentialRevision !== credential.nonce || target.expiresAt <= Date.now()) throw new CredentialError('credential_denied', 404)
     // A failed or timed-out external request can have taken effect. Never
     // imply that retrying a new lease is safe once gateway I/O has begun.
     effectStarted = true

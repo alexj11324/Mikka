@@ -45,7 +45,8 @@ effect, revocation marks the login revoked, expires its saved session and
 consumes outstanding leases without deleting their records. Revocation
 serializes with an in-flight fill through an account/origin database lock.
 It does not log out an already running browser or revoke sessions at the
-third-party website. Updating an existing saved login is temporarily refused.
+third-party website. Updating a saved login expires its retained session; broker
+leases bind the encrypted secret nonce, checked under the account lock before I/O.
 
 ## API contract
 
