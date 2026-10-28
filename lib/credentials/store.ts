@@ -44,7 +44,6 @@ export class CredentialStore {
       // Serializes upserts, use and deletion for this account/site; no workspace credential sharing.
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${caller.userId}:${origin}`])
       const existing = (await client.query('SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND username=$3 FOR UPDATE', [caller.userId, origin, input.username])).rows[0]
-      if (existing) throw new CredentialError('credential_update_retention_hold', 409)
       const id = existing?.id ?? randomUUID()
       const leak = fingerprint(caller.userId, input.password)
       const envelope = await seal(this.kms, { userId: caller.userId, credentialId: id, origin }, Buffer.from(JSON.stringify({ username: input.username, password: input.password })))

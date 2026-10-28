@@ -273,7 +273,8 @@ test('retention hold refuses credential removal without touching the database', 
   assert.equal(touched, false)
 })
 
-test('retention hold prevents replacing an existing saved login', async () => {
+test('saving an existing login retains session records', async () => {
+  process.env.BETTER_AUTH_SECRET = 'isolated-credential-test-fingerprint-key'
   const statements: string[] = []
   const client = { async query(sql: string) {
     statements.push(sql)
@@ -284,9 +285,9 @@ test('retention hold prevents replacing an existing saved login', async () => {
   }, release() {} }
   const pool = { async connect() { return client } }
   const store = new CredentialStore(pool as never, fixtureKms())
-  await assert.rejects(store.save({ userId: 'fixture', workspaceId: 'workspace', botId: 'bot', runId: 'run' }, { nonce: 'a'.repeat(43), origin: owner.origin, username: 'fixture', password: 'synthetic' }), (error: unknown) => error instanceof CredentialError && error.code === 'credential_update_retention_hold')
-  assert(statements.includes('ROLLBACK'))
-  assert(!statements.some(sql => /\bDELETE\b|INSERT INTO credential_secrets/i.test(sql)))
+  await store.save({ userId: 'fixture', workspaceId: 'workspace', botId: 'bot', runId: 'run' }, { nonce: 'a'.repeat(43), origin: owner.origin, username: 'fixture', password: 'synthetic' })
+  assert(statements.includes('COMMIT'))
+  assert(!statements.some(sql => /\bDELETE\b/i.test(sql)))
 })
 
 test('credential action fails closed when the trusted page binding changes', () => {
