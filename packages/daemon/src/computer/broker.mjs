@@ -16,7 +16,7 @@ export class ComputerBroker {
     driver,
     socketPath,
     permitted,
-    execute = (driver, call, display) => executeDriver(driver, call, display),
+    execute = (driver, call, display, _runId, context) => executeDriver(driver, call, display, undefined, context.assertLive),
     now = Date.now,
     ttl = 300000,
   }) {
@@ -39,7 +39,6 @@ export class ComputerBroker {
   }
   async listen() {
     if (this.suspended) throw new Error("Broker suspended");
-    rmSync(this.socketPath, { force: true });
     this.server = createServer((socket) => {
       this.sockets.add(socket);
       socket.on("close", () => this.sockets.delete(socket));
@@ -84,14 +83,17 @@ export class ComputerBroker {
       return Promise.reject(new Error("Not permitted"));
     const call = normalizeCall(value);
     const actionId = randomUUID();
+    const assertLive = () => {
+      if (this.suspended || signal?.aborted || this.grants.get(token) !== grant ||
+          this.driver?.fingerprint !== grant.fingerprint || !this.permitted(grant.runId))
+        throw new Error("Not permitted");
+    };
     if (grant.permission === "allow") {
       // Recheck at execution admission. The trusted execute callback also
       // enforces the live run, owner, display and policy-version fence.
       return Promise.resolve().then(() => {
-        if (signal?.aborted || this.grants.get(token) !== grant ||
-            this.driver?.fingerprint !== grant.fingerprint || !this.permitted(grant.runId))
-          throw new Error("Not permitted");
-        return this.execute(this.driver, call, grant.display, grant.runId, { actionId });
+        assertLive();
+        return this.execute(this.driver, call, grant.display, grant.runId, { actionId, assertLive });
       });
     }
     if (this.pending.size >= 20) return Promise.reject(new Error("Not permitted"));
@@ -120,6 +122,7 @@ export class ComputerBroker {
       signal?.addEventListener("abort", cancel, { once: true });
       this.pending.set(request.id, {
         token,
+        assertLive,
         cleanup: () => signal?.removeEventListener("abort", cancel),
         request: { ...request, digest },
         resolve,
@@ -165,7 +168,13 @@ export class ComputerBroker {
       return { ok: true };
     }
     try {
-      row.resolve(await this.execute(this.driver, call, display, runId, { actionId: id }));
+      const assertLive = () => {
+        row.assertLive();
+        if (expiresAt <= this.now() || target !== this.driver?.fingerprint)
+          throw new Error("Not permitted");
+      };
+      assertLive();
+      row.resolve(await this.execute(this.driver, call, display, runId, { actionId: id, assertLive }));
     } catch (error) {
       row.reject(error);
     }

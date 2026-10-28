@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, chmod } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -55,6 +55,33 @@ test("suspending revokes grants and pending reviews without closing resources", 
   assert.equal(b.spec("run", "allow"), undefined);
   await assert.rejects(() => b.listen(), /suspended/);
   assert.equal(calls, 0);
+});
+test("listen rejects a pre-existing path without deleting or replacing it", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "broker-conflict-"));
+  const socketPath = join(dir, "socket");
+  await writeFile(socketPath, "retained evidence");
+  const b = await fixture(t, { socketPath });
+  await assert.rejects(() => b.listen(), { code: "EADDRINUSE" });
+  assert.equal(await readFile(socketPath, "utf8"), "retained evidence");
+  t.after(() => { console.log(`Retained conflict test directory: ${dir}`); });
+});
+for (const permission of ["allow", "ask"]) test(`suspension during ${permission} asynchronous admission blocks the later action`, async (t) => {
+  let release, called = 0;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const b = await fixture(t, { execute: async (_driver, _call, _display, _runId, context) => { await waiting; context.assertLive(); called++; } });
+  const grant = b.spec("run", permission);
+  const result = b.request(grant.token, { name: "get_desktop_state" });
+  let decision;
+  if (permission === "ask") {
+    const row = b.list()[0];
+    decision = b.decide(row.id, row.digest, true);
+  }
+  await Promise.resolve();
+  b.suspend();
+  release();
+  await assert.rejects(result, /Not permitted/);
+  if (decision) await decision;
+  assert.equal(called, 0);
 });
 test("each broker action has its own trusted id and ask reuses the review id", async (t) => {
   const ids = [];

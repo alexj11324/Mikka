@@ -124,7 +124,7 @@ export function driverArguments(input, platform = process.platform) {
 }
 // Owned by the daemon, never by a harness. No shell, auto-update, host
 // credentials, arbitrary tool names, output paths or browser attachment tools.
-export async function executeDriver(driver, input, display, leaseGuard) {
+export async function executeDriver(driver, input, display, leaseGuard, assertLive = () => {}) {
   // Set the display per child, never process.env: concurrent bots must not race.
   if (display !== undefined && !/^:[1-9][0-9]{0,3}$/.test(display))
     throw new Error("Invalid desktop display");
@@ -155,6 +155,7 @@ export async function executeDriver(driver, input, display, leaseGuard) {
   const argsForProcess = leaseGuard
     ? ["-F", "-s", `/run/mikka-viewer/${display.slice(1)}.lock`, "/usr/bin/python3", "/opt/mikka/computer/lease-driver.py", display, leaseGuard.botId, leaseGuard.ownerId, String(leaseGuard.policyVersion)]
     : ["mcp", "--direct"];
+  assertLive();
   const child = spawn(command, argsForProcess, {
     env: { ...env, ...(display === undefined ? {} : { DISPLAY: display }) },
     stdio: ["pipe", "pipe", "pipe"],
@@ -222,6 +223,7 @@ export async function executeDriver(driver, input, display, leaseGuard) {
       JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) +
         "\n",
     );
+    assertLive();
     return await request("tools/call", { name: call.name, arguments: args });
   } finally {
     clearTimeout(timer);

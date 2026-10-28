@@ -16,16 +16,17 @@ export type CredentialResolution = { kind: 'ordinary' } | { kind: 'consumed' } |
 export type CredentialExecutorAuthority = {
   consumeMatchingIntent: (runId: string, actionId: string, digest: string) => Promise<CredentialResolution>
   withCurrentLease: <T>(intent: CredentialIntent, action: (live: LiveCredentialLease) => Promise<T>) => Promise<T>
-  executeCredential: (intent: CredentialIntent) => Promise<unknown>
+  executeCredential: (intent: CredentialIntent, assertLive: () => void) => Promise<unknown>
   now?: () => number
 }
 export function credentialAwareExecutor(deps: CredentialExecutorAuthority & {
-  executeOrdinary: (driver: ComputerDriver, call: ComputerCall, display: string | undefined, runId: string) => Promise<unknown>
+  executeOrdinary: (driver: ComputerDriver, call: ComputerCall, display: string | undefined, runId: string, assertLive: () => void) => Promise<unknown>
 }) {
-  return async (driver: ComputerDriver, call: ComputerCall, display: string | undefined, runId: string, context: { actionId: string }) => {
+  return async (driver: ComputerDriver, call: ComputerCall, display: string | undefined, runId: string, context: { actionId: string; assertLive: () => void }) => {
     const digest = createHash('sha256').update(JSON.stringify(call)).digest('hex')
     const resolved = await deps.consumeMatchingIntent(runId, context.actionId, digest)
-    if (resolved.kind === 'ordinary') return deps.executeOrdinary(driver, call, display, runId)
+    context.assertLive()
+    if (resolved.kind === 'ordinary') return deps.executeOrdinary(driver, call, display, runId, context.assertLive)
     if (resolved.kind !== 'credential') throw new Error('Credential action already consumed')
     const { intent } = resolved
     if (![intent.actionId,intent.runId,intent.userId,intent.workspaceId,intent.botId,intent.subagentId,intent.targetId,intent.loaderId].every(value => typeof value === 'string' && value.length > 0) || intent.actionId !== context.actionId || !Number.isSafeInteger(intent.epoch) || intent.epoch < 0 || !Number.isSafeInteger(intent.policyVersion) || intent.policyVersion < 0 || intent.runId !== runId || intent.callDigest !== digest || intent.driverFingerprint !== driver.fingerprint || intent.display !== display || !Number.isSafeInteger(intent.backendNodeId) || intent.backendNodeId < 1 || !['username', 'password'].includes(intent.role) || !Number.isSafeInteger(intent.expiresAt) || intent.expiresAt <= (deps.now ?? Date.now)()) throw new Error('Credential action unavailable')
@@ -33,7 +34,8 @@ export function credentialAwareExecutor(deps: CredentialExecutorAuthority & {
     if (url.protocol !== 'https:' || url.username || url.password || url.origin !== intent.origin) throw new Error('Credential action unavailable')
     return deps.withCurrentLease(intent, async live => {
       if (!live.running || live.runId !== runId || live.userId !== intent.userId || live.workspaceId !== intent.workspaceId || live.botId !== intent.botId || live.subagentId !== intent.subagentId || live.epoch !== intent.epoch || live.display !== intent.display || live.policyVersion !== intent.policyVersion || live.driverFingerprint !== intent.driverFingerprint || live.targetId !== intent.targetId || live.origin !== intent.origin || live.loaderId !== intent.loaderId || live.backendNodeId !== intent.backendNodeId || intent.expiresAt <= (deps.now ?? Date.now)()) throw new Error('Credential action unavailable')
-      const result = await deps.executeCredential(intent)
+      context.assertLive()
+      const result = await deps.executeCredential(intent, context.assertLive)
       if (!result || typeof result !== 'object' || !('status' in result) || typeof result.status !== 'string' || !['needs_login', 'session_applied', 'submitted'].includes(result.status)) throw new Error('Credential action unavailable')
       return { status: result.status }
     })
@@ -43,7 +45,7 @@ export function credentialAwareExecutor(deps: CredentialExecutorAuthority & {
 /** Shared host admission callback used by the daemon broker. */
 export function createHostedComputerExecutor(deps: {
   liveComputer: (runId: string, display: string | undefined) => { botId: string; ownerId: string; policyVersion: number }
-  executeOrdinary: (driver: ComputerDriver, call: ComputerCall, display: string | undefined, runId: string) => Promise<unknown>
+  executeOrdinary: (driver: ComputerDriver, call: ComputerCall, display: string | undefined, runId: string, assertLive: () => void) => Promise<unknown>
   authority?: CredentialExecutorAuthority
 }) {
   const authority = deps.authority
@@ -56,8 +58,9 @@ export function createHostedComputerExecutor(deps: {
       return action(live)
     }),
   })
-  return async (driver: ComputerDriver, call: ComputerCall, display: string | undefined, runId: string, context: { actionId: string }) => {
+  return async (driver: ComputerDriver, call: ComputerCall, display: string | undefined, runId: string, context: { actionId: string; assertLive: () => void }) => {
+    context.assertLive()
     deps.liveComputer(runId, display)
-    return credential ? credential(driver, call, display, runId, context) : deps.executeOrdinary(driver, call, display, runId)
+    return credential ? credential(driver, call, display, runId, context) : deps.executeOrdinary(driver, call, display, runId, context.assertLive)
   }
 }
