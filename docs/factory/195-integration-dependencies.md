@@ -37,3 +37,18 @@ not pass or authorization. Monitor support awaits its owner; no local bypass.
 `planMonitorIssueAssociation` is a pure proposal, not a validator or durable dedupe
 store. Repeated links coalesce; ambiguous links block. Original issue scope is
 checked. New issue is only proposed, never created. It cannot close/recover issues.
+
+V2 consumer source dependency: #194 commit
+2ff475c47e47d2a3e4a4e9440031512a06a8aebc, lib/factory/publication-receipt.ts.
+monitor-v2-binding imports its actual FactoryPublicationReceiptV2 type directly;
+no substitute receipt schema or reader is introduced. This minimal branch does
+not contain #194's files yet: source-only tsx tests erase type imports, so their
+success is NOT evidence of typecheck/build or a runtime reader invocation.
+Normal typecheck awaits coordinated availability of that dependency on the base.
+
+The pure validator requires provider identity, immutable target and candidate
+SHA/repository, explicit action/environment, observation time after publication,
+and production alias before/after. A stable bound 5xx/invalid health body is
+unhealthy; moved identity, unauthorized status or missing health blocks. READY
+alone never proves health. No transport is registered, no real GET is performed,
+and authorized transaction/ancestry validation remain mandatory caller duties.
