@@ -2,6 +2,7 @@ import type { Composio } from '@composio/core'
 import { tool } from 'ai'
 import { z } from 'zod'
 
+import { pickDefaultAccountId } from '@/lib/composio-accounts'
 import { listComposioPages } from '@/lib/composio-pagination'
 
 const email = z.email().max(320)
@@ -183,6 +184,8 @@ export async function executeComposioAction(
   actionName: string,
   input: unknown,
   client: ComposioActionClient | null,
+  /** The account the person chose with 设为默认 for a toolkit, if any. */
+  chosenDefault: (toolkit: string) => Promise<string | null> = async () => null,
 ): Promise<ComposioActionResult> {
   if (!Object.hasOwn(COMPOSIO_ACTIONS, actionName)) return { error: 'integrationActionNotAllowed' }
   const action = COMPOSIO_ACTIONS[actionName as ComposioActionName]
@@ -194,16 +197,17 @@ export async function executeComposioAction(
     const accounts = await listComposioPages(cursor => client.connectedAccounts.list({
       userIds: [userId], toolkitSlugs: [action.toolkit], statuses: ['ACTIVE'], cursor,
     }))
-    const active = accounts.filter(account => account.toolkit.slug === action.toolkit && account.status === 'ACTIVE' && !account.isDisabled)
-    if (active.length === 0) return { error: 'integrationNotConnected' }
-    if (active.length > 1) return { error: 'integrationMultipleAccounts' }
+    const own = accounts.filter(account => account.toolkit.slug === action.toolkit)
+    // The default account (components/plugins 默认): the chosen one while usable, else the oldest usable.
+    const accountId = pickDefaultAccountId(own, own.length > 1 ? await chosenDefault(action.toolkit) : null)
+    if (!accountId) return { error: 'integrationNotConnected' }
 
     const schema = await client.tools.getRawComposioToolBySlug(action.slug)
     if (!schema.version || schema.version === 'latest') return { error: 'integrationActionVersionUnavailable' }
 
     const result = await client.tools.execute(action.slug, {
       userId,
-      connectedAccountId: active[0].id,
+      connectedAccountId: accountId,
       version: schema.version,
       arguments: actionArguments(actionName as ComposioActionName, parsed),
     })

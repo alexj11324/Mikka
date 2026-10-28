@@ -40,3 +40,10 @@ test('OAuth resume URLs omit app-only parameters while preserving the signed req
   const path = oauthResumePath({ sig: 'signed', exp: '123', client_id: 'client', response_type: 'code', oauth: 'failed', continue: 'google', next: '/' })
   assert.equal(path, '/api/auth/oauth2/authorize?client_id=client&response_type=code')
 })
+
+test('returns to the plugins page and a known app page, nothing else', () => {
+  assert.equal(safeAuthReturn('/?section=plugins'), '/?section=plugins')
+  assert.equal(safeAuthReturn('/?section=plugins&app=gmail'), '/?section=plugins&app=gmail')
+  assert.equal(safeAuthReturn('/?section=plugins&app=github'), '/')
+  assert.equal(safeAuthReturn('/?section=plugins&app=gmail&next=//evil.test'), '/')
+})

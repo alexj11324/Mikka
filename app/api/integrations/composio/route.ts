@@ -2,16 +2,22 @@ import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth, authBaseURL } from '@/lib/auth'
-import { COMPOSIO_AUTH_CALLBACK_PATH } from '@/lib/auth-return'
-import { BASE_PATH, withBasePath } from '@/lib/base-path'
-import { cannotRevokeComposioAccount, COMPOSIO_TOOLKITS, getComposio, isComposioToolkit, renameComposioAccount } from '@/lib/composio'
-import { accountUpdateSchema, COMPOSIO_REPLACE_COOKIE, disconnectComposioAccount, toConnectedAccountView } from '@/lib/composio-accounts'
+import { BASE_PATH } from '@/lib/base-path'
+import { COMPOSIO_TOOLKITS, getComposio, isComposioToolkit, renameComposioAccount, retireComposioAccount } from '@/lib/composio'
+import { chooseComposioDefault, listComposioAccountRecords } from '@/lib/composio-account-store'
+import { accountUpdateSchema, isDuplicateAliasError, safeReturnPath, toConnectedAccountView, withAccountRecords } from '@/lib/composio-accounts'
 import { isComposioCallbackVerifierConfigured } from '@/lib/composio-config'
+import { COMPOSIO_FLOW_COOKIE, composioFlowCookieOptions, encodeComposioFlow } from '@/lib/composio-flow'
 import { listComposioPages } from '@/lib/composio-pagination'
 
 const accountIdSchema = z.string().trim().min(1).max(255)
-// Connect a new account for a toolkit, or reconnect one the person has.
-const connectSchema = z.union([z.object({ toolkit: z.enum(COMPOSIO_TOOLKITS) }).strict(), z.object({ accountId: accountIdSchema }).strict()])
+const returnToSchema = z.string().max(512).optional()
+// Connect a new account for a toolkit, or reconnect one the person has;
+// `returnTo` is where the callback sends them back (validated again there).
+const connectSchema = z.union([
+  z.object({ toolkit: z.enum(COMPOSIO_TOOLKITS), returnTo: returnToSchema }).strict(),
+  z.object({ accountId: accountIdSchema, returnTo: returnToSchema }).strict(),
+])
 const disconnectSchema = z.object({ accountId: accountIdSchema })
 
 function sameOrigin(request: Request) {
@@ -37,8 +43,11 @@ async function handleGET(request: Request) {
     return NextResponse.json({ configured: false, callbackVerifierConfigured, webhookConfigured, accounts: [] }, { headers: { 'Cache-Control': 'private, no-store' } })
   }
   try {
-    const items = await listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [session.user.id], cursor }))
-    const accounts = items.flatMap(account => toConnectedAccountView(account) ?? [])
+    const [items, records] = await Promise.all([
+      listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [session.user.id], cursor })),
+      listComposioAccountRecords(session.user.id),
+    ])
+    const accounts = withAccountRecords(items.flatMap(account => toConnectedAccountView(account) ?? []), records)
     return NextResponse.json({ configured: true, callbackVerifierConfigured, webhookConfigured, accounts }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch {
     return NextResponse.json({ error: 'integrationsUnavailable' }, { status: 502 })
@@ -65,9 +74,9 @@ async function handlePOST(request: Request) {
     const connection = await composioSession.authorize(toolkit)
     if (!connection.redirectUrl) return NextResponse.json({ error: 'integrationStartFailed' }, { status: 502 })
     const response = NextResponse.json({ redirectUrl: connection.redirectUrl }, { headers: { 'Cache-Control': 'no-store' } })
-    const cookie = { path: withBasePath(COMPOSIO_AUTH_CALLBACK_PATH), httpOnly: true, sameSite: 'lax' as const, secure: new URL(request.url).protocol === 'https:' }
-    if (replacing) response.cookies.set(COMPOSIO_REPLACE_COOKIE, replacing.id, { ...cookie, maxAge: 600 })
-    else response.cookies.set(COMPOSIO_REPLACE_COOKIE, '', { ...cookie, maxAge: 0 })
+    // Bound to this link: the callback acts on `replace` only when it completes `link`.
+    const returnTo = safeReturnPath(parsed.data.returnTo) ?? undefined
+    response.cookies.set(COMPOSIO_FLOW_COOKIE, encodeComposioFlow({ link: connection.id, replace: replacing?.id, returnTo }), composioFlowCookieOptions(request.url, 600))
     return response
   } catch {
     return NextResponse.json({ error: 'integrationStartFailed' }, { status: 502 })
@@ -86,14 +95,14 @@ async function handleDELETE(request: Request) {
   try {
     const account = await findOwnAccount(composio, session.user.id, parsed.data.accountId)
     if (!account) return NextResponse.json({ error: 'integrationNotFound' }, { status: 404 })
-    await disconnectComposioAccount(composio.connectedAccounts, account.id, cannotRevokeComposioAccount)
+    await retireComposioAccount(composio, session.user.id, account.id)
     return new Response(null, { status: 204 })
   } catch {
     return NextResponse.json({ error: 'integrationDisconnectFailed' }, { status: 502 })
   }
 }
 
-/** Turns an account on or off (Composio's `isDisabled`), or renames it. */
+/** Turns an account on or off (Composio's `isDisabled`), renames it, or makes it the toolkit's default. */
 async function handlePATCH(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
   noteLogUser(session?.user?.id)
@@ -109,8 +118,15 @@ async function handlePATCH(request: Request) {
     if ('enabled' in parsed.data) {
       if (parsed.data.enabled) await composio.connectedAccounts.enable(account.id)
       else await composio.connectedAccounts.disable(account.id)
+    } else if ('default' in parsed.data) {
+      await chooseComposioDefault(session.user.id, account.toolkit.slug, account.id)
     } else {
-      await renameComposioAccount(account.id, parsed.data.alias)
+      try {
+        await renameComposioAccount(composio, account.id, parsed.data.alias)
+      } catch (error) {
+        if (isDuplicateAliasError(error)) return NextResponse.json({ error: 'aliasTaken' }, { status: 409 })
+        throw error
+      }
     }
     return new Response(null, { status: 204 })
   } catch {

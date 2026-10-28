@@ -502,6 +502,23 @@ export const suggestionTriggerChecks = pgTable('suggestion_trigger_checks', {
 })
 
 /**
+ * Per Composio connected account: the provider email read at connect time and
+ * whether it is the account bots use for its toolkit (one default per person
+ * and toolkit). Tokens stay in Composio.
+ */
+export const composioAccounts = pgTable('composio_accounts', {
+  accountId: text('accountId').primaryKey(),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  toolkit: text('toolkit').notNull(),
+  email: text('email'),
+  isDefault: boolean('isDefault').notNull().default(false),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  index('composio_accounts_user_idx').on(table.userId, table.toolkit),
+  uniqueIndex('composio_accounts_default_key').on(table.userId, table.toolkit).where(sql`"isDefault"`),
+])
+
+/**
  * Each person's IANA time zone, so the daily briefing is written at 08:00
  * their time (app/api/cron/briefings). The browser's zone, sent when the
  * suggestions list loads, replaces any earlier value; the connect callbacks'

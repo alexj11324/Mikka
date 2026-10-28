@@ -10,7 +10,7 @@ import { withBasePath } from '@/lib/base-path'
 import { cn } from '@/lib/utils'
 import type { ComposioAppId } from '@/lib/composio-accounts'
 import type { SkillsSearchResult } from '@/lib/skills-search'
-import { IntegrationsSettings } from '@/components/settings/integrations-settings'
+import { ConnectedAppDetail, ConnectedAppsList, ConnectedAppsStatus, isComposioAppId, useConnectedApps, usePluginHref } from '@/components/plugins/connected-apps'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { Frame, FramePanel } from '@/components/reui/frame'
@@ -34,7 +34,27 @@ async function fetchSkills([path, query]: readonly [string, string]): Promise<Sk
 export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean }) {
   const t = useTranslations('Plugins')
   const [tab, setTab] = useState<'plugins' | 'skills'>('plugins')
+  const tApps = useTranslations('Settings.integrations')
+  const apps = useConnectedApps()
+  const pluginHref = usePluginHref()
+  // The open app's page is in the URL (?section=plugins&app=gmail), so back,
+  // reload and shared links land on it.
   const [app, setApp] = useState<ComposioAppId | null>(null)
+  useEffect(() => {
+    const read = () => { const value = new URL(window.location.href).searchParams.get('app'); setApp(isComposioAppId(value) ? value : null) }
+    read()
+    window.addEventListener('popstate', read)
+    return () => window.removeEventListener('popstate', read)
+  }, [])
+  function openApp(next: ComposioAppId | null) {
+    const url = new URL(window.location.href)
+    url.searchParams.set('section', 'plugins')
+    if (next) url.searchParams.set('app', next)
+    else url.searchParams.delete('app')
+    window.history.pushState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    setApp(next)
+    if (next) setTab('plugins')
+  }
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const trimmedQuery = query.trim()
@@ -74,7 +94,10 @@ export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean })
               </SettingsSection>
               <GoogleSignInSettings googleEnabled={googleEnabled} />
             </>}
-            <IntegrationsSettings showWebhookDetails={false} rootLabel={t('pluginsTab')} app={app} onAppChange={setApp} />
+            {app
+              ? <ConnectedAppDetail apps={apps} app={app} rootLabel={t('pluginsTab')} rootHref={pluginHref(null)} onBack={() => openApp(null)} />
+              : <ConnectedAppsList apps={apps} title={tApps('heading')} appHref={pluginHref} onOpen={openApp} />}
+            <ConnectedAppsStatus apps={apps} />
           </TabsContent>
           <TabsContent value="skills" className="flex flex-col gap-5 pt-4">
             <div className="flex flex-col gap-3">

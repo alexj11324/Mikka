@@ -1692,7 +1692,12 @@
       "developer": "开发者",
       "website": "网站",
       "updateFailed": "无法更新此账户。",
-      "renameFailed": "无法重命名此账户。"
+      "renameFailed": "无法重命名此账户。",
+      "default": "默认",
+      "makeDefault": "设为默认",
+      "aliasTaken": "这个名称已被另一个账户使用。",
+      "disconnectConsequence": "Bot 将无法再使用这个 {name} 账户。",
+      "disconnected": "已断开 {name}"
     },
     "telegram": {
       "heading": "消息平台",

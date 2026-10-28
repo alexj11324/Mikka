@@ -1692,7 +1692,12 @@
       "developer": "Developer",
       "website": "Website",
       "updateFailed": "Could not update this account.",
-      "renameFailed": "Could not rename this account."
+      "renameFailed": "Could not rename this account.",
+      "default": "Default",
+      "makeDefault": "Make default",
+      "aliasTaken": "Another account already uses this name.",
+      "disconnectConsequence": "Bots will no longer be able to use this {name} account.",
+      "disconnected": "Disconnected {name}"
     },
     "telegram": {
       "heading": "Messaging",

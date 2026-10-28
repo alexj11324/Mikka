@@ -61,24 +61,35 @@ test('executes only for the signed-in user’s active, enabled account and pins 
   })
 })
 
-test('does not execute if no active connection exists or the toolkit has multiple accounts', async () => {
+test('does not execute without an active, enabled connection or with invalid input', async () => {
   let executed = false
   const noAccounts = await executeComposioAction('user-1', 'search_notion_pages', { query: 'roadmap' }, client([
     { ...activeNotion, status: 'REVOKED' },
     { ...activeNotion, id: 'disabled-notion-account', isDisabled: true },
   ]))
-  const multipleAccounts = await executeComposioAction('user-1', 'search_notion_pages', { query: 'roadmap' }, client([
-    activeNotion,
-    { ...activeNotion, id: 'second-notion-account' },
-  ]))
-
   assert.deepEqual(noAccounts, { error: 'integrationNotConnected' })
-  assert.deepEqual(multipleAccounts, { error: 'integrationMultipleAccounts' })
   const noCalls = client([activeNotion], {})
   noCalls.tools.execute = async () => { executed = true; return { successful: true, error: null, data: {} } }
   const invalidInput = await executeComposioAction('user-1', 'search_notion_pages', { page_size: 0 }, noCalls)
   assert.deepEqual(invalidInput, { error: 'invalidIntegrationInput' })
   assert.equal(executed, false)
+})
+
+test('with several accounts, runs as the chosen default, else the oldest usable one', async () => {
+  const older = { ...activeNotion, id: 'older', createdAt: '2026-09-01T00:00:00Z' }
+  const newer = { ...activeNotion, id: 'newer', createdAt: '2026-10-01T00:00:00Z' }
+  const accountUsed = async (accounts: unknown[], chosen: string | null) => {
+    const calls: Record<string, unknown> = {}
+    const asked: string[] = []
+    await executeComposioAction('user-1', 'search_notion_pages', { query: 'roadmap' }, client(accounts, calls), async toolkit => { asked.push(toolkit); return chosen })
+    return { id: (calls.execution as { params: { connectedAccountId: string } }).params.connectedAccountId, asked }
+  }
+  assert.deepEqual(await accountUsed([newer, older], 'newer'), { id: 'newer', asked: ['notion'] })
+  assert.deepEqual(await accountUsed([newer, older], null), { id: 'older', asked: ['notion'] })
+  // A chosen default that is switched off falls back to the oldest usable account.
+  assert.deepEqual(await accountUsed([{ ...newer, isDisabled: true }, older], 'newer'), { id: 'older', asked: ['notion'] })
+  // One account needs no lookup.
+  assert.deepEqual(await accountUsed([newer], null), { id: 'newer', asked: [] })
 })
 
 test('rejects tool slugs outside Mikka’s fixed allowlist', async () => {
