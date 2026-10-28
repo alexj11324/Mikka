@@ -23,44 +23,10 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  credential-scope:
-    name: Identify credential integration changes
-    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka'
-    runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.scope.outputs.changed }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - id: scope
-        name: Check changed credential integration paths without loading credentials
-        env:
-          BEFORE_SHA: ${{ github.event.before }}
-          AFTER_SHA: ${{ github.sha }}
-        run: |
-          node --input-type=module <<'JS'
-          import { execFileSync } from 'node:child_process'
-          import { appendFileSync } from 'node:fs'
-          const before = process.env.BEFORE_SHA
-          const after = process.env.AFTER_SHA
-          if (!/^[0-9a-f]{40}$/.test(after ?? '') || !/^[0-9a-f]{40}$/.test(before ?? '')) throw new Error('Missing immutable comparison range')
-          const args = /^0+$/.test(before)
-            ? ['diff-tree', '--root', '--no-commit-id', '--name-only', '-r', after]
-            : ['diff', '--name-only', before, after]
-          const files = execFileSync('git', args, { encoding: 'utf8' }).trim().split('\n')
-          const changed = files.some(file => /^(lib\/infisical-workload(?:[.-]|\/)|scripts\/credential-diagnostics|docs\/infisical-cloud\.md$)/.test(file))
-          appendFileSync(process.env.GITHUB_OUTPUT, `changed=${changed}\n`)
-          JS
-
   cloud-secret-access:
     name: Cloud credential access (OIDC)
-    needs: credential-scope
-    # Only credential integration changes need live issuer validation. App tests use synthetic fixtures.
-    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && needs.credential-scope.outputs.changed == 'true' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
+    # This migration-only candidate must not retrieve live provider credentials.
+    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
