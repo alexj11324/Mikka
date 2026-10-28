@@ -1,0 +1,31 @@
+# Default-off personal approved-write endpoint
+
+Depends on the transaction foundation in PR373. This batch adds POST `/api/approved-writes` (normal app base path applies), owner/session approval services and one operation ledger. It does not register Bot/native/Coordinator tools, edit frontend layout, replace existing email/calendar-create/update handlers or enable a provider. `PERSONAL_WRITES_ENABLED` remains a code constantfalse; no request/environment override. Disabled calls return503/approvedWritesDisabled before auth, application Pool or provider runtime loads.
+
+## Existing-schema compatibility
+
+No ordinary Drizzle schema/table definition or existing pending-action read/write source changes. Existing `db.select().from(pendingActions)` therefore still projects only its historical columns. Two additive migration sources are required **before enabling the new feature**, not for the unchanged legacy paths:
+
+- 20261028143920_operation_ledger.sql: generic execution ledger, bound to owner+personal workspace+persisted proposal ID.
+- 20261028143921_approved_write_binding.sql: ledger invokedAt plus pending_actions intentKey/operationBinding and owner+intent uniqueness. No new Drizzle columns on pendingActions. Historical308 names are recognized only with exact SQL hash matches, avoiding automatic replay of old applied payloads.
+
+There is no Coordinator receipt table or native protocol/schema dependency in this batch. A required CI-only real-PG regression creates a fresh legacy-only schema, applies only the frozen old pending_actions DDL, inserts one synthetic pending email, calls the actual legacy list for owner/other-owner, and calls the actual disabled product POST. It asserts the new columns/tables are absent. The fixture refuses non-Actions/non-CI/non-required mode, other DB URLs and non-PG17. Hard caps:40query dispatches,3DDL statements,1INSERT,0UPDATE/DELETE/DROP/auth/provider. Only the ephemeral Actions mikka_e2e service at127.0.0.1:5432 is permitted; unique fixture schema and data remain until that service exits. No retained local DB is used. The required inventory expands to17suites and preserves all existing16.
+
+## Browser contract
+
+When a later reviewed release enables the code gate, accept only POST, exact same Origin and browser cookie, with no Authorization header. Better Auth resolves the owner/session server-side with cookie cache disabled; session expiry/revocation is rechecked in the database. Model text, user-supplied owner/connection/workspace fields and displayed proposal cards are not approval.
+
+- Propose: `{op:"propose",action,input,intentId:UUID}`. Create an ID for one explicit human intent, retain across HTTP/lost-response retries and409/503; explicit new intent gets a new ID. UUID case is canonicalized. First read replay under the intent lock, resolve metadata with no APP transaction open, then lock/re-read/limit/session-check and insert. Concurrent metadata reads may duplicate, but the committed intent has one proposal. Changed action/payload rejects, never silently selects a new ID.
+- View: `{op:"view",action,id}`. Returns frozen input, approvalContext, account `{provider,accountId,version}`, timestamps, status and error. No approval, effect, provider lookup or projection writeback.
+- List: `{op:"list",limit?:1..50,cursor?:string}` (default20), returns `{items,nextCursor,asOf}`. Fixed-asOf descending createdAt/id cursor is owner+session-bound. Consistent proposal/ledger snapshot per page; status may advance between pages. Ambiguous/tampered legacy rows become attention-only and cannot poison the whole page or become approvable. Uses its own projection rather than the legacy filter which excludes new/running actions.
+- Decide: `{op:"decide",action,id,approve:boolean}`. Explicit authenticated human approval only. Frozen owner/account/target/version/content is rechecked before send. Repeated confirms share the persisted operation ID and invoke gate; unknown outcomes never authorize resend or become declined/no-effect.
+
+Strict actions: append_notion_paragraph `{page_id:UUID,text:1..2000}`, send_slack_message `{channel:C/G-ID,text:1..3000}`, cancel_calendar_event `{event_id:1..1024,send_updates:"none"|"all"}`. Text is trimmed; unknown fields reject. Slack DM/MPIM/archive/nonmember/bad metadata reject. Calendar only nonrecurring single events with attendee/version/notification binding; missing atomic conditional delete transport fails closed.
+
+HTTP400invalid envelope/input,401session/Bearer rejection,403Origin,409domain/uncertain COMMIT,503unavailable/disabled.200is a typed result, not automatic provider success. View/list statuses pending/running/done/declined; running+operationUncertain remains unresolved. COMMIT errors retain explicit committed/unconfirmed state from the foundation; clients keep IDs and inspect the same result. No automatic transaction-body retry.
+
+## Verification boundaries
+
+Focused tests use actual application functions/SQL generation with in-memory auth/PG/provider leaves; they are not real provider or PG concurrency evidence. The new legacy-schema DB test runs only through the authorized temporary Actions DB suite. Required current-head CI, production build and real-PG results must be recorded separately; older607/849 results are not transferred.
+
+Slack metadata401 remains blocked without identity retry. Notion native/account capability and real provider targets remain unaccepted. Atomic Calendar If-Match transport remains absent/disabled. Bounded approved provider invocation still holds the existing authorization locks; real cancellation/lease timing and a future transport design need separate validation before enabling. No exactly-once, TLS-cancel, native STOP, production auth or production-user acceptance is claimed. Keep issues177/208/308 open and release gatefalse.
