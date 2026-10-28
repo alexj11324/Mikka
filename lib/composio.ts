@@ -1,7 +1,7 @@
 import 'server-only'
-import { Composio, ComposioConnectedAccountNotRevokableError, ComposioConnectedAccountRevocationNotSupportedError } from '@composio/core'
-import { executeComposioAction, type ComposioActionName, type ComposioActionResult } from '@/lib/composio-actions'
-import { COMPOSIO_APP_IDS, disconnectComposioAccount, PROVIDER_IDENTITY, providerAnswer, SLACK_USER_INFO, sanitizeEmail, slackUserEmail, slackUserId, type ComposioAppId } from '@/lib/composio-accounts'
+import { Composio } from '@composio/core'
+import { COMPOSIO_ACTIONS, executeComposioAction, resolveComposioAccount, type ComposioActionName, type ComposioActionResult } from '@/lib/composio-actions'
+import { COMPOSIO_APP_IDS, revokeAndForgetAccount, PROVIDER_IDENTITY, providerAnswer, SLACK_USER_INFO, sanitizeEmail, slackUserEmail, slackUserId, type ComposioAppId } from '@/lib/composio-accounts'
 import { chosenComposioDefault, forgetComposioAccount } from '@/lib/composio-account-store'
 
 export const COMPOSIO_TOOLKITS = COMPOSIO_APP_IDS
@@ -12,8 +12,14 @@ export function getComposio() {
   return apiKey ? new Composio({ apiKey }) : null
 }
 
-export function runComposioAction(userId: string, action: ComposioActionName, input: unknown): Promise<ComposioActionResult> {
-  return executeComposioAction(userId, action, input, getComposio(), toolkit => chosenComposioDefault(userId, toolkit))
+export function runComposioAction(userId: string, action: ComposioActionName, input: unknown, accountId?: string): Promise<ComposioActionResult> {
+  return executeComposioAction(userId, action, input, getComposio(), toolkit => chosenComposioDefault(userId, toolkit), accountId)
+}
+
+export async function resolveActionAccount(userId: string, action: ComposioActionName): Promise<string | null> {
+  const composio = getComposio()
+  if (!composio) return null
+  return resolveComposioAccount(userId, COMPOSIO_ACTIONS[action].toolkit, composio, toolkit => chosenComposioDefault(userId, toolkit))
 }
 
 export function isComposioToolkit(value: string): value is ComposioToolkit {
@@ -29,11 +35,6 @@ type ComposioClient = NonNullable<ReturnType<typeof getComposio>>
  */
 export async function renameComposioAccount(composio: ComposioClient, id: string, alias: string) {
   await composio.getClient().connectedAccounts.patch(id, { alias })
-}
-
-/** Revoke cannot be done for this account: the provider has no revocation API, or the account is not in a revokable state. */
-export function cannotRevokeComposioAccount(error: unknown) {
-  return error instanceof ComposioConnectedAccountRevocationNotSupportedError || error instanceof ComposioConnectedAccountNotRevokableError
 }
 
 /**
@@ -58,10 +59,13 @@ export async function readComposioAccountEmail(composio: ComposioClient, userId:
 
 /**
  * Disconnects one of the person's accounts and forgets Mikka's notes on it.
- * Its alias is cleared first so the account that replaces it can take it.
+ * The alias is cleared only after revocation succeeds, so a failed revoke
+ * leaves the old account name intact.
  */
-export async function retireComposioAccount(composio: ComposioClient, userId: string, accountId: string) {
-  await renameComposioAccount(composio, accountId, '').catch(() => undefined)
-  await disconnectComposioAccount(composio.connectedAccounts, accountId, cannotRevokeComposioAccount)
-  await forgetComposioAccount(userId, accountId)
+export async function retireComposioAccount(composio: ComposioClient, userId: string, accountId: string, alias?: string | null) {
+  await revokeAndForgetAccount({
+    revoke: () => composio.connectedAccounts.revoke(accountId),
+    clearAlias: () => renameComposioAccount(composio, accountId, ''),
+    forget: () => forgetComposioAccount(userId, accountId),
+  }, Boolean(alias))
 }

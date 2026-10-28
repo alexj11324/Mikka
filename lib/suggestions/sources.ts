@@ -86,7 +86,7 @@ async function currentGmail(userId: string): Promise<ExternalNotification[]> {
   const result = await runComposioAction(userId, 'fetch_recent_gmail', { query: 'in:inbox is:important newer_than:2d -category:promotions -category:social', max_results: 15 })
   if ('error' in result) return []
   const messages = (result.data as { messages?: unknown }).messages
-  return Array.isArray(messages) ? messages.flatMap(message => gmailNotification(userId, message as Record<string, unknown>) ?? []) : []
+  return Array.isArray(messages) ? messages.flatMap(message => ((notification => notification ? { ...notification, connectedAccountId: result.accountId } : [])(gmailNotification(userId, message as Record<string, unknown>)))) : []
 }
 
 /** Open Linear issues assigned to the person that moved in the last three days. */

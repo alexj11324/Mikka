@@ -80,7 +80,7 @@ async function handleGET(request: NextRequest) {
         saveEmail: (toolkit, accountId, email) => saveComposioAccountEmail(userId, toolkit, accountId, email),
         noteAttempt: (toolkit, accountId) => noteComposioEmailAttempt(userId, toolkit, accountId),
         rename: (accountId, alias) => renameComposioAccount(composio, accountId, alias),
-        retire: accountId => retireComposioAccount(composio, userId, accountId),
+        retire: (accountId, alias) => retireComposioAccount(composio, userId, accountId, alias),
         chooseDefault: (toolkit, accountId) => chooseComposioDefault(userId, toolkit, accountId),
         log: (step, error) => console.error('Composio connect follow-up failed', { step, error: error instanceof Error ? error.name : 'unknown' }),
       })

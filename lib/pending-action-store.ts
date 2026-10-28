@@ -1,7 +1,7 @@
 import 'server-only'
 import { and, desc, eq, gt } from 'drizzle-orm'
 import { isApprovalAction, parseActionInput } from '@/lib/composio-actions'
-import { runComposioAction } from '@/lib/composio'
+import { resolveActionAccount, runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
 import { pendingActions } from '@/lib/db/schema'
 import { calendarEventSummary, PENDING_ACTION_TTL_MS, type PendingActionView } from '@/lib/pending-action-view'
@@ -20,14 +20,16 @@ export async function proposeAction(userId: string, action: string, input: unkno
   if (!parsed) return { error: 'invalidIntegrationInput' }
   const waiting = await db.$count(pendingActions, and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
   if (waiting >= MAX_PENDING) return { error: 'tooManyPendingActions: ask the person to approve or decline the waiting ones first' }
+  const accountId = await resolveActionAccount(userId, action)
+  if (!accountId) return { error: 'integrationNotConnected' }
   let context: PendingActionView['context'] = null
   if (action === 'update_calendar_event') {
-    const current = await runComposioAction(userId, 'get_calendar_event', { event_id: parsed.event_id })
+    const current = await runComposioAction(userId, 'get_calendar_event', { event_id: parsed.event_id }, accountId)
     if ('error' in current) return { error: `eventNotReadable: ${current.error}` }
     context = calendarEventSummary(current.data)
   }
   const id = crypto.randomUUID()
-  await db.insert(pendingActions).values({ id, userId, action, input: parsed, context })
+  await db.insert(pendingActions).values({ id, userId, action, input: parsed, context, connectedAccountId: accountId })
   return { status: 'awaiting_approval', actionId: id }
 }
 

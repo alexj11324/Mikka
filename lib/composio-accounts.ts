@@ -197,22 +197,14 @@ export function isDuplicateAliasError(error: unknown) {
   return status === 409 || (typeof message === 'string' && /alias/i.test(message) && /(unique|already|exist|duplicate|taken|conflict)/i.test(message))
 }
 
-type RevokeApi = {
-  revoke: (id: string) => Promise<unknown>
-  delete: (id: string) => Promise<unknown>
-}
-
-/**
- * Disconnects an account: revoke the tokens at the provider, which leaves it
- * REVOKED (hidden from the page). When the provider cannot revoke
- * programmatically or the account is in a state that cannot be revoked,
- * delete it on Composio instead, which drops the stored tokens.
- */
-export async function disconnectComposioAccount(api: RevokeApi, id: string, cannotRevoke: (error: unknown) => boolean) {
-  try {
-    await api.revoke(id)
-  } catch (error) {
-    if (!cannotRevoke(error)) throw error
-    await api.delete(id)
-  }
+/** Revoke before clearing any alias. SDK HTTP-status wrappers do not prove
+ * a delete is safe, so errors leave the account and its alias untouched. */
+export async function revokeAndForgetAccount(deps: {
+  revoke: () => Promise<unknown>
+  clearAlias: () => Promise<unknown>
+  forget: () => Promise<unknown>
+}, hasAlias: boolean) {
+  await deps.revoke()
+  if (hasAlias) await deps.clearAlias().catch(() => undefined)
+  await deps.forget()
 }

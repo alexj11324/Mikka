@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { accountUpdateSchema, composioConnectRedirect, disconnectComposioAccount, isDuplicateAliasError, pickDefaultAccountId, PROVIDER_IDENTITY, safeReturnPath, sanitizeEmail, slackUserEmail, slackUserId, toConnectedAccountView, withAccountRecords } from './composio-accounts'
+import { accountUpdateSchema, composioConnectRedirect, revokeAndForgetAccount, isDuplicateAliasError, pickDefaultAccountId, PROVIDER_IDENTITY, safeReturnPath, sanitizeEmail, slackUserEmail, slackUserId, toConnectedAccountView, withAccountRecords } from './composio-accounts'
 import { decodeComposioFlow, encodeComposioFlow } from './composio-flow'
 
 const account = { id: 'ca_1', status: 'ACTIVE', isDisabled: false, alias: null as string | null, createdAt: '2026-10-28T10:00:00.000Z', toolkit: { slug: 'gmail' } }
@@ -41,19 +41,19 @@ test('an update either switches an account or renames it, never both', () => {
   assert.equal(accountUpdateSchema.safeParse({ accountId: 'ca_1', default: false }).success, false)
 })
 
-test('disconnect revokes, and deletes only when the account cannot be revoked', async () => {
+test('revocation failure leaves the alias and stored account untouched, including 400 and 409', async () => {
+  for (const status of [400, 409, 503]) {
+    const calls: string[] = []
+    await assert.rejects(revokeAndForgetAccount({
+      revoke: async () => { calls.push('revoke'); throw new Error(String(status)) },
+      clearAlias: async () => { calls.push('clear') },
+      forget: async () => { calls.push('forget') },
+    }, true))
+    assert.deepEqual(calls, ['revoke'])
+  }
   const calls: string[] = []
-  const api = (revoke: () => Promise<unknown>) => ({ revoke: async (id: string) => { calls.push(`revoke ${id}`); return revoke() }, delete: async (id: string) => { calls.push(`delete ${id}`) } })
-  class CannotRevoke extends Error {}
-
-  await disconnectComposioAccount(api(async () => ({})), 'ca_1', error => error instanceof CannotRevoke)
-  assert.deepEqual(calls.splice(0), ['revoke ca_1'])
-
-  await disconnectComposioAccount(api(async () => { throw new CannotRevoke() }), 'ca_2', error => error instanceof CannotRevoke)
-  assert.deepEqual(calls.splice(0), ['revoke ca_2', 'delete ca_2'])
-
-  await assert.rejects(disconnectComposioAccount(api(async () => { throw new Error('network') }), 'ca_3', error => error instanceof CannotRevoke), /network/)
-  assert.deepEqual(calls.splice(0), ['revoke ca_3'])
+  await revokeAndForgetAccount({ revoke: async () => { calls.push('revoke') }, clearAlias: async () => { calls.push('clear') }, forget: async () => { calls.push('forget') } }, true)
+  assert.deepEqual(calls, ['revoke', 'clear', 'forget'])
 })
 
 test('the default account is the chosen usable one, else the oldest usable one', () => {

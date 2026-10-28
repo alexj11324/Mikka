@@ -43,7 +43,7 @@ test('executes only for the signed-in user’s active, enabled account and pins 
     client([activeNotion], calls),
   )
 
-  assert.deepEqual(result, { data: { results: [] } })
+  assert.deepEqual(result, { data: { results: [] }, accountId: 'notion-account' })
   assert.deepEqual(calls.accountQuery, {
     userIds: ['user-1'],
     toolkitSlugs: ['notion'],
@@ -134,4 +134,19 @@ test('only sending mail and writing the calendar need approval', () => {
   assert.equal(isApprovalAction('update_calendar_event'), true)
   assert.equal(isApprovalAction('list_calendar_events'), false)
   assert.equal(isApprovalAction('fetch_recent_gmail'), false)
+})
+
+
+test('bound actions never follow a changed default or use a disabled, missing, or wrong-toolkit account', async () => {
+  const older = { ...activeNotion, id: 'older', createdAt: '2026-09-01T00:00:00Z' }
+  const newer = { ...activeNotion, id: 'newer', createdAt: '2026-10-01T00:00:00Z' }
+  const calls: Record<string, unknown> = {}
+  await executeComposioAction('user-1', 'search_notion_pages', { query: 'x' }, client([older, newer], calls), async () => 'newer', 'older')
+  assert.equal((calls.execution as { params: { connectedAccountId: string } }).params.connectedAccountId, 'older')
+  for (const accounts of [[newer], [{ ...older, isDisabled: true }, newer], [{ ...older, toolkit: { slug: 'gmail' } }, newer]]) {
+    const attempted: Record<string, unknown> = {}
+    const result = await executeComposioAction('user-1', 'search_notion_pages', { query: 'x' }, client(accounts, attempted), async () => 'newer', 'older')
+    assert.deepEqual(result, { error: 'integrationNotConnected' })
+    assert.equal(attempted.execution, undefined)
+  }
 })

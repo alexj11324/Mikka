@@ -24,8 +24,8 @@ export type ComposioEmailDeps = {
 }
 
 export type ComposioConnectDeps = ComposioEmailDeps & {
-  /** Disconnects the old account and forgets Mikka's notes on it (clears its alias first). */
-  retire: (accountId: string) => Promise<void>
+  /** Disconnects the old account and forgets Mikka's notes on it. */
+  retire: (accountId: string, alias?: string | null) => Promise<void>
   chooseDefault: (toolkit: ComposioAppId, accountId: string) => Promise<void>
   log: (step: string, error: unknown) => void
 }
@@ -93,15 +93,17 @@ export async function followUpComposioConnect(
     ? input.items.find(item => item.id === input.replaceId && item.toolkit.slug === toolkit)
     : undefined
   const handover = replaced ? reconnectHandover(input.items, input.records, replaced.id) : null
-  if (replaced) {
+  if (replaced && added.status === 'ACTIVE' && !added.isDisabled) {
+    let retired = false
     try {
-      await deps.retire(replaced.id)
+      await deps.retire(replaced.id, replaced.alias)
+      retired = true
     } catch (error) {
       deps.log('retire', error)
     }
     // After the retire, which frees the old name, so Composio takes it for the new account.
-    if (handover?.alias) await deps.rename(added.id, handover.alias).catch(error => deps.log('carryAlias', error))
-    if (handover?.isDefault) await deps.chooseDefault(toolkit, added.id).catch(error => deps.log('carryDefault', error))
+    if (retired && handover?.alias) await deps.rename(added.id, handover.alias).catch(error => deps.log('carryAlias', error))
+    if (retired && handover?.isDefault) await deps.chooseDefault(toolkit, added.id).catch(error => deps.log('carryDefault', error))
   }
   await fillEmail(deps, added, toolkit, Boolean(handover?.alias))
 }

@@ -176,7 +176,14 @@ function actionArguments(actionName: ComposioActionName, input: Record<string, u
   const action = COMPOSIO_ACTIONS[actionName]
   return 'toArguments' in action ? (action.toArguments as (value: Record<string, unknown>) => Record<string, unknown>)(input) : input
 }
-export type ComposioActionResult = { data: Record<string, unknown> } | { error: string; logId?: string }
+export type ComposioActionResult = { data: Record<string, unknown>; accountId: string } | { error: string; logId?: string }
+
+/** Select a usable account once; callers may bind later operations to its id. */
+export async function resolveComposioAccount(userId: string, toolkit: string, client: ComposioActionClient, chosenDefault: (toolkit: string) => Promise<string | null>): Promise<string | null> {
+  const accounts = await listComposioPages(cursor => client.connectedAccounts.list({ userIds: [userId], toolkitSlugs: [toolkit], statuses: ['ACTIVE'], cursor }))
+  const own = accounts.filter(account => account.toolkit.slug === toolkit)
+  return pickDefaultAccountId(own, own.length > 1 ? await chosenDefault(toolkit) : null)
+}
 export type ComposioActionClient = Pick<Composio, 'connectedAccounts' | 'tools'>
 
 export async function executeComposioAction(
@@ -186,6 +193,7 @@ export async function executeComposioAction(
   client: ComposioActionClient | null,
   /** The account the person chose with 设为默认 for a toolkit, if any. */
   chosenDefault: (toolkit: string) => Promise<string | null> = async () => null,
+  boundAccountId?: string,
 ): Promise<ComposioActionResult> {
   if (!Object.hasOwn(COMPOSIO_ACTIONS, actionName)) return { error: 'integrationActionNotAllowed' }
   const action = COMPOSIO_ACTIONS[actionName as ComposioActionName]
@@ -198,8 +206,10 @@ export async function executeComposioAction(
       userIds: [userId], toolkitSlugs: [action.toolkit], statuses: ['ACTIVE'], cursor,
     }))
     const own = accounts.filter(account => account.toolkit.slug === action.toolkit)
-    // The default account (components/plugins 默认): the chosen one while usable, else the oldest usable.
-    const accountId = pickDefaultAccountId(own, own.length > 1 ? await chosenDefault(action.toolkit) : null)
+    // A bound action never falls back to a different account.
+    const accountId = boundAccountId
+      ? (own.some(account => account.id === boundAccountId && account.status === 'ACTIVE' && !account.isDisabled) ? boundAccountId : null)
+      : pickDefaultAccountId(own, own.length > 1 ? await chosenDefault(action.toolkit) : null)
     if (!accountId) return { error: 'integrationNotConnected' }
 
     const schema = await client.tools.getRawComposioToolBySlug(action.slug)
@@ -212,7 +222,7 @@ export async function executeComposioAction(
       arguments: actionArguments(actionName as ComposioActionName, parsed),
     })
     return result.successful
-      ? { data: result.data, ...(result.logId ? { logId: result.logId } : {}) }
+      ? { data: result.data, accountId, ...(result.logId ? { logId: result.logId } : {}) }
       : { error: result.error ?? 'integrationActionFailed', ...(result.logId ? { logId: result.logId } : {}) }
   } catch (error) {
     console.error('Composio action failed', {

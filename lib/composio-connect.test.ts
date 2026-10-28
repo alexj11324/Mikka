@@ -67,10 +67,19 @@ test('a failed retire still reads the email; another toolkit is never retired', 
   const items = [gmail('old', '2026-09-01T00:00:00Z'), gmail('new', '2026-10-28T00:00:00Z'), { ...gmail('n1', '2026-01-01T00:00:00Z'), toolkit: { slug: 'notion' } }]
   const { calls, deps } = fakeDeps({ new: 'me@example.com' })
   await followUpComposioConnect({ items, records: [], addedId: 'new', replaceId: 'old' }, { ...deps, retire: async () => { throw new Error('boom') } })
-  assert.deepEqual(calls, ['log retire', 'default new', 'read new', 'save new me@example.com', 'rename new me@example.com'])
+  assert.deepEqual(calls, ['log retire', 'read new', 'save new me@example.com', 'rename new me@example.com'])
   const second = fakeDeps()
   await followUpComposioConnect({ items, records: [], addedId: 'new', replaceId: 'n1' }, second.deps)
   assert.deepEqual(second.calls, ['read new', 'save new null'])
+})
+
+test('a non-working replacement never retires the old connection or takes its default', async () => {
+  for (const extra of [{ status: 'INITIATED' }, { status: 'FAILED' }, { isDisabled: true }]) {
+    const items = [gmail('old', '2026-09-01T00:00:00Z'), gmail('new', '2026-10-28T00:00:00Z', extra)]
+    const { calls, deps } = fakeDeps()
+    await followUpComposioConnect({ items, records: [record('old', { isDefault: true })], addedId: 'new', replaceId: 'old' }, deps)
+    assert.ok(!calls.some(call => call.startsWith('retire ') || call.startsWith('default ')))
+  }
 })
 
 test('old accounts get their email on load: at most five, in parallel, each asked once', async () => {

@@ -671,6 +671,7 @@ export type PendingActionStatus = (typeof PENDING_ACTION_STATUSES)[number]
 export const pendingActions = pgTable('pending_actions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   action: text('action').notNull(),
+  connectedAccountId: text('connectedAccountId'),
   input: jsonb('input').$type<Record<string, unknown>>().notNull(),
   context: jsonb('context').$type<Record<string, unknown> | null>(),
   status: text('status').$type<PendingActionStatus>().notNull().default('pending'),

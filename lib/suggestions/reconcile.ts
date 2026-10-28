@@ -31,7 +31,7 @@ const list = (value: unknown): Json[] => Array.isArray(value) ? value.map(record
 async function recentGmail(userId: string): Promise<ExternalNotification[]> {
   const result = await runComposioAction(userId, 'fetch_recent_gmail', { query: 'in:inbox newer_than:2d -category:promotions -category:social', max_results: 50 })
   if ('error' in result) throw new Error(result.error)
-  return list(result.data.messages).flatMap(message => gmailNotification(userId, message) ?? [])
+  return list(result.data.messages).flatMap(message => ((notification => notification ? { ...notification, connectedAccountId: result.accountId } : [])(gmailNotification(userId, message))))
 }
 
 /**
