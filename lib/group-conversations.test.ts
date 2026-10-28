@@ -61,6 +61,28 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     try {
       await reverse.query(reads) // #69 first, then this migration
       await reverse.query(migration)
+      // Compare both orders at the catalog level, including table columns,
+      // defaults, constraints and index keys. Each pool resolves its own schema.
+      const catalog = async (target: Pool) => {
+        const columns = await target.query(`SELECT table_name,column_name,ordinal_position,data_type,udt_name,is_nullable,column_default
+          FROM information_schema.columns WHERE table_schema=current_schema()
+          ORDER BY table_name,ordinal_position`)
+        const constraints = await target.query(`SELECT t.relname AS table_name,c.conname,c.contype,pg_get_constraintdef(c.oid) AS definition
+          FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace
+          WHERE n.nspname=current_schema() ORDER BY t.relname,c.conname`)
+        const indexes = await target.query(`SELECT t.relname AS table_name,idx.relname AS index_name,i.indisunique,i.indisprimary,
+          ARRAY(SELECT pg_get_indexdef(i.indexrelid,k,true) FROM generate_series(1,i.indnkeyatts) AS k ORDER BY k) AS keys,
+          pg_get_expr(i.indpred,i.indrelid) AS predicate
+          FROM pg_index i JOIN pg_class t ON t.oid=i.indrelid JOIN pg_class idx ON idx.oid=i.indexrelid
+          JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname=current_schema()
+          ORDER BY t.relname,idx.relname`)
+        return {columns:columns.rows,constraints:constraints.rows,indexes:indexes.rows}
+      }
+      const forwardCatalog = await catalog(scoped)
+      const reverseCatalog = await catalog(reverse)
+      assert.deepEqual([...new Set(forwardCatalog.columns.map(row => row.table_name))],
+        ['conversation_links','conversation_members','conversation_messages','conversation_reads','conversations'])
+      assert.deepEqual(reverseCatalog, forwardCatalog, 'both migration orders must produce equivalent columns, constraints and indexes')
     } finally { await reverse.end() }
     const run = (changes: Partial<GroupRequest>) => handleGroup(scoped, directory, { ...base, ...changes })
     for (const input of [undefined, '{', JSON.stringify({ workspaceId, title: '', members: [] }), JSON.stringify({ workspaceId: randomUUID(), title: 'foreign' }), JSON.stringify({ workspaceId, title: 'private', members: [{ memberType: 'agent', memberId: privateAgent }] })]) {
