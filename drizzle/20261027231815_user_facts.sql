@@ -1,10 +1,11 @@
 -- R-73 phase 1 (docs/design/proactive.md § 2.2, § 3): each person's profile
--- of facts drawn from what reaches them, shown and editable in 记忆; the
--- person's 记忆 switch with the date their facts were last consolidated; and
--- the daily usage of proactive model calls. Who is entitled lives in PostHog
+-- of facts drawn from what reaches them, shown and editable in 记忆; the date
+-- their facts were last consolidated; and the daily usage of proactive model
+-- calls. The 记忆 switch is user_preferences."memoryEnabled"
+-- (20261027203647_mobile_push.sql); who is entitled lives in PostHog
 -- (mikka-proactive-profile). Facts belong to one person, never to a
--- workspace. Mirrors user_facts, memory_settings and proactive_usage in
--- lib/db/schema.ts. Additive only; safe to run again.
+-- workspace. Mirrors user_facts, user_fact_consolidations and
+-- proactive_usage in lib/db/schema.ts. Additive only; safe to run again.
 
 create table if not exists user_facts (
   id uuid primary key,
@@ -30,11 +31,10 @@ create table if not exists user_facts (
 create index if not exists user_facts_state_idx on user_facts ("userId", state);
 create index if not exists user_facts_kind_idx on user_facts ("userId", kind);
 
-create table if not exists memory_settings (
+-- The person's local date (YYYY-MM-DD) of the last nightly consolidation.
+create table if not exists user_fact_consolidations (
   "userId" text primary key,
-  enabled boolean not null default true,
-  -- The person's local date (YYYY-MM-DD) of the last nightly consolidation.
-  "consolidatedOn" text,
+  "consolidatedOn" text not null,
   "updatedAt" timestamptz not null default now()
 );
 

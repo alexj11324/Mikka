@@ -2,7 +2,7 @@ import 'server-only'
 import { and, asc, desc, eq, ne, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { db } from '@/lib/db'
-import { memorySettings, proactiveUsage, userFacts, userTimeZones } from '@/lib/db/schema'
+import { proactiveUsage, userFactConsolidations, userFacts, userPreferences, userTimeZones } from '@/lib/db/schema'
 import { personLocale } from '@/lib/suggestions/action-title-server'
 import { localClock, safeTimeZone } from '@/lib/suggestions/briefing'
 import type { UserFactKind } from './kinds'
@@ -12,14 +12,13 @@ import { clampSubject, mergedEvidence, mergedValue, planConsolidation, raisedCon
 // own user id; nothing here takes a workspace, so teammates never see each
 // other's facts.
 
-/** Whether 记忆 is on for the person; no row means on. */
+/**
+ * Whether 记忆 is on for the person: user_preferences."memoryEnabled", the one
+ * switch web and mobile Settings write (lib/preferences.ts); no row means on.
+ */
 export async function memoryEnabled(userId: string): Promise<boolean> {
-  const [row] = await db.select({ enabled: memorySettings.enabled }).from(memorySettings).where(eq(memorySettings.userId, userId)).limit(1)
+  const [row] = await db.select({ enabled: userPreferences.memoryEnabled }).from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1)
   return row?.enabled ?? true
-}
-
-export async function setMemoryEnabled(userId: string, enabled: boolean): Promise<void> {
-  await db.insert(memorySettings).values({ userId, enabled }).onConflictDoUpdate({ target: memorySettings.userId, set: { enabled, updatedAt: new Date() } })
 }
 
 /** Profile model calls one person may make per UTC day (proactive.md § 3). */
@@ -157,10 +156,11 @@ const CONSOLIDATION_CONCURRENCY = 8
  * first keeps overlapping runs to one merge per person and day.
  */
 export async function consolidateDueFacts({ entitled, now = new Date(), limit = 500, deadline = Infinity }: { entitled: (userId: string) => Promise<boolean>; now?: Date; limit?: number; deadline?: number }) {
-  const people = await db.selectDistinct({ userId: userFacts.userId, timeZone: userTimeZones.timeZone, enabled: memorySettings.enabled, consolidatedOn: memorySettings.consolidatedOn })
+  const people = await db.selectDistinct({ userId: userFacts.userId, timeZone: userTimeZones.timeZone, enabled: userPreferences.memoryEnabled, consolidatedOn: userFactConsolidations.consolidatedOn })
     .from(userFacts)
     .leftJoin(userTimeZones, eq(userTimeZones.userId, userFacts.userId))
-    .leftJoin(memorySettings, eq(memorySettings.userId, userFacts.userId))
+    .leftJoin(userPreferences, eq(userPreferences.userId, userFacts.userId))
+    .leftJoin(userFactConsolidations, eq(userFactConsolidations.userId, userFacts.userId))
     .where(eq(userFacts.state, 'active'))
   const due = people.flatMap(person => {
     if (person.enabled === false) return []
@@ -175,9 +175,9 @@ export async function consolidateDueFacts({ entitled, now = new Date(), limit = 
     await Promise.all(batch.slice(index, index + CONSOLIDATION_CONCURRENCY).map(async person => {
       try {
         if (!await entitled(person.userId)) { result.skipped++; return }
-        const [claimed] = await db.insert(memorySettings).values({ userId: person.userId, consolidatedOn: person.date })
-          .onConflictDoUpdate({ target: memorySettings.userId, set: { consolidatedOn: person.date, updatedAt: now }, setWhere: and(eq(memorySettings.enabled, true), sql`${memorySettings.consolidatedOn} is distinct from ${person.date}`) })
-          .returning({ userId: memorySettings.userId })
+        const [claimed] = await db.insert(userFactConsolidations).values({ userId: person.userId, consolidatedOn: person.date })
+          .onConflictDoUpdate({ target: userFactConsolidations.userId, set: { consolidatedOn: person.date, updatedAt: now }, setWhere: sql`${userFactConsolidations.consolidatedOn} is distinct from ${person.date}` })
+          .returning({ userId: userFactConsolidations.userId })
         if (!claimed) { result.skipped++; return }
         await consolidateFacts(person.userId, person.timeZone, now)
         result.written++

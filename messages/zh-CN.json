@@ -2729,5 +2729,8 @@
     "loadError": "无法加载已保存的历史对话。",
     "retry": "重试",
     "incomplete": "此历史回复未完成。"
+  },
+  "MobilePush": {
+    "verificationCode": "收到一条验证码"
   }
 }

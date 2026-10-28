@@ -24,8 +24,8 @@ const seen = (at: string, suggestionId: string, fields: Record<string, unknown> 
 })
 
 dbTest('facts stay with their person, merge on repeat, and keep the person\'s corrections', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, { workspaces, workspaceMembers }, store, { and, eq, inArray, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('../db/workspace-schema'), import('./store'), import('drizzle-orm'),
+  const [{ createRequestDatabaseScope, db }, schema, { workspaces, workspaceMembers }, store, preferences, { and, eq, inArray, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('../db/workspace-schema'), import('./store'), import('../preferences'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const alex = `test-facts-alex-${randomUUID()}`
@@ -35,7 +35,8 @@ dbTest('facts stay with their person, merge on repeat, and keep the person\'s co
   t.after(async () => {
     await scope.run(async () => {
       await db.delete(schema.userFacts).where(inArray(schema.userFacts.userId, [alex, dana, outsider]))
-      await db.delete(schema.memorySettings).where(inArray(schema.memorySettings.userId, [alex, dana]))
+      await db.delete(schema.userFactConsolidations).where(inArray(schema.userFactConsolidations.userId, [alex, dana, outsider]))
+      await db.delete(schema.userPreferences).where(inArray(schema.userPreferences.userId, [alex, dana]))
       await db.delete(schema.proactiveUsage).where(inArray(schema.proactiveUsage.userId, [alex, dana]))
       await db.delete(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId))
       await db.delete(workspaces).where(eq(workspaces.id, workspaceId))
@@ -96,7 +97,10 @@ dbTest('facts stay with their person, merge on repeat, and keep the person\'s co
 
     // Nightly merge: due once per local day from 04:00, never for someone with 记忆 off.
     await store.recordFacts(alex, ['2026-10-01', '2026-10-08', '2026-10-15'].map((day, index) => seen(`${day}T01:00:00Z`, `p${index}`, { subject: `调料 ${index}` })))
-    await store.setMemoryEnabled(dana, false)
+    // One 记忆 switch: what web and mobile Settings write (lib/preferences.ts) is what extraction and the merge read.
+    assert.equal(await store.memoryEnabled(dana), true, 'no preferences row: on')
+    await preferences.savePreferences(dana, { memoryEnabled: false })
+    assert.equal((await preferences.readPreferences(dana)).memoryEnabled, false)
     const morning = new Date('2026-10-28T04:30:00Z')
     // Entitlement comes from PostHog (lib/profile/entitlement.ts); here Alex and Dana are entitled, a third person is not.
     await store.recordFacts(outsider, [seen('2026-10-01T01:00:00Z', 'o1')])
@@ -105,9 +109,9 @@ dbTest('facts stay with their person, merge on repeat, and keep the person\'s co
     assert.equal(first.written, 1, 'only Alex: Dana has 记忆 off, the outsider is not entitled')
     assert.ok((await store.listFacts(alex)).some(item => item.kind === 'interest' && item.subject === '川菜'), 'scattered purchases become an interest')
     assert.equal((await store.listFacts(dana)).some(item => item.subject === '川菜'), false)
-    const [settings] = await db.select().from(schema.memorySettings).where(eq(schema.memorySettings.userId, alex))
+    const [settings] = await db.select().from(schema.userFactConsolidations).where(eq(schema.userFactConsolidations.userId, alex))
     assert.equal(settings.consolidatedOn, '2026-10-28')
-    assert.equal((await db.select().from(schema.memorySettings).where(eq(schema.memorySettings.userId, outsider))).length, 0, 'not entitled: not merged or claimed')
+    assert.equal((await db.select().from(schema.userFactConsolidations).where(eq(schema.userFactConsolidations.userId, outsider))).length, 0, 'not entitled: not merged or claimed')
     const again = await store.consolidateDueFacts({ entitled, now: morning })
     assert.deepEqual([again.written, again.due], [0, 1], 'once per local day; only the outsider stays due, and is skipped')
     assert.equal(await store.memoryEnabled(dana), false)

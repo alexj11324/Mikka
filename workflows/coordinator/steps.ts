@@ -1,4 +1,7 @@
 import { preserveMessageSources } from '@/lib/coordinator/message-safety'
+import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
+import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
+import type { AgentExecution } from '@/lib/agent-kit/store'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { createHash } from 'node:crypto'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
@@ -23,6 +26,7 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
 import type { TelegramReplyTarget } from '@/lib/coordinator-events'
 import { postTelegramText } from '@/lib/telegram/client'
+import type { PushReason } from '@/lib/push-reasons'
 import { queueCloudRun } from '@/lib/computer/queue-run'
 import { ComputerStore } from '@/lib/computer/store'
 import { bindBotSubscription } from '@/lib/computer/bot-subscription'
@@ -115,12 +119,20 @@ export async function sendTelegramChunk(threadId: string, chunk: string) {
   await postTelegramText(threadId, chunk)
 }
 
+/** Pushes a reply the Coordinator raised on its own to the person's phones, as their 通知 settings allow (lib/mobile-push.ts). */
+export async function pushToPhones(userId: string, botId: string | null, text: string | null, reasons: PushReason[]) {
+  'use step'
+  // Loaded here, not at the top: only this step needs the push sender and its settings.
+  const { pushReply } = await import('@/lib/mobile-push')
+  await pushReply(userId, botId, text, reasons)
+}
+
 /**
  * Folds older messages into the summary once the conversation passes the
  * token budget, then returns the prompt for this turn: the instructions with
  * the person's memory, and the messages.
  */
-export async function preparePrompt(userId: string, botId: string | null = null): Promise<{ instructions: string; messages: ModelMessage[] }> {
+export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
   let { summary, memory, messages } = await store.loadConversation(userId, botId)
   const summaryTrust = { key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) }
@@ -138,7 +150,7 @@ export async function preparePrompt(userId: string, botId: string | null = null)
     await store.saveSummary(userId, summary, cut, botId)
     messages = messages.filter(row => row.position > cut)
   }
-  return { instructions: instructionsWithMemory(await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages, summaryTrust) }
+  return { instructions: instructionsWithMemory(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS), memory), messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope, botId: string | null = null) {
@@ -211,10 +223,10 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
 }
 
 /** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope, botId: string | null = null) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId)), status: 'queued' }))
+  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId, execution)), status: 'queued' }))
 }
 
 /** Only the person's own Bots in workspaces they still belong to are listed. */
@@ -259,7 +271,7 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
 }
 
 /** Queue and bind atomically, with a stable tool-call id for workflow retries. */
-export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string }, toolCallId: string, scope?: NativeToolScope) {
+export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
@@ -271,7 +283,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
   const issue = await issueForUser(userId, input.issueId)
   if (!issue) return { error: 'issueNotFound' }
   try {
-    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, idempotencyKey: `coordinator:${toolCallId}` })
+    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, idempotencyKey: `coordinator:${toolCallId}`,execution })
     return { ...result, botId: input.botId, task: issue.title, status: 'queued' as const }
   } catch { return { error: 'cloudComputerUnavailable' } }
 }

@@ -2729,5 +2729,8 @@
     "loadError": "Unable to load saved chat history.",
     "retry": "Retry",
     "incomplete": "This saved reply did not finish."
+  },
+  "MobilePush": {
+    "verificationCode": "A verification code arrived"
   }
 }

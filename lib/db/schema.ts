@@ -1,3 +1,4 @@
+import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
 import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
@@ -190,6 +191,8 @@ export type RunStatus = (typeof RUN_STATUSES)[number]
 
 /** One execution of one agent. The daemon claims it, runs it and reports back. */
 export const agentRuns = pgTable('agent_runs', {
+  /** Immutable execution provenance; old rows remain unrecorded. */
+  agentDefinition: jsonb('agentDefinition').$type<WorkerDefinitionSnapshot | null>(),
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
   agentId: uuid('agentId').notNull().references(() => agents.id, { onDelete: 'cascade' }),
@@ -448,12 +451,10 @@ export const userFacts = pgTable('user_facts', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('user_facts_subject_key').on(table.userId, table.kind, table.subjectKey), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind)])
 
-/** The person's 记忆 switch; no row means on. Off: nothing is extracted or merged. */
-export const memorySettings = pgTable('memory_settings', {
+/** The local date (YYYY-MM-DD) the nightly consolidation last ran for the person (lib/profile/store.ts). The 记忆 switch is userPreferences.memoryEnabled. */
+export const userFactConsolidations = pgTable('user_fact_consolidations', {
   userId: text('userId').primaryKey(),
-  enabled: boolean('enabled').notNull().default(true),
-  /** The local date (YYYY-MM-DD) the nightly consolidation last ran for the person. */
-  consolidatedOn: text('consolidatedOn'),
+  consolidatedOn: text('consolidatedOn').notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -664,3 +665,33 @@ export const nativeCoordinatorTools = pgTable('native_coordinator_tools', {
   status: text('status').notNull().default('pending'), output: jsonb('output'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.turnId, table.callId] })])
+
+/** One Expo push token per installed copy of the iOS app (apps/mobile); removed on sign-out. */
+export const mobilePushTokens = pgTable('mobile_push_tokens', {
+  id: uuid('id').primaryKey(),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: text('token').notNull(),
+  platform: text('platform').notNull(),
+  deviceName: text('deviceName'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('mobile_push_tokens_token_key').on(table.token), index('mobile_push_tokens_user_idx').on(table.userId)])
+
+export const PUSH_WHEN = ['always', 'away'] as const
+export type PushWhen = (typeof PUSH_WHEN)[number]
+
+/**
+ * The app's 通知 and 记忆 settings (docs/design/mobile.md). The push flags pick
+ * which of the Coordinator's own messages reach the phone; 主动消息 itself is
+ * attention_settings.enabled. No row means the defaults.
+ */
+export const userPreferences = pgTable('user_preferences', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  pushDecide: boolean('pushDecide').notNull().default(true),
+  pushReview: boolean('pushReview').notNull().default(true),
+  pushFinished: boolean('pushFinished').notNull().default(false),
+  pushBriefing: boolean('pushBriefing').notNull().default(true),
+  pushWhen: text('pushWhen').$type<PushWhen>().notNull().default('always'),
+  memoryEnabled: boolean('memoryEnabled').notNull().default(true),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
