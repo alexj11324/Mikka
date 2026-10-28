@@ -10,6 +10,7 @@ import { personalWorkerMailboxScopeMatches } from './personal-mailbox-capability
 const owner = 'synthetic-owner', botId = '28700000-0000-4000-8000-000000000011'
 const workspaceId = '28700000-0000-4000-8000-000000000012', globalId = '00000000-0000-4000-8000-000000000001'
 const agentId = '28700000-0000-4000-8000-000000000013', repoId = '28700000-0000-4000-8000-000000000014', issueId = '28700000-0000-4000-8000-000000000015'
+const repoUrl = 'https://github.com/example/fixture.git'
 const execution = { status: 'running' as const, id: '28700000-0000-4000-8000-000000000016', snapshot: makeSnapshot('28700000-0000-4000-8000-000000000017', 1, { ...DEFAULT_AGENT_DEFINITION, tools: ['mailbox_inbox'] }, 'HOST', { harness: 'ai_sdk', model: 'synthetic' }) }
 let ownedBot = true, botQueries = 0
 const inserted: Record<string, unknown>[] = []
@@ -26,7 +27,7 @@ const database = {
 }
 mock.module(new URL('./db/index.ts', import.meta.url).href, { exports: { db: database, pool: {} } })
 mock.module(new URL('./device-repositories.ts', import.meta.url).href, { exports: { ensureDeviceRepository: async (userId: string, deviceId: string, repo: string) => {
-  assert.equal(userId, owner); assert.equal(deviceId, 'device'); assert.equal(repo, 'owner/repo')
+  assert.equal(userId, owner); assert.equal(deviceId, 'device'); assert.equal(repo, repoUrl)
   return { id: repoId, baseBranch: 'main' }
 } } })
 mock.module(new URL('./issue-access.ts', import.meta.url).href, { exports: { requireUser: () => { throw Error('Unexpected user session lookup') }, issueForUser: async (id: string) => { assert.equal(id, owner); return { id: issueId, title: 'Fixture', content: null } } } })
@@ -39,16 +40,16 @@ test('actual personal producer freezes owned Bot workspace or explicit unbound s
   const { queueRun } = await import('./agent-runs')
   process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '1'; delete process.env.MIKKA_BYOS_ENABLED
   for (const bot of [botId, null]) {
-    await queueRun(owner, { issueId, agentId, repo: 'owner/repo' }, bot, execution)
+    await queueRun(owner, { issueId, agentId, repo: repoUrl }, bot, execution)
     assert.equal(personalWorkerMailboxScopeMatches('codex', inserted.at(-1)!.agentDefinition, { botId: bot, workspaceId: bot ? workspaceId : globalId }), true)
   }
   ownedBot = false
   const count = inserted.length
-  await assert.rejects(queueRun(owner, { issueId, agentId, repo: 'owner/repo' }, botId, execution), /runInvalid/)
+  await assert.rejects(queueRun(owner, { issueId, agentId, repo: repoUrl }, botId, execution), /runInvalid/)
   assert.equal(inserted.length, count)
   delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
   const lookups = botQueries
-  await queueRun(owner, { issueId, agentId, repo: 'owner/repo' }, botId, execution)
+  await queueRun(owner, { issueId, agentId, repo: repoUrl }, botId, execution)
   assert.equal(botQueries, lookups)
   assert.equal((inserted.at(-1)!.agentDefinition as { mailbox?: unknown }).mailbox, undefined)
   ownedBot = true

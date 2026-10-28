@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { access, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -24,10 +24,8 @@ test('migration runner handles historical and new names without replay and rejec
   const sql = await readFile(new URL('../drizzle/' + current, import.meta.url), 'utf8')
   try {
     await mkdir(join(root, 'scripts')); await mkdir(join(root, 'drizzle'))
-    for (const name of ['migrate.mjs', 'migration-order.mjs'])
+    for (const name of ['migrate.mjs', 'migration-order.mjs', 'migration-steps.mjs', 'migration-targets.mjs', 'preview-database-url.mjs'])
       await writeFile(join(root, 'scripts', name), await readFile(new URL('../scripts/' + name, import.meta.url)))
-    const targets = new URL('../scripts/migration-targets.mjs', import.meta.url)
-    if (await access(targets).then(() => true, () => false)) await writeFile(join(root, 'scripts/migration-targets.mjs'), await readFile(targets))
     await symlink(new URL('../node_modules', import.meta.url).pathname, join(root, 'node_modules'))
     await writeFile(join(root, 'drizzle', baseline), 'SELECT 1;\n')
     await writeFile(join(root, 'drizzle', current), sql)
