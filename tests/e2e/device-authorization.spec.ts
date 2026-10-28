@@ -20,7 +20,7 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   await register(page, '/settings?section=devices')
   await page.getByRole('button', { name: '连接设备', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '连接电脑', exact: true })
-  await expect(dialog).toContainText('npm install --global')
+  await expect(dialog).toContainText('npm install --global @aspectlylabs/mikka')
   await expect(dialog).toContainText('mikka daemon login --server')
   await expect(dialog).toContainText(new URL(page.url()).origin + app('/'))
   await expect(dialog).not.toContainText('pnpm daemon')

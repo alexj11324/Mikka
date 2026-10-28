@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { RepositoryCache } from "../src/repositories"
+import { runPolicy } from "../src/permissions"
 
 import { DAEMON_RPC_ERRORS } from "@mikka/protocol"
 import { afterEach, describe, expect, it } from "vitest"
@@ -93,6 +94,39 @@ afterEach(async () => {
 })
 
 describe("mock runs", () => {
+  it("starts from the issue branch only when the trusted push policy permits it", async () => {
+    const source = await makeRepo()
+    git(source, "checkout", "-b", "mikka/issue-1")
+    writeFileSync(join(source, "issue-branch.txt"), "earlier work\n")
+    git(source, "add", "issue-branch.txt")
+    git(source, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "earlier work")
+    git(source, "checkout", "main")
+    const origin = join(tempDir(), "origin.git")
+    git(source, "clone", "--bare", source, origin)
+    const cases = [
+      { decision: "allow", approved: false, expected: true },
+      { decision: "ask", approved: true, expected: true },
+      { decision: "ask", approved: false, expected: false },
+      { decision: "deny", approved: true, expected: false },
+    ] as const
+    for (const { decision, approved, expected } of cases) {
+      const server = new MemoryServer(DEVICE)
+      server.addRepo(DEVICE, { repoId: "repo-1", name: "fixture", path: origin, push: { approved, remote: "origin" } })
+      const daemon = await boot(server, tempDir())
+      const defaults = runPolicy(undefined)
+      const runId = server.queueRun(DEVICE, {
+        issueId: `issue-${decision}-${approved}`, repoId: "repo-1",
+        remoteUrl: pathToFileURL(origin).href, harness: "mock", prompt: "inspect",
+        pushBranch: "mikka/issue-1", fixture: "turn-ended",
+        policy: { ...defaults, permissions: { ...defaults.permissions, git_push: decision } },
+      })
+      const run = await runToEnd(daemon, server, runId)
+      // An isolated child process observes the same checkout a CLI receives.
+      const observed = execFileSync(process.execPath, ["-e", "process.stdout.write(String(require('node:fs').existsSync('issue-branch.txt')))"], { cwd: run.worktree as string, encoding: "utf8" })
+      expect(observed).toBe(String(expected))
+      await daemon.stop()
+    }
+  })
   it("runs a fixture in its own worktree, writes the file change and ends in review", async () => {
     const { server, dataDir, repo } = await setup()
     const daemon = await boot(server, dataDir)
