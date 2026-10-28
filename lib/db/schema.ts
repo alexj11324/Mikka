@@ -1,8 +1,10 @@
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import type { AttentionLevel } from '@/lib/attention/judgment'
+import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
@@ -225,6 +227,8 @@ export type RunStatus = (typeof RUN_STATUSES)[number]
 
 /** One execution of one agent. The daemon claims it, runs it and reports back. */
 export const agentRuns = pgTable('agent_runs', {
+  /** Immutable execution provenance; old rows remain unrecorded. */
+  agentDefinition: jsonb('agentDefinition').$type<WorkerDefinitionSnapshot | null>(),
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
   agentId: uuid('agentId').notNull().references(() => agents.id, { onDelete: 'cascade' }),
@@ -454,6 +458,55 @@ export const attentionSettings = pgTable('attention_settings', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
+/** Where a fact was seen: references only, never the source text. */
+export interface UserFactEvidence { source: string; suggestionId?: string; externalId?: string; factIds?: string[]; at: string }
+
+/**
+ * One fact in one person's profile (lib/profile), drawn from what reaches them
+ * and merged nightly. Facts belong to the person, never to a workspace, and
+ * only they see them in 记忆. A fact the person corrected (`userEdited`) is
+ * never overwritten by the model. Same fact = same (userId, kind, subjectKey).
+ */
+export const userFacts = pgTable('user_facts', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  kind: text('kind').$type<UserFactKind>().notNull(),
+  /** One line, e.g. 川菜, or Verizon 套餐. */
+  subject: text('subject').notNull(),
+  /** The subject folded for dedupe (lib/profile/facts.ts subjectKey). */
+  subjectKey: text('subjectKey').notNull(),
+  /** Structured details: amount, date, time window, place, merchant, items. */
+  value: jsonb('value').$type<Record<string, unknown>>().notNull().default({}),
+  evidence: jsonb('evidence').$type<UserFactEvidence[]>().notNull().default([]),
+  confidence: real('confidence').notNull(),
+  firstSeenAt: timestamp('firstSeenAt', { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp('lastSeenAt', { withTimezone: true }).notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  state: text('state').$type<UserFactState>().notNull().default('active'),
+  userEdited: boolean('userEdited').notNull().default(false),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('user_facts_subject_key').on(table.userId, table.kind, table.subjectKey), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind)])
+
+/** The local date (YYYY-MM-DD) the nightly consolidation last ran for the person (lib/profile/store.ts). The 记忆 switch is userPreferences.memoryEnabled. */
+export const userFactConsolidations = pgTable('user_fact_consolidations', {
+  userId: text('userId').primaryKey(),
+  consolidatedOn: text('consolidatedOn').notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type ProactiveUsageKind = 'extraction'
+
+/** Proactive model calls and tokens per person, UTC day and kind, for the daily cap (lib/profile/store.ts) and cost per person. */
+export const proactiveUsage = pgTable('proactive_usage', {
+  userId: text('userId').notNull(),
+  day: date('day').notNull(),
+  kind: text('kind').$type<ProactiveUsageKind>().notNull(),
+  calls: integer('calls').notNull().default(0),
+  inputTokens: integer('inputTokens').notNull().default(0),
+  outputTokens: integer('outputTokens').notNull().default(0),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.day, table.kind] })])
+
 /** Every handoff and decision on a matter; the budgets count `handoff` and `notify` rows (lib/attention/budget.ts). */
 export const attentionLog = pgTable('attention_log', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
@@ -648,3 +701,33 @@ export const nativeCoordinatorTools = pgTable('native_coordinator_tools', {
   status: text('status').notNull().default('pending'), output: jsonb('output'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.turnId, table.callId] })])
+
+/** One Expo push token per installed copy of the iOS app (apps/mobile); removed on sign-out. */
+export const mobilePushTokens = pgTable('mobile_push_tokens', {
+  id: uuid('id').primaryKey(),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: text('token').notNull(),
+  platform: text('platform').notNull(),
+  deviceName: text('deviceName'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('mobile_push_tokens_token_key').on(table.token), index('mobile_push_tokens_user_idx').on(table.userId)])
+
+export const PUSH_WHEN = ['always', 'away'] as const
+export type PushWhen = (typeof PUSH_WHEN)[number]
+
+/**
+ * The app's 通知 and 记忆 settings (docs/design/mobile.md). The push flags pick
+ * which of the Coordinator's own messages reach the phone; 主动消息 itself is
+ * attention_settings.enabled. No row means the defaults.
+ */
+export const userPreferences = pgTable('user_preferences', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  pushDecide: boolean('pushDecide').notNull().default(true),
+  pushReview: boolean('pushReview').notNull().default(true),
+  pushFinished: boolean('pushFinished').notNull().default(false),
+  pushBriefing: boolean('pushBriefing').notNull().default(true),
+  pushWhen: text('pushWhen').$type<PushWhen>().notNull().default('always'),
+  memoryEnabled: boolean('memoryEnabled').notNull().default(true),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})

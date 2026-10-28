@@ -23,6 +23,17 @@ test('the owner reads their own thread in full', () => {
   assert.deepEqual(mine.detail, { name: 'Route group replies', agentName: 'Mikka Backend', harness: 'codex', summary: 'Done' })
 })
 
+test('stopping is shared status metadata and disappears when the daemon acknowledges', () => {
+  const row = { ...make('stopping'), stopRequestedAt: new Date('2026-01-01T00:00:01Z') }
+  const members = new Set(['viewer', 'teammate'])
+  const [live] = projectIssueThreads([row], 'issue', 'viewer', members)
+  assert.equal(live.stopping, true)
+  assert.equal(live.detail, null)
+  assert.ok(!('stopRequestedAt' in live), 'the private timestamp stays out of teammate metadata')
+  const [ended] = projectIssueThreads([{ ...row, status: 'stopped' }], 'issue', 'viewer', members)
+  assert.equal(ended.stopping, false)
+})
+
 test('a Bot display name or Bot identifier cannot replace the thread owner', () => {
   const row = { ...make('bot-run', 'owner'), agentName: 'My Bot', botId: 'viewer' }
   const members = new Set(['owner', 'viewer'])

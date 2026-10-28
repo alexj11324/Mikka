@@ -1,6 +1,7 @@
+import {readFileSync} from 'node:fs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { APPLICATION_BASELINE, ARTIFACT_COMPATIBILITY, orderMigrations } from './migration-order.mjs'
+import { APPLICATION_BASELINE, ARTIFACT_COMPATIBILITY, orderMigrations, alreadyApplied } from './migration-order.mjs'
 
 test('only the explicit baseline precedes legacy migrations, without changing their IDs', () => {
   const names = ['20261024000000_future.sql', '0004_b.sql', APPLICATION_BASELINE, '0001_a.sql', '0004_a.sql']
@@ -27,4 +28,12 @@ test('BYOS migration aliases recognize both recorded branch histories without re
     assert.equal(alreadyApplied(canonical, new Set(['unrelated.sql']), sql), false)
     assert.throws(() => alreadyApplied(canonical, new Set([historical[0]]), sql + ' '), /content changed/)
   }
+})
+
+
+test('Agent Kit migration alias requires its original exact SQL', () => {
+  const name='20261027181000_agent_kit.sql'
+  const sql=readFileSync(new URL('../drizzle/'+name,import.meta.url),'utf8')
+  assert.equal(alreadyApplied(name,new Set(['20261027040500_agent_kit.sql']),sql),true)
+  assert.throws(()=>alreadyApplied(name,new Set(['20261027040500_agent_kit.sql']),sql+'-- changed'),/content changed/)
 })

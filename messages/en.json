@@ -1493,6 +1493,9 @@
         "title": "Profile",
         "description": "See the account details used in your workspace."
       },
+      "memory": {
+        "title": "Memory"
+      },
       "account": {
         "title": "Account",
         "description": "Manage how you sign in to Mikka."
@@ -1535,6 +1538,24 @@
       "email": "Email",
       "notSet": "Not set",
       "readOnly": "Account details are read-only; this version does not support editing them here."
+    },
+    "memory": {
+      "enabled": "Use memory",
+      "learn": "Learn from connected apps",
+      "error": "Could not update memory",
+      "empty": "No memories yet",
+      "correct": "Correct",
+      "delete": "Delete",
+      "kinds": {
+        "interest": "Interests",
+        "routine": "Routines",
+        "place": "Places",
+        "subscription": "Subscriptions",
+        "deadline": "Deadlines",
+        "tool": "Tools",
+        "person": "People",
+        "preference": "Preferences"
+      }
     },
     "workspaceForm": {
       "id": "Workspace ID",
@@ -2351,8 +2372,9 @@
     "started": "started {time}",
     "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
     "composer": "Tell {agent} what to do next…",
-    "send": "Send",
-    "sendFailed": "Not sent. Your draft is still here"
+    "sendFailed": "Not sent. Your draft is still here",
+    "stopping": "Stopping…",
+    "stopFailed": "Couldn't stop it. Try again"
   },
   "Computer": {
     "status": {
@@ -2716,5 +2738,8 @@
     "loadError": "Unable to load saved chat history.",
     "retry": "Retry",
     "incomplete": "This saved reply did not finish."
+  },
+  "MobilePush": {
+    "verificationCode": "A verification code arrived"
   }
 }

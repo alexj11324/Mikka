@@ -73,7 +73,7 @@ let actions: typeof import('../app/actions/agents')
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => viewer ? { user: { id: viewer } } : null } } } })
   mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
-  mock.module('@/lib/db', { namedExports: { db: database } })
+  mock.module('@/lib/db', { namedExports: { db: database, pool: { query() { throw new Error('Unexpected SQL pool access outside thread control') } } } })
   mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) } } })
   mock.module('@/lib/issue-access', { namedExports: {
     requireIssueAccess: async (id: string) => {
@@ -131,10 +131,16 @@ test('actual stop action is idempotent for the owner and rejects ended/stopping 
   await actions.stopRun(runId)
   const stoppedAt = current.run.stopRequestedAt
   assert.ok(stoppedAt instanceof Date)
+  const detail = await actions.getIssueThread(issueId, runId)
+  assert.equal(detail.thread.stopping, true)
+  assert.equal(detail.thread.stopRequestedAt, stoppedAt)
+  const [listed] = await actions.listIssueThreads(issueId)
+  assert.equal(listed.stopping, true)
   await actions.stopRun(runId)
   assert.equal(current.run.stopRequestedAt, stoppedAt); assert.equal(current.updates, 1)
   await assert.rejects(actions.sendIssueThreadMessage({ issueId, runId, text: 'after stop' }), rejected('runNotFound'))
   current.run.status = 'succeeded'
+  assert.equal((await actions.getIssueThread(issueId, runId)).thread.stopping, false)
   await assert.rejects(actions.stopRun(runId), rejected('runNotFound'))
   assert.equal(current.messages.length, 0); assert.equal(current.updates, 1)
 })
