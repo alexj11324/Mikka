@@ -74,7 +74,9 @@ async function release(scope, outcome = 'clean') {
     assert.ok(info.isFile() && !info.isSymbolicLink())
     assert.equal(info.mode & 0o777, 0o600)
     if (process.getuid) assert.equal(info.uid, process.getuid())
-    const retained = JSON.parse(await readFile(account.storageStatePath, 'utf8'))
+    let retained
+    try { retained = JSON.parse(await readFile(account.storageStatePath, 'utf8')) }
+    catch { throw new Error('RETAINED_STATE_UNREADABLE') }
     assert.ok(Array.isArray(retained.cookies) && Array.isArray(retained.origins))
   }
   await assert.rejects(scope.owner.request('/api/auth/get-session'), { code: 'LEASE_CLOSED' })
