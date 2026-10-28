@@ -32,6 +32,8 @@ wrapped DEKs live in Neon. KMS encryption context is exactly
 purpose (password, session or OTP). A fresh random nonce is used for every
 write. Cookie/localStorage snapshots reuse the credential's DEK with separate
 purpose AAD, so the decrypt-only broker needs no GenerateDataKey permission.
+The snapshot includes cookies returned by Chrome for the credential origin,
+including both HttpOnly and script-accessible cookies, and that origin's localStorage.
 
 The server derives the user from an authenticated owner-bound bot/subagent or
 thread; workspace membership alone never authorizes a login. No API or model
@@ -39,6 +41,8 @@ tool accepts or returns a credential ID. Multiple matching accounts require a
 new login choice instead of silently selecting one. Deletion revokes first,
 erases password/session ciphertexts and outstanding leases atomically, and
 serializes with an in-flight fill through an account/origin database lock.
+Deletion removes Mikka's saved ciphertext and leases; it does not log out an
+already running browser or revoke sessions at the third-party website.
 
 ## API contract
 

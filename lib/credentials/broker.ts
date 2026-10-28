@@ -51,8 +51,8 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
             functionDeclaration: 'function(entries){localStorage.clear();for(const [k,v] of entries)localStorage.setItem(k,v)}',
             arguments: [{ value: state.localStorage }], returnByValue: true })
         }
-        // HttpOnly cookies only. Login restoration is verified after reload;
-        // if the login form remains, fall back to the saved password.
+        // After reload, use absence of a password field as a restoration
+        // heuristic; if the form remains, fall back to the saved password.
         await cdp.call('Page.reload')
         const deadline = Date.now() + 5000
         do {
