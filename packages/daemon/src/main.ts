@@ -77,7 +77,7 @@ import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
 import { ComputerBroker } from "./computer/broker.mjs"
-import { detectComputerDriver, executeDriver } from "./computer/driver.mjs"
+import { detectComputerDriver, executeDriver, type ComputerDriver } from "./computer/driver.mjs"
 import { pollWebComputerReviews } from "./computer/web-review"
 
 export * from "./server-link"
@@ -200,6 +200,7 @@ export class Daemon {
   private reviewAbort: AbortController | null = null
   private reviewLoop: Promise<void> = Promise.resolve()
   private cloudComputerBroker: ComputerBroker | null = null
+  private localComputerDriver: ComputerDriver | null = null
   /** Messages handed to an agent whose delivery the server has not taken yet. */
   private unacked = new Set<string>()
   /** Runs this daemon already started cancelling for a stop request. */
@@ -258,6 +259,7 @@ export class Daemon {
     // adapters require the separately probed sandbox-runtime from main.
     this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
     if (this.stopped) throw new Error("daemon stopped during startup")
+    if (!this.options.hostedSubscriptions && this.sandbox) this.localComputerDriver = await detectComputerDriver()
     if (this.options.cloudComputer) {
       if (!this.options.hostedSubscriptions || !this.options.e2bContainerRuntime || this.options.computerBroker) throw new Error("Cloud computer runtime unavailable")
       const driver = await detectComputerDriver('/opt/mikka/computer/cua-driver')
@@ -719,6 +721,7 @@ export class Daemon {
         daemonVersion: DAEMON_VERSION,
         protocolVersion: DAEMON_PROTOCOL_VERSION,
         harnesses: this.harnesses,
+        computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
         ...(this.device.workspaceId
           ? { workspaceId: this.device.workspaceId }
           : {}),
@@ -770,6 +773,7 @@ export class Daemon {
       const quotas = this.quota?.snapshot().quotas
       const { leases, revoked, cloudCredential } = await link.heartbeat(deviceId, {
         harnesses: this.harnesses,
+        computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
         runs: this.supervisor.heartbeatRuns(),
         worktreeDiskBytes: await this.worktrees.diskUsage(),
         ...(quotas ? { quotas } : {}),

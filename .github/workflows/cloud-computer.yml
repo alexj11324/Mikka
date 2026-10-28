@@ -37,3 +37,39 @@ jobs:
       - run: node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts
         env:
           COMPUTER_TEST_DATABASE_URL: postgresql://postgres:isolated-ci@localhost:5432/computer_test
+      - run: node --import ./scripts/server-test.mjs --import tsx --test lib/computer/local-reviews.db.test.ts
+        env:
+          COMPUTER_TEST_DATABASE_URL: postgresql://postgres:isolated-ci@localhost:5432/computer_test
+      - run: node --test tests/device-computer-migration.test.mjs
+        env:
+          COMPUTER_TEST_DATABASE_URL: postgresql://postgres:isolated-ci@localhost:5432/computer_test
+      - run: node --test packages/daemon/src/computer/local-grant.test.mjs
+      - run: cd packages/daemon && node --import tsx --test test/local-computer-adapters.node-test.ts
+  local-driver-linux:
+    name: Local driver (Linux Xvfb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install isolated X11 and pinned MIT driver
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y xvfb x11-utils x11-apps xdotool libxdo3
+          mkdir -p "$RUNNER_TEMP/cua"
+          curl -fL --retry 2 https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-linux-x86_64-binary.tar.gz -o "$RUNNER_TEMP/cua/driver.tar.gz"
+          echo "31ab9709dd91ce73677e49b9f3e75c6f0d3e4d9625c286c9e58262bfbea698dd  $RUNNER_TEMP/cua/driver.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/cua/driver.tar.gz" -C "$RUNNER_TEMP/cua"
+      - name: Real driver through exact-operation broker
+        run: MIKKA_CUA_TEST_BINARY="$RUNNER_TEMP/cua/cua-driver" MIKKA_CUA_TEST_SCREENSHOT="$RUNNER_TEMP/cua/desktop.png" node --import tsx --test packages/daemon/src/computer/xvfb.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: local-computer-linux-evidence
+          path: ${{ runner.temp }}/cua/desktop*.png
+          if-no-files-found: ignore

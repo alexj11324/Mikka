@@ -21,9 +21,11 @@ import {
 import { carryHistory, prepareCursorHome } from "../agents/harness-home"
 import {
   MCP_SERVER_NAME,
+  COMPUTER_MCP_SERVER_NAME,
   RESUME_MESSAGE,
   RunContext,
   runPaths,
+  type ComputerSpecProvider,
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import type { RunChunk } from "../chunks"
@@ -47,6 +49,7 @@ export interface CursorAdapterOptions {
   stateDir: string
   /** `agent` (or `cursor-agent`) on PATH by default. */
   binary?: string
+  computerProvider?: ComputerSpecProvider
 }
 
 /**
@@ -263,6 +266,7 @@ export class CursorAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (resumeId && earlier) return endedSession(resumeId, earlier)
     ctx.clearHandoff()
+    const computerMcp = this.options.computerProvider?.(options.runId, options.policy)
     const argv = [
       this.options.binary ?? "agent",
       // Cursor's own sandbox cannot nest inside Mikka's.
@@ -396,6 +400,8 @@ export class CursorAdapter implements AgentAdapter {
         args: mcp.args,
         env: Object.entries(mcp.env).map(([name, value]) => ({ name, value })),
       },
+      ...(computerMcp ? [{ name: COMPUTER_MCP_SERVER_NAME, command: computerMcp.command,
+        args: computerMcp.args, env: Object.entries(computerMcp.env).map(([name, value]) => ({ name, value })) }] : []),
     ]
     const ready = <T>(step: Promise<T>, label: string) =>
       untilReady(child, step, `cursor ${label}`)
