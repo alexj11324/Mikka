@@ -97,14 +97,17 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
   const { data: bots = [] } = useSWR('bots', listBots)
   const botId = conversation.kind === 'bot' ? conversation.id ?? null : null
   const coordinator = conversation.kind === 'coordinator'
-  // A bot's own threads; the Coordinator's are the ones it dispatched (no bot on the run).
-  const ownThreads = botId ? threads.filter(thread => thread.botId === botId) : coordinator ? threads.filter(thread => !thread.botId) : []
+  // A bot's own threads; the Coordinator's are the ones it dispatched: no bot on the run, and not from an MCP client.
+  const ownThreads = botId ? threads.filter(thread => thread.botId === botId) : coordinator ? threads.filter(thread => !thread.botId && thread.source !== 'mcp') : []
   // An older chat without a bot learns its thread from the 电脑 cards in it.
   const cloudComputer = useCloudComputer()
   const registered = useConversationThread(cloudComputer && conversation.kind === 'agent' ? conversation.id : null)
   const computer = cloudComputer ? botId ?? registered?.botId : undefined
   // A conversation whose bot works on its computer opens on its screen (Figma 103:64).
   useEffect(() => { if (registered?.runId) { setView('overview'); setTab('computer') } }, [registered?.runId])
+  // No computer here (cloud computers off, or the Coordinator): no 电脑 tab.
+  const tabs = computer ? TABS : TABS.filter(item => item !== 'computer')
+  const shown = tabs.includes(tab) ? tab : 'threads'
 
   const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
   return <aside aria-label={t('label')} className={cn('hidden min-h-0 shrink-0 flex-col border-l transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90')}>
@@ -121,12 +124,12 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
         </div>
       </div>
       <TabsContent value="overview" className="flex min-h-0 flex-col">
-        <Tabs value={tab} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
+        <Tabs value={shown} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
           <div className="flex shrink-0 flex-col items-center gap-3 px-4 pt-9 pb-4">
             {coordinator ? <CoordinatorAvatar size="profile" /> : conversation.kind === 'bot' ? <BotAvatar color={conversation.color} shape={conversation.shape} size="profile" /> : <LetterAvatar name={conversation.name} size="profile" />}
             <h2 className="max-w-full truncate text-xl font-semibold">{conversation.name}</h2>
             <TabsList aria-label={t('tabs')} className="mt-2 gap-1 bg-transparent p-0">
-              {TABS.map(item => <TabsTrigger key={item} value={item} className={pill}>{t(item)}</TabsTrigger>)}
+              {tabs.map(item => <TabsTrigger key={item} value={item} className={pill}>{t(item)}</TabsTrigger>)}
             </TabsList>
           </div>
           <TabsContent value="details" className="flex min-h-0 flex-col gap-4 overflow-y-auto px-4 pb-4">
@@ -139,11 +142,9 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
           <TabsContent value="prs" className="min-h-0 overflow-y-auto px-4 pb-4">
             <PullRequests threads={ownThreads} issues={issues} />
           </TabsContent>
-          <TabsContent value="computer" className="min-h-0 overflow-y-auto px-4 pb-4">
-            {computer
-              ? botId ? <AgentComputer botId={botId} name={conversation.name} header={false} /> : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} />
-              : <p className="px-2 text-xs text-muted-foreground">{t('noComputer')}</p>}
-          </TabsContent>
+          {computer && <TabsContent value="computer" className="min-h-0 overflow-y-auto px-4 pb-4">
+            {botId ? <AgentComputer botId={botId} name={conversation.name} header={false} /> : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} header={false} />}
+          </TabsContent>}
         </Tabs>
       </TabsContent>
       <TabsContent value="all" className="min-h-0 overflow-y-auto px-4 py-3">

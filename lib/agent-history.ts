@@ -1,6 +1,24 @@
 export type SavedAgentSession = { id: string; title: string; updatedAt: string; preview?: string }
 
 /**
+ * Chat markdown as one plain line, shared by the bot list's preview and the
+ * right column's thread rows: citation tokens ([[issue:…]]) and link targets
+ * go, as do heading, quote and list markers, bold, strikethrough, *italic*
+ * and code ticks. Single underscores stay, so MIKKA_R2_ACCESS_KEY reads as written.
+ */
+export function markdownLine(text: string): string {
+  return text
+    .replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, '')
+    .replace(/!?\[([^\]\n]*)\]\([^)\s]+\)/g, '$1')
+    .replace(/^[ \t]{0,3}(?:#{1,6}[ \t]+|>[ \t]?|[-*+][ \t]+|\d+[.)][ \t]+)/gm, '')
+    .replace(/(\*\*|__|~~)(\S(?:[\s\S]*?\S)?)\1/g, '$2')
+    .replace(/\*(\S(?:[^*\n]*?\S)?)\*/g, '$1')
+    .replace(/`+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
  * One line of plain text for the conversation list: the first sentence-sized
  * string in the reply (OpenUI Lang keeps prose in quoted arguments), else
  * plain-text replies as they are, else the person's last message.

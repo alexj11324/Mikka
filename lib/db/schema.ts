@@ -219,6 +219,11 @@ export const agentRuns = pgTable('agent_runs', {
   sessionId: text('sessionId'), worktreePath: text('worktreePath'),
   stopReason: text('stopReason'), error: text('error'),
   report: jsonb('report').$type<Record<string, unknown> | null>(),
+  /** The opening of the agent's last reply (240 characters), written as its text arrives; the right column's row shows it. */
+  lastReply: text('lastReply'),
+  lastReplyAt: timestamp('lastReplyAt', { withTimezone: true }),
+  /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
+  source: text('source').$type<'mcp' | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */
   attempt: integer('attempt').notNull().default(1),
@@ -229,7 +234,7 @@ export const agentRuns = pgTable('agent_runs', {
   finishedAt: timestamp('finishedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`)])
+}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`)])
 
 /** The run's event stream, one row per chunk; `seq` dedupes re-sent batches. */
 export const runChunks = pgTable('run_chunks', {

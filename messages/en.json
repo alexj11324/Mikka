@@ -2406,13 +2406,7 @@
       "handbackFailed": "Couldn't hand back. Try again."
     },
     "approval": {
-      "action": {
-        "click": "Click the screen",
-        "type": "Type text",
-        "key": "Press a key",
-        "scroll": "Scroll",
-        "screenshot": "View the screen"
-      },
+      "action": { "click": "Click the screen", "type": "Type text", "key": "Press a key", "scroll": "Scroll", "screenshot": "View the screen" },
       "allowRun": "Allow for this task",
       "deny": "Deny",
       "allow": "Allow",
@@ -2424,6 +2418,8 @@
       "title": "Threads",
       "empty": "No threads yet",
       "untitled": "Untitled thread",
+      "justNow": "just now",
+      "yesterday": "yesterday",
       "group": {
         "waiting": "Waiting on you ({count})",
         "running": "In progress ({count})",
@@ -2509,7 +2505,6 @@
       "noRoutines": "No routines yet",
       "noLibrary": "No files yet",
       "noPullRequests": "No PRs yet",
-      "noComputer": "No computer yet",
       "prGroup": {
         "review": "Waiting for review ({count})",
         "running": "In progress ({count})",

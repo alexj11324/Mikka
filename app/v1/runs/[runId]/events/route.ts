@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, lt, sql } from 'drizzle-orm'
 import { runEventBatchSchema } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { agentRuns, devices, runChunks } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
 import { computerEventsMatch } from '@/lib/computer/events'
+import { LAST_REPLY_CHARS, lastReplyUpdate } from '@/lib/thread-groups'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,29 @@ async function ownedRun(runId: string, userId: string): Promise<boolean> {
     .where(and(eq(agentRuns.id, runId), eq(devices.ownerId, userId)))
     .limit(1)
   return Boolean(row)
+}
+
+/**
+ * Keeps `agent_runs.lastReply` on the opening of the agent's latest text part.
+ * A part whose start is in this batch replaces it; more text for a part
+ * already started appends, up to LAST_REPLY_CHARS. Written only when a delta
+ * carries text.
+ */
+async function recordLastReply(runId: string, chunks: Record<string, unknown>[], fromSeq: number) {
+  const update = lastReplyUpdate(chunks)
+  if (!update) return
+  let replace = update.replace
+  if (!replace) {
+    // The part started in an earlier batch: append only if its text is already the stored reply.
+    const [earlier] = await db.select({ seq: runChunks.seq }).from(runChunks)
+      .where(and(eq(runChunks.runId, runId), lt(runChunks.seq, fromSeq), sql`${runChunks.chunk}->>'type' = 'text-delta'`, sql`${runChunks.chunk}->>'id' = ${update.part}`, sql`${runChunks.chunk}->>'delta' <> ''`))
+      .limit(1)
+    replace = !earlier
+  }
+  if (replace && !update.text.trim()) return
+  await db.update(agentRuns)
+    .set({ lastReply: replace ? sql`left(${update.text}::text, ${LAST_REPLY_CHARS}::int)` : sql`left(coalesce(${agentRuns.lastReply}, '') || ${update.text}::text, ${LAST_REPLY_CHARS}::int)`, lastReplyAt: new Date() })
+    .where(eq(agentRuns.id, runId))
 }
 
 /**
@@ -37,12 +61,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
       : undefined
     if (!computerEventsMatch(parsed.data.chunks, runId, binding?.botId ?? null)) return NextResponse.json({ error: 'Invalid computer event.' }, { status: 400 })
   }
-  await db.insert(runChunks)
+  const inserted = await db.insert(runChunks)
     .values(parsed.data.chunks.map((chunk, index) => ({
       id: crypto.randomUUID(), runId, seq: parsed.data.fromSeq + index,
       chunk: chunk as Record<string, unknown>,
     })))
     .onConflictDoNothing()
+    .returning({ seq: runChunks.seq })
+  // Only chunks stored now count, so a re-sent batch never appends its text twice.
+  const fresh = new Set(inserted.map(row => row.seq))
+  await recordLastReply(runId, parsed.data.chunks.flatMap((chunk, index) => fresh.has(parsed.data.fromSeq + index) ? [chunk as Record<string, unknown>] : []), parsed.data.fromSeq)
   await db.update(agentRuns)
     .set({ status: 'running', updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing')))

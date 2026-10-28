@@ -8,7 +8,7 @@ import type { BotView } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
-import { groupThreads, THREAD_GROUPS } from '@/lib/thread-groups'
+import { activityLabel, groupThreads, lastActivity, THREAD_GROUPS } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
 import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
 import { GroupHeader } from './group-header'
@@ -38,17 +38,18 @@ export function ThreadMark({ size = 'profile' }: { size?: 'profile' | 'row' }) {
  * verbatim. No status word, no bot name. In 全部线程 a 16px avatar in its
  * bot's colour leads the name and the last activity sits on the right.
  */
-function ThreadRow({ thread, issues, bots, all, onOpenIssue }: { thread: Thread; issues: Issue[]; bots: BotView[]; all: boolean; onOpenIssue: (id: string) => void }) {
+function ThreadRow({ thread, issues, bots, all, now, onOpenIssue }: { thread: Thread; issues: Issue[]; bots: BotView[]; all: boolean; now: Date; onOpenIssue: (id: string) => void }) {
   const t = useTranslations('Shell.threads')
   const format = useFormatter()
-  const now = useNow({ updateInterval: 60_000 })
   const bot = thread.botId ? bots.find(item => item.id === thread.botId) : undefined
   const name = threadName(thread, issues, t('untitled'))
+  const at = new Date(lastActivity(thread))
+  const when = activityLabel(at, now)
   const body = <>
     <span className="flex w-full min-w-0 items-center gap-2">
       {all && (thread.botId ? <BotAvatar color={bot?.color} shape={bot?.shape} size="row" /> : <CoordinatorAvatar size="row" />)}
       <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
-      {all && <span className="shrink-0 text-xs text-muted-foreground">{format.relativeTime(new Date(thread.updatedAt), now)}</span>}
+      {all && <span className="shrink-0 text-xs text-muted-foreground">{when === 'relative' ? format.relativeTime(at, now) : t(when)}</span>}
     </span>
     {thread.lastReply && <span className={cn('block w-full truncate text-xs text-muted-foreground', all && 'pl-6')}>{thread.lastReply}</span>}
   </>
@@ -67,16 +68,18 @@ function ThreadRow({ thread, issues, bots, all, onOpenIssue }: { thread: Thread;
  */
 export function ThreadList({ threads, issues, bots, all = false, onOpenIssue }: { threads: Thread[]; issues: Issue[]; bots: BotView[]; all?: boolean; onOpenIssue: (id: string) => void }) {
   const t = useTranslations('Shell.threads')
+  // One clock for every row's time.
+  const now = useNow({ updateInterval: 60_000 })
   if (!threads.length) return <p className="px-2 text-xs text-muted-foreground">{t('empty')}</p>
-  const groups = groupThreads(threads, id => issues.find(issue => issue.id === id)?.status)
-  const rows = (list: Thread[]) => <ul className="flex flex-col">{list.map(thread => <ThreadRow key={thread.id} thread={thread} issues={issues} bots={bots} all={all} onOpenIssue={onOpenIssue} />)}</ul>
+  const groups = groupThreads(threads, id => issues.find(issue => issue.id === id))
+  const rows = (list: Thread[]) => <ul className="flex flex-col">{list.map(thread => <ThreadRow key={thread.id} thread={thread} issues={issues} bots={bots} all={all} now={now} onOpenIssue={onOpenIssue} />)}</ul>
   return <div role="group" aria-label={t('title')} className="flex flex-col gap-3">
     {THREAD_GROUPS.map(group => {
       const list = groups[group]
       if (!list.length) return null
       const label = t(`group.${group}`, { count: list.length })
       if (group === 'resolved') return <Collapsible key={group} className="flex flex-col gap-1">
-        <CollapsibleTrigger render={<Button variant="ghost" className="group block h-auto w-full p-0 text-left font-normal hover:bg-transparent" />}>
+        <CollapsibleTrigger render={<Button variant="ghost" className="group flex h-auto w-full p-0 text-left font-normal hover:bg-transparent" />}>
           <GroupHeader>{label}<ChevronRight aria-hidden="true" className="size-3.5 transition-transform group-data-panel-open:rotate-90" /></GroupHeader>
         </CollapsibleTrigger>
         <CollapsibleContent>{rows(list)}</CollapsibleContent>

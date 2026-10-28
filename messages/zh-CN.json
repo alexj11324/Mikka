@@ -2406,13 +2406,7 @@
       "handbackFailed": "没能交还，请重试。"
     },
     "approval": {
-      "action": {
-        "click": "点击屏幕",
-        "type": "输入文字",
-        "key": "按键",
-        "scroll": "滚动",
-        "screenshot": "查看屏幕"
-      },
+      "action": { "click": "点击屏幕", "type": "输入文字", "key": "按键", "scroll": "滚动", "screenshot": "查看屏幕" },
       "allowRun": "本任务内都允许",
       "deny": "拒绝",
       "allow": "允许",
@@ -2424,6 +2418,8 @@
       "title": "线程",
       "empty": "还没有线程",
       "untitled": "未命名线程",
+      "justNow": "刚刚",
+      "yesterday": "昨天",
       "group": {
         "waiting": "等待回复（{count}）",
         "running": "进行中（{count}）",
@@ -2509,7 +2505,6 @@
       "noRoutines": "还没有例行",
       "noLibrary": "还没有资料",
       "noPullRequests": "还没有 PR",
-      "noComputer": "还没有电脑",
       "prGroup": {
         "review": "等待审查（{count}）",
         "running": "进行中（{count}）",

@@ -7,7 +7,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { agents, agentRuns, type RunStatus } from '@/lib/db/schema'
 import { reclaimLostRuns } from '@/lib/run-leases'
-import { LAST_REPLY_CHARS, replyLine } from '@/lib/thread-groups'
+import { replyLine } from '@/lib/thread-groups'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
 export interface TaskRun {
@@ -39,6 +39,8 @@ export interface Thread {
   id: string
   /** The bot that started it; null when the Coordinator dispatched it to an agent. */
   botId: string | null
+  /** 'mcp' when an MCP client dispatched it: not the Coordinator's, though it has no bot either. */
+  source: 'mcp' | null
   /** Who runs it. */
   agentName: string
   issueId: string | null
@@ -46,37 +48,29 @@ export interface Thread {
   status: RunStatus
   error: string | null
   createdAt: string
-  /** Last activity, for the 全部线程 row's time. */
   updatedAt: string
-  /** The opening of the agent's last reply, verbatim, on one line; null before it says anything. */
+  /** The opening of the agent's last reply on one plain line; null before it says anything (and for runs from before it was stored). */
   lastReply: string | null
+  /** When that reply was last written; with updatedAt, the row's last activity. */
+  lastReplyAt: string | null
+  /** A retry of this run exists (it went offline and was queued again), so it no longer waits on anyone. */
+  superseded: boolean
 }
 
-/**
- * The opening of a run's last reply: the deltas of its last text part
- * (every adapter starts a part with `text-start`), read from the run's chunk
- * index without an LLM. Only the opening is kept; the row shows one line.
- */
-const lastReplySql = sql<string | null>`(
-  select left(string_agg(part.chunk->>'delta', '' order by part.seq), ${LAST_REPLY_CHARS}::int)
-  from (
-    select d.chunk, d.seq from run_chunks d,
-      (select s.seq, s.chunk->>'id' as id from run_chunks s
-        where s."runId" = ${agentRuns.id} and s.chunk->>'type' = 'text-start' order by s.seq desc limit 1) start
-    where d."runId" = ${agentRuns.id} and d.seq > start.seq and d.chunk->>'type' = 'text-delta' and d.chunk->>'id' = start.id
-    order by d.seq limit 40
-  ) part
-)`
-
-/** The right column's threads: every run the Coordinator or a bot started in the last 30 days. */
+/** The right column's threads: every run the Coordinator or a bot started in the last 30 days, latest activity first. */
 export async function listThreads(): Promise<Thread[]> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   const rows = await db.select({
     id: agentRuns.id, botId: agentRuns.botId, agentName: agents.name, issueId: agentRuns.issueId, prompt: sql<string>`left(${agentRuns.prompt}, 200)`,
-    status: agentRuns.status, error: agentRuns.error, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt, lastReply: lastReplySql,
+    status: agentRuns.status, error: agentRuns.error, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
+    lastReply: agentRuns.lastReply, lastReplyAt: agentRuns.lastReplyAt, source: agentRuns.source,
+    superseded: sql<boolean>`exists (select 1 from agent_runs retry where retry."retryOf" = ${agentRuns.id})`,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
     .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
-    .orderBy(desc(agentRuns.createdAt)).limit(200)
-  return rows.map(row => ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), lastReply: replyLine(row.lastReply) }))
+    .orderBy(desc(sql`coalesce(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)
+  return rows.map(row => ({
+    ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+    lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null, superseded: Boolean(row.superseded),
+  }))
 }
