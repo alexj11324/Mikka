@@ -194,15 +194,20 @@ jobs:
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
     needs: [changes, ui-policy-full]
-    if: always() && needs.changes.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require the full suite unless only documentation changed
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           FULL_RESULT: ${{ needs.ui-policy-full.result }}
         run: |
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "Changed files job did not succeed: $CHANGES_RESULT"
+            exit 1
+          fi
           if [ "$DOCS_ONLY" = "true" ]; then
             echo "Documentation-only change; the full UI policy suite is skipped."
             exit 0
@@ -283,15 +288,20 @@ jobs:
     # The required check name. Same docs-only behavior as UI policy above.
     name: Production build and browser interactions
     needs: [changes, browser-tests-full]
-    if: always() && needs.changes.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require the full suite unless only documentation changed
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           FULL_RESULT: ${{ needs.browser-tests-full.result }}
         run: |
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "Changed files job did not succeed: $CHANGES_RESULT"
+            exit 1
+          fi
           if [ "$DOCS_ONLY" = "true" ]; then
             echo "Documentation-only change; the production build and database suites are skipped."
             exit 0

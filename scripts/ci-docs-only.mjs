@@ -21,22 +21,20 @@ import { pathToFileURL } from 'node:url'
 
 /** Paths whose changes cannot require a build or a browser test. */
 const DOCS_ONLY = [
-  /^docs\//,
-  /^tasks\//,
-  /^[^/]+\.md$/,
+  /^docs\/.*\.md$/,
+  /^tasks\/.*\.md$/,
+  /^README(?:\.[^/]+)?\.md$/,
   /^LICENSE$/,
   /^\.github\/pull_request_template\.md$/,
-  /^scripts\/diagram-svg\.mjs$/,
-  /^scripts\/generate-diagrams\.mjs$/,
 ]
 
 export function isDocsOnly(files, unsafeModes = false) {
-  return !unsafeModes && files.length > 0 && files.every(file => DOCS_ONLY.some(pattern => pattern.test(file)))
+  return !unsafeModes && files.length > 0 && files.every(file => !/(?:^|\/)AGENTS\.md$/.test(file) && DOCS_ONLY.some(pattern => pattern.test(file)))
 }
 
-/** Regular files may be executable; symlinks (120000) and gitlinks (160000) may not. */
+/** Only non-executable regular files are eligible. */
 function isRegularMode(mode) {
-  return mode === '100644' || mode === '100755'
+  return mode === '100644'
 }
 
 /**
@@ -45,9 +43,9 @@ function isRegularMode(mode) {
  * not count as documentation.
  */
 export function hasUnsafeModes(rawDiff) {
-  return rawDiff.split('\n').filter(Boolean).some(line => {
-    // `:100644 100644 <old> <new> M\tpath` (rename lines carry two paths).
-    const header = line.startsWith(':') ? line.slice(1).split('\t')[0] : ''
+  return rawDiff.split('\0').filter((_, index) => index % 2 === 0).filter(Boolean).some(line => {
+    // With --no-renames -z, each header is followed by one NUL-delimited path.
+    const header = line.startsWith(':') ? line.slice(1) : ''
     const [oldMode, newMode, , , status] = header.split(' ')
     if (!status) return true
     if (status.startsWith('U')) return true
@@ -77,9 +75,9 @@ function eventPayload() {
 
 function changedFiles(base, head) {
   const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
-  const files = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMRDTU', `${base}...${head}`], options)
-    .split('\n').map(file => file.trim()).filter(Boolean)
-  const raw = execFileSync('git', ['diff', '--raw', '--no-abbrev', '--diff-filter=ACMRDTU', `${base}...${head}`], options)
+  const files = execFileSync('git', ['diff', '--no-renames', '-z', '--name-only', `${base}...${head}`], options)
+    .split('\0').filter(Boolean)
+  const raw = execFileSync('git', ['diff', '--no-renames', '-z', '--raw', '--no-abbrev', `${base}...${head}`], options)
   return { files, unsafeModes: hasUnsafeModes(raw) }
 }
 

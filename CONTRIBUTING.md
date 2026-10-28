@@ -49,12 +49,12 @@ cannot.
    hand: Actions → Browser tests → Run workflow.
 4. **After merging** (CI): the same suite on main, and again every night.
 
-A pull request that only changes documentation — `docs/`, `tasks/`, root
-Markdown such as the READMEs, `LICENSE`, the pull request template, or the
-README diagram generator — skips the heavy unit, build and browser jobs. The
-required status checks still report success from a small gate job. Code,
-workflow, configuration, message and public-asset changes always run the full
-suites; one non-documentation file is enough.
+A pull request that only changes documentation — non-executable Markdown in
+`docs/` or `tasks/` (excluding `AGENTS.md`), root README files, `LICENSE`, or
+the pull request template — skips the heavy unit, build and browser jobs. The
+required status checks report success from a small gate job. Code, executable
+files, generated assets, diagram scripts, workflow, configuration, message and
+public-asset changes run the full suites; one other file is enough.
 
 ## License
 

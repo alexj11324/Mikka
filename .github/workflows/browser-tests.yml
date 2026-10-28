@@ -190,15 +190,20 @@ jobs:
     # changed; otherwise it mirrors the full suite's result.
     name: Browser tests (before merge)
     needs: [changes, browser-e2e-full]
-    if: always() && needs.changes.result == 'success' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    if: always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require the full suite unless only documentation changed
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           FULL_RESULT: ${{ needs.browser-e2e-full.result }}
         run: |
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "Changed files job did not succeed: $CHANGES_RESULT"
+            exit 1
+          fi
           if [ "$DOCS_ONLY" = "true" ]; then
             echo "Documentation-only change; the full browser suite is skipped."
             exit 0
