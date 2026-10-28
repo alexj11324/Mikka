@@ -1,4 +1,4 @@
-/** Require an explicit Preview endpoint and prevent inherited password use. */
+/** Require an explicit Preview endpoint and password, excluding pg defaults. */
 export function previewDatabaseURL(env) {
   const value = env.DATABASE_URL
   if (!value?.trim()) throw new Error('PREVIEW_DATABASE_URL_REQUIRED')
@@ -9,7 +9,7 @@ export function previewDatabaseURL(env) {
     const user = decodeURIComponent(url.username)
     const overrides = ['host', 'hostaddr', 'port', 'dbname', 'database', 'user', 'password']
     if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || !user.trim() || !database.trim() || database.includes('/') || url.hash ||
-      (!url.password && env.PGPASSWORD) ||
+      !url.password ||
       [...url.searchParams.keys()].some(key => overrides.includes(key.toLowerCase()))) throw new Error()
     // pg otherwise takes PGPORT from the surrounding environment when the
     // connection string omits a port, even with an explicit host and database.
