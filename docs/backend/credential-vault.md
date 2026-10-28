@@ -58,10 +58,10 @@ prefix is `/api/threads/:runId/credentials`.
   `{nonce,origin,code}`. Codes are encrypted, used once and never saved as a
   reusable login. The consumed lease's OTP ciphertext is erased immediately.
 - `POST <prefix>/login` with `{site}` applies a saved session when present or
-  submits the saved password. `{site,forcePassword:true}` selects a password
+  inserts an observed login field under the viewing guard. `{site,forcePassword:true}` selects a password
   retry after the caller has visually assessed the session result. Responses
   contain only origin and the mechanical result `session_applied` or
-  `submitted` (or `needs_login` if there is no unambiguous saved login).
+  `guarded` (or `needs_login` if there is no unambiguous saved login).
   None means the website accepted a login. After the viewing guard has ended,
   the visual workflow must inspect the redacted page and decide whether login
   succeeded, a password retry or a verification code is needed. It must not
@@ -95,6 +95,24 @@ document/input checks pass. A URL hash/pushState change does not authorize it.
 Errors, worker crashes and timeouts keep the guard closed. CDP parameters,
 responses, cookies, localStorage and Input arguments must never be logged.
 The model receives no secret, credential ID, cookie or broker capability.
+
+### Current integration boundary
+
+The broker requires the trusted target resolver to provide `observedInput`:
+`{loaderId,backendNodeId,credentialRole,epoch,permissionVersion}`. The host
+must consume the existing `computer_use` decision before issuing the scoped
+gateway capability. These fields are not accepted from the credential HTTP
+submission body. The store additionally binds each lease to the encrypted
+secret's nonce; the broker verifies it under the account lock before gateway
+I/O, fencing password updates even after a lease has been claimed.
+
+`guarded` means insertion completed with observation still locked. It is not
+submission or successful login. The gateway retains the guard; its token is
+not returned to the model. The trusted browser host still needs to connect
+its authorized submit/clear continuation and safe guard completion. The
+published legacy #346 resolver does not supply `observedInput` and therefore
+fails closed with this broker. Unit, database and direct-CDP fixtures do not
+establish that this production integration or visual-model acceptance passed.
 
 HMAC fingerprints (using a domain-separated derivation of the existing auth
 secret) reject copies of saved passwords before coordinator inbox and chat/tool
