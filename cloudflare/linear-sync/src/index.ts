@@ -1,5 +1,5 @@
 import { parseLinearWebhookRequest, verifyBearer } from '@/lib/linear-sync/webhook'
-import { linearSyncDisabledResponse, linearSyncEnabled } from '@/lib/linear-sync/flags'
+import { linearSyncDisabledResponse, linearSyncEnabled, linearSyncState } from '@/lib/linear-sync/flags'
 
 const WEBHOOK_PATH = '/mikka/api/webhooks/linear'
 const CRON_PATH = '/mikka/api/cron/linear-sync'
@@ -76,7 +76,9 @@ async function webhook(request: Request, env: Env, ctx: WorkerContext) {
   const parsed = await parseLinearWebhookRequest(request, env.LINEAR_WEBHOOK_SECRET)
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: parsed.status })
   if ('ignored' in parsed) return new Response(null, { status: 200 })
-  if (!await linearSyncEnabled(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')) return linearSyncDisabledResponse()
+  const state = await linearSyncState(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')
+  if (state === 'disabled') return Response.json({ disabled: true })
+  if (state !== 'enabled') return linearSyncDisabledResponse()
   if (!syncConfigured(env)) return Response.json({ error: 'Linear sync is not configured' }, { status: 503 })
 
   try {

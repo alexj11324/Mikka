@@ -22,11 +22,17 @@ the background and flag evaluation never opens a database connection.
 
 When paused:
 
-- Next and Cloudflare validate webhook signatures, then return `503` with
-  `Retry-After: 60` before inserting an inbox row or ingesting suggestions.
-  Unsupported event types retain their existing `200` response. Linear's
-  retry retention is finite: pausing does not promise an indefinite archive
-  of events that arrive while paused, including OAuth revocations.
+- Next and Cloudflare validate webhook signatures, then acknowledge a
+  confirmed off/missing flag with `200 { disabled: true }` without inserting
+  an inbox row or ingesting suggestions. Events arriving during this pause
+  are intentionally skipped, including OAuth revocations; they are not an
+  archive or an automatic remote backfill on resume. A missing token,
+  evaluation error or timeout instead returns `503` with `Retry-After: 60`,
+  preserving retries during an outage. Unsupported event types retain `200`.
+  Linear retries non-200 deliveries after 1 minute, 1 hour and 6 hours, and
+  may then disable a failing webhook. After a long evaluation outage, check
+  Linear's webhook status and manually re-enable it if necessary. Confirmed
+  PostHog pauses use 200 so they do not trigger this provider disablement.
 - Protected crons return `{ inbox: 0, outbox: 0, disabled: true }`; the
   Cloudflare schedule exits before loading its database runtime. Dispatch
   callbacks and all worker entry points check the same flag.
@@ -62,7 +68,8 @@ new code does not establish that an old Preview or unrelated database caller
 has stopped, or that Neon will suspend. Do not suspend/delete Neon resources
 as part of operating this switch.
 
-Official evaluation API: https://posthog.com/docs/api/flags.
+Official references: [PostHog flag evaluation](https://posthog.com/docs/api/flags)
+and [Linear webhook delivery/retries](https://linear.app/developers/webhooks).
 
 ## Linear OAuth app
 

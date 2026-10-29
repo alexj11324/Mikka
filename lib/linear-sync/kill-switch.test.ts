@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto'
 import { before, mock, test } from 'node:test'
 
 let enabled = false
+let unavailable = false
 let reads = 0
 let claims = 0
 let syncs = 0
@@ -21,6 +22,7 @@ let callback: typeof import('../../app/api/integrations/linear/callback/route')
 before(async () => {
   mock.module('./flags', { namedExports: {
     linearSyncEnabled: async () => enabled,
+    linearSyncState: async () => unavailable ? 'unavailable' : enabled ? 'enabled' : 'disabled',
     linearSyncDisabledResponse: () => Response.json({ disabled: true }, { status: 503, headers: { 'retry-after': '60' } }),
   } })
   mock.module('next/server', { namedExports: { after: (fn: () => Promise<void>) => { scheduled.push(fn) }, NextResponse: { redirect: unexpected } } })
@@ -127,7 +129,13 @@ test('Next routes authenticate before returning disabled without queuing, draini
   assert.equal((await webhook.POST(request('0'.repeat(64)))).status, 401)
   const signature = createHmac('sha256', 'test-webhook').update(body).digest('hex')
   const response = await webhook.POST(request(signature))
-  assert.equal(response.status, 503)
-  assert.equal(response.headers.get('retry-after'), '60')
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { disabled: true })
+  unavailable = true
+  try {
+    const uncertain = await webhook.POST(request(signature))
+    assert.equal(uncertain.status, 503)
+    assert.equal(uncertain.headers.get('retry-after'), '60')
+  } finally { unavailable = false }
   assert.equal(reads, 0); assert.equal(claims, 0); assert.equal(scheduled.length, 0)
 })

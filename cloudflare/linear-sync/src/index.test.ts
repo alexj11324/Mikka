@@ -59,12 +59,22 @@ test('disabled Worker webhook, protected cron and scheduler never read Hyperdriv
   const response = await handleRequest(new Request('https://sync.example.test/mikka/api/webhooks/linear', {
     method: 'POST', body, headers: { 'linear-event': 'Issue', 'linear-delivery': 'paused-delivery', 'linear-signature': createHmac('sha256', webhookSecret).update(body).digest('hex') },
   }), env, { waitUntil: () => { background++ } })
-  assert.equal(response.status, 503)
-  assert.equal(response.headers.get('retry-after'), '60')
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { disabled: true })
   const cron = await handleRequest(new Request('https://sync.example.test/mikka/api/cron/linear-sync', { headers: { authorization: 'Bearer test-worker-cron' } }), env, ctx)
   assert.deepEqual(await cron.json(), { inbox: 0, outbox: 0, disabled: true })
   await runScheduled(env)
   assert.equal(background, 0)
+})
+
+test('Worker retains webhook retry semantics when PostHog is unavailable', async t => {
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('network unavailable') })
+  const body = JSON.stringify({ action: 'update', type: 'Issue', organizationId: 'org', webhookTimestamp: Date.now(), data: { id: 'issue' } })
+  const response = await handleRequest(new Request('https://sync.example.test/mikka/api/webhooks/linear', {
+    method: 'POST', body, headers: { 'linear-event': 'Issue', 'linear-delivery': 'unavailable-delivery', 'linear-signature': createHmac('sha256', webhookSecret).update(body).digest('hex') },
+  }), { NEXT_PUBLIC_POSTHOG_KEY: 'test-worker-unavailable', LINEAR_WEBHOOK_SECRET: webhookSecret }, ctx)
+  assert.equal(response.status, 503)
+  assert.equal(response.headers.get('retry-after'), '60')
 })
 
 test('Worker requires an explicit true from its own configured PostHog project before loading sync', async t => {

@@ -6,7 +6,7 @@ import { dispatchLinearWebhook } from '@/lib/linear-sync/dispatch'
 import { parseLinearWebhookRequest } from '@/lib/linear-sync/webhook'
 import { linearWebhookNotifications } from '@/lib/suggestions/sources'
 import { ingestNotifications } from '@/lib/suggestions/store'
-import { linearSyncDisabledResponse, linearSyncEnabled } from '@/lib/linear-sync/flags'
+import { linearSyncDisabledResponse, linearSyncEnabled, linearSyncState } from '@/lib/linear-sync/flags'
 
 export const runtime = 'nodejs'
 
@@ -14,7 +14,9 @@ async function handlePOST(request: Request) {
   const parsed = await parseLinearWebhookRequest(request, process.env.LINEAR_WEBHOOK_SECRET)
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: parsed.status })
   if ('ignored' in parsed) return new Response(null, { status: 200 })
-  if (!await linearSyncEnabled()) return linearSyncDisabledResponse()
+  const state = await linearSyncState()
+  if (state === 'disabled') return Response.json({ disabled: true })
+  if (state !== 'enabled') return linearSyncDisabledResponse()
   const [saved] = await db.insert(linearSyncInbox).values({
     deliveryId: parsed.deliveryId,
     organizationId: parsed.organizationId,
