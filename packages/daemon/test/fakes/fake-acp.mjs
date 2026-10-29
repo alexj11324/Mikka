@@ -61,6 +61,11 @@ new acp.AgentSideConnection(
       async prompt(params) {
         const session = sessions.get(params.sessionId)
         const text = params.prompt.map((p) => p.text ?? "").join("\n")
+        if (text.includes('COMPUTER_CONFIG_TEST')) {
+          const server = session.mcp.find(s => s.name === 'mikka_computer')
+          await say(params.sessionId, JSON.stringify({ computer: server ? { command: server.command, args: server.args, env: Object.fromEntries(server.env.map(e => [e.name, e.value])) } : null }))
+          return { stopReason: 'end_turn' }
+        }
         await say(params.sessionId, `heard: ${text} `)
         await say(params.sessionId, "thinking ")
         await say(params.sessionId, "about it")
