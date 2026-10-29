@@ -107,3 +107,24 @@ changes still require final exact-SHA cloud CI and real functional acceptance.
 No real model inference, real-account login, production SQL, or merge has been
 performed. Team-account routing and the bounded functional model-request fee
 remain unanswered user questions; no reply is inferred from elapsed time.
+
+## 2026-10-29 final gate preparation
+
+The real gateway/Chromium/PostgreSQL fixture additionally restored its freshly
+sealed synthetic session after removing cookies from its own new browser. The
+actual broker returned session_applied and released the actual gateway guard;
+the synthetic KMS key remained inside the broker fixture process. Evidence is
+/workspace/pr346-session-reuse-real.log; retained schema
+broker_cc39496131e44d0bb47d673a36fabdb3 and profile directory
+/tmp/pr346-broker-19030ru3. This is real browser and encrypted-storage behavior,
+not a real KMS or model claim.
+
+Candidate 6b6a151 passed backend run 40790289334. Full CI 40790289377
+failed before the heavy jobs because the trusted main classifier was copied
+to a suffixless mktemp file and Node rejected its unknown file extension.
+Both workflow launchers now preserve its .mjs suffix. Main independently
+fixed the same issue in PR 393; main dff1ccd65d2016fc7e2df6a726e84de3097291e2
+is now merged normally into this candidate, including its shared resource
+retention and scoped session revocation changes. Both classifier regressions
+passed together (11 tests); broker bundling and native imports also passed.
+Final exact-SHA CI and the full browser gate are still required.
