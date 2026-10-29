@@ -25,7 +25,18 @@ stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDevice
 stub('../mcp/worker.ts',{issueRunToken:async()=>({token:'synthetic-only'})})
 stub('../mcp/resource.ts',{mcpResourceURL:null})
 stub('../run-leases.ts',{latestCheckpoint:async()=>null})
-stub('../computer/claim.ts',{claimLocalRun:claimed,claimCloudRun:cloudClaimed})
+stub('../computer/claim.ts',{claimLocalRun:claimed,claimCloudRun:cloudClaimed,prepareLocalClaimBinding:async()=>{throw Error('Factory check/continuation is outside this ordinary-run fixture')}})
+// This fixture covers ordinary Agent-kit subscription snapshots. Factory and
+// Skill assignment SQL, terminal fences and native binding CAS have their own
+// PostgreSQL composition regressions; do not initialize auth/provider services here.
+stub('../factory/server.ts',{
+ guardExecutionRun:async()=>{throw Error('Mocked ordinary claim must not execute a transaction callback')},
+ claimFactoryCheckRun:async()=>{throw Error('No Factory check in this fixture')},factoryQuestions:{},
+})
+stub('../self-improvement/server.ts',{
+ skillAssignments:{preflight:async()=>undefined,recordClaim:async()=>undefined},
+ claimBenchmarkAssignment:async()=>undefined,
+})
 stub('../subscription-runtime.ts',{subscriptionRuntime:()=>({repository:{binding:bindingById,nativeBinding:latestBinding}})})
 let claim: typeof import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route').POST
 let queue: typeof import('../computer/queue-run').queueCloudRun
@@ -33,10 +44,10 @@ before(async()=>{claim=(await import('../../app/v1/devices/[deviceId]/runs/[runI
 beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;selectIndex=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [bindingById,latestBinding,claimed,cloudClaimed])fn.mock.resetCalls()})
 const request=()=>claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+randomUUID()+'/claim',{method:'POST'}),{params:Promise.resolve({deviceId,runId:randomUUID()})})
 test('local claim uses frozen harness and exact subscription despite Agent edits',async()=>{
- const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.harness,'codex');assert.equal(body.model,'frozen-model');assert.deepEqual(bindingById.mock.calls[0].arguments,[owner,binding.id]);assert.equal(latestBinding.mock.callCount(),0);assert.equal(claimed.mock.callCount(),1)
+ const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.harness,'codex');assert.equal(body.model,'frozen-model');assert.deepEqual(bindingById.mock.calls[0].arguments,[owner,binding.id]);assert.equal(latestBinding.mock.callCount(),0);assert.equal(claimed.mock.callCount(),1);assert.equal(typeof (claimed.mock.calls[0].arguments as unknown[])[5],'function','Factory lineage guard remains attached to the local claim')
 })
 test('cloud claim preserves main scoped claim and frozen subscription',async()=>{
- cloud=true;const response=await request();assert.equal(response.status,200);assert.equal(cloudClaimed.mock.callCount(),1);assert.equal(claimed.mock.callCount(),0);assert.equal((await response.json()).computer.botId,botId)
+ cloud=true;const response=await request();assert.equal(response.status,200);assert.equal(cloudClaimed.mock.callCount(),1);assert.equal(claimed.mock.callCount(),0);assert.equal((await response.json()).computer.botId,botId);assert.equal(typeof (cloudClaimed.mock.calls[0].arguments as unknown[])[6],'function','Factory lineage guard remains attached to the cloud claim')
 })
 test('missing, substituted or disabled pinned subscription refuses before claim without fallback',async()=>{
  for(const change of ['missing','model','consumer','disabled']){
