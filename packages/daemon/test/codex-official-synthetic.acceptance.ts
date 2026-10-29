@@ -100,7 +100,7 @@ function sse(response: ServerResponse, id: string, item: JsonObject) {
   response.end()
 }
 
-async function provider(command: string, native: "enabled" | "disabled" | "restricted", target?: { name: string; arguments: JsonObject; callId: string }) {
+async function provider(command: string, native: "enabled" | "disabled" | "restricted", target?: { name: string; namespace: string; arguments: JsonObject; callId: string }) {
   const requests: JsonObject[] = []
   const failures: string[] = []
   const toolOutput = deferred<JsonObject>()
@@ -136,8 +136,8 @@ async function provider(command: string, native: "enabled" | "disabled" | "restr
       if (native !== "enabled" && raw.length) throw new Error(`native shell still advertised: ${raw.map((tool) => tool.name).join(",")}`)
       const exec = tools.find((tool) => tool.name === "exec_command")
       if (native === "enabled" && !exec) throw new Error("official CLI did not advertise exec_command")
-      const selected = target ? tools.find(tool => tool.name === target.name) : exec
-      if (target && !selected) throw new Error(`official CLI did not advertise registered ${target.name}; tools=${JSON.stringify(tools)}`)
+      const selected = target ? tools.find(tool => tool.name === target.name && tool.namespace === target.namespace) : exec
+      if (target && !selected) throw new Error(`official CLI did not advertise registered ${target.namespace}.${target.name}; tools=${JSON.stringify(tools)}`)
       // In disabled mode deliberately send an unavailable native call as a
       // negative control; it must return an error without running the command.
       sse(response, "synthetic_response_tool", {
@@ -381,7 +381,7 @@ async function computerDiagnostic(binary: string) {
     if (!grant) throw new Error('synthetic computer ask grant unavailable')
     brokerEndpoint = grant.socketPath
     const port = Number(new URL(brokerEndpoint).port)
-    synthetic = await provider('', 'disabled', { name: toolName, arguments: {}, callId: 'synthetic_computer_mcp_call' })
+    synthetic = await provider('', 'disabled', { name: 'get_desktop_state', namespace: 'mcp__mikka_computer', arguments: {}, callId: 'synthetic_computer_mcp_call' })
     const adapter = new CodexAdapter({
       sandbox: new SandboxRuntime(), stateDir: dir, userHome,
       binary: wrapper(dir, binary, synthetic.url, 'disabled', join(dir, 'runs', runId, 'official-cli.stderr.log')),

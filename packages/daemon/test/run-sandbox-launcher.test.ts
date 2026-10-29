@@ -197,7 +197,7 @@ describe.skipIf(process.env.MIKKA_SANDBOX_ACCEPTANCE !== "1")("official per-run 
     lines.on('line',line => { const frame=JSON.parse(line); if(frame.id===2)answer.resolve(frame) })
     try {
       child.process.stdin.write(JSON.stringify({jsonrpc:'2.0',id:1,method:'initialize'})+'\n')
-      child.process.stdin.write(JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'get_desktop_state',arguments:{}}})+'\n')
+      child.process.stdin.write(JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'get_desktop_state',arguments:{},_meta:{progressToken:2,'claudecode/toolUseId':'synthetic-call'}}})+'\n')
       const reply = await deadline(answer.promise,'actual sandboxed computer MCP transport')
       expect(reply.result.content).toContainEqual({type:'text',text:'synthetic-desktop-state'})
       expect(calls).toHaveLength(1)

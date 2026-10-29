@@ -21,7 +21,7 @@ let selectIndex = 0, support = true
 const rows = [
   [{ id:runId, userId:owner, deviceId, agentId, deviceRepoId:repoId, issueId, kind:'implement', prompt:'APPROVAL_TEST', agentDefinition:null, retryOf:null }],
   [{ id:agentId, userId:owner, harness:'codex' }],
-  [{ id:repoId, userId:owner, baseBranch:'main', verifyCommand:null }],
+  [{ id:repoId, userId:owner, deviceId, baseBranch:'main', verifyCommand:null }],
 ]
 const db = { select: () => ({ from: () => ({ where: () => ({ limit: async () => rows[selectIndex++] }) }) }) }
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool,db } })

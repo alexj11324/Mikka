@@ -460,13 +460,40 @@ async function computerDiagnostic(runtime: OfficialRuntime) {
   let finished: Promise<void> | undefined
   let networkCeiling: readonly string[] = []
   let failure: string | undefined
+  let grantToken = ""
+  let observedToolOutput: JsonObject | undefined
+  let streamEnded = false
+  let streamError: string | undefined
+  const clipped = (value: unknown, limit = 600) => {
+    let text = typeof value === "string" ? value : JSON.stringify(value) ?? "undefined"
+    for (const secret of [grantToken, KEY]) if (secret) text = text.replaceAll(secret, "[synthetic-token-redacted]")
+    text = text.replace(/(https?:\/\/)[^\s/"'@]+@/gi, "$1[proxy-auth-redacted]@")
+      .replace(/\b(Basic|Bearer)\s+[A-Za-z0-9+/_=-]+/g, "$1 [auth-redacted]")
+    return text.length > limit ? `${text.slice(0, limit)}...[clipped]` : text
+  }
+  const protocolSummary = () => JSON.stringify({
+    approvals: approvals.slice(-6).map(request => clipped(request)),
+    asks: asks.slice(-4).map(request => clipped(request)),
+    decisions: decisions.slice(-6),
+    events: events.slice(-6).map(event => clipped(event)),
+    providerErrors: synthetic?.failures.slice(-4).map(error => clipped(error)),
+    providerRequests: synthetic?.requests.slice(-2).map(({ route, body }) => ({
+      route, model: body.model, stream: body.stream,
+      toolNames: clipped(Array.isArray(body.tools) ? body.tools.filter(object).map(tool => tool.name) : [], 1200),
+    })),
+    toolResult: clipped(observedToolOutput, 1600),
+    brokerCalls: broker.calls.slice(-4).map(call => clipped(call)),
+    streamEnded, streamError: clipped(streamError),
+  })
   try {
     await broker.listen()
     const grant = broker.spec(runId, policy.permissions.computer_use)
     if (!grant) throw new Error("synthetic ask broker grant unavailable")
+    grantToken = grant.token
     const brokerDomain = new URL(grant.socketPath).host
     const brokerPort = Number(new URL(grant.socketPath).port)
     synthetic = await provider(COMPUTER_TOOL, {}, false)
+    void synthetic.toolOutput.promise.then(output => { observedToolOutput = output })
     const providerPort = synthetic.port
     networkCeiling = Object.freeze([`127.0.0.1:${providerPort}`, brokerDomain])
     gate = new ToolApprovalGate(runId, {
@@ -511,7 +538,13 @@ async function computerDiagnostic(runtime: OfficialRuntime) {
       log: createLogger(),
     }), "official Claude computer session start")
     finished = (async () => { for await (const event of session!.events()) events.push(event) })()
-    const pending = await deadline(waitFor(() => broker.list()[0], 30_000), "actual broker ask from official CLI MCP proxy")
+    void finished.then(() => { streamEnded = true }, error => { streamEnded = true; streamError = String(error) })
+    const pending = await deadline(waitFor(() => {
+      if (synthetic!.failures.length) throw new Error("synthetic provider failed before broker admission")
+      if (observedToolOutput) throw new Error("official CLI returned a tool_result before broker admission/review")
+      if (streamEnded || events.some(event => event.type === "exit")) throw new Error("official CLI terminated before broker admission")
+      return broker.list()[0]
+    }, 30_000), "actual broker ask from official CLI MCP proxy")
     expect(broker.calls).toEqual([{ name: "get_desktop_state", arguments: {} }])
     expect(broker.list()).toHaveLength(1)
     expect(pending).toMatchObject({ runId, call: { name: "get_desktop_state", arguments: {} } })
@@ -538,8 +571,8 @@ async function computerDiagnostic(runtime: OfficialRuntime) {
     expect(asks).toEqual([])
     expect(events.filter(event => event.type === "exit")).toEqual([expect.objectContaining({ type: "exit", outcome: "succeeded" })])
   } catch (error) {
-    failure = String(error)
-    throw error
+    failure = `${clipped(String(error))}; synthetic protocol summary: ${protocolSummary()}`
+    throw new Error(failure)
   } finally {
     live = false
     gate?.revoke()

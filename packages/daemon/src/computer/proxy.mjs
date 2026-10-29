@@ -47,7 +47,8 @@ async function request(call) {
     socket.on("end", () => {
       try {
         const body = JSON.parse(text);
-        body.error ? reject(new Error(body.error)) : resolve(body.result);
+        if (body.error) reject(new Error(body.error));
+        else resolve(body.result);
       } catch (error) {
         reject(error);
       }
@@ -76,7 +77,15 @@ lines.on("line", (line) => {
         });
       if (msg.method === "tools/list") return send(msg.id, { tools: TOOLS });
       if (msg.method !== "tools/call") return send(msg.id, {});
-      const result = await request(normalizeCall(msg.params));
+      // MCP transport metadata (for example Claude's progressToken and
+      // toolUseId) is not part of the action or any authority decision.
+      // Validate the envelope separately; keep driver arguments strict.
+      const params = msg.params;
+      if (!params || typeof params !== 'object' || Array.isArray(params) ||
+        Object.keys(params).some(key => !['name', 'arguments', '_meta'].includes(key)) ||
+        ('_meta' in params && (!params._meta || typeof params._meta !== 'object' || Array.isArray(params._meta))))
+        throw new Error('Invalid MCP call envelope');
+      const result = await request(normalizeCall({ name: params.name, arguments: params.arguments }));
       send(msg.id, {
         ...result,
         content: [
