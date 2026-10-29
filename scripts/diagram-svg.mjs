@@ -84,8 +84,8 @@ export function legend(y, t, p) {
 }
 
 export const LEGEND_TEXT = {
-  en: { lShipped: 'Shipped', lPlanned: 'Planned', lFlow: 'Data flow', lPlannedFlow: 'Planned flow' },
-  zh: { lShipped: '已上线', lPlanned: '规划中', lFlow: '数据流', lPlannedFlow: '规划中的数据流' },
+  en: { lShipped: 'Shipped', lPlanned: 'Pending', lFlow: 'Data flow', lPlannedFlow: 'Pending flow' },
+  zh: { lShipped: '已上线', lPlanned: '待完成', lFlow: '数据流', lPlannedFlow: '待完成的数据流' },
 }
 
 export function svg(width, height, title, elements) {
