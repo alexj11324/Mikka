@@ -3,6 +3,7 @@ import { linearSyncDisabledResponse, linearSyncEnabled, linearSyncState } from '
 
 const WEBHOOK_PATH = '/mikka/api/webhooks/linear'
 const CRON_PATH = '/mikka/api/cron/linear-sync'
+const STATUS_PATH = '/mikka/api/integrations/linear/status'
 
 export interface Env {
   NEXT_PUBLIC_POSTHOG_KEY?: string
@@ -115,6 +116,10 @@ async function cron(request: Request, env: Env) {
 
 export async function handleRequest(request: Request, env: Env, ctx: WorkerContext) {
   const path = new URL(request.url).pathname
+  if (path === STATUS_PATH && request.method === 'GET') {
+    const state = await linearSyncState(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')
+    return Response.json({ enabled: state === 'enabled', state }, { headers: { 'cache-control': 'no-store' } })
+  }
   if (path === WEBHOOK_PATH && request.method === 'POST') return webhook(request, env, ctx)
   if (path === CRON_PATH && request.method === 'GET') return cron(request, env)
   return new Response(null, { status: 404 })

@@ -6,9 +6,23 @@ import { handleRequest, runScheduled, type Env } from './index'
 const webhookSecret = 'worker-test-webhook-secret'
 const ctx = { waitUntil: (_promise: Promise<unknown>) => {} }
 
-test('exposes only webhook intake and the protected sync cron route', async () => {
+test('keeps the application OAuth callback outside the sync Worker', async () => {
   const response = await handleRequest(new Request('https://sync.example.test/mikka/api/integrations/linear/callback'), {}, ctx)
   assert.equal(response.status, 404)
+})
+
+test('global status distinguishes a confirmed PostHog pause from unavailable configuration without accessing Hyperdrive', async t => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ errorsWhileComputingFlags: false, flags: { 'mikka-linear-sync': { enabled: false } } }))
+  const env: Env = { get HYPERDRIVE(): { connectionString: string } { throw new Error('Status must not initialize a database') } }
+  const request = () => new Request('https://sync.example.test/mikka/api/integrations/linear/status')
+  const unavailable = await handleRequest(request(), env, ctx)
+  assert.deepEqual(await unavailable.json(), { enabled: false, state: 'unavailable' })
+  env.NEXT_PUBLIC_POSTHOG_KEY = 'test-worker-status-paused'
+  const paused = await handleRequest(request(), env, ctx)
+  assert.deepEqual(await paused.json(), { enabled: false, state: 'disabled' })
+  assert.equal(paused.headers.get('cache-control'), 'no-store')
+  const rejected = await handleRequest(new Request(request(), { method: 'POST' }), env, ctx)
+  assert.equal(rejected.status, 404)
 })
 
 test('returns 503 before accepting webhooks when the secret is missing', async () => {

@@ -1,9 +1,10 @@
-import { linearSyncEnabled } from '@/lib/linear-sync/flags'
+import { linearSyncState } from '@/lib/linear-sync/flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /** Global availability only. No session, user, token or database reads. */
 export async function GET() {
-  return Response.json({ enabled: await linearSyncEnabled() }, { headers: { 'cache-control': 'no-store' } })
+  const state = await linearSyncState()
+  return Response.json({ enabled: state === 'enabled', state }, { headers: { 'cache-control': 'no-store' } })
 }

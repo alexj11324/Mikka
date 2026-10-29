@@ -68,6 +68,14 @@ new code does not establish that an old Preview or unrelated database caller
 has stopped, or that Neon will suspend. Do not suspend/delete Neon resources
 as part of operating this switch.
 
+The app and both Workers expose a database-free, unauthenticated `GET
+/mikka/api/integrations/linear/status` with `Cache-Control: no-store`. It
+returns only global availability: `{ enabled, state }`. `state: disabled`
+means PostHog confirmed a false or absent flag; `unavailable` means missing
+configuration or failed evaluation and also pauses work. This distinction
+lets deployment checks verify real PostHog wiring without retrieving webhook
+signing or cron credentials. The endpoint reads no session or tenant data.
+
 Official references: [PostHog flag evaluation](https://posthog.com/docs/api/flags)
 and [Linear webhook delivery/retries](https://linear.app/developers/webhooks).
 
