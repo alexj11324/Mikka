@@ -1,4 +1,4 @@
-export type WorkspaceSection = 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins'
+export type WorkspaceSection = 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts'
 
 export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   inbox: 'Nav.inbox',
@@ -12,4 +12,6 @@ export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   'team-projects': 'Nav.projects',
   'all-issues': 'Nav.allIssues',
   plugins: 'Nav.plugins',
+  suggestions: 'Nav.suggestions',
+  artifacts: 'Nav.artifacts',
 }
