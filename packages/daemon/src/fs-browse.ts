@@ -4,7 +4,7 @@
 // ask (the server checks), and the owner already owns every folder here.
 import { execFile } from "node:child_process"
 import type { Dirent } from "node:fs"
-import { readdir, stat } from "node:fs/promises"
+import { readdir, realpath, stat } from "node:fs/promises"
 import { homedir, platform } from "node:os"
 import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 import { promisify } from "node:util"
@@ -125,4 +125,13 @@ export async function browseFolder(
     truncated,
     repo: await repoAround(path),
   }
+}
+
+/** Verify the user-asserted public GitHub identity against this checkout's origin. */
+export async function verifyExpectedOrigin(path: string, expected: string): Promise<boolean> {
+  const key = (value: string) => /^(?:https:\/\/github\.com\/|git@github\.com:)([A-Za-z0-9][A-Za-z0-9-]*)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/.exec(value)?.slice(1).join('/').toLowerCase()
+  const top = await git(path, ["rev-parse", "--show-toplevel"])
+  const origin = await git(path, ["config", "--get", "remote.origin.url"])
+  if (!top || !origin || !key(expected) || key(expected) !== key(origin)) return false
+  try { return await realpath(path) === await realpath(top) } catch { return false }
 }

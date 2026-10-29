@@ -13,12 +13,17 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // (`ServerUnreachableError`, the outbox keeps the item); 409 on a claim is
 // `RunNotPinnedHereError`; any other 4xx is a refusal (`DaemonError`) that
 // retrying cannot fix.
-import type { z } from "zod"
+import { z } from "zod"
+import { ToolApprovalGate } from "./agents/tool-approval"
+import { toolApprovalDecision } from "./agents/tool-approval-policy"
+import { SKILL_ARTIFACT_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
 import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
+import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCaptureResponse, type CaptureUploadRequest, type CaptureUploadResponse, type ScreenCaptureRequest } from '@mikka/protocol/capture'
 
 import {
   CLIENT_VERSION_HEADER,
+  REPO_ORIGIN_HEADER,
   DAEMON_RPC_ERRORS,
   devicePaths,
   fsPaths,
@@ -53,6 +58,8 @@ import type {
   RunAssignment,
   ServerLink,
 } from "./server-link"
+
+const deviceSessionRejection = z.object({ error: z.enum(["Unauthorized", "authRequired"]) }).strict()
 
 /**
  * Ids go into the path as one escaped segment each. `.` and `..` survive
@@ -97,6 +104,55 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
+  async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string) {
+    if (!assignment.policy || !assignment.policyRevision) throw new Error('Run policy unavailable')
+    const policyRevision = assignment.policyRevision
+    const path = `/v1/runs/${seg(assignment.runId)}/tool-approval`
+    const proposal = z.object({ id: z.uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/), status: z.string() })
+    const response = z.object({ decision: z.enum(['pending', 'allow', 'deny']) })
+    const liveness = new AbortController()
+    const gate = new ToolApprovalGate(assignment.runId, {
+      permission: request => toolApprovalDecision(request, assignment.policy, worktree),
+      isLive: async () => { try { check(); const current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean() }), signal:liveness.signal, timeoutMs:5000 }); check(); return current.live } catch { return false } },
+      ask: async (request, signal) => {
+        const delay = () => new Promise<void>((resolve, reject) => {
+          const done = () => { signal.removeEventListener('abort', stop); resolve() }
+          const timer = setTimeout(done, 1000)
+          const stop = () => { clearTimeout(timer); reject(new Error('cancelled')) }
+          signal.addEventListener('abort', stop, { once: true })
+          if (signal.aborted) stop()
+        })
+        const retry = async <T>(operation: () => Promise<T>): Promise<T> => {
+          for (;;) {
+            try { return await operation() }
+            catch (error) { if (signal.aborted || !(error instanceof ServerUnreachableError)) throw error; await delay() }
+          }
+        }
+        const created = await retry(() => this.call('POST', path, { body: { operation: 'propose', deviceId: assignment.deviceId, policyRevision, requestId: request.requestId, harness: request.harness, method: request.method, input: request.input }, schema: proposal, signal }))
+        try {
+          for (;;) {
+            const result = await retry(() => this.call('POST', path, { body: { operation: 'take', deviceId: assignment.deviceId, id: created.id, digest: created.digest }, schema: response, signal }))
+            if (result.decision !== 'pending') return result.decision
+            await delay()
+          }
+        } finally {
+          void this.call('POST', path, { body: { operation: 'cancel', deviceId: assignment.deviceId, id: created.id, digest: created.digest } }).catch(() => undefined)
+        }
+      },
+    })
+    let checking = false
+    const monitor = setInterval(() => {
+      if (checking || gate.revoked) return
+      checking = true
+      void gate.checkLive().then(live => { if (!live) gate.revoke() }).finally(() => { checking = false })
+    },1000)
+    monitor.unref()
+    const abort = () => gate.revoke()
+    gate.onRevoke(() => { liveness.abort(); clearInterval(monitor); signal.removeEventListener('abort',abort) })
+    if (signal.aborted) gate.revoke()
+    else signal.addEventListener('abort', abort, { once: true })
+    return gate
+  }
   async prepareRunMailbox(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
     return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: this.fetchImpl,
       headers: { [CLIENT_VERSION_HEADER]: this.clientVersion, ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) } })
@@ -143,11 +199,14 @@ export class HttpServerLink implements ServerLink {
     }: { timeoutMs?: number; signal?: AbortSignal } = {}
   ): Promise<Response> {
     try {
-      return await this.fetchImpl(serverUrl(this.baseUrl, path), {
+      const response = await this.fetchImpl(serverUrl(this.baseUrl, path), {
         method,
+        redirect: "manual",
         headers: {
           "content-type": "application/json",
           [CLIENT_VERSION_HEADER]: this.clientVersion,
+          [SKILL_ARTIFACT_HEADER]: '1',
+          [REPO_ORIGIN_HEADER]: '1',
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
         },
@@ -157,6 +216,16 @@ export class HttpServerLink implements ServerLink {
           ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
           : AbortSignal.timeout(timeoutMs),
       })
+      // Deployment protection is not device-session rejection; never follow it with credentials.
+      if (response.redirected || (response.status >= 300 && response.status < 400))
+        throw new Error(`Unexpected server redirect (${response.status})`)
+      if (response.status === 401) {
+        // Only the device API's exact rejection contracts can revoke a saved credential.
+        const body: unknown = await response.clone().json().catch(() => null)
+        if (!deviceSessionRejection.safeParse(body).success)
+          throw new Error("Unexpected device authentication response")
+      }
+      return response
     } catch (error) {
       throw new ServerUnreachableError(error)
     }
@@ -254,9 +323,17 @@ export class HttpServerLink implements ServerLink {
       { schema: runAssignmentSchema, claimOf: runId }
     )
   }
+  async validateSkillReceipt(runId:string,receiptId:string) {
+    return this.call('GET',`/v1/runs/${seg(runId)}/skill-receipt?receiptId=${encodeURIComponent(checkId(receiptId))}`,{schema:skillReceiptRevalidationSchema})
+  }
   async syncComputerReviews(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal) {
     const result = await this.call("POST", computerSyncPath(checkId(deviceId)), { body: { requests }, schema: computerSyncResponse, signal })
     return result.decisions
+  }
+  async localComputerAuthority(deviceId: string, runId: string) {
+    return this.call('GET', `${devicePaths.claim(checkId(deviceId), checkId(runId)).replace(/\/claim$/, '')}/computer-authority`, {
+      schema: runAssignmentSchema.shape.localComputer.unwrap(),
+    })
   }
   async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
     return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
@@ -269,6 +346,45 @@ export class HttpServerLink implements ServerLink {
       throw new Error('subscription_native_unavailable')
     }
     return {contentType,body:response.body}
+  }
+
+  async beginCapture(runId: string, request: CaptureUploadRequest) {
+    return this.call("POST", capturePaths.begin(checkId(runId)), { body: request, schema: captureUploadResponse })
+  }
+
+  async resumeCapture(runId: string, captureId: string) {
+    return this.call("POST", capturePaths.upload(checkId(runId), checkId(captureId)), { schema: captureUploadResponse })
+  }
+
+  /** Straight to object storage with the signed headers, or to the server when it has no bucket. */
+  async sendCapture(runId: string, captureId: string, upload: CaptureUploadResponse["upload"], bytes: Uint8Array, contentType: string) {
+    const server = upload.target === "server"
+    let response: Response
+    try {
+      response = await this.fetchImpl(server ? serverUrl(this.baseUrl, capturePaths.upload(checkId(runId), checkId(captureId))) : upload.url, {
+        method: "PUT",
+        headers: server
+          ? { "content-type": contentType, [CLIENT_VERSION_HEADER]: this.clientVersion, ...(this.credential ? { authorization: `Bearer ${this.credential}` } : {}), ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) }
+          : upload.headers,
+        body: bytes,
+        redirect: "error",
+        signal: AbortSignal.timeout(300_000),
+      })
+    } catch (error) {
+      throw new ServerUnreachableError(error)
+    }
+    if (response.status >= 500 || response.status === 429) throw new ServerUnreachableError(response.status)
+    if (response.status === 401 && server) throw new SessionRejectedError()
+    if (!response.ok) throw new DaemonError(response.status, `PUT capture failed: ${response.status}`, { status: response.status })
+  }
+
+  async completeCapture(runId: string, captureId: string) {
+    const { capture } = await this.call("POST", capturePaths.complete(checkId(runId), checkId(captureId)), { schema: captureCompleteResponse, timeoutMs: 120_000 })
+    return capture
+  }
+
+  async screenCapture(runId: string, request: ScreenCaptureRequest, signal?: AbortSignal) {
+    return this.call("POST", capturePaths.screen(checkId(runId)), { body: request, schema: screenCaptureResponse, signal, timeoutMs: 120_000 })
   }
 
   async appendRunChunks(runId: string, batch: ChunkBatch) {

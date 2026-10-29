@@ -22,6 +22,7 @@ import {
   policyInstructions,
   pushDecision,
   runDomains,
+  rawCliShellAvailable,
 } from "./permissions"
 
 describe("permission policy (ADR 0009)", () => {
@@ -29,10 +30,11 @@ describe("permission policy (ADR 0009)", () => {
     ["read_in_worktree", "allow"],
     ["write_in_worktree", "allow"],
     ["run_project_script", "allow"],
-    ["install_dependency", "ask"],
+    ["install_dependency", "allow"],
     ["write_outside_repo", "ask"],
     ["git_push", "ask"],
     ["network", "ask"],
+    ["computer_use", "ask"],
   ] as const)("%s -> %s", (action, expected) => {
     expect(PERMISSION_DEFAULTS[action]).toBe(expected)
     expect(decide(action)).toBe(expected)
@@ -48,6 +50,8 @@ describe("permission policy (ADR 0009)", () => {
   it("asks for unknown actions", () => {
     expect(decide("format_disk")).toBe("ask")
     expect(decide("__proto__")).toBe("ask")
+    expect(decide("format_disk", { policy: { ...policy({}), readOnly: true } })).toBe("deny")
+    expect(decide("__proto__", { policy: { ...policy({}), readOnly: true } })).toBe("deny")
   })
 
   it("classifies writes by worktree boundary", () => {
@@ -98,10 +102,23 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(decide("run_setup_recipe", { policy: p })).toBe("ask")
   })
 
+  it("uses only the run computer permission and makes read-only take precedence", () => {
+    for (const decision of ["allow", "ask", "deny"] as const) {
+      const p = policy({ computer_use: decision })
+      expect(decide("computer_use", { policy: p })).toBe(decision)
+      expect(decide("computer_use", { policy: { ...p, readOnly: true } })).toBe("deny")
+    }
+    const legacy = policy({})
+    delete legacy.permissions.computer_use
+    expect(decide("computer_use", { policy: legacy })).toBe("ask")
+    expect(decide("computer_use", { policy: { ...legacy, readOnly: true } })).toBe("deny")
+  })
+
   it("builds the run's domain list from network and install choices", () => {
     expect(runDomains(policy({}), ["npmjs.org"])).toEqual([
       "github.com",
       "npmjs.org",
+      ...PACKAGE_REGISTRY_DOMAINS,
     ])
     expect(runDomains(policy({ network: "allow" }), ["npmjs.org"])).toEqual([
       "*",
@@ -109,7 +126,7 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(runDomains(policy({ network: "deny" }), ["npmjs.org"])).toEqual([])
     expect(
       runDomains(policy({ network: "deny", install_dependency: "allow" }))
-    ).toEqual([...PACKAGE_REGISTRY_DOMAINS])
+    ).toEqual([])
     expect(runDomains(policy({ install_dependency: "allow" }))).toEqual([
       "github.com",
       ...PACKAGE_REGISTRY_DOMAINS,
@@ -182,10 +199,10 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(classifyCommand("xargs git push")).toBe("git_push")
   })
 
-  it("gives Claude Code ask or deny rules for installs and always denies git push", () => {
-    expect(claudePermissionRules(policy({}))).toMatchObject({
+  it("gives Claude Code ask or deny rules for explicit install restrictions and always denies git push", () => {
+    expect(claudePermissionRules(policy({install_dependency: "ask"}))).toMatchObject({
       ask: expect.arrayContaining(["Bash(npm install:*)"]),
-      deny: ["Bash(git push:*)"],
+      deny: ['Bash','PowerShell','Monitor',"Bash(git push:*)"],
     })
     const denied = claudePermissionRules(policy({ install_dependency: "deny" }))
     expect(denied.ask).toEqual([])
@@ -195,6 +212,7 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(
       claudePermissionRules(policy({ install_dependency: "allow" }))
     ).toEqual({ allow: [], ask: [], deny: ["Bash(git push:*)"] })
+    expect(claudePermissionRules(policy({install_dependency:'allow',git_push:'allow'}))).toEqual({allow:[],ask:[],deny:['Bash(git push:*)']})
     const settings = claudeSettings(
       {
         allowWrite: ["/work"],
@@ -248,7 +266,8 @@ describe("applying the workspace's policy (ADR 0028)", () => {
         : null
     }
     expect(chosen("touch NOTES.md")).toBe("yes")
-    expect(chosen("npm install zod")).toBe("no")
+    expect(chosen("npm install zod", policy({install_dependency: "deny"}))).toBe("no")
+    expect(chosen("npm install zod")).toBe("yes")
     expect(
       chosen("npm install zod", policy({ install_dependency: "allow" }))
     ).toBe("yes")
@@ -268,7 +287,15 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(strict).toContain("Do not install or add dependencies")
     expect(strict).toContain("Writing outside it is not allowed")
     const defaults = runInstructions("/wt")
-    expect(defaults).toContain("limited to an allow-list")
-    expect(defaults).toContain("needs a person's approval")
+    expect(defaults).toContain("limited to the workspace ceiling")
+    expect(defaults).toContain("pre-authorized")
+    expect(defaults).not.toContain("Native shell execution is unavailable")
+  })
+  it('keeps project shell execution independent of daemon publication permission', () => {
+    for (const install of ['allow','ask','deny'] as const) for (const push of ['allow','ask','deny'] as const) {
+      const value=policy({install_dependency:install,git_push:push})
+      expect(rawCliShellAvailable(value)).toBe(install==='allow')
+      expect(rawCliShellAvailable({...value,readOnly:true})).toBe(false)
+    }
   })
 })

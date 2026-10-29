@@ -14,6 +14,7 @@ import { IssueScopeControl } from './issue-scope-control'
 import type { TaskScope } from '@/lib/task-identifier'
 import type { IssueMetadata } from '@/lib/issue-metadata'
 import { cn } from '@/lib/utils'
+import type { ExplicitTeamChoice } from '@/lib/issue-team-intent'
 
 export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled, onMetadataBusy, status, priority, pending, onStatus, onPriority, request, relations, onDate, onEstimate }: {
   task: { id: string; revision: number; scope: TaskScope; scopeSetBy: 'agent' | 'user'; metadata: IssueMetadata }; onMetadataSaved: (issue: MetadataSavedIssue) => void; metadataDisabled: boolean; onMetadataBusy: (busy: boolean) => void
@@ -28,6 +29,7 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
   const [expanded, setExpanded] = useState(false)
+  const [teamChoice, setTeamChoice] = useState<ExplicitTeamChoice | null>(null)
   const contentId = useId()
   const control = { task, disabled: metadataDisabled, onSaved: onMetadataSaved, onBusyChange: onMetadataBusy, request }
   return <aside id="issue-properties" aria-label={t('properties')} className="order-1 w-full min-w-0 lg:sticky lg:top-20 lg:order-2 lg:self-start">
@@ -37,14 +39,14 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
       <FieldGroup className="gap-1">
         <PropertyRow label={t('statusLabel')}><IssuePropertyMenu variant="row" label={t('statusLabel')} value={status} options={statusOptions} icon={CircleDashed} disabled={pending} onChange={onStatus} /></PropertyRow>
         <PropertyRow label={t('priorityLabel')}><IssuePropertyMenu variant="row" label={t('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} /></PropertyRow>
-        <PropertyRow label={t('scope.label')}><IssueScopeControl task={task} disabled={metadataDisabled} onSaved={onMetadataSaved} /></PropertyRow>
+        <PropertyRow label={t('scope.label')}><IssueScopeControl task={task} disabled={metadataDisabled} onSaved={onMetadataSaved} teamChoice={teamChoice} /></PropertyRow>
         <PropertyRow label={tMetadata('assignee')}><IssueMetadataControls {...control} section="assignee" /></PropertyRow>
         <PropertyRow label={tMetadata('labels')}><div className="flex min-h-7 flex-wrap items-center gap-1.5"><IssueMetadataControls {...control} section="labels" /></div></PropertyRow>
         <PropertyRow label={tMetadata('project')}><IssueMetadataControls {...control} section="project" /></PropertyRow>
         {task.metadata.estimate !== null && <PropertyRow label={tMetadata('estimate')}><Button variant="ghost" size="sm" className={ROW_VALUE} disabled={metadataDisabled} onClick={onEstimate}><Signal data-icon="inline-start" />{tMetadata('estimatePoints', { count: task.metadata.estimate })}</Button></PropertyRow>}
         {task.metadata.dueDate && <PropertyRow label={tMetadata('dueDate')}><Button variant="ghost" size="sm" className={ROW_VALUE} disabled={metadataDisabled} onClick={onDate}><Calendar data-icon="inline-start" /><time dateTime={task.metadata.dueDate}>{task.metadata.dueDate}</time></Button></PropertyRow>}
         {task.metadata.pullRequests.length > 0 && <PropertyRow label={tMetadata('pullRequests')}><div className="flex min-h-7 flex-wrap items-center gap-1.5"><IssueMetadataControls {...control} section="pullRequests" /></div></PropertyRow>}
-        <IssueTeamControl issueId={task.id} disabled={metadataDisabled} />
+        <IssueTeamControl issueId={task.id} disabled={metadataDisabled} onChosen={(issueId, teamId) => setTeamChoice(teamId ? { issueId, teamId, selectionId: crypto.randomUUID() } : null)} />
       </FieldGroup>
     </section>
     {task.metadata.pullRequests.length === 0 && request?.target === 'pullRequests' && <IssueMetadataControls {...control} section="pullRequests" />}

@@ -1,9 +1,13 @@
-import { modelMessage, summaryMessage, type SummaryTrust } from './message-safety'
+import { modelMessage, summaryMessage, type SourcedMessage, type SummaryTrust } from './message-safety'
 import { pruneMessages, type ModelMessage } from 'ai'
 import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from '@/lib/attention/handoff'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
 import { splitQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
+import { PUBLICATION_ERRORS, type PublicationErrorCode } from '@/lib/run-publication-result'
+import { pullRequestSchema } from '@/lib/issue-metadata'
+import { splitBrowserNotes, type BrowserNote } from '@/lib/browser/note'
+import { splitSuggestion, type SuggestionCard } from '@/lib/suggestions/card'
 
 // What the Coordinator's model sees. Everything here depends only on the
 // stored conversation, never on time or on how long the person was away, so
@@ -30,11 +34,26 @@ export interface StoredMessage {
 export function estimateTokens(messages: readonly ModelMessage[]): number {
   let ascii = 0
   let other = 0
-  for (const char of JSON.stringify(messages)) {
+  let imageCount = 0
+  // Inline pixel encodings are not language tokens. Reserve a conservative
+  // image allowance instead of counting megabytes of base64 as prose. This is
+  // a compaction estimate, not provider billing or proof of visual capability.
+  const projection = JSON.stringify(messages.map(message => {
+    if (message.role !== 'user' || !Array.isArray(message.content)) return message
+    return { ...message,content:message.content.map(part => {
+      if (part.type === 'file' && typeof part.mediaType === 'string' && part.mediaType.startsWith('image/')) {
+        imageCount++
+        return { ...part,data:'[image]' }
+      }
+      if (part.type === 'image') { imageCount++;return { ...part,image:'[image]' } }
+      return part
+    }) }
+  }))
+  for (const char of projection) {
     if (char.charCodeAt(0) < 128) ascii++
     else other++
   }
-  return Math.ceil(ascii / 4) + other
+  return Math.ceil(ascii / 4) + other + imageCount * 16_384
 }
 
 /**
@@ -96,6 +115,8 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         `[Event] Run ${event.runId} ended with status ${payload.status} (${payload.stopReason}).`,
         event.issueId ? `Issue: ${event.issueId}.` : null,
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
+        ...publicationPrompt(payload.publication),
+        payload.verification === 'not_run' ? 'Verification was not run. Tell the person that no verification command is configured and the work needs human review. Mention a draft PR only when the server-confirmed publication includes one. Never say the changes passed verification.' : null,
         note,
       ].filter(Boolean).join('\n')
     case 'run_retried':
@@ -110,11 +131,15 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
     case 'run_report':
       return [event.runId ? `[Event] The agent in run ${event.runId} reports progress: ${payload.text}` : `[Event] An Agent reports coordination data: ${payload.text}`, event.issueId ? `Issue: ${event.issueId}.` : null, note].filter(Boolean).join('\n')
     case 'run_question':
+      if (typeof payload.taskId === 'string' && typeof payload.questionId === 'string') return [
+        `[Event] Execution question ${payload.questionId} for task ${payload.taskId}, run ${event.runId}: ${String(payload.question ?? '')}`,
+        payload.needsUser === true ? 'The unresolved question has been escalated to its owner.' : 'Inspect the persisted question and existing facts before escalating to the person.',
+      ].join('\n')
       return [
         `[Event] The agent in run ${event.runId} asks the person: ${payload.question}`,
         Array.isArray(payload.options) ? `Options: ${payload.options.join(' / ')}` : null,
         payload.context ? `Context: ${payload.context}` : null,
-        'The run keeps going. Ask the person, then pass their answer on with send_to_run.',
+        'Check the current run state and existing task facts first. Resolve within existing authority when possible; ask the person only for a concrete missing decision or policy ask. Never invent their permission. send_to_run does not itself prove the run resumed.',
         note,
       ].filter(Boolean).join('\n')
     case 'artifact_submitted':
@@ -163,8 +188,21 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
   }
 }
 
-/** Bookkeeping the chat leaves out: the Coordinator records its attention decisions with it. */
-const HIDDEN_TOOLS = new Set(['record_attention'])
+function publicationPrompt(value: unknown): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+  const publication = value as Record<string, unknown>
+  const pr = pullRequestSchema.safeParse(publication.pullRequest)
+  const error = typeof publication.errorCode === 'string' && Object.hasOwn(PUBLICATION_ERRORS, publication.errorCode)
+    ? PUBLICATION_ERRORS[publication.errorCode as PublicationErrorCode] : null
+  return [
+    ...(pr.success ? [`Verified GitHub pull request: ${pr.data.url} (${pr.data.state}).`] : []),
+    ...(error ? [`Publication needs attention: ${error}`] : []),
+    'Report the result in this chat. The existing thread card updates in place. Only claim a pull request exists when this event includes its verified GitHub link.',
+  ]
+}
+
+/** Internal bookkeeping: attention decisions and execution-identity discovery stay out of the chat. */
+const HIDDEN_TOOLS = new Set(['record_attention', 'list_agents'])
 
 /** Longest the memory may grow; past this the Coordinator must forget something first. */
 export const MEMORY_MAX_CHARS = 8000
@@ -206,6 +244,10 @@ export interface ChatItem {
   pending?: true
   /** What the person quoted from an artifact, shown above their text. */
   quote?: ArtifactQuote
+  /** Notes the person pinned on pages in the browser, shown as chips above their text. */
+  notes?: BrowserNote[]
+  /** The 建议 card the person tapped, drawn above their instruction (R-21). */
+  suggestion?: SuggestionCard
   /** Artifacts shown as cards under this entry, in order. */
   artifacts: string[]
 }
@@ -246,6 +288,13 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
   }
   for (const { id, position, message, createdAt, pending } of rows) {
     if (message.role === 'user') {
+      const source = message as SourcedMessage
+      // Completion instructions are model context. Trust the host event marker,
+      // not a text prefix a person can also write; its reply starts a new message.
+      if (!source.mikkaUserEvent && source.mikkaEvent?.eventKind === 'run_finished') {
+        briefingBoundary = true
+        continue
+      }
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
       // The request for its welcome is for the Coordinator only.
       if (raw.startsWith(COORDINATOR_WELCOME_MARK)) continue
@@ -259,7 +308,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         briefingBoundary = true
         continue
       }
-      const event = raw.startsWith('[Event]')
+      const event = !source.mikkaUserEvent && raw.startsWith('[Event]')
       if (event) {
         const cited = takeArtifacts(raw.split('\n')[0])
         if (cited.ids.length) {
@@ -272,8 +321,10 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       // The triage line is for the Coordinator, not the person.
       if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') })
       else {
-        const { quote, text } = splitQuote(raw)
-        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}) })
+        const { quote, text: unquoted } = splitQuote(raw)
+        const { notes, text: rest } = splitBrowserNotes(unquoted)
+        const { suggestion, text } = splitSuggestion(rest)
+        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}) })
       }
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
@@ -288,7 +339,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       } else if (cited.text || tools.length || shown.length) {
         items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)] })
         waiting.ids = []
-        // Only a reply that shows ends the boundary: a tool-only step (record_attention) before the text does not.
+        // Only a reply that shows ends the boundary; hidden tool-only steps do not.
         briefingBoundary = false
       }
     } else if (message.role === 'tool') {

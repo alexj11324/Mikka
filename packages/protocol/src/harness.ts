@@ -10,12 +10,14 @@ export type Harness = z.infer<typeof harnessSchema>
 export const harnessInfoSchema = z.object({
   harness: harnessSchema,
   installed: z.boolean(),
-  /** This daemon can host a Mikka personal Coordinator on this harness. */
+  /** Deprecated (#312, 2026-10-27): could host the native Coordinator. The server keeps that runtime switched off. */
   coordinator: z.boolean().optional(),
   /** Set only by a runner with an isolated, owner-bound subscription broker. */
   subscriptionBroker: z.literal(true).optional(),
   /** Set only by an E2B worker with the guarded Bot computer broker. */
   computerBroker: z.literal(true).optional(),
+  /** Run-scoped CLI approvals and policy-version checks are supported. */
+  toolApproval: z.literal(true).optional(),
   /** Version string reported by the CLI, null when not installed. */
   version: z.string().nullable(),
 })

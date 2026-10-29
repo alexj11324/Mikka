@@ -1,0 +1,330 @@
+{
+  "target": {
+    "name": "MIKKA_DATABASE_URL",
+    "host": "ep-twilight-violet-b5lbqgbv-pooler.c-7.us-east-2.aws.neon.tech",
+    "database": "orvilo_mvp",
+    "sameDatabaseAs": [
+      "DATABASE_URL",
+      "ORVILO_DATABASE_URL"
+    ]
+  },
+  "mode": "exact per-feature candidates only; no SQL execution authorized by this file",
+  "selection": "Apply only an expressly approved subset in verified dependency order. This is not an all-pending runner manifest.",
+  "groups": [
+    {
+      "id": "shared-read-projections",
+      "files": [
+        "20261028224737_run_last_reply.sql",
+        "20261029010446_device_computer_capability.sql",
+        "20261029011614_coordinator_triage_attempt.sql",
+        "20261029044015_issue_status_codes.sql"
+      ],
+      "impact": "Add missing run/device/triage columns and retry index; extend issue status CHECK without changing existing values.",
+      "requires": [],
+      "status": "pending-exact-production-approval"
+    },
+    {
+      "id": "new-approved-write-policy",
+      "files": [
+        "20261029043646_agent_external_write_policy.sql",
+        "20261029043647_workspace_external_write_policy.sql"
+      ],
+      "impact": "Add empty permission maps and version columns with update triggers; absence remains ask, no allow grant.",
+      "requires": [],
+      "status": "pending-exact-production-approval"
+    },
+    {
+      "id": "connection-settings-and-legacy-approvals",
+      "files": [
+        "20261029043630_composio_accounts.sql",
+        "20261029043632_composio_account_email_checks.sql",
+        "20261029043635_pending_action_account.sql"
+      ],
+      "impact": "New account metadata table/check timestamps and nullable connectedAccountId; no inferred legacy account binding.",
+      "requires": [],
+      "status": "pending-exact-production-approval"
+    },
+    {
+      "id": "cli-policy",
+      "files": [
+        "20261029011700_agent_tool_approvals.sql",
+        "20261029011701_cli_run_policy.sql"
+      ],
+      "impact": "New one-request approval table; policy/version/generation on three existing tables and revision triggers. UUID defaults initialize historical metadata, not permissions.",
+      "requires": [],
+      "status": "pending-exact-production-approval"
+    },
+    {
+      "id": "local-repository-admission",
+      "files": [
+        "20261029022353_local_repository_defaults.sql",
+        "20261029024124_run_publications.sql",
+        "20261029044017_run_publication_scope.sql"
+      ],
+      "impact": "New repository/settings/publication receipts, nullable branch columns and scope/title. No copied Git push grant.",
+      "requires": [],
+      "status": "pending-exact-production-approval"
+    },
+    {
+      "id": "factory-lifecycle",
+      "files": [
+        "20261028015330_issue_tool_calls.sql",
+        "20261029043638_issue_scope_generation.sql",
+        "20261029044009_skill_candidate_registry.sql",
+        "20261029044016_factory_public_consumers.sql",
+        "20261029044018_factory_scope_generation.sql"
+      ],
+      "requires": [
+        "shared-read-projections",
+        "cli-policy",
+        "local-repository-admission",
+        "daemon-claim-ledger"
+      ],
+      "blockedBy": [
+        "issue-read-compatibility-approval"
+      ],
+      "impact": "Add missing issue scope generation and ledger/candidate tables, current Factory columns; principal backfill, source-event FK removal and not-null/unique changes. No live publication policy/issuer is supplied by schema.",
+      "status": "pending-exact-production-approval"
+    },
+    {
+      "id": "daemon-claim-ledger",
+      "files": [
+        "20261029044012_skill_evaluations.sql"
+      ],
+      "requiresFiles": [
+        "20261029044009_skill_candidate_registry.sql"
+      ],
+      "impact": "New immutable benchmark/skill-result tables queried by the existing claim path even for ordinary runs; no model evaluation activation.",
+      "requires": [],
+      "status": "pending-exact-production-approval"
+    },
+    {
+      "id": "browser-and-thread-machines",
+      "files": [
+        "20261029011635_subagents_thread_machines.sql",
+        "20261029080000_unattended_browser_runtime.sql",
+        "20261029080001_owner_cloud_machines.sql"
+      ],
+      "impact": "Five runtime tables; seven progress/lease fields; replace workspace-only machine PK, desktop FK and unique constraint with owner-scoped keys. Preserve existing machines/desktops.",
+      "requires": [],
+      "status": "pending-exact-production-approval"
+    },
+    {
+      "id": "credential-vault",
+      "files": [
+        "20261029012027_account_credential_vault.sql"
+      ],
+      "requires": [
+        "browser-and-thread-machines"
+      ],
+      "impact": "Six new vault tables and indexes, app/broker key and lease bindings. CREATE TABLE is not retry-safe without checking transaction/ledger outcome; no AWS/credential grant.",
+      "status": "pending-exact-production-approval"
+    },
+    {
+      "id": "hosted-subscription-settings",
+      "files": [
+        "20261029043631_byos_account_label.sql",
+        "20261029043633_byos_connection_removed.sql"
+      ],
+      "requires": [
+        "cli-policy",
+        "daemon-claim-ledger",
+        "browser-and-thread-machines"
+      ],
+      "impact": "Nullable accountLabel/removedAt and CHECK constraints; no new provider identity, validated route, subscription access or provisioning authorization.",
+      "status": "pending-exact-production-approval"
+    },
+    {
+      "id": "issue-read-compatibility",
+      "files": [
+        "20261029160411_issue_read_compatibility.sql"
+      ],
+      "status": "independently-reviewed-local-PG-verified; production-not-approved",
+      "impact": "Only adds existing issue projection column; no Linear function/trigger/flag or provider authorization change."
+    }
+  ],
+  "files": [
+    {
+      "name": "20261028015330_issue_tool_calls.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "f4cca64f143e5942c5c0bce833ac21669af104eff2d78b32492db3dc83498fa9"
+    },
+    {
+      "name": "20261028224737_run_last_reply.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "def77b392f2672b6cae103c13bee1b8fc8b265f6b7f7d397fd3c9e530c587b7a"
+    },
+    {
+      "name": "20261029010446_device_computer_capability.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "540c48eb75c3940bf48c23aab5463038106d0f68114eb274f463350ee665a07e"
+    },
+    {
+      "name": "20261029011614_coordinator_triage_attempt.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "702ac545dde7a8968493f8ac0b0f5a1e9ad8df9468ded8280a81d3efc5ba8b86"
+    },
+    {
+      "name": "20261029011635_subagents_thread_machines.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "1d48526f9212a7d7342c501ec69d37b9b7fa550f923168645cf804daf6ef33f3"
+    },
+    {
+      "name": "20261029011700_agent_tool_approvals.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "89aa44504ac46c8fec3660e0b2ce9a6fd06395fdab9de51a3a7e7d20562fb5fe"
+    },
+    {
+      "name": "20261029011701_cli_run_policy.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "3917975dff59ad31cdd8a9f7025b5c14d2a9951de531b7f2644b1a5f6cc44a3c"
+    },
+    {
+      "name": "20261029012027_account_credential_vault.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "68a735ed78ad3d6c5f9b0344f57931b8975fd84ce4331a757fa80610c4ff4233"
+    },
+    {
+      "name": "20261029022353_local_repository_defaults.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "904b822ef1a281e1fb294ce1a25c3237e5493703ef61bb88c20628954093226a"
+    },
+    {
+      "name": "20261029024124_run_publications.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "2808e1fca5e5e0a7b6979bbdfe4a20b1e8abb15ffe0a9e1d76082e1ea0452a41"
+    },
+    {
+      "name": "20261029043630_composio_accounts.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "d7c0087befa184c76f6ac4908532d3eb8233303e31286a7dfbb8265d5ba5edc4"
+    },
+    {
+      "name": "20261029043631_byos_account_label.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "d8908e19acb9c4ee3c06ff15f7be3df13cb65eeffba2b55dced181ad4d41b117"
+    },
+    {
+      "name": "20261029043632_composio_account_email_checks.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "b50f79948cd3cb0f3a592058d15cbd2b6075758f468b072f24c30b85052c321a"
+    },
+    {
+      "name": "20261029043633_byos_connection_removed.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "108d1c2cd5544ad7429a733ca2099c5b959eaa6aacd4b25e42e4672120d73e54"
+    },
+    {
+      "name": "20261029043635_pending_action_account.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "3ccea2dfdf25bbb566a8faf7df0a87397f2863a5891d64e2eb188297f199efbd"
+    },
+    {
+      "name": "20261029043638_issue_scope_generation.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "fd602bfcef233b455036b6567355f4ea5337f3655dd77f2b3a13777c85fa9257"
+    },
+    {
+      "name": "20261029043646_agent_external_write_policy.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "58868e1fcc9fdb256c77e144bdfda8a461d797cc5c4f11f481197aa05118d158"
+    },
+    {
+      "name": "20261029043647_workspace_external_write_policy.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "7e76838ecbce763d05e0983e0cb148232961772d80fb4d0bb7bc5c5b9a0456f9"
+    },
+    {
+      "name": "20261029044009_skill_candidate_registry.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "c2501a2b3c53e028809fb127af245a0b8bbdeda4f20fac5c1bfa8e837fbb0628"
+    },
+    {
+      "name": "20261029044012_skill_evaluations.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "aa6ed27d6c38ba3a33bfbc3de9b45991ddb92c2985e6c43a6bab980a171f697c"
+    },
+    {
+      "name": "20261029044015_issue_status_codes.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "190e2afea98f319efb6d3605236441420e30fc39fb81eea0c44ab17d8b6819d1"
+    },
+    {
+      "name": "20261029044016_factory_public_consumers.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "fac25b384b65fa4df9ac8dad985aa8c6ac349ab9d6c5437547af762c71551aa1"
+    },
+    {
+      "name": "20261029044017_run_publication_scope.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "9b9b3a666dcd0ee1946f34419d683d43d964a33028ae7fbc2f1e169997aeced4"
+    },
+    {
+      "name": "20261029044018_factory_scope_generation.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "6f71cf25a84c434bb2cf25633d7b18aef573c2974db54754c443c12f3ea8965e"
+    },
+    {
+      "name": "20261029080000_unattended_browser_runtime.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "f873386cdae499ab04b2b94ec13a03b4cedb8225b5ce1ac316c2ed0b8c4eb384"
+    },
+    {
+      "name": "20261029080001_owner_cloud_machines.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "9431a96ee92321f8d71973bd148525cceb96e1277b20c1c1046c315b5eabd606"
+    },
+    {
+      "name": "20261029160411_issue_read_compatibility.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "20b051737e255e5ccc70a790693822d024af1f6dc2062f6ae69406cef7ef44a6",
+      "requiresSeparateApproval": true
+    }
+  ],
+  "exclusions": {
+    "alreadyApplied": [
+      "20261029023121_device_authorization.sql"
+    ],
+    "linearAndMixedBodies": [
+      "all Linear migration sources",
+      "20261029043639_linear_publications.sql",
+      "20261029043641_team_issue_creation_gate.sql"
+    ],
+    "conditionalPersistentAllow": [
+      "20261029010447_workspace_computer_policy_allow.sql"
+    ],
+    "accessAndCostActions": [
+      "provider grants or business writes",
+      "new credential access or AWS trust",
+      "new workload identities or Infisical settings",
+      "subscription activation or machine/snapshot provisioning"
+    ],
+    "historyOnly": [
+      "20261028143920_operation_ledger.sql",
+      "20261028143921_approved_write_binding.sql",
+      "20261029044000_factory_192_routing.sql",
+      "20261029044001_factory_192_question_source_identity.sql"
+    ],
+    "notRequiredForOrdinaryFactory": [
+      "20261029044010_skill_mount_evidence.sql",
+      "20261029044011_feedback_candidate_generation.sql",
+      "20261029044013_factory_skill_activation.sql",
+      "20261029044014_skill_lifecycle_operations.sql"
+    ]
+  },
+  "nonSchemaBlockers": [
+    "Real provider acceptance on explicitly authorized targets",
+    "Real existing Factory policy/version authority and attestation issuer",
+    "App/broker deployment binding for guarded login",
+    "Separate exact approval for the new compatibility candidate"
+  ],
+  "safety": {
+    "productionSQLExecuted": false,
+    "linearStateChanged": false,
+    "flagChangesIncluded": false,
+    "paidProvisioningIncluded": false,
+    "credentialAccessIncluded": false
+  },
+  "baselineRevision": "04d7b67d286f9c0453f4709f04b1f046b218de48",
+  "compatibilitySourceBranch": "fix/issue-read-compat"
+}

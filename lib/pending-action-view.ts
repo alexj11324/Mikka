@@ -4,7 +4,7 @@ import type { PendingActionStatus } from '@/lib/db/schema'
 /** One pending action as the approval card shows it. */
 export interface PendingActionView {
   id: string
-  action: ApprovalActionName
+  action: ApprovalActionName | 'approve_repository_push' | 'browser_operation' | 'credential_operation'
   input: Record<string, unknown>
   /** For a calendar change: the event as it is now. */
   context: { summary?: string; start?: string; end?: string } | null

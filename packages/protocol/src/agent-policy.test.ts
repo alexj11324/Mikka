@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 
 import {
   APPROVAL_MODES,
+  defaultRunPolicy,
+  runPolicyDigestInput,
   CONFIGURABLE_ACTIONS,
   DEFAULT_NETWORK_ALLOW,
   FIXED_PERMISSIONS,
@@ -29,16 +31,17 @@ describe("agent policy table (ADR 0009)", () => {
     )
   })
 
-  it("keeps the ADR defaults", () => {
+  it("keeps unattended sandbox defaults while preserving publication and computer authority", () => {
     expect(PERMISSION_DEFAULTS).toEqual({
       read_in_worktree: "allow",
       write_in_worktree: "allow",
       run_project_script: "allow",
       run_setup_recipe: "allow",
-      install_dependency: "ask",
+      install_dependency: "allow",
       write_outside_repo: "ask",
       git_push: "ask",
       network: "ask",
+      computer_use: "ask",
     })
   })
 
@@ -59,11 +62,14 @@ describe("agent policy table (ADR 0009)", () => {
     expect(
       resolvePermissions({ write_outside_repo: "allow", git_push: "deny" })
     ).toEqual({
-      install_dependency: "ask",
+      install_dependency: "allow",
       write_outside_repo: "ask",
       git_push: "deny",
       network: "ask",
+      computer_use: "ask",
     })
+    expect(resolvePermissions({ computer_use: "unknown" }).computer_use).toBe("ask")
+    expect(storedPermissionsSchema.safeParse({ computer_use: "unknown" }).success).toBe(false)
   })
 
   it("normalizes the domain list and refuses a bare wildcard", () => {
@@ -116,6 +122,16 @@ describe("resolveAgentSettings", () => {
     })
     expect(parsed.policy?.permissions.network).toBe("deny")
   })
+
+  it("keeps computer permission in new assignments and accepts an older assignment without granting allow", () => {
+    const policy = resolveAgentSettings({ permissions: { computer_use: "allow" } }).policy
+    const assignment = { runId: "r1", issueId: "i1", deviceId: "d1", repoId: "p1", baseBranch: "main", harness: "mock", prompt: "x" }
+    expect(runAssignmentSchema.parse({ ...assignment, policy }).policy?.permissions.computer_use).toBe("allow")
+    const legacy = { ...policy, permissions: { ...policy.permissions } }
+    delete legacy.permissions.computer_use
+    expect(runAssignmentSchema.parse({ ...assignment, policy: legacy }).policy?.permissions.computer_use).toBeUndefined()
+    expect(resolveAgentSettings(null).policy.permissions.computer_use).toBe("ask")
+  })
 })
 
 describe("a person's approval mode (ADR 0060)", () => {
@@ -137,6 +153,7 @@ describe("a person's approval mode (ADR 0060)", () => {
       // Network stays as the workspace set it: a read-only run still has to
       // reach its model's API (ADR 0046).
       network: "allow",
+      computer_use: "deny",
     })
     expect(readOnly.readOnly).toBe(true)
     expect(readOnly.networkAllow).toEqual(["example.com"])
@@ -250,4 +267,32 @@ describe("a person's own instructions (ADR 0060)", () => {
     expect(resolveDefaultHarness("")).toBeNull()
     expect(resolveDefaultHarness(undefined)).toBeNull()
   })
+})
+
+it("canonicalizes resolved execution policy independent of object key order", () => {
+  const policy = defaultRunPolicy()
+  expect(runPolicyDigestInput()).toBe(runPolicyDigestInput(policy))
+  const reordered = { networkAllow: policy.networkAllow, permissions: {
+    network: policy.permissions.network, git_push: policy.permissions.git_push, computer_use: policy.permissions.computer_use,
+    write_outside_repo: policy.permissions.write_outside_repo, install_dependency: policy.permissions.install_dependency,
+  } }
+  expect(runPolicyDigestInput(reordered)).toBe(runPolicyDigestInput(policy))
+  expect(runPolicyDigestInput({ ...policy, readOnly: true })).not.toBe(runPolicyDigestInput(policy))
+})
+
+it('uses unattended cloud networking only for a trusted cloud environment and keeps explicit choices', () => {
+  expect(resolveAgentSettings(null, undefined, 'cloud').policy.permissions.network).toBe('allow')
+  expect(resolveAgentSettings(null).policy.permissions.network).toBe('ask')
+  for (const network of ['allow','ask','deny'] as const) {
+    expect(resolveAgentSettings({ permissions:{network} },undefined,'cloud').policy.permissions.network).toBe(network)
+  }
+  expect(resolveAgentSettings({permissions:{install_dependency:'deny',git_push:'deny'}},undefined,'cloud').policy.permissions).toMatchObject({install_dependency:'deny',git_push:'deny'})
+})
+
+it('cannot widen a worker/workspace egress ceiling with a frozen assignment', () => {
+  const base={...defaultRunPolicy(),networkCeiling:['*.github.com:443']}
+  expect(isNoLooserThan(base,{...base,networkCeiling:['api.github.com:443']})).toBe(true)
+  expect(isNoLooserThan(base,{...base,networkCeiling:['api.github.com']})).toBe(false)
+  expect(isNoLooserThan(base,defaultRunPolicy())).toBe(false)
+  expect(resolveAgentSettings({networkAllow:['registry.example.com']},undefined,'cloud').policy.permissions.network).toBe('ask')
 })

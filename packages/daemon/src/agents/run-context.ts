@@ -15,6 +15,7 @@ import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
 import type { Harness, RunKind } from "@mikka/protocol"
+import { runQuestion, type RunQuestion } from "@mikka/protocol/run"
 import { planHandoff, planSplitProblem } from "@mikka/protocol/plan"
 import {
   SKILL_BODY_FILE,
@@ -23,7 +24,9 @@ import {
   skillSlug,
   skillsPromptSection,
   type RunSkill,
+  type SkillAssignmentReceipt,
 } from "@mikka/protocol/skill"
+import { verifyAssignedSkills, verifyMountedSkill } from './skill-artifact'
 
 import type { AgentReport, ExitEvent } from "../adapters/types"
 import { assertSafeId } from "../ids"
@@ -35,6 +38,7 @@ import {
   runPolicy,
   type RunPolicy,
 } from "../permissions"
+import { CAPTURES_DIR } from "../captures"
 import { ownDir } from "./harness-home"
 import type { SandboxPolicy } from "./sandbox"
 
@@ -74,6 +78,9 @@ export interface McpServerSpec {
   env: Record<string, string>
 }
 
+/** Trusted daemon callback, evaluated separately for each local run. */
+export type ComputerSpecProvider = (runId: string, policy?: RunPolicy) => McpServerSpec | undefined
+
 export interface RunContextOptions {
   /** Only the host may advertise this bound control-channel capability. */
   mailboxEnabled?: boolean
@@ -87,8 +94,11 @@ export interface RunContextOptions {
   policy?: RunPolicy
   /** The skills the run was given; none when the assignment carries none. */
   skills?: readonly RunSkill[]
+  skillReceipt?: SkillAssignmentReceipt
   /** Extra writable paths (the harness's own session store). */
   extraWrite?: readonly string[]
+  /** Per-worktree git metadata, object store and this run's branch ref. */
+  gitWritePaths?: readonly string[]
   /**
    * The run's own dir in the daemon's state dir (handoff file, temp files,
    * the harness's per-run home). Writable from the sandbox; nothing the
@@ -107,6 +117,7 @@ interface HandoffFile {
   summary?: string
   nextStep?: string | null
   openQuestions?: string[]
+  question?: RunQuestion
   blockedOn?: string
   /** A planning hand-in; see `planFromHandoff`. */
   plan?: unknown
@@ -122,7 +133,7 @@ interface HandoffFile {
 export function credentialDenyRead(
   /** Its own login stays readable; null (verify) hides every harness login. */
   harness: Exclude<Harness, "mock"> | null,
-  home = homedir()
+  home = homedir(),
 ): string[] {
   return [
     ".ssh",
@@ -180,7 +191,7 @@ export function runPaths(stateDir: string, runId: string) {
 export class RunContext {
   /** Real path of the worktree (macOS: `/tmp` is `/private/tmp`). */
   readonly worktree: string
-  /** The worktree's own git dir (`<repo>/.git/worktrees/<name>`); read-only. */
+  /** The worktree's own git administration (`<repo>/.git/worktrees/<name>`). */
   readonly gitDir: string
   readonly runDir: string
   readonly handoffFile: string
@@ -192,6 +203,8 @@ export class RunContext {
   readonly skillsDir: string
   /** Scratch dir for the CLI's own temp files (writable, never committed). */
   readonly tmpDir: string
+  /** Screenshots and recordings `submit_capture` queued; the daemon uploads them (`captures.ts`). */
+  readonly capturesDir: string
 
   constructor(private readonly options: RunContextOptions) {
     this.worktree = realpathSync(options.worktree)
@@ -199,7 +212,7 @@ export class RunContext {
       execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
         cwd: this.worktree,
         encoding: "utf8",
-      }).trim()
+      }).trim(),
     )
     // The run dir is the agent's to write: never follow what it put there.
     ownDir(options.runDir)
@@ -208,6 +221,8 @@ export class RunContext {
     this.skillsDir = join(this.runDir, SKILLS_DIR)
     this.tmpDir = join(this.runDir, "tmp")
     ownDir(this.tmpDir)
+    this.capturesDir = join(this.runDir, CAPTURES_DIR)
+    ownDir(this.capturesDir)
     this.writeSkills()
   }
 
@@ -218,6 +233,7 @@ export class RunContext {
    */
   private writeSkills(): void {
     const skills = this.options.skills ?? []
+    verifyAssignedSkills(skills, this.options.skillReceipt)
     if (skills.length === 0) return
     ownDir(this.skillsDir)
     const taken = new Set<string>()
@@ -227,8 +243,20 @@ export class RunContext {
       for (let n = 2; taken.has(slug); n += 1) slug = `${base}-${n}`
       taken.add(slug)
       const dir = join(this.skillsDir, slug)
+      if (this.options.skillReceipt) {
+        const existing = lstatSync(dir, { throwIfNoEntry:false })
+        if (existing && (!existing.isDirectory() || existing.isSymbolicLink())) throw new Error('Unsafe Skill artifact directory')
+        const file = lstatSync(join(dir, SKILL_BODY_FILE), { throwIfNoEntry:false })
+        if (file && (!file.isFile() || file.isSymbolicLink() || file.nlink!==1)) throw new Error('Unsafe Skill artifact file')
+      }
       mkdirSync(dir, { recursive: true })
-      writeFileSync(join(dir, SKILL_BODY_FILE), skillMarkdown(skill), "utf8")
+      const bodyFile=join(dir,SKILL_BODY_FILE)
+      if (this.options.skillReceipt) {
+        // Never truncate a previous inode. Existing pinned bytes are read-only;
+        // a new pathname uses exclusive creation, rejecting a raced-in link.
+        if (!lstatSync(bodyFile,{throwIfNoEntry:false})) writeFileSync(bodyFile,skillMarkdown(skill),{encoding:'utf8',flag:'wx',mode:0o600})
+      } else writeFileSync(bodyFile, skillMarkdown(skill), "utf8")
+      if (this.options.skillReceipt) verifyMountedSkill(join(dir, SKILL_BODY_FILE), this.options.skillReceipt)
       for (const file of skill.files) {
         const target = resolve(dir, file.path)
         // The path schema already refuses `..`, a leading `/` and a
@@ -251,16 +279,19 @@ export class RunContext {
     const readOnly = runPolicy(this.options.policy).readOnly === true
     return {
       allowWrite: [
-        ...(readOnly ? [] : [this.worktree]),
+        ...(readOnly ? [] : [this.worktree, ...(this.options.gitWritePaths ?? [])]),
         this.runDir,
         ...(this.options.extraWrite ?? []),
       ],
       // The daemon runs git here after the agent: the `.git` file (which
-      // says where the repo is) stays read-only, and so does the git dir
-      // (it is not in `allowWrite`).
+      // says where the repo is) stays read-only. Only the daemon-validated
+      // per-worktree administration and object/ref paths are writable.
       denyWrite: [
         join(this.worktree, ".git"),
-        ...(readOnly ? [this.worktree] : []),
+        join(this.gitDir, "commondir"),
+        join(this.gitDir, "gitdir"),
+        join(this.gitDir, "config.worktree"),
+        ...(readOnly ? [this.worktree, ...(this.options.gitWritePaths ?? [])] : []),
       ],
       denyRead: [
         ...credentialDenyRead(this.options.harness),
@@ -270,7 +301,7 @@ export class RunContext {
         ...HARNESS_DOMAINS[this.options.harness],
         ...runDomains(
           runPolicy(this.options.policy),
-          this.options.networkAllow ?? []
+          this.options.networkAllow ?? [],
         ),
       ],
     }
@@ -285,7 +316,7 @@ export class RunContext {
   instructions(): string {
     const skills = skillsPromptSection(
       this.options.skills ?? [],
-      this.skillsDir
+      this.skillsDir,
     )
     return [
       runInstructions(this.worktree, this.options.policy),
@@ -302,7 +333,10 @@ export class RunContext {
     const command = this.options.nodeBinary ?? process.execPath
     return {
       command,
-      args: [MCP_SERVER_SCRIPT, "--handoff", this.handoffFile],
+      args: [
+        MCP_SERVER_SCRIPT, "--handoff", this.handoffFile,
+        "--captures", this.capturesDir, "--capture-root", this.worktree, "--capture-root", this.tmpDir,
+      ],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
       env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},
     }
@@ -338,13 +372,18 @@ export class RunContext {
     // dropped rather than passed up as if the daemon had asked for it.
     const plan =
       this.options.kind === "plan" ? planFromHandoff(file.plan, log) : null
+    const question = runQuestion.safeParse(file.question)
     const report: AgentReport = {
+      ...(question.success ? { question: question.data } : {}),
       summary: file.summary ?? "",
       openQuestions: file.openQuestions ?? [],
       nextStep: file.nextStep ?? null,
       ...(file.blockedOn ? { blockedOn: file.blockedOn } : {}),
       ...(plan ? { plan } : {}),
       ...(Array.isArray(file.criteria) ? { criteria: file.criteria } : {}),
+      ...(runQuestion.safeParse(file.question).success
+        ? { question: runQuestion.parse(file.question) }
+        : {}),
     }
     if (file.kind === "submit")
       return {
@@ -380,7 +419,7 @@ export class RunContext {
  */
 function planFromHandoff(
   raw: unknown,
-  log?: Logger
+  log?: Logger,
 ): AgentReport["plan"] | null {
   if (!raw) return null
   const parsed = planHandoff.safeParse(raw)
@@ -392,7 +431,7 @@ function planFromHandoff(
   if (problem) {
     log?.warn(
       { problem },
-      "planning hand-in proposes a split that cannot be built"
+      "planning hand-in proposes a split that cannot be built",
     )
     return null
   }
@@ -445,7 +484,7 @@ export function runInstructions(worktree: string, policy?: RunPolicy): string {
     "- Do not commit, push or switch branches. Mikka verifies, commits and pushes your work after you hand it in.",
     "- Run every command in the foreground. Nothing keeps running after your turn: when your turn ends, the run ends.",
     "- When the task is done and checked, call the `submit` tool of the `mikka` MCP server with a short summary. That is the only way to finish successfully.",
-    "- If you need a decision from a human, call `ask_human`. If something outside the code blocks you, call `report_blocked`.",
+    "- First use the issue and existing facts. For missing task context call `request_help`: the Orchestrator checks known facts before involving the person. Call `ask_human` only for a genuinely unresolved product decision or missing permission. Call `report_blocked` for an external condition. These preserve a durable question and stop this run; an answer continues its original worktree/session. Never invent authorization or start another task while waiting.",
     "- Ending your turn without calling one of these tools counts as unfinished work.",
   ].join("\n")
 }

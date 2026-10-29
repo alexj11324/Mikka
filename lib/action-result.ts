@@ -2,6 +2,7 @@ export const ACTION_ERROR_CODES = [
   'generic',
   'authRequired',
   'validationGeneric',
+  'issueToolsDisabled',
   'validationTitleRequired',
   'validationDocument',
   'validationNameRequired',
@@ -29,9 +30,16 @@ export const ACTION_ERROR_CODES = [
   'repoPathInvalid',
   'repoNotFound',
   'runInvalid',
+  'runAlreadyActive',
+  'runDispatchKeyConflict',
   'runNotFound',
+  'runNotActive',
+  'factoryQuestionNeedsAnswerTool',
   'artifactNotFound',
+  'suggestionNotFound',
+  'coordinatorUnavailable',
   'messageRequired',
+  'messageTooLong',
   'submissionConflict',
   'pendingActionUnavailable',
   'deviceSaveFailed',
@@ -56,8 +64,16 @@ export const ACTION_ERROR_CODES = [
   'issueUnavailable',
   'issuePreferenceLimit',
   'issueScopeInvalid',
+  'issueScopeTeamRequired',
   'issueScopeOwnerOnly',
   'issueScopeInLinear',
+  'issueScopeConfirmationRequired',
+  'teamIssueInvalid',
+  'teamIssueAccessDenied',
+  'teamIssueRequestConflict',
+  'teamIssueChanged',
+  'teamIssueRetry',
+  'teamIssueOutcomeUnknown',
   'issueOwnerOnly',
   'issueRestoreWindow',
   'issueDeleteFailed',
@@ -105,6 +121,8 @@ export type ActionErrorParams = Record<string, string | number>
 export interface ActionFailure {
   error: ActionErrorCode
   params?: ActionErrorParams
+  /** Stable operation ID for retrying a team action, including unknown outcomes. */
+  requestId?: string
 }
 
 export type ActionResult<T> = (T & { error?: undefined }) | ActionFailure

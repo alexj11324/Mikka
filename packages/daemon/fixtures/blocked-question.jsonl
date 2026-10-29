@@ -1,0 +1,2 @@
+{"t":0,"chunk":{"type":"start","messageId":"msg-blocked-question"}}
+{"t":10,"exit":{"outcome":"failed","stopReason":"blocked","report":{"summary":"Waiting for a service dependency.","blockedOn":"Service unavailable","question":{"questionId":"8ebea126-b259-46b1-afca-7fe845576de1","kind":"external","question":"Can the service be restored?","options":[]}}}}

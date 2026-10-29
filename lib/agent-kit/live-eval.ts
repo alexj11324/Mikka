@@ -2,19 +2,18 @@ import 'server-only'
 import { freezeHostedModelSelection, resolveFrozenHostedModel } from '@/lib/subscription-model-snapshot'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
 import { generateText, streamText, isStepCount } from 'ai'
-import { z } from 'zod'
 import { createCoordinatorRegistry } from '@/workflows/coordinator/tools'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
-import { definitionInstructions } from './definition'
+import { executionInstructions, executionHostInstructions } from './execution-instructions'
 import { CORE_EVAL_CASES, runEvalSuite, compareReports, type EvalCase, type EvalTrace, type ToolObservation } from './evals'
 import { evaluationTools } from './eval-fixtures'
+import { judgeLiveTrace } from './semantic-judge'
 import { caseFromFailure } from './improvement'
 import { selectRegisteredTools } from './registry'
 import { AgentKitError, type AgentKitStore, type AgentScope } from './store'
-
-const finalReply = z.strictObject({ text:z.string().max(16_000),outcome:z.enum(['answered','blocked','approval_required']) })
+import { completedEvaluationReply } from './eval-generation'
 
 /** Live means real inference with synthetic, inert tools, not real-account or native-CLI acceptance. */
 export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, proposalId: string, requestId: string, mode: 'fixture' | 'live') {
@@ -39,16 +38,17 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
       if (!job.execution) throw new AgentKitError('agentEvaluationSnapshotMissing')
       const frozenRuntime = job.execution.snapshot.runtime
       const resolvedModel = await resolveFrozenHostedModel(scope,frozenRuntime,dependencies,signal)
+      let failed=false
       const options = {
         model:resolvedModel,
-        instructions:definitionInstructions(job.execution.snapshot.hostInstructions,definition) + '\n\nEvaluation response format: end with only JSON {"text":"your grounded answer","outcome":"answered|blocked|approval_required"}. Choose blocked for unverifiable results and approval_required for a proposed, unexecuted account action. All tools are inert evaluation fixtures.',
-        prompt:testCase.input,tools,stopWhen:isStepCount(5),abortSignal:signal,maxOutputTokens:1400,maxRetries:0,
+        instructions:executionInstructions({ ...job.execution.snapshot, definition }) + '\n\nEvaluation response format: end with only JSON {"text":"your grounded answer","outcome":"answered|blocked|approval_required"}. Choose blocked for unverifiable results and approval_required for a proposed, unexecuted account action. All tools are inert evaluation fixtures.',
+        prompt:testCase.input,tools,stopWhen:isStepCount(5),abortSignal:signal,maxOutputTokens:1400,maxRetries:0,onError:()=>{failed=true},
       }
       const result = frozenRuntime.modelSelection ? streamText(options) : await generateText(options)
-      const reply = finalReply.parse(JSON.parse(await result.text))
+      const reply = await completedEvaluationReply(result,signal,()=>failed)
       return { ...reply,tools:observations }
     }
-    const common = { cases,mode,model:job.evaluation.model ?? undefined,hostInstructions:job.execution?.snapshot.hostInstructions ?? hostInstructions,run,caseTimeoutMs:15_000 }
+    const common = { cases,mode,model:job.evaluation.model ?? undefined,hostInstructions:job.execution ? executionHostInstructions(job.execution.snapshot) : hostInstructions,run,judge:mode === 'live' ? judgeLiveTrace : undefined,caseTimeoutMs:15_000 }
     const baseline = await runEvalSuite({ ...common,definition:job.baseline.definition })
     const candidate = await runEvalSuite({ ...common,definition:job.candidate.definition })
     const completed = await store.finishEvaluation(scope,job.evaluation.id,{ baseline,candidate })

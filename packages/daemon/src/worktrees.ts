@@ -1,5 +1,5 @@
 // One `git worktree` per run under the daemon's data dir (R4, R11, R12).
-// The allow-list check happens before anything here is called.
+// Local callers pass daemon-owned clone caches, never user checkouts.
 import {
   copyFileSync,
   existsSync,
@@ -27,7 +27,7 @@ export const DISK_USAGE_TTL_MS = 5 * 60_000
 export const FETCH_TIMEOUT_MS = 60_000
 
 /** Git config for fetching into the main repo: no hooks, no `ext::`. */
-const FETCH_GIT = [
+export const FETCH_GIT = [
   "-c",
   "core.hooksPath=/dev/null",
   "-c",
@@ -51,7 +51,7 @@ export class WorktreeManager {
   private usageAt = 0
   private usageRefresh: Promise<number> | null = null
 
-  constructor(private readonly root: string) {}
+  constructor(private readonly root: string, private readonly retainResources = false) {}
 
   /** The run's worktree dir; never outside the worktree root. */
   pathFor(runId: string) {
@@ -234,6 +234,7 @@ export class WorktreeManager {
   }
 
   private async removePath(path: string, repoPath: string) {
+    if (this.retainResources) return
     try {
       await simpleGit(repoPath).raw(["worktree", "remove", "--force", path])
     } catch {
@@ -257,6 +258,7 @@ export class WorktreeManager {
     worktree: string | null,
     repoPath: string
   ): Promise<boolean> {
+    if (this.retainResources) return false
     const root = resolve(this.root)
     const path = worktree ? resolve(worktree) : null
     if (path && dirname(path) !== root) return false
@@ -364,6 +366,7 @@ export class WorktreeManager {
     retentionMs: number,
     now = Date.now()
   ): Promise<string[]> {
+    if (this.retainResources) return []
     const removed: string[] = []
     for (const run of finished) {
       if (now - Date.parse(run.finishedAt) < retentionMs) continue

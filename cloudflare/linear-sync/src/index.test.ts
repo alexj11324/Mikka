@@ -1,14 +1,28 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { test } from 'node:test'
-import { handleRequest, type Env } from './index'
+import { handleRequest, runScheduled, type Env } from './index'
 
 const webhookSecret = 'worker-test-webhook-secret'
 const ctx = { waitUntil: (_promise: Promise<unknown>) => {} }
 
-test('exposes only webhook intake and the protected sync cron route', async () => {
+test('keeps the application OAuth callback outside the sync Worker', async () => {
   const response = await handleRequest(new Request('https://sync.example.test/mikka/api/integrations/linear/callback'), {}, ctx)
   assert.equal(response.status, 404)
+})
+
+test('global status distinguishes a confirmed PostHog pause from unavailable configuration without accessing Hyperdrive', async t => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ errorsWhileComputingFlags: false, flags: { 'mikka-linear-sync': { enabled: false } } }))
+  const env: Env = { get HYPERDRIVE(): { connectionString: string } { throw new Error('Status must not initialize a database') } }
+  const request = () => new Request('https://sync.example.test/mikka/api/integrations/linear/status')
+  const unavailable = await handleRequest(request(), env, ctx)
+  assert.deepEqual(await unavailable.json(), { enabled: false, state: 'unavailable' })
+  env.NEXT_PUBLIC_POSTHOG_KEY = 'test-worker-status-paused'
+  const paused = await handleRequest(request(), env, ctx)
+  assert.deepEqual(await paused.json(), { enabled: false, state: 'disabled' })
+  assert.equal(paused.headers.get('cache-control'), 'no-store')
+  const rejected = await handleRequest(new Request(request(), { method: 'POST' }), env, ctx)
+  assert.equal(rejected.status, 404)
 })
 
 test('returns 503 before accepting webhooks when the secret is missing', async () => {
@@ -44,4 +58,53 @@ test('acknowledges valid but unsupported Linear event types without database acc
     body,
   }), { LINEAR_WEBHOOK_SECRET: webhookSecret }, ctx)
   assert.equal(response.status, 200)
+})
+
+test('disabled Worker webhook, protected cron and scheduler never read Hyperdrive or create background DB work', async t => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ errorsWhileComputingFlags: false, flags: { 'mikka-linear-sync': { enabled: false } } }))
+  let background = 0
+  const env: Env = {
+    NEXT_PUBLIC_POSTHOG_KEY: 'test-worker-disabled',
+    LINEAR_WEBHOOK_SECRET: webhookSecret,
+    CRON_SECRET: 'test-worker-cron',
+    get HYPERDRIVE(): { connectionString: string } { throw new Error('Disabled worker must not initialize or inspect its database') },
+  }
+  const body = JSON.stringify({ action: 'update', type: 'Issue', organizationId: 'org', webhookTimestamp: Date.now(), data: { id: 'issue' } })
+  const response = await handleRequest(new Request('https://sync.example.test/mikka/api/webhooks/linear', {
+    method: 'POST', body, headers: { 'linear-event': 'Issue', 'linear-delivery': 'paused-delivery', 'linear-signature': createHmac('sha256', webhookSecret).update(body).digest('hex') },
+  }), env, { waitUntil: () => { background++ } })
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { disabled: true })
+  const revokedBody = JSON.stringify({ action: 'remove', type: 'OAuthAuthorization', organizationId: 'org', webhookTimestamp: Date.now(), data: { userId: 'user' } })
+  const revoked = await handleRequest(new Request('https://sync.example.test/mikka/api/webhooks/linear', {
+    method: 'POST', body: revokedBody, headers: { 'linear-event': 'OAuthAuthorization', 'linear-delivery': 'revoked-delivery', 'linear-signature': createHmac('sha256', webhookSecret).update(revokedBody).digest('hex') },
+  }), env, ctx)
+  assert.equal(revoked.status, 503)
+  assert.equal(revoked.headers.get('retry-after'), '60')
+  const cron = await handleRequest(new Request('https://sync.example.test/mikka/api/cron/linear-sync', { headers: { authorization: 'Bearer test-worker-cron' } }), env, ctx)
+  assert.deepEqual(await cron.json(), { inbox: 0, outbox: 0, disabled: true })
+  await runScheduled(env)
+  assert.equal(background, 0)
+})
+
+test('Worker retains webhook retry semantics when PostHog is unavailable', async t => {
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('network unavailable') })
+  const body = JSON.stringify({ action: 'update', type: 'Issue', organizationId: 'org', webhookTimestamp: Date.now(), data: { id: 'issue' } })
+  const response = await handleRequest(new Request('https://sync.example.test/mikka/api/webhooks/linear', {
+    method: 'POST', body, headers: { 'linear-event': 'Issue', 'linear-delivery': 'unavailable-delivery', 'linear-signature': createHmac('sha256', webhookSecret).update(body).digest('hex') },
+  }), { NEXT_PUBLIC_POSTHOG_KEY: 'test-worker-unavailable', LINEAR_WEBHOOK_SECRET: webhookSecret }, ctx)
+  assert.equal(response.status, 503)
+  assert.equal(response.headers.get('retry-after'), '60')
+})
+
+test('Worker requires an explicit true from its own configured PostHog project before loading sync', async t => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ errorsWhileComputingFlags: false, flags: { 'mikka-linear-sync': { enabled: true } } }))
+  const env: Env = { NEXT_PUBLIC_POSTHOG_KEY: 'test-worker-enabled', CRON_SECRET: 'test-worker-cron' }
+  const request = () => new Request('https://sync.example.test/mikka/api/cron/linear-sync', { headers: { authorization: 'Bearer test-worker-cron' } })
+  const enabled = await handleRequest(request(), env, ctx)
+  assert.equal(enabled.status, 503)
+  assert.deepEqual(await enabled.json(), { error: 'Linear sync is not configured' })
+  // No project token stays off even when another project's flag was true.
+  const unconfigured = await handleRequest(request(), { CRON_SECRET: env.CRON_SECRET }, ctx)
+  assert.deepEqual(await unconfigured.json(), { inbox: 0, outbox: 0, disabled: true })
 })

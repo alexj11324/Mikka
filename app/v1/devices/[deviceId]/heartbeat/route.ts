@@ -2,9 +2,12 @@ import { after, NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { deviceHeartbeatSchema } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
+import { ensureDeviceAgents } from '@/lib/device-agents'
 import { devices } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 import { reclaimLostRuns, renewRunLeases } from '@/lib/run-leases'
+import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
+import { skillAssignments } from '@/lib/self-improvement/server'
 import { renewCloudDeviceToken } from '@/lib/computer/cloud-device'
 
 export const dynamic = 'force-dynamic'
@@ -23,8 +26,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (!await ownedDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
-  await db.update(devices).set({ harnesses: parsed.data.harnesses, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
-  const result = await renewRunLeases(deviceId, parsed.data.runs.map(run => run.runId))
+  await db.update(devices).set({ harnesses: parsed.data.harnesses, computerUse: parsed.data.computerUse ?? { installed: false, version: null }, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
+  await ensureDeviceAgents(pool, caller.userId, deviceId, parsed.data.harnesses)
+  const selected=await skillAssignments.renewHeartbeat(caller.userId,deviceId,parsed.data.runs.map(run=>run.runId),request.headers.get(SKILL_ARTIFACT_HEADER)==='1')
+  const result=await renewRunLeases(deviceId,selected.legacy)
+  result.leases={...result.leases,...selected.leases}
+  result.revoked=[...new Set([...(result.revoked??[]),...selected.revoked])]
   const cloudCredential = caller.scopeDeviceId === deviceId && caller.scopeWorkspaceId
     ? await renewCloudDeviceToken(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId, deviceId, tokenId: caller.tokenId }).catch(() => null)
     : null

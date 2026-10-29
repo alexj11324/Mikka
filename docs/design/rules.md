@@ -11,11 +11,12 @@ source wins in a conflict is in [`README.md`](README.md).
 ## Bots, chats and threads
 
 - **R-01** The left column is the bot list (bots and group chats). The right
-  column is the thread list. There is no "conversation list".
-- **R-02** The right panel's 详情 header shows the bot selected on the left:
-  the same bloub avatar and the same name as its left row, then 「<Bot 名>
-  的屏幕」. A thread's name appears only as a row in the thread list, never as
-  that header.
+  column is 概览 with its tabs, the thread list (线程) being one of them, or
+  全部线程 (R-50). There is no "conversation list".
+- **R-02** The right panel's 概览 header shows the bot selected on the left:
+  the same bloub avatar and the same name as its left row, then the tabs
+  详情 / 线程 / PR / 电脑 (R-50). A thread's name appears only as a row in a
+  thread list, never as that header.
 - **R-03** Choosing another bot on the left switches the centre chat, the
   right threads and the computer together.
 - **R-04** Every bot comes with its own computer. There is no 新建云端电脑 entry
@@ -23,6 +24,8 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-05** Bots run only on Mikka's own AI SDK harness. The 新建 Bot dialog
   has a big live preview, a shape grid, colours and a name. It has no machine
   picker, no harness picker and no 说明 field (instructions are edited in chat).
+  The Coordinator has no runtime switch either: the #312 native Claude Code /
+  Codex runtime is deprecated and stays off (decision 2026-10-27).
 - **R-06** The Coordinator has no special UI; it is a normal bot (Alex
   2026-10-24). Its role is coordinating, not looking different: the same
   bloub avatar with no star or badge, the same row, the same chat, the
@@ -42,28 +45,33 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-11** The composer has no model picker. The model is our default;
   BYOK users will choose it in Settings later.
 - **R-12** No starter or suggestion cards in any chat ("试试从这些事情开始").
-  Suggestions live only in the 建议 list. A new bot greets with one bubble
-  and an A–D choice card.
-- **R-13** One-to-one chats (a bot, the Coordinator, the board's Coordinator
-  sidebar) show no avatar or name on messages; the header pill names the bot.
+  Suggestions live only on the 建议 page (R-55). A new bot greets with one
+  bubble and an A–D choice card.
+- **R-13** One-to-one chats (a bot, the Coordinator, the 建议 page's
+  Coordinator chat, the board's Coordinator sidebar) show no avatar or name on
+  messages; the header pill names the bot.
   Group chats show a 24px avatar on the left of the bubbles at the bottom of
   each run and the name once per run, 12px Medium in the bot's colour (Figma
   `224:5023`). A group's 详情 is about people, not computers: the group
   avatar and name, then its members (people and bots), recent threads and
   files. No cloud computer in a group; open a bot's own chat to see its.
 - **R-14** The user's messages sit in an accent-blue bubble with white text
-  (`accent/default`); a bot's text sits in the light grey bubble. Charts, OpenUI cards
-  and choice cards have no bubble. Bordered cards (document, computer) sit
-  below the text bubble, never inside it. This holds in every one-to-one
+  (`accent/default`); a bot's text sits in the light grey bubble. Charts,
+  OpenUI cards and choice cards have no bubble. Bordered cards (document,
+  computer, Artifact) sit below the text bubble, never inside it. A 建议 card
+  the user taps is their message but keeps its card shape, no blue bubble; the
+  instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
 - **R-15** A task or thread mentioned in chat is an inline chip, not a large
   card (a task chip carries the board's status icon). A thread the reply
-  dispatches is different: it is a thread card under that reply (R-66).
+  dispatches is different: it is a thread card under that reply (R-66). An
+  Artifact waiting for acceptance is a bordered card under the reply (icon,
+  name, state such as 待你确认); clicking it opens the Artifact window (R-56).
 - **R-16** The computer card in chat shows a title, a status, one sentence
   about the task and a big screen. Approval is part of that card. It never
   shows an operation log, a step checklist, or OS and spec lines.
-- **R-17** The caption under a bot's screen is 「<Bot 名> 的屏幕」 and nothing
-  else.
+- **R-17** The 概览 header does not show 「<Bot 名> 的屏幕」. The 电脑 tab
+  holds the bot's screen, the existing `AgentComputer` view (R-50).
 
 ## Suggestions, tasks and devices
 
@@ -90,23 +98,25 @@ source wins in a conflict is in [`README.md`](README.md).
   not the cap); held items wait, they are not dropped. The Coordinator never
   acts on an event before the person says yes. Its own ideas also go in its
   chat.
-- **R-21** The right panel has two parts: 建议 on top, then 任务. 建议 is the
-  normal-level items in one list, newest first, each row with its app's icon
-  (no per-app cards). The daily briefing is not in 建议; it is the
-  Coordinator's 08:00 message, also sent right after the person connects an app. A 任务 here is a thread started by the
-  orchestrator or a bot; all of them stay listed. It is not a flat list of the
-  board's issues. 建议 items are standalone cards, each one sentence: a verb
-  chip, the app's icon inline, the concrete thing and its reason, deadline or
-  amount (「取消你的 Verizon 套餐，赶在 11 月 1 日自动扣款 $52.13 之前」); no
-  separate meta line. Tapping posts the card in the bot's chat followed by the
-  full instruction handed to the orchestrator, written with its background
-  (account, source, what to check, and to stop for confirmation before an
-  irreversible step). While it runs, the card sits under 进行中 with a
-  progressive verb (正在取消). The flow: the person says
-  yes to a Coordinator card, or taps a 建议 card, which starts the task at once
-  (no composer step) → the orchestrator runs it as a bot sub-agent (web, R-72)
-  or dispatches a thread (a real task such as coding) → the card shows it
-  running and leaves 建议 when done; a thread also shows up below as a 任务.
+- **R-21** 建议 is its own rail page (R-55), not part of the right panel; the
+  panel's old 任务 section is the 线程 tab (R-50). 建议 is the normal-level
+  items in one list, newest first, each row with its app's icon (no per-app
+  cards). The daily briefing is not in 建议; it is the Coordinator's 08:00 message, also
+  sent right after the person connects an app. A thread started by the
+  orchestrator or a bot stays listed in the thread lists (R-52); they are not
+  a flat list of the board's issues. 建议 items are standalone cards, each one
+  sentence: a verb chip, the app's icon inline, the concrete thing and its
+  reason, deadline or amount
+  (「取消你的 Verizon 套餐，赶在 11 月 1 日自动扣款 $52.13 之前」); no
+  separate meta line. Tapping posts the same card in the Coordinator chat
+  beside it followed by the full instruction handed to the orchestrator,
+  written with its background (account, source, what to check, and to stop for
+  confirmation before an irreversible step). While it runs, the card shows a
+  progressive verb (正在取消). The flow: the person says yes to a Coordinator
+  card, or taps a 建议 card, which starts the task at once (no composer step) →
+  the orchestrator runs it as a bot sub-agent (web, R-72) or dispatches a
+  thread (a real task such as coding) → the card shows it running and leaves
+  建议 when done; a thread also shows up in the thread lists.
 - **R-22** Tasks are never created on the board itself: no column `+`, no
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
@@ -142,8 +152,10 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   line before the properties column or an open thread. Nothing else gets a
   line; sections are separated by space. The content column is centred in
   the main area, up to 680px wide.
-- **R-62** 线程 lists the threads working on the issue: status icon (never
-  the bot's avatar, `glossary.md`), thread name, one line on what it is doing, status, time. Clicking one opens it on
+- **R-62** 线程 lists the threads working on the issue, grouped as R-52:
+  status icon (never the bot's avatar, `glossary.md`), thread name, time, and
+  the opening of its last reply (R-53). Someone who cannot open the thread
+  sees no reply line. Clicking one opens it on
   the right as a conversation that ends in the composer (R-10); people and
   the agent talk there. A thread's content is its owner's alone: teammates
   (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
@@ -179,6 +191,61 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   with 「‹ Coordinator」 to go back, on a phone it pushes in full screen.
   Figma: page 「线程卡片 · 聊天里派出线程」.
 
+## Right panel, 建议, Artifact and browser
+
+Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
+
+- **R-50** The right panel is the right third of the window. Its header has
+  two pills on the left, 「概览」 (selected by default) and 「全部线程」, and
+  search, widen and close icons on the right. The pills switch only this
+  column; the centre chat is never removed or replaced. 概览 is the selected
+  bot's avatar and name (R-02), then the tabs 详情, 线程, PR, 电脑. 线程
+  lists only the threads this bot dispatched (for the Coordinator, the
+  threads it dispatched); 电脑 is the bot's cloud computer (`AgentComputer`).
+  全部线程 lists every bot's threads; each row carries a 16px bot avatar in
+  that bot's colour, the only thread list that shows one, and a relative
+  time on the right (2 分钟前, 昨天).
+- **R-51** The right panel is read-only. No action buttons anywhere in it (no
+  让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
+  header's search, widen and close, and a list group's collapse chevron), the only
+  control is 「展开」 to expand a list. 详情 holds two lists, 例行 (routines)
+  and 资料库 (library). The bot creates routines when asked in chat; files are
+  uploaded with the composer's 「+」.
+- **R-52** Every thread list groups its rows in this order: 等待回复（N）,
+  进行中（N）, 空闲（N）, 已解决（N）. A group header is muted text
+  (「等待回复（2）」) followed by a thin rule filling the rest of the row.
+  已解决 is collapsed by default behind a chevron. A failed thread sits under
+  等待回复. Never a 「今天」 or 「今天完成」 group.
+- **R-53** A thread row has two lines: the thread's title, then the opening of
+  its last reply quoted verbatim, cut to one line. No generated description,
+  no status word and no bot-name prefix (generating them costs compute).
+- **R-54** The PR tab lists this bot's PRs in groups 等待审查, 进行中, 已合并,
+  with R-52's header style. Each row is the PR title and its number.
+- **R-55** 建议 is the second rail item. Its page is split 50/50 with a 1px
+  divider: on the left the title 「建议」 (24px SemiBold) with a refresh icon,
+  then one column of mobile-style cards (R-21: verb chip, source mark, inline
+  brand mention chips); on the right the Coordinator chat, flush. Clicking a
+  card posts the identical card (same shape, same chips) into that chat as
+  the user's message (Hark), followed by the full instruction; the
+  Coordinator then handles it as R-21 says (a sub-agent for a web task, a
+  thread for a real one). The cards follow these taste rules: border or
+  shadow, never both; radius 16 (F8); one left/right edge; inline icons
+  12–14px; accent only on data or on one control.
+- **R-56** Artifact is the fifth rail item, with Mikka's own icon: two
+  upright rounded cards, slightly tilted, the front one bottom-left, the back
+  one top-right showing only its top and right edges (Figma `icon/artifact`).
+  The Artifact page has a category list on the left (全部, 验收, 文档, 网页 …)
+  and a table on the right: 名称, 状态, 来源, 上次活动. A thread page's header
+  has an 「Artifact · N」 entry. Opening an Artifact shows a window with the
+  acceptance content on the left (PR, checks, screenshots and recordings),
+  the thread's chat on the right, and 打回 / 通过 at the top.
+- **R-57** The local 浏览器 is an icon-only globe toggle at the right of the
+  top bar, with no 「浏览器」 label. Turned on, it opens a right column with
+  the browser (URL bar and page). Selecting an element and annotating it puts
+  a chip 「1 · <element> · <action> · <note>」 into the current chat's
+  composer. The 浏览器 is the person's own and app-wide; it is not a bot's
+  电脑 (R-50).
+
 ## Settings
 
 - **R-70** Every setting needs a precedent. A row on any Settings screen
@@ -192,11 +259,14 @@ do what Linear does. Figma: `220:5022` (MIK-25).
 - **R-71** Icons follow precedent too: each icon is the one mainstream
   products use for the same function (memory = book as in ChatGPT,
   notifications = bell, connectors = blocks as in Claude…). The spec or review
-  page names the product for each.
+  page names the product for each. Rail icons: 主页 House, 建议 Lightbulb,
+  看板 Columns3, 插件 Blocks. Artifact is the one exception: it uses
+  Mikka's own stacked-cards icon (R-56), never lucide Copy or Library.
 - **R-72** Two kinds of work. A real task, such as coding, is a thread: a full
   coding agent (Claude Code, Codex) does it, and it is listed in the thread
   list. A web task is the bot's own: the bot runs it as a sub-agent (分身) with
-  its own browser, and can run several at once. A sub-agent is never listed
+  its own browser on the bot's cloud 电脑 (not the local 浏览器, R-57), and can
+  run several at once. A sub-agent is never listed
   as a thread and has no name or avatar of its own; in the chat it shows as
   one card per web task with its live screen and a step line (进行中, 需要你操作,
   完成), and the bot itself reports what it did, in its own voice. The user
@@ -236,17 +306,33 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the app-wide sweep is open in `decisions.md`. Exception: a comment card
   and the comment box (R-63) carry a 1px `--border` line, which must be a
   dark grey in dark mode, never white at low opacity.
+  Secondary buttons follow the same rule: a grey fill and no stroke, like
+  the 「Add folder…」 button in Claude desktop's settings (a light grey pill
+  on a white panel, no outline). `Button variant="outline"` (and the
+  `outline` Toggle, the motion `secondary`/`outline` buttons) use the
+  `--control` / `--control-hover` tokens, a translucent black (light) or
+  white (dark) overlay, so the button still reads on grey cards and
+  sidebars. Grouped buttons (`ButtonGroup`) keep a 2px gap so each one
+  stays distinct, and `ButtonGroupText` is the same grey with no border.
+  The top-bar search pill is grey too. Do not give a Button
+  `bg-background`/`bg-card` with a border, or turn an outline Button back
+  to white; ui-policy fails both as `style/secondary-button-fill`. Status
+  tones (`statusTones`, used by status and priority pickers and status
+  badges) are a tinted fill with no stroke; neutral uses `--control`.
 - **R-32** Font Geist, Chinese falls back to the system font. Only these text
   styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
   (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium
-  (group title), 11/14 Medium (badge).
+  (group title), 11/14 Medium (badge), and 24/32 SemiBold for the 建议 page
+  title only (R-55).
 - **R-33** Radii: 6 tag, 8 button and input, 9 rail item, 12 card and shell,
   14 approval and list card, 16 dialog, 999 pill. Spacing is a multiple of 4.
+  Exception: 建议 cards use 16 (R-55).
 - **R-34** Status colours come only from the StatusBadge set (Figma
   `99:75`), shared by devices, threads and tasks.
 - **R-35** Shell (Comma): grey window background, 44px top bar (back,
-  forward, centred search pill that opens ⌘K), 72px icon rail with a text
-  label under each icon (主页, 看板…), and one rounded content card. Build on
+  forward, centred search pill that opens ⌘K, the 浏览器 globe toggle at the
+  right, R-57), 72px icon rail with a text label under each icon, in this
+  order: 主页, 建议, 看板, 插件, Artifact; and one rounded content card. Build on
   `components/app-shell.tsx`; no reUI App Shell blocks.
 - **R-36** Bots use bloub avatars (`BotAvatar`, Figma `196:3571`, all 16
   shapes kept); people use letter avatars.
@@ -281,8 +367,10 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   "send to a bot"). Never "这里是空的" or "Check back later".
 - **R-42** Every visible string lives in `messages/zh-CN.json` and
   `messages/en.json`; `pnpm i18n:check` must pass. Write Chinese first.
-- **R-43** Use the glossary's words: Bot, 对话, 线程. Never 会话 for a left
-  row or a run. Built-in role names stay English (Coordinator).
+- **R-43** Use the glossary's words: Bot, 对话, 线程, 资料库, 浏览器, 电脑.
+  Never 会话 for a left row or a run, and never 任务 for the panel's thread
+  tab. 「Artifact」 is never translated. Built-in role names stay English
+  (Coordinator).
 - **R-44** The home greeting stays 「早上好，Alex」 (time of day + name).
 
 - **R-45** A 建议 item, briefing item or follow-up item makes clear what to

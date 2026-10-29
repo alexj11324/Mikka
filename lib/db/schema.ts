@@ -3,6 +3,8 @@ import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, times
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
+import type { SetupRecipe } from '@mikka/protocol/device'
+import type { CaptureContentType, CaptureKind, CaptureSource } from '@mikka/protocol/capture'
 import type { AttentionLevel } from '@/lib/attention/judgment'
 import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
 
@@ -25,6 +27,8 @@ export const issues = pgTable('issues', {
   status: text('status').notNull(), priority: text('priority').notNull(),
   // Workspace issues sync with Linear; personal ones never leave Mikka (MIK-46).
   scope: text('scope').$type<'workspace' | 'personal'>().notNull().default('personal'),
+  scopeVersion: integer('scopeVersion').notNull().default(1),
+  linearSyncBlocked: boolean('linearSyncBlocked').notNull().default(false),
   // The agent judges scope at creation; a person's change wins and teaches the next judgment (MIK-47).
   scopeSetBy: text('scopeSetBy').$type<'agent' | 'user'>().notNull().default('agent'),
   scopeConfidence: real('scopeConfidence'),
@@ -32,6 +36,18 @@ export const issues = pgTable('issues', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc())])
+export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
+  requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),
+  issueId: uuid('issueId').notNull().unique(), teamId: uuid('teamId').notNull(),
+  fingerprint: text('fingerprint').notNull(), status: text('status').$type<'preparing' | 'complete'>().notNull().default('preparing'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
+export const teamIssuePromotions = pgTable('team_issue_promotions', {
+  requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(), issueId: uuid('issueId').notNull(),
+  teamId: uuid('teamId').notNull(), expectedTeamId: uuid('expectedTeamId'), expectedRevision: integer('expectedRevision').notNull(),
+  status: text('status').$type<'preparing' | 'complete' | 'stale'>().notNull().default('preparing'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
 // The personal issue prefix someone chose; without a row it comes from their email (MIK-46).
 export const issuePrefixes = pgTable('issue_prefixes', {
   userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
@@ -110,7 +126,19 @@ export const linearTeamSyncs = pgTable('linear_team_syncs', {
   active: boolean('active').notNull().default(true), lastError: text('lastError'), lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('linear_team_syncs_owner_idx').on(table.ownerId, table.active), uniqueIndex('linear_team_syncs_one_active_per_owner_key').on(table.ownerId).where(sql`${table.active}`)])
+/** One immutable remote identity per workspace scope generation. Reservation
+ * commits before provider IO, so an ambiguous response is retried with this ID. */
+export const linearIssuePublications = pgTable('linear_issue_publications', {
+  id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  ownerId: text('ownerId').notNull(), teamSyncId: uuid('teamSyncId').notNull(),
+  scopeVersion: integer('scopeVersion').notNull(), linearIssueId: text('linearIssueId').notNull().unique(),
+  writePending: boolean('writePending').notNull().default(false),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  retiredAt: timestamp('retiredAt', { withTimezone: true }),
+}, table => [uniqueIndex('linear_issue_publications_scope_key').on(table.issueId, table.scopeVersion), uniqueIndex('linear_issue_publications_active_key').on(table.issueId).where(sql`${table.retiredAt} is null`)])
 export const linearIssueLinks = pgTable('linear_issue_links', {
+  externalTargetVerified: boolean('externalTargetVerified').notNull().default(false),
+  publicationId: uuid('publicationId').references(() => linearIssuePublications.id, { onDelete: 'set null' }),
   id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().unique().references(() => issues.id, { onDelete: 'cascade' }),
   ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
   teamSyncId: uuid('teamSyncId').notNull().references(() => linearTeamSyncs.id, { onDelete: 'cascade' }),
@@ -120,6 +148,15 @@ export const linearIssueLinks = pgTable('linear_issue_links', {
   remoteRemovedAt: timestamp('remoteRemovedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('linear_issue_links_team_idx').on(table.teamSyncId)])
+/** A durable deny-list for detached remote identities. Kept separately from
+ * active links so delayed webhooks and imports cannot publish a personal task. */
+export const linearIssueDetachments = pgTable('linear_issue_detachments', {
+  linearIssueId: text('linearIssueId').primaryKey(),
+  issueId: uuid('issueId').notNull(), ownerId: text('ownerId').notNull(),
+  teamSyncId: uuid('teamSyncId'), linearIdentifier: text('linearIdentifier'),
+  sourceLinkId: uuid('sourceLinkId').unique(), publicationId: uuid('publicationId'),
+  detachedAt: timestamp('detachedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('linear_issue_detachments_issue_idx').on(table.issueId)])
 export const linearCommentLinks = pgTable('linear_comment_links', {
   id: uuid('id').primaryKey(), issueLinkId: uuid('issueLinkId').notNull().references(() => linearIssueLinks.id, { onDelete: 'cascade' }),
   threadId: text('threadId').notNull(), messageId: text('messageId').notNull(), authorUserId: text('authorUserId'), linearCommentId: text('linearCommentId').notNull().unique(),
@@ -127,6 +164,7 @@ export const linearCommentLinks = pgTable('linear_comment_links', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('linear_comment_links_local_key').on(table.issueLinkId, table.threadId, table.messageId)])
 export const linearSyncOutbox = pgTable('linear_sync_outbox', {
+  scopeVersion: integer('scopeVersion').notNull().default(1), claimToken: uuid('claimToken'),
   id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   status: text('status').notNull().default('queued'), attempts: integer('attempts').notNull().default(0),
   availableAt: timestamp('availableAt', { withTimezone: true }).notNull().defaultNow(), lastError: text('lastError'),
@@ -158,6 +196,7 @@ export const devices = pgTable('devices', {
   platform: text('platform'), arch: text('arch'),
   daemonVersion: text('daemonVersion'), protocolVersion: integer('protocolVersion'),
   harnesses: jsonb('harnesses').$type<HarnessInfo[]>().notNull().default([]),
+  computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),
   /** Off: the device stays registered but the orchestrator gives it no runs. */
   enabled: boolean('enabled').notNull().default(true),
   maxConcurrentRuns: integer('maxConcurrentRuns').notNull().default(3),
@@ -165,6 +204,16 @@ export const devices = pgTable('devices', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('devices_owner_idx').on(table.ownerId)])
+
+/** Better Auth 1.7.12 owns the device authorization lifecycle. */
+export const deviceCodes = pgTable('deviceCode', {
+  id: text('id').primaryKey(), deviceCode: text('deviceCode').notNull(),
+  userCode: text('userCode').notNull(), userId: text('userId'),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  status: text('status').notNull(),
+  lastPolledAt: timestamp('lastPolledAt', { withTimezone: true }),
+  pollingInterval: integer('pollingInterval'), clientId: text('clientId'), scope: text('scope'),
+}, table => [uniqueIndex('device_code_key').on(table.deviceCode), uniqueIndex('device_user_code_key').on(table.userCode)])
 
 /** A daemon credential. Only the SHA-256 hash is stored. */
 export const deviceTokens = pgTable('device_tokens', {
@@ -183,9 +232,18 @@ export const deviceTokens = pgTable('device_tokens', {
 export const deviceRepos = pgTable('device_repos', {
   id: uuid('id').primaryKey(), deviceId: uuid('deviceId').notNull().references(() => devices.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull(), repoPath: text('repoPath').notNull(), remoteUrl: text('remoteUrl'),
-  baseBranch: text('baseBranch').notNull().default('main'), verifyCommand: text('verifyCommand'),
+  baseBranch: text('baseBranch').default('main'), verifyCommand: text('verifyCommand'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('device_repos_key').on(table.deviceId, table.repoPath)])
+
+/** Owner-reviewed settings follow a repository across computers and transports. */
+export const repositorySettings = pgTable('repository_settings', {
+  userId: text('userId').notNull(), remoteKey: text('remoteKey').notNull(),
+  verifyCommand: text('verifyCommand'), setup: jsonb('setup').$type<SetupRecipe | null>(),
+  networkAllow: jsonb('networkAllow').$type<string[] | null>(),
+  push: jsonb('push').$type<import('@/lib/run-publication-policy').RepositoryPushApproval | null>(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.remoteKey] })])
 
 /** A named role run by one harness on one device. */
 export const agents = pgTable('agents', {
@@ -215,10 +273,22 @@ export const agentRuns = pgTable('agent_runs', {
   status: text('status').$type<RunStatus>().notNull().default('queued'),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),
-  baseBranch: text('baseBranch').notNull().default('main'),
+  /** Caller-supplied retry identity, scoped to userId. Null for older dispatchers. */
+  dispatchKey: text('dispatchKey'),
+  /** Hash of the original dispatch parameters; rejects reuse for different work. */
+  dispatchFingerprint: text('dispatchFingerprint'),
+  baseBranch: text('baseBranch').default('main'),
   sessionId: text('sessionId'), worktreePath: text('worktreePath'),
   stopReason: text('stopReason'), error: text('error'),
   report: jsonb('report').$type<Record<string, unknown> | null>(),
+  /** The opening of the agent's last reply (240 characters), written as its text arrives; the right column's row shows it. */
+  lastReply: text('lastReply'),
+  /** The text part (chunk id) lastReply comes from: more text for it appends, another part replaces it. */
+  lastReplyPart: text('lastReplyPart'),
+  lastReplyAt: timestamp('lastReplyAt', { withTimezone: true }),
+  /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
+  source: text('source').$type<'mcp' | null>(),
+  questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true} | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */
   attempt: integer('attempt').notNull().default(1),
@@ -229,7 +299,35 @@ export const agentRuns = pgTable('agent_runs', {
   finishedAt: timestamp('finishedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`)])
+}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`)])
+
+/** A verified owner/repository binding. Installation tokens are never stored. */
+export const githubRepositoryInstallations = pgTable('github_repository_installations', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  remoteKey: text('remoteKey').notNull(),
+  githubAccountId: text('githubAccountId').notNull(),
+  installationId: bigint('installationId', { mode: 'number' }).notNull(),
+  repositoryId: bigint('repositoryId', { mode: 'number' }).notNull(),
+  verifiedAt: timestamp('verifiedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.remoteKey] })])
+
+/** Server-issued publication assignment and durable completion receipt (ADR 0024). */
+export const runPublications = pgTable('run_publications', {
+  runId: uuid('runId').primaryKey().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  scopeVersion: integer('scopeVersion'), issueTitle: text('issueTitle'),
+  remoteUrl: text('remoteUrl').notNull(), remoteKey: text('remoteKey').notNull(),
+  identifier: text('identifier'), branch: text('branch'), baseBranch: text('baseBranch'),
+  pushApproved: boolean('pushApproved').notNull().default(false),
+  status: text('status').$type<'assigned' | 'pending' | 'processing' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
+  workflowRunId: text('workflowRunId'), leaseToken: uuid('leaseToken'), leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
+  attempts: integer('attempts').notNull().default(0),
+  pullRequest: jsonb('pullRequest').$type<{ url: string; state: 'open' | 'draft' | 'merged' | 'closed' } | null>(),
+  errorCode: text('errorCode'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('run_publications_issue_repo_idx').on(table.issueId, table.remoteKey), index('run_publications_pending_idx').on(table.status, table.leaseExpiresAt)])
 
 /** The run's event stream, one row per chunk; `seq` dedupes re-sent batches. */
 export const runChunks = pgTable('run_chunks', {
@@ -303,6 +401,10 @@ export const coordinatorEvents = pgTable('coordinator_events', {
   payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
   /** Null until triaged; an untriaged event wakes the Coordinator. */
   tier: text('tier').$type<CoordinatorEventTier>(),
+  /** Host scheduling metadata, separate from untrusted notification payload. */
+  lastTriageAttemptAt: timestamp('lastTriageAttemptAt', { withTimezone: true }),
+  /** Model response envelope bound to the event and winning attempt, not approval. */
+  triageDecision: jsonb('triageDecision').$type<Record<string, unknown>>(),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt)])
@@ -502,6 +604,27 @@ export const suggestionTriggerChecks = pgTable('suggestion_trigger_checks', {
 })
 
 /**
+ * Per Composio connected account: the provider email read at connect time and
+ * whether it is the account bots use for its toolkit (one default per person
+ * and toolkit). Tokens stay in Composio.
+ */
+export const composioAccounts = pgTable('composio_accounts', {
+  accountId: text('accountId').primaryKey(),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  toolkit: text('toolkit').notNull(),
+  email: text('email'),
+  /** When the provider gave a final answer on the email (found or not), so it is asked once. */
+  emailCheckedAt: timestamp('emailCheckedAt', { withTimezone: true }),
+  /** The last try, final or not; a failed try waits about an hour before the next. */
+  lastAttemptAt: timestamp('lastAttemptAt', { withTimezone: true }),
+  isDefault: boolean('isDefault').notNull().default(false),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  index('composio_accounts_user_idx').on(table.userId, table.toolkit),
+  uniqueIndex('composio_accounts_default_key').on(table.userId, table.toolkit).where(sql`"isDefault"`),
+])
+
+/**
  * Each person's IANA time zone, so the daily briefing is written at 08:00
  * their time (app/api/cron/briefings). The browser's zone, sent when the
  * suggestions list loads, replaces any earlier value; the connect callbacks'
@@ -569,6 +692,8 @@ export const conversations = pgTable('conversations', {
   id: uuid('id').primaryKey(), workspaceId: uuid('workspaceId').notNull(),
   kind: text('kind').$type<'group' | 'agent_dm'>().notNull(), title: text('title').notNull(),
   createdBy: text('createdBy').notNull(), lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull().default(sql`0`),
+  // Optional owner-designated current group agent; never inferred or backfilled.
+  leadAgentId: uuid('leadAgentId'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 export const conversationMembers = pgTable('conversation_members', {
@@ -596,6 +721,22 @@ export const conversationLinks = pgTable('conversation_links', {
   lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull(), messageCount: bigint('messageCount', { mode: 'bigint' }).notNull(),
 }, t => [index('conversation_links_source_idx').on(t.sourceConversationId, t.anchorPosition)])
 
+/** Group execution queue/corrections are scoped through conversation membership. */
+export const groupTurns = pgTable('group_turns', {
+  messageId: uuid('messageId').primaryKey().references(() => conversationMessages.id, { onDelete: 'cascade' }),
+  conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  status: text('status').$type<'queued' | 'running' | 'complete' | 'failed'>().notNull().default('queued'),
+  agentId: uuid('agentId'), activeRunId: uuid('activeRunId'), route: jsonb('route'), error: text('error'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('group_turns_queue_idx').on(t.conversationId, t.status, t.createdAt)])
+export const groupRoutingCorrections = pgTable('group_routing_corrections', {
+  messageId: uuid('messageId').primaryKey().references(() => conversationMessages.id, { onDelete: 'cascade' }),
+  conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  message: text('message').notNull(), wrongId: uuid('wrongId').notNull(), rightId: uuid('rightId'), decisionExecution: jsonb('decisionExecution'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('group_routing_corrections_recent_idx').on(t.conversationId, t.createdAt.desc())])
 // --- Artifacts ---------------------------------------------------------------
 //
 // A document (Markdown) or web page (HTML) an agent hands over through the MCP
@@ -639,6 +780,53 @@ export const artifactShares = pgTable('artifact_shares', {
   revokedAt: timestamp('revokedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('artifact_shares_token_key').on(table.tokenHash), index('artifact_shares_artifact_idx').on(table.artifactId)])
+
+// --- Run captures ------------------------------------------------------------
+//
+// Screenshots and screen recordings a thread keeps as evidence (lib/captures).
+// Binary, immutable and unversioned, so they are not artifacts: a capture is
+// one file in the artifacts bucket under `storageKey`, bound to its run.
+
+export const RUN_CAPTURE_STATUSES = ['recording', 'uploading', 'ready', 'failed'] as const
+export type RunCaptureStatus = (typeof RUN_CAPTURE_STATUSES)[number]
+
+export const runCaptures = pgTable('run_captures', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  issueId: uuid('issueId').references(() => issues.id, { onDelete: 'set null' }),
+  botId: uuid('botId').references(() => bots.id, { onDelete: 'set null' }),
+  kind: text('kind').$type<CaptureKind>().notNull(),
+  contentType: text('contentType').$type<CaptureContentType>().notNull(),
+  source: text('source').$type<CaptureSource>().notNull(),
+  status: text('status').$type<RunCaptureStatus>().notNull(),
+  title: varchar('title', { length: 200 }).notNull(),
+  /** Object key in the artifacts bucket; set once the file is there. */
+  storageKey: text('storageKey'),
+  /** The file itself, only where no bucket is configured (previews, tests); production always uses R2. */
+  inlineContent: bytea('inlineContent'),
+  /** Declared by the uploader until the file is ready, then measured. */
+  size: integer('size'), sha256: text('sha256'),
+  durationMs: integer('durationMs'),
+  /** A cloud computer recording: the desktop it records and when it stops by itself. */
+  display: integer('display'),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  error: text('error'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  index('run_captures_run_idx').on(table.runId, table.createdAt),
+  index('run_captures_user_idx').on(table.userId, table.createdAt),
+  uniqueIndex('run_captures_recording_key').on(table.runId).where(sql`${table.status} = 'recording'`),
+])
+
+/** A link anyone can open, as `artifact_shares`: only the token's hash is stored; revoking ends it. */
+export const runCaptureShares = pgTable('run_capture_shares', {
+  id: uuid('id').primaryKey(),
+  captureId: uuid('captureId').notNull().references(() => runCaptures.id, { onDelete: 'cascade' }),
+  tokenHash: text('tokenHash').notNull(), createdBy: text('createdBy').notNull(),
+  revokedAt: timestamp('revokedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('run_capture_shares_token_key').on(table.tokenHash), index('run_capture_shares_capture_idx').on(table.captureId)])
 /**
  * Something an agent wants to do in the person's own accounts (send an email,
  * create or change a calendar event). It stays `pending` until the person
@@ -650,6 +838,7 @@ export type PendingActionStatus = (typeof PENDING_ACTION_STATUSES)[number]
 export const pendingActions = pgTable('pending_actions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   action: text('action').notNull(),
+  connectedAccountId: text('connectedAccountId'),
   input: jsonb('input').$type<Record<string, unknown>>().notNull(),
   context: jsonb('context').$type<Record<string, unknown> | null>(),
   status: text('status').$type<PendingActionStatus>().notNull().default('pending'),
@@ -658,7 +847,44 @@ export const pendingActions = pgTable('pending_actions', {
   decidedAt: timestamp('decidedAt', { withTimezone: true }),
 }, table => [index('pending_actions_user_status_idx').on(table.userId, table.status, table.createdAt)])
 
-// Optional native Coordinator bridge (#312). Existing users default to AI SDK.
+// Factory #192 uses existing issues, Coordinator events and Harness runs.
+export const factoryTasks = pgTable('factory_tasks', {
+  id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  botId: uuid('botId'),
+  issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  scopeVersion: integer('scopeVersion'),
+  sourceEventId: uuid('sourceEventId').notNull(),
+  route: jsonb('route').$type<import('../factory/contract').FactoryRoute>().notNull(),
+  stage: text('stage').$type<import('../factory/contract').FactoryStage>().notNull(),
+  status: text('status').$type<import('../factory/contract').FactoryStatus>().notNull(),
+  revision: integer('revision').notNull().default(1), attemptId: uuid('attemptId').notNull(), candidateId: uuid('candidateId'),
+  reason: text('reason').notNull(), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('factory_tasks_source_key').on(table.userId, table.issueId, table.sourceEventId), index('factory_tasks_owner_issue_idx').on(table.userId, table.issueId, table.updatedAt)])
+
+export const factoryCandidates = pgTable('factory_candidates', {
+  id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
+  sha: text('sha').notNull(), repository: text('repository').notNull(), environment: text('environment').notNull(), scope: text('scope').notNull(),
+  runId: uuid('runId').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('factory_candidates_task_id_key').on(table.taskId, table.id)])
+
+export const factoryAttempts = pgTable('factory_attempts', {
+  id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
+  stage: text('stage').$type<import('../factory/contract').FactoryStage>().notNull(), ordinal: integer('ordinal').notNull(), position: integer('position').notNull(),
+  status: text('status').$type<import('../factory/contract').FactoryStatus>().notNull(), candidateId: uuid('candidateId'),
+  runId: uuid('runId'), sessionId: text('sessionId'), reason: text('reason').notNull(),
+  output: jsonb('output').$type<Record<string, unknown>>().notNull().default({}),
+  evidence: jsonb('evidence').$type<import('../factory/contract').FactoryEvidence[]>().notNull().default([]),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), finishedAt: timestamp('finishedAt', { withTimezone: true }),
+}, table => [unique('factory_attempts_task_stage_ordinal_key').on(table.taskId, table.stage, table.ordinal), unique('factory_attempts_task_position_key').on(table.taskId, table.position), unique('factory_attempts_task_id_key').on(table.taskId, table.id), uniqueIndex('factory_attempts_one_run_key').on(table.runId).where(sql`${table.runId} IS NOT NULL`), index('factory_attempts_run_idx').on(table.runId)])
+
+export const factoryEvents = pgTable('factory_events', {
+  taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }), eventId: uuid('eventId').notNull(),
+  request: jsonb('request').$type<Record<string, unknown>>().notNull(), result: jsonb('result').$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.taskId, table.eventId] })])
+// Deprecated native Coordinator bridge (#312, decision 2026-10-27). Kept, switched off; see docs/architecture/native-coordinator.md.
 export const coordinatorRuntimeSettings = pgTable('coordinator_runtime_settings', {
   userId: text('userId').primaryKey(), runtime: jsonb('runtime').notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),

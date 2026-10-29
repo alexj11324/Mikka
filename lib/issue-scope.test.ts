@@ -1,12 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { scopeFromProbability, scopeQuestions, scopeState, WORKSPACE_THRESHOLD } from './issue-scope'
+import { scopeFromProbability, scopeQuestions, scopeState } from './issue-scope'
 
-test('only a confident judgment makes a workspace task', () => {
-  assert.equal(scopeFromProbability(0.95), 'workspace')
-  assert.equal(scopeFromProbability(WORKSPACE_THRESHOLD), 'workspace')
-  assert.equal(scopeFromProbability(0.6), 'personal')
-  assert.equal(scopeFromProbability(0), 'personal')
+test('no model probability is authorization to publish a task', () => {
+  for (const probability of [0, 0.6, 0.8, 0.95, 1, Infinity, NaN]) assert.equal(scopeFromProbability(probability), 'personal')
 })
 
 test('the question is one predicate named workspace', () => {

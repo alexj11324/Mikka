@@ -21,6 +21,8 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
   const computerEnabled = await steps.computerToolsEnabled()
+  const mailboxEnabled = await steps.mailboxToolsEnabled()
+  const writeEnabled = await steps.personalWriteToolsEnabled()
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const inbox = await steps.takeInbox(userId,holder,botId)
     if (!inbox.held) return
@@ -33,9 +35,10 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
       const selected = await native.runtime(userId)
       execution = await kit.beginAgentExecution(userId,botId,holder,round,selected)
       if (execution && execution.snapshot.runtime.harness !== selected.harness) throw new Error('agent_runtime_changed')
+      const mailboxTools = mailboxEnabled ? await steps.mailboxCatalogue(userId,botId,execution?.id) : []
       const result = selected.harness === 'ai_sdk'
-        ? await runHostedWorkflowTurn(execution?.snapshot.runtime ?? { harness:'ai_sdk',model:COORDINATOR_MODEL },coordinatorTools(userId,botId,undefined,{ execution,computerEnabled }),{ ...(await steps.preparePrompt(userId,botId,execution?.snapshot)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep })
-        : await nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scope,{ execution,computerEnabled }),botId,execution?.snapshot)
+        ? await runHostedWorkflowTurn(execution?.snapshot.runtime ?? { harness:'ai_sdk',model:COORDINATOR_MODEL },coordinatorTools(userId,botId,undefined,{ execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}),...(inbox.approvedRepositoryKey ? { approvedRepositoryKey: inbox.approvedRepositoryKey } : {}) }),{ ...(await steps.preparePrompt(userId,botId,execution?.snapshot,mailboxTools)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep })
+        : await nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scope,{ execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}),...(inbox.approvedRepositoryKey ? { approvedRepositoryKey: inbox.approvedRepositoryKey } : {}) }),botId,execution?.snapshot)
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       await steps.appendMessages(userId,holder,result.responseMessages,quiet ? null : turnWarning(result.finishReason,result.text),botId)
       if (inbox.handoffMatterIds.length) await steps.settleAttention(userId,inbox.handoffMatterIds,inbox.handoffOnly && !quiet)
@@ -44,13 +47,15 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
       if (inbox.pushReasons?.length && !quiet && result.text.trim() && result.text.trim() !== QUIET_REPLY) {
         await steps.pushToPhones(userId, botId, inbox.pushHidesText ? null : result.text, inbox.pushReasons)
       }
-      if (inbox.telegramTargets.length && result.text.trim()) {
-        const threads = await steps.telegramReplyThreads(userId,inbox.telegramTargets)
-        for (const threadId of threads) {
+      if (inbox.telegramTargets.length && !quiet) {
+        const reply = result.text.trim() ? result.text : '没有生成回复，请再试一次'
+        if (!result.text.trim()) await steps.appendMessages(userId, holder, [{ role: 'assistant', content: reply }], turnWarning(result.finishReason, result.text), botId)
+        for (const target of inbox.telegramTargets) {
           try {
-            for (const chunk of splitTelegramText(result.text)) await steps.sendTelegramChunk(threadId,chunk)
-          } catch (error) {
-            console.error('Telegram reply failed',error instanceof Error ? error.message : String(error))
+            for (const chunk of splitTelegramText(reply)) await steps.sendTelegramChunk(userId, botId, holder, target, chunk)
+            await steps.acknowledgeTelegramReply(userId, botId, holder, target)
+          } catch {
+            console.error('Telegram reply failed')
           }
         }
       }

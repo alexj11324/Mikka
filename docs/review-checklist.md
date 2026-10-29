@@ -6,13 +6,43 @@ fails, fix it first; do not show work with known failures.
 
 ## Before showing UI
 
+### Usability (first, before anything visual)
+
+Looks and rules are not enough: a screen passes only if people can get done
+what they came for. A reviewer who did not build the screen runs this.
+
+- [ ] Task list written from the user's side, not from the UI: owner/admin,
+      member and first-time user; first use, daily use and trouble (something
+      broke, ran away, needs undo, is needed from yesterday, on the phone).
+      Each task cites the feature in code or docs.
+- [ ] Each task walked: where a person looks first (cite the convention),
+      where it actually is, whether the control exists, and whether it can be
+      finished — states, feedback, confirmation, undo, error recovery, empty,
+      permission, keyboard, touch and narrow width.
+- [ ] Each task rated Found / Hard to find / Missing / Present but
+      insufficient, with severity 0–4. No task at severity 3 or 4 is left.
+- [ ] Every capability the code already ships for this area is reachable;
+      the change removes no recovery or safety control.
+- [ ] The walk-through table (task | before | after) is in the PR body or the
+      review page.
+
 ### Model
 
 - [ ] Left column lists bots and group chats only; no thread names (R-01).
-- [ ] Right 详情 header = the selected bot's avatar and name; caption
-      「<Bot 名> 的屏幕」 (R-02, R-17).
+- [ ] Right 概览 header = the selected bot's avatar and name, then 详情 /
+      线程 / PR / 电脑; the 概览 header has no 「<Bot 名> 的屏幕」 (R-02,
+      R-17, R-50).
 - [ ] Switching bots switches chat, threads and computer together (R-03).
 - [ ] No 新建云端电脑, no per-bot computer list (R-04).
+- [ ] The right panel has no action button; besides navigation the only
+      control is 「展开」 (R-51).
+- [ ] Thread lists group 等待回复 → 进行中 → 空闲 → 已解决, 已解决 collapsed,
+      no 「今天」 group (R-52).
+- [ ] A thread row's second line quotes the last reply verbatim; no generated
+      summary, status word or bot name (R-53).
+- [ ] The Artifact rail item uses Mikka's stacked-cards icon, not lucide Copy
+      or Library (R-56).
+- [ ] The browser toggle is an icon-only globe with no 「浏览器」 label (R-57).
 
 ### Leftovers from old components
 
@@ -75,7 +105,8 @@ more than once.
 2. Alex accepted the review page.
 3. Then e2e tests are written or updated and pass in CI (not before
    acceptance).
-4. CI is green (`pnpm check:ci` runs in CI; do not run builds on the Mac).
+4. CI is green: the CI and Browser tests workflows (`CONTRIBUTING.md` § How
+   changes are tested); do not run builds on the Mac.
 5. Docs updated in the same PR: `rules.md`, `components.md`, `decisions.md`,
    `glossary.md` or the feature spec, whichever the change touches.
 6. Merged to main. Green PRs may be merged without asking.
@@ -85,6 +116,5 @@ more than once.
 - One topic per PR. Title in the repo's commit style (`feat(scope): …`,
   `fix(scope): …`, `docs(design): …`) with the `MIK-xx` ids.
 - The PR body follows `.github/pull_request_template.md`.
-- Migrations: idempotent, tested on a real Postgres, since they run on Neon
-  on deploy.
+- Migrations: idempotent and tested on a real Postgres; see `docs/migration-bootstrap.md` for when they run.
 - Small problems a reviewer finds are fixed by the reviewer directly.

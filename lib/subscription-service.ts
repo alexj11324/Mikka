@@ -7,6 +7,7 @@ import { readSubscriptionQuota } from '../packages/daemon/src/subscription-quota
 import { SubscriptionRepository } from './subscription-repository'
 import { resolveSubscriptionModel } from './subscription-model'
 import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
+import { accountLabel, failedUsage, parseSubscriptionUsage, type SubscriptionUsage, type WorkerUsage } from './subscription-usage'
 
 export interface SubscriptionCapabilities {
   ready(route: SubscriptionRoute): boolean
@@ -122,6 +123,22 @@ export class SubscriptionService {
     await this.check(use)
     const row = await this.repository.connection(ownerId, binding.connectionId)
     return run({ use, modelId: binding.modelId, access: () => this.access(use), worker: this.worker(this.repository.scope(row)).forUse(use) })
+  }
+  /** The owner's own Settings read: no binding, a connected revision only.
+   * Never throws for a provider or worker failure: the row degrades instead,
+   * keeping the last known email. */
+  async usage(ownerId: string, id: string, signal?: AbortSignal): Promise<SubscriptionUsage> {
+    const row = await this.repository.connection(ownerId, id)
+    if (row.state !== 'connected') return failedUsage(row.id, 'unavailable', row.accountLabel)
+    try {
+      const result = await this.worker(this.repository.scope(row)).call<WorkerUsage>('usage', { revision: Number(row.epoch) }, signal)
+      const usage = parseSubscriptionUsage(row.id, row.provider, result)
+      if (usage.account && usage.account !== row.accountLabel) await this.repository.saveAccountLabel(row, usage.account).catch(() => undefined)
+      return { ...usage, account: usage.account ?? accountLabel(row.accountLabel) }
+    } catch {
+      // The list shows a connection the runtime itself moved to reconnect_required.
+      return failedUsage(row.id, 'unavailable', row.accountLabel)
+    }
   }
   async status(ownerId: string, id: string, signal?: AbortSignal) {
     const row = await this.repository.connection(ownerId, id)

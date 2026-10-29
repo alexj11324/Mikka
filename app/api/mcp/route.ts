@@ -1,3 +1,7 @@
+import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
+import type { AuthInfo } from '@modelcontextprotocol/server'
+import type { MailboxToolName } from '@mikka/protocol/mailbox'
+import { mailboxAck, mailboxSend } from '@/lib/mailbox-tools'
 import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
@@ -6,6 +10,7 @@ import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
 import { COMPOSIO_ACTIONS } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
+import { dispatchRequestKey } from '@/lib/run-dispatch'
 import * as actions from '@/lib/mcp/actions'
 import * as tools from '@/lib/mcp/tools'
 import * as worker from '@/lib/mcp/worker'
@@ -170,8 +175,8 @@ const handler = createMcpHandler(server => {
   }, async (input, ctx) => outcome(await runComposioAction(mcpUserId(ctx.http?.authInfo), 'read_slack_thread', input)))
 
   server.registerTool('list_agents', {
-    title: 'List agents',
-    description: 'List the person\'s agents with their harness, whether their device is online, and the repositories on that device. dispatch_run needs an agent id and one of its repository ids.',
+    title: 'List local execution tools',
+    description: 'List available local execution tools and their computers. Use the returned internal id as agentId for dispatch_run and provide the repository URL separately. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, never an Agent.',
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true },
   }, async (_input, ctx) => json(await actions.listAgents(mcpUserId(ctx.http?.authInfo))))
@@ -208,11 +213,12 @@ const handler = createMcpHandler(server => {
 
   server.registerTool('dispatch_run', {
     title: 'Dispatch a run',
-    description: 'Queue a run: one agent works one issue in one repository on its device. Returns the run id at once; follow it with get_run or list_runs.',
+    description: 'Queue a thread for an issue on the selected computer. Its daemon clones the repository into its own cache and runs the selected coding harness. Returns the run id at once; follow it with get_run or list_runs.',
     inputSchema: z.object({
       issueId: id, agentId: id,
-      deviceRepoId: id.describe('A repository id from list_agents, on the agent\'s own device.'),
+      repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo or an HTTPS/SSH git URL. The daemon clones it; no repository registration is needed.'),
       note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
+      requestKey: dispatchRequestKey.optional().describe('Reuse this key when retrying the same dispatch. Changed parameters with the same key are rejected.'),
     }),
   }, async (input, ctx) => outcome(await actions.dispatchRun(mcpUserId(ctx.http?.authInfo), input)))
 
@@ -262,7 +268,19 @@ const authed = withMcpAuth(handler, verifyMcpToken, {
  * URL into each run with the run token from the claim; the token's prefix
  * picks these tools instead of the person's.
  */
-const workerHandler = createMcpHandler(server => {
+function createWorkerHandler(mailbox: readonly MailboxToolName[]) { return createMcpHandler(server => {
+  for (const [name, action] of Object.entries({ mailbox_recipients: 'recipients', mailbox_send: 'send', mailbox_inbox: 'inbox', mailbox_ack: 'ack', mailbox_sent: 'sent' }).filter(([name]) => mailbox.includes(name as MailboxToolName))) {
+    server.registerTool(name, {
+      description: action === 'send' ? 'Queue a short personal peer message; use a stable key for exact retries and replyTo for replies. No user authority or execution is granted.' : 'Inspect or acknowledge your authenticated personal mailbox at a safe boundary. No automatic wake or terminal resume. Read is not ACK.',
+      inputSchema: action === 'send' ? mailboxSend.strict() : action === 'ack' ? mailboxAck.strict() : z.object({}).strict(),
+    }, async (input, ctx) => {
+      const run = worker.workerRun(ctx.http?.authInfo)
+      const { personalWorkerMailbox } = await import('@/lib/personal-mailbox-runtime')
+      const result = await personalWorkerMailbox(run.userId, run.id, { ...input, action }, ctx.http!.authInfo!.token, ctx.mcpReq.signal)
+      return { isError: result.status !== 200, content: [{ type: 'text' as const, text: JSON.stringify(result.body) }] }
+    })
+  }
+
   server.registerTool('report', {
     title: 'Report progress',
     description: 'Tell the person\'s Coordinator about progress on this run. Use it sparingly, at milestones (a plan settled, a hard part solved, ready for review), not after every step.',
@@ -286,9 +304,17 @@ const workerHandler = createMcpHandler(server => {
     description: 'Tell the person\'s Coordinator you cannot go on, and why: missing access, a broken environment, a contradiction in the task. The Coordinator tells the person.',
     inputSchema: z.object({ reason: z.string().trim().min(1).max(4000) }),
   }, async ({ reason }, ctx) => message(await worker.blocked(worker.workerRun(ctx.http?.authInfo), reason)))
-}, { serverInfo: { name: 'mikka-worker', version: '1.0.0' } })
+}, { serverInfo: { name: 'mikka-worker', version: '1.0.0' } }) }
 
-const workerAuthed = withMcpAuth(workerHandler, worker.verifyRunToken, { required: true, resourceMetadataPath: withBasePath('/.well-known/oauth-protected-resource') })
+const workerHandler = createWorkerHandler([])
+const workerAuthed = withMcpAuth(async request => {
+  // withMcpAuth supplies auth after verification. Never inspect request JSON
+  // for catalogue selection or trust a client-provided definition/origin.
+  const run = worker.workerRun((request as Request & { auth?: AuthInfo }).auth)
+  const tools = personalMailboxEnabled() ? await (await import('@/lib/personal-mailbox-runtime')).personalWorkerMailboxAdvertised(run.userId, run.id) : []
+  const handler = tools.length ? createWorkerHandler(tools) : workerHandler
+  return handler(request)
+}, worker.verifyRunToken, { required: true, resourceMetadataPath: withBasePath('/.well-known/oauth-protected-resource') })
 
 function route(request: Request) {
   const bearer = request.headers.get('authorization')?.match(/^Bearer\s+(\S+)/i)?.[1]

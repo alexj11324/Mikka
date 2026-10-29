@@ -85,13 +85,10 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
    Cloudflare 开了代理时 `server: cloudflare` 不代表后端不是 Vercel，但**缺 `x-vercel-id`
    基本可以断定不是**。
 
-2. **代码里已经有 fallback 时，别再加冗余的 env 变量**。
-   `lib/auth.ts:5` 本来就是
-   `BETTER_AUTH_URL ?? VERCEL_PROJECT_PRODUCTION_URL ?? VERCEL_URL ?? V0_RUNTIME_URL`。
-   官方文档写明 `VERCEL_PROJECT_PRODUCTION_URL`
-   **"is always set, even in preview deployments"** —— 所以 Preview 上的 fallback
-   本来就指向 production 域名，这正是「GitHub OAuth App 只能注册一个 callback URL」
-   约束下的设计。我把它改成 `https://$VERCEL_URL`，反而**覆盖掉**了这条设计。
+2. **代码里已经有 fallback 时，别再加冗余的 env 变量**。先读 `lib/auth-config.ts` 的
+   `resolveAppOrigin`：Preview 默认用自己的 `VERCEL_URL`，Production 用
+   `VERCEL_PROJECT_PRODUCTION_URL`；Preview 登录经 `BETTER_AUTH_OAUTH_PROXY_URL`
+   回调中心（见 `docs/cloud-preview.md`）。
 
 **规则**：
 
@@ -141,6 +138,8 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
    `h-px bg-*`。分组用间距（`gap-*`）或背景（`bg-muted/*`）。
 2. 竖线（`border-l/r`、`orientation="vertical"`）和盒状边框（`border`）可以保留。
 3. 这条已经落在 `style/no-horizontal-rule`；先跑 `node scripts/lint-ui.mjs`，不要靠肉眼。
+4. 例外（已在 `scripts/ui-policy.mjs` 豁免）：设置页的 `divide-y` 行分隔（`docs/settings.md`）、
+   任务页头部线与评论卡片内的线（R-61/R-63）、未读「新」分隔线。设置页字段不要用 `bg-muted` 分组。
 
 
 ---
@@ -175,3 +174,28 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 验证时看 HTTP 状态（404）、浏览器 `document.documentElement.lang` 与页面文案三者是否一致。
 另外 `JSON.parse` 会静默丢掉重复 key，检查器应能发现重复键，或至少用 `jq`/脚本单独查一次。
 
+
+## 2026-10-28 README 的「已上线」不能只看代码是否存在
+
+**发生了什么**：README 仍把跨设备接续、连接应用审批操作、多 bot 写成「规划中」，
+而这几项早已合并；反过来，云端电脑、原生 Coordinator、iOS App 的代码也在 main 上，
+但分别被生产 flag、环境变量和 TestFlight 验收挡住，不能算上线。
+
+**规则**：
+
+1. 判断是否上线至少看三层证据：PR 是否 merged、是否有 feature flag / 环境变量门禁、
+   对应 issue 是否仍 OPEN。
+2. **生产环境变量和线上接口才是最终证据**：`vercel env ls production` 看开关，
+   再请求生产路由看返回码（禁用是 503，启用但未登录是 401）。issue OPEN
+   只说明验收没收尾，不等于功能没开。
+3. **带日期的验收文档会过期**。这次 E2B 就是被 10-27 的「production flags remain off」
+   误导，而 10-27 晚些时候生产变量已经打开；必须以当前环境为准。
+4. 合并 PR 的描述里如果记录了生产回调验证（如 Slack #51），才算线上可用；
+   仅有代码和单测只算「已实现」。
+5. 文档里「规划中」的条目要按能力拆分：同一块能力可能一部分已上线
+   （邮件/日历审批），另一部分仍未上线（文档、Slack 操作）。
+6. 改 README 图表前先找生成脚本（`scripts/generate-diagrams.mjs`），
+   不要手改 SVG；改完渲染明暗、中英四种组合抽查。
+7. 区分「没开发」和「开发了但没合入」：查 open PR 和相关分支
+   （`gh pr list --state open`、`git branch -r | grep`）。Plan 里的虚线
+   只代表没上线，不代表没有实现。

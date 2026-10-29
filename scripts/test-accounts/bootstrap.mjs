@@ -6,6 +6,16 @@ import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
 import { assertDatabaseIdentity, databaseTarget, environmentFingerprint, EnvironmentError, validateEnvironment } from './environment.mjs'
+import { recordAuthenticationSecrets } from './session.mjs'
+
+/** Capture the runner's existing secrets before a server or account can start. */
+export async function recordRunnerEvidenceSecrets(environment) {
+  validateEnvironment(environment)
+  const authSecret = process.env.BETTER_AUTH_SECRET
+  if (typeof authSecret !== 'string' || authSecret.length < 32) throw new EnvironmentError('RUNNER_AUTH_SECRET_REQUIRED')
+  const databasePassword = decodeURIComponent(new URL(process.env.E2E_DATABASE_URL).password)
+  await recordAuthenticationSecrets([authSecret, databasePassword], { environment })
+}
 
 /**
  * Only an owning test harness may install the initial marker. The normal CLI's
@@ -87,6 +97,10 @@ async function main() {
       if (!server.address || server.port !== 5432) throw new EnvironmentError('OWNED_GITHUB_SERVICE_UNVERIFIED')
     },
   })
+  // A startup failure may precede the first account acquisition. Its log still
+  // needs the real runner secret inventory; do not invent an account or let the
+  // scanner accept a missing store. Account credentials/cookies append later.
+  await recordRunnerEvidenceSecrets(descriptor)
   console.log(JSON.stringify({ environmentId: descriptor.id, deploymentSha: descriptor.deploymentSha, origin: descriptor.origin, status: 'prepared' }))
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

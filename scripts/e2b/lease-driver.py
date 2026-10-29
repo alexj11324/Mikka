@@ -13,6 +13,8 @@ def main():
     display, bot, owner, version = sys.argv[1:]
     if not re.fullmatch(r':[1-9][0-9]{0,2}', display) or os.environ.get('DISPLAY') != display:
         raise ValueError('invalid display')
+    if (Path('/run/mikka-viewer') / f'{display[1:]}.guard').exists():
+        raise ValueError('credential entry is private')
     state = json.loads((Path('/run/mikka-viewer') / f'{display[1:]}.json').read_text())
     if state.get('botId') != bot or state.get('ownerId') != owner or state.get('display') != int(display[1:]):
         raise ValueError('desktop changed')

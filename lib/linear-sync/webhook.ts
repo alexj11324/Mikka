@@ -34,6 +34,11 @@ export async function verifyBearer(value: string | null, secret: string) {
 }
 
 type LinearWebhookPayload = z.infer<typeof payloadSchema>
+
+export function isLinearOAuthRevocation(event: { type?: unknown; action?: unknown }) {
+  return (event.type === 'OAuthAuthorization' || event.type === 'OAuthApp') &&
+    typeof event.action === 'string' && ['remove', 'revoke', 'revoked'].includes(event.action)
+}
 type ParseResult =
   | { ok: true; ignored: true }
   | { ok: true; deliveryId: string; eventType: string; organizationId: string; payload: LinearWebhookPayload }

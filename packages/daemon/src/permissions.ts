@@ -17,6 +17,7 @@ import {
 
 import {
   defaultRunPolicy,
+  intersectNetworkDomains,
   PACKAGE_REGISTRY_DOMAINS,
   PERMISSION_ACTIONS,
   PERMISSION_DEFAULTS,
@@ -33,7 +34,7 @@ export type { PermissionAction, PermissionDecision, RunPolicy }
 export interface PermissionContext {
   /** Whether the user approved this repo's setup recipe. */
   setupRecipeApproved?: boolean
-  /** The workspace's choices; the ADR 0009 defaults when absent. */
+  /** Trusted host assignment only, never model-supplied. Defaults when absent. */
   policy?: RunPolicy
 }
 
@@ -41,7 +42,8 @@ export function decide(
   action: string,
   context: PermissionContext = {}
 ): PermissionDecision {
-  if (!Object.hasOwn(PERMISSION_DEFAULTS, action)) return "ask"
+  if (!Object.hasOwn(PERMISSION_DEFAULTS, action))
+    return context.policy?.readOnly ? "deny" : "ask"
   const typed = action as PermissionAction
   // A read-only run (ADR 0046) changes nothing, whatever the workspace chose:
   // the check reads the worktree, reports, and stops.
@@ -59,10 +61,18 @@ export function runPolicy(sent: RunPolicy | undefined): RunPolicy {
   return sent ?? defaultRunPolicy()
 }
 
+/** Project commands run inside the host-enforced sandbox. Publishing is a
+ * separate daemon capability, never a prerequisite for building or testing.
+ * An explicitly restricted installation profile retains file-only execution;
+ * unconfigured sandbox work allows project dependencies. */
+export function rawCliShellAvailable(policy: RunPolicy): boolean {
+  return !policy.readOnly && policy.permissions.install_dependency === 'allow'
+}
+
 /**
  * Domains a run may reach on top of its harness's model API (which is
- * always reachable). `allow` opens every host; `deny` keeps only the
- * package registries when installs are allowed; `ask` is the workspace's
+ * always reachable). `allow` opens every host; `deny` closes non-model hosts
+ * even when installs are allowed; `ask` is the workspace's
  * and the repo's lists, and any other host goes to the sandbox's ask
  * callback (denied until approval cards exist).
  */
@@ -74,9 +84,10 @@ export function runDomains(
     policy.permissions.install_dependency === "allow"
       ? PACKAGE_REGISTRY_DOMAINS
       : []
-  if (policy.permissions.network === "allow") return ["*"]
-  if (policy.permissions.network === "deny") return [...registries]
-  return [...new Set([...policy.networkAllow, ...repoAllow, ...registries])]
+  if (policy.permissions.network === "deny") return []
+  const destinations = policy.permissions.network === "allow" ? ["*"]
+    : [...new Set([...policy.networkAllow, ...repoAllow, ...registries])]
+  return policy.networkCeiling === undefined ? destinations : intersectNetworkDomains(destinations, policy.networkCeiling)
 }
 
 /**
@@ -176,8 +187,8 @@ function classifySegment(segment: string, depth: number): PermissionAction | nul
 
 /**
  * Claude Code permission rules for the run (`--settings` `permissions`).
- * Rules apply in bypass mode too; in print mode an `ask` rule has nobody to
- * ask, so the call is refused and the agent is told to call `ask_human`.
+ * The SDK handles asks through the run-bound host gate. A raw shell whose
+ * configurable effects cannot be authorized is unavailable as a capability.
  * `git push` is always denied to the agent: the daemon pushes (ADR 0017).
  */
 export function claudePermissionRules(policy: RunPolicy): {
@@ -197,6 +208,7 @@ export function claudePermissionRules(policy: RunPolicy): {
     allow: [],
     ask: decision === "ask" ? install : [],
     deny: [
+      ...(!rawCliShellAvailable(policy) ? ['Bash','PowerShell','Monitor'] : []),
       "Bash(git push:*)",
       ...(policy.readOnly ? READ_ONLY_TOOLS : []),
       ...(decision === "deny" ? install : []),
@@ -215,24 +227,25 @@ export function policyInstructions(policy: RunPolicy): string[] {
     lines.push(
       "- This is a read-only check: you may read the worktree but not change it, and nothing is pushed. Report what you found through `submit`; do not fix anything yourself."
     )
+  if (!rawCliShellAvailable(policy)) lines.push('- Native shell execution is unavailable under the current dependency-installation policy. Use the available file tools; report a blocked operation when a shell is required. A chat response does not grant execution authority.')
   lines.push(
     permissions.network === "allow"
       ? "- Network access is open for this workspace."
       : permissions.network === "deny"
         ? "- Network access is turned off (only your model API is reachable). Do not try to reach other hosts."
-        : "- Network access is limited to an allow-list. If a request is blocked, do not try to work around it; call `ask_human` if you need it."
+        : "- Network access is limited to the workspace ceiling. Destinations within that ceiling are pre-authorized; destinations outside it remain unavailable. Do not work around a blocked request."
   )
   lines.push(
     permissions.install_dependency === "allow"
       ? "- You may install or add dependencies when the task needs them."
       : permissions.install_dependency === "deny"
         ? "- Do not install or add dependencies; this workspace does not allow it. Work with what is installed, or call `report_blocked`."
-        : "- Installing or adding dependencies needs a person's approval: call `ask_human` with what you need and why instead of installing it."
+        : "- Dependency installation is unavailable through the native shell under this policy. Report the blocked operation; do not treat a chat reply as approval."
   )
   lines.push(
     permissions.write_outside_repo === "deny"
       ? "- Work only inside that worktree. Writing outside it is not allowed."
-      : "- Work only inside that worktree. Everything outside it is read-only; if you need to change something there, call `ask_human`."
+      : "- Work only inside that worktree. Everything outside it remains read-only; a chat reply cannot expand the filesystem boundary."
   )
   return lines
 }

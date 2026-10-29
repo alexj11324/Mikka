@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync } from 'node:fs'
 import { execFile, execFileSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import { tmpdir } from 'node:os'
@@ -240,8 +240,21 @@ test('lint permits imported components but fails handwritten business UI without
     assert.equal(rawBlock.status, 1)
     assert.ok(rawBlock.report.diagnostics.some(d => d.file === 'components/blocks/example.tsx' && d.rule === 'interaction/use-button-component'))
   } finally {
-    rmSync(cwd, { recursive: true, force: true })
+    console.error(`Retained UI policy fixture directory: ${cwd}`)
   }
+})
+
+test('R-31: a Button may not bring back a white fill with a border', () => {
+  has(`${prefix} const ui = <Button variant="outline" className="border-border bg-background" />`, 'style/secondary-button-fill')
+  has(`${prefix} const ui = <Button className={cn('border bg-card')} />`, 'style/secondary-button-fill')
+  has(`${prefix} const ui = <Button variant="outline" className="rounded-full bg-background" />`, 'style/secondary-button-fill')
+  const clean = source => assert.ok(!rules(`${prefix} const ui = ${source}`).includes('style/secondary-button-fill'), source)
+  clean('<Button variant="outline" className="rounded-full" />')
+  clean('<Button variant="ghost" className="border-transparent hover:bg-background" />')
+  clean('<Button variant="secondary" className="bg-background hover:bg-background/80" />')
+  clean('<Button className="border-0 bg-background" />')
+  clean('<Button className="focus-visible:border-input bg-card" />')
+  clean('<Button className="hover:border bg-card" />')
 })
 
 test('utility parser respects bracket expressions and variants', () => {
@@ -249,10 +262,11 @@ test('utility parser respects bracket expressions and variants', () => {
   assert.equal(utilityBase('dark:hover:text-[length:var(--size)]'), 'text-[length:var(--size)]')
 })
 
-test('MIK-8: only UnreadDivider may draw a horizontal Separator', () => {
+test('MIK-8: only UnreadDivider and the right column\'s GroupHeader may draw a horizontal Separator', () => {
   const source = 'import { Separator } from "@/components/ui/separator"; const ui = <Separator />'
   const rules = file => auditSource(file, source, policy).map(item => item.rule)
   assert.ok(!rules('components/chat/unread-divider.tsx').includes('style/no-horizontal-rule'))
+  assert.ok(!rules('components/nav/group-header.tsx').includes('style/no-horizontal-rule'))
   assert.ok(rules('components/chat/unread-pill.tsx').includes('style/no-horizontal-rule'))
   assert.ok(rules('components/coordinator/coordinator-chat.tsx').includes('style/no-horizontal-rule'))
   assert.ok(rules('components/settings/members.tsx').includes('style/no-horizontal-rule'))

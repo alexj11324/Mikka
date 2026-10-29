@@ -72,9 +72,9 @@ Normal UI actions continue scheduling the same work with `after()`.
 
 ## New-task entry
 
-The dialog, destination selection and submission retry changes are separate
-MVP work and are not part of this backend-only batch. They require their own
-Preview and UI acceptance before release.
+The dialog, destination selection and submission retry changes are layered
+over the backend-only batch in this PR. They require the issue-tool rollout,
+matching schema, fixed Preview and UI acceptance before release.
 
 ## Verification
 

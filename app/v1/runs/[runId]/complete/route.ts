@@ -1,64 +1,48 @@
 import { after, NextResponse } from 'next/server'
-import { and, eq, inArray } from 'drizzle-orm'
-import { runStateForStop } from '@mikka/protocol/daemon'
-import { runCompleteRequest, reachesReview } from '@mikka/protocol/run'
-import { db } from '@/lib/db'
-import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
-import { agentRuns, devices, issues, type RunStatus } from '@/lib/db/schema'
+import { and, eq } from 'drizzle-orm'
+import { runCompleteRequest } from '@mikka/protocol/run'
 import { authenticateDevice } from '@/lib/device-link'
-import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
-import { runFinishedEvent } from '@/lib/coordinator-events'
+import { persistRunCompletion } from '@/lib/run-publications'
+import { startRunPublication } from '@/lib/run-publication-workflow'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
-import { revokeRunTokens } from '@/lib/mcp/worker'
+import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
+import { stopRecordingsAfter } from '@/lib/captures/run-end'
+import { db } from '@/lib/db'
+import { agentRuns, devices } from '@/lib/db/schema'
+import { dispatchCompletedIssue } from '@/lib/run-completion'
+import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
+import { ImprovementError } from '@/lib/self-improvement/contract'
 
 export const dynamic = 'force-dynamic'
 
-/** A run in one of these states may still be completed; the rest already ended. */
-const LIVE_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
-
-/**
- * `POST /v1/runs/:runId/complete`: how the run ended, once. Only an explicit
- * `submitted` whose verify did not fail counts as success; the issue then
- * moves to review, which is the only issue write this route makes. The
- * owner's Coordinator hears that the run ended.
- */
+/** The first completion is immutable; retries also recover a failed enqueue. */
 export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { runId } = await params
-  const [run] = await db
-    .select({ id: agentRuns.id, userId: agentRuns.userId, botId: agentRuns.botId, issueId: agentRuns.issueId, status: agentRuns.status, kind: agentRuns.kind })
-    .from(agentRuns)
-    .innerJoin(devices, eq(devices.id, agentRuns.deviceId))
-    .where(and(eq(agentRuns.id, runId), eq(devices.ownerId, caller.userId)))
-    .limit(1)
-  if (!run) return NextResponse.json({ error: 'Unknown run.' }, { status: 404 })
-  // A run ends once: a repeated completion is accepted and ignored.
-  if (!(LIVE_STATUSES as readonly string[]).includes(run.status)) return new NextResponse(null, { status: 204 })
   const parsed = runCompleteRequest.safeParse(await request.json().catch(() => null))
-  if (!parsed.success) return NextResponse.json({ error: 'Invalid completion.' }, { status: 400 })
-  const { stopReason, report } = parsed.data
-  // The daemon's own terminal mapping, not just the stop reason: a
-  // submission whose verify failed is a failure, and one with no verify
-  // result only stopped. A `plan` run writes no code, so its verify says
-  // nothing about it.
-  let status: RunStatus = runStateForStop(stopReason)
-  if (stopReason === 'submitted' && report?.verify.status !== 'passed' && run.kind !== 'plan') {
-    status = report?.verify.status === 'failed' ? 'failed' : 'stopped'
+  if (!parsed.success) {
+    // A malformed replay cannot change a completed run. Preserve the daemon's
+    // idempotent acknowledgement without skipping valid publication retries.
+    const [ended] = await db.select({ status: agentRuns.status }).from(agentRuns).innerJoin(devices, eq(devices.id, agentRuns.deviceId))
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(devices.ownerId, caller.userId), ...(caller.scopeDeviceId ? [eq(devices.id, caller.scopeDeviceId)] : []))).limit(1)
+    if (ended && !(UNFINISHED_RUN_STATUSES as readonly string[]).includes(ended.status)) return new NextResponse(null, { status: 204 })
+    return NextResponse.json({ error: 'Invalid completion.' }, { status: 400 })
   }
-  const ended = await db.update(agentRuns)
-    .set({ status, stopReason, report: report ?? null, finishedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATUSES])))
-    .returning({ id: agentRuns.id })
-  // Only the completion that ended the run tells the Coordinator.
-  if (ended.length) {
-    await revokeRunTokens(runId)
-    await recordCoordinatorEvent(db, runFinishedEvent({ ...run, status, stopReason, report }))
-    after(() => wakeCoordinator(run.userId))
+  let result: Awaited<ReturnType<typeof persistRunCompletion>>
+  try { result = await persistRunCompletion(caller.userId, runId, parsed.data, caller.scopeDeviceId) }
+  catch (error) {
+    if (error instanceof ImprovementError) return NextResponse.json({ error: error.code }, { status: 409 })
+    throw error
   }
-  if (run.issueId && reachesReview(stopReason, report)) {
-    await db.update(issues).set({ status: 'review', updatedAt: new Date() }).where(eq(issues.id, run.issueId))
-    dispatchLinearIssueSync(run.issueId)
+  if (!result) return NextResponse.json({ error: 'Unknown run.' }, { status: 404 })
+  stopRecordingsAfter([runId])
+  if (result.publicationPending) {
+    try { await startRunPublication(runId) }
+    catch { return NextResponse.json({ error: 'Result publication is temporarily unavailable.' }, { status: 503, headers: { 'Retry-After': '15' } }) }
+  } else {
+    await dispatchCompletedIssue(result, dispatchLinearIssueSync)
+    after(() => wakeCoordinator(result.userId))
   }
   return new NextResponse(null, { status: 204 })
 }

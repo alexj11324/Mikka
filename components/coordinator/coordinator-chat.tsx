@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from '
 import useSWR, { useSWRConfig } from 'swr'
 import { withBasePath } from '@/lib/base-path'
 import { useTranslations } from 'next-intl'
-import { getCoordinatorChat, sendCoordinatorMessage, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { getCoordinatorChat, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,7 @@ import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
+import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { ThreadCard } from './thread-card'
 import { PendingActions } from './pending-actions'
 import { UnreadDivider } from '@/components/chat/unread-divider'
@@ -29,6 +30,8 @@ import dynamic from 'next/dynamic'
 import { ArtifactCard, ArtifactChip } from '@/components/artifacts/artifact-card'
 import { ArtifactQuoteChip, ArtifactQuoteLine } from '@/components/artifacts/artifact-quote'
 import type { ArtifactChatSlot } from '@/components/artifacts/artifact-viewer'
+import { BrowserNoteChip, BrowserNoteLine, useBrowserNotesComposer } from '@/components/browser/browser-notes'
+import { SentSuggestion } from '@/components/suggestions/mobile-card'
 
 const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
 
@@ -88,9 +91,14 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   }
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const { submit, failureMessage } = useCoordinatorSubmit()
   const { mutate: mutateAll } = useSWRConfig()
   // A thread card opens its conversation in place of the chat; back returns here (R-66).
   const [openThread, setOpenThread] = useState<{ issueId: string; runId: string } | null>(null)
+  // Notes pinned in the browser wait in this composer while it is the chat on screen (not inside the reader, not under an open thread).
+  const browser = useBrowserNotesComposer(!embedded && !openThread)
+  const noteCount = browser?.notes.length ?? 0
+  useEffect(() => { if (noteCount) inputRef.current?.focus() }, [noteCount])
   // The 建议 item whose text is in the composer: once sent, the Coordinator dispatches a thread for it and it leaves 建议.
   const suggestion = useRef<string | null>(null)
   // 「让 Agent 安排」 and 建议 items put their sentence here for the person to finish (MIK-39).
@@ -117,19 +125,27 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const sources = data?.sources
   const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue }), [sources, previews, onOpenIssue])
   const quotes = useMemo(() => items.flatMap(item => item.quote ? [item.quote] : []), [items])
+  // An artifact handed over shows here first; the Artifact page and a thread's 「Artifact · N」 refresh with it.
+  const artifactIds = useMemo(() => items.flatMap(item => item.artifacts).join(','), [items])
+  useEffect(() => {
+    if (!artifactIds) return
+    void mutateAll(key => key === 'artifacts' || (Array.isArray(key) && key[0] === 'run-artifacts'))
+  }, [artifactIds, mutateAll])
   const openArtifact = embedded?.openArtifact ?? setViewing
   // A quote just picked in the reader: put the cursor where the request goes.
   useEffect(() => { if (embedded?.quote) inputRef.current?.focus() }, [embedded?.quote])
 
-  /** Sends `text` to the Coordinator or bot; false if it did not go. */
-  async function post(text: string) {
+  /** Sends `text` to the Coordinator or bot, with the browser's notes when `withNotes`; false if it did not go. */
+  async function post(text: string, withNotes = false) {
     if (!text || sending) return false
     setSending(true)
     setSendError(null)
+    const notes = withNotes && browser?.notes.length ? [...browser.notes] : undefined
     try {
-      const result = botId ? await sendCoordinatorMessage(text, embedded?.quote, botId) : await sendCoordinatorMessage(text, embedded?.quote)
-      if (result.error) { setSendError(actionError(result.error)); return false }
+      const outcome = await submit(text, { quote: embedded?.quote, botId, notes })
+      if (outcome.kind !== 'accepted') { setSendError(failureMessage(outcome)); return false }
       embedded?.clearQuote()
+      if (notes) browser?.removeMany(notes.map(note => note.n))
       await mutate()
       return true
     } catch { setSendError(actionError()); return false } finally { setSending(false) }
@@ -137,7 +153,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
-    if (!await post(text)) return
+    if (!await post(text, true)) return
     setDraft(current => current.trim() === text ? '' : current)
     if (draft.trim() === text && draftKey) { try { sessionStorage.removeItem(draftKey) } catch { /* storage may be unavailable */ } }
     const id = suggestion.current
@@ -168,9 +184,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               {item.from === 'event'
                 ? <p className="text-center text-xs text-muted-foreground">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
+                    {/* A tapped 建议 card: the same card, then only what it adds (R-21, R-40). */}
+                    {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
                     {item.text && (item.from === 'coordinator'
                       ? <CoordinatorReply text={item.text} citations={citations} />
-                      : <Bubble variant="secondary" align="end" className={cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.text}</BubbleContent></Bubble>)}
+                      : <Bubble variant="secondary" align="end" className={cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}{item.text}</BubbleContent></Bubble>)}
                     {item.artifacts.length > 0 && <div className={cn('flex flex-col gap-2', embedded ? 'items-start gap-1.5' : 'w-full')}>
                       {item.artifacts.flatMap(id => { const artifact = data?.artifacts[id]; return artifact ? [embedded
                         ? <ArtifactChip key={id} artifact={artifact} active={id === embedded.activeArtifactId} onOpen={openArtifact} />
@@ -197,7 +215,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
       <PendingActions />
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }}
-        quote={embedded?.quote ? <ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} /> : undefined} />
+        quote={embedded?.quote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">
+          {embedded?.quote && <ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} />}
+          {browser?.notes.map(note => <BrowserNoteChip key={note.n} note={note} onRemove={() => browser.remove(note.n)} />)}
+        </div> : undefined} />
     </div>
     {!embedded && viewing && <ArtifactViewer artifactId={viewing} onArtifactChange={setViewing} onClose={() => setViewing(null)}
       bot={{ name, avatar: avatar('pill') }} quotes={quotes}

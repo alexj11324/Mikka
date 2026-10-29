@@ -1,10 +1,11 @@
 export const statusTones = {
-  neutral: 'border-muted-foreground/20 bg-muted/50 text-muted-foreground',
-  warning: 'border-warning/25 bg-warning/10 text-warning-foreground',
-  info: 'border-info/25 bg-info/10 text-info-foreground',
-  success: 'border-success/25 bg-success/10 text-success-foreground',
-  destructive: 'border-destructive/25 bg-destructive/10 text-destructive',
-  focus: 'border-info/25 bg-info/10 text-info-foreground',
+  // R-31: a tinted fill, no stroke. Neutral uses the control overlay so it reads on grey too.
+  neutral: 'border-transparent bg-control text-muted-foreground',
+  warning: 'border-transparent bg-warning/10 text-warning-foreground',
+  info: 'border-transparent bg-info/10 text-info-foreground',
+  success: 'border-transparent bg-success/10 text-success-foreground',
+  destructive: 'border-transparent bg-destructive/10 text-destructive',
+  focus: 'border-transparent bg-info/10 text-info-foreground',
 } as const
 
 export type StatusTone = keyof typeof statusTones

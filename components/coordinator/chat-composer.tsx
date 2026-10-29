@@ -10,8 +10,9 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { MESSAGE_MAX } from '@/lib/message-limits'
 
-const MAX_LENGTH = 10_000
+const MAX_LENGTH = MESSAGE_MAX
 
 /**
  * The Grok-style composer every chat uses (Coordinator and bots): one rounded

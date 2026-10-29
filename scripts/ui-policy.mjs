@@ -86,7 +86,8 @@ function checkUtility(token, policy, report, options = {}) {
 }
 
 // MIK-8: the 「新」 unread divider is the only chat file allowed to draw a horizontal rule.
-export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx']
+// The right column's group headers (「等待回复（2）」 and a rule, Figma 395:27702, Alex 2026-10-28) are the other.
+export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx', 'components/nav/group-header.tsx']
 const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx']
 
 export function auditSource(file, text, policy) {
@@ -236,6 +237,14 @@ export function auditSource(file, text, policy) {
           if (['FieldLabel', 'FieldTitle'].includes(name) && bases.some(base => base === 'font-normal' || /^text-(?:muted-foreground|secondary-foreground)(?:\/|$)/.test(base))) add(classAttr, 'forms/label-hierarchy', '字段主标题使用 FieldLabel / FieldTitle 默认的 foreground + medium；辅助说明使用 FieldDescription，不降低标题层级。')
           const drawnRule = bases.some(base => /^h-(?:px|0\.5)$/.test(base)) && bases.some(base => /^bg-(?!transparent|none$|clip-|origin-|cover|contain|center|left|right|top|bottom|repeat|no-repeat|fixed|local|scroll|auto|blend-)/.test(base))
           if (drawnRule) add(classAttr, 'style/no-horizontal-rule', '禁止用 h-px/0.5 + bg-* 手画水平细线；用间距或背景分组。')
+          // R-31: a secondary button is a grey fill with no stroke (Claude desktop's 「Add folder…」).
+          // A white fill plus a border brings back the old outline button at the call site.
+          // Only unprefixed tokens count: hover:/focus-visible: states and border-0 are not a resting stroke.
+          const whiteFill = tokens.some(token => /^(?:bg-background|bg-card)(?:\/|$)/.test(token))
+          const stroke = tokens.some(token => /^border(?:-(?:[1-9]\d*|border|input)(?:\/.*)?)?$/.test(token))
+          const variantAttr = attr(node, 'variant')?.initializer
+          const outline = !!variantAttr && ts.isStringLiteral(variantAttr) && variantAttr.text === 'outline'
+          if (name === 'Button' && whiteFill && (stroke || outline)) add(classAttr, 'style/secondary-button-fill', '次级按钮用灰色填充、无描边（R-31）；不要给 Button 加白底 + 描边，也不要把 outline 按钮改回白底。')
           for (const token of tokens) {
             const base = utilityBase(token)
             // 组件调用处的视觉 class 不做限制。Mikka 的规则集里没有这一条，

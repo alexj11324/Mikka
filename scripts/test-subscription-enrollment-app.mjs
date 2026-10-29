@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { copyFile, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile } from 'node:fs/promises'
 import { createServer } from 'node:https'
 import { createServer as netServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -65,7 +65,7 @@ try {
     MIKKA_BYOS_INFISICAL_ORIGIN: `https://127.0.0.1:${vault.address().port}`, MIKKA_BYOS_INFISICAL_PROJECT: 'fixture-project', MIKKA_BYOS_INFISICAL_ENVIRONMENT: 'staging', MIKKA_BYOS_INFISICAL_TOKEN: 'fixture-custody-only',
     MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH: '/attempts', MIKKA_BYOS_ENROLLMENT_CLAIM_PATH: '/claims', MIKKA_BYOS_ENROLLMENT_GRANT_PATH: '/grants', SSL_CERT_FILE: '/tmp/vault-ca.pem', NO_PROXY: '127.0.0.1',
   }
-  const args = ['run', '-d', '--rm', '--name', name, '--network=host', '--memory=4g', '--cpus=2', '--user', `${process.getuid()}:${process.getgid()}`, '-v', `${snapshot}:/workspace/Mikka`, '-v', `${source}/node_modules:/workspace/Mikka/node_modules:ro`, '-v', `${source}/packages/protocol/node_modules:/workspace/Mikka/packages/protocol/node_modules:ro`, '-v', `${certificate}:/tmp/vault-ca.pem:ro`, '-w', '/workspace/Mikka']
+  const args = ['run', '-d', '--name', name, '--network=host', '--memory=4g', '--cpus=2', '--user', `${process.getuid()}:${process.getgid()}`, '-v', `${snapshot}:/workspace/Mikka`, '-v', `${source}/node_modules:/workspace/Mikka/node_modules:ro`, '-v', `${source}/packages/protocol/node_modules:/workspace/Mikka/packages/protocol/node_modules:ro`, '-v', `${certificate}:/tmp/vault-ca.pem:ro`, '-w', '/workspace/Mikka']
   for (const [key, value] of Object.entries(env)) args.push('-e', `${key}=${value}`)
   args.push('node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a', 'node', 'node_modules/next/dist/bin/next', 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', String(port))
   await run('docker', args); started = true
@@ -99,7 +99,7 @@ try {
   assert.equal((await scoped(completion)).status,409);assert.equal(claimAttempts,1)
   console.log('PASS: actual Next operator and scoped handoff routes -> production custody worker -> TLS fixture; valid proof reaches refused replay latch; no SQL/reader/native/E2B/external OAuth request')
 } finally {
-  if (started) await run('docker', ['rm', '-f', name])
+  if (started) console.error(`Retained enrollment test container: ${name}`)
   if (vault) { vault.closeAllConnections(); await new Promise(resolve => vault.close(resolve)) }
-  await rm(directory, { recursive: true, force: true })
+  console.error(`Retained enrollment test directory: ${directory}`)
 }

@@ -78,7 +78,8 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
       {navigation.map(group => {
         const items = group.items.filter(item => {
           const label = i18nText(`Settings.sections.${item.section}.title` as never)
-          return settingsItemVisible({ query, groupTitle: group.title, groupLabel: i18nText(`Settings.groups.${group.key}`), itemTitle: item.title, label, section: item.section, routed: Boolean(activeSection) })
+          const keywords = item.section === 'integrations' ? i18nText('Settings.sections.integrations.keywords') : ''
+          return settingsItemVisible({ query, groupTitle: group.title, groupLabel: i18nText(`Settings.groups.${group.key}`), itemTitle: item.title, label, keywords, section: item.section, routed: Boolean(activeSection) })
         })
         return items.length > 0 && <SidebarGroup key={group.key} className="py-2"><SidebarGroupLabel>{i18nText(`Settings.groups.${group.key}`)}</SidebarGroupLabel><SidebarMenu>{items.map(item => {
           const id = item.section

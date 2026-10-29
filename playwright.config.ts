@@ -15,7 +15,10 @@ export default defineConfig({
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3100',
     locale: 'zh-CN',
-    trace: 'retain-on-failure',
+    // Authenticated traces include cookies/form network bodies. The evidence
+    // scanner intentionally forbids them; keep screenshots and error contexts.
+    trace: 'off',
+    video: 'off',
     screenshot: 'only-on-failure',
     actionTimeout: 15000,
     navigationTimeout: 45000,

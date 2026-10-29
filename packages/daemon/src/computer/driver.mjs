@@ -30,7 +30,7 @@ export const TOOLS = [
   {
     name: "get_desktop_state",
     description:
-      "Screenshot this device desktop. Requires exact human approval.",
+      "Screenshot this device desktop, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -39,7 +39,7 @@ export const TOOLS = [
   },
   {
     name: "click",
-    description: "Click this device desktop at the approved coordinates.",
+    description: "Click this device desktop at the requested coordinates, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
       properties: {
@@ -53,7 +53,7 @@ export const TOOLS = [
   {
     name: "type_text",
     description:
-      "Type exactly the approved text into the focused desktop control.",
+      "Type exactly the requested text into the focused desktop control, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
       properties: { text: { type: "string", minLength: 1, maxLength: 8000 } },
@@ -63,7 +63,7 @@ export const TOOLS = [
   },
   {
     name: "press_key",
-    description: "Press the approved key and modifiers on the focused desktop.",
+    description: "Press the requested key and modifiers on the focused desktop, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
       properties: { key: { type: "string" }, modifiers: { type: "array", items: { type: "string", enum: ["ctrl", "shift", "alt", "super"] }, maxItems: 4, uniqueItems: true } },
@@ -72,7 +72,7 @@ export const TOOLS = [
   },
   {
     name: "scroll",
-    description: "Scroll the approved amount at a desktop coordinate.",
+    description: "Scroll the requested amount at a desktop coordinate, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
       properties: { direction: { type: "string", enum: ["up", "down", "left", "right"] }, amount: { type: "integer", minimum: 1, maximum: 50 }, x: { type: "integer", minimum: 0, maximum: 100000 }, y: { type: "integer", minimum: 0, maximum: 100000 } },
@@ -80,6 +80,49 @@ export const TOOLS = [
     },
   },
 ];
+// Cloud computer captures: evidence for the person, kept with the thread.
+// They never return the image to the model, so they need no review; the
+// server binds them to the run's own desktop (lib/captures/screen.ts).
+const captureTitle = { type: "string", minLength: 1, maxLength: 200, description: "What it shows, for the person." };
+export const CAPTURE_TOOLS = [
+  {
+    name: "capture_screenshot",
+    description:
+      "Save a screenshot of this thread's computer as evidence for the person. It is kept with the thread; you do not get the image back.",
+    inputSchema: { type: "object", properties: { title: captureTitle }, required: ["title"], additionalProperties: false },
+  },
+  {
+    name: "start_screen_recording",
+    description:
+      "Start recording this thread's computer screen as evidence for the person. One recording at a time; it stops by itself after maxSeconds (default 120, at most 300). Call stop_screen_recording when the flow you are showing is done.",
+    inputSchema: {
+      type: "object",
+      properties: { title: captureTitle, maxSeconds: { type: "integer", minimum: 5, maximum: 300 } },
+      required: ["title"], additionalProperties: false,
+    },
+  },
+  {
+    name: "stop_screen_recording",
+    description: "Stop the screen recording and keep it with the thread.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+];
+const CAPTURE_ACTIONS = { capture_screenshot: "screenshot", start_screen_recording: "start_recording", stop_screen_recording: "stop_recording" };
+export function normalizeCaptureCall(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid tool call");
+  if (Object.keys(value).some((k) => !["name", "arguments"].includes(k))) throw new Error("Unknown call fields");
+  const { name, arguments: args = {} } = value;
+  const action = Object.hasOwn(CAPTURE_ACTIONS, name) ? CAPTURE_ACTIONS[name] : undefined;
+  if (!action || !args || typeof args !== "object" || Array.isArray(args)) throw new Error("Unsupported tool or arguments");
+  const keys = Object.keys(args).sort().join(",");
+  const title = typeof args.title === "string" ? args.title.replace(/\s+/g, " ").trim() : "";
+  if (action === "stop_recording" && !keys) return { action };
+  if (action === "screenshot" && keys === "title" && title && title.length <= 200) return { action, title };
+  if (action === "start_recording" && ["title", "maxSeconds,title"].includes(keys) && title && title.length <= 200 && (args.maxSeconds === undefined || (Number.isInteger(args.maxSeconds) && args.maxSeconds >= 5 && args.maxSeconds <= 300)))
+    return { action, title, ...(args.maxSeconds === undefined ? {} : { maxSeconds: args.maxSeconds }) };
+  throw new Error("Unsupported tool or arguments");
+}
+export const isCaptureTool = (name) => Object.hasOwn(CAPTURE_ACTIONS, name);
 export function normalizeCall(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("Invalid tool call");
@@ -124,7 +167,7 @@ export function driverArguments(input, platform = process.platform) {
 }
 // Owned by the daemon, never by a harness. No shell, auto-update, host
 // credentials, arbitrary tool names, output paths or browser attachment tools.
-export async function executeDriver(driver, input, display, leaseGuard) {
+export async function executeDriver(driver, input, display, leaseGuard, assertLive = () => {}, beforeAction) {
   // Set the display per child, never process.env: concurrent bots must not race.
   if (display !== undefined && !/^:[1-9][0-9]{0,3}$/.test(display))
     throw new Error("Invalid desktop display");
@@ -155,6 +198,7 @@ export async function executeDriver(driver, input, display, leaseGuard) {
   const argsForProcess = leaseGuard
     ? ["-F", "-s", `/run/mikka-viewer/${display.slice(1)}.lock`, "/usr/bin/python3", "/opt/mikka/computer/lease-driver.py", display, leaseGuard.botId, leaseGuard.ownerId, String(leaseGuard.policyVersion)]
     : ["mcp", "--direct"];
+  assertLive();
   const child = spawn(command, argsForProcess, {
     env: { ...env, ...(display === undefined ? {} : { DISPLAY: display }) },
     stdio: ["pipe", "pipe", "pipe"],
@@ -222,6 +266,8 @@ export async function executeDriver(driver, input, display, leaseGuard) {
       JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) +
         "\n",
     );
+    if (beforeAction) await beforeAction();
+    assertLive();
     return await request("tools/call", { name: call.name, arguments: args });
   } finally {
     clearTimeout(timer);

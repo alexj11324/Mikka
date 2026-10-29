@@ -2,6 +2,7 @@ import 'server-only'
 import { eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { issueDocuments, issues, linearCommentLinks, linearConnections, linearIssueLinks } from '@/lib/db/schema'
+import { requireCurrentPublication, withCurrentPublication, type Publication } from './publication'
 import { hashValue } from './crypto'
 import { createLinearComment, linearComment, updateLinearComment } from './client'
 import { linearAccessToken } from './tokens'
@@ -29,7 +30,8 @@ async function externalCommentExists(token: string, commentId: string, issueId: 
   } catch { return false }
 }
 
-export async function linearCommentSync(issue: IssueRow, issueLink: IssueLink, state: string | null, ownerToken: string, organizationId: string) {
+export async function linearCommentSync(issue: IssueRow, issueLink: IssueLink, state: string | null, ownerToken: string, organizationId: string, snapshot: Publication) {
+  const guard = () => requireCurrentPublication(snapshot)
   const doc = loadIssueDocument(state, issue.content)
   try {
     const threads = readIssueThreads(doc)
@@ -52,24 +54,27 @@ export async function linearCommentSync(issue: IssueRow, issueLink: IssueLink, s
           const token = await commentToken(issue.userId, link.authorUserId, organizationId, ownerToken)
           const exists = await externalCommentExists(token, link.linearCommentId, issueLink.linearIssueId)
           if (exists) {
+            await guard()
             await updateLinearComment(token, link.linearCommentId, plainTextToLinearMarkdown(message.body))
           } else {
+            await guard()
             const created = await createLinearComment(token, { id: link.linearCommentId, issueId: issueLink.linearIssueId, body: plainTextToLinearMarkdown(message.body), ...(parentId ? { parentId } : {}) }).catch(async error => {
+              await guard()
               if (await externalCommentExists(token, link!.linearCommentId, issueLink.linearIssueId)) return { id: link!.linearCommentId }
               throw error
             })
             link = { ...link, linearCommentId: created.id }
           }
-          await db.update(linearCommentLinks).set({ bodyHash: hashValue(message.body), syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearCommentLinks.id, link.id))
+          await withCurrentPublication(snapshot, tx => tx.update(linearCommentLinks).set({ bodyHash: hashValue(message.body), syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearCommentLinks.id, link!.id)))
           if (index === 0) rootCommentId = link.linearCommentId
           continue
         }
 
         const linearCommentId = crypto.randomUUID()
-        const [inserted] = await db.insert(linearCommentLinks).values({
+        const [inserted] = await withCurrentPublication(snapshot, tx => tx.insert(linearCommentLinks).values({
           id: crypto.randomUUID(), issueLinkId: issueLink.id, threadId: thread.id, messageId: message.id,
           linearCommentId, parentLinearCommentId: parentId ?? null, bodyHash: hashValue(message.body), authorUserId: message.authorUserId ?? null, syncStatus: 'pending',
-        }).onConflictDoNothing().returning()
+        }).onConflictDoNothing().returning())
         link = inserted ?? byLocalId.get(`${thread.id}\0${message.id}`)
         if (!link) throw new Error('Could not reserve the Linear comment mapping')
         byLocalId.set(`${thread.id}\0${message.id}`, link)
@@ -78,18 +83,21 @@ export async function linearCommentSync(issue: IssueRow, issueLink: IssueLink, s
         const token = await commentToken(issue.userId, message.authorUserId, organizationId, ownerToken)
         let created: { id: string }
         if (await externalCommentExists(token, link.linearCommentId, issueLink.linearIssueId)) created = { id: link.linearCommentId }
-        else created = await createLinearComment(token, { id: link.linearCommentId, issueId: issueLink.linearIssueId, body: plainTextToLinearMarkdown(message.body), ...(parentId ? { parentId } : {}) }).catch(async error => {
-          if (await externalCommentExists(token, link!.linearCommentId, issueLink.linearIssueId)) return { id: link!.linearCommentId }
-          await db.update(linearCommentLinks).set({ syncStatus: 'error', lastError: error instanceof Error ? error.message.slice(0, 300) : 'Linear comment sync failed', updatedAt: new Date() }).where(eq(linearCommentLinks.id, link!.id))
-          throw error
-        })
-        await db.update(linearCommentLinks).set({ linearCommentId: created.id, syncStatus: 'synced', lastError: null, bodyHash: hashValue(message.body), updatedAt: new Date() }).where(eq(linearCommentLinks.id, link.id))
+        else {
+          await guard()
+          created = await createLinearComment(token, { id: link.linearCommentId, issueId: issueLink.linearIssueId, body: plainTextToLinearMarkdown(message.body), ...(parentId ? { parentId } : {}) }).catch(async error => {
+            await guard()
+            if (await externalCommentExists(token, link!.linearCommentId, issueLink.linearIssueId)) return { id: link!.linearCommentId }
+            await withCurrentPublication(snapshot, tx => tx.update(linearCommentLinks).set({ syncStatus: 'error', lastError: error instanceof Error ? error.message.slice(0, 300) : 'Linear comment sync failed', updatedAt: new Date() }).where(eq(linearCommentLinks.id, link!.id)))
+            throw error
+          })
+        }
+        await withCurrentPublication(snapshot, tx => tx.update(linearCommentLinks).set({ linearCommentId: created.id, syncStatus: 'synced', lastError: null, bodyHash: hashValue(message.body), updatedAt: new Date() }).where(eq(linearCommentLinks.id, link.id)))
         if (index === 0) rootCommentId = created.id
       }
     }
   } finally { doc.destroy() }
 }
-
 export async function applyLinearCommentToApp(input: {
   issue: IssueRow
   issueLink: IssueLink
@@ -100,19 +108,15 @@ export async function applyLinearCommentToApp(input: {
   createdAt: string
   action: string
 }) {
+  if (!input.issueLink.externalTargetVerified) return
   const [existing] = await db.select().from(linearCommentLinks).where(eq(linearCommentLinks.linearCommentId, input.id)).limit(1)
-  if (input.action === 'remove') {
-    if (existing) await db.update(linearCommentLinks).set({ syncStatus: 'remote_removed', lastError: null, updatedAt: new Date() }).where(eq(linearCommentLinks.id, existing.id))
-    return
-  }
-  if (existing?.authorUserId) {
+  if (input.action !== 'remove' && existing?.authorUserId) {
     const [stored] = await db.select({ state: issueDocuments.state }).from(issueDocuments).where(eq(issueDocuments.issueId, input.issue.id)).limit(1)
     const doc = loadIssueDocument(stored?.state ?? null, input.issue.content)
     try {
       const local = readIssueThreadMessage(doc, existing.threadId, existing.messageId)
       if (local && existing.bodyHash !== hashValue(local.body)) return
       if (local && input.body === plainTextToLinearMarkdown(local.body)) {
-        await db.update(linearCommentLinks).set({ syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearCommentLinks.id, existing.id))
         return
       }
     } finally { doc.destroy() }
@@ -128,9 +132,14 @@ export async function applyLinearCommentToApp(input: {
   if (body.length > 2000) throw new Error('Linear comment is larger than Mikka supports')
   await db.transaction(async tx => {
     await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
-    const [latestIssue] = await tx.select({ updatedAt: issues.updatedAt }).from(issues).where(eq(issues.id, input.issue.id)).for('update').limit(1)
-    const [currentLink] = await tx.select({ appSyncedAt: linearIssueLinks.appSyncedAt }).from(linearIssueLinks).where(eq(linearIssueLinks.id, input.issueLink.id)).for('update').limit(1)
-    if (!latestIssue || !currentLink) return
+    const [latestIssue] = await tx.select({ updatedAt: issues.updatedAt, scope: issues.scope, userId: issues.userId, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(eq(issues.id, input.issue.id)).for('update').limit(1)
+    const [currentLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.id, input.issueLink.id)).for('update').limit(1)
+    if (!latestIssue || latestIssue.scope !== 'workspace' || latestIssue.linearSyncBlocked || latestIssue.userId !== input.issue.userId || !currentLink || !currentLink.externalTargetVerified || currentLink.issueId !== input.issue.id || currentLink.ownerId !== input.issue.userId || currentLink.teamSyncId !== input.issueLink.teamSyncId || currentLink.linearIssueId !== input.issueLink.linearIssueId) return
+    if (input.action === 'remove') {
+      if (existing && existing.issueLinkId === currentLink.id) await tx.update(linearCommentLinks).set({ syncStatus: 'remote_removed', lastError: null, updatedAt: new Date() }).where(eq(linearCommentLinks.id, existing.id))
+      return
+    }
+    if (existing && existing.issueLinkId !== currentLink.id) return
     const nextUpdatedAt = new Date()
     const [stored] = await tx.select({ state: issueDocuments.state }).from(issueDocuments).where(eq(issueDocuments.issueId, input.issue.id)).for('update').limit(1)
     const doc = loadIssueDocument(stored?.state ?? null, input.issue.content)

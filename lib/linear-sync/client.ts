@@ -77,7 +77,7 @@ export async function findLinearUserByEmail(token: string, email: string) {
   return null
 }
 
-export async function ensureLinearLabel(token: string, teamId: string, name: string, color: string) {
+export async function ensureLinearLabel(token: string, teamId: string, name: string, color: string, beforeWrite?: () => Promise<void>) {
   let after: string | null = null
   do {
     type LabelsPage = { team: { labels: { nodes: { id: string; name: string }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } | null } | null }
@@ -90,6 +90,7 @@ export async function ensureLinearLabel(token: string, teamId: string, name: str
     after = labels?.pageInfo.hasNextPage ? labels.pageInfo.endCursor : null
   } while (after)
 
+  await beforeWrite?.()
   const created = await linearGraphQL<{ issueLabelCreate: { success: boolean; issueLabel: { id: string } | null } }>(token, `mutation MikkaLinearCreateLabel($input: IssueLabelCreateInput!) {
     issueLabelCreate(input: $input) { success issueLabel { id } }
   }`, { input: { name, color, teamId } })

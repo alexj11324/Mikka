@@ -1,23 +1,10 @@
 // Claude Code adapter (ADR 0003): the user's own signed-in Claude Code, run
 // through `@anthropic-ai/claude-agent-sdk`, one CLI process per session.
 //
-// The SDK starts the CLI itself — its own bundled build, not one from PATH —
-// so this adapter no longer hands a child to the daemon's `AgentSandbox`.
-// Instead the run's policy goes to Claude Code's own sandbox through the
-// `settings` option (the JSON `--settings` took before): the agent's commands
-// may write only where the run allows (the worktree, the run dir, the
-// harness's own state), may read everything but the credential stores, and
-// may reach only the run's domains. `allowUnsandboxedCommands: false` keeps
-// the agent from stepping outside it, and `failIfUnavailable` makes a sandbox
-// that cannot start an error rather than a silent fallback to no sandbox.
-//
-// What this does not cover: the sandbox confines the commands the agent runs,
-// not the CLI's own tools. Read/Write/Edit and WebFetch/WebSearch run inside
-// the CLI process, so neither the filesystem lists nor the network list bound
-// them the way the daemon's outer sandbox bounded everything the CLI did
-// (measured, not assumed). Permission deny rules do still bite in bypass mode
-// — `Read(<path>)`, `Edit(<path>)`, or a bare tool name — so the credential
-// stores can be closed again by generating rules from `policy.denyRead`.
+// The SDK's process hook places the entire local CLI inside its run-owned
+// official sandbox, including native tools and MCP children. Hosted runs use
+// their enclosing Docker boundary. Native permission callbacks additionally
+// use the live run gate; they cannot expand either outer boundary.
 //
 // Isolation (ADR 0009) without touching the login: Claude Code keeps its
 // OAuth token in the macOS Keychain under a name derived from its config
@@ -30,6 +17,7 @@
 // `resume` works after a daemon restart and for a follow-up run in the same
 // worktree (the store is keyed by the cwd).
 import { spawn } from "node:child_process"
+import { computerDomain, computerSandboxPolicy, sandboxComputerSpec } from '../computer/transport'
 import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { homedir } from "node:os"
@@ -60,8 +48,12 @@ import {
   RunContext,
   runPaths,
   type McpServerSpec,
+  type ComputerSpecProvider,
 } from "../agents/run-context"
-import type { SandboxPolicy } from "../agents/sandbox"
+import type { AgentSandbox, SandboxPolicy } from "../agents/sandbox"
+import { requireRunToolApproval } from "../agents/tool-approval"
+import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
+import { runNetworkApproval } from "../agents/run-network"
 import { ownDir } from "../agents/harness-home"
 import { buildChildEnv } from "../env"
 import { mailboxInputs } from '@mikka/protocol/mailbox'
@@ -82,6 +74,8 @@ import type {
 } from "./types"
 
 export interface ClaudeAdapterOptions {
+  /** Explicit synthetic-test transport only; production uses the outer launcher. */
+  sandbox?: AgentSandbox
   /** The daemon's adapter state dir (per-run dirs live under it). */
   stateDir: string
   /**
@@ -89,11 +83,14 @@ export interface ClaudeAdapterOptions {
    * drive fake CLIs through it; unset, the SDK starts the build it ships.
    */
   binary?: string
+  /** Trusted host-only restriction; never widens the run's network ceiling. */
+  networkCeiling?: readonly string[]
   /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
   spawnHosted?: (options: SpawnOptions, oauthPlaceholder: string) => SpawnedProcess
   onHostedSession?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
+  computerProvider?: ComputerSpecProvider
   /** `~/.claude` of the user whose login the CLI uses. */
   configDir?: string
   /** Trusted owner-bound broker; the CLI receives no refresh grant. */
@@ -138,7 +135,7 @@ export function claudeProjectDirName(cwd: string): string {
  * which bypass mode auto-allows.
  */
 export function claudeSandboxSettings(
-  policy: SandboxPolicy
+  policy: SandboxPolicy,
 ): NonNullable<Settings["sandbox"]> {
   const anyHost = policy.allowDomains.includes("*")
   return {
@@ -174,7 +171,7 @@ export function claudeSandboxSettings(
  */
 export function claudeSettings(
   policy: SandboxPolicy,
-  workspace?: RunPolicy
+  workspace?: RunPolicy,
 ): Settings {
   return {
     sandbox: claudeSandboxSettings(policy),
@@ -192,13 +189,13 @@ export function claudeChunks(message: SDKMessage): RunChunk[] {
         chunks.push(
           { type: "text-start", id },
           { type: "text-delta", id, delta: block.text },
-          { type: "text-end", id }
+          { type: "text-end", id },
         )
       } else if (block.type === "thinking" && block.thinking) {
         chunks.push(
           { type: "reasoning-start", id },
           { type: "reasoning-delta", id, delta: block.thinking },
-          { type: "reasoning-end", id }
+          { type: "reasoning-end", id },
         )
       } else if (block.type === "tool_use") {
         chunks.push({
@@ -226,7 +223,7 @@ export function claudeChunks(message: SDKMessage): RunChunk[] {
               type: "tool-output-available",
               toolCallId: block.tool_use_id,
               output,
-            }
+            },
       )
     }
   } else if (message.type === "result") {
@@ -257,7 +254,7 @@ function toolResultText(content: unknown): string {
   if (Array.isArray(content)) {
     return content
       .map((part: { text?: unknown }) =>
-        typeof part?.text === "string" ? part.text : ""
+        typeof part?.text === "string" ? part.text : "",
       )
       .join("\n")
       .slice(-4000)
@@ -393,6 +390,10 @@ export class ClaudeAdapter implements AgentAdapter {
 
   start(options: StartOptions): Promise<AgentSession> {
     const continued = options.continueSession
+    if (options.requireSessionResume && !continued)
+      return Promise.reject(
+        new Error("Original Claude question session is required"),
+      )
     return continued
       ? this.open(continued.sessionId, "continue", continued.message, options)
       : this.open(randomUUID(), "new", options.prompt, options)
@@ -412,8 +413,10 @@ export class ClaudeAdapter implements AgentAdapter {
     sessionId: string,
     mode: "new" | "restart" | "continue",
     firstMessage: string,
-    options: SessionOptions & { prompt?: string }
+    options: SessionOptions & { prompt?: string },
   ): Promise<AgentSession> {
+    const approval = requireRunToolApproval(options.runId, options.toolApproval)
+    if (!await approval.checkLive()) { approval.revoke(); throw new Error('Run tool approval unavailable') }
     const paths = runPaths(this.options.stateDir, options.runId)
     const runDir = await claimRunDir(paths)
     const externalAuth = this.options.subscriptionAuth
@@ -464,9 +467,11 @@ export class ClaudeAdapter implements AgentAdapter {
       harness: "claude_code",
       kind: options.kind,
       worktree: options.cwd,
+      gitWritePaths: options.gitWritePaths,
       networkAllow: options.networkAllow,
       policy: options.policy,
       skills: options.skills,
+      skillReceipt: options.skillReceipt,
       runDir,
       privateDir: paths.privateDir,
       // Its session store, so `resume` works; keyed by the cwd it sees.
@@ -475,7 +480,7 @@ export class ClaudeAdapter implements AgentAdapter {
         join(
           configDir,
           "projects",
-          claudeProjectDirName(realpathSync(options.cwd))
+          claudeProjectDirName(realpathSync(options.cwd)),
         ),
       ],
     })
@@ -489,11 +494,15 @@ export class ClaudeAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (earlier) return endedSession(sessionId, earlier)
     ctx.clearHandoff()
+    const outerLocal = !this.options.spawnHosted && this.options.sandbox?.kind !== 'none'
+    const computerMcp = sandboxComputerSpec(this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy), outerLocal ? 'sandbox-runtime' : 'none')
 
     const queue = new EventQueue()
+    const approvalTransport = new AbortController()
     const prompts = new PromptQueue(sessionId)
     let written = 0
     let results = 0
+    let runtimeModel: string | null = null
     let ending = false
     let lastError: string | undefined
     let graceTimer: NodeJS.Timeout | undefined
@@ -509,6 +518,18 @@ export class ClaudeAdapter implements AgentAdapter {
 
     if(externalAuth && this.options.onHostedSession) {
       try{await this.options.onHostedSession(sessionId)}catch{throw new Error(SUBSCRIPTION_ERROR)}
+    }
+    const spawnOuter = (config: SpawnOptions): SpawnedProcess => {
+      const policy = computerSandboxPolicy(ctx.policy(), computerMcp)
+      const requested = this.options.networkCeiling
+      const maximum = requested === undefined ? policy.allowDomains
+        : policy.allowDomains.includes('*') ? [...requested]
+        : requested.includes('*') ? policy.allowDomains
+        : requested.filter(domain => policy.allowDomains.includes(domain))
+      const child = spawnRunSandbox({ command:this.options.binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,maximum,computerDomain(computerMcp)), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
+      const off = options.toolApproval!.onRevoke(() => { void child.revoke().catch(() => undefined) })
+      void child.exited.finally(off)
+      return child.process
     }
     const session = query({
       prompt: prompts,
@@ -530,12 +551,15 @@ export class ClaudeAdapter implements AgentAdapter {
         settingSources: [],
         settings: {
           ...claudeSettings(ctx.policy(), options.policy),
+          // The official runtime launcher encloses the entire CLI. Nesting
+          // the CLI's Bash-only sandbox is unsupported on macOS.
+          ...(outerLocal ? {sandbox:{enabled:false,allowUnsandboxedCommands:true,autoAllowBashIfSandboxed:false}} : {}),
           ...(externalAuth ? { forceLoginMethod: "claudeai" as const } : {})
         },
         mcpServers: {
           ...(options.mailbox ? { mikka_mailbox: claudeMailboxServer(options.mailbox) } : {}),
           [MCP_SERVER_NAME]: { type: "stdio", ...ctx.mcpServer() },
-          ...(this.options.computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...this.options.computerMcp } } : {}),
+          ...(computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...computerMcp } } : {}),
         },
         strictMcpConfig: true,
         systemPrompt: {
@@ -543,11 +567,16 @@ export class ClaudeAdapter implements AgentAdapter {
           preset: "claude_code",
           append: ctx.instructions(),
         },
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
+        permissionMode: "default" as const,
+        canUseTool: async (toolName: string, input: Record<string, unknown>, callback: { toolUseID: string; signal: AbortSignal }) => {
+            const gate = options.toolApproval!
+            const signal = AbortSignal.any([callback.signal, approvalTransport.signal])
+            const decision = await gate.request({ runId: options.runId, harness: 'claude_code', requestId: callback.toolUseID, method: `cli/${toolName}`, input }, signal)
+            return decision === 'allow' && !gate.revoked && !signal.aborted && !ending ? { behavior: 'allow' as const, updatedInput: input } : { behavior: 'deny' as const, message: 'Permission not granted.' }
+        },
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
-        ...(this.options.spawnHosted && externalAuth
+        ...(outerLocal ? {spawnClaudeCodeProcess:spawnOuter} : this.options.spawnHosted && externalAuth
           ? { spawnClaudeCodeProcess: (options:SpawnOptions) => this.options.spawnHosted!(options,nativeToken!) }
           : this.options.binary || externalAuth
           ? { spawnClaudeCodeProcess: spawnBinary(this.options.binary, nativeToken) }
@@ -560,10 +589,12 @@ export class ClaudeAdapter implements AgentAdapter {
 
     /** The CLI and everything it started are gone before the exit is told. */
     let ended: Promise<void> | undefined
-    const end = (event: Omit<ExitEvent, "type"> | null) =>
-      (ended ??= close(event))
-    const close = async (event: Omit<ExitEvent, "type"> | null) => {
+    const end = (event: Omit<ExitEvent, "type"> | null, revokeRunGate = true) =>
+      (ended ??= close(event, revokeRunGate))
+    const close = async (event: Omit<ExitEvent, "type"> | null, revokeRunGate: boolean) => {
       ending = true
+      approvalTransport.abort()
+      if (revokeRunGate) options.toolApproval?.revoke()
       clearTimeout(graceTimer)
       clearTimeout(authTimer)
       prompts.close()
@@ -577,7 +608,7 @@ export class ClaudeAdapter implements AgentAdapter {
       void end(
         lastError
           ? { outcome: "failed", error: lastError }
-          : { outcome: "succeeded" }
+          : { outcome: "succeeded" },
       )
     }
     const diedEarly = (error: string) => {
@@ -596,6 +627,20 @@ export class ClaudeAdapter implements AgentAdapter {
     void (async () => {
       try {
         for await (const message of session) {
+          if (
+            options.requireSessionResume &&
+            "session_id" in message &&
+            typeof message.session_id === "string" &&
+            message.session_id !== sessionId
+          )
+            throw new Error("Claude resumed a different question session")
+          if (message.type === "system" && message.subtype === "init" && typeof message.model === "string")
+            runtimeModel = message.model || null
+          if (message.type === "assistant" && message.parent_tool_use_id == null && typeof message.message.model === "string")
+            runtimeModel = message.message.model || null
+          if (runtimeModel && ((message.type === "system" && message.subtype === "init") ||
+            (message.type === "assistant" && message.parent_tool_use_id == null)))
+            options.onRuntimeModel?.(sessionId, runtimeModel)
           if (provesSession(message)) spoke(true)
           // A new turn (the queued message) produces its own result.
           if (message.type === "assistant" || message.type === "user")
@@ -627,6 +672,7 @@ export class ClaudeAdapter implements AgentAdapter {
       } catch (error) {
         if (!ending) diedEarly(errorMessage(error))
       } finally {
+        approvalTransport.abort()
         clearTimeout(authTimer)
         spoke(false)
         finished()
@@ -674,21 +720,24 @@ export class ClaudeAdapter implements AgentAdapter {
     prompts.push(firstMessage)
     written++
     if (mode === "continue" && !(await untilSpoken(spoken))) {
-      if (externalAuth) {
+      if (options.requireSessionResume || externalAuth) {
         await end(null)
-        throw new Error(SUBSCRIPTION_ERROR)
+        throw new Error(externalAuth ? SUBSCRIPTION_ERROR : 'Original Claude question session is unavailable; refusing a fresh session')
       }
       log.info(
         { stderr: stderrTail() },
-        "could not continue the earlier claude session; starting a new one"
+        "could not continue the earlier claude session; starting a new one",
       )
-      await end(null)
+      // Close the failed transport and its pending callbacks. The same live
+      // run retries once with a fresh transport, retaining its trusted gate.
+      await end(null, false)
       return this.open(randomUUID(), "new", options.prompt ?? "", options)
     }
     log.info({ mode, sandbox: "claude-code" }, "claude session started")
 
     return {
       sessionId,
+      get runtimeModel() { return runtimeModel },
       events: () => queue.drain(),
       async send(text) {
         if (ending) throw new Error("The Claude session already ended")

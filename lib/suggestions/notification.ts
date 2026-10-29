@@ -6,6 +6,7 @@ import type { SuggestionAction, SuggestionSource } from '@/lib/db/schema'
 
 export interface ExternalNotification {
   userId: string
+  connectedAccountId?: string
   source: SuggestionSource
   /** Stable per source, so a repeat delivery is recognised. */
   externalId: string
@@ -158,14 +159,18 @@ export function notionSearchNotification(userId: string, page: Json): ExternalNo
 }
 
 /** A verified Composio trigger event, or null for a toolkit or shape we do not read. */
-export function composioNotification(event: { userId: string; toolkitSlug: string; payload?: Json }): ExternalNotification | null {
+export function composioNotification(event: { userId: string; toolkitSlug: string; payload?: Json; metadata?: { connectedAccount?: { id?: string } } }): ExternalNotification | null {
   const payload = record(event.payload)
+  let notification: ExternalNotification | null
   switch (event.toolkitSlug.toLowerCase()) {
-    case 'gmail': return gmailNotification(event.userId, payload)
-    case 'slack': return slackNotification(event.userId, payload)
-    case 'notion': return notionNotification(event.userId, payload)
+    case 'gmail': notification = gmailNotification(event.userId, payload); break
+    case 'slack': notification = slackNotification(event.userId, payload); break
+    case 'notion': notification = notionNotification(event.userId, payload); break
     default: return null
   }
+  if (!notification) return null
+  return { ...notification, connectedAccountId: event.metadata?.connectedAccount?.id || undefined }
+
 }
 
 // --- Linear (organisation webhook) -------------------------------------------

@@ -5,7 +5,7 @@ export type ToolOutcome = 'ok' | 'error' | 'approval_pending'
 export function toolOutcome(output: unknown): ToolOutcome {
   if (output && typeof output === 'object') {
     if ('error' in output && output.error) return 'error'
-    if ('status' in output && ['pending','pending_approval','proposed'].includes(String(output.status))) return 'approval_pending'
+    if ('status' in output && ['pending','pending_approval','awaiting_approval','proposed'].includes(String(output.status))) return 'approval_pending'
     if ('approvalRequired' in output && output.approvalRequired === true) return 'approval_pending'
   }
   return 'ok'

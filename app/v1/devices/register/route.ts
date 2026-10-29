@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { deviceRegistration } from '@mikka/protocol/device'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { ensureDeviceAgents } from '@/lib/device-agents'
 import { devices } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice, WORKSPACE_ID } from '@/lib/device-link'
 
@@ -22,14 +23,17 @@ export async function POST(request: Request) {
   const fields = {
     name: info.name, hostname: info.hostname ?? null, platform: info.platform, arch: info.arch,
     daemonVersion: info.daemonVersion, protocolVersion: info.protocolVersion,
+    computerUse: info.computerUse ?? { installed: false, version: null },
     harnesses: info.harnesses, lastSeenAt: now, updatedAt: now,
   }
   if (info.deviceId && await ownedDevice(info.deviceId, caller.userId)) {
     await db.update(devices).set(fields).where(eq(devices.id, info.deviceId))
+    await ensureDeviceAgents(pool, caller.userId, info.deviceId, info.harnesses)
     return NextResponse.json({ deviceId: info.deviceId, workspaceId: caller.scopeWorkspaceId ?? WORKSPACE_ID })
   }
   if (caller.scopeDeviceId) return NextResponse.json({ error: 'Cloud device is unavailable.' }, { status: 403 })
   const deviceId = crypto.randomUUID()
   await db.insert(devices).values({ id: deviceId, ownerId: caller.userId, ...fields })
+  await ensureDeviceAgents(pool, caller.userId, deviceId, info.harnesses)
   return NextResponse.json({ deviceId, workspaceId: caller.scopeWorkspaceId ?? WORKSPACE_ID })
 }

@@ -2,6 +2,87 @@
 
 The integration maps one Linear team to one Mikka account. New issues and changes to already linked issues sync in both directions. The Neon inbox records signed webhook deliveries before responding; an outbox trigger captures app edits in the same transaction as the issue or collaboration write. The Mikka app and OAuth callback remain on Vercel; a Cloudflare Worker receives Linear webhooks and drains the durable inbox and outbox through Hyperdrive.
 
+## Global PostHog switch
+
+`mikka-linear-sync` is a **boolean global flag** in the existing US PostHog
+project. Every backend evaluates it against the same distinct ID,
+`mikka-linear-sync-service`, rather than a user or team. Configure a boolean
+flag with a 100% rollout and no person, group or runtime-only targeting when
+enabling; leave it inactive to pause all sync. The settings page reads this
+same server decision, so browser SDK overrides cannot enable backend work.
+
+Both Vercel and each Linear Worker must have `NEXT_PUBLIC_POSTHOG_KEY` from
+that same existing project. It is the public ingestion token already used by
+the app, not a management credential. Do not add a personal API key to the
+app or Worker. Missing configuration/flag, non-boolean variants, HTTP errors,
+evaluation errors, quota limits and a two-second timeout all read off. Values
+are cached for at most 30 seconds per running instance, including failures;
+expired true values are never reused during an outage. No flag timer runs in
+the background and flag evaluation never opens a database connection.
+
+When paused:
+
+- Next and Cloudflare validate webhook signatures. With a confirmed off
+  flag, ordinary issue/comment events are acknowledged with `200 { disabled:
+  true }` without inserting inbox rows or ingesting suggestions. A signed
+  OAuth authorization/app revocation is the exception: it immediately marks
+  the matching local connection revoked and disables its active team syncs in
+  one database transaction, so a pause cannot hide lost authorization. It
+  does not perform ordinary sync work or remote backfill. If this cleanup
+  cannot be committed, the endpoint returns `503` with `Retry-After: 60` so
+  Linear retries it. A missing token, evaluation error or timeout also returns
+  `503`, preserving retries during an outage. Unsupported event types retain
+  `200`. Linear retries non-200 deliveries after 1 minute, 1 hour and 6 hours,
+  and may then disable a failing webhook. After a long evaluation outage,
+  check Linear's webhook status and manually re-enable it if necessary.
+  Confirmed PostHog pauses use 200 for ordinary events so they do not trigger
+  this provider disablement.
+- Protected crons return `{ inbox: 0, outbox: 0, disabled: true }`; the
+  Cloudflare schedule exits before loading its database runtime. Dispatch
+  callbacks and all worker entry points check the same flag.
+- The suggestions recovery cron skips its Linear inbox scan and notification
+  replay; a delayed Linear connection briefing exits before database/provider
+  reads. This switch does not pause the other suggestion sources.
+- Each worker checks again **before every claim**. A job already claimed
+  completes its normal processing and bookkeeping; disabling does not turn
+  it into a failure, reset attempts, mark waiting jobs done or cancel it
+  between a remote write and its local checkpoint. Long jobs may therefore
+  finish after the local flag cache expires. Observe in-flight work separately.
+- OAuth start/callback, team enablement, team discovery and manual retries
+  cannot start new work. An explicit user pause or disconnect remains
+  available under its existing ownership checks.
+- Settings show `Sync paused`. They do not read the session/integration
+  tables or run a polling loop while globally off. Connected, actively
+  syncing settings poll without overlap while visible; paused/disconnected
+  settings stop polling. Remounting or focusing the page rechecks global
+  availability, allowing a later PostHog enablement to be discovered.
+
+Connections, team settings, inbox/outbox rows, links and audit history are
+preserved. Existing database triggers still record app edits durably in the
+same transaction; pausing does not discard edits or suppress the app's own
+ordinary database writes. On re-enable, queued and stale processing jobs
+resume through normal dispatch/recovery cron; failed jobs retain their
+existing explicit retry flow. There is no bulk remote backfill on resume.
+
+Operational verification must record the flag state and deployed SHA for
+Vercel production, the unique Preview, each existing Linear Worker and the
+old `feat/linear-bidirectional-sync` Preview separately. Old immutable
+deployments do not gain this check when main changes. A disabled setting on
+new code does not establish that an old Preview or unrelated database caller
+has stopped, or that Neon will suspend. Do not suspend/delete Neon resources
+as part of operating this switch.
+
+The app and both Workers expose a database-free, unauthenticated `GET
+/mikka/api/integrations/linear/status` with `Cache-Control: no-store`. It
+returns only global availability: `{ enabled, state }`. `state: disabled`
+means PostHog confirmed a false or absent flag; `unavailable` means missing
+configuration or failed evaluation and also pauses work. This distinction
+lets deployment checks verify real PostHog wiring without retrieving webhook
+signing or cron credentials. The endpoint reads no session or tenant data.
+
+Official references: [PostHog flag evaluation](https://posthog.com/docs/api/flags)
+and [Linear webhook delivery/retries](https://linear.app/developers/webhooks).
+
 ## Linear OAuth app
 
 Create a Linear OAuth application and configure its callback URL as:
@@ -33,6 +114,7 @@ Set these server-only environment variables in the Mikka app and the Linear sync
 | `CRON_SECRET` | Protects `/mikka/api/cron/linear-sync`; set on the Worker and app if Vercel Cron is also enabled |
 | `LINEAR_REDIRECT_URL` | Optional exact callback URL override; required in Vercel Preview because preview requests must not store their OAuth state in Production |
 | `HYPERDRIVE` binding | Cloudflare Hyperdrive connection to the same Neon branch used by the app |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Existing public PostHog project token; set in both deployments; missing means sync stays off |
 
 Generate an encryption key with `openssl rand -hex 32`. Never commit the generated value. Environments sharing the same Neon branch must share the same `LINEAR_TOKEN_ENCRYPTION_KEY`; production can use its own key because it uses a separate Neon branch.
 
@@ -51,4 +133,4 @@ Mikka `review` shares Linear's `started` category with `doing`; `duplicate` shar
 
 ## Neon schema
 
-Sync tables and triggers are part of `drizzle/0004_linear_sync.sql`, `drizzle/0005_linear_sync_retry_and_comment_keys.sql`, `drizzle/0006_linear_comment_authorship.sql`, and `drizzle/0007_linear_description_snapshot.sql`. They use the Mikka issue database through `MIKKA_DATABASE_URL`, with `ORVILO_DATABASE_URL` as a legacy fallback. `scripts/apply-sql.mjs` converts a Neon pooled URL to its direct endpoint for migration and prints the database and branch before applying a SQL file. The local migration target is the isolated `dev-local` branch; production is not changed by local development.
+Sync tables and triggers are part of `drizzle/0004_linear_sync.sql`, `drizzle/0005_linear_sync_retry_and_comment_keys.sql`, `drizzle/0006_linear_comment_authorship.sql`, and `drizzle/0007_linear_description_snapshot.sql`. They use the Mikka issue database through `MIKKA_DATABASE_URL`. `scripts/apply-sql.mjs` converts a Neon pooled URL to its direct endpoint for migration and prints the database and branch before applying a SQL file. The local migration target is the isolated `dev-local` branch; production is not changed by local development.

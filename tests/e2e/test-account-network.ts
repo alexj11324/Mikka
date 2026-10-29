@@ -3,8 +3,26 @@ import type { BrowserContext, CDPSession, Page, Route } from '@playwright/test'
 type LeaseScope = { assertActive: () => Promise<void> }
 type PausedRequest = {
   requestId: string
-  request: { url: string }
+  request: { url: string; method: string }
+  resourceType: string
   responseErrorReason?: string
+}
+export type LocalImageFixture = Readonly<{ url: string; body: Uint8Array }>
+
+function imageResponses(fixtures: readonly LocalImageFixture[]) {
+  if (fixtures.length > 4) throw new Error('TEST_ACCOUNT_INVALID_IMAGE_FIXTURE')
+  const responses = new Map<string, Buffer>()
+  for (const fixture of fixtures) {
+    const url = new URL(fixture.url)
+    const body = Buffer.from(fixture.body)
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash ||
+      url.href !== fixture.url || responses.has(fixture.url) || body.length > 65_536 ||
+      !body.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error('TEST_ACCOUNT_INVALID_IMAGE_FIXTURE')
+    responses.set(fixture.url, body)
+  }
+  // Copy at installation: later mutation of fixture bytes cannot change a
+  // response. Only the static PNG body is used, never request headers/cookies.
+  return (url: string, method: string, type: string) => method === 'GET' && type.toLowerCase() === 'image' ? responses.get(url) : undefined
 }
 
 function sameOrigin(value: string, origin: string) {
@@ -23,9 +41,13 @@ export async function installAccountOriginFence(
   context: BrowserContext,
   scope: LeaseScope,
   origin: string,
+  // A refusal decision, not successful transport completion. Announce it
+  // before abort can emit a browser error; failed aborts still call onFailure.
   onBlocked: () => void,
   onFailure: () => void,
+  localImages: readonly LocalImageFixture[] = [],
 ) {
+  const localImage = imageResponses(localImages)
   const sessions = new WeakMap<Page, { ready: Promise<void>; active: boolean }>()
   const closingPages = new WeakSet<Page>()
   let closing = false
@@ -76,7 +98,14 @@ export async function installAccountOriginFence(
               await session.send('Fetch.continueRequest', { requestId: event.requestId })
               return
             }
-            if (!sameOrigin(event.request.url, origin)) { await abort(session, event.requestId); onBlocked(); return }
+            const image = localImage(event.request.url, event.request.method, event.resourceType)
+            if (image) {
+              await session.send('Fetch.fulfillRequest', { requestId: event.requestId, responseCode: 200,
+                responseHeaders: [{ name: 'Content-Type', value: 'image/png' }, { name: 'Cache-Control', value: 'no-store' }],
+                body: image.toString('base64') })
+              return
+            }
+            if (!sameOrigin(event.request.url, origin)) { onBlocked(); await abort(session, event.requestId); return }
             await session.send('Fetch.continueRequest', { requestId: event.requestId })
           } catch {
             await abort(session, event.requestId).catch(() => {})
@@ -94,26 +123,32 @@ export async function installAccountOriginFence(
   const firstRequest = async (route: Route) => {
     try {
       await scope.assertActive()
-      if (!sameOrigin(route.request().url(), origin)) { await route.abort('blockedbyclient'); onBlocked(); return }
+      const request = route.request()
+      const image = localImage(request.url(), request.method(), request.resourceType())
+      if (!image && !sameOrigin(request.url(), origin)) { onBlocked(); await route.abort('blockedbyclient'); return }
       // An initial request needs an already installed Page request gate.
       // Initial popup navigation can precede Page creation. Waiting for 'page'
       // here deadlocks; allowing it would release an unprotected redirect.
       // This adapter deliberately refuses that unsupported navigation.
       let page: Page
       try { page = route.request().frame().page() } catch {
-        await route.abort('blockedbyclient')
         onBlocked()
+        await route.abort('blockedbyclient')
         return
       }
       // Fetch.enable cannot retroactively fence redirects of a request already
       // started. Ordinary newPage() returns only after protection is active;
       // any earlier navigation is rejected rather than lazily allowed.
       if (!sessions.get(page)?.active) {
-        await route.abort('blockedbyclient')
         onBlocked()
+        await route.abort('blockedbyclient')
         return
       }
       await scope.assertActive()
+      if (image) {
+        await route.fulfill({ status: 200, contentType: 'image/png', headers: { 'cache-control': 'no-store' }, body: image })
+        return
+      }
       await route.continue()
     } catch {
       await route.abort('blockedbyclient').catch(() => {})

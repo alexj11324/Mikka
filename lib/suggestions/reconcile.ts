@@ -8,6 +8,7 @@ import { redeliverFailedGitHubWebhooks, type RedeliveryResult } from './github-r
 import { gmailNotification, notionSearchNotification, type ExternalNotification } from './notification'
 import { ensureComposioTriggers, linearWebhookNotifications } from './sources'
 import { ingestNotifications } from './store'
+import { linearSyncEnabled } from '@/lib/linear-sync/flags'
 
 // The hourly backfill behind the webhooks (app/api/cron/suggestions-reconcile).
 // It reads what each source holds now and ingests it like a webhook delivery;
@@ -31,7 +32,7 @@ const list = (value: unknown): Json[] => Array.isArray(value) ? value.map(record
 async function recentGmail(userId: string): Promise<ExternalNotification[]> {
   const result = await runComposioAction(userId, 'fetch_recent_gmail', { query: 'in:inbox newer_than:2d -category:promotions -category:social', max_results: 50 })
   if ('error' in result) throw new Error(result.error)
-  return list(result.data.messages).flatMap(message => gmailNotification(userId, message) ?? [])
+  return list(result.data.messages).flatMap(message => ((notification => notification ? { ...notification, connectedAccountId: result.accountId } : [])(gmailNotification(userId, message))))
 }
 
 /**
@@ -78,6 +79,7 @@ async function reconcilePerson(userId: string, toolkits: readonly string[], sinc
  * window's Issue and Comment deliveries from there instead of asking Linear.
  */
 async function reconcileLinear(since: Date, result: ReconcileResult) {
+  if (!await linearSyncEnabled()) return
   const deliveries = await db.select({ organizationId: linearSyncInbox.organizationId, payload: linearSyncInbox.payload }).from(linearSyncInbox)
     .where(and(gte(linearSyncInbox.receivedAt, since), inArray(linearSyncInbox.eventType, ['Issue', 'Comment'])))
     .limit(LINEAR_INBOX_LIMIT)

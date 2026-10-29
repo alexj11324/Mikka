@@ -8,10 +8,34 @@ rule id here.
 
 Newest first.
 
+## MVP decisions awaiting Alex
+
+| Date | Proposal | Status / behavior until confirmed |
+| --- | --- | --- |
+| 2026-10-28 | ~~Proposed public daemon name and release workflow.~~ See the approved decision below. | Superseded; no npm publication has been performed. |
+| 2026-10-28 | Replace the Vercel-incompatible SSH setup dialog with three online commands (install, browser login, start), using the current origin plus base path. Add a web code-review page that approves or denies only the initiating daemon's device grant. | **待 Alex 确认**. Existing accepted Figma frames do not cover these views; review frames are prepared before implementation and linked from `daemon-connection.md`. |
+
 ## Decided
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-29 | Connect Linear sync to one PostHog feature flag and leave it off (Alex: 「那你Linear同步接一下posthog」「关掉这个feature」). Pausing covers backend intake, cron, dispatch, claims and settings polling; preserve connections, queued work and existing data. Settings show only the paused state | `../linear-sync.md`, R-40 | Per-team pause as a substitute for global disablement |
+| 2026-10-28 | Alex approved a manual, main-only GitHub Actions release with npm trusted publishing and provenance, per-repository push approval in the owner's conversation, and a draft PR marked unverified when no verification command ran. The initial `@mikka/daemon` package name was superseded by the single-install direction below. Source: “上面的请求全部允许”. Trusted publisher configuration and fixed-Preview acceptance remain outstanding. | | MVP proposals above and run-publication proposals below |
+| 2026-10-28 | Alex requested one installation and one `mikka` command, with the daemon as a subcommand: “如果说可以一起的话，最好一起吧，懒得弄两次”. The release candidate is `@aspectlylabs/mikka`; npm organization ownership and trusted publishing must be verified before publication. | | Initial `@mikka/daemon` public-name decision |
+| 2026-10-27 | A thread's owner stops it from the shared composer; the draft stays editable. Stop status appears immediately in the thread and the task's thread list. After about 30 seconds without acknowledgement, show an error and retry. Source: Alex's MVP core-loop brief, item 1 (#357). Existing accepted panel frames are `220:5314` / `220:5199`; [light/dark/narrow stop and timeout review](https://www.figma.com/design/zPe5LKycb2XuT1ivCLRw07?node-id=372-4786) is prepared. These new states remain **待 Alex 确认**; real Preview screenshots are still pending. | R-10, R-62 | PR #336's disabled composer while stopping and unbounded acknowledgement wait |
+| 2026-10-28 | Status badges and status pickers have no stroke: a tinted fill only (`statusTones`), following the no-strokes request for secondary buttons. Covers `Badge tone=` (for example the PR state badges) and the `BadgeButton` status and priority pickers; neutral uses the grey control fill | R-31, R-34 | Tinted fill + tinted stroke |
+| 2026-10-28 | Secondary buttons are a grey fill with no border, app-wide, like the 「Add folder…」 button in Claude desktop's settings (light grey pill on a white panel, no outline). Applies everywhere, not only settings | R-31 | White-fill outline buttons with a border (shadcn `outline`) |
+| 2026-10-28 | UI v9 approved by Alex (brief and Figma frames F1–F10, page `395:15023`). Copy is Chinese-first; 「Artifact」 is never translated; 资料库 = library; the right panel's 任务 tab is renamed 线程. 浏览器 (local, app-wide, top-bar globe) is distinct from 电脑 (a bot's cloud computer, a panel tab) | R-43, R-57, R-72, glossary | 任务 as the panel's thread label |
+| 2026-10-28 | Icon rail, in order: 主页 (House), 建议 (Lightbulb), 看板 (Columns3), 插件 (unchanged), Artifact. Artifact uses Mikka's own icon (two tilted upright rounded cards, Figma `icon/artifact`), not lucide Copy or Library. The browser is an icon-only globe toggle at the right of the top bar, no 「浏览器」 text; when on it opens a right column, and an annotated element goes into the current composer as a 「1 · <element> · <action> · <note>」 chip | R-35, R-56, R-57, R-71 | 建议 as an inbox icon (2026-10-27) |
+| 2026-10-28 | Right panel: pills 概览 (default) / 全部线程 switch only the right column, the centre chat stays. 概览 = bot avatar and name, then 详情 / 线程 / PR / 电脑; the header does not show 「<Bot 名> 的屏幕」, and 电脑 keeps the existing `AgentComputer` view. 线程 lists only the threads this bot dispatched. 全部线程 lists every bot's threads with a 16px bot avatar and a relative time per row. The panel is read-only: no 让它安排, 新建 or 上传; besides navigation the only control is 展开; routines come from chat, files from the composer's 「+」 | R-01, R-02, R-17, R-50, R-51 | 详情 header with 「<Bot 名> 的屏幕」 (2026-10-24 21:13); 建议 + 任务 panel (2026-10-24 21:57); threads never shown with a bot avatar, for 全部线程 only (2026-10-27) |
+| 2026-10-28 | Thread lists group as 等待回复 → 进行中 → 空闲 → 已解决 (已解决 collapsed; failed under 等待回复; never 「今天完成」). A row's second line is the verbatim opening of the last reply, one line, hidden from someone who cannot open the thread; no generated description, status word or bot-name prefix, because generating them costs compute. The PR tab groups 等待审查 / 进行中 / 已合并, each row title and number | R-52, R-53, R-54, R-62 | Thread row with a one-line summary and a status word |
+| 2026-10-28 | 建议 leaves the right panel for its own rail page: 50/50 with the Coordinator chat; clicking a card pushes the identical card into that chat as the user's message, then the full instruction, and the Coordinator handles it as R-21 says (sub-agent or thread). Page title 24/32 SemiBold. Card taste rules: border or shadow, radius 16 (F8; approved range 4–8 or 16–24), one edge, 12–14px inline icons, accent on data or one control | R-12, R-14, R-21, R-32, R-33, R-55 | 建议 on top of the right panel; card posted in the bot's chat (2026-10-27) |
+| 2026-10-28 | Artifact gets its own rail page (categories on the left; 名称 / 状态 / 来源 / 上次活动 table), an 「Artifact · N」 entry in the thread header, and an acceptance window (PR, checks, screenshots and recordings left; thread chat right; 打回 / 通过 at the top) | R-15, R-56 | |
+| 2026-10-28 | Mobile approvals: the proposals from `/api/pending-actions` sit as cards at the end of every phone chat (the web shows them above its composer), with 不要 and 发送 / 保存到日历; a push about one opens its chat scrolled to that card, marked. OpenUI cards are drawn natively (choice, questions, approval, follow-ups, buttons); a card is live until the person writes after it, and an answered choice card marks the option named in that reply. A card the app cannot draw shows its words and 「在网页上打开」, which opens that chat on the web signed in through a one-minute, single-use better-auth token, to an allow-listed path only. Precedent: Slack and GitHub Mobile actionable cards; Claude iOS tool approval (usability review onboarding-mobile P0-1, chat P0-1) | R-14, R-20 | 「卡片 · 在网页上查看」 opening the signed-out web root |
+| 2026-10-28 | Mobile push permission is asked after the Coordinator's first message of its own, or in 通知 (turning a push on, or 允许推送), never at launch. When iOS said no or registering failed, 「推送无法送达」 is the first Settings row (打开设置 / 重试), as the spec's table already lists. The EAS project id comes from `EAS_PROJECT_ID` (`app.config.ts`). Precedent: ChatGPT, Slack and Comma iOS | `mobile.md` Settings | Prompt at sign-in; no state shown |
+| 2026-10-28 | Mobile sending: a failed message keeps its bubble with 「未发送 · 重试」 and the composer keeps the words until the server takes them; 「没有网络」 shows under the header while offline; a 401 signs out locally and sign-in says 「登录已失效，请重新登录。」. The composer drops 「+」 and the mic until attachments and dictation exist (the 2026-10-27 placement stands for when they return); the drawer's search filters the drawer by name (ChatGPT iOS). Precedent: iMessage, Slack | R-40 | Draft cleared on send; dead 「+」, mic and search buttons |
+| 2026-10-27 | Cloud-computer copy names the bot, not Agent: 「<Bot 名> 操作中」, 「交还给 <Bot 名>」 (the computer is the bot's, R-04; Agent is not user-facing). Decided during the doc cleanup Alex delegated (「你应该自己去判断」) | R-04 | 「Agent 操作中」, 「交还给 Agent」 |
+| 2026-10-27 | The native Claude Code / Codex Coordinator runtime (#312, [`native-coordinator.md`](../architecture/native-coordinator.md)) is a deprecated design. The Coordinator and every bot run their chats only on Mikka's own harness; Claude Code and Codex only execute threads. The code stays, switched off (`MIKKA_NATIVE_COORDINATOR` unset); no runtime picker is built (「先关着放着…文档里面写清楚，这个是被废弃的方案」). Precedent: Comma retired running its chat agents on Codex / Claude Code on 2026-10-10 and kept them only for executing tasks on a station, a device or the Group's Cloud VM (AFK-surf/Comma `docs/architecture/DOMAIN_CONCEPTS.md`, Retired Sessions; migration `20261010150001_retire_external_runtime_config`) | R-05 | Opt-in native Claude Code / Codex Coordinator runtime (#312, PR #314) |
 | 2026-10-27 | A thread's owner stops it from the shared composer; the draft stays editable. Stop status appears immediately in the thread and the task's thread list. After about 30 seconds without acknowledgement, show an error and retry. Source: Alex's MVP core-loop brief, item 1 (#357). Existing thread layout is `220:5199`; stop/timeout state review and real Preview screenshots remain pending. | R-10, R-62 | PR #336's disabled composer while stopping and unbounded acknowledgement wait |
 | 2026-10-28 | Profile facts (#353) keep a fourth state, `expired` (past its date or faded; revived when seen again), besides active, dismissed and deleted; 记忆 has one switch for web, mobile, the Coordinator prompt and extraction (`user_preferences."memoryEnabled"`); the 提问或更新 input on web 记忆 waits for later (Alex, accepting both questions on #353) | R-73, `proactive.md` § 2.2 | |
 | 2026-10-27 | Build the mobile app now in `apps/mobile` with Expo, and verify screens with Expo web screenshots in the cloud, not the iOS simulator. Alex: 「你做一下移动端 APP…直接开 Expo 的 web 模式进行截图验证就行，不需要本地跑 iOS 的 simulator」 | — | — |
@@ -25,7 +49,7 @@ Newest first.
 | 2026-10-27 | Saved logins belong to the user's account and are kept (not one-time); every thread and every bot sub-agent of that user can use them. Browsers visit any site with no preset allowlist (「密码应该是绑在这个账户上边，每个线程都可以调用，密码不是一次性的，可以存进密码箱。浏览器可以就是说访问所有网站，不要预设白名单」) | R-72, `credential-vault.md` | Run-bound, one-time credentials; registered-service allowlist (#223) |
 | 2026-10-27 | A web sub-agent's login is a 登录 <site> pill in the bot's chat that expands in place into the login card, as Hark's Secured Login: the bot announces it, the card has 邮箱, 密码, Google, Apple and 登录 with 🔒 Secured by Mikka, and the login is saved to an encrypted vault for later runs (the user's Hark screenshots, 「你看看人家」「它是先从一个药丸转化为这个卡的」) | R-72, `cloud-computer-backend.md` § 2 | Login bottom sheet; password used once and not stored |
 | 2026-10-27 | No explanatory sentences on sheets: the login sheet is logo, title, account, password and button, with 🔒 Secured by Mikka as the only reassurance; R-40 now gives the delete test and applies to specs and agent briefs too (「你口水话怎么这么多呀？你下面写一个 secured by mikka 不就行了吗？」「能不能在文档或者什么地方写一下，避免这种口水话」) | R-40, `review-checklist.md` | Login-sheet subtitle and privacy sentence |
-| 2026-10-27 | 建议 cards copy Hark's content: one sentence with the reason or deadline inside, no meta line; tapping posts the card plus the full instruction with its background in the bot's chat. A web sub-agent that needs a login asks with a 登录 chip and a password sheet; the password is typed into the site, and the user never takes over the screen (「人家那个不需要你接受，只需要你在下面登录 Cloudflare，它会弹出一个密码框…那边就会自动写入了」「人家是有背景的」) | R-21, R-72 | 接手 (takeover) on sub-agent cards; card title plus meta line |
+| 2026-10-27 | 建议 cards copy Hark's content: one sentence with the reason or deadline inside, no meta line; tapping posts the card plus the full instruction with its background ~~in the bot's chat~~ (in the 建议 page's Coordinator chat since 2026-10-28, R-55). A web sub-agent that needs a login asks with a 登录 chip and a password sheet; the password is typed into the site, and the user never takes over the screen (「人家那个不需要你接受，只需要你在下面登录 Cloudflare，它会弹出一个密码框…那边就会自动写入了」「人家是有背景的」) | R-21, R-72 | 接手 (takeover) on sub-agent cards; card title plus meta line |
 | 2026-10-27 | Tapping a 建议 card starts the task at once: the orchestrator (Coordinator) takes it, runs it as a bot sub-agent (web) or a thread (real task), and the card shows it running. 建议 items are standalone cards whose content follows Hark (verb, app icon, the concrete thing with its deadline or amount); Mikka keeps its own look (「不是说让你去抄那个 UI 的界面…你卡片的内容可以抄一下他的」「点一下直接开始交互，直接把任务交给 orchestrator 去做」) | R-21 | Clicking a 建议 item fills the composer (2026-10-24) |
 | 2026-10-27 | Machines: one shared bot machine per workspace (bots and their web sub-agents, like Grok Bot), and one machine per cloud thread started from a workspace snapshot (like Cursor cloud agents and Devin). A desktop starts on demand on the machine that needs it, so nothing moves between machines (「BOT 单独一台机器，云端的话是 Three 单独一台机器，因为云端的负荷会很重」, 「同意，按这个改设计文档并开 issue」) | `cloud-computer-backend.md` § 2 | One machine per workspace for bots and threads (2026-10-24) |
 | 2026-10-27 | Work splits by kind. A real task such as coding is a thread, done by a full coding agent (Claude Code, Codex), and only threads appear in the thread list. A web task is done by the bot itself: each one runs as its own sub-agent (分身) with its own browser, several at once (Hark Handoff precedent). Sub-agents never appear in the thread list; the bot speaks for them in its chat (「coding 任务是交给完整的编程 Agent 去做；如果只是网页任务，我们的 BOT 直接就处理了」「网页分身不要出现，只有thread才会出现在那里…统一由 BOT 来回复就行了」「如果是真正的任务，比如单独处理 coding 问题，那肯定是要单独来的」) | R-72 | Bot "does not do the work itself" (`glossary.md`) |
@@ -35,14 +59,14 @@ Newest first.
 | 2026-10-27 | Items are written as verb-first actions that name the person or object (Comma, ChatGPT precedent) (「是不是应该设计成以动词开头啊…你写的东西就是有头无尾」) | R-45 | 「有人问…」 style items |
 | 2026-10-27 | After an item is handled, the Coordinator reports the result and asks about the rest of today's briefing (chips, one button per item, 不用了) (「处理完之后应该还有跟进的过程…你可以问一下剩下两条你要不要处理」) | R-20 | |
 | 2026-10-27 | The 建议 briefing names each item as an inline mention chip (app icon + short label, as Comma's briefing does); tapping a chip opens that item. No 「去 Coordinator 处理」 link (「简报这一块，人家是加上了这个 mention block 的」) | R-21 | Plain briefing text with a link to the Coordinator |
-| 2026-10-27 | Every icon must match what mainstream products use for the same function; memory is a book (ChatGPT), 建议 an inbox, 线程 a code window, 任务 a checklist. Design reviews are sent as an Artifact page, with 3× images (「图标是不是用错了…你要去思考一下，目前主流产品都用什么图标」「要用 artifact」) | R-71 | Lightbulb, sparkles and other unsourced icons |
+| 2026-10-27 | Every icon must match what mainstream products use for the same function; memory is a book (ChatGPT), ~~建议 an inbox~~ (建议 is Lightbulb since 2026-10-28, R-71), 线程 a code window, 任务 a checklist. Design reviews are sent as an Artifact page, with 3× images (「图标是不是用错了…你要去思考一下，目前主流产品都用什么图标」「要用 artifact」) | R-71 | Lightbulb, sparkles and other unsourced icons |
 | 2026-10-27 | A finished thread's check is green. PR states use GitHub's own colours: open green, draft grey, merged purple, closed red (「打勾可以用绿色」「PR 的颜色根据 GitHub 上来」) | R-62, R-66 | Grey check (same day) |
 | 2026-10-27 | Mobile Settings rebuilt as a hierarchy with a cited precedent per row (`mobile.md` § Settings, Figma 07–07e): account → 个人资料, 工作区, 通知, 记忆, 已连接的 App, 外观, 语言, 版本, 退出登录. 记忆 is a settings page after all (ChatGPT, Claude precedent) | R-70 | Flat settings page; 「关于你」 in chat only (same day) |
 | 2026-10-27 | Every setting must have a precedent in a comparable product, cited in the spec; settings are a hierarchy, never one flat page; no rows that tell the person what they already know (「每一项设置，都必须找到同类型产品已有的设置作为参考…如果同类产品没有这样做，那你这样做就是违规」「分级菜单，你不能拉通拍」「账户登录方式写个Google，你是有毛病吗」) | R-70 | |
 | 2026-10-27 | Mobile Settings: profile, 工作区, 通知 (主动消息, 电脑在用时不推送到手机), 已连接的 App, 账户, 通用, 退出登录. What the Coordinator knows about the person is managed in the chat, not in Settings; no push-device list (「什么叫他妈“正在推送，不归我管”」「重新写设置页」) | | 「关于你」 and 推送设备 in Settings (same day) |
 | 2026-10-27 | 建议 shows its items as one long list (icon, title, source and time per row), not cards per app (「卡片统一用最下面那种长方形形式」) | R-21 | Horizontal per-app cards (same day) |
 | 2026-10-27 | Mobile cards have no outline: a card in the chat (proactive card, thread card) is a filled grey surface like the bubble, the way 建议's cards are filled; secondary buttons inside are white. Source icons are the apps' own coloured marks, never a glyph on a tinted square (「描边的话不好看」「直接用那个带颜色的图标不行吗」) | | Outlined cards; tinted-square source icons |
-| 2026-10-27 | A thread is never drawn with its bot's bloub avatar: bots coordinate, threads do the work; a thread shows a status icon. The thread card has no step line under its name, only outputs as chips. Spinners are grey, colour is restrained. The mobile look follows the Claude app (header pill, status-icon session list, filter menu, New-thread pill) (「BOT 是不干事情的…左边居然用的是 BOT 的 blob 图像，这个是不对的」「下面的那些话不需要写在那上面」「用灰色就行，颜色要克制」「学习Claude的ui」). Bot text stays in its grey bubble (R-14, 「文字要用泡泡框住」) | R-62, R-66, glossary | Threads shown with the bot's avatar (2026-10-24); card step line (2026-10-25) |
+| 2026-10-27 | A thread is never drawn with its bot's bloub avatar: bots coordinate, threads do the work; a thread shows a status icon (except in 全部线程, which shows each row's bot avatar since 2026-10-28, R-50). The thread card has no step line under its name, only outputs as chips. Spinners are grey, colour is restrained. The mobile look follows the Claude app (header pill, status-icon session list, filter menu, New-thread pill) (「BOT 是不干事情的…左边居然用的是 BOT 的 blob 图像，这个是不对的」「下面的那些话不需要写在那上面」「用灰色就行，颜色要克制」「学习Claude的ui」). Bot text stays in its grey bubble (R-14, 「文字要用泡泡框住」) | R-62, R-66, glossary | Threads shown with the bot's avatar (2026-10-24); card step line (2026-10-25) |
 | 2026-10-27 | Mobile navigation is a side drawer like the ChatGPT iOS app: opens on the Coordinator chat; drawer = Coordinator, 建议, 线程, 任务, then 置顶 and 最近 bots/chats; the 线程 screen follows ChatGPT's Codex screen (machine filter chips, sections, floating composer) (「对，就按抽屉结构改」) | | Three bottom tabs (proposed same day) |
 | 2026-10-27 | Mobile: Expo builds both platforms, iOS ships first; the mobile visual design is native and drawn fresh, not the web look (「我们肯定先做 iOS」「原生肯定是要重新做呀」). Spec: `mobile.md` | | |
 | 2026-10-27 | A push notification has no buttons; the Coordinator's proactive message in its chat is a card with buttons. Pushes go to every device at once; a setting can turn off phone pushes while the computer is open (「手机推送不带按钮，在消息里面带按钮…同时推，但是在开关里面保留选项」) | R-20 | Plain-text reminders (Comma) |
@@ -70,13 +94,13 @@ Newest first.
 | 2026-10-25 | Sign-in: Google button uses Google's official "G" mark; no scope or callback-URL notes under the OAuth buttons; divider reads "or" / 「或」 (「这个是假的」「删一下口水话」) | R-40 | "Or use email" divider |
 | 2026-10-25 00:39 | Artifact viewer design accepted (「设计稿我批了」); files in R2, versions in Neon, HTML in an opaque-origin sandbox iframe with no separate usercontent domain, 选择元素 through an injected script and `postMessage` | R-31, `docs/mcp.md` § Artifacts | Codex's drafts (2026-10-24) |
 | 2026-10-24 21:57 | Clef is fully replaced by the OpenAI Decisions API, including the first auto-approval screen (「10月22日那个东西已经过时了，已经完全换成了 OpenAI 的 decisions API」) | R-20 | Clef (2026-10-22) |
-| 2026-10-24 21:57 | Right panel = 建议 + 任务; 任务 = threads started by the orchestrator or a bot, all kept, not the board's issues; a clicked suggestion fills the composer, the bot dispatches a thread, and the item moves from 建议 down to 任务 | R-21 | 建议 / bot threads / 我的任务 (20:46); 任务 tab = flat board list (2026-10-23) |
+| 2026-10-24 21:57 | ~~Right panel = 建议 + 任务~~ (replaced 2026-10-28: 建议 page, R-55; 线程 tab, R-50); 任务 = threads started by the orchestrator or a bot, all kept, not the board's issues (still holds as 线程); ~~a clicked suggestion fills the composer, the bot dispatches a thread, and the item moves from 建议 down to 任务~~ | R-21 | 建议 / bot threads / 我的任务 (20:46); 任务 tab = flat board list (2026-10-23) |
 | 2026-10-24 21:57 | bloub keeps all 16 shapes | R-36 | |
 | 2026-10-24 21:57 | Task scope is two-way: a workspace task in Linear can be turned back into a personal one (「保持双向」); code in issue #184 | R-26 | "Once in Linear it can't revert" (2026-10-23, MIK-30) |
 | 2026-10-24 21:51 | No filler or explanatory copy anywhere in the UI (口水话) | R-40 | |
 | 2026-10-24 21:50 | The Coordinator has no special UI; it is a normal bot (no star, no badge, no special empty state) | R-06 | Coordinator bloub with an orange star |
 | 2026-10-24 21:28 | Artifact hosting: files in Cloudflare R2; versions, permissions and share tokens in Neon. HTML renders in an iframe with `sandbox="allow-scripts"` (no `allow-same-origin`) and a strict CSP; no separate user-content domain. Share links at `app.aspectlylabs.com/mikka/a/<token>` (only me / workspace / anyone with the link; revocable; noindex). Markdown renders in-app, sanitized | | |
-| 2026-10-24 21:13 | Right panel 详情 header = the selected bot (same bloub and name as the left row) + 「<Bot 名> 的屏幕」; thread names only in the thread list | R-02, R-17 | An earlier relay that put the run name in the header |
+| ~~2026-10-24 21:13~~ | ~~Right panel 详情 header = the selected bot (same bloub and name as the left row) + 「<Bot 名> 的屏幕」; thread names only in the thread list~~ (replaced 2026-10-28: 概览 header with tabs, R-02, R-50) | R-02, R-17 | An earlier relay that put the run name in the header |
 | 2026-10-24 20:43 | Bot chat = plain conversation, no starter cards; Coordinator avatar is a bloub (see 21:50); 新建 Bot dialog is Grok-sized (big preview, shapes above, colours below) | R-06, R-12, R-05 | |
 | ~~2026-10-24 20:46~~ | ~~Right panel with a bot selected keeps 建议, then the bot's threads, then 我的任务~~ (replaced 21:57) | R-21 | |
 | 2026-10-24 19:36 | Bots run only on Mikka's AI SDK harness; own `bots` table; 新建 Bot = shape, colour, name only | R-05 | Bots as rows in `agents` |
@@ -107,6 +131,7 @@ Only these frames count as a source (file `zPe5LKycb2XuT1ivCLRw07`).
 | Group chat | `224:5023` (blue user bubbles; `205:4488` archived) | 2026-10-25 |
 | Artifact viewer | `178:11626` | 2026-10-25 00:39 |
 | Issue detail, threads and comments | page `220:5022`, frames `220:5023`, `220:5199` | 2026-10-25 |
+| UI v9: right panel, 建议, Artifact, browser | page `395:15023`; F1 `395:27702` chat + 线程 tab, F2 `395:27790` Artifact page, F3 `395:15024` thread with Artifact entry, F4 `395:27525` Artifact acceptance window, F5 `402:5699` 详情 tab, F6 `412:8066` browser open, F7 `418:5884` Coordinator 线程 tab, F8 `420:5831` 建议 page, F9 `422:5820` PR tab, F10 `445:6126` 全部线程 | 2026-10-28 |
 
 ## Open
 
@@ -114,8 +139,15 @@ Questions waiting on Alex. Move a row to "Decided" when he answers.
 
 | Since | Question | Default until answered |
 | --- | --- | --- |
+| 2026-10-28 | 待 Alex 确认：本机线程只接受可 clone 的远程仓库；没有 origin 的本地仓库不支持。来源：核心闭环 MVP 第 3 项。 | 按请求的 remote URL 在 daemon 缓存中 clone；不读取本地 checkout。 |
+| 2026-10-28 | 待 Alex 确认：线程看不到用户 checkout 里未提交的改动。来源：核心闭环 MVP 第 3 项。 | 每个线程从远程分支建立独立 worktree；用户先提交并推送需要带入的改动。 |
 | 2026-10-24 | Remove white hairlines app-wide (dialog and popover rings, column borders), not only inputs? | Inputs only |
 | 2026-10-24 | Token drift between Figma and code (`rules.md` § Tokens): which side moves? | Code value ships, Figma follows |
+| 2026-10-28 | How does a group chat lay out in the v9 right panel (概览 tabs, 全部线程)? | Keep the 2026-10-25 group 详情 (R-13) |
+| 2026-10-28 | 待 Alex 确认: a thread's screenshots and recordings are evidence kept with the thread, not artifacts: own table, no card in the chat, no Coordinator wake; the acceptance view (Figma waiting on approval) will show them | Built that way (`docs/mcp.md` § Run captures) |
+| 2026-10-28 | 待 Alex 确认: only the thread's owner sees its captures, as its content (R-62); share links work as artifact links | Owner only, links as artifacts |
+| 2026-10-28 | 待 Alex 确认: cloud computer captures need no per-call approval (the image never goes to the model), but are refused while the person holds the desktop or the workspace turned computers off. A recording already going keeps going if the person takes over | No approval; refused while held; a running recording continues |
+| 2026-10-28 | 待 Alex 确认: limits: images 10 MB, videos 100 MB; one recording per thread, 120 s by default and at most 300 s, 10 fps MP4; the run's end stops and keeps it | These limits |
 
 
 ## 2026-10-25: Retire standalone Agent generation
@@ -126,3 +158,52 @@ behaviour. Preserve owner-scoped historical reads, shared Bot rendering/images,
 and Claude Code/Codex/Cursor task execution harnesses. Harness names describe
 execution layers, not extra user-facing Bots. This is a behavioural retirement,
 not a shell/layout redesign; source correction: Alex 2026-10-25 23:40 UTC.
+
+## 2026-10-27: GitHub repository access and PR status
+
+GitHub repository access is individual: each person authorizes their own GitHub
+account and App installation. A linked PR's displayed state follows GitHub; Mikka
+does not close or reopen it. Existing manually shared task links remain shared.
+## MVP result closure · 2026-10-28
+
+R-66 implementation review frame, **待 Alex 确认** (not accepted):
+[Thread result cards, light/dark/narrow](https://www.figma.com/design/zPe5LKycb2XuT1ivCLRw07?node-id=356-4750).
+Status icon, thread title and real PR output chips only; no avatar or progress
+line. Show at most two PRs and fold additional or non-fitting outputs into `+N`.
+Use the existing Lucide icons and GitHub [Primer color states](https://primer.style/product/primitives/color/)
+through dedicated theme tokens, including draft gray and merged purple.
+
+| Status | Proposed decision | Behavior until Alex confirms |
+| --- | --- | --- |
+| 2026-10-28 · 已确认 | Repository push approval belongs to the signed-in repository owner and is requested in that person's chat. Approval follows `(userId, remoteKey)` across devices; it is not a device setting or a model decision. | No automatic approval. The existing confirmation card shows the repository and permission; the authenticated backend records owner/time and claim sends the snapshot. Revocation prevents later claims and PR creation. Fixed-Preview acceptance remains outstanding. |
+| 2026-10-28 · 已确认 | A submitted thread without a configured repository verification command may commit and push after explicit repository approval, then open a **draft** PR for human review. It retains `verify: not_run`; only an approved, matching, actually pushed unverified result may be `succeeded`, meaning handed in for review, never verification passed. Without that push it remains stopped and unverified, with no automatic task review transition. An unverified continuation converts its own task-marked open PR to draft; a closed/merged PR is never reopened automatically. Failed verification cannot publish. | Coordinator explicitly reports “未配置验证，草稿 PR 待人工检查” when the server confirms a draft; otherwise it reports the blocked/unverified result without inventing a PR. No command such as `true` is inserted and no test pass is fabricated. |
+| 待 Alex 确认 | Server PR creation uses a live-verified GitHub identity linked to the same Mikka user, plus an installation of the Mikka GitHub App with repository access. A Google-only session needs that GitHub connection before the server can open its PR. | Existing login methods remain unchanged. Missing linked identity, installation or permission is reported as incomplete setup; no App credential is borrowed from another owner. |
+
+## 2026-10-29 — Unattended sandbox execution
+
+Alex authorized implementation and tested delivery of an unattended sandbox workflow.
+Isolated cloud coding tasks default to public web egress and project dependency
+installation; explicit denials, read-only checks and administrator ceilings remain
+binding. Local execution retains its bounded destination policy. Project shell
+execution is independent of Git publication authority; publication still happens
+through the host's existing authorized delivery path.
+
+Web sub-agents receive current screenshots and produce structured mouse/keyboard
+operations. DOM text is optional observation evidence, never a keyword-based
+business authorization system. Decisions supplies semantic judgments; host-owned
+allow/ask/deny policy remains authoritative. Ordinary browsing/drafting does not
+request a second per-click approval. Saved same-owner/site unattended-login grants
+cover a single guarded sign-in, without separate fill and submit prompts. Secrets
+stay behind the existing broker; unknown mutation outcomes are not blindly retried.
+
+Do not add proactive recommendations, habit/location triggers, background research,
+full onboarding, a new knowledge base, or local-browser-session import in this work.
+
+## 2026-10-29 — Open implemented non-Linear capabilities
+
+Alex requested opening the implemented capabilities discussed in the README's
+task-flow and architecture diagrams, with Linear bidirectional sync excepted.
+Preserve Linear's existing state. Availability follows the existing owner,
+workspace and allow/ask/deny checks; it does not create provider or publication
+authority. Track the concrete rollout prerequisites and verification in
+[the rollout record](../integration/non-linear-rollout-20261029.md).

@@ -16,10 +16,10 @@ test('任务和项目共用状态语义色', () => {
   assert.equal(statusDots[statusTone('offTrack')], 'bg-destructive')
 })
 
-test('所有任务状态及优先级具有浅底、描边、文字及圆点样式', () => {
+test('所有任务状态及优先级具有浅底、文字及圆点样式，无描边（R-31）', () => {
   for (const option of [...ISSUE_STATUSES, ...ISSUE_PRIORITIES]) {
     const classes = statusTones[option.tone]
-    assert.match(classes, /border-/)
+    assert.doesNotMatch(classes, /border-(?!transparent)/)
     assert.match(classes, /bg-/)
     assert.match(classes, /text-/)
     assert.ok(statusDots[option.tone])

@@ -10,8 +10,10 @@ const buttonVariants = cva(
       variant: {
         status: '',
         default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        // R-31: the secondary button is a grey fill with no stroke, like Claude desktop's
+        // 「Add folder…」. `control` is a translucent overlay so it reads on white and grey alike.
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "bg-control text-foreground hover:bg-control-hover aria-expanded:bg-control-hover",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
@@ -52,8 +54,9 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot="button"
+      data-button-variant={tone ? undefined : variant}
       data-tone={tone}
-      className={cn(buttonVariants({ variant: tone ? 'status' : variant, size }), tone && 'rounded-md border hover:brightness-95 aria-expanded:brightness-95', tone && statusTones[tone], className)}
+      className={cn(buttonVariants({ variant: tone ? 'status' : variant, size }), tone && 'rounded-md hover:brightness-95 aria-expanded:brightness-95', tone && statusTones[tone], className)}
       {...props}
     />
   )

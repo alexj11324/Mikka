@@ -1,5 +1,7 @@
+import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { readdirSync } from 'node:fs'
 import { Pool } from 'pg'
-import { readFile } from 'node:fs/promises'
 import { getMigrations } from 'better-auth/db/migration'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { postgresSchemaStatements } from '@chat-adapter/state-pg'
@@ -17,8 +19,22 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pa
   throw new Error('测试初始化仅允许本机且名称以 _e2e 结尾的数据库。')
 }
 
+// Bootstrap probes use disposable schemas; the app itself needs migrations on its E2E target.
+execFileSync(process.execPath, ['scripts/migrate.mjs'], {
+  cwd: new URL('..', import.meta.url), stdio: 'inherit',
+  env: { ...process.env, MIKKA_DATABASE_URL: connectionString, DATABASE_URL: connectionString, MIGRATE: '1' },
+})
+
 const authPool = new Pool({ connectionString, max: 1 })
 try {
+  const expected = readdirSync(new URL('../drizzle/', import.meta.url)).filter(name => name.endsWith('.sql')).sort()
+  const applied = (await authPool.query('SELECT name FROM schema_migrations ORDER BY name')).rows.map(row => row.name)
+  assert.deepEqual(applied, expected, 'The E2E app target must contain every tracked migration')
+  for (const table of ['factory_questions', 'improvement_skill_candidates', 'improvement_skill_selections',
+    'improvement_skill_mounts', 'improvement_benchmark_instances', 'improvement_skill_lifecycle']) {
+    assert.ok((await authPool.query('SELECT to_regclass($1) AS relation', [table])).rows[0].relation,
+      `Missing SQL-only E2E table: ${table}`)
+  }
   // The OAuth provider's tables (drizzle/0009); its pages do not matter here.
   const migration = await getMigrations({ database: authPool, emailAndPassword: { enabled: true }, plugins: [oauthProvider({ loginPage: '/sign-in', consentPage: '/oauth/consent', disableJwtPlugin: true })] })
   await migration.runMigrations()
@@ -59,11 +75,8 @@ try {
     ]
     await pool.query(`CREATE TABLE IF NOT EXISTS ${identifier(config.name)} (${[...columns, ...constraints].join(', ')})`)
   }
-  // Computer infrastructure uses reviewed SQL migrations rather than Drizzle
-  // table definitions. Apply the same additive DDL in the isolated E2E DB.
-  for (const name of ['20261027164501_cloud_computers.sql', '20261027164502_computer_run_bindings.sql', '20261027164510_local_computer_reviews.sql', '20261027164511_cloud_device_scope.sql', '20261027164512_cloud_worker_leases.sql', '20261027164513_computer_run_approvals.sql', '20261027164514_bot_cloud_runtimes.sql', '20261027164515_workspace_computer_policy.sql']) {
-    await pool.query(await readFile(new URL(`../drizzle/${name}`, import.meta.url), 'utf8'))
-  }
+  // The complete migration runner above already applied SQL-only runtime,
+  // CLI policy and Factory tables. Never replay a handwritten subset here.
   for (const statement of postgresSchemaStatements) await pool.query(statement)
   console.log('独立 E2E 数据库已就绪；认证表使用 Better Auth 迁移，业务表来自现有 Drizzle schema。')
 } finally {

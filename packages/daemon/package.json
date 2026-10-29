@@ -6,7 +6,7 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "bin": {
-    "mikka": "./bin/mikka.ts"
+    "mikka": "./dist/mikka.js"
   },
   "exports": {
     ".": "./src/main.ts",
@@ -24,11 +24,14 @@
     "daemon": "tsx bin/mikka.ts daemon",
     "dev": "tsx watch bin/mikka.ts daemon --dev --server memory",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "vitest run && pnpm test:mailbox-cli",
-    "test:mailbox-cli": "node --import tsx --test test/run-mailbox.node-test.ts",
+    "test": "vitest run && pnpm test:mailbox-cli && pnpm test:repository-identity",
+    "test:mailbox-cli": "node --import tsx --test --test-timeout=60000 test/run-mailbox.node-test.ts",
     "codex:types": "codex app-server generate-ts --out \"${TMPDIR:-/tmp}/mikka-codex-types\" && echo \"Generated; compare v2/ with src/adapters/codex-protocol.ts\"",
     "test:real": "MIKKA_REAL_AGENTS=${MIKKA_REAL_AGENTS:-claude_code,codex,cursor} vitest run test/real-agents.test.ts",
-    "test:changed": "vitest run --changed origin/main --passWithNoTests"
+    "test:changed": "vitest run --changed origin/main --passWithNoTests",
+    "build": "node scripts/build.mjs",
+    "test:package": "node --test test/package.test.mjs",
+    "test:repository-identity": "node --experimental-strip-types --test test/repository-identity-pure.node-test.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.9.0",
@@ -49,6 +52,7 @@
     "@types/node": "24.19.2",
     "@types/proper-lockfile": "4.1.4",
     "tsx": "4.23.15",
+    "esbuild": "0.28.2",
     "vitest": "5.0.5"
   }
 }

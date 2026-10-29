@@ -4,6 +4,7 @@ import type { Harness, HarnessInfo } from "@mikka/protocol"
 import { execa } from "execa"
 
 import { buildChildEnv } from "./env"
+import { daemonTestMode } from "@mikka/protocol/repository"
 import { DAEMON_VERSION } from "./paths"
 
 /** Candidate binaries per harness, tried in order. */
@@ -42,6 +43,6 @@ export async function detectHarnesses(): Promise<HarnessInfo[]> {
   )
   return [
     ...detected,
-    { harness: "mock", installed: true, version: DAEMON_VERSION },
+    ...(daemonTestMode(process.env) ? [{ harness: "mock" as const, installed: true, version: DAEMON_VERSION }] : []),
   ]
 }

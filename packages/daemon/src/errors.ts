@@ -15,12 +15,11 @@ export class DaemonError extends Error {
   }
 }
 
-export class RepoNotAllowedError extends DaemonError {
-  constructor(repoId: string) {
+export class InvalidRepositoryError extends DaemonError {
+  constructor(message = 'Invalid repository URL; dispatch a new thread.') {
     super(
       DAEMON_RPC_ERRORS.repoNotAllowed,
-      `Repository "${repoId}" is not in this device's allow-list. Add it to the device's repos before running agents on it.`,
-      { repoId }
+      message,
     )
   }
 }

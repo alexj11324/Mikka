@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, writeFile, mkdir, symlink, rm } from 'node:fs/promises'
+import { mkdtemp, writeFile, mkdir, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -65,8 +65,7 @@ test('directory loader materializes the bundled Markdown example without executi
 })
 test('directory loader rejects traversal, symlinks and ambiguous asset fields', async t => {
   const root=await mkdtemp(join(tmpdir(),'mikka-agent-kit-'))
-  if (process.env.MIKKA_PRESERVE_TEST_FIXTURES === '1') t.diagnostic(`Preserved synthetic loader fixtures: ${root}`)
-  else t.after(() => rm(root,{ recursive:true,force:true }))
+  t.diagnostic(`Retained synthetic loader fixtures: ${root}`)
   await mkdir(join(root,'bundle'));await writeFile(join(root,'outside.md'),'private')
   const manifest={ ...base(),instructionsFile:'../outside.md' } as Record<string,unknown>;delete manifest.instructions
   const write=() => writeFile(join(root,'bundle','agent.json'),JSON.stringify(manifest))
@@ -101,6 +100,7 @@ test('an after-hook failure does not report a successful external effect as fail
 test('tool errors and pending approvals are distinguishable from completed effects', () => {
   assert.equal(toolOutcome({ error:'unavailable' }),'error')
   assert.equal(toolOutcome({ status:'pending_approval' }),'approval_pending')
+  assert.equal(toolOutcome({ status:'awaiting_approval' }),'approval_pending')
   assert.equal(toolOutcome({ approvalRequired:true }),'approval_pending')
   assert.equal(toolOutcome({ ok:true }),'ok')
 })

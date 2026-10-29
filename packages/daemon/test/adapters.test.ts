@@ -10,8 +10,10 @@ import { execa } from "execa"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { NoSandbox } from "../src/agents/sandbox"
+import { ToolApprovalGate } from "../src/agents/tool-approval"
 import type { RunChunk } from "../src/chunks"
 import { Daemon } from "../src/main"
+import { RunJournal } from "../src/runs/journal"
 import { MemoryServer } from "../src/server-link"
 import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
 import { resolveAgentSettings } from "@mikka/protocol/agent-policy"
@@ -33,10 +35,12 @@ afterEach(async () => {
 })
 
 async function boot(server: MemoryServer, dataDir: string) {
+  const link = server.link()
+  link.prepareRunToolApproval = async assignment => new ToolApprovalGate(assignment.runId, { permission: () => 'allow', ask: async () => 'deny', isLive: () => true })
   const daemon = await new Daemon({
     dataDir,
     flavor: "dev",
-    link: server.link(),
+    link,
     credential: "cred",
     heartbeatMs: 50,
     harnesses: (["claude_code", "codex", "cursor"] as const).map((harness) => ({
@@ -52,17 +56,21 @@ async function boot(server: MemoryServer, dataDir: string) {
   return daemon
 }
 
-async function setup() {
+async function setup(repoPushApproved = true) {
   const repo = await makeRepo()
   const origin = tempDir("orvo-")
   await execa("git", ["init", "-q", "--bare", origin])
   await execa("git", ["remote", "add", "origin", origin], { cwd: repo })
+  await execa("git", ["push", "-q", "origin", "main"], { cwd: repo })
+  await execa("git", ["symbolic-ref", "HEAD", "refs/heads/main"], { cwd: origin })
   const server = new MemoryServer(DEVICE)
   server.addRepo(DEVICE, {
     repoId: "repo",
     name: "sandbox",
-    path: repo,
-    push: { approved: true },
+    // The fixture's upstream is cloned into the daemon cache. A user's
+    // checkout is never the fetch/push target for a local thread.
+    path: origin,
+    ...(repoPushApproved ? { push: { approved: true } } : {}),
   })
   const dataDir = tempDir()
   return { repo, origin, server, dataDir, daemon: await boot(server, dataDir) }
@@ -72,7 +80,7 @@ function queue(
   server: MemoryServer,
   harness: Harness,
   prompt: string,
-  verifyCommand = "test -f NOTES.md"
+  verifyCommand = "test -f NOTES.md",
 ) {
   return server.queueRun(DEVICE, {
     issueId: `issue-${harness}`,
@@ -105,6 +113,12 @@ function texts(chunks: RunChunk[]) {
     .join("")
 }
 
+it('does not advertise policy enforcement from callback availability alone', async () => {
+  const { server } = await setup()
+  const reported = server.devices.get(DEVICE)?.info.harnesses ?? []
+  expect(reported.some(item => item.toolApproval === true)).toBe(false)
+})
+
 describe.each(["claude_code", "codex", "cursor"] as const)(
   "%s adapter",
   (harness) => {
@@ -130,7 +144,7 @@ describe.each(["claude_code", "codex", "cursor"] as const)(
       })
       // The completion carries the same result for the orchestrator.
       expect(completion?.report.publish).toEqual(
-        publish?.type === "data-publish" ? publish.data : undefined
+        publish?.type === "data-publish" ? publish.data : undefined,
       )
       const { stdout } = await execa("git", [
         "--git-dir",
@@ -150,7 +164,7 @@ describe.each(["claude_code", "codex", "cursor"] as const)(
         stopReason: "turn_ended",
       })
       expect(
-        server.chunksFor(runId).some((c) => c.type === "data-publish")
+        server.chunksFor(runId).some((c) => c.type === "data-publish"),
       ).toBe(false)
     })
 
@@ -180,7 +194,7 @@ describe.each(["claude_code", "codex", "cursor"] as const)(
       await ended(daemon, unasked)
       expect(texts(server.chunksFor(unasked))).toContain("model: none")
     })
-  }
+  },
 )
 
 describe("the issue branch", () => {
@@ -191,7 +205,20 @@ describe("the issue branch", () => {
     GIT_COMMITTER_EMAIL: "person@mikka.invalid",
   }
 
-  function queueOnIssue(server: MemoryServer, pushBranch: string) {
+  it("hands in unverified changes for a draft PR without inventing a verify pass", async () => {
+    const { origin, server, daemon } = await setup(false)
+    const runId = server.queueRun(DEVICE, {
+      issueId: "issue-unverified", repoId: "repo", baseBranch: "main",
+      harness: "claude_code", prompt: "Please SUBMIT", pushBranch: "mikka/orv-4",
+      policy: resolveAgentSettings({ permissions: { git_push: "allow" } }).policy,
+    })
+    await started(daemon, runId)
+    expect(await ended(daemon, runId)).toMatchObject({ state: "succeeded" })
+    expect(server.runs.get(runId)?.completion?.report).toMatchObject({ verify: { status: "not_run" }, publish: { pushed: true, branch: "mikka/orv-4" } })
+    expect((await execa("git", ["--git-dir", origin, "show", "mikka/orv-4:NOTES.md"])).stdout).toBeTruthy()
+  })
+
+  function queueOnIssue(server: MemoryServer, pushBranch: string, claimApproved = false) {
     return server.queueRun(DEVICE, {
       issueId: "issue-orv-1",
       repoId: "repo",
@@ -200,6 +227,7 @@ describe("the issue branch", () => {
       prompt: "Please SUBMIT",
       verifyCommand: "test -f NOTES.md",
       pushBranch,
+      ...(claimApproved ? { policy: resolveAgentSettings({ permissions: { git_push: 'allow' } }).policy } : {}),
     })
   }
 
@@ -239,7 +267,7 @@ describe("the issue branch", () => {
     expect(await remote("rev-parse", "mikka/orv-1^")).toBe(personTip)
     const files = await remote("ls-tree", "--name-only", "mikka/orv-1")
     expect(files.split("\n")).toEqual(
-      expect.arrayContaining(["NOTES.md", "PERSON.md"])
+      expect.arrayContaining(["NOTES.md", "PERSON.md"]),
     )
   })
 
@@ -260,8 +288,30 @@ describe("the issue branch", () => {
       "mikka/orv-2^",
     ])
     expect(parent.stdout).toBe(
-      (await execa("git", ["rev-parse", "main"], { cwd: repo })).stdout
+      (await execa("git", ["rev-parse", "main"], { cwd: repo })).stdout,
     )
+  })
+
+  it("continues an existing issue branch when push approval comes only from claim policy", async () => {
+    const { origin, server, daemon } = await setup(false)
+    const first = queueOnIssue(server, "mikka/orv-3", true)
+    await started(daemon, first)
+    await ended(daemon, first)
+    expect(server.runs.get(first)?.completion?.report.publish?.pushed).toBe(true)
+
+    const person = join(tempDir("mikka-person-"), "clone")
+    await execa("git", ["clone", "-q", "--branch", "mikka/orv-3", origin, person])
+    writeFileSync(join(person, "PERSON.md"), "A follow-up made by the person.\n")
+    await execa("git", ["add", "PERSON.md"], { cwd: person })
+    await execa("git", ["commit", "-q", "-m", "follow-up"], { cwd: person, env: PERSON })
+    await execa("git", ["push", "-q", "origin", "mikka/orv-3"], { cwd: person })
+    const personTip = (await execa("git", ["rev-parse", "HEAD"], { cwd: person })).stdout
+
+    const second = queueOnIssue(server, "mikka/orv-3", true)
+    await started(daemon, second)
+    await ended(daemon, second)
+    expect(server.runs.get(second)?.completion?.report.publish).toMatchObject({ pushed: true, branch: "mikka/orv-3", commit: personTip })
+    expect((await execa("git", ["--git-dir", origin, "show", "mikka/orv-3:PERSON.md"])).stdout).toBe("A follow-up made by the person.")
   })
 })
 
@@ -281,7 +331,7 @@ describe("workspace agent policy (ADR 0028)", () => {
     await started(daemon, runId)
     expect(await ended(daemon, runId)).toMatchObject({ state: "succeeded" })
     expect(
-      server.chunksFor(runId).find((c) => c.type === "data-publish")
+      server.chunksFor(runId).find((c) => c.type === "data-publish"),
     ).toMatchObject({
       data: {
         pushed: false,
@@ -289,7 +339,7 @@ describe("workspace agent policy (ADR 0028)", () => {
       },
     })
     await expect(
-      execa("git", ["--git-dir", origin, "rev-parse", `mikka/run-${runId}`])
+      execa("git", ["--git-dir", origin, "rev-parse", `mikka/run-${runId}`]),
     ).rejects.toThrow()
   })
 
@@ -312,10 +362,10 @@ describe("workspace agent policy (ADR 0028)", () => {
     // The submit is verified, so a normal run would publish here.
     expect(await ended(daemon, runId)).toMatchObject({ state: "succeeded" })
     expect(server.chunksFor(runId).some((c) => c.type === "data-publish")).toBe(
-      false
+      false,
     )
     await expect(
-      execa("git", ["--git-dir", origin, "rev-parse", `mikka/run-${runId}`])
+      execa("git", ["--git-dir", origin, "rev-parse", `mikka/run-${runId}`]),
     ).rejects.toThrow()
   })
 })
@@ -327,14 +377,14 @@ describe("verify", () => {
       server,
       "claude_code",
       "Please SUBMIT",
-      "test -f NOTES.md && echo patched > NOTES.md"
+      "test -f NOTES.md && echo patched > NOTES.md",
     )
     await started(daemon, runId)
     const run = await ended(daemon, runId)
     expect(run).toMatchObject({ state: "failed", stopReason: "submitted" })
     expect(run.error).toMatch(/changed the worktree/)
     expect(server.chunksFor(runId).some((c) => c.type === "data-publish")).toBe(
-      false
+      false,
     )
   })
 })
@@ -369,7 +419,7 @@ describe("interjections and cancel", () => {
     await daemon.supervisor.send(runId, "now SUBMIT")
     expect(await ended(daemon, runId)).toMatchObject({ state: "succeeded" })
     expect(server.runs.get(runId)?.completion?.report.summary).toBe(
-      "Steered and wrote NOTES.md"
+      "Steered and wrote NOTES.md",
     )
   })
 
@@ -382,7 +432,7 @@ describe("interjections and cancel", () => {
       await waitFor(() => texts(server.chunksFor(runId)) !== "")
       const run = await daemon.supervisor.cancel(runId)
       expect(run).toMatchObject({ state: "cancelled", stopReason: "cancelled" })
-    }
+    },
   )
 })
 
@@ -404,7 +454,7 @@ describe.each(["claude_code", "codex", "cursor"] as const)(
     function queueFollowUp(
       server: MemoryServer,
       continuesRunId: string,
-      resumeSessionId: string
+      resumeSessionId: string,
     ) {
       return server.queueRun(DEVICE, {
         issueId: `issue-${harness}`,
@@ -446,10 +496,73 @@ describe.each(["claude_code", "codex", "cursor"] as const)(
       expect(run.worktree).toBe(earlier.worktree)
       expect(texts(server.chunksFor(runId))).toContain("BRIEF")
     })
-  }
+    it.skipIf(harness === "cursor")(
+      "question continuation refuses a missing original session without a fresh prompt",
+      async () => {
+        const { server, daemon } = await setup()
+        const earlier = await earlierRun(server, daemon)
+        const runId = queueFollowUp(server, earlier.runId, "gone-session")
+        server.runs.get(runId)!.assignment.requireSessionResume = true
+        await started(daemon, runId)
+        const run = await ended(daemon, runId)
+        expect(run.state).toBe("failed")
+        expect(texts(server.chunksFor(runId))).not.toContain("BRIEF")
+        expect(texts(server.chunksFor(runId))).not.toContain(FOLLOW_UP)
+      },
+    )
+    it.skipIf(harness === "cursor")(
+      "question continuation resumes the exact original session",
+      async () => {
+        const { server, daemon } = await setup()
+        const earlier = await earlierRun(server, daemon)
+        const runId = queueFollowUp(
+          server,
+          earlier.runId,
+          earlier.sessionId as string,
+        )
+        server.runs.get(runId)!.assignment.requireSessionResume = true
+        await started(daemon, runId)
+        const run = await ended(daemon, runId)
+        expect(run.sessionId).toBe(earlier.sessionId)
+        expect(texts(server.chunksFor(runId))).toContain(FOLLOW_UP)
+        expect(texts(server.chunksFor(runId))).not.toContain("BRIEF")
+      },
+    )
+  },
 )
 
 describe("resume after a daemon restart", () => {
+  it.each(["claude_code", "codex"] as const)(
+    "%s: uncertain question delivery fails closed without another CLI turn",
+    async (harness) => {
+      const { server, dataDir, daemon } = await setup()
+      const runId = queue(server, harness, harness === "codex" ? "WAIT please" : "HANG please")
+      await started(daemon, runId)
+      await waitFor(() => texts(server.chunksFor(runId)) !== "")
+      await daemon.stop()
+      daemons.splice(daemons.indexOf(daemon), 1)
+      const journal = new RunJournal(join(dataDir, "runs.json"))
+      const entry = journal.get(runId)!
+      journal.put({
+        ...entry,
+        assignment: {
+          ...entry.assignment,
+          requireSessionResume: true,
+          resumeSessionId: entry.sessionId!,
+          continuesRunId: "original-run",
+          followUp: "NEVER REPLAY THIS ANSWER",
+        },
+        questionResumeState: "starting",
+      })
+      const before = texts(server.chunksFor(runId))
+      const second = await boot(server, dataDir)
+      const run = await ended(second, runId)
+      expect(run.state).toBe("failed")
+      expect(run.error).toContain("delivery is uncertain")
+      expect(texts(server.chunksFor(runId))).toBe(before)
+    },
+  )
+
   it.each(["claude_code", "cursor"] as const)(
     "%s: the next daemon reopens the same session",
     async (harness) => {
@@ -471,7 +584,7 @@ describe("resume after a daemon restart", () => {
         expect(shown).toContain(`resumed ${sessionId}`)
       // ACP replays history on load; it must not be shown twice.
       expect(shown).not.toContain("REPLAYED HISTORY")
-    }
+    },
   )
 
   it("ends at once, without the CLI, when the agent handed in before the restart", async () => {
@@ -486,14 +599,14 @@ describe("resume after a daemon restart", () => {
     writeFileSync(join(worktree as string, "NOTES.md"), "notes\n")
     writeFileSync(
       join(dataDir, "adapters", "runs", runId, "handoff.json"),
-      JSON.stringify({ kind: "submit", summary: "Done before the crash" })
+      JSON.stringify({ kind: "submit", summary: "Done before the crash" }),
     )
 
     const second = await boot(server, dataDir)
     const run = await ended(second, runId)
     expect(run).toMatchObject({ state: "succeeded", stopReason: "submitted" })
     expect(server.runs.get(runId)?.completion?.report.summary).toBe(
-      "Done before the crash"
+      "Done before the crash",
     )
     expect(texts(server.chunksFor(runId))).not.toContain("resumed")
   })

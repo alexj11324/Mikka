@@ -8,19 +8,19 @@ import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import {
-  agents, agentRuns, deviceRepos, deviceTokens, devices, issueMembers, runChunks, runMessages, users,
-  SUPPORTED_HARNESSES, type SupportedHarness,
+  agents, agentRuns, deviceRepos, devices, issueMembers, runChunks, runMessages, users,
+  type SupportedHarness,
 } from '@/lib/db/schema'
-import { DEVICE_ONLINE_WINDOW_MS, hashDeviceToken, newDeviceToken } from '@/lib/device-link'
+import { DEVICE_ONLINE_WINDOW_MS, issueDeviceToken } from '@/lib/device-link'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
 import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
+import { executionBotName, runBotName } from '@/lib/run-bot-name'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, type IssueThread } from '@/lib/issue-threads'
-import { runIsActive } from '@/lib/issue-run-conversation'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
 async function getUserId(): Promise<string> {
@@ -32,7 +32,7 @@ async function getUserId(): Promise<string> {
 export interface DeviceRepoView {
   id: string
   repoPath: string
-  baseBranch: string
+  baseBranch: string | null
   verifyCommand: string | null
 }
 
@@ -60,7 +60,7 @@ export interface AgentView {
   deviceName: string | null
 }
 
-/** Every device this person owns, with the repos agents may work in. */
+/** Every local device this person owns, with its repository history. */
 export async function listDevices(): Promise<DeviceView[]> {
   const userId = await getUserId()
   const rows = await db.select().from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'))).orderBy(desc(devices.lastSeenAt))
@@ -83,10 +83,7 @@ export async function createDeviceToken(input: { name: string }): Promise<Action
     const userId = await getUserId()
     const parsed = z.object({ name: z.string().trim().max(60) }).safeParse(input)
     if (!parsed.success) return { error: 'deviceNameTooLong' }
-    const token = newDeviceToken()
-    await db.insert(deviceTokens).values({
-      id: crypto.randomUUID(), userId, name: parsed.data.name, tokenHash: hashDeviceToken(token),
-    })
+    const token = await issueDeviceToken(userId, parsed.data.name)
     return { token }
   })
 }
@@ -119,106 +116,14 @@ export async function listLocalSshHosts(): Promise<SshHostView[]> {
   return listSshHosts()
 }
 
-export async function addDeviceRepo(input: { deviceId: string; repoPath: string; baseBranch: string; verifyCommand: string }): Promise<void> {
-  const userId = await getUserId()
-  const parsed = z.object({
-    deviceId: z.uuid(),
-    repoPath: z.string().trim().min(1).max(4000).startsWith('/'),
-    baseBranch: z.string().trim().min(1).max(200),
-    verifyCommand: z.string().trim().max(2000),
-  }).safeParse(input)
-  if (!parsed.success) throw new ActionFailureError('repoPathInvalid')
-  const [device] = await db.select({ id: devices.id }).from(devices)
-    .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId))).limit(1)
-  if (!device) throw new ActionFailureError('deviceNotFound')
-  await db.insert(deviceRepos).values({
-    id: crypto.randomUUID(), deviceId: device.id, userId,
-    repoPath: parsed.data.repoPath, baseBranch: parsed.data.baseBranch,
-    verifyCommand: parsed.data.verifyCommand || null,
-  }).onConflictDoNothing()
-}
-
-export async function removeDeviceRepo(id: string): Promise<void> {
-  const userId = await getUserId()
-  const parsed = z.uuid().safeParse(id)
-  if (!parsed.success) throw new ActionFailureError('repoNotFound')
-  await db.delete(deviceRepos).where(and(eq(deviceRepos.id, parsed.data), eq(deviceRepos.userId, userId)))
-}
-
 export async function listAgents(): Promise<AgentView[]> {
   const userId = await getUserId()
   const rows = await db.select({
-    id: agents.id, name: agents.name, description: agents.description, instructions: agents.instructions,
+    id: agents.id, name: executionBotName, description: agents.description, instructions: agents.instructions,
     harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name,
   }).from(agents).leftJoin(devices, eq(devices.id, agents.deviceId))
     .where(and(eq(agents.userId, userId), sql`not exists (select 1 from bot_cloud_runtimes bcr where bcr."agentId" = ${agents.id})`)).orderBy(asc(agents.name))
   return rows
-}
-
-const agentInput = z.object({
-  deviceId: z.uuid(),
-  harness: z.enum(SUPPORTED_HARNESSES),
-  name: z.string().trim().min(1).max(60),
-  description: z.string().trim().max(200),
-  instructions: z.string().trim().max(4000),
-})
-
-function agentValidationCode(error: z.ZodError): 'validationNameRequired' | 'validationGeneric' {
-  return error.issues[0]?.path[0] === 'name' ? 'validationNameRequired' : 'validationGeneric'
-}
-
-/**
- * An agent is a named role run by one harness on one device. The harness must
- * be one the device actually reports as installed — the daemon's own
- * detection decides what can be added.
- */
-export async function createAgent(input: z.infer<typeof agentInput>): Promise<{ id: string }> {
-  const userId = await getUserId()
-  const parsed = agentInput.safeParse(input)
-  if (!parsed.success) throw new ActionFailureError(agentValidationCode(parsed.error))
-  const device = await ownedDeviceWithHarness(parsed.data.deviceId, parsed.data.harness, userId)
-  if (!device) throw new ActionFailureError('agentHarnessMissing')
-  const id = crypto.randomUUID()
-  try {
-    await db.insert(agents).values({ id, userId, ...parsed.data })
-  } catch (error) {
-    // 23505 is the name unique index; anything else is a real failure.
-    if ((error as { code?: string }).code === '23505') throw new ActionFailureError('agentDuplicateName')
-    throw new ActionFailureError('agentAddFailed')
-  }
-  return { id }
-}
-
-export async function updateAgent(input: { id: string; name: string; description: string; instructions: string }): Promise<void> {
-  const userId = await getUserId()
-  const parsed = z.object({
-    id: z.uuid(), name: z.string().trim().min(1).max(60),
-    description: z.string().trim().max(200), instructions: z.string().trim().max(4000),
-  }).safeParse(input)
-  if (!parsed.success) throw new ActionFailureError(agentValidationCode(parsed.error))
-  try {
-    await db.update(agents).set({
-      name: parsed.data.name, description: parsed.data.description,
-      instructions: parsed.data.instructions, updatedAt: new Date(),
-    }).where(and(eq(agents.id, parsed.data.id), eq(agents.userId, userId)))
-  } catch (error) {
-    if ((error as { code?: string }).code === '23505') throw new ActionFailureError('agentDuplicateName')
-    throw new ActionFailureError('agentSaveFailed')
-  }
-}
-
-export async function deleteAgent(id: string): Promise<void> {
-  const userId = await getUserId()
-  const parsed = z.uuid().safeParse(id)
-  if (!parsed.success) throw new ActionFailureError('agentNotFound')
-  await db.delete(agents).where(and(eq(agents.id, parsed.data), eq(agents.userId, userId)))
-}
-
-async function ownedDeviceWithHarness(deviceId: string, harness: SupportedHarness, userId: string) {
-  const [device] = await db.select().from(devices)
-    .where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId))).limit(1)
-  if (!device) return null
-  return device.harnesses.some(info => info.harness === harness && info.installed) ? device : null
 }
 
 /** Who currently collaborates on the issue (R-26): they see that its threads exist. */
@@ -242,8 +147,8 @@ async function issueThreadAccess(issueId: string) {
 
 const threadColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt,
-  report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
-  agentName: sql<string>`coalesce((select b.name from computer_run_bindings crb join bots b on b.id=crb."botId" and b."ownerId"=crb."ownerId" where crb."runId"=${agentRuns.id}), ${agents.name})`, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt,
+  sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
+  agentName: runBotName, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt,
 }
 
 /** The issue's threads, as much of each as this viewer may see (R-62). */
@@ -267,7 +172,7 @@ async function readableThread(issueId: string, runId: string) {
 
 export interface IssueThreadDetail {
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
-  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null }
+  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
 }
@@ -282,7 +187,7 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
   const [thread] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
   return {
-    thread: { ...thread, prompt: row.prompt, stopRequestedAt: row.stopRequestedAt },
+    thread: { ...thread, prompt: row.prompt, stopRequestedAt: row.stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
   }
@@ -293,8 +198,11 @@ export async function sendIssueThreadMessage(input: { issueId: string; runId: st
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId)
-  if (!runIsActive(row.status)) throw new ActionFailureError('runNotFound')
-  await addRunMessage(user.id, { runId: row.id, text: text.data })
+  const requestHeaders=await headers()
+  if(requestHeaders.has('authorization')||!requestHeaders.get('cookie'))throw new ActionFailureError('authRequired')
+  const session=await auth.api.getSession({headers:requestHeaders,query:{disableCookieCache:true}})
+  if(!session?.user||session.user.id!==user.id)throw new ActionFailureError('authRequired')
+  await addRunMessage(user.id,{runId:row.id,text:text.data},{source:'human',sessionId:session.session.id})
 }
 
 /**

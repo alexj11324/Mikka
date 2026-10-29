@@ -1,5 +1,6 @@
 import { sourcedEventMessage } from './message-safety'
 import { visibleRuns } from '@/lib/agent-runs'
+import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { issueForUser } from '@/lib/issue-access'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
@@ -7,10 +8,13 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
-import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
-import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
+import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, pendingActions, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { z } from 'zod'
+import { taskDestinationSchema } from '@/lib/task-destination'
+import { validateRepositoryApproval } from '@/lib/repository-approval-proposal'
+import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
-import { eventsForInbox } from '@/lib/coordinator/triage'
+import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
@@ -20,6 +24,9 @@ import { threadName } from '@/lib/issue-threads'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 import { readPreferences } from '@/lib/preferences'
 import { pushReasons, type PushReason } from '@/lib/push-reasons'
+import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
+import type { TriageJudgment } from './triage-batch'
+import type { DecisionExecution } from './decide'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -30,7 +37,7 @@ const LEASE_MS = 10 * 60_000
 /** Inbox events moved into the conversation per take. */
 const INBOX_BATCH = 50
 
-type Executor = Pick<typeof db, 'select' | 'insert'>
+type Executor = Pick<typeof db, 'select' | 'insert' | 'execute'>
 
 // Every bot chats on this harness. `botId` picks the chat: null is the
 // person's Coordinator (the built-in bot), otherwise one of their own bots.
@@ -41,13 +48,15 @@ const messagesOf = (userId: string, botId: string | null) => and(eq(coordinatorM
 const eventsOf = (userId: string, botId: string | null) => and(eq(coordinatorEvents.userId, userId), ofBot(coordinatorEvents.botId, botId))
 
 async function nextPosition(executor: Executor, userId: string, botId: string | null): Promise<number> {
+  await executor.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bot-chat:${userId}:${botId ?? 'coordinator'}`},0))`)
   const [row] = await executor.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
   return Number(row?.last ?? 0) + 1
 }
 
-/** Undelivered events that should start a turn; issue_done is background even before triage. */
-const wakingEvent = and(isNull(coordinatorEvents.deliveredAt), ne(coordinatorEvents.kind, 'issue_done'), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background')))
+/** Direct user input is deliverable without a classifier. Other events need
+ * a classification; a missing runtime judgment remains pending. */
+const wakingEvent = and(isNull(coordinatorEvents.deliveredAt), or(eq(coordinatorEvents.kind, 'user_message'), and(isNotNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background'))))
 function waking(userId: string, botId: string | null) {
   return and(eventsOf(userId, botId), wakingEvent)
 }
@@ -60,7 +69,7 @@ export async function hasWakingEvents(userId: string, botId: string | null = nul
 
 /** The person's chats with events that should start a turn: null is the Coordinator. */
 export async function wakingChats(userId: string): Promise<(string | null)[]> {
-  const rows = await db.selectDistinct({ botId: coordinatorEvents.botId }).from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), wakingEvent))
+  const rows = await db.selectDistinct({ botId: coordinatorEvents.botId }).from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background'))))
   return rows.map(row => row.botId)
 }
 
@@ -73,7 +82,7 @@ export async function wakingChats(userId: string): Promise<(string | null)[]> {
 export interface InboxTake {
   held: boolean
   added: number
-  telegramTargets: TelegramReplyTarget[]
+  telegramTargets: PendingTelegramTarget[]
   /** Matters from connected apps handed over in this take (lib/attention). */
   handoffMatterIds: string[]
   /** Every event in the take is a handoff: a reply can only be telling the person about one. */
@@ -82,6 +91,8 @@ export interface InboxTake {
   pushReasons: PushReason[]
   /** A handed-over verification code: the push says only that one came, the code stays in the app chat. */
   pushHidesText: boolean
+  taskEventId?: string
+  approvedRepositoryKey?: string
 }
 
 const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushReasons: [], pushHidesText: false }
@@ -95,26 +106,56 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
       .where(and(sessionOf(userId, botId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
     if (!taken) return { held: false, ...NO_TAKE }
-    const due = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
+    const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+    const due = isolateTaskRequest(candidates)
     if (!due.length) return { held: true, ...NO_TAKE }
-    const backgroundLimit = INBOX_BATCH - due.length
+    let taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
+    let approvedRepositoryKey: string | undefined
+    const approval = due.length === 1 && due[0].kind === 'action_decided' && due[0].payload.action === 'approve_repository_push' && due[0].payload.status === 'done' ? due[0] : undefined
+    if (approval && z.uuid().safeParse(approval.payload.requestEventId).success && z.uuid().safeParse(approval.payload.actionId).success) {
+      const [request] = await tx.select().from(pendingActions).where(and(eq(pendingActions.id, approval.payload.actionId as string), eq(pendingActions.userId, userId), eq(pendingActions.action, 'approve_repository_push'), eq(pendingActions.status, 'done'))).limit(1)
+      const taskIds = z.array(z.uuid()).safeParse(request?.context?.taskEventIds)
+      const binding = validateRepositoryApproval(request?.input)
+      if (binding && taskIds.success && taskIds.data.includes(approval.payload.requestEventId as string)) {
+        const [original] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, approval.payload.requestEventId as string), eventsOf(userId, botId), eq(coordinatorEvents.kind, 'user_message'))).limit(1)
+        const destination = taskDestinationSchema.safeParse(original?.payload.taskDestination)
+        if (original?.deliveredAt && destination.success && destination.data.kind === 'device') {
+          taskEventId = original.id
+          approvedRepositoryKey = binding.remoteKey
+        }
+      }
+    }
+    const isolatedTask = Boolean(taskEventId) || Boolean(approval)
+    const backgroundLimit = isolatedTask ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
-      .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
+      .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), eq(coordinatorEvents.tier, 'background')))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
     if (!events.length) return { held: true, ...NO_TAKE }
+    const chatEvents = events.filter(event => !(event.kind === 'user_message' && event.payload.postedToChat === true))
     const first = await nextPosition(tx, userId, botId)
-    await tx.insert(coordinatorMessages).values(events.map((event, index) => ({
+    if (chatEvents.length) await tx.insert(coordinatorMessages).values(chatEvents.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
       message: sourcedEventMessage({ ...event, deliveredAt: now }, eventPrompt(event)),
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
+    for (const event of events) {
+      const payload = markTelegramPending(event)
+      if (payload) await tx.update(coordinatorEvents).set({ payload }).where(eq(coordinatorEvents.id, event.id))
+    }
+    // A failed model turn has already consumed its inbox. Persisted source
+    // receipts keep its destination available to the next successful turn.
+    const pendingReplies = await tx.select().from(coordinatorEvents)
+      .where(and(eventsOf(userId, botId), isNotNull(coordinatorEvents.deliveredAt), sql`${coordinatorEvents.payload}->'mikkaTelegramReply'->>'state' = 'pending'`))
+      .orderBy(asc(coordinatorEvents.createdAt), asc(coordinatorEvents.id)).limit(100)
     const handoffs = events.filter(event => isHandoff(event.kind))
     return {
       held: true, added: events.length,
+      ...(taskEventId ? { taskEventId } : {}),
+      ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}),
       // A verification code is told in the app chat only, never on Telegram.
-      telegramTargets: handoffs.some(carriesCode) ? [] : telegramReplyTargets(events),
+      telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
       handoffOnly: handoffs.length === events.length,
       pushReasons: pushReasons(events),
@@ -139,15 +180,56 @@ export async function releaseLease(userId: string, holder: string, botId: string
   return hasWakingEvents(userId, botId)
 }
 
-/** Undelivered events not yet triaged, oldest first. */
+/** Direct user delivery first. Runtime ordering uses the last attempt, falling
+ * back to original creation time. Trying a slow event advances the durable
+ * cursor instead of repeatedly hiding all events after the oldest batch. */
 export async function untriagedEvents(userId: string, botId: string | null = null) {
-  return db.select().from(coordinatorEvents)
-    .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier)))
-    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+  const retryBefore = new Date(Date.now() - TRIAGE_RETRY_COOLDOWN_MS)
+  const events = await db.select().from(coordinatorEvents)
+    .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier),
+      or(eq(coordinatorEvents.kind, 'user_message'), isNull(coordinatorEvents.lastTriageAttemptAt), lt(coordinatorEvents.lastTriageAttemptAt, retryBefore))))
+    .orderBy(desc(eq(coordinatorEvents.kind, 'user_message')), asc(sql`coalesce(${coordinatorEvents.lastTriageAttemptAt}, ${coordinatorEvents.createdAt})`), asc(coordinatorEvents.id)).limit(INBOX_BATCH)
+  const runIds = [...new Set(events.flatMap(event => event.runId ? [event.runId] : []))]
+  // Reuse the existing visibility gate; teammate projections stay restricted.
+  const observed = new Map((runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length }) : [])
+    .map(run => [run.id, { id: run.id, status: run.status, finishedAt: run.finishedAt }]))
+  return events.map(event => ({ ...event, observedRun: event.runId ? observed.get(event.runId) ?? null : null }))
 }
 
-export async function setEventTier(id: string, tier: CoordinatorEventTier): Promise<void> {
-  await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.tier)))
+export async function setEventTier(id: string, tier: CoordinatorEventTier, scope: { userId: string; botId: string | null }): Promise<boolean> {
+  const applied = await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier), eventsOf(scope.userId, scope.botId))).returning({ id: coordinatorEvents.id })
+  return applied.length === 1
+}
+
+type TriageEventRecord = typeof coordinatorEvents.$inferSelect
+export async function claimTriageAttempt(event: TriageEventRecord, scope: { userId: string; botId: string | null }): Promise<Date | null> {
+  const now = new Date(), retryBefore = new Date(now.getTime() - TRIAGE_RETRY_COOLDOWN_MS)
+  const [claimed] = await db.update(coordinatorEvents).set({ lastTriageAttemptAt: now })
+    .where(and(eventsOf(scope.userId, scope.botId), eq(coordinatorEvents.id, event.id), ne(coordinatorEvents.kind, 'user_message'),
+      isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier),
+      event.lastTriageAttemptAt ? sql`date_trunc('milliseconds', ${coordinatorEvents.lastTriageAttemptAt}) = ${event.lastTriageAttemptAt}` : isNull(coordinatorEvents.lastTriageAttemptAt),
+      or(isNull(coordinatorEvents.lastTriageAttemptAt), lt(coordinatorEvents.lastTriageAttemptAt, retryBefore))))
+    .returning({ attemptedAt: coordinatorEvents.lastTriageAttemptAt })
+  return claimed?.attemptedAt ?? null
+}
+
+/** Winning attempt and the exact event payload must still match. Persisting the
+ * actual host receipt with the tier does not turn that choice into permission. */
+export async function completeTriageAttempt(event: TriageEventRecord & { observedRun?: unknown }, scope: { userId: string; botId: string | null }, attemptedAt: Date, judgment: TriageJudgment & { tier: CoordinatorEventTier; execution: DecisionExecution }): Promise<boolean> {
+  const receipt = { version: 1, method: 'model', eventId: event.id, eventKind: event.kind,
+    attemptedAt: attemptedAt.toISOString(), chosenTier: judgment.tier, observedRun: event.observedRun ?? null, execution: judgment.execution }
+  const applied = await db.update(coordinatorEvents).set({ tier: judgment.tier, triageDecision: receipt })
+    .where(and(eventsOf(scope.userId, scope.botId), eq(coordinatorEvents.id, event.id), eq(coordinatorEvents.kind, event.kind),
+      event.runId ? eq(coordinatorEvents.runId, event.runId) : isNull(coordinatorEvents.runId),
+      event.issueId ? eq(coordinatorEvents.issueId, event.issueId) : isNull(coordinatorEvents.issueId),
+      // pg Date values expose milliseconds, whereas default now() can contain
+      // microseconds. Compare the same observable precision, not a rounded
+      // parameter against the full timestamp (which would reject real events).
+      sql`date_trunc('milliseconds', ${coordinatorEvents.createdAt}) = ${event.createdAt}`,
+      eq(coordinatorEvents.payload, event.payload), eq(coordinatorEvents.lastTriageAttemptAt, attemptedAt),
+      isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier)))
+    .returning({ id: coordinatorEvents.id })
+  return applied.length === 1
 }
 
 /**
@@ -155,7 +237,9 @@ export async function setEventTier(id: string, tier: CoordinatorEventTier): Prom
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
 export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null): Promise<void> {
+  await assertCredentialSafeChat(userId, messages)
   await db.transaction(async tx => {
+    await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId" IS NOT DISTINCT FROM ${botId}::uuid FOR UPDATE`)
     if (messages.length) {
       const first = await nextPosition(tx, userId, botId)
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => ({
@@ -248,6 +332,7 @@ export async function citationSources(userId: string, texts: readonly string[], 
       const identifiers = task ? await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }]) : new Map<string, string>()
       const issue = task ? { id: task.id, title: task.title, number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null } : null
       sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue,
+        pullRequests: task ? readIssueMetadata(task.content).pullRequests : [],
         name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
         createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
     }

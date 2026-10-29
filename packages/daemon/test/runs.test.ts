@@ -1,19 +1,23 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { pathToFileURL } from "node:url"
+import { RepositoryCache } from "../src/repositories"
+import { runPolicy } from "../src/permissions"
 
 import { DAEMON_RPC_ERRORS } from "@mikka/protocol"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { RunChunk } from "../src/chunks"
 import { Daemon } from "../src/main"
+import { RunJournal } from "../src/runs/journal"
 import { connectDaemonInDataDir } from "../src/rpc/client"
 import {
   MAX_CONTINUES,
   MemoryServer,
   type SetupRecipe,
 } from "../src/server-link"
-import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
+import { makeRepo, tempDir, waitFor } from "./helpers"
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8" }).trim()
@@ -87,10 +91,42 @@ function states(chunks: RunChunk[]) {
 
 afterEach(async () => {
   for (const daemon of daemons.splice(0)) await daemon.stop()
-  cleanupTempDirs()
 })
 
 describe("mock runs", () => {
+  it("starts from the issue branch only when the trusted push policy permits it", async () => {
+    const source = await makeRepo()
+    git(source, "checkout", "-b", "mikka/issue-1")
+    writeFileSync(join(source, "issue-branch.txt"), "earlier work\n")
+    git(source, "add", "issue-branch.txt")
+    git(source, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "earlier work")
+    git(source, "checkout", "main")
+    const origin = join(tempDir(), "origin.git")
+    git(source, "clone", "--bare", source, origin)
+    const cases = [
+      { decision: "allow", approved: false, expected: true },
+      { decision: "ask", approved: true, expected: true },
+      { decision: "ask", approved: false, expected: false },
+      { decision: "deny", approved: true, expected: false },
+    ] as const
+    for (const { decision, approved, expected } of cases) {
+      const server = new MemoryServer(DEVICE)
+      server.addRepo(DEVICE, { repoId: "repo-1", name: "fixture", path: origin, push: { approved, remote: "origin" } })
+      const daemon = await boot(server, tempDir())
+      const defaults = runPolicy(undefined)
+      const runId = server.queueRun(DEVICE, {
+        issueId: `issue-${decision}-${approved}`, repoId: "repo-1",
+        remoteUrl: pathToFileURL(origin).href, harness: "mock", prompt: "inspect",
+        pushBranch: "mikka/issue-1", fixture: "turn-ended",
+        policy: { ...defaults, permissions: { ...defaults.permissions, git_push: decision } },
+      })
+      const run = await runToEnd(daemon, server, runId)
+      // An isolated child process observes the same checkout a CLI receives.
+      const observed = execFileSync(process.execPath, ["-e", "process.stdout.write(String(require('node:fs').existsSync('issue-branch.txt')))"], { cwd: run.worktree as string, encoding: "utf8" })
+      expect(observed).toBe(String(expected))
+      await daemon.stop()
+    }
+  })
   it("runs a fixture in its own worktree, writes the file change and ends in review", async () => {
     const { server, dataDir, repo } = await setup()
     const daemon = await boot(server, dataDir)
@@ -140,9 +176,77 @@ describe("mock runs", () => {
     client.close()
   })
 
-  it("refuses a repo that is not allow-listed", async () => {
+  it("rejects an assignment whose repository URL differs from its approved identity", async () => {
+    const { server, dataDir, repo } = await setup()
+    const daemon = await boot(server, dataDir)
+    const runId = server.queueRun(DEVICE, {
+      issueId: "issue-origin-mismatch", repoId: "repo-1", baseBranch: "main", harness: "mock",
+      prompt: "do it", fixture: "success-edit", verifyCommand: VERIFY,
+      remoteUrl: pathToFileURL(repo).href,
+      expectedRepoRemote: "https://github.com/example/expected",
+    })
+    await daemon.syncWithServer()
+    await waitFor(() => server.runs.get(runId)?.completion)
+    expect(server.runs.get(runId)?.completion?.stopReason).toBe("error")
+    expect(daemon.supervisor.list().some(run => run.runId === runId)).toBe(false)
+    expect(existsSync(join(dataDir, "worktrees", runId))).toBe(false)
+    expect(existsSync(join(repo, "MIKKA_MOCK.md"))).toBe(false)
+  })
+
+  it("accepts an approved repository URL delivered at claim without registering a checkout", async () => {
+    const repo = await makeRepo()
+    const remoteUrl = pathToFileURL(repo).href
+    const server = new MemoryServer(DEVICE)
+    const link = server.link()
+    const claim = link.claimRun.bind(link)
+    link.claimRun = async (deviceId, runId) => ({
+      ...await claim(deviceId, runId), remoteUrl, expectedRepoRemote: remoteUrl,
+    })
+    const daemon = await new Daemon({ dataDir: tempDir(), flavor: "dev", link, credential: "cred-1",
+      harnesses: [{ harness: "mock", installed: true, version: "test" }], mockSpeed: Number.POSITIVE_INFINITY,
+      heartbeatMs: 60_000, quotaSource: null }).start()
+    daemons.push(daemon)
+    await daemon.syncWithServer()
+    const runId = server.queueRun(DEVICE, { issueId: "issue-new-repo", repoId: "repo-new", baseBranch: "main",
+      harness: "mock", prompt: "do it", fixture: "success-edit", verifyCommand: VERIFY })
+    await daemon.syncWithServer()
+    await waitFor(() => daemon.supervisor.list().find(run => run.runId === runId))
+    await daemon.supervisor.idle()
+    await waitFor(() => server.runs.get(runId)?.completion)
+    expect(server.repos.size).toBe(0)
+    expect(server.runs.get(runId)?.completion?.stopReason).toBe("submitted")
+    expect(existsSync(join(repo, "MIKKA_MOCK.md"))).toBe(false)
+  })
+
+  it("checks the fixed candidate in its cache after the remote default branch advances", async () => {
+    const { server, dataDir, repo } = await setup()
+    writeFileSync(join(repo, "acceptance.mjs"), "console.log('pinned candidate checked')\n")
+    git(repo, "add", "acceptance.mjs")
+    git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "candidate")
+    const candidate = git(repo, "rev-parse", "HEAD")
+    writeFileSync(join(repo, "later-work.txt"), "outside the fixed candidate\n")
+    git(repo, "add", "later-work.txt")
+    git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "later work")
+    const daemon = await boot(server, dataDir)
+    const runId = server.queueRun(DEVICE, {
+      issueId: "issue-fixed-candidate", repoId: "repo-1", baseBranch: candidate, harness: "mock",
+      prompt: "Check the fixed candidate", kind: "acceptance", fixture: "check-pass",
+      verifyCommand: "node acceptance.mjs", policy: { ...runPolicy(undefined), readOnly: true },
+    })
+    const run = await runToEnd(daemon, server, runId)
+    expect(run.state).toBe("succeeded")
+    expect(existsSync(join(run.worktree as string, "later-work.txt"))).toBe(false)
+    expect(server.runs.get(runId)?.completion?.report).toMatchObject({
+      sourceCommit: candidate,
+      check: { sha: candidate, readOnly: true },
+      verify: { status: "passed", exitCode: 0 },
+    })
+    expect(server.runs.get(runId)?.completion?.report.publish).toBeUndefined()
+  })
+
+  it("refuses a local assignment without a repository URL", async () => {
     const { server, dataDir } = await setup()
-    await boot(server, dataDir)
+    const daemon = await boot(server, dataDir)
     const runId = queue(server, "success-edit", "repo-elsewhere")
     const client = await connectDaemonInDataDir(dataDir, {
       name: "t",
@@ -155,8 +259,10 @@ describe("mock runs", () => {
       message: string
     }
     expect(error.code).toBe(DAEMON_RPC_ERRORS.repoNotAllowed)
-    expect(error.message).toMatch(/not in this device's allow-list/)
+    expect(error.message).toMatch(/Repository URL required/)
     expect(existsSync(join(dataDir, "worktrees", runId))).toBe(false)
+    await waitFor(() => daemon.status().pendingUploads === 0)
+    expect(server.runs.get(runId)?.completion?.stopReason).toBe('error')
     client.close()
   })
 
@@ -183,10 +289,10 @@ describe("mock runs", () => {
     client.close()
   })
 
-  it("runs the approved setup recipe, then the repo's tests in the worktree", async () => {
+  it("runs approved setup from the cache without copying a user checkout file", async () => {
     const { server, dataDir } = await setup({
       copyFiles: [".env.local"],
-      command: "node -e \"require('fs').writeFileSync('setup-ran','')\"",
+      command: "node -e \"const fs=require('fs');fs.writeFileSync('.env.local','CACHE=1\\n');fs.writeFileSync('setup-ran','')\"",
       approved: true,
     })
     const daemon = await boot(server, dataDir)
@@ -196,7 +302,7 @@ describe("mock runs", () => {
     await daemon.supervisor.idle()
     const worktree = daemon.supervisor.get(runId).worktree as string
     expect(readFileSync(join(worktree, ".env.local"), "utf8")).toBe(
-      "SANDBOX=1\n"
+      "CACHE=1\n"
     )
     const output = server
       .chunksFor(runId)
@@ -283,11 +389,11 @@ describe("mock runs", () => {
     await daemon.syncWithServer()
     await waitFor(() => daemon.supervisor.get(runId).state === "running")
     await daemon.supervisor.cancel(runId)
+    const cached = new RepositoryCache(join(dataDir, 'repos')).pathFor(pathToFileURL(repo).href)
     await waitFor(
-      () =>
-        git(repo, "branch", "--list", `mikka/run-${runId}`) === "" &&
-        git(repo, "worktree", "list").split("\n").length === 1
+      () => git(cached, 'branch', '--list', `mikka/run-${runId}`) === '' && git(cached, 'worktree', 'list').split('\n').length === 1
     )
+    expect(git(repo, 'worktree', 'list').split('\n')).toHaveLength(1)
   })
 })
 
@@ -411,18 +517,19 @@ describe("plan runs", () => {
 describe("clean-up of earlier leftovers", () => {
   it("sweeps empty run branches at start and keeps one with a commit", async () => {
     const { repo, server, dataDir } = await setup()
+    const cached = await new RepositoryCache(join(dataDir, 'repos')).prepare(pathToFileURL(repo).href)
     // Left by runs this daemon has no record of: one empty, one with work.
-    git(repo, "branch", "mikka/run-empty1", "main")
-    git(repo, "branch", "mikka/run-work1", "main")
+    git(cached, "branch", "mikka/run-empty1", "main")
+    git(cached, "branch", "mikka/run-work1", "main")
     git(
-      repo,
+      cached,
       "worktree",
       "add",
       "-q",
       join(tempDir(), "wt"),
       "mikka/run-work1"
     )
-    const wt = git(repo, "worktree", "list", "--porcelain")
+    const wt = git(cached, "worktree", "list", "--porcelain")
       .split("\n")
       .find((l) => l.endsWith("/wt"))
       ?.slice("worktree ".length)
@@ -440,8 +547,8 @@ describe("clean-up of earlier leftovers", () => {
       "work"
     )
     await boot(server, dataDir)
-    expect(git(repo, "branch", "--list", "mikka/run-empty1")).toBe("")
-    expect(git(repo, "branch", "--list", "mikka/run-work1")).not.toBe("")
+    expect(git(cached, "branch", "--list", "mikka/run-empty1")).toBe("")
+    expect(git(cached, "branch", "--list", "mikka/run-work1")).not.toBe("")
   })
 })
 
@@ -460,7 +567,8 @@ describe("follow-up runs", () => {
   function queueFollowUp(
     server: MemoryServer,
     continuesRunId: string,
-    resumeSessionId: string
+    resumeSessionId: string,
+    requireSessionResume = false
   ) {
     return server.queueRun(DEVICE, {
       issueId: "issue-success-edit",
@@ -471,6 +579,7 @@ describe("follow-up runs", () => {
       followUp: FOLLOW_UP,
       continuesRunId,
       resumeSessionId,
+      requireSessionResume,
       fixture: "success-edit",
       verifyCommand: VERIFY,
     })
@@ -499,6 +608,50 @@ describe("follow-up runs", () => {
     const third = queueFollowUp(server, second, sessionId)
     expect(await runToEnd(daemon, server, third)).toMatchObject({ sessionId })
     expect(mockSession(dataDir, sessionId).messages).toHaveLength(3)
+  })
+
+  it("Factory external blockers retain their empty worktree for a later exact-session answer", async () => {
+    const {server,dataDir}=await setup()
+    const daemon=await boot(server,dataDir)
+    const first=server.queueRun(DEVICE,{issueId:"issue-blocked",repoId:"repo-1",baseBranch:"main",harness:"mock",prompt:"do it",fixture:"quota",preserveQuestionWorktree:true})
+    const run=await runToEnd(daemon,server,first)
+    expect(run.stopReason).toBe("blocked")
+    expect(await daemon.supervisor.discardIfEmpty(first)).toBe(false)
+    expect(existsSync(run.worktree!)).toBe(true)
+  })
+
+  it("required question continuation rejects a mock harness even with its exact earlier session", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const first = queue(server, "success-edit")
+    const earlier = await runToEnd(daemon, server, first)
+    const sessionId = earlier.sessionId as string
+    const second = queueFollowUp(server, first, sessionId, true)
+    expect(await runToEnd(daemon, server, second)).toMatchObject({state:"failed",sessionId:null,worktree:null})
+    expect(mockSession(dataDir,sessionId).messages).toEqual(["do it"])
+    expect(server.runs.get(second)?.completion?.report.summary).toContain('original resumable session')
+  })
+
+  it("required question continuation cannot use a missing worktree to start a fresh mock session", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const first = queue(server, "success-edit")
+    const earlier = await runToEnd(daemon, server, first)
+    const sessionId=earlier.sessionId as string
+    const second=queueFollowUp(server,"run-unknown",sessionId,true)
+    expect(await runToEnd(daemon,server,second)).toMatchObject({state:"failed"})
+    expect(mockSession(dataDir,sessionId).messages).toEqual(["do it"])
+    expect(server.runs.get(second)?.completion?.report?.summary ?? '').toContain('original resumable session')
+  })
+
+  it("required question continuation rejects an unknown mock session before adapter fallback", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const first = queue(server, "success-edit")
+    await runToEnd(daemon, server, first)
+    const second=queueFollowUp(server,first,"mock-unknown",true)
+    expect(await runToEnd(daemon,server,second)).toMatchObject({state:"failed"})
+    expect(server.runs.get(second)?.completion?.report?.summary ?? '').toContain('original resumable session')
   })
 
   it("starts a new session with the full brief in a fresh worktree", async () => {
@@ -543,6 +696,22 @@ describe("follow-up runs", () => {
 // reason, and the issue gets a next owner or a named wait reason. Only a
 // submission whose verify passed goes to review.
 describe("run stops", () => {
+  it("preserves a blocked question's empty worktree durably until explicit cancellation", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const runId = queue(server, "blocked-question")
+    const run = await runToEnd(daemon, server, runId)
+    expect(run.stopReason).toBe("blocked")
+    expect(await daemon.supervisor.discardIfEmpty(runId)).toBe(false)
+    expect(existsSync(run.worktree as string)).toBe(true)
+    const journal = new RunJournal(join(dataDir, "runs.json"))
+    expect(journal.get(runId)?.waitingQuestionId).toBe(
+      "8ebea126-b259-46b1-afca-7fe845576de1"
+    )
+    expect(await daemon.supervisor.discardIfEmpty(runId, runId)).toBe(true)
+    expect(existsSync(run.worktree as string)).toBe(false)
+  })
+
   it.each([
     [
       "turn-ended",
@@ -629,30 +798,49 @@ describe("run stops", () => {
 
   it("lease: a run whose lease cannot be renewed stops as device_lost", async () => {
     const { server, dataDir } = await setup(undefined, 300)
-    const daemon = await boot(server, dataDir)
-    const runId = queue(server, "stall")
-    await daemon.syncWithServer()
-    await waitFor(() => daemon.supervisor.get(runId).state === "running")
-    expect(daemon.supervisor.get(runId).leaseExpiresAt).toBeDefined()
-    expect(daemon.supervisor.computerRunAllowed(runId)).toBe(true)
-    // The heartbeat renews the lease while the server is reachable.
-    await new Promise((resolve) => setTimeout(resolve, 600))
-    expect(daemon.supervisor.get(runId).state).toBe("running")
+    // Git/child startup on a busy runner is not a lease-timer assertion. Keep
+    // real I/O/timers, but advance the shared host/server clock deliberately.
+    let now = Date.now()
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now)
+    try {
+      const daemon = await boot(server, dataDir)
+      const runId = queue(server, "stall")
+      await daemon.syncWithServer()
+      await waitFor(() => daemon.supervisor.get(runId).state === "running")
+      const firstLease = Date.parse(daemon.supervisor.get(runId).leaseExpiresAt!)
+      expect(firstLease).toBe(now + 300)
+      expect(daemon.supervisor.computerRunAllowed(runId)).toBe(true)
+      // A real heartbeat renews the same 300ms lease before it expires.
+      now += 200
+      await daemon.syncWithServer()
+      const renewed = Date.parse(daemon.supervisor.get(runId).leaseExpiresAt!)
+      expect(renewed).toBe(now + 300)
+      expect(renewed).toBeGreaterThan(firstLease)
+      expect(daemon.supervisor.get(runId).state).toBe("running")
+      expect(daemon.supervisor.computerRunAllowed(runId)).toBe(true)
 
-    server.online = false
-    await daemon.supervisor.idle()
-    expect(daemon.supervisor.get(runId).stopReason).toBe("device_lost")
-    expect(daemon.supervisor.computerRunAllowed(runId)).toBe(false)
-    // Meanwhile the server sees an active run without a fresh lease.
-    expect(server.unownedRuns()).toEqual([runId])
+      server.online = false
+      now = renewed - 1
+      expect(daemon.supervisor.computerRunAllowed(runId)).toBe(true)
+      now = renewed
+      expect(daemon.supervisor.computerRunAllowed(runId)).toBe(false)
+      now += 1
+      await daemon.supervisor.idle()
+      expect(daemon.supervisor.get(runId).stopReason).toBe("device_lost")
+      expect(daemon.supervisor.computerRunAllowed(runId)).toBe(false)
+      // Meanwhile the server sees an active run without a fresh lease.
+      expect(server.unownedRuns()).toEqual([runId])
 
-    server.online = true
-    await waitFor(() => daemon.status().pendingUploads === 0)
-    expect(server.issueOwner.get("issue-stall")).toEqual({
-      owner: "external",
-      reason: "device_offline",
-    })
-    expect(server.unownedRuns()).toEqual([])
+      server.online = true
+      await waitFor(() => daemon.status().pendingUploads === 0)
+      expect(server.issueOwner.get("issue-stall")).toEqual({
+        owner: "external",
+        reason: "device_offline",
+      })
+      expect(server.unownedRuns()).toEqual([])
+    } finally {
+      clock.mockRestore()
+    }
   })
 
   it("lease: a run the server took back stops at the next heartbeat", async () => {

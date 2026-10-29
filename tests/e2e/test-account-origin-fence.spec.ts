@@ -1,6 +1,7 @@
 import { createServer, type Server } from 'node:http'
 import { test, expect, type Browser, type BrowserContext, type CDPSession } from '@playwright/test'
 import { installAccountOriginFence } from './test-account-network'
+import { SYNTHETIC_PNG } from '../helpers/browser-image'
 
 // Transport-only Chromium regressions. These servers have no application data,
 // auth endpoint or private credential. Existing pool/HTTP cases separately test
@@ -28,7 +29,7 @@ async function fixture(browser: Browser, use: (value: {
   allowedCookieSeen: () => boolean; failures: string[]
   initialPopupHits: () => number
   detachProtection: () => Promise<void>
-}) => Promise<void>, options: { failProtocolAbort?: boolean; expectFailure?: boolean; failClose?: 'page' | 'context' } = {}) {
+}) => Promise<void>, options: { failProtocolAbort?: boolean; expectFailure?: boolean; failClose?: 'page' | 'context'; localImage?: boolean } = {}) {
   let foreignRequests = 0, websocketRequests = 0, allowedCookie = false, initialPopupRequests = 0
   const foreign = createServer((_request, response) => {
     foreignRequests++
@@ -46,6 +47,7 @@ async function fixture(browser: Browser, use: (value: {
     if (path === '/foreign-direct') return redirect(`${foreignOrigin}/blocked`)
     if (path === '/foreign-via') return redirect('/foreign-middle')
     if (path === '/foreign-middle') return redirect(`${foreignOrigin}/blocked`, 307)
+    if (path === '/fixture-image') return redirect(`${foreignOrigin}/fixture.png`)
     if (path === '/popup') { response.setHeader('content-type', 'text/html'); response.end('<a id="foreign" target="_blank" href="/foreign-via">foreign chain</a><a id="same" target="_blank" href="/same-start">same chain</a>'); return }
     if (path === '/worker.js') {
       response.setHeader('content-type', 'text/javascript')
@@ -113,7 +115,8 @@ async function fixture(browser: Browser, use: (value: {
       return session
     } })
     await installAccountOriginFence(context, { assertActive: async () => {} }, origin,
-      () => { blocked++ }, () => { failures.push('ORIGIN_FENCE_FAILED') })
+      () => { blocked++ }, () => { failures.push('ORIGIN_FENCE_FAILED') },
+      options.localImage ? [{ url: `${foreignOrigin}/fixture.png`, body: SYNTHETIC_PNG }] : [])
     await use({ context, origin, foreignOrigin, blocked: () => blocked,
       foreignHits: () => foreignRequests, websocketHits: () => websocketRequests,
       allowedCookieSeen: () => allowedCookie, initialPopupHits: () => initialPopupRequests, failures,
@@ -124,6 +127,44 @@ async function fixture(browser: Browser, use: (value: {
     await Promise.all([stop(allowed), stop(foreign)])
   }
 }
+
+test('origin fence decodes only the exact local fixture image without contacting the reachable foreign sink', async ({ browser }) => {
+  await fixture(browser, async f => {
+    const page = await f.context.newPage()
+    let browserErrors = 0
+    page.on('console', message => { if (message.type() === 'error') browserErrors++ })
+    page.on('pageerror', () => { browserErrors++ })
+    await page.goto(`${f.origin}/final`)
+    // Direct requests exercise routing; the same-origin redirect also reaches
+    // the independent CDP gate. Neither may continue to the foreign server.
+    for (const url of [`${f.foreignOrigin}/fixture.png`, `${f.origin}/fixture-image`]) {
+      const decoded = await page.evaluate(async src => {
+        const image = new Image()
+        document.body.append(image)
+        image.src = src
+        await image.decode()
+        return { complete: image.complete, width: image.naturalWidth, height: image.naturalHeight }
+      }, url)
+      expect(decoded).toEqual({ complete: true, width: 1, height: 1 })
+    }
+    expect(f.foreignHits()).toBe(0)
+    expect(f.blocked()).toBe(0)
+    expect(browserErrors).toBe(0)
+
+    // The identical URL is still forbidden as a fetch, and adding a query
+    // does not turn another image request into the registered static fixture.
+    expect(await page.evaluate(async url => {
+      try { await fetch(url, { mode: 'no-cors', credentials: 'include' }); return false } catch { return true }
+    }, `${f.foreignOrigin}/fixture.png`)).toBe(true)
+    expect(await page.evaluate(async src => {
+      const image = new Image()
+      image.src = src
+      try { await image.decode(); return false } catch { return true }
+    }, `${f.foreignOrigin}/fixture.png?unregistered=1`)).toBe(true)
+    await expect.poll(f.blocked).toBe(2)
+    expect(f.foreignHits()).toBe(0)
+  }, { localImage: true })
+})
 
 test('origin fence preserves same-origin redirect cookies and streaming browser responses', async ({ browser }) => {
   await fixture(browser, async f => {
@@ -200,6 +241,14 @@ test('origin fence blocks a browser fetch redirect before it can carry cookies t
   await fixture(browser, async f => {
     const page = await f.context.newPage()
     await page.goto(`${f.origin}/final`)
+    const refusalsAtRequestFailure: number[] = []
+    const refusalsAtConsoleError: number[] = []
+    page.on('requestfailed', request => {
+      if (request.resourceType() === 'fetch') refusalsAtRequestFailure.push(f.blocked())
+    })
+    page.on('console', message => {
+      if (message.type() === 'error' && message.text() === 'Failed to load resource: net::ERR_BLOCKED_BY_CLIENT') refusalsAtConsoleError.push(f.blocked())
+    })
     try {
       const result = await page.evaluate(async () => {
         try { await fetch('/foreign-via'); return 'unexpected-success' } catch { return 'blocked' }
@@ -207,6 +256,13 @@ test('origin fence blocks a browser fetch redirect before it can carry cookies t
       expect(result).toBe('blocked')
     } finally { expect(f.foreignHits()).toBe(0) }
     await expect.poll(f.blocked).toBe(1)
+    // Chromium reports this rejected request through Network.loadingFailed /
+    // requestfailed. A caught fetch need not also print a console error.
+    // Require an actual browser failure event and its refusal snapshot; retain
+    // the same ordering check for any console event Chromium does emit.
+    await expect.poll(() => refusalsAtRequestFailure.length).toBeGreaterThan(0)
+    expect(refusalsAtRequestFailure.every(count => count === 1)).toBe(true)
+    expect(refusalsAtConsoleError.every(count => count === 1)).toBe(true)
   })
 })
 
@@ -217,7 +273,7 @@ test('origin fence closes the context and reports failure when the protocol cann
     finally { expect(f.foreignHits()).toBe(0) }
     await expect.poll(() => f.context.isClosed()).toBe(true)
     expect(f.failures).toEqual(['ORIGIN_FENCE_FAILED'])
-    expect(f.blocked()).toBe(0)
+    expect(f.blocked()).toBe(1)
   }, { failProtocolAbort: true })
 })
 

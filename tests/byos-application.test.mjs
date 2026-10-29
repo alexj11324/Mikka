@@ -15,7 +15,7 @@ import { streamText, isStepCount, tool, toUIMessageStream } from 'ai'
 import { z } from 'zod'
 import { SubscriptionRepository } from '../lib/subscription-repository.ts'
 import { SubscriptionService } from '../lib/subscription-service.ts'
-import { subscriptionHTTP, subscriptionCallback, subscriptionList } from '../lib/subscription-http.ts'
+import { subscriptionHTTP, subscriptionCallback, subscriptionList, subscriptionUsage } from '../lib/subscription-http.ts'
 import { subscriptionNativeHTTP } from '../lib/subscription-native-http.ts'
 import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-worker-client.ts'
 import { resolveAgentSubscription } from '../lib/agent-subscription.ts'
@@ -23,6 +23,7 @@ import { resolveAgentModel } from '../lib/agent-model.ts'
 import { hostedSubscriptionLauncher } from '../packages/daemon/src/subscription-launcher.ts'
 import { buildChildEnv } from '../packages/daemon/src/env.ts'
 import { NoSandbox } from '../packages/daemon/src/agents/sandbox.ts'
+import { ToolApprovalGate } from '../packages/daemon/src/agents/tool-approval.ts'
 import { createLogger } from '../packages/daemon/src/log.ts'
 
 const workspaceId = '20000000-0000-4000-8000-000000000001'
@@ -198,6 +199,17 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       assert.equal((await post(completion)).status, 409)
       const persisted = await pool.query('select "secretName",epoch,state from byos_connections where id=$1', [connectionId])
       assert.equal(persisted.rows[0].state, 'connected')
+      const usage = async user => { const response = await subscriptionUsage(new Request(`http://localhost/api/subscriptions/usage?workspace=${workspaceId}`, { headers: { cookie: `fixture=${user}` } }), dependencies); return { status: response.status, text: await response.text() } }
+      const read = await usage('alice')
+      assert.equal(read.status, 200)
+      assert.ok(!/fixture-|Bearer|access_token/.test(read.text), 'usage exported a credential')
+      const row = JSON.parse(read.text).connections.find(item => item.id === connectionId)
+      assert.deepEqual({ status: row.status, windows: row.windows }, { status: 'ok', windows: [{ kind: 'five_hour', remaining: 80, resetsAt: null }] })
+      assert.deepEqual(JSON.parse((await usage('bob')).text).connections, [], 'usage is owner-scoped')
+      const listed = await (await subscriptionList(new Request(`http://localhost/api/subscriptions?workspace=${workspaceId}`, { headers: { cookie: 'fixture=alice' } }), dependencies)).json()
+      const entry = listed.connections.find(item => item.id === connectionId)
+      assert.equal(entry.account, row.account, 'list keeps the email a usage read stored')
+      assert.deepEqual(entry.bots, [])
       const stored = JSON.parse(secrets.get(persisted.rows[0].secretName))
       assert.equal(stored.ownerId, 'alice'); assert.equal(stored.payload.refresh_token, 'fixture-refresh')
       const consumerId = randomUUID()
@@ -272,6 +284,10 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       execFileSync('git', ['init', '-q', cwd])
       const binaryPath = resolve(root, `packages/daemon/test/fakes/fake-${provider === 'codex' ? 'codex' : 'claude'}-subscription.mjs`); await chmod(binaryPath, 0o755)
       const options = { runId: randomUUID(), cwd, prompt: provider === 'codex' ? 'REFRESH' : 'HANG', env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: runtime } }), log: createLogger({ level: 'silent' }) }
+      // This case exercises account custody with synthetic CLIs. Install a
+      // host-scoped gate without approving any tool operation; production
+      // assignments obtain their gate from the authenticated server link.
+      options.toolApproval = new ToolApprovalGate(options.runId, { permission: () => 'deny', ask: async () => 'deny', isLive: () => true })
       const launched = await service.launchNative('alice', consumerId, native.body.bindingId, hostedSubscriptionLauncher(options, { stateDir: runtime, sandbox: new NoSandbox(), codexBinary: binaryPath, claudeBinary: binaryPath, revocationPollMs: 30 }))
       sessions.push(launched)
       if (provider === 'claude') assert.equal((await post({ action: 'disconnect', connectionId, revision })).status, 200)
@@ -281,8 +297,10 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       if (provider === 'codex') assert.equal((await post({ action: 'disconnect', connectionId, revision })).status, 200)
       await assert.rejects(service.model(use), { code: 'disconnected' })
       const stateAfter = await repository.connection('alice', connectionId)
+      assert.equal(stateAfter.accountLabel, 'fixture@example.invalid', 'a disconnected row keeps its email')
       const reconnect = await post({ action: 'reconnect', connectionId, revision: Number(stateAfter.epoch) })
       assert.equal(reconnect.status, 200)
+      assert.equal((await repository.connection('alice', connectionId)).accountLabel, null, 'a new sign-in must not show the old email')
       assert.equal((await finishAttempt(connectionId, reconnect.body)).status, 200)
       await assert.rejects(service.model(use), { code: 'stale_binding' })
       assert.ok(!(await repository.connection('alice', connectionId)).quota, 'reconnect must clear old account quota')
@@ -318,6 +336,17 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
     assert.ok(!secrets.has(fairness[2]), 'two failed connections starved later cleanup')
     for(const name of fairness) blockedDeletes.delete(name)
     for(let pass=0;pass<4;pass++) await service.cleanupBatch()
+    // 移除: a pending (never finished) connection is fenced, then gone from the list for good.
+    const abandoned = await post({ action: 'connect', workspaceId, provider: 'claude' })
+    assert.equal(abandoned.status, 200)
+    const listedIds = async () => (await (await subscriptionList(new Request(`http://localhost/api/subscriptions?workspace=${workspaceId}`, { headers: { cookie: 'fixture=alice' } }), dependencies)).json()).connections.map(item => item.id)
+    assert.ok((await listedIds()).includes(abandoned.body.connectionId))
+    assert.equal((await post({ action: 'remove', connectionId: abandoned.body.connectionId, revision: abandoned.body.revision }, 'bob')).status, 409, 'another owner cannot remove it')
+    const removed = await post({ action: 'remove', connectionId: abandoned.body.connectionId, revision: abandoned.body.revision })
+    assert.equal(removed.status, 200)
+    assert.ok(!(await listedIds()).includes(abandoned.body.connectionId), '移除 left the row listed')
+    const gone = await pool.query('select state,"removedAt" from byos_connections where id=$1', [abandoned.body.connectionId])
+    assert.equal(gone.rows[0].state, 'disconnected'); assert.ok(gone.rows[0].removedAt)
     if (process.env.MIKKA_BYOS_BACKEND_ONLY === '1') { console.log('Backend-only acceptance complete; browser acceptance intentionally not run'); return }
     // Actual Settings component in Chromium, synthetic session/provider only.
     const require = createRequire(import.meta.url)
@@ -333,7 +362,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
         else if (incoming.url.startsWith('/api/subscriptions')) {
           const chunks = []; for await (const chunk of incoming) chunks.push(chunk)
           const req = new Request(url, { method: incoming.method, headers: incoming.headers, ...(incoming.method === 'POST' ? { body: Buffer.concat(chunks) } : {}) })
-          response = incoming.url.startsWith('/api/subscriptions/callback') ? await subscriptionCallback(req, dependencies) : incoming.method === 'POST' ? await http(req) : await subscriptionList(req, dependencies)
+          response = incoming.url.startsWith('/api/subscriptions/callback') ? await subscriptionCallback(req, dependencies) : incoming.method === 'POST' ? await http(req) : incoming.url.startsWith('/api/subscriptions/usage') ? await subscriptionUsage(req, dependencies) : await subscriptionList(req, dependencies)
         } else response = new Response('<!doctype html><html><body><main id="root"></main><script src="/browser.js"></script></body></html>', { headers: { 'content-type': 'text/html' } })
         outgoing.writeHead(response.status, Object.fromEntries(response.headers)); outgoing.end(Buffer.from(await response.arrayBuffer()))
       } catch { outgoing.writeHead(500).end() }

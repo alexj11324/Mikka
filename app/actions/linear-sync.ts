@@ -8,9 +8,12 @@ import { db } from '@/lib/db'
 import { issues, linearConnections, linearIssueLinks, linearSyncInbox, linearSyncOutbox, linearTeamSyncs } from '@/lib/db/schema'
 import { createLinearAuthorizationUrl, disconnectLinear, LINEAR_OAUTH_CALLBACK_PATH, LINEAR_OAUTH_STATE_COOKIE, linearAccessToken, linearOAuthConfigured } from '@/lib/linear-sync/oauth'
 import { linearTeams } from '@/lib/linear-sync/client'
+import { readIssueMetadata } from '@/lib/issue-metadata'
 import { dispatchLinearIssueSync, dispatchLinearWebhook } from '@/lib/linear-sync/dispatch'
+import { linearSyncEnabled } from '@/lib/linear-sync/flags'
 
 export async function getLinearIntegrationState() {
+  if (!await linearSyncEnabled()) return { enabled: false, configured: false, connected: false, organizationName: null, syncs: [], errors: [], inboundErrors: [] }
   const user = await requireUser()
   const [connection] = await db.select({ organizationName: linearConnections.organizationName, connected: linearConnections.userId })
     .from(linearConnections).where(and(eq(linearConnections.userId, user.id), isNull(linearConnections.revokedAt))).limit(1)
@@ -25,10 +28,11 @@ export async function getLinearIntegrationState() {
     .from(linearSyncInbox).innerJoin(linearConnections, and(eq(linearConnections.organizationId, linearSyncInbox.organizationId), eq(linearConnections.userId, user.id)))
     .where(and(eq(linearSyncInbox.status, 'failed'), isNull(linearConnections.revokedAt)))
     .orderBy(desc(linearSyncInbox.receivedAt)).limit(20)
-  return { configured: linearOAuthConfigured(), connected: Boolean(connection), organizationName: connection?.organizationName ?? null, syncs, errors, inboundErrors }
+  return { enabled: true, configured: linearOAuthConfigured(), connected: Boolean(connection), organizationName: connection?.organizationName ?? null, syncs, errors, inboundErrors }
 }
 
 export async function startLinearOAuth() {
+  if (!await linearSyncEnabled()) throw new Error('Linear sync is disabled')
   const user = await requireUser()
   const authorization = await createLinearAuthorizationUrl(user.id)
   ;(await cookies()).set(LINEAR_OAUTH_STATE_COOKIE, authorization.state, { httpOnly: true, sameSite: 'lax', secure: true, path: LINEAR_OAUTH_CALLBACK_PATH, maxAge: 600 })
@@ -36,12 +40,14 @@ export async function startLinearOAuth() {
 }
 
 export async function listLinearTeamOptions() {
+  if (!await linearSyncEnabled()) return []
   const user = await requireUser()
   const token = await linearAccessToken(user.id)
   return (await linearTeams(token)).map(({ id, key, name }) => ({ id, key, name }))
 }
 
 export async function enableLinearTeam(input: { teamId: string }) {
+  if (!await linearSyncEnabled()) return { error: 'linearSyncDisabled' as const }
   const user = await requireUser()
   const parsed = z.object({ teamId: z.string().uuid() }).safeParse(input)
   if (!parsed.success) return { error: 'linearTeamInvalid' as const }
@@ -68,28 +74,43 @@ export async function disableLinearTeam(id: string) {
 }
 
 export async function retryLinearIssue(issueId: string) {
+  if (!await linearSyncEnabled()) return { error: 'linearSyncDisabled' as const }
   const user = await requireUser()
   const parsed = z.uuid().safeParse(issueId)
   if (!parsed.success) return { error: 'linearIssueInvalid' as const }
   const { issue } = await requireIssueAccess(parsed.data)
   if (issue.userId !== user.id) return { error: 'issueOwnerOnly' as const }
-  await db.transaction(async tx => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${issue.id}, 0))`)
+  const result = await db.transaction(async tx => {
+    // Match scope/publication writers: task first, then outbox. The access
+    // snapshot above may predate retirement or another publication generation.
+    const [latest] = await tx.select().from(issues).where(eq(issues.id, issue.id)).for('update')
+    if (!latest || latest.userId !== user.id) return { error: 'issueOwnerOnly' as const }
+    if (latest.linearSyncBlocked || latest.scope !== 'workspace' || readIssueMetadata(latest.content).deletedAt) return { error: 'linearIssueInvalid' as const }
+    const [verifiedLink] = await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId))
+      .where(and(eq(linearIssueLinks.issueId, issue.id), eq(linearIssueLinks.ownerId, user.id), eq(linearIssueLinks.externalTargetVerified, true), eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.active, true))).limit(1)
+    if (!verifiedLink) return { error: 'linearIssueInvalid' as const }
+    // Never relabel a retired claim as current work. Supersede any stale open
+    // row before inserting into the issue-wide partial unique index.
+    await tx.update(linearSyncOutbox).set({ status: 'done', claimToken: null, updatedAt: new Date() })
+      .where(and(eq(linearSyncOutbox.issueId, issue.id), sql`${linearSyncOutbox.scopeVersion} <> ${latest.scopeVersion}`, sql`${linearSyncOutbox.status} in ('queued', 'processing')`))
     const [open] = await tx.select({ id: linearSyncOutbox.id }).from(linearSyncOutbox)
-      .where(and(eq(linearSyncOutbox.issueId, issue.id), sql`${linearSyncOutbox.status} in ('queued', 'processing')`)).limit(1)
+      .where(and(eq(linearSyncOutbox.issueId, issue.id), eq(linearSyncOutbox.scopeVersion, latest.scopeVersion), sql`${linearSyncOutbox.status} in ('queued', 'processing')`)).limit(1)
     if (!open) {
       const [failed] = await tx.select({ id: linearSyncOutbox.id }).from(linearSyncOutbox)
-        .where(and(eq(linearSyncOutbox.issueId, issue.id), eq(linearSyncOutbox.status, 'failed'))).orderBy(desc(linearSyncOutbox.updatedAt)).limit(1)
-      if (failed) await tx.update(linearSyncOutbox).set({ status: 'queued', attempts: 0, availableAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(linearSyncOutbox.id, failed.id))
-      else await tx.insert(linearSyncOutbox).values({ id: crypto.randomUUID(), issueId: issue.id }).onConflictDoNothing()
+        .where(and(eq(linearSyncOutbox.issueId, issue.id), eq(linearSyncOutbox.status, 'failed'), eq(linearSyncOutbox.scopeVersion, latest.scopeVersion))).orderBy(desc(linearSyncOutbox.updatedAt)).limit(1)
+      if (failed) await tx.update(linearSyncOutbox).set({ status: 'queued', claimToken: null, attempts: 0, availableAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(linearSyncOutbox.id, failed.id))
+      else await tx.insert(linearSyncOutbox).values({ id: crypto.randomUUID(), issueId: issue.id, scopeVersion: latest.scopeVersion }).onConflictDoNothing()
     }
     await tx.update(linearIssueLinks).set({ syncStatus: 'pending', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.issueId, issue.id))
+    return { success: true as const }
   })
+  if ('error' in result) return result
   dispatchLinearIssueSync(issue.id)
   return { success: true as const }
 }
 
 export async function retryLinearDelivery(deliveryId: string) {
+  if (!await linearSyncEnabled()) return { error: 'linearSyncDisabled' as const }
   const user = await requireUser()
   const parsed = z.string().min(1).max(200).safeParse(deliveryId)
   if (!parsed.success) return { error: 'linearDeliveryInvalid' as const }

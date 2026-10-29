@@ -17,11 +17,11 @@ async function seedThreads(email: string, title: string) {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
     const { rows: [issue] } = await pool.query<{ id: string }>('SELECT id FROM issues WHERE "userId" = $1 AND title = $2', [user.id, title])
     const agentId = randomUUID()
-    await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Thread agent'])
+    await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Coordinator'])
     for (const [status, prompt, summary] of [['succeeded', 'Model the routing table', 'PR #95 merged'], ['running', 'Route group replies', null]] as const) {
       const runId = randomUUID()
       await pool.query('INSERT INTO agent_runs (id, "userId", "issueId", "agentId", status, prompt, report) VALUES ($1, $2, $3, $4, $5, $6, $7)', [runId, user.id, issue.id, agentId, status, prompt, summary && JSON.stringify({ summary })])
-      await pool.query('INSERT INTO run_chunks (id, "runId", seq, chunk) VALUES ($1, $2, 1, $3)', [randomUUID(), runId, JSON.stringify({ type: 'text-delta', id: runId, delta: `Agent reply for ${prompt}` })])
+      await pool.query('INSERT INTO run_chunks (id, "runId", seq, chunk) VALUES ($1, $2, 1, $3)', [randomUUID(), runId, JSON.stringify({ type: 'text-delta', id: runId, delta: `线程回复 for ${prompt}` })])
     }
     return issue.id
   } finally { await pool.end() }
@@ -42,18 +42,24 @@ test('Issue threads open on the right as a conversation; comments are cards with
   const activity = page.getByRole('region', { name: '任务活动', exact: true })
   await expect(activity.getByText('派出线程')).toHaveCount(2)
 
+  // This finished fixture lacks a repository and session, so it must not probe feedback eligibility.
+  const feedbackRequests: string[] = []
+  page.on('request', request => { if (new URL(request.url()).pathname.endsWith('/api/self-improvement')) feedbackRequests.push(request.url()) })
+  await page.route('**/api/self-improvement?runId=*', route => route.fulfill({ status: 500, body: 'Unexpected feedback probe' }))
   // A finished thread reads as a conversation and takes no message.
   await threads.getByRole('button', { name: '打开线程 Model the routing table', exact: true }).click()
   let panel = page.getByRole('region', { name: 'Model the routing table', exact: true })
-  await expect(panel.getByRole('list', { name: '线程对话' })).toContainText('Agent reply for Model the routing table')
+  await expect(panel.getByRole('list', { name: '线程对话' })).toContainText('线程回复 for Model the routing table')
   await expect(panel.getByRole('textbox')).toHaveCount(0)
+  expect(feedbackRequests).toEqual([])
 
   // A running thread ends in the composer; what is said there goes to the agent and stays in the thread.
   await threads.getByRole('button', { name: '打开线程 Route group replies', exact: true }).click()
   panel = page.getByRole('region', { name: 'Route group replies', exact: true })
-  await panel.getByRole('textbox', { name: '告诉 Thread agent 下一步做什么…' }).fill('Check the fallback timer')
+  await panel.getByRole('textbox', { name: '告诉 Coordinator 下一步做什么…' }).fill('Check the fallback timer')
   await panel.getByRole('button', { name: '发送', exact: true }).click()
   await expect(panel.getByRole('list', { name: '线程对话' })).toContainText('Check the fallback timer')
+  expect(feedbackRequests).toEqual([])
   await testInfo.attach('thread-open', { body: await page.screenshot(), contentType: 'image/png' })
   await panel.getByRole('button', { name: '关闭线程', exact: true }).click()
   await expect(panel).toHaveCount(0)
@@ -88,18 +94,23 @@ test('Issue threads open on the right as a conversation; comments are cards with
     await teammatePage.reload()
     const search = await openSearch(teammatePage)
     await search.getByRole('combobox', { name: '全局搜索', exact: true }).fill(title)
-    await expect(search.getByText(/^没有匹配的(任务|结果)$/)).toBeVisible()
+    await expect(search.getByRole('listbox').getByText('没有匹配的结果', { exact: true })).toBeVisible()
+    await expect(search.getByRole('status')).toHaveText('没有匹配的结果')
     await expect(search.getByRole('option').filter({ hasText: title })).toHaveCount(0)
     await expect(teammatePage.getByText('Route group replies')).toHaveCount(0)
-    await expect(teammatePage.getByText('Agent reply', { exact: false })).toHaveCount(0)
+    await expect(teammatePage.getByText('线程回复', { exact: false })).toHaveCount(0)
   } finally {
     await colleague.close()
     expect(colleagueErrors).toEqual([])
   }
 })
 
-test('The owner stops a live thread from its composer; it reads 正在停止… until the run ends', async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 1440, height: 960 })
+for (const view of [{ name: 'desktop', width: 1440, height: 960 }, { name: 'narrow', width: 390, height: 844 }] as const) {
+// Start at the reviewed size: changing the task's desktop/mobile layout mid-run
+// remounts its thread panel and would test a different draft-lifetime behavior.
+test(`The owner stops a live thread from its composer; it reads 正在停止… until the run ends (${view.name})`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: view.width, height: view.height })
+  await page.emulateMedia({ colorScheme: 'light' })
   const { email } = await register(page)
   const title = `Thread stop ${randomUUID()}`
   await seedTask(page, title)
@@ -109,7 +120,7 @@ test('The owner stops a live thread from its composer; it reads 正在停止… 
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
     const { rows: [issue] } = await pool.query<{ id: string }>('SELECT id FROM issues WHERE "userId" = $1 AND title = $2', [user.id, title])
     const agentId = randomUUID()
-    await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Thread agent'])
+    await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Coordinator'])
     for (const [status, prompt] of [['waiting_input', 'Pick a cache key'], ['running', 'Trim the bundle']] as const) {
       runs[status] = randomUUID()
       await pool.query('INSERT INTO agent_runs (id, "userId", "issueId", "agentId", status, prompt) VALUES ($1, $2, $3, $4, $5, $6)', [runs[status], user.id, issue.id, agentId, status, prompt])
@@ -122,10 +133,11 @@ test('The owner stops a live thread from its composer; it reads 正在停止… 
   await threads.getByRole('button', { name: '打开线程 Pick a cache key', exact: true }).click()
   let panel = page.getByRole('region', { name: 'Pick a cache key', exact: true })
   await expect(panel.getByRole('button', { name: '停止', exact: true })).toBeVisible()
+  await panel.getByRole('button', { name: '关闭线程', exact: true }).click()
 
   await threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true }).click()
   panel = page.getByRole('region', { name: 'Trim the bundle', exact: true })
-  const composer = panel.getByRole('textbox', { name: '告诉 Thread agent 下一步做什么…' })
+  const composer = panel.getByRole('textbox', { name: '告诉 Coordinator 下一步做什么…' })
   const stop = panel.getByRole('button', { name: '停止', exact: true })
   // Typing turns stop into send; clearing the draft brings stop back.
   await composer.fill('Keep the polyfills')
@@ -133,7 +145,12 @@ test('The owner stops a live thread from its composer; it reads 正在停止… 
   await expect(stop).toHaveCount(0)
   await composer.fill('')
   await expect(stop).toBeVisible()
-  await page.screenshot({ path: testInfo.outputPath('thread-stop-running.png') })
+  await testInfo.attach(`thread-stop-running-${view.name}-light`, { body: await page.screenshot(), contentType: 'image/png' })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await testInfo.attach(`thread-stop-running-${view.name}-dark`, { body: await page.screenshot(), contentType: 'image/png' })
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(page.locator('html')).not.toHaveClass(/dark/)
 
   await page.clock.install()
   await stop.click()
@@ -147,13 +164,28 @@ test('The owner stops a live thread from its composer; it reads 正在停止… 
   try {
     await expect.poll(async () => (await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt).not.toBeNull()
     const originalStop = (await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt
-    await page.screenshot({ path: testInfo.outputPath('thread-stop-stopping.png') })
+    await testInfo.attach(`thread-stop-stopping-${view.name}-light`, { body: await page.screenshot(), contentType: 'image/png' })
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await expect(page.locator('html')).toHaveClass(/dark/)
+    await testInfo.attach(`thread-stop-stopping-${view.name}-dark`, { body: await page.screenshot(), contentType: 'image/png' })
+    await page.emulateMedia({ colorScheme: 'light' })
+    await expect(page.locator('html')).not.toHaveClass(/dark/)
     // An offline daemon never acknowledges. The timeout unlocks retry, not the draft.
     await page.clock.fastForward(30_100)
     await expect(panel.getByRole('alert')).toContainText('停止未确认')
     await expect(composer).toHaveValue('Keep this draft while stopping')
     await expect(composer).toBeEditable()
-    await page.screenshot({ path: testInfo.outputPath('thread-stop-timeout.png') })
+    await testInfo.attach(`thread-stop-timeout-${view.name}-light`, { body: await page.screenshot(), contentType: 'image/png' })
+    // Review frame 372:4786: the same actual timeout, editable draft and retry
+    // control in both themes, not a seeded replacement for the stopped state.
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await expect(page.locator('html')).toHaveClass(/dark/)
+    await expect(panel.getByRole('alert')).toContainText('停止未确认')
+    await expect(composer).toHaveValue('Keep this draft while stopping')
+    await expect(composer).toBeEditable()
+    await expect(panel.getByRole('button', { name: '重试停止', exact: true })).toBeEnabled()
+    await testInfo.attach(`thread-stop-timeout-${view.name}-dark`, { body: await page.screenshot(), contentType: 'image/png' })
+    await testInfo.attach(`thread-stop-${view.name}-bounds.json`, { body: JSON.stringify({ frame: '372:4786', viewport: { width: view.width, height: view.height }, bounds: await panel.boundingBox(), boundary: 'UI fixture with no daemon acknowledgement; the real stop action and 30-second timeout execute. Terminal acknowledgement below is seeded separately.' }, null, 2), contentType: 'application/json' })
     await panel.getByRole('button', { name: '重试停止', exact: true }).click()
     await expect(panel.getByRole('alert')).toHaveCount(0)
     await expect(composer).toHaveValue('Keep this draft while stopping')
@@ -167,3 +199,4 @@ test('The owner stops a live thread from its composer; it reads 正在停止… 
   await expect(threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true })).toContainText('已停止')
   await expect(panel.getByRole('textbox')).toHaveCount(0)
 })
+}

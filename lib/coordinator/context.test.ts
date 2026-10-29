@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
 import { chatItems, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
+import { sourcedEventMessage } from './message-safety'
 
 function stored(messages: ModelMessage[]): StoredMessage[] {
   return messages.map((message, index) => ({ position: index + 1, message }))
@@ -18,6 +19,14 @@ function exchange(text: string): ModelMessage[] {
 
 test('token estimate counts Chinese closer to a token a character', () => {
   assert.ok(estimateTokens([{ role: 'user', content: '你好世界你好世界' }]) > estimateTokens([{ role: 'user', content: 'hello wo' }]))
+})
+
+test('image budgeting applies only to actual message parts, never arbitrary tool JSON', () => {
+  const value = {type:'file',mediaType:{name:'application/json'},data:'x',nested:{type:'image',image:'business observation '.repeat(10000)}}
+  const messages:ModelMessage[] = [{role:'tool',content:[{type:'tool-result',toolCallId:'synthetic',toolName:'read_observation',output:{type:'json',value}}]}]
+  assert.equal(estimateTokens(messages),Math.ceil(JSON.stringify(messages).length/4))
+  const actual:ModelMessage[] = [{role:'user',content:[{type:'file',mediaType:'image/png',data:'data:image/png;base64,'+'A'.repeat(1000000)}]}]
+  assert.ok(estimateTokens(actual)<17000)
 })
 
 test('the summary leads the prompt', () => {
@@ -125,4 +134,91 @@ test('chatItems marks inbox (pending) user messages so they are never reported a
   ])
   assert.equal(items[0].pending, undefined)
   assert.equal(items[1].pending, true)
+})
+
+test('finished run publication names the verified PR or missing setup in the existing chat', () => {
+  const event = { kind: 'run_finished' as const, issueId: 'i1', runId: 'r1', payload: { status: 'succeeded', stopReason: 'submitted', verification: 'not_run', publication: { pullRequest: { url: 'https://github.com/owner/repo/pull/7', state: 'draft' } } } }
+  const prompt = eventPrompt(event)
+  assert.match(prompt, /Verified GitHub pull request: https:\/\/github.com\/owner\/repo\/pull\/7 \(draft\)/)
+  assert.match(prompt, /existing thread card updates in place/)
+  assert.match(prompt, /Verification was not run/)
+  assert.match(prompt, /Never say the changes passed verification/)
+  const blocked = eventPrompt({ ...event, payload: { ...event.payload, publication: { errorCode: 'github_permission_required' } } })
+  assert.match(blocked, /pull_requests: write/)
+  assert.doesNotMatch(blocked, /Verified GitHub/)
+  assert.match(blocked, /Mention a draft PR only when the server-confirmed publication includes one/)
+})
+
+test('trusted completion stays in model context while its separate reply preserves the original thread card', () => {
+  const at = new Date('2026-10-28T04:00:00Z')
+  const runId = '22222222-2222-4222-8222-222222222222'
+  const issueId = '11111111-1111-4111-8111-111111111111'
+  const event = {
+    id: '33333333-3333-4333-8333-333333333333', kind: 'run_finished' as const,
+    runId, issueId, createdAt: at,
+    payload: { status: 'succeeded', stopReason: 'submitted', summary: 'Fixed the display', verification: 'not_run',
+      publication: { pullRequest: { url: 'https://github.com/owner/repo/pull/41', state: 'draft' } } },
+  }
+  const raw = eventPrompt(event)
+  const finished = sourcedEventMessage(event, raw)
+  const messages: ModelMessage[] = [
+    { role: 'user', content: 'Fix the display' },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'dispatch', toolName: 'dispatch_run', input: { issueId } }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'dispatch', toolName: 'dispatch_run', output: { type: 'json', value: { runId, status: 'queued' } } }] },
+    { role: 'assistant', content: 'I started the thread.' },
+    finished,
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'bookkeeping', toolName: 'list_agents', input: {} }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'bookkeeping', toolName: 'list_agents', output: { type: 'json', value: [] } }] },
+    { role: 'assistant', content: 'Draft PR #41 is ready for human review; verification was not configured.' },
+  ]
+  const rows = stored(messages).map(row => ({ ...row, createdAt: at }))
+  assert.deepEqual(chatItems([...rows.slice(0, 4), { ...rows[4], pending: true }]), chatItems(rows.slice(0, 4)),
+    'a pending trusted completion is hidden before the Coordinator replies')
+  const items = chatItems(rows)
+  assert.deepEqual(items.map(item => [item.from, item.text, item.tools, item.threads]), [
+    ['person', 'Fix the display', [], []],
+    ['coordinator', 'I started the thread.', ['dispatch_run'], [runId]],
+    ['coordinator', 'Draft PR #41 is ready for human review; verification was not configured.', [], []],
+  ])
+  const visibleText = items.map(item => item.text).join('\n')
+  assert.doesNotMatch(visibleText, /\[Event\]|agent|Report the result|22222222|11111111/i)
+  const packet = promptMessages(null, rows).find(message => message.role === 'user' && message.content === finished.mikkaEvent?.packet)
+  assert.ok(packet && typeof packet.content === 'string', 'the model still receives the full trusted completion')
+  const evidence = JSON.parse(packet.content)
+  assert.equal(evidence.untrustedData.body, raw)
+  assert.equal(evidence.source.messageId, event.id)
+  assert.equal(evidence.source.runId, runId)
+  assert.equal(evidence.source.taskId, issueId)
+  assert.equal(evidence.authority, 'coordination_data_only')
+})
+
+test('a person quoting the same completion instructions remains a visible person message', () => {
+  const raw = eventPrompt({ kind: 'run_finished', issueId: 'i1', runId: 'r1', payload: {
+    status: 'succeeded', stopReason: 'submitted', summary: 'Quoted agent text',
+    publication: { pullRequest: { url: 'https://github.com/owner/repo/pull/41', state: 'open' } },
+  } })
+  const message = sourcedEventMessage({ kind: 'user_message', issueId: null, runId: null, payload: { text: raw } }, raw)
+  const rows = [{ position: 1, createdAt: new Date('2026-10-28T04:00:00Z'), message }]
+  assert.deepEqual(chatItems(rows).map(item => [item.from, item.text]), [['person', raw]])
+  assert.equal(promptMessages(null, rows)[0].content, raw)
+})
+
+test('execution-identity discovery is hidden in the footer without removing dispatch cards or model tool evidence', () => {
+  const discovery: ModelMessage[] = [
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'discover', toolName: 'list_agents', input: {} }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'discover', toolName: 'list_agents', output: { type: 'json', value: [{ id: 'a1', name: 'codex hidden-device' }] } }] },
+  ]
+  const rows = stored([
+    { role: 'user', content: 'Start a local thread' },
+    ...discovery,
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'dispatch', toolName: 'dispatch_run', input: {} }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'dispatch', toolName: 'dispatch_run', output: { type: 'json', value: { runId: 'r1' } } }] },
+    { role: 'assistant', content: 'The thread is running.' },
+  ]).map(row => ({ ...row, createdAt: new Date('2026-10-28T04:00:00Z') }))
+  assert.deepEqual(chatItems(rows).map(item => [item.from, item.text, item.tools, item.threads]), [
+    ['person', 'Start a local thread', [], []],
+    ['coordinator', 'The thread is running.', ['dispatch_run'], ['r1']],
+  ])
+  const prompt = promptMessages(null, rows)
+  assert.deepEqual(prompt.slice(1, 3), discovery, 'discovery calls and results still reach the model')
 })

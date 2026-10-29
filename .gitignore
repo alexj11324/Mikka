@@ -25,6 +25,9 @@ yarn-error.log*
 
 # private temporary test credentials and sessions
 /.cache/e2e/
+/.cache/mvp-retained/
+/playwright-mvp-report/
+/mvp-test-results/
 
 # typescript
 *.tsbuildinfo
@@ -45,3 +48,9 @@ next-env.d.ts
 /packages/subscription-worker/.upstream/
 /packages/subscription-worker/.cache/
 /packages/subscription-worker/bin/
+/packages/daemon/dist/
+/packages/daemon/.retained-build-*/
+/packages/daemon/.retained-package-test-*/
+# Generated standalone credential broker bundles.
+/services/credential-broker/dist/
+/services/credential-broker/public/

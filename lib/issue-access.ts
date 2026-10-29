@@ -22,18 +22,18 @@ export async function requireIssueAccess(id: string, includeDeleted = false) {
   return { ...issue, user }
 }
 
-async function findIssueForUser(userId: string, id: string, includeDeleted: boolean) {
+async function findIssueForUser(userId: string, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'> = db) {
   if (!z.uuid().safeParse(id).success) return null
   const access = await issueTeamAccess(id, userId)
-  const visibility = await issueVisibility(userId, includeDeleted)
-  const [row] = await db.select({ issue: issues }).from(issues)
+  const visibility = await issueVisibility(userId, includeDeleted, undefined, executor)
+  const [row] = await executor.select({ issue: issues }).from(issues)
     .where(and(eq(issues.id, id), visibility.predicate)).limit(1)
   if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) return null
   return { issue: row.issue, teamId: access.teamId }
 }
 
 /** The issue this user can access; for callers without a session, like the Coordinator. */
-export async function issueForUser(userId: string, id: string, includeDeleted = false) {
-  const result = await findIssueForUser(userId, id, includeDeleted)
+export async function issueForUser(userId: string, id: string, includeDeleted = false, executor: Pick<typeof db, 'select'> = db) {
+  const result = await findIssueForUser(userId, id, includeDeleted, executor)
   return result?.issue ?? null
 }

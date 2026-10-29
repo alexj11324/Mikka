@@ -1,0 +1,56 @@
+name: Unattended sandbox acceptance
+on:
+  push:
+    branches: [main, 'fix/unattended-sandbox-404']
+  pull_request:
+    paths:
+      - '.github/workflows/unattended-sandbox.yml'
+      - 'packages/daemon/**'
+      - 'packages/protocol/**'
+      - 'scripts/e2b/**'
+      - 'lib/agent-tool-approval/**'
+      - 'lib/cloud-computer/**'
+      - 'lib/computer/**'
+      - 'lib/credentials/**'
+      - 'components/settings/computer-policy-settings.tsx'
+      - 'tests/e2e/computer-policy-settings.spec.ts'
+      - 'workflows/subagent/**'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: unattended-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  runtime:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Visual model, scoped policy and network contracts
+        run: pnpm test:unattended
+      - name: Install isolated browser acceptance dependencies
+        run: |
+          python3 -m pip install aiohttp==3.13.5 playwright==1.60.0 pillow==11.3.0
+          pnpm exec playwright install --with-deps chromium
+          node --input-type=module -e "import{chromium}from'@playwright/test';console.log(chromium.executablePath())" > "$RUNNER_TEMP/mikka-chromium-path"
+          sudo ln -sf "$(cat "$RUNNER_TEMP/mikka-chromium-path")" /usr/bin/chromium
+      - name: Real Chromium observation, action, replay and credential guards
+        run: |
+          python3 scripts/e2b/subagent-guard.test.py
+          python3 scripts/e2b/subagent-visual-browser.test.py
+      - name: Prepare fixed Docker runtime
+        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
+      - name: Real network-isolated Docker public download
+        run: MIKKA_PUBLIC_EGRESS_DOCKER=1 node --import tsx --test packages/daemon/test/public-egress-docker.node-test.ts

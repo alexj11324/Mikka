@@ -3,7 +3,7 @@
 import { useState, type ComponentProps, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useTranslations } from 'next-intl'
-import { Box, CalendarDays, ChevronsLeftRight, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, GitMerge, GitPullRequest, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2, X } from 'lucide-react'
+import { Box, CalendarDays, ChevronsLeftRight, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
@@ -12,6 +12,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuRadioGroup
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { LabelDot, IssueMetadataControls, type MetadataRequest, type MetadataSavedIssue } from '@/components/workspace/issue-metadata-controls'
 import { IssuePropertyMenu } from '@/components/workspace/issue-property-menu'
+import { IssuePullRequestLink } from '@/components/workspace/issue-pull-request-link'
 import { CardControlBoundary, CardCreatedAt } from '@/components/workspace/issue-card-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier, type IssueStatus } from '@/components/workspace/issue-properties'
 import { BOARD_COLUMNS, type AgentState, type BoardColumns, type BoardTask, type CardProperty } from './data'
@@ -70,10 +71,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     show('priority') && <CardControlBoundary key="priority"><IssuePropertyMenu label={tIssue('priorityLabel')} value={task.priority} options={priorityOptions} icon={Flag} iconOnly compact disabled={controlsDisabled} onChange={value => onPriorityChange(task, value)} /></CardControlBoundary>,
     ...(show('labels') ? metadata.labels.map(label => <Badge key={`label-${label.name}`} variant="outline" size="lg" className="border-transparent px-1 max-w-36"><LabelDot color={label.color} /><span className="truncate">{label.name}</span></Badge>) : []),
     show('project') && metadata.project && <Badge key="project" variant="outline" size="lg" className="border-transparent px-1 max-w-36"><Box /><span className="truncate">{metadata.project}</span></Badge>,
-    ...(show('pullRequests') ? metadata.pullRequests.map(pr => {
-      const Icon = pr.state === 'merged' ? GitMerge : pr.state === 'closed' ? X : GitPullRequest
-      return <CardControlBoundary key={pr.url}><Badge variant="outline" size="lg" className="border-transparent px-1 tabular-nums" render={<a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" />}><Icon className={cn(pr.state === 'open' && 'text-success-foreground', pr.state === 'merged' && 'text-info-foreground', pr.state === 'closed' && 'text-destructive')} />#{pr.url.split('/').at(-1)}</Badge></CardControlBoundary>
-    }) : []),
+    ...(show('pullRequests') ? metadata.pullRequests.map(pr => <CardControlBoundary key={pr.url}><IssuePullRequestLink issueId={task.id} pr={pr} compact /></CardControlBoundary>) : []),
     show('subtasks') && subtasks && subtasks.total > 0 && <Badge key="subtasks" variant="outline" size="lg" className="border-transparent px-1 tabular-nums" title={tCard('subtasks')}><ListChecks />{subtasks.done}/{subtasks.total}</Badge>,
     show('agentState') && agentState && <Badge key="agent" variant={AGENT_STATE_BADGES[agentState]} size="lg"><span aria-hidden="true" className={cn('size-1.5 rounded-full', AGENT_STATE_DOTS[agentState])} />{tCard(`agent.${agentState}`)}</Badge>,
     show('dueDate') && metadata.dueDate && <Badge key="due" variant="outline" size="lg" className="border-transparent px-1 tabular-nums"><CalendarDays />{metadata.dueDate.slice(5)}</Badge>,
@@ -92,7 +90,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     {chips.length > 0 && <div className="flex flex-wrap items-center gap-1 pl-7">{chips}</div>}
     {show('createdAt') && <div className="pl-7"><CardCreatedAt createdAt={task.createdAt} /></div>}
     {/* Opened from the context menu: labels, project and PR editors, rendered off-card. */}
-    {!isOverlay && <div hidden><IssueMetadataControls task={task} section="all" disabled={controlsDisabled} request={request && request.target !== 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>}
+    {!isOverlay && <div hidden><IssueMetadataControls task={task} section="all" compact disabled={controlsDisabled} request={request && request.target !== 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>}
   </div>
 
   if (isOverlay) return <KanbanItem value={task.id} disabled className="shrink-0">{card}</KanbanItem>

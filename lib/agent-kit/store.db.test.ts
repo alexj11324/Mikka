@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
 import { DEFAULT_AGENT_DEFINITION, builtinAgentDefinition } from './builtin'
 import { digest } from './definition'
+import { DECISION_MODEL } from '../coordinator/decision'
 import { AgentKitStore, type AgentScope } from './store'
-import { CORE_EVAL_CASES, EVAL_RUNNER_VERSION, type EvalReport } from './evals'
+import { CORE_EVAL_CASES, EVAL_RUNNER_VERSION, bindSemanticEvidence, type EvalReport } from './evals'
 import { createAgentDefinitionHandler } from './http'
 
 // Explicitly isolated cloud sandbox OR the existing Actions loopback DB gate.
@@ -22,18 +23,29 @@ if(!loopback || (!dedicated && !actions)) throw new Error('Refusing non-isolated
 const pool=new Pool({connectionString,max:12})
 const store=new AgentKitStore(pool)
 const defaults=DEFAULT_AGENT_DEFINITION
-const migration=readFileSync(new URL('../../drizzle/20261027181000_agent_kit.sql',import.meta.url),'utf8')
-
+const kitTables=['agent_kit_heads','agent_kit_versions','agent_kit_executions','agent_kit_events','agent_kit_proposals','agent_kit_evaluations','agent_kit_activations']
+function fixedMigration(){
+  const migration=readFileSync(new URL('../../drizzle/20261027181000_agent_kit.sql',import.meta.url),'utf8')
+  assert.equal(createHash('sha256').update(migration).digest('hex'),'365230faab874af93a8f696a1f83f1b3276a83bb6ea933b3939a6b654dea1be2')
+  return migration
+}
+async function relationExists(name:string){
+  const {rows}=await pool.query("select to_regclass(format('%I.%I',current_schema(),$1::text)) as relation",[name])
+  return Boolean(rows[0]?.relation)
+}
 before(async()=>{
-  // Dedicated tests can start with only the real migration's parent contracts.
-  // Existing CI uses the complete application schema and does not recreate tables.
-  if(dedicated) await pool.query(`
-    create table if not exists "user"(id text primary key,name text not null,email text not null unique,"emailVerified" boolean not null default false,"createdAt" timestamptz not null default now(),"updatedAt" timestamptz not null default now());
-    create table if not exists bots(id uuid primary key,"ownerId" text not null references "user"(id),"workspaceId" uuid not null,name text not null,color text default 'encre',shape text default 'cercle',"createdAt" timestamptz default now(),"updatedAt" timestamptz default now(),unique(id,"workspaceId","ownerId"));
-    create table if not exists agent_runs(id uuid primary key);
-  `)
-  await pool.query(migration)
-  await pool.query(migration)
+  for(const name of ['user','bots','agent_runs'])assert.ok(await relationExists(name),`Existing isolated parent schema required: ${name}`)
+  const present=await Promise.all(kitTables.map(relationExists))
+  if(actions && present.every(value=>!value)){
+    // The CI ORM bootstrap does not create these raw-SQL tables. Initialize
+    // only this job's newly owned service, never an old dedicated target or
+    // partially present schema. Existing Kit tables are never replayed here.
+    const {rows:[objects]}=await pool.query("select to_regprocedure('agent_kit_immutable_row()') as immutable,to_regprocedure('agent_kit_snapshot_guard()') as guard,exists(select 1 from pg_constraint where conname='agent_kit_active_version_fk') as constraint_present")
+    assert.ok(!objects.immutable && !objects.guard && !objects.constraint_present,'Refusing partial Agent Kit objects in the fresh CI fixture')
+    await pool.query(fixedMigration())
+    console.info(JSON.stringify({event:'agent_kit_fresh_ci_schema_initialized',database:'mikka_e2e',tables:kitTables,sqlSha256:'365230faab874af93a8f696a1f83f1b3276a83bb6ea933b3939a6b654dea1be2'}))
+  }
+  for(const name of kitTables)assert.ok(await relationExists(name),`Existing isolated Agent Kit schema required: ${name}; partial or old targets are not automatically rebuilt`)
 })
 after(async()=>{await pool.end()})
 async function owner(bot=true):Promise<AgentScope>{
@@ -41,6 +53,7 @@ async function owner(bot=true):Promise<AgentScope>{
   const botId=bot ? randomUUID() : null
   const workspaceId=bot ? randomUUID() : null
   await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$2,$3,false,now(),now())',[ownerId,'Synthetic Agent Kit',`${ownerId}@example.com`])
+  console.info(JSON.stringify({event:'agent_kit_fixture_owner_retained',ownerId,botId,workspaceId}))
   if(botId) await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,$4)',[botId,ownerId,workspaceId,'Synthetic bot'])
   return {ownerId,botId,workspaceId}
 }
@@ -54,11 +67,67 @@ async function failures(scope:AgentScope){
   }
   return store.propose(scope,current.version,randomUUID(),defaults)
 }
-function report(definitionDigest:string,passed:boolean,mode:'fixture'|'live'):EvalReport{
-  return {runnerVersion:EVAL_RUNNER_VERSION,suiteDigest:digest(CORE_EVAL_CASES),definitionDigest,hostInstructionsDigest:digest('synthetic test host policy'),mode,model:mode==='live'?'synthetic-test-model':null,results:CORE_EVAL_CASES.map(item=>({caseId:item.id,passed,failures:passed?[]:['testFailure']})),passed:passed?CORE_EVAL_CASES.length:0,total:CORE_EVAL_CASES.length,errors:0}
+// Synthetic DB activation contract only; no model is invoked by this fixture.
+function report(definitionDigest:string,passed:boolean,mode:'fixture'|'live'):EvalReport {
+  const suiteDigest=digest(CORE_EVAL_CASES),hostInstructions='synthetic test host policy',hostInstructionsDigest=digest(hostInstructions)
+  const results=CORE_EVAL_CASES.map(item=>{
+    const result={caseId:item.id,passed,failures:passed?[]:['testFailure']}
+    if(mode!=='live') return result
+    const semantic=bindSemanticEvidence({
+      testCase:item,trace:{text:'synthetic contract',outcome:item.expectedOutcome,tools:[]},
+      definitionDigest,hostInstructionsDigest,hostInstructions,suiteDigest,
+    },{
+      decision:passed?'pass':'fail',execution:{
+        executionId:randomUUID(),modelId:DECISION_MODEL,providerGenerationId:'synthetic-database-contract',
+        startedAt:'2026-10-28T20:00:00Z',completedAt:'2026-10-28T20:00:00Z',
+        requestDigest:digest('synthetic-database-contract'),imageDigests:[],vision:'no-image-input',
+      },
+    })
+    return {...result,semantic}
+  })
+  return {runnerVersion:EVAL_RUNNER_VERSION,suiteDigest,definitionDigest,hostInstructionsDigest,
+    mode,model:mode==='live'?'synthetic-test-model':null,results,
+    passed:passed?CORE_EVAL_CASES.length:0,total:CORE_EVAL_CASES.length,errors:0}
 }
 
-test('real PostgreSQL migration is rerunnable and historical runs stay unrecorded',async()=>{
+test('the unchanged Agent Kit migration replays only in a newly created CI-owned database and retains historical rows',async t=>{
+  // The newer user authorization covers this run's NEW managed CI resources.
+  // It does not permit replay against a prior dedicated retained database.
+  assert.ok(actions,'Migration replay requires this Actions job\'s owned temporary PostgreSQL service')
+  const migration=fixedMigration()
+  const database=`mikka_agent_kit_replay_${randomUUID().replaceAll('-','')}`
+  assert.match(database,/^mikka_agent_kit_replay_[a-f0-9]{32}$/)
+  await pool.query(`create database "${database}"`)
+  t.diagnostic(JSON.stringify({event:'agent_kit_replay_database_created',database,retention:'retain',syntheticRowsMaximum:1}))
+  const isolatedTarget=new URL(connectionString)
+  isolatedTarget.pathname='/'+database
+  const isolated=new Pool({connectionString:isolatedTarget.href,max:1})
+  try{
+    const actual=await isolated.query('select current_database() as database')
+    assert.equal(actual.rows[0].database,database)
+    await isolated.query(`
+      create table "user"(id text primary key);
+      create table bots(id uuid primary key,"ownerId" text not null references "user"(id),"workspaceId" uuid not null,unique(id,"workspaceId","ownerId"));
+      create table agent_runs(id uuid primary key);
+    `)
+    const historicalId=randomUUID()
+    await isolated.query('insert into agent_runs(id) values($1)',[historicalId])
+    await isolated.query(migration)
+    await isolated.query(migration)
+    const rows=await isolated.query('select "agentDefinition" from agent_runs where id=$1',[historicalId])
+    assert.deepEqual(rows.rows,[{agentDefinition:null}],'migration replay does not invent or delete historical execution evidence')
+    assert.equal((await isolated.query('select count(*)::int as count from agent_runs')).rows[0].count,1,'the new replay database retains exactly its one synthetic historical run')
+    const triggers=await isolated.query("select tgname from pg_trigger where tgrelid in ('agent_kit_versions'::regclass,'agent_kit_events'::regclass,'agent_kit_activations'::regclass,'agent_kit_executions'::regclass) and not tgisinternal order by tgname")
+    assert.deepEqual(triggers.rows.map(row=>row.tgname),['agent_kit_activations_immutable','agent_kit_events_immutable','agent_kit_execution_guard','agent_kit_versions_immutable'])
+    const constraint=await isolated.query("select count(*)::int as count from pg_constraint where conrelid='agent_kit_heads'::regclass and conname='agent_kit_active_version_fk'")
+    assert.equal(constraint.rows[0].count,1)
+  }finally{
+    await isolated.end()
+    t.diagnostic(JSON.stringify({event:'agent_kit_replay_database_retained',database}))
+  }
+})
+
+test('existing migrated schema leaves historical runs unrecorded',async()=>{
   const id=randomUUID();await pool.query('insert into agent_runs(id) values($1)',[id]).catch(async()=>{
     // A full app schema has required run identity; its nullable column is checked directly instead.
     const column=await pool.query("select is_nullable,column_default from information_schema.columns where table_name='agent_runs' and column_name='agentDefinition'")
@@ -66,7 +135,6 @@ test('real PostgreSQL migration is rerunnable and historical runs stay unrecorde
   })
   const rows=await pool.query('select "agentDefinition" from agent_runs where id=$1',[id])
   if(rows.rowCount) assert.equal(rows.rows[0].agentDefinition,null)
-  await pool.query(migration)
 })
 test('concurrent first reads seed exactly one immutable default version',async()=>{
   const scope=await owner()
