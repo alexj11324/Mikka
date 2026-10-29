@@ -49,6 +49,16 @@ export const teamIssuePromotions = pgTable('team_issue_promotions', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 // The personal issue prefix someone chose; without a row it comes from their email (MIK-46).
+/** A desktop browser handoff, bound to the signed-in person before the browser opens. */
+export const desktopAuthRequests = pgTable('desktop_auth_requests', {
+  stateHash: text('stateHash').primaryKey(),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  callback: text('callback').notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  usedAt: timestamp('usedAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('desktop_auth_requests_user_idx').on(table.userId, table.expiresAt)])
+
 export const issuePrefixes = pgTable('issue_prefixes', {
   userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   prefix: varchar('prefix', { length: 4 }).notNull(),

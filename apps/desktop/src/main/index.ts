@@ -4,21 +4,21 @@
 
 import { app, BrowserWindow, Menu, Notification, dialog, session, shell } from 'electron'
 import { autoUpdater } from 'electron-updater'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 
 import { IPC } from '@mikka/protocol/ipc'
 
 import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
+import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { NotificationCenter } from './notification-center'
-import { appExternalUrl, desktopAuthFinishUrl, externalUrl, navigationDecision } from './security'
+import { appExternalUrl, desktopAuthFinishUrl, desktopAuthState, externalUrl, navigationDecision } from './security'
 
 const APP_URL = __MIKKA_APP_URL__
 const APP_VERSION = __MIKKA_APP_VERSION__
 const FLAVOR = __MIKKA_FLAVOR__
 const PARTITION = FLAVOR === 'dev' ? 'persist:mikka-dev' : 'persist:mikka'
 const APP_ORIGIN = new URL(APP_URL).origin
-const AUTH_PROTOCOL = 'mikka-desktop'
 
 app.setName(FLAVOR === 'dev' ? 'Mikka Dev' : 'Mikka')
 if (process.platform === 'win32') app.setAppUserModelId('com.aspectlylabs.mikka')
@@ -30,28 +30,41 @@ app.on('web-contents-created', (_event, contents) => {
 
 let mainWindow: BrowserWindow | null = null
 let pendingClick: string | null = null
-let pendingProtocol: string | null = null
 let retrying: NodeJS.Timeout | null = null
+let authServer: LoopbackAuthServer | null = null
+let authTimer: NodeJS.Timeout | null = null
 
-function handleProtocolUrl(raw: string): void {
-  const finish = desktopAuthFinishUrl(raw, APP_URL)
-  if (!finish) return
-  if (!app.isReady() || !mainWindow || mainWindow.isDestroyed()) {
-    pendingProtocol = finish
-    return
-  }
-  if (mainWindow.isMinimized()) mainWindow.restore()
-  mainWindow.show()
-  mainWindow.focus()
-  void mainWindow.loadURL(finish)
+function closeAuthServer(): void {
+  if (authTimer) { clearTimeout(authTimer); authTimer = null }
+  if (authServer) { authServer.close(); authServer = null }
 }
 
-function registerProtocol(): void {
-  if (process.defaultApp && process.argv[1]) {
-    app.setAsDefaultProtocolClient(AUTH_PROTOCOL, process.execPath, [resolve(process.argv[1])])
-    return
-  }
-  app.setAsDefaultProtocolClient(AUTH_PROTOCOL)
+/**
+ * Starts a one-shot HTTP listener bound to 127.0.0.1 and returns its callback.
+ * The renderer registers that callback with the web app before opening the
+ * browser, so the token can only be delivered to this process. No custom URL
+ * scheme is registered.
+ */
+async function prepareAuth(rawState: unknown): Promise<string> {
+  const state = desktopAuthState(rawState)
+  if (!state) throw new Error('prepareAuth needs a desktop nonce')
+  closeAuthServer()
+  const listener = await startLoopbackAuth({
+    state,
+    appUrl: APP_URL,
+    onFinish: finish => {
+      authServer = null
+      if (authTimer) { clearTimeout(authTimer); authTimer = null }
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+      void mainWindow.loadURL(finish)
+    },
+  })
+  authServer = listener
+  authTimer = setTimeout(closeAuthServer, 10 * 60_000)
+  return listener.callback
 }
 
 function deliverClick(href: string): void {
@@ -317,7 +330,6 @@ function installMenu(): void {
 }
 
 function start(): void {
-  registerProtocol()
   registerSession()
   registerBridge({
     appUrl: APP_URL,
@@ -326,6 +338,7 @@ function start(): void {
       if (!target) throw new Error('openExternal accepts only app-origin HTTP(S) URLs')
       return shell.openExternal(target)
     },
+    prepareAuth,
     localDevice: localDeviceStatus,
     quota: localQuota,
     notifications,
@@ -336,11 +349,6 @@ function start(): void {
     },
   })
   createMainWindow()
-  if (pendingProtocol) {
-    const finish = pendingProtocol
-    pendingProtocol = null
-    void mainWindow?.loadURL(finish)
-  }
   installMenu()
   setupUpdates()
   if (app.isPackaged) setTimeout(() => { void checkForUpdates(false) }, 15_000)
@@ -352,24 +360,15 @@ function start(): void {
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.on('open-url', (event, url) => {
-    event.preventDefault()
-    handleProtocolUrl(url)
-  })
-  app.on('second-instance', (_event, argv) => {
-    for (const argument of argv) {
-      if (argument.startsWith(`${AUTH_PROTOCOL}://`)) handleProtocolUrl(argument)
-    }
+  app.on('second-instance', () => {
     if (!mainWindow) return
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
     mainWindow.focus()
   })
+  app.on('before-quit', closeAuthServer)
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
   })
-  for (const argument of process.argv) {
-    if (argument.startsWith(`${AUTH_PROTOCOL}://`)) handleProtocolUrl(argument)
-  }
   void app.whenReady().then(start)
 }

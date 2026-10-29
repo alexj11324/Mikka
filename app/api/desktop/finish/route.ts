@@ -13,7 +13,7 @@ const safeHeaders = {
 }
 
 /**
- * Loaded inside the desktop shell after the `mikka-desktop://auth` callback.
+ * Loaded inside the desktop shell after its loopback callback.
  * The token is in the fragment, so it never reaches this server or a proxy
  * log. The page checks the nonce the renderer stored before opening the
  * browser, exchanges the one-minute token for the Electron session cookie,

@@ -24,6 +24,7 @@ if (appOrigin && window.location.origin === appOrigin) {
       serverUrl: __MIKKA_APP_URL__,
       zeroUrl: '',
       openExternal: (url: unknown) => ipcRenderer.invoke(IPC.appOpenExternal, url),
+    prepareAuth: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareAuth, state),
     },
     notifications: {
       show: (notification: unknown) => ipcRenderer.invoke(IPC.notificationsShow, notification),

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { appExternalUrl, desktopAuthFinishUrl, externalUrl, isTrustedFrame, navigationDecision, originOf } from './security'
+import { appExternalUrl, desktopAuthFinishUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision, originOf } from './security'
 
 const APP = 'https://app.aspectlylabs.com/mikka'
 
@@ -50,10 +50,10 @@ test('external app-origin opens stay on the app origin', () => {
   assert.equal(appExternalUrl('https://user:pass@app.aspectlylabs.com/mikka/sign-in', APP), null)
 })
 
-test('desktop auth deep links become the in-app token exchange page', () => {
+test('loopback auth callback becomes the in-app token exchange page', () => {
   const token = 'a'.repeat(32)
   const state = 'b'.repeat(32)
-  const finish = desktopAuthFinishUrl(`mikka-desktop://auth?token=${token}&state=${state}&next=${encodeURIComponent('/settings?section=integrations')}`, APP)
+  const finish = desktopAuthFinishUrl(token, state, '/settings?section=integrations', APP)
   assert.ok(finish)
   const url = new URL(finish)
   assert.equal(url.origin, 'https://app.aspectlylabs.com')
@@ -64,14 +64,19 @@ test('desktop auth deep links become the in-app token exchange page', () => {
   assert.equal(hash.get('next'), '/settings?section=integrations')
 })
 
-test('desktop auth deep links reject other schemes, hosts, tokens and paths', () => {
+test('loopback auth callbacks reject invalid tokens and paths', () => {
   const token = 'a'.repeat(32)
   const state = 'b'.repeat(32)
-  assert.equal(desktopAuthFinishUrl(`mikka://auth?token=${token}&state=${state}`, APP), null)
-  assert.equal(desktopAuthFinishUrl(`mikka-desktop://other?token=${token}&state=${state}`, APP), null)
-  assert.equal(desktopAuthFinishUrl(`mikka-desktop://auth?state=${state}`, APP), null)
-  assert.equal(desktopAuthFinishUrl(`mikka-desktop://auth?token=${token}`, APP), null)
-  assert.equal(desktopAuthFinishUrl(`mikka-desktop://auth?token=short&state=${state}`, APP), null)
-  assert.equal(desktopAuthFinishUrl(`mikka-desktop://auth?token=${token}&state=${state}&next=${encodeURIComponent('//evil.example')}`, APP), null)
-  assert.equal(desktopAuthFinishUrl(`mikka-desktop://auth?token=${token}&state=${state}&next=${encodeURIComponent('https://evil.example')}`, APP), null)
+  assert.equal(desktopAuthFinishUrl('short', state, '/', APP), null)
+  assert.equal(desktopAuthFinishUrl(token, 'short', '/', APP), null)
+  assert.equal(desktopAuthFinishUrl(token, state, '//evil.example', APP), null)
+  assert.equal(desktopAuthFinishUrl(token, state, 'https://evil.example', APP), null)
+  assert.equal(desktopAuthFinishUrl(token, state, '/ok#fragment', APP), null)
+})
+
+test('the loopback nonce is bounded', () => {
+  assert.equal(desktopAuthState('abcdefghijklmnop'), 'abcdefghijklmnop')
+  assert.equal(desktopAuthState('short'), null)
+  assert.equal(desktopAuthState('a'.repeat(129)), null)
+  assert.equal(desktopAuthState(null), null)
 })
