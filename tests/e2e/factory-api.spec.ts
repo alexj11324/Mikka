@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { test, expect, app, browserClientHeaders } from "./fixtures";
 import { createFactoryStore } from "../../lib/factory/store";
+import { factoryCheckGates } from "../../lib/factory/checks";
 
 // Only disposable CI. This is real HTTP/session/PG coverage, not Preview OAuth
 // or real Harness acceptance; do not run sign-up fixtures against cloud data.
@@ -75,6 +76,7 @@ test("Factory HTTP API isolates owners, requires sessions/origins and atomically
             user,
           ])
         ).rowCount === 1,
+      factoryCheckGates,
     );
     const routed = await store.route(userId, {
       issueId,

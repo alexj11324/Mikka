@@ -12,6 +12,8 @@ const full = { tier: 'full', specs: [], performance: false }
 
 test('documentation alone skips browser runtime; mixed source tests retain every critical flow', () => {
   assert.deepEqual(browserPlan(['README.md', 'docs/backend/checks.md']), { tier: 'docs', specs: [], performance: false })
+  assert.deepEqual(browserPlan(['AGENTS.md']), { tier: 'docs', specs: [], performance: false })
+  assert.deepEqual(browserPlan(['AGENTS.md', 'README.md']), { tier: 'docs', specs: [], performance: false })
   for (const files of [['lib/model.test.ts'], ['README.md', '.github/workflows/analytics-ci.yml']]) {
     assert.deepEqual(browserPlan(files), { tier: 'smoke', specs: smoke, performance: false })
   }

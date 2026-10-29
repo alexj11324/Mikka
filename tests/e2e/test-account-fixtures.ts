@@ -5,7 +5,7 @@ import { acquireTestAccounts } from '../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../scripts/test-accounts/environment.mjs'
 import { browserConsoleDiagnostic, browserResponseDiagnostic, browserTestErrorDiagnostic } from '../../scripts/test-accounts/browser-diagnostics.mjs'
 import { app, browserClientHeaders } from './fixtures'
-import { installAccountOriginFence } from './test-account-network'
+import { installAccountOriginFence, type LocalImageFixture } from './test-account-network'
 
 type StorageState = Exclude<BrowserContextOptions['storageState'], string | undefined>
 type AccountScope = Awaited<ReturnType<typeof acquireTestAccounts>>
@@ -58,13 +58,14 @@ function guardContextRequests(context: BrowserContext, scope: AccountScope, orig
  * Authentication tests keep using register() and the application's real forms.
  * Raw authentication values stay inside the protected runner files/context.
  */
-export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page }>({
+export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page; localImageFixtures: readonly LocalImageFixture[] }>({
   // Traces and recordings can retain auth headers and input values. Keep these
   // options on this fixture type so importing it never changes another suite.
   trace: 'off',
   video: 'off',
   screenshot: 'off',
-  testAccounts: async ({ browser }, use, testInfo) => {
+  localImageFixtures: [[], { option: true }],
+  testAccounts: async ({ browser, localImageFixtures }, use, testInfo) => {
     const environment = await loadEnvironment()
     const scope = await acquireTestAccounts({
       environment,
@@ -103,7 +104,7 @@ export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page 
         contexts.push(context)
         guardContextRequests(context, scope, origin)
         const fence = await installAccountOriginFence(context, scope, origin,
-          () => { blockedOrigins++ }, () => { runtimeFailures.push('BROWSER_ORIGIN_FENCE_FAILED') })
+          () => { blockedOrigins++ }, () => { runtimeFailures.push('BROWSER_ORIGIN_FENCE_FAILED') }, localImageFixtures)
         context.on('page', page => {
           // Never attach raw browser errors, responses or request URLs: those
           // may carry a credential in a query, response or diagnostic message.

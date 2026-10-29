@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { test, expect, app } from "./fixtures";
+import { test, expect, register, app } from "./fixtures";
 import { createFactoryStore, type FactoryTask } from "../../lib/factory/store";
 import { createFactoryDispatch } from "../../lib/factory/dispatch";
 import { factoryCheckGates } from "../../lib/factory/checks";
@@ -9,9 +9,13 @@ import { insertRunOnce } from "../../lib/run-dispatch";
 import { createSkillAssignments } from "../../lib/self-improvement/assignments";
 import { BASELINE_ARTIFACT } from "../../lib/self-improvement/builtin-skill";
 import { SKILL_ARTIFACT_HEADER, skillAssignmentReceiptSchema } from "@mikka/protocol/skill";
+import { DAEMON_PROTOCOL_VERSION } from "@mikka/protocol/daemon";
+import { REPO_ORIGIN_HEADER } from "@mikka/protocol/device";
+import { remoteKey } from "@mikka/protocol/repository";
 
 // Real HTTP + PG, explicit synthetic daemon reports. Not real Harness acceptance.
 test("Factory execution claims reject stopped tasks and unadopted retry children before token issuance", async ({
+  page,
   playwright,
   baseURL,
 }, testInfo) => {
@@ -22,18 +26,23 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
   const target = new URL(process.env.E2E_DATABASE_URL!);
   expect(target.hostname).toBe("127.0.0.1");
   expect(target.pathname).toBe("/mikka_e2e");
+  expect(process.env.MIKKA_FACTORY_ROUTING_ENABLED).toBe("1");
+  expect(process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED).toBe("1");
+  // Claim policy materialization requires the real account's owner FK before
+  // the request can reach the Factory task lock exercised below.
+  const { email } = await register(page);
   const pool = new Pool({ connectionString: target.toString(), max: 3 });
-  const userId = `factory-check-ci-${randomUUID()}`,
-    issueId = randomUUID(),
+  const issueId = randomUUID(),
     agentId = randomUUID(),
     deviceId = randomUUID(),
     repoId = randomUUID(),
     sourceEventId = randomUUID(),
     tokenId = randomUUID();
   const token = `orv_${randomBytes(32).toString("base64url")}`;
+  const remoteUrl = `https://github.com/mikka-ci/factory-claim-${repoId}.git`;
   const client = await playwright.request.newContext({
     baseURL,
-    extraHTTPHeaders: { authorization: `Bearer ${token}` },
+    extraHTTPHeaders: { authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: "1" },
   });
   const bind = (t: FactoryTask) => ({
     taskId: t.id,
@@ -43,7 +52,9 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
     candidateId: t.candidateId,
   });
   const fixtureIssues = [issueId];
+  const fixtureEvents = [sourceEventId];
   try {
+    const userId = (await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email=$1', [email])).rows[0].id;
     await pool.query(
       `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Check HTTP fixture','{}','todo','normal')`,
       [issueId, userId],
@@ -53,8 +64,8 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
       [sourceEventId, userId, `check-ci:${sourceEventId}`],
     );
     await pool.query(
-      `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Check HTTP fixture',true,now(),'[{"harness":"codex","installed":true,"version":"fixture"}]')`,
-      [deviceId, userId],
+      `INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt","protocolVersion",harnesses) VALUES ($1,$2,'Check HTTP fixture','local',true,now(),$3,'[{"harness":"codex","installed":true,"version":"fixture","toolApproval":true}]')`,
+      [deviceId, userId, DAEMON_PROTOCOL_VERSION],
     );
     await pool.query(
       `INSERT INTO device_tokens (id,"userId","tokenHash") VALUES ($1,$2,$3)`,
@@ -65,8 +76,8 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
       [agentId, userId, deviceId],
     );
     await pool.query(
-      `INSERT INTO device_repos (id,"deviceId","userId","repoPath","verifyCommand") VALUES ($1,$2,$3,'/ci/check-http','node acceptance.mjs')`,
-      [repoId, deviceId, userId],
+      `INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl","verifyCommand") VALUES ($1,$2,$3,$4,$5,'node acceptance.mjs')`,
+      [repoId, deviceId, userId, remoteKey(remoteUrl), remoteUrl],
     );
     const evidence = [];
     for (const mode of [
@@ -84,6 +95,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
       const fixtureIssue = randomUUID(),
         event = randomUUID();
       fixtureIssues.push(fixtureIssue);
+      fixtureEvents.push(event);
       await pool.query(
         `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Execution HTTP fixture','{}','todo','normal')`,
         [fixtureIssue, userId],
@@ -218,10 +230,20 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
         )
       ).rows[0].n;
       if (!allowed) {
+        // A policy/FK failure must not satisfy a Factory rejection case.
+        const error = mode === "access-revoked"
+          ? "The task is no longer available to this thread."
+          : ["cancel", "revoke", "ordinary-stop", "selected-cancel"].includes(mode)
+            ? "Run is not queued for this device."
+            : "Run is no longer queued for this device.";
+        expect({ error: body.error, code: body.code }).toEqual({
+          error,
+          code: mode === "access-revoked" ? "issue_unavailable" : undefined,
+        });
         expect(body.skillReceipt).toBeUndefined();
         expect(body.skills).toBeUndefined();
         expect(receipts).toHaveLength(0);
-        expect(body.mcp).toBeUndefined();
+        expect(Object.hasOwn(body, "mcp")).toBe(false);
         expect(body.prompt).toBeUndefined();
         expect(tokens).toBe(0);
         expect(
@@ -260,9 +282,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
     await pool.query(`DELETE FROM agents WHERE id=$1`, [agentId]);
     await pool.query(`DELETE FROM device_tokens WHERE id=$1`, [tokenId]);
     await pool.query(`DELETE FROM devices WHERE id=$1`, [deviceId]);
-    await pool.query(`DELETE FROM coordinator_events WHERE "userId"=$1`, [
-      userId,
-    ]);
+    await pool.query(`DELETE FROM coordinator_events WHERE id=ANY($1::uuid[])`, [fixtureEvents]);
     await pool.end();
   }
 });

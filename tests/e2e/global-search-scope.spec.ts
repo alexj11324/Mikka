@@ -36,7 +36,8 @@ test('⌘K finds a task outside the loaded recent list through server search', a
   await expect(hit).toBeVisible()
   await expect(search.getByRole('status')).toHaveText(/\d+ 条结果/)
   await input.fill(`nothing-${randomUUID()}`)
-  await expect(search.getByText('没有匹配的结果', { exact: true })).toBeVisible()
+  await expect(search.getByRole('listbox').getByText('没有匹配的结果', { exact: true })).toBeVisible()
+  await expect(search.getByRole('status')).toHaveText('没有匹配的结果')
   await input.fill(`target ${tag}`)
   await expect(hit).toBeVisible()
   await hit.click()
@@ -87,22 +88,42 @@ test('explicit local scope changes do not ask for a second confirmation', async 
   expect(errors).toEqual([])
 })
 
-test('an unresolved Linear sync keeps a shared task from becoming personal', async ({ page, context }) => {
+test('an unresolved Linear publication keeps a shared task from becoming personal', async ({ page, context }) => {
   const errors = watchRuntime(context)
   await prepareTeam(page)
   const title = `Scope blocked ${randomUUID().slice(0, 8)}`
   const id = await seedTask(page, title)
   await page.reload()
   await share(page, title)
-  // Synthetic fixture: a failed job may already have reached Linear.
+  // A Mikka team promotion does not authorize a new Linear publication. The
+  // current trigger must still refuse to enqueue this unverified destination.
   const pool = isolatedPool()
-  try { await pool.query(`INSERT INTO linear_sync_outbox (id, "issueId", status) VALUES ($1, $2, 'failed')`, [randomUUID(), id]) }
-  finally { await pool.end() }
+  try {
+    const unverifiedJob = await pool.query(`INSERT INTO linear_sync_outbox (id, "issueId", status) VALUES ($1, $2, 'failed') RETURNING id`, [randomUUID(), id])
+    expect(unverifiedJob.rowCount).toBe(0)
+    const before = (await pool.query('SELECT scope, revision, "scopeVersion", "linearSyncBlocked" FROM issues WHERE id=$1', [id])).rows[0]
+    expect(before).toMatchObject({ scope: 'workspace', linearSyncBlocked: true })
 
-  await choosePersonal(page)
-  await expect(page.getByText('请先确认如何处理 Linear 中的任务，再转为个人任务。', { exact: true })).toBeVisible()
-  await expect(page.getByRole('alertdialog')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '归属：工作区', exact: true })).toBeVisible()
+    // Synthetic retained state: an earlier reservation committed but its
+    // provider response was lost. There is no active link or provider grant.
+    // Preserve the real owner/generation and all current database guards.
+    const syncId = randomUUID(), publicationId = randomUUID(), remoteId = randomUUID()
+    const sync = await pool.query(`INSERT INTO linear_team_syncs (id, "ownerId", "linearTeamId", "linearTeamKey", "linearTeamName", active)
+      SELECT $1, "userId", $2, 'SCOPE', 'Synthetic retained Linear target', false FROM issues WHERE id=$3 RETURNING id`, [syncId, randomUUID(), id])
+    expect(sync.rowCount).toBe(1)
+    const publication = await pool.query(`INSERT INTO linear_issue_publications (id, "issueId", "ownerId", "teamSyncId", "scopeVersion", "linearIssueId", "writePending")
+      SELECT $1, id, "userId", $2, "scopeVersion", $3, true FROM issues WHERE id=$4 RETURNING *`, [publicationId, syncId, remoteId, id])
+    expect(publication.rowCount).toBe(1)
+    expect((await pool.query('SELECT id FROM linear_issue_links WHERE "issueId"=$1', [id])).rowCount).toBe(0)
+    expect((await pool.query('SELECT id FROM linear_sync_outbox WHERE "issueId"=$1', [id])).rowCount).toBe(0)
+
+    await choosePersonal(page)
+    await expect(page.getByText('请先确认如何处理 Linear 中的任务，再转为个人任务。', { exact: true })).toBeVisible()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '归属：工作区', exact: true })).toBeVisible()
+    expect((await pool.query('SELECT scope, revision, "scopeVersion", "linearSyncBlocked" FROM issues WHERE id=$1', [id])).rows[0]).toEqual(before)
+    expect((await pool.query('SELECT * FROM linear_issue_publications WHERE id=$1', [publicationId])).rows).toEqual(publication.rows)
+  } finally { await pool.end() }
   expect(errors).toEqual([])
 })
 
