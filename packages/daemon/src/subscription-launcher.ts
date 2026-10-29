@@ -6,6 +6,7 @@ import type { StartOptions, AgentSession } from './adapters/types'
 import type { AgentSandbox } from './agents/sandbox'
 import { startSubscriptionSession } from './subscription'
 import type { NativeLease, SubscriptionWorkerClient } from './subscription-worker-client'
+import { requireRunToolApproval } from './agents/tool-approval'
 
 /** Called inside the trusted owner runtime, never from a task-supplied cwd/env. */
 export async function launchHostedSubscription(use: SubscriptionUse, options: StartOptions, host: {
@@ -17,7 +18,13 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
   claudeBinary?: string
   revocationPollMs?: number
 }): Promise<AgentSession> {
-  const check = async () => authorizeSubscriptionUse({ ...use, execution: 'native' }, await host.access())
+  const gate = requireRunToolApproval(options.runId, options.toolApproval)
+  const check = async () => {
+    if (!await gate.checkLive()) { gate.revoke(); throw new Error('Run tool approval unavailable') }
+    const access = await host.access()
+    if (gate.revoked) throw new Error('Run tool approval unavailable')
+    return authorizeSubscriptionUse({ ...use, execution: 'native' }, access)
+  }
   const authorized = await check()
   const revision = authorized.binding.connectionRevision
   let lastToken: string | undefined
@@ -50,7 +57,7 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
     adapter: async () => authorized.binding.route === 'codex_cli'
       ? new CodexAdapter({ stateDir: host.stateDir, sandbox: host.sandbox, binary: host.codexBinary,
         subscriptionAuth: { accountId, verify: async () => { await check() }, token: async force => { const value = await next(force); return { accessToken: value.accessToken, chatgptAccountId: value.chatgptAccountId ?? '', chatgptPlanType: value.chatgptPlanType } } } })
-      : new ClaudeAdapter({ stateDir: host.stateDir, binary: host.claudeBinary,
+      : new ClaudeAdapter({ stateDir: host.stateDir, sandbox: host.sandbox, binary: host.claudeBinary,
         subscriptionAuth: { accountId, verify: async () => { await check() }, token: async () => { const value = await next(); return { accountId: value.accountId ?? '', accessToken: value.accessToken, expiresAt: value.expiresAt ?? '' } } } })
   })
   let ended = false
@@ -59,7 +66,9 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
     if (ended || checking) return
     checking = true
     void (async () => {
+      if (!await gate.checkLive()) { gate.revoke(); throw new Error('Run tool approval unavailable') }
       const access = await host.access()
+      if (gate.revoked) throw new Error('Run tool approval unavailable')
       // A host refresh callback waits for durable publication. Do not cancel
       // that same native session for its own transient refresh state. Epoch,
       // ownership, binding, readiness, quota and billing checks still apply;
@@ -70,11 +79,12 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
     })().catch(async () => { await session.cancel(); cleanup() }).finally(() => { checking = false })
   }, host.revocationPollMs ?? 1000)
   timer.unref()
-  function cleanup() { ended = true; clearInterval(timer) }
+  const off = gate.onRevoke(() => { void session.cancel().catch(() => undefined).finally(cleanup) })
+  function cleanup() { ended = true; clearInterval(timer); off(); gate.revoke() }
   return {
     sessionId: session.sessionId,
     async *events() { try { yield* session.events() } finally { cleanup() } },
-    send: text => session.send(text),
+    send: text => { if (gate.revoked) throw new Error('Run tool approval unavailable'); return session.send(text) },
     async cancel() { cleanup(); await session.cancel() },
     async detach() { cleanup(); if (session.detach) await session.detach() }
   }

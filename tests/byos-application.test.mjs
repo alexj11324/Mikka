@@ -23,6 +23,7 @@ import { resolveAgentModel } from '../lib/agent-model.ts'
 import { hostedSubscriptionLauncher } from '../packages/daemon/src/subscription-launcher.ts'
 import { buildChildEnv } from '../packages/daemon/src/env.ts'
 import { NoSandbox } from '../packages/daemon/src/agents/sandbox.ts'
+import { ToolApprovalGate } from '../packages/daemon/src/agents/tool-approval.ts'
 import { createLogger } from '../packages/daemon/src/log.ts'
 
 const workspaceId = '20000000-0000-4000-8000-000000000001'
@@ -272,6 +273,10 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       execFileSync('git', ['init', '-q', cwd])
       const binaryPath = resolve(root, `packages/daemon/test/fakes/fake-${provider === 'codex' ? 'codex' : 'claude'}-subscription.mjs`); await chmod(binaryPath, 0o755)
       const options = { runId: randomUUID(), cwd, prompt: provider === 'codex' ? 'REFRESH' : 'HANG', env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: runtime } }), log: createLogger({ level: 'silent' }) }
+      // This case exercises account custody with synthetic CLIs. Install a
+      // host-scoped gate without approving any tool operation; production
+      // assignments obtain their gate from the authenticated server link.
+      options.toolApproval = new ToolApprovalGate(options.runId, { permission: () => 'deny', ask: async () => 'deny', isLive: () => true })
       const launched = await service.launchNative('alice', consumerId, native.body.bindingId, hostedSubscriptionLauncher(options, { stateDir: runtime, sandbox: new NoSandbox(), codexBinary: binaryPath, claudeBinary: binaryPath, revocationPollMs: 30 }))
       sessions.push(launched)
       if (provider === 'claude') assert.equal((await post({ action: 'disconnect', connectionId, revision })).status, 200)

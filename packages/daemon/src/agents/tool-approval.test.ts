@@ -10,6 +10,7 @@ describe('run-bound tool approval', () => {
     expect(gate.revoked).toBe(false)
     gate.revoke()
     expect(gate.revoked).toBe(true)
+    expect(() => requireRunToolApproval('run-1',gate)).toThrow('Run tool approval unavailable')
     gate.revoke()
     expect(gate.revoked).toBe(true)
   })

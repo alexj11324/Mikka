@@ -415,15 +415,17 @@ export class Daemon {
       ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
       : (this.options.harnesses ?? (await detectHarnesses()))
     if (this.stopped) throw new Error("daemon stopped during startup")
-    // Do not advertise enforcement merely because an approval callback exists:
-    // each harness must prove that all policy-gated operations reach it.
-    const runApprovalTransport = this.ownedSandbox !== null && this.sandbox === this.ownedSandbox && typeof this.options.link.prepareRunToolApproval === 'function'
+    // A callback alone is insufficient: the host must own the enforcement
+    // boundary and bind its lifetime to the run's authenticated gate.
+    const runApprovalTransport = typeof this.options.link.prepareRunToolApproval === 'function'
+    const localIsolation = this.ownedSandbox !== null && this.sandbox === this.ownedSandbox
     this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
       ...info,
-      // A real sandbox probe has already succeeded before this point. A
-      // callback alone or a synthetic NoSandbox transport cannot attest it.
-      // Hosted runtimes need their own verified per-run network integration.
-      toolApproval: !hosted && runApprovalTransport && (info.harness === 'claude_code' || (info.harness === 'codex' && /(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(info.version ?? ''))) ? true as const : undefined,
+      // Local enforcement requires the successful owned SRT probe. Hosted
+      // enforcement uses its existing network-none/read-only Docker boundary
+      // and gate-bound broker/container teardown; general egress stays outside
+      // that ceiling. Codex also verifies its pinned interface at initialize.
+      toolApproval: runApprovalTransport && (hosted || (localIsolation && (info.harness === 'claude_code' || (info.harness === 'codex' && /(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(info.version ?? ''))))) ? true as const : undefined,
       coordinator: hosted ? false : coordinatorCapable(info),
     }))
     // Runs survive restarts: pick up what the journal says was active.
