@@ -60,6 +60,7 @@ import {
   RunContext,
   runPaths,
   type McpServerSpec,
+  type ComputerSpecProvider,
 } from "../agents/run-context"
 import type { SandboxPolicy } from "../agents/sandbox"
 import { ownDir } from "../agents/harness-home"
@@ -94,6 +95,7 @@ export interface ClaudeAdapterOptions {
   onHostedSession?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
+  computerProvider?: ComputerSpecProvider
   /** `~/.claude` of the user whose login the CLI uses. */
   configDir?: string
   /** Trusted owner-bound broker; the CLI receives no refresh grant. */
@@ -489,6 +491,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (earlier) return endedSession(sessionId, earlier)
     ctx.clearHandoff()
+    const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
 
     const queue = new EventQueue()
     const prompts = new PromptQueue(sessionId)
@@ -535,7 +538,7 @@ export class ClaudeAdapter implements AgentAdapter {
         mcpServers: {
           ...(options.mailbox ? { mikka_mailbox: claudeMailboxServer(options.mailbox) } : {}),
           [MCP_SERVER_NAME]: { type: "stdio", ...ctx.mcpServer() },
-          ...(this.options.computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...this.options.computerMcp } } : {}),
+          ...(computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...computerMcp } } : {}),
         },
         strictMcpConfig: true,
         systemPrompt: {

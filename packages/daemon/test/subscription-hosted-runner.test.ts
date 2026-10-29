@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, expect, it, vi } from "vitest";
-import type { RunAssignment } from "@mikka/protocol";
+import { defaultRunPolicy, type RunAssignment } from "@mikka/protocol";
 import { createHostedBotRunner } from "../src/subscription-hosted-runner";
 import { MemoryServer } from "../src/server-link";
 import { createLogger } from "../src/log";
@@ -116,7 +116,10 @@ for (const harness of ["codex", "claude_code"] as const) {
   }, 45000);
 }
 
-it.each(['codex', 'claude_code'] as const)('holds a hosted %s computer call until its Bot-bound broker approves it', async harness => {
+it.each([
+  ['codex', 'ask'], ['codex', 'allow'], ['codex', 'deny'],
+  ['claude_code', 'ask'], ['claude_code', 'allow'], ['claude_code', 'deny'],
+] as const)('applies hosted %s computer policy %s to its Bot-bound broker', async (harness, permission) => {
   const root = tempDir('mnh-computer-'), stateDir = join(root, 'adapters')
   mkdirSync(stateDir)
   let executions = 0
@@ -136,16 +139,27 @@ it.each(['codex', 'claude_code'] as const)('holds a hosted %s computer call unti
     const runner = await createHostedBotRunner({ stateDir, link, binaries: { [harness]: binary }, computerBroker: broker,
       ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { dockerSocket: 'unix:///run/mikka-container/docker.sock' as const } : {}) })
     const assignment = { runId, deviceId, issueId: randomUUID(), repoId: randomUUID(), baseBranch: 'main', harness, prompt: 'COMPUTER', model: 'fixture-model',
+      policy: { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: permission } },
       computer: { botId, ownerId: 'fixture-owner', display: ':2', policyVersion: 0 },
       subscriptionBinding: { bindingId: randomUUID(), ownerId: 'fixture-owner', workspaceId, consumerId: randomUUID(), route: harness === 'codex' ? 'codex_cli' : 'claude_code_cli' },
     } as RunAssignment
-    const session = await runner.start(assignment, { runId, cwd: await makeRepo(), prompt: 'COMPUTER', model: 'fixture-model', env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }), log: createLogger({ level: 'silent' }) })
+    const started = runner.start(assignment, { runId, cwd: await makeRepo(), prompt: 'COMPUTER', model: 'fixture-model', env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }), log: createLogger({ level: 'silent' }) })
+    if (permission === 'deny') {
+      await expect(started).rejects.toThrow('subscription_hosted_runtime_unavailable')
+      expect(executions).toBe(0)
+      expect(broker.list()).toHaveLength(0)
+      return
+    }
+    const session = await started
     const finished = (async () => { const events = []; for await (const event of session.events()) events.push(event); return events })()
-    const review = await waitFor(() => broker.list()[0])
-    expect(review).toMatchObject({ runId, display: ':2', call: { name: 'click', arguments: { x: 3, y: 4 } } })
-    expect(executions).toBe(0)
-    await broker.decide(review.id, review.digest, true)
+    if (permission === 'ask') {
+      const review = await waitFor(() => broker.list()[0])
+      expect(review).toMatchObject({ runId, display: ':2', call: { name: 'click', arguments: { x: 3, y: 4 } } })
+      expect(executions).toBe(0)
+      await broker.decide(review.id, review.digest, true)
+    }
     expect((await finished).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
     expect(executions).toBe(1)
+    expect(broker.list()).toHaveLength(0)
   } finally { await broker.close() }
 }, 60000)
