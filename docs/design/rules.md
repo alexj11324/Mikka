@@ -319,7 +319,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   to white; ui-policy fails both as `style/secondary-button-fill`. Status
   tones (`statusTones`, used by status and priority pickers and status
   badges) are a tinted fill with no stroke; neutral uses `--control`.
-- **R-32** Font Geist, Chinese falls back to the system font. Only these text
+- **R-32** Font Geist, self-hosted from `app/fonts/Geist-Variable.woff2` through
+  `next/font/local` (no runtime font CDN). A local font is only allowed after
+  its file and CSS variable are registered in `ui-policy.json` →
+  `typography.localFonts`. Chinese falls back to the system font. Only these text
   styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
   (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium
   (group title), 11/14 Medium (badge), and 24/32 SemiBold for the 建议 page

@@ -89,7 +89,7 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
   await expect(page.getByRole('button', { name: '账户菜单', exact: true })).toHaveCount(0)
   await rail(page, '插件').click()
-  await expect(page.locator('a', { hasText: '管理设备' })).toHaveAttribute('href', app('/devices'))
+  await expect(page.locator('a', { hasText: '管理设备' })).toHaveAttribute('href', app('/settings?section=devices'))
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '切换工作区', exact: true }).hover()
   const switcher = page.getByRole('menu', { name: '切换工作区', exact: true })

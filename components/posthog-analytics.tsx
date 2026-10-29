@@ -17,7 +17,7 @@ export function PostHogAnalytics() {
     if (isPending) return
     if (previousIdentity.current && previousIdentity.current !== userId) {
       posthog.reset(true)
-      posthog.register({ app: 'mikka', environment: process.env.NODE_ENV })
+      posthog.register({ app: 'mikka', environment: process.env.NODE_ENV, runtime: window.mikka?.app?.runtime === 'electron' ? 'electron' : 'browser' })
     }
     if (userId && posthog.get_distinct_id() !== userId) posthog.identify(userId)
     previousIdentity.current = userId

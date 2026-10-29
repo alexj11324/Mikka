@@ -1,0 +1,32 @@
+{
+  "name": "@mikka/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mikka desktop shell: the web UI with native capabilities",
+  "author": "Aspectly Labs",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/dev.mjs",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "oxlint --deny-warnings -c oxlint.json src scripts",
+    "test": "node --import tsx --test src/main/notification-center.test.ts src/main/security.test.ts src/main/daemon-map.test.ts",
+    "package": "node scripts/build.mjs && electron-builder --config electron-builder.yml",
+    "package:dir": "node scripts/build.mjs && electron-builder --dir --config electron-builder.yml"
+  },
+  "devDependencies": {
+    "@mikka/config": "workspace:*",
+    "@mikka/daemon": "workspace:*",
+    "@mikka/protocol": "workspace:*",
+    "@types/node": "^25.1.0",
+    "electron": "45.1.0",
+    "electron-builder": "26.18.0",
+    "electron-updater": "^6.8.11",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

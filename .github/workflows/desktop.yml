@@ -1,0 +1,144 @@
+name: Desktop shell
+
+# Checks the Electron shell and the shared platform contract. Packaging,
+# signing and notarization run on the release runners, not here.
+
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - 'packages/protocol/**'
+      - 'lib/platform/**'
+      - 'components/desktop/**'
+      - 'app/actions/task-runs.ts'
+      - 'components/devices/**'
+      - 'components/coordinator/new-task-dialog.tsx'
+      - 'app/**/settings/**'
+      - 'next.config.mjs'
+      - 'lib/auth-return.ts'
+      - 'instrumentation-client.ts'
+      - 'lib/analytics-policy.ts'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/desktop.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/desktop/**'
+      - 'packages/protocol/**'
+      - 'lib/platform/**'
+      - 'components/desktop/**'
+      - 'app/actions/task-runs.ts'
+      - 'components/devices/**'
+      - 'components/coordinator/new-task-dialog.tsx'
+      - 'app/**/settings/**'
+      - 'next.config.mjs'
+      - 'lib/auth-return.ts'
+      - 'instrumentation-client.ts'
+      - 'lib/analytics-policy.ts'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/desktop.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies without the Electron runtime
+        run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: pnpm --filter @mikka/desktop typecheck
+      - run: pnpm --filter @mikka/desktop lint
+      - run: pnpm --filter @mikka/desktop test
+      - run: pnpm --filter @mikka/desktop build
+      - run: pnpm --filter @mikka/protocol typecheck
+      - run: pnpm test:platform
+
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3000
+      AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium system dependencies
+        timeout-minutes: 15
+        run: pnpm exec playwright install --with-deps chromium
+      - run: sudo apt-get install -y xvfb
+      - name: Generate ephemeral test-only auth secret
+        run: echo "BETTER_AUTH_SECRET=$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')" >> "$GITHUB_ENV"
+      - name: Apply tracked migrations to the disposable database
+        run: pnpm migrate
+        env:
+          MIGRATE: '1'
+      - name: Prepare the isolated E2E schema
+        run: pnpm test:e2e:setup
+      - name: Build the dev Electron shell
+        run: pnpm --filter @mikka/desktop build
+        env:
+          MIKKA_DESKTOP_FLAVOR: dev
+      - name: Start the web app for the smoke test
+        run: |
+          nohup pnpm exec next dev --turbopack --port 3000 > /tmp/mikka-dev.log 2>&1 &
+          for _ in $(seq 1 180); do
+            grep -q "Ready in" /tmp/mikka-dev.log && exit 0
+            sleep 1
+          done
+          cat /tmp/mikka-dev.log
+          exit 1
+      - name: Electron window, bridge and settings acceptance
+        run: xvfb-run -a node apps/desktop/test/smoke.mjs
+        env:
+          MIKKA_SMOKE_APP_URL: http://localhost:3000/mikka
+          MIKKA_SMOKE_SCREENSHOT: /tmp/mikka-desktop-smoke.png
+      - name: Keep the dev log and screenshot on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-smoke-failure
+          path: |
+            /tmp/mikka-dev.log
+            /tmp/mikka-desktop-smoke.png
+          if-no-files-found: ignore
+          retention-days: 7

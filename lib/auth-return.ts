@@ -20,7 +20,7 @@ export function safeAuthReturn(value?: string) {
   const url = new URL(value, internalOrigin)
   if (url.origin !== internalOrigin || url.hash) return '/'
   if (/^\/invite\/[a-f0-9]{64}$/.test(url.pathname) && !url.search) return url.pathname
-  if (url.pathname === '/devices' && !url.search) return '/devices'
+  if (url.pathname === '/devices' && !url.search) return '/settings?section=devices'
   if (url.pathname === '/device') {
     const code = url.searchParams.get('user_code')
     return hasOnlyQueryKeys(url, ['user_code']) && (code === null || /^[A-Z0-9-]{4,32}$/.test(code))

@@ -27,6 +27,6 @@ if (posthogConfig.token) {
   disable_product_tours: true,
   disable_web_experiments: true,
   before_send: sanitizeAnalyticsEvent,
-    loaded: client => client.register({ app: 'mikka', environment: process.env.NODE_ENV }),
+    loaded: client => client.register({ app: 'mikka', environment: process.env.NODE_ENV, runtime: window.mikka?.app?.runtime === 'electron' ? 'electron' : 'browser' }),
   })
 }

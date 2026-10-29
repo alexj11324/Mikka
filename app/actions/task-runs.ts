@@ -5,7 +5,7 @@ import { and, desc, eq, isNotNull, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { agents, agentRuns, type RunStatus } from '@/lib/db/schema'
+import { agents, agentRuns, issues, type RunStatus } from '@/lib/db/schema'
 import { reclaimLostRuns } from '@/lib/run-leases'
 import { runBotName } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
@@ -13,6 +13,7 @@ import { replyLine } from '@/lib/thread-groups'
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
 export interface TaskRun {
   issueId: string
+  issueTitle: string
   agentId: string
   agentName: string
   status: RunStatus
@@ -27,9 +28,9 @@ export async function listTaskRuns(): Promise<TaskRun[]> {
   // (or lands in 等你) even when none of the person's devices is online.
   await reclaimLostRuns(session.user.id).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error))
   const rows = await db.selectDistinctOn([agentRuns.issueId], {
-    issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: runBotName,
+    issueId: agentRuns.issueId, issueTitle: issues.title, agentId: agentRuns.agentId, agentName: runBotName,
     status: agentRuns.status, error: agentRuns.error, finishedAt: agentRuns.finishedAt,
-  }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
+  }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).innerJoin(issues, eq(issues.id, agentRuns.issueId))
     .where(and(eq(agentRuns.userId, session.user.id), isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
     .orderBy(agentRuns.issueId, desc(agentRuns.createdAt)).limit(200)
   return rows.map(row => ({ ...row, issueId: row.issueId!, finishedAt: row.finishedAt?.toISOString() ?? null }))

@@ -176,7 +176,7 @@ test('the workflow-extracted trusted classifier executes as an ES module', () =>
     const workflow = readFileSync(file, 'utf8')
     const allocation = workflow.match(/trusted="\$\((mktemp[^\n]*)\)"/)
     assert.ok(allocation, file)
-    const env = { PATH: process.env.PATH, TMPDIR: dir }
+    const env = { PATH: process.env.PATH, TMPDIR: dir, HOME: process.env.HOME ?? '' }
     const extracted = execFileSync('bash', ['-ceu', allocation[1]], { env, encoding: 'utf8' }).trim()
     writeFileSync(extracted, readFileSync('scripts/ci-docs-only.mjs'))
     const output = execFileSync(process.execPath, [extracted, '--base', 'missing-base', '--head', 'missing-head'], { env, encoding: 'utf8' })
@@ -224,7 +224,7 @@ test('each actual workflow temp-file command produces a classifier Node can load
     const command = source.match(/^          (trusted="\$\(mktemp[^\n]*\)")$/m)?.[1]
     assert.ok(command, 'Exercise the actual workflow temporary-file command')
     const dir = mkdtempSync(join(tmpdir(), 'docs-gate-module-retained-'))
-    const env = { PATH: process.env.PATH, TMPDIR: dir }
+    const env = { PATH: process.env.PATH, TMPDIR: dir, HOME: process.env.HOME ?? '' }
     const trusted = execFileSync('bash', ['-e', '-c', command + '; printf "%s" "$trusted"'], { cwd: dir, env, encoding: 'utf8' })
     assert.equal(resolve(trusted, '..'), dir, 'Fixture must belong to this new temporary directory')
     writeFileSync(trusted, readFileSync('scripts/ci-docs-only.mjs'))

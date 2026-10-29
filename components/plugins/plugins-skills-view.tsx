@@ -88,7 +88,7 @@ export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean })
             {!app && <>
               <SettingsSection id="agent-runtime-heading" title={t('agentRuntime')}>
                 <SettingRow title={t('agentDevices')} description={t('agentRuntimeDescription')}>
-                  <Button variant="secondary" size="sm" nativeButton={false} render={<Link href="/devices" />}>
+                  <Button variant="secondary" size="sm" nativeButton={false} render={<Link href="/settings?section=devices" />}>
                     {t('manageDevices')}
                   </Button>
                 </SettingRow>

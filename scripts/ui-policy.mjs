@@ -1,3 +1,4 @@
+import path from 'node:path'
 import ts from 'typescript'
 import postcss from 'postcss'
 
@@ -28,6 +29,10 @@ export function utilityBase(token) {
     if (token[i] === ':' && depth === 0) start = i + 1
   }
   return token.slice(start).replace(/^!|!$/g, '')
+}
+
+function localFontPath(file, src) {
+  return path.posix.normalize(path.posix.join(path.posix.dirname(file), src))
 }
 
 const palette = /^(?:bg|text|border(?:-[trblxyse])?|ring|outline|fill|stroke|decoration|from|via|to|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)(?:-|\/|$)/
@@ -114,7 +119,7 @@ export function auditSource(file, text, policy) {
         const name = spec.propertyName?.text ?? spec.name.text
         if (!policy.typography.googleFonts.includes(name)) add(spec, 'typography/font-family', `字体 ${name} 不在批准的字体集合中。`)
       }
-      if (from === 'next/font/local') add(node, 'typography/font-family', '本地字体也必须先进入统一字体策略，不允许临时引入。')
+      // next/font/local 的字体文件与 CSS 变量在调用处对照 typography.localFonts 校验。
       if (/^(?:@base-ui\/|@radix-ui\/|radix-ui$|react\/jsx-runtime|react\/jsx-dev-runtime)/.test(from)) add(node, 'components/no-primitive-bypass', '业务代码只组合已下载组件，不直接使用底层 primitives 或 JSX runtime。')
       if (/^(?:@tabler\/icons|@heroicons\/|react-icons\/|@phosphor-icons\/)/.test(from) && from !== policy.iconLibrary) add(node, 'icons/library', `仅使用配置的 ${policy.iconLibrary}。`)
     }
@@ -204,6 +209,16 @@ export function auditSource(file, text, policy) {
       const entry = imports.get(name)
       if (name === 'React.createElement' || entry?.name === 'createElement' || /(?:^|\.)(?:jsx|jsxs|jsxDEV)$/.test(name)) add(node, 'components/no-element-factory', '不允许通过 createElement/JSX runtime 绕过组件来源检查。')
       if (name === 'document.createElement' || entry?.name === 'cva') add(node, 'components/no-custom-implementation', '不允许在业务代码手写 UI 元素或 variants。')
+      if (entry?.from === 'next/font/local') {
+        const options = node.arguments[0]
+        const fontOptions = options && ts.isObjectLiteralExpression(options) ? options : null
+        const option = key => fontOptions?.properties.find(prop => ts.isPropertyAssignment(prop) && prop.name.getText(source).replaceAll(/['"]/g, '') === key)?.initializer
+        const sources = resolve(option('src')).strings
+        const variable = resolve(option('variable')).strings
+        const approvedFonts = policy.typography.localFonts ?? []
+        const approved = approvedFonts.some(font => sources.some(src => localFontPath(file, src) === font.src) && variable.includes(font.variable))
+        if (!approved) add(node, 'typography/font-family', '本地字体必须先登记到 ui-policy.json 的 typography.localFonts，并绑定批准的 CSS 变量；不允许临时引入。')
+      }
     }
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const raw = node.tagName.getText(source), name = canonical(node), parents = ancestors(node)

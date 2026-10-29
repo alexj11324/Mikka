@@ -21,7 +21,7 @@ import { useComputer } from '@/hooks/use-computer'
 
 const MAX_LENGTH = 8000
 
-type Machine = { value: string; label: string; cloud?: boolean; online?: boolean; server?: boolean }
+type Machine = { value: string; label: string; cloud?: boolean; online?: boolean }
 
 /** A machine's icon with its state dot. Mikka Cloud stays green asleep, since picking it wakes it; red only when it failed (the workspace has one, so any bot's computer reports it). */
 function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
@@ -29,7 +29,7 @@ function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: st
   const tStatus = useTranslations('Computer.status')
   const { data: state } = useComputer(machine.cloud ? cloudBotId : null)
   if (machine.cloud) return <DeviceIcon kind="cloud" state={state?.machine === 'error' ? 'error' : 'online'} label={state ? tStatus(state.machine === 'error' ? 'failed' : state.machine) : t('cloud')} />
-  return <DeviceIcon kind={machine.server ? 'server' : 'personal'} state={machine.online ? 'online' : 'offline'} label={machine.online ? t('online') : t('offline')} />
+  return <DeviceIcon kind="personal" state={machine.online ? 'online' : 'offline'} label={machine.online ? t('online') : t('offline')} />
 }
 
 function MachineLabel({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
@@ -69,12 +69,10 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   // Direct daemon devices are 本机, including Linux. OS is not evidence that
   // a computer is an SSH target reached through another machine (R-23).
   const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true }
-  const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, online: item.online, server: false }))
-  const local = own.filter(item => !item.server)
-  const remote = own.filter(item => item.server)
+  const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, online: item.online }))
   // R-23: the task keeps its chosen destination even when cloud execution is
   // unavailable; the Coordinator can create it and report the missing setup.
-  const machines = [cloud, ...local, ...remote]
+  const machines: Machine[] = [cloud, ...own]
   const [picked, setPicked] = useState<string | null>(null)
   const device = machines.find(item => item.value === picked) ?? machines[0]
   useEffect(() => { if (open && initialText) setDraft(current => current || initialText) }, [open, initialText])
@@ -122,8 +120,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
             <SelectTrigger size="sm" className="h-7 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><MachineIcon machine={device} cloudBotId={cloudBotId} /><SelectValue /></SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-60">
               <SelectGroup><SelectItem value={cloud.value}><MachineLabel machine={cloud} cloudBotId={cloudBotId} /></SelectItem></SelectGroup>
-              {local.length > 0 && <><SelectGroup><SelectLabel>{tDevices('thisMachine')}</SelectLabel>{local.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudBotId={cloudBotId} /></SelectItem>)}</SelectGroup></>}
-              {remote.length > 0 && <><SelectGroup><SelectLabel>{tDevices('otherDevices')}</SelectLabel>{remote.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudBotId={cloudBotId} /></SelectItem>)}</SelectGroup></>}
+              {own.length > 0 && <SelectGroup><SelectLabel>{tDevices('thisMachine')}</SelectLabel>{own.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudBotId={cloudBotId} /></SelectItem>)}</SelectGroup>}
             </SelectContent>
           </Select>
           : <span className="flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{t('noDevice')}</span>}

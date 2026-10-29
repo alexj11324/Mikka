@@ -1,0 +1,141 @@
+name: Desktop release
+
+# Builds signed installers on tags named desktop-vX.Y.Z and attaches them to a
+# draft GitHub Release. Publishing the draft is a manual step after the
+# artifacts and release notes have been checked.
+#
+# Required repository secrets for macOS:
+#   APPLE_DEVELOPER_ID_P12_BASE64  Developer ID Application certificate (base64)
+#   APPLE_DEVELOPER_ID_P12_PASSWORD
+# Notarization (required for a public macOS release), one of:
+#   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+#   APPLE_API_KEY_P8_BASE64, APPLE_API_KEY_ID, APPLE_API_ISSUER
+
+on:
+  push:
+    tags:
+      - 'desktop-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build, for example desktop-v0.1.0
+        required: true
+        type: string
+      skip_notarization:
+        description: Build macOS without notarization (internal testing only)
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10.34.3'
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Tag and package version agree
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          test "$RELEASE_TAG" = "desktop-v$version" || {
+            echo "::error::tag $RELEASE_TAG does not match apps/desktop/package.json version $version"
+            exit 1
+          }
+          echo "Building Mikka Desktop $version"
+
+  macos:
+    needs: preflight
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      CSC_LINK: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 }}
+      CSC_KEY_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Require the Developer ID certificate
+        run: |
+          test -n "$CSC_LINK" && test -n "$CSC_KEY_PASSWORD" || {
+            echo "::error::APPLE_DEVELOPER_ID_P12_BASE64 / APPLE_DEVELOPER_ID_P12_PASSWORD are missing"
+            exit 1
+          }
+      - name: Materialize App Store Connect key
+        if: ${{ env.APPLE_API_KEY_P8_BASE64 != '' }}
+        run: |
+          printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 -D > "$RUNNER_TEMP/AuthKey.p8"
+          echo "APPLE_API_KEY=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+      - name: Require notarization credentials
+        if: ${{ github.event.inputs.skip_notarization != 'true' }}
+        run: |
+          if { test -z "$APPLE_ID" || test -z "$APPLE_APP_SPECIFIC_PASSWORD" || test -z "$APPLE_TEAM_ID"; } &&
+             { test -z "$APPLE_API_KEY" || test -z "$APPLE_API_KEY_ID" || test -z "$APPLE_API_ISSUER"; }; then
+            echo "::error::Public macOS releases need notarization secrets (APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID or APPLE_API_KEY_P8_BASE64/APPLE_API_KEY_ID/APPLE_API_ISSUER). Use skip_notarization only for internal builds."
+            exit 1
+          fi
+      - name: Package signed macOS app
+        run: pnpm --filter @mikka/desktop package -- --mac --arm64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mikka-desktop-macos
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest-mac.yml
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: macos
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Read release version
+        run: echo "RELEASE_VERSION=${RELEASE_TAG#desktop-v}" >> "$GITHUB_ENV"
+      - name: Write checksums
+        working-directory: release
+        run: find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Mikka Desktop ${{ env.RELEASE_VERSION }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            release/*

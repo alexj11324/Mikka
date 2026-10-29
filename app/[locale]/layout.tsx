@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import localFont from "next/font/local";
 import Script from 'next/script';
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
@@ -13,7 +13,7 @@ import { posthogConfig } from "@/lib/posthog-config";
 
 import "../globals.css";
 
-const fontSans = Geist({ subsets: ['latin'], variable: '--font-geist' });
+const fontSans = localFont({ src: '../fonts/Geist-Variable.woff2', variable: '--font-geist', weight: '100 900' });
 
 type LocaleParams = { params: Promise<{ locale: string }> };
 
