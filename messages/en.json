@@ -1529,7 +1529,9 @@
       "name": "Name",
       "email": "Email",
       "notSet": "Not set",
-      "readOnly": "Account details are read-only; this version does not support editing them here."
+      "readOnly": "Account details are read-only; this version does not support editing them here.",
+      "save": "Save",
+      "saved": "Saved"
     },
     "memory": {
       "enabled": "Use memory",

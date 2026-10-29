@@ -212,7 +212,7 @@ Writing Style Guide、Shopify Polaris、Material 3 的公开规则。本轮收�
 | A24 取消建议 | 有后端无 UI | `DELETE /api/suggestions/:id` 存在，建议卡片没有取消入口 |
 | A25 简报 | 未测 | 需要 Coordinator 08:00 消息与建议数据 |
 | A26 / D16 通知设置 | 无 UI | 偏好后端存在（`lib/preferences.ts`），设置页没有通知分区 |
-| D12 / D14 个人资料、语言 | 只读 | `settings-view.tsx` 里名称与语言是 `<span>`，没有编辑/保存动作 |
+| D14 语言 | 只读 | `settings-view.tsx` 里语言仍是 `<span>`，没有切换动作 |
 | D19 / D20 推送失败 | 设计已补 | 需要 APNs 与真机，未跑 |
 | B / C 轨外部项 | 未执行 | 需要 Linear 工作区、GitHub App、Composio 连接、云电脑 |
 | 新增 artifact 状态 | 未覆盖 | 深色与窄屏版本、键盘与读屏操作 |
