@@ -17,12 +17,13 @@ machine), the way Grok Bot does it. Bot and thread are defined in
 [glossary.md](glossary.md): the threads (runs) a bot starts use that bot's
 computer. The computer is keyed by `bots.id`, never `agents.id`:
 
-- **Agent 详情页**: the bot's avatar and name, then its live screen captioned
-  "Mikka Frontend 的屏幕" (no state badge). A centered 打开 button opens a full-window viewer.
+- **电脑 tab (right panel)**: the selected bot's existing `AgentComputer`
+  view. The 概览 header shows the bot's avatar and name, not a screen caption
+  (decision 2026-10-28, R-02).
 - **Full-window viewer**: starts view-only (仅观看). 取得控制权 pauses the agent
-  and gives the user mouse and keyboard (你在操作); 交还给 Agent hands control back.
+  and gives the user mouse and keyboard (你在操作); 交还给 <Bot 名> hands control back.
 - **Chat**: one 电脑 card per computer task. It shows the task sentence, a state
-  (Agent 操作中 / 等你审批 / 完成) and the live screen. Approval happens inside
+  (<Bot 名> 操作中 / 等你审批 / 完成) and the live screen. Approval happens inside
   the card (允许 / 拒绝 / 本任务内都允许). There is no step list and no operation
   log anywhere.
 - **Sleep**: the computer sleeps when idle and keeps its disk. It wakes
@@ -221,8 +222,7 @@ Report findings in the issue before building on an assumption that failed.
   本任务内都允许 auto-approves later operations of the same run on the same
   desktop. A workspace `deny` still wins.
 
-Additive migrations only. They run automatically on Neon prod builds
-(`scripts/migrate.mjs`), so test them against a real Postgres.
+Additive migrations only, tested against a real Postgres; see `docs/migration-bootstrap.md` for when they run.
 
 ## 5. API contract for the frontend
 
