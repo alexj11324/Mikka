@@ -19,13 +19,27 @@ export class SubmissionConflictError extends Error {
 
 type Executor = Pick<typeof db, 'insert' | 'select'>
 
+function submissionKey(userId: string, botId: string | null, submissionId: string) {
+  return `personal_submission:v1:${createHash('sha256').update(JSON.stringify([userId, botId, submissionId])).digest('hex')}`
+}
+
+/** Read an existing receipt without inserting an event for an already-dismissed suggestion. */
+export async function personalSubmissionRecorded(executor: Pick<typeof db, 'select'>, userId: string, text: string, submissionId: string): Promise<boolean> {
+  const id = personalSubmissionInput.shape.submissionId.parse(submissionId)!
+  const [prior] = await executor.select({ userId: coordinatorEvents.userId, botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, issueId: coordinatorEvents.issueId, runId: coordinatorEvents.runId, payload: coordinatorEvents.payload })
+    .from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey, submissionKey(userId, null, id))).limit(1)
+  if (!prior) return false
+  if (prior.userId !== userId || prior.botId !== null || prior.kind !== 'user_message' || prior.issueId !== null || prior.runId !== null || !isDeepStrictEqual(prior.payload, { text })) throw new SubmissionConflictError()
+  return true
+}
+
 /** Caller authenticates the person and validates any Bot ownership before calling. */
 export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId?: string | null; taskDestination?: TaskDestination } = {}) {
   const submissionId = personalSubmissionInput.shape.submissionId.parse(options.submissionId)
   const botId = options.botId ?? null
   const taskDestination = options.taskDestination ? taskDestinationSchema.parse(options.taskDestination) : undefined
   const dedupeKey = submissionId
-    ? `personal_submission:v1:${createHash('sha256').update(JSON.stringify([userId, botId, submissionId])).digest('hex')}`
+    ? submissionKey(userId, botId, submissionId)
     : `user_message:${randomUUID()}`
   const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text, ...(taskDestination ? { taskDestination } : {}) } }
   const [inserted] = await executor.insert(coordinatorEvents).values({ id: randomUUID(), ...event })

@@ -24,6 +24,8 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Bot avatars | `BotAvatar` (bloub, Figma `196:3571`) | R-36. Not on main yet: it lands with the bot list PR |
 | Buttons, badges, dialogs, menus, tabs, switches | reUI first, then `components/ui/*` | Figma style guide rule 4 |
 | Brand mark | inline SVG per `brand.md` | |
+| 建议 page (rail) | `components/suggestions/suggestion-feed.tsx`; cards from `components/suggestions/mobile-card.tsx` (`SuggestionCardBody`, `SourceMark`) | Figma F8 `420:5831`, R-21. A tapped card heads the person's message in the Coordinator chat (`lib/suggestions/card.ts`) |
+| Artifact page (rail) | `components/artifacts/artifact-library.tsx`, opening `ArtifactWindow` (the reader beside the thread or Coordinator chat) | Figma F2 `395:27790`, F4 `395:27525`. Rail icon `components/icons/artifact-icon.tsx`, never lucide Copy/Library |
 | Agent outputs (documents, web pages) | `components/artifacts/`: `ArtifactCard` (in chat), `ArtifactChip` (chat beside the reader), `ArtifactViewer` (reader), `ArtifactQuoteChip` / `ArtifactQuoteLine` | Figma `178:11626`. Quoted text is marked by `remarkMarks`, never by touching the DOM |
 
 ## Do not use
