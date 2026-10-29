@@ -1,6 +1,7 @@
+import { localExecutionHarnesses } from '@/lib/device-agents'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
-import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, isNull, or, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { issueForUser } from '@/lib/issue-access'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
@@ -10,7 +11,7 @@ import { addRunMessage, queueRun, requestRunStop } from '@/lib/agent-runs'
 import { forgetNotes, rememberNote } from '@/lib/coordinator/context'
 import { editMemory } from '@/lib/coordinator/store'
 import { db } from '@/lib/db'
-import { agentRuns, agents, coordinatorSessions, deviceRepos, devices, issueMembers, issues, runChunks } from '@/lib/db/schema'
+import { agentRuns, agents, coordinatorSessions, devices, issueMembers, issues, runChunks } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import type { IssueLabel } from '@/lib/issue-metadata'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -157,19 +158,16 @@ export async function searchIssues(userId: string, input: { query: string; statu
 }
 
 export async function listAgents(userId: string) {
-  const rows = await db.select({ id: agents.id, name: agents.name, description: agents.description, harness: agents.harness, deviceId: agents.deviceId, deviceName: devices.name, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt })
-    .from(agents).leftJoin(devices, eq(devices.id, agents.deviceId)).where(eq(agents.userId, userId)).orderBy(asc(agents.name))
-  const deviceIds = [...new Set(rows.map(row => row.deviceId).filter((id): id is string => Boolean(id)))]
-  const repos = deviceIds.length ? await db.select().from(deviceRepos).where(inArray(deviceRepos.deviceId, deviceIds)) : []
-  return rows.map(row => ({
-    id: row.id, name: row.name, description: row.description, harness: row.harness, device: row.deviceName,
+  const rows = await db.select({ id: agents.id, harness: agents.harness, deviceId: devices.id, deviceName: devices.name, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt, harnesses: devices.harnesses })
+    .from(agents).innerJoin(devices, eq(devices.id, agents.deviceId))
+    .where(and(eq(agents.userId, userId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).orderBy(asc(devices.name), asc(agents.harness))
+  return rows.filter(row => localExecutionHarnesses(row.harnesses).includes(row.harness)).map(row => ({
+    id: row.id, harness: row.harness, deviceId: row.deviceId, device: row.deviceName,
     deviceOnline: Boolean(row.enabled && row.lastSeenAt && Date.now() - row.lastSeenAt.getTime() < DEVICE_ONLINE_WINDOW_MS),
-    repos: repos.filter(repo => repo.deviceId === row.deviceId).map(repo => ({ id: repo.id, path: repo.repoPath, baseBranch: repo.baseBranch })),
   }))
 }
 
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }) {
-  // Marked 'mcp' so the right column does not count it as the Coordinator's.
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }) {
   return attempt(async () => ({ ...(await queueRun(userId, input, null, undefined, 'mcp')), status: 'queued' }))
 }
 

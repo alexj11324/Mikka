@@ -11,6 +11,7 @@ stub('../lib/coordinator/native.ts',{nativeCoordinatorStore:{assertToolActive:ch
 stub('../lib/coordinator/store.ts',{editMemory:effect})
 stub('../lib/issue-visibility.ts',{issueVisibility:effect})
 stub('../lib/agent-runs.ts',{addRunMessage:effect,queueRun:effect,readRun:effect,requestRunStop:effect,visibleRuns:effect})
+stub('../lib/mcp/actions.ts',{listAgents:effect})
 stub('../lib/db/index.ts',{db:null,pool:null})
 stub('../lib/search/index.ts',{webSearch:effect})
 stub('../lib/device-link.ts',{DEVICE_ONLINE_WINDOW_MS:60_000})
@@ -36,7 +37,7 @@ const calls = {
   createIssue:()=>steps.createIssue(user,{title:'Task'},'tool-call',scope),
   updateIssue:()=>steps.updateIssue(user,{issueId:'issue',title:'Updated'},'tool-call',scope),
   listAgents:()=>steps.listAgents(user,scope),
-  dispatchRun:()=>steps.dispatchRun(user,{issueId:'issue',agentId:'agent',deviceRepoId:'repo'},scope),
+  dispatchRun:()=>steps.dispatchRun(user,{issueId:'issue',agentId:'agent',repo:'owner/repo'},scope),
   listComputerWorkspaces:()=>steps.listComputerWorkspaces(user,scope),
   createComputerBot:()=>steps.createComputerBot(user,{workspaceId:'workspace',name:'Bot'},'tool-call',scope),
   listComputerBots:()=>steps.listComputerBots(user,scope),

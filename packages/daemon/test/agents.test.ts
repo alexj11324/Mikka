@@ -177,7 +177,12 @@ describe("run context", () => {
     const policy = ctx.policy()
     expect(policy).toMatchObject({
       allowWrite: [ctx.worktree, ctx.runDir, "/tmp/codex-auth.json"],
-      denyWrite: [join(ctx.worktree, ".git")],
+      denyWrite: [
+        join(ctx.worktree, ".git"),
+        join(ctx.gitDir, "commondir"),
+        join(ctx.gitDir, "gitdir"),
+        join(ctx.gitDir, "config.worktree"),
+      ],
       allowDomains: [
         "openai.com",
         "*.openai.com",

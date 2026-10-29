@@ -45,25 +45,25 @@ test('a resumed session gets only the note on what happened', () => {
 })
 
 test('https and ssh spellings of one remote match', () => {
-  const key = 'github.com/alexj11324/mikka'
-  for (const url of ['https://github.com/alexj11324/Mikka.git', 'git@github.com:alexj11324/Mikka.git', 'ssh://git@github.com/alexj11324/Mikka', 'https://token@github.com/alexj11324/mikka/']) {
+  const key = 'v2/github.com/alexj11324/mikka'
+  for (const url of ['https://github.com/alexj11324/Mikka.git', 'git@github.com:alexj11324/Mikka.git', 'ssh://git@github.com/alexj11324/Mikka']) {
     assert.equal(remoteKey(url), key, url)
   }
-  assert.equal(remoteKey('ssh://git@host:2222/team/repo.git'), 'host/team/repo')
+  assert.equal(remoteKey('ssh://git@host:2222/team/repo.git'), 'v2/ssh/host/2222/user/git/absolute/team/repo.git')
+  assert.throws(() => remoteKey('https://token@github.com/alexj11324/mikka/'))
 })
 
 const candidate = (deviceId: string, extra: Partial<TakeoverCandidate> = {}): TakeoverCandidate => ({
-  deviceId, deviceRepoId: `repo-${deviceId}`, remoteUrl: 'git@github.com:a/b.git', harnesses: [{ harness: 'codex', installed: true }], ...extra,
+  deviceId, harnesses: [{ harness: 'codex', installed: true }], ...extra,
 })
 const lostRun = { remoteUrl: 'https://github.com/a/b', harness: 'codex', lostDeviceId: 'd1' }
 
-test('a run goes on another machine with the same repository and harness', () => {
+test('a run goes on another machine with the harness, without registering a repository', () => {
   assert.equal(pickTakeover([candidate('d1'), candidate('d2')], lostRun)?.deviceId, 'd2')
 })
 
 test('no other machine fits: the run waits for its own', () => {
   assert.equal(pickTakeover([candidate('d1')], lostRun), null)
-  assert.equal(pickTakeover([candidate('d2', { remoteUrl: 'git@github.com:a/other.git' })], lostRun), null)
   assert.equal(pickTakeover([candidate('d2', { harnesses: [{ harness: 'codex', installed: false }] })], lostRun), null)
   assert.equal(pickTakeover([candidate('d2', { harnesses: [{ harness: 'claude_code', installed: true }] })], lostRun), null)
   assert.equal(pickTakeover([candidate('d2')], { ...lostRun, remoteUrl: null }), null)

@@ -14,6 +14,7 @@ import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { activityActor } from '@/lib/activity-actor'
 
 const patchSchema = z.object({
+  // R-60 keeps the UI human-only; the verified legacy MCP contract remains supported.
   assignee: assigneeSchema.pick({ kind: true, id: true }).nullable().optional(),
   project: z.string().trim().min(1).max(100).nullable().optional(),
   labels: z.array(labelSchema).max(12).optional(),
@@ -31,7 +32,6 @@ export async function getIssuePropertyOptions(id: string) {
   const projectRecords = await listProjects()
   return {
     members: owner ? [owner, ...members.filter(member => member.id !== owner.id)] : members,
-    agents: choices.agents,
     projects: [...new Set(projectRecords.map(item => item.name))].sort(),
     projectRecords: projectRecords.map(item => ({ id: item.id, name: item.name })),
 
@@ -45,6 +45,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
     const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), patch: patchSchema, inviteEmail: z.email().max(254).optional() }).safeParse(input)
     if (!parsed.success) return { error: 'issueMetadataInvalid' }
     const { issue, user } = await requireIssueAccess(parsed.data.id)
+    if (parsed.data.patch.assignee?.kind === 'agent' && activityActor(user.id).actorType !== 'agent') return { error: 'issueMetadataInvalid' }
     try {
       const result = await db.transaction(async tx => {
         const [latest] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')

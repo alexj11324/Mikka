@@ -76,6 +76,9 @@ import {
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
+import { RepositoryCache } from "./repositories"
+import { daemonTestMode, normalizeRepository } from "@mikka/protocol/repository"
+import type { RunAssignment } from "./server-link"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
 import { ComputerBroker } from "./computer/broker.mjs"
 import { detectComputerDriver, executeDriver, type ComputerDriver } from "./computer/driver.mjs"
@@ -150,7 +153,7 @@ interface DeviceFile {
   deviceId?: string
   /** Set by `mikka daemon login --workspace` for multi-workspace users. */
   workspaceId?: string
-  /** Last allow-list from the server, so runs resume while offline. */
+  /** Last repository settings from the server; paths are logical keys locally. */
   repos?: DeviceRepo[]
 }
 
@@ -181,6 +184,7 @@ export class Daemon {
   private outbox!: Outbox
   private journal!: RunJournal
   private worktrees!: WorktreeManager
+  private repositories!: RepositoryCache
   supervisor!: RunSupervisor
   private device: DeviceFile = {}
   private harnesses: HarnessInfo[] = []
@@ -262,6 +266,7 @@ export class Daemon {
       (runId, _item, error) => this.supervisor.markUndeliverable(runId, error)
     )
     this.worktrees = new WorktreeManager(paths.worktrees)
+    this.repositories = new RepositoryCache(paths.repos)
     // Hosted subscriptions use their dedicated container sandbox. Local
     // adapters require the separately probed sandbox-runtime from main.
     this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
@@ -332,14 +337,14 @@ export class Daemon {
     await this.cloudComputerBroker?.listen()
     if (this.stopped) throw new Error("daemon stopped during startup")
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([
-      [
+      ...(daemonTestMode(process.env) ? [[
         "mock",
         new MockAdapter({
           stateDir: paths.adapterState,
           fixturesDir: this.options.fixturesDir,
           speed: this.options.mockSpeed,
         }),
-      ],
+      ] as [Harness, AgentAdapter]] : []),
       ...(hosted
         ? hosted.harnesses.map(
             (harness) =>
@@ -397,7 +402,13 @@ export class Daemon {
             return result
           }
         : undefined,
-      repos: () => this.device.repos ?? [],
+      repository: assignment => this.repository(assignment),
+      prepareRepository: async (assignment, signal) => {
+        if (assignment.remoteUrl) await this.repositories.prepare(assignment.remoteUrl, signal)
+      },
+      baseRef: assignment => assignment.remoteUrl
+        ? this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch)
+        : Promise.resolve(assignment.baseBranch ?? 'HEAD'),
       log: this.log,
       stallMs: this.options.stallMs,
       verify: hosted
@@ -412,7 +423,7 @@ export class Daemon {
         : this.verifier(),
       publisher: {
         snapshot: ({ worktree, repo }) => snapshotTree(repo.path, worktree),
-        publish: ({ runId, worktree, repo, assignment, report, tree }) =>
+        publish: async ({ runId, worktree, repo, assignment, report, tree }) =>
           publishRun({
             runId,
             repoPath: repo.path,
@@ -421,7 +432,7 @@ export class Daemon {
             issueId: assignment.issueId,
             summary: report.summary,
             pushBranch: assignment.pushBranch,
-            baseBranch: assignment.baseBranch,
+            baseBranch: assignment.remoteUrl ? await this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch) : assignment.baseBranch,
             push: (() => {
               const decision = pushDecision(
                 runPolicy(assignment.policy),
@@ -936,15 +947,18 @@ export class Daemon {
       await this.supervisor.discardIfEmpty(entry.assignment.runId)
     }
     // Run branches the journal has no worktree or no record for.
-    for (const repo of this.device.repos ?? []) {
+    const paths = this.options.hostedSubscriptions
+      ? (this.device.repos ?? []).map(repo => repo.path)
+      : this.repositories.paths()
+    for (const repoPath of paths) {
       const branches = await this.worktrees
-        .runBranches(repo.path)
+        .runBranches(repoPath)
         .catch(() => [])
       for (const { runId, worktree } of branches) {
         if (active.has(runId)) continue
         const known = this.journal.get(runId)
         if (!known) {
-          await this.supervisor.discardOrphan(runId, worktree, repo.path)
+          await this.supervisor.discardOrphan(runId, worktree, repoPath)
         } else if (!known.worktree) {
           await this.supervisor.discardIfEmpty(runId)
         }
@@ -952,11 +966,18 @@ export class Daemon {
     }
   }
 
+  private repository(assignment: RunAssignment): DeviceRepo {
+    const settings = this.device.repos?.find(repo => repo.repoId === assignment.repoId)
+    if (assignment.remoteUrl) {
+      const { key } = normalizeRepository(assignment.remoteUrl, { allowFile: daemonTestMode(process.env) })
+      return { ...settings, repoId: assignment.repoId, name: key.split('/').at(-1)!, path: this.repositories.pathFor(assignment.remoteUrl) }
+    }
+    if (this.options.hostedSubscriptions && assignment.computer && settings) return settings
+    throw new DaemonError(DAEMON_RPC_ERRORS.repoNotAllowed, 'Repository URL required; dispatch a new thread.')
+  }
+
   private async pruneWorktrees() {
     const retentionMs = this.options.retentionMs ?? 7 * 24 * 60 * 60 * 1000
-    const repos = new Map(
-      (this.device.repos ?? []).map((r) => [r.repoId, r.path])
-    )
     const entries = this.journal.all()
     // Follow-up runs work in the worktree of the run they continue: keep it
     // while any of them is unfinished, and count retention from the last.
@@ -978,7 +999,8 @@ export class Daemon {
       .filter((e) => isTerminalRunState(e.state))
       .flatMap((e) => {
         const path = this.worktrees.pathFor(e.assignment.runId)
-        const repoPath = repos.get(e.assignment.repoId)
+        let repoPath: string | undefined
+        try { repoPath = this.repository(e.assignment).path } catch { /* Legacy checkout is never touched. */ }
         return repoPath && !inUse.has(path)
           ? [
               {
@@ -1081,7 +1103,7 @@ export class Daemon {
         const runId = memory.queueRun(deviceId, {
           issueId: `dev-issue-${randomUUID()}`,
           repoId: params.repoId,
-          baseBranch: params.baseBranch ?? "HEAD",
+          baseBranch: params.baseBranch,
           harness: "mock",
           prompt: "Mock run",
           fixture: params.fixture ?? "success-edit",

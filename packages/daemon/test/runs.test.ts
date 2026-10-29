@@ -1,6 +1,9 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { pathToFileURL } from "node:url"
+import { RepositoryCache } from "../src/repositories"
+import { runPolicy } from "../src/permissions"
 
 import { DAEMON_RPC_ERRORS } from "@mikka/protocol"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -13,7 +16,7 @@ import {
   MemoryServer,
   type SetupRecipe,
 } from "../src/server-link"
-import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
+import { makeRepo, tempDir, waitFor } from "./helpers"
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8" }).trim()
@@ -87,10 +90,42 @@ function states(chunks: RunChunk[]) {
 
 afterEach(async () => {
   for (const daemon of daemons.splice(0)) await daemon.stop()
-  cleanupTempDirs()
 })
 
 describe("mock runs", () => {
+  it("starts from the issue branch only when the trusted push policy permits it", async () => {
+    const source = await makeRepo()
+    git(source, "checkout", "-b", "mikka/issue-1")
+    writeFileSync(join(source, "issue-branch.txt"), "earlier work\n")
+    git(source, "add", "issue-branch.txt")
+    git(source, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "earlier work")
+    git(source, "checkout", "main")
+    const origin = join(tempDir(), "origin.git")
+    git(source, "clone", "--bare", source, origin)
+    const cases = [
+      { decision: "allow", approved: false, expected: true },
+      { decision: "ask", approved: true, expected: true },
+      { decision: "ask", approved: false, expected: false },
+      { decision: "deny", approved: true, expected: false },
+    ] as const
+    for (const { decision, approved, expected } of cases) {
+      const server = new MemoryServer(DEVICE)
+      server.addRepo(DEVICE, { repoId: "repo-1", name: "fixture", path: origin, push: { approved, remote: "origin" } })
+      const daemon = await boot(server, tempDir())
+      const defaults = runPolicy(undefined)
+      const runId = server.queueRun(DEVICE, {
+        issueId: `issue-${decision}-${approved}`, repoId: "repo-1",
+        remoteUrl: pathToFileURL(origin).href, harness: "mock", prompt: "inspect",
+        pushBranch: "mikka/issue-1", fixture: "turn-ended",
+        policy: { ...defaults, permissions: { ...defaults.permissions, git_push: decision } },
+      })
+      const run = await runToEnd(daemon, server, runId)
+      // An isolated child process observes the same checkout a CLI receives.
+      const observed = execFileSync(process.execPath, ["-e", "process.stdout.write(String(require('node:fs').existsSync('issue-branch.txt')))"], { cwd: run.worktree as string, encoding: "utf8" })
+      expect(observed).toBe(String(expected))
+      await daemon.stop()
+    }
+  })
   it("runs a fixture in its own worktree, writes the file change and ends in review", async () => {
     const { server, dataDir, repo } = await setup()
     const daemon = await boot(server, dataDir)
@@ -140,9 +175,9 @@ describe("mock runs", () => {
     client.close()
   })
 
-  it("refuses a repo that is not allow-listed", async () => {
+  it("refuses a local assignment without a repository URL", async () => {
     const { server, dataDir } = await setup()
-    await boot(server, dataDir)
+    const daemon = await boot(server, dataDir)
     const runId = queue(server, "success-edit", "repo-elsewhere")
     const client = await connectDaemonInDataDir(dataDir, {
       name: "t",
@@ -155,8 +190,10 @@ describe("mock runs", () => {
       message: string
     }
     expect(error.code).toBe(DAEMON_RPC_ERRORS.repoNotAllowed)
-    expect(error.message).toMatch(/not in this device's allow-list/)
+    expect(error.message).toMatch(/Repository URL required/)
     expect(existsSync(join(dataDir, "worktrees", runId))).toBe(false)
+    await waitFor(() => daemon.status().pendingUploads === 0)
+    expect(server.runs.get(runId)?.completion?.stopReason).toBe('error')
     client.close()
   })
 
@@ -183,10 +220,10 @@ describe("mock runs", () => {
     client.close()
   })
 
-  it("runs the approved setup recipe, then the repo's tests in the worktree", async () => {
+  it("runs approved setup from the cache without copying a user checkout file", async () => {
     const { server, dataDir } = await setup({
       copyFiles: [".env.local"],
-      command: "node -e \"require('fs').writeFileSync('setup-ran','')\"",
+      command: "node -e \"const fs=require('fs');fs.writeFileSync('.env.local','CACHE=1\\n');fs.writeFileSync('setup-ran','')\"",
       approved: true,
     })
     const daemon = await boot(server, dataDir)
@@ -196,7 +233,7 @@ describe("mock runs", () => {
     await daemon.supervisor.idle()
     const worktree = daemon.supervisor.get(runId).worktree as string
     expect(readFileSync(join(worktree, ".env.local"), "utf8")).toBe(
-      "SANDBOX=1\n"
+      "CACHE=1\n"
     )
     const output = server
       .chunksFor(runId)
@@ -283,11 +320,11 @@ describe("mock runs", () => {
     await daemon.syncWithServer()
     await waitFor(() => daemon.supervisor.get(runId).state === "running")
     await daemon.supervisor.cancel(runId)
+    const cached = new RepositoryCache(join(dataDir, 'repos')).pathFor(pathToFileURL(repo).href)
     await waitFor(
-      () =>
-        git(repo, "branch", "--list", `mikka/run-${runId}`) === "" &&
-        git(repo, "worktree", "list").split("\n").length === 1
+      () => git(cached, 'branch', '--list', `mikka/run-${runId}`) === '' && git(cached, 'worktree', 'list').split('\n').length === 1
     )
+    expect(git(repo, 'worktree', 'list').split('\n')).toHaveLength(1)
   })
 })
 
@@ -411,18 +448,19 @@ describe("plan runs", () => {
 describe("clean-up of earlier leftovers", () => {
   it("sweeps empty run branches at start and keeps one with a commit", async () => {
     const { repo, server, dataDir } = await setup()
+    const cached = await new RepositoryCache(join(dataDir, 'repos')).prepare(pathToFileURL(repo).href)
     // Left by runs this daemon has no record of: one empty, one with work.
-    git(repo, "branch", "mikka/run-empty1", "main")
-    git(repo, "branch", "mikka/run-work1", "main")
+    git(cached, "branch", "mikka/run-empty1", "main")
+    git(cached, "branch", "mikka/run-work1", "main")
     git(
-      repo,
+      cached,
       "worktree",
       "add",
       "-q",
       join(tempDir(), "wt"),
       "mikka/run-work1"
     )
-    const wt = git(repo, "worktree", "list", "--porcelain")
+    const wt = git(cached, "worktree", "list", "--porcelain")
       .split("\n")
       .find((l) => l.endsWith("/wt"))
       ?.slice("worktree ".length)
@@ -440,8 +478,8 @@ describe("clean-up of earlier leftovers", () => {
       "work"
     )
     await boot(server, dataDir)
-    expect(git(repo, "branch", "--list", "mikka/run-empty1")).toBe("")
-    expect(git(repo, "branch", "--list", "mikka/run-work1")).not.toBe("")
+    expect(git(cached, "branch", "--list", "mikka/run-empty1")).toBe("")
+    expect(git(cached, "branch", "--list", "mikka/run-work1")).not.toBe("")
   })
 })
 

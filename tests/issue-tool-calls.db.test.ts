@@ -21,7 +21,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
   const { pool } = await import('../lib/db')
   const { createIssue, updateIssue } = await import('../lib/mcp/actions')
   const { createCoordinatorRegistry } = await import('../workflows/coordinator/tools')
-  const { systemActor } = await import('../lib/activity-actor')
+  const { systemActor, agentActor } = await import('../lib/activity-actor')
   const owner = `issue-tools-${randomUUID()}`
   const stranger = `issue-tools-${randomUUID()}`
   const callId = `create-${randomUUID()}`
@@ -37,7 +37,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
     const legacy = await createIssue(stranger, { title: 'Existing MCP path without rollout', assigneeAgentId: null }, actor)
     assert.ok('id' in legacy)
-    const assigned = await updateIssue(stranger, { issueId: legacy.id, assigneeAgentId: legacyAgent }, actor)
+    const assigned = await updateIssue(stranger, { issueId: legacy.id, assigneeAgentId: legacyAgent }, agentActor(legacyAgent))
     assert.ok('id' in assigned, 'the pre-existing MCP agent assignment remains accepted')
     assert.equal(assigned.assignee, 'Legacy fixture')
     assert.ok('id' in await updateIssue(stranger, { issueId: legacy.id, assigneeAgentId: null }, actor), 'the pre-existing MCP agent field remains accepted')
@@ -61,6 +61,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     assert.equal(await count('issues'), 1)
     assert.equal(await count('issue_tool_calls'), 1)
     const id = results[0].id as string
+    assert.deepEqual(await updateIssue(owner, { issueId: id, assigneeAgentId: legacyAgent }, agentActor(legacyAgent)), { error: 'agentNotFound' }, 'legacy MCP cannot assign another owner’s agent')
     const versions = await count('issue_versions')
     process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
     assert.deepEqual(await createIssue(owner, { ...input }, actor, callId), { error: 'issueToolsDisabled' })

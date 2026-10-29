@@ -466,6 +466,7 @@ export class ClaudeAdapter implements AgentAdapter {
       harness: "claude_code",
       kind: options.kind,
       worktree: options.cwd,
+      gitWritePaths: options.gitWritePaths,
       networkAllow: options.networkAllow,
       policy: options.policy,
       skills: options.skills,

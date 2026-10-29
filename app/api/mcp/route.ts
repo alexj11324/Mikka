@@ -174,8 +174,8 @@ const handler = createMcpHandler(server => {
   }, async (input, ctx) => outcome(await runComposioAction(mcpUserId(ctx.http?.authInfo), 'read_slack_thread', input)))
 
   server.registerTool('list_agents', {
-    title: 'List agents',
-    description: 'List the person\'s agents with their harness, whether their device is online, and the repositories on that device. dispatch_run needs an agent id and one of its repository ids.',
+    title: 'List local execution tools',
+    description: 'List available local execution tools and their computers. Use the returned internal id as agentId for dispatch_run and provide the repository URL separately. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, never an Agent.',
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true },
   }, async (_input, ctx) => json(await actions.listAgents(mcpUserId(ctx.http?.authInfo))))
@@ -212,10 +212,10 @@ const handler = createMcpHandler(server => {
 
   server.registerTool('dispatch_run', {
     title: 'Dispatch a run',
-    description: 'Queue a run: one agent works one issue in one repository on its device. Returns the run id at once; follow it with get_run or list_runs.',
+    description: 'Queue a thread for an issue on the selected computer. Its daemon clones the repository into its own cache and runs the selected coding harness. Returns the run id at once; follow it with get_run or list_runs.',
     inputSchema: z.object({
       issueId: id, agentId: id,
-      deviceRepoId: id.describe('A repository id from list_agents, on the agent\'s own device.'),
+      repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo or an HTTPS/SSH git URL. The daemon clones it; no repository registration is needed.'),
       note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
     }),
   }, async (input, ctx) => outcome(await actions.dispatchRun(mcpUserId(ctx.http?.authInfo), input)))

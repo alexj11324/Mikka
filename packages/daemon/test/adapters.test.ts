@@ -57,11 +57,15 @@ async function setup() {
   const origin = tempDir("orvo-")
   await execa("git", ["init", "-q", "--bare", origin])
   await execa("git", ["remote", "add", "origin", origin], { cwd: repo })
+  await execa("git", ["push", "-q", "origin", "main"], { cwd: repo })
+  await execa("git", ["symbolic-ref", "HEAD", "refs/heads/main"], { cwd: origin })
   const server = new MemoryServer(DEVICE)
   server.addRepo(DEVICE, {
     repoId: "repo",
     name: "sandbox",
-    path: repo,
+    // The fixture's upstream is cloned into the daemon cache. A user's
+    // checkout is never the fetch/push target for a local thread.
+    path: origin,
     push: { approved: true },
   })
   const dataDir = tempDir()

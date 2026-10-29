@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { ChevronRight, Laptop, Paperclip } from 'lucide-react'
-import { listAgents, listDevices } from '@/app/actions/agents'
+import { listDevices } from '@/app/actions/agents'
+import { listBots } from '@/app/actions/bots'
 import { sendCoordinatorMessage } from '@/app/actions/coordinator'
 import { useActionError } from '@/lib/use-action-error'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
@@ -23,16 +24,16 @@ const MAX_LENGTH = 8000
 type Machine = { value: string; label: string; cloud?: boolean; online?: boolean; server?: boolean }
 
 /** A machine's icon with its state dot. Mikka Cloud stays green asleep, since picking it wakes it; red only when it failed (the workspace has one, so any bot's computer reports it). */
-function MachineIcon({ machine, cloudAgentId }: { machine: Machine; cloudAgentId: string | undefined }) {
+function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
   const t = useTranslations('Shell.newTaskDialog')
   const tStatus = useTranslations('Computer.status')
-  const { data: state } = useComputer(machine.cloud ? cloudAgentId : null)
+  const { data: state } = useComputer(machine.cloud ? cloudBotId : null)
   if (machine.cloud) return <DeviceIcon kind="cloud" state={state?.machine === 'error' ? 'error' : 'online'} label={state ? tStatus(state.machine === 'error' ? 'failed' : state.machine) : t('cloud')} />
   return <DeviceIcon kind={machine.server ? 'server' : 'personal'} state={machine.online ? 'online' : 'offline'} label={machine.online ? t('online') : t('offline')} />
 }
 
-function MachineLabel({ machine, cloudAgentId }: { machine: Machine; cloudAgentId: string | undefined }) {
-  return <><MachineIcon machine={machine} cloudAgentId={cloudAgentId} /><span className="min-w-0 flex-1 truncate pr-3">{machine.label}</span></>
+function MachineLabel({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
+  return <><MachineIcon machine={machine} cloudBotId={cloudBotId} /><span className="min-w-0 flex-1 truncate pr-3">{machine.label}</span></>
 }
 
 /**
@@ -62,7 +63,8 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const fileId = useId()
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
-  const { data: bots = [] } = useSWR(open ? 'agents' : null, listAgents)
+  const { data: bots = [] } = useSWR(open ? 'bots' : null, listBots)
+  const cloudBotId = bots[0]?.id
   // Mikka Cloud first and by default: there the Coordinator picks the bot, so no bot is named.
   // Direct daemon devices are 本机, including Linux. OS is not evidence that
   // a computer is an SSH target reached through another machine (R-23).
@@ -115,11 +117,11 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
       <div className="flex items-center gap-2 pr-8 text-sm">
         {device
           ? <Select value={device.value} onValueChange={value => setPicked(value)} items={machines.map(({ value, label }) => ({ value, label }))}>
-            <SelectTrigger size="sm" className="h-7 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><MachineIcon machine={device} cloudAgentId={bots[0]?.id} /><SelectValue /></SelectTrigger>
+            <SelectTrigger size="sm" className="h-7 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><MachineIcon machine={device} cloudBotId={cloudBotId} /><SelectValue /></SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-60">
-              <SelectGroup><SelectItem value={cloud.value}><MachineLabel machine={cloud} cloudAgentId={bots[0]?.id} /></SelectItem></SelectGroup>
-              {local.length > 0 && <><SelectGroup><SelectLabel>{tDevices('thisMachine')}</SelectLabel>{local.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudAgentId={bots[0]?.id} /></SelectItem>)}</SelectGroup></>}
-              {remote.length > 0 && <><SelectGroup><SelectLabel>{tDevices('otherDevices')}</SelectLabel>{remote.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudAgentId={bots[0]?.id} /></SelectItem>)}</SelectGroup></>}
+              <SelectGroup><SelectItem value={cloud.value}><MachineLabel machine={cloud} cloudBotId={cloudBotId} /></SelectItem></SelectGroup>
+              {local.length > 0 && <><SelectGroup><SelectLabel>{tDevices('thisMachine')}</SelectLabel>{local.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudBotId={cloudBotId} /></SelectItem>)}</SelectGroup></>}
+              {remote.length > 0 && <><SelectGroup><SelectLabel>{tDevices('otherDevices')}</SelectLabel>{remote.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudBotId={cloudBotId} /></SelectItem>)}</SelectGroup></>}
             </SelectContent>
           </Select>
           : <span className="flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{t('noDevice')}</span>}

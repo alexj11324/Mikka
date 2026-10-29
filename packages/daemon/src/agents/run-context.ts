@@ -92,6 +92,8 @@ export interface RunContextOptions {
   skills?: readonly RunSkill[]
   /** Extra writable paths (the harness's own session store). */
   extraWrite?: readonly string[]
+  /** Per-worktree git metadata, object store and this run's branch ref. */
+  gitWritePaths?: readonly string[]
   /**
    * The run's own dir in the daemon's state dir (handoff file, temp files,
    * the harness's per-run home). Writable from the sandbox; nothing the
@@ -183,7 +185,7 @@ export function runPaths(stateDir: string, runId: string) {
 export class RunContext {
   /** Real path of the worktree (macOS: `/tmp` is `/private/tmp`). */
   readonly worktree: string
-  /** The worktree's own git dir (`<repo>/.git/worktrees/<name>`); read-only. */
+  /** The worktree's own git administration (`<repo>/.git/worktrees/<name>`). */
   readonly gitDir: string
   readonly runDir: string
   readonly handoffFile: string
@@ -254,16 +256,19 @@ export class RunContext {
     const readOnly = runPolicy(this.options.policy).readOnly === true
     return {
       allowWrite: [
-        ...(readOnly ? [] : [this.worktree]),
+        ...(readOnly ? [] : [this.worktree, ...(this.options.gitWritePaths ?? [])]),
         this.runDir,
         ...(this.options.extraWrite ?? []),
       ],
       // The daemon runs git here after the agent: the `.git` file (which
-      // says where the repo is) stays read-only, and so does the git dir
-      // (it is not in `allowWrite`).
+      // says where the repo is) stays read-only. Only the daemon-validated
+      // per-worktree administration and object/ref paths are writable.
       denyWrite: [
         join(this.worktree, ".git"),
-        ...(readOnly ? [this.worktree] : []),
+        join(this.gitDir, "commondir"),
+        join(this.gitDir, "gitdir"),
+        join(this.gitDir, "config.worktree"),
+        ...(readOnly ? [this.worktree, ...(this.options.gitWritePaths ?? [])] : []),
       ],
       denyRead: [
         ...credentialDenyRead(this.options.harness),

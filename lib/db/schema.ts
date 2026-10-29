@@ -3,6 +3,7 @@ import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, times
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
+import type { SetupRecipe } from '@mikka/protocol/device'
 import type { AttentionLevel } from '@/lib/attention/judgment'
 import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
 
@@ -184,9 +185,18 @@ export const deviceTokens = pgTable('device_tokens', {
 export const deviceRepos = pgTable('device_repos', {
   id: uuid('id').primaryKey(), deviceId: uuid('deviceId').notNull().references(() => devices.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull(), repoPath: text('repoPath').notNull(), remoteUrl: text('remoteUrl'),
-  baseBranch: text('baseBranch').notNull().default('main'), verifyCommand: text('verifyCommand'),
+  baseBranch: text('baseBranch').default('main'), verifyCommand: text('verifyCommand'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('device_repos_key').on(table.deviceId, table.repoPath)])
+
+/** Owner-reviewed settings follow a repository across computers and transports. */
+export const repositorySettings = pgTable('repository_settings', {
+  userId: text('userId').notNull(), remoteKey: text('remoteKey').notNull(),
+  verifyCommand: text('verifyCommand'), setup: jsonb('setup').$type<SetupRecipe | null>(),
+  networkAllow: jsonb('networkAllow').$type<string[] | null>(),
+  push: jsonb('push').$type<{ approved: boolean; remote?: string } | null>(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.remoteKey] })])
 
 /** A named role run by one harness on one device. */
 export const agents = pgTable('agents', {
@@ -216,7 +226,7 @@ export const agentRuns = pgTable('agent_runs', {
   status: text('status').$type<RunStatus>().notNull().default('queued'),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),
-  baseBranch: text('baseBranch').notNull().default('main'),
+  baseBranch: text('baseBranch').default('main'),
   sessionId: text('sessionId'), worktreePath: text('worktreePath'),
   stopReason: text('stopReason'), error: text('error'),
   report: jsonb('report').$type<Record<string, unknown> | null>(),

@@ -70,6 +70,8 @@ export interface SessionOptions {
   log: Logger
   /** Domains the repo lets this run reach, on top of the harness's own. */
   networkAllow?: readonly string[]
+  /** Validated cache git directories for this run, supplied by the daemon. */
+  gitWritePaths?: readonly string[]
   /**
    * The workspace's agent policy from the assignment (ADR 0028): domains,
    * the CLI's own permission rules where it has them, the agent's rules.

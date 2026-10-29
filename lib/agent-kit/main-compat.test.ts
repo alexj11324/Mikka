@@ -19,12 +19,15 @@ let computerPermission: 'ask' | 'allow' = 'ask'
 const cloudClaimed=mock.fn(async()=>({botId,ownerId:owner,display:':3',policyVersion:1,permission:computerPermission}))
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
 let selectIndex=0
-const db={select:()=>({from:()=>({where:()=>({limit:async()=>[[{id:randomUUID(),userId:owner,agentId,deviceId,deviceRepoId:repoId,issueId,kind:'implement',prompt:'task',agentDefinition:definition}],[{id:agentId,userId:owner,harness:'claude_code'}],[{id:repoId,userId:owner,deviceId,baseBranch:'main'}]][selectIndex++]})})})}
+let mismatch: string|undefined
+const db={select:()=>({from:()=>({where:()=>({limit:async()=>[[{id:randomUUID(),userId:mismatch==='run'?'other-owner':owner,agentId,deviceId,deviceRepoId:repoId,issueId,baseBranch:null,kind:'implement',prompt:'task',agentDefinition:definition}],[{id:agentId,userId:mismatch==='agent'?'other-owner':owner,deviceId:randomUUID(),harness:'claude_code'}],[{id:repoId,userId:mismatch==='repo'?'other-owner':owner,deviceId:mismatch==='device'?randomUUID():deviceId,baseBranch:'main',repoPath:mismatch==='legacy-key'?'github.com/example/repo':'v2/github.com/example/repo',remoteUrl:mismatch==='repo-url'?'https://github.com:8443/example/repo.git':'https://github.com/example/repo.git'}]][selectIndex++]})})})}
 let cloud=false,localCapable=false
+let protocolVersion=3
 stub('../db/index.ts',{db,pool:{}})
-stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,subscriptionBroker:true,computerBroker:true}]})})
+stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,subscriptionBroker:true,computerBroker:true}]})})
 stub('../mcp/worker.ts',{issueRunToken:async()=>({token:'synthetic-only'})})
 stub('../mcp/resource.ts',{mcpResourceURL:null})
+stub('../device-repositories.ts',{readRepositorySettings:async()=>null})
 stub('../run-leases.ts',{latestCheckpoint:async()=>null})
 stub('../computer/local-authority.ts',{localComputerAuthority:async()=>({botId,ownerId:owner,workspaceId:workspace,policyVersion:3,permission:'allow'})})
 stub('../computer/claim.ts',{claimLocalRun:claimed,claimCloudRun:cloudClaimed})
@@ -32,10 +35,22 @@ stub('../subscription-runtime.ts',{subscriptionRuntime:()=>({repository:{binding
 let claim: typeof import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route').POST
 let queue: typeof import('../computer/queue-run').queueCloudRun
 before(async()=>{claim=(await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')).POST;queue=(await import('../computer/queue-run')).queueCloudRun})
-beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;computerPermission='ask';selectIndex=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [bindingById,latestBinding,claimed,cloudClaimed])fn.mock.resetCalls()})
+beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;computerPermission='ask';mismatch=undefined;protocolVersion=3;selectIndex=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [bindingById,latestBinding,claimed,cloudClaimed])fn.mock.resetCalls()})
 const request=()=>claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+randomUUID()+'/claim',{method:'POST'}),{params:Promise.resolve({deviceId,runId:randomUUID()})})
 test('local claim uses frozen harness and exact subscription despite Agent edits',async()=>{
- const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.harness,'codex');assert.equal(body.model,'frozen-model');assert.deepEqual(bindingById.mock.calls[0].arguments,[owner,binding.id]);assert.equal(latestBinding.mock.callCount(),0);assert.equal(claimed.mock.callCount(),1)
+ const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.harness,'codex');assert.equal(body.model,'frozen-model');assert.equal(body.remoteUrl,'https://github.com/example/repo.git');assert.equal(body.baseBranch,undefined);assert.deepEqual(bindingById.mock.calls[0].arguments,[owner,binding.id]);assert.equal(latestBinding.mock.callCount(),0);assert.equal(claimed.mock.callCount(),1)
+})
+test('an old local daemon gets an upgrade response without consuming the queued run',async()=>{
+ protocolVersion=2;const response=await request();assert.equal(response.status,409);assert.equal((await response.json()).code,'daemonUpgradeRequired');assert.equal(selectIndex,0);assert.equal(claimed.mock.callCount(),0)
+})
+test('claim refuses cross-owner or cross-device records even without a subscription',async()=>{
+ process.env.MIKKA_BYOS_ENABLED='0';definition=null
+ for(const target of ['run','agent','repo','device']){mismatch=target;selectIndex=0;assert.equal((await request()).status,409)}
+ assert.equal(claimed.mock.callCount(),0);assert.equal(cloudClaimed.mock.callCount(),0)
+})
+test('claim refuses legacy or endpoint-mismatched repository bindings before taking a lease',async()=>{
+ for(const target of ['legacy-key','repo-url']){mismatch=target;selectIndex=0;assert.equal((await request()).status,409)}
+ assert.equal(claimed.mock.callCount(),0);assert.equal(cloudClaimed.mock.callCount(),0)
 })
 test('cloud claim preserves main scoped claim and frozen subscription',async()=>{
  cloud=true;const response=await request();assert.equal(response.status,200);assert.equal(cloudClaimed.mock.callCount(),1);assert.equal(claimed.mock.callCount(),0);const body=await response.json();assert.equal(body.computer.botId,botId);assert.equal(body.computer.policyVersion,1);assert.equal(body.policy.permissions.computer_use,'ask')
