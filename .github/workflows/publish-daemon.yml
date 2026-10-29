@@ -34,7 +34,10 @@ jobs:
         run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
       - run: pnpm --filter @mikka/daemon test
       - run: pnpm --filter @mikka/daemon build
+        id: daemon-package
       - run: pnpm --filter @mikka/daemon test:package
+        env:
+          MIKKA_DAEMON_DIST_DIR: ${{ steps.daemon-package.outputs.package-directory }}
       - name: Publish with npm trusted publishing and provenance
-        working-directory: packages/daemon/dist
+        working-directory: ${{ steps.daemon-package.outputs.package-directory }}
         run: npm publish --access public --provenance

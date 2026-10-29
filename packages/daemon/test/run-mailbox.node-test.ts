@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -19,7 +20,8 @@ import type { StartOptions, AgentSession } from '../src/adapters/types'
 import { getEventListeners } from 'node:events'
 import { execFileSync } from 'node:child_process'
 
-// Only synthetic process fixtures. No database, Docker, login or network fetch.
+// Synthetic process fixtures and retained local Git worktrees only.
+// No database, Docker, login or network fetch.
 // All files/empty IPC directories are retained; no cleanupTempDirs/rm/prune.
 const retained = mkdtempSync(join(tmpdir(), 'mikka-mailbox-cli-'))
 const supervisorRepository = join(retained, 'supervisor-repository')

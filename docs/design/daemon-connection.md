@@ -51,7 +51,10 @@ Device-code pages and endpoints are not cached and suppress referrers.
 ## Packaging and release
 
 `pnpm --filter @mikka/daemon build` emits JavaScript, protocol code and runtime
-assets into `packages/daemon/dist`. The generated package contains no `tsx` or
+assets into a new `packages/daemon/.retained-build-*` directory. Package tests
+and release steps select that exact directory with `MIKKA_DAEMON_DIST_DIR` or
+the build step's `package-directory` output. Existing artifacts are retained.
+The generated package contains no `tsx` or
 workspace dependency. The source package is private; the distribution is not.
 The isolated pack test exercises the compiled CLI outside the workspace with
 only its declared external dependencies, including manual `--token` login.

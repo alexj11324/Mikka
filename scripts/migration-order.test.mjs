@@ -39,17 +39,19 @@ test('Agent Kit migration alias requires its original exact SQL', () => {
 })
 
 test('local repository defaults only accepts the exact SQL under its historical name', () => {
-  const name = '20261028143922_local_repository_defaults.sql'
+  const name = '20261029022353_local_repository_defaults.sql'
   const old = '20261028020000_local_repository_defaults.sql'
+  const previous = '20261028143922_local_repository_defaults.sql'
   const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
   assert.equal(alreadyApplied(name, new Set(), sql), false)
   assert.equal(alreadyApplied(name, new Set([old]), sql), true)
+  assert.equal(alreadyApplied(name, new Set([previous]), sql), true)
   assert.equal(alreadyApplied(name, new Set([name]), sql), true)
   assert.throws(() => alreadyApplied(name, new Set([old]), sql + '\n-- modified'), /content changed/)
 })
 
 test('device authorization recognizes its historical name only for identical SQL', () => {
-  const name = '20261028202036_device_authorization.sql'
+  const name = '20261029023121_device_authorization.sql'
   const old = '20261028022909_device_authorization.sql'
   const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
   assert.equal(alreadyApplied(name, new Set(), sql), false)
@@ -59,7 +61,7 @@ test('device authorization recognizes its historical name only for identical SQL
 })
 
 test('publication migration keeps the exact historical SQL receipt', () => {
-  const name = '20261028224429_run_publications.sql'
+  const name = '20261029024124_run_publications.sql'
   const old = '20261028030036_run_publications.sql'
   const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
   assert.equal(alreadyApplied(name, new Set([old]), sql), true)

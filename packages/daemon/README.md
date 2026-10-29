@@ -37,9 +37,17 @@ token out of screenshots, logs and shell history.
 
 ```sh
 pnpm --filter @mikka/daemon build
+export MIKKA_DAEMON_DIST_DIR=/absolute/path/printed/by/the/build
 pnpm --filter @mikka/daemon test:package
-npm pack ./packages/daemon/dist
+npm pack "$MIKKA_DAEMON_DIST_DIR"
 ```
+
+Each build writes a new `.retained-build-*` directory in the source package.
+Existing builds remain intact. The package test requires that exact directory
+and retains its `.retained-package-test-*` installation, tarball and fixture
+index for inspection. The test daemon still performs its normal lifecycle
+cleanup inside the new dedicated fixture; previously retained resources are
+not part of that fixture.
 
 No global `tsx` or separate `@mikka/protocol` package is needed. The proposed
 release workflow uses npm trusted publishing from GitHub Actions, with npm

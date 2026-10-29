@@ -2366,9 +2366,6 @@
     "createWorkspace": "创建工作区"
   },
   "IssueThreads": {
-    "pullRequest": "PR #{number}",
-    "moreOutputs": "+{count}",
-    "moreOutputsAria": "还有 {count} 个输出",
     "title": "线程",
     "agent": "Bot",
     "hidden": "线程",
@@ -2387,7 +2384,10 @@
     "composer": "告诉 {agent} 下一步做什么…",
     "sendFailed": "没发出去，草稿还在",
     "stopping": "正在停止…",
-    "stopFailed": "没停下来，再试一次"
+    "stopFailed": "没停下来，再试一次",
+    "pullRequest": "PR #{number}",
+    "moreOutputs": "+{count}",
+    "moreOutputsAria": "还有 {count} 个输出"
   },
   "Computer": {
     "status": {
@@ -2674,6 +2674,40 @@
       "unassigned": "未分配"
     }
   },
+  "SuggestionsPage": {
+    "title": "建议",
+    "refresh": "刷新建议",
+    "loadError": "建议加载失败。",
+    "retry": "重试",
+    "loading": "正在加载建议",
+    "empty": "暂时没有要看的消息",
+    "connect": "连接应用",
+    "action": {
+      "reply": "回复",
+      "review": "Review",
+      "handle": "处理",
+      "read": "查看"
+    },
+    "original": "原文：「{title}」"
+  },
+  "ArtifactsPage": {
+    "title": "Artifact",
+    "category": {
+      "all": "全部",
+      "documents": "文档",
+      "pages": "网页"
+    },
+    "columns": {
+      "name": "名称",
+      "source": "来源",
+      "updated": "上次活动"
+    },
+    "loadError": "Artifact 加载失败。",
+    "retry": "重试",
+    "loading": "正在加载 Artifact",
+    "empty": "还没有 Artifact",
+    "threadEntry": "Artifact · {count}"
+  },
   "Artifact": {
     "kindDocument": "文档",
     "kindPage": "网页",
@@ -2742,8 +2776,28 @@
     "retry": "重试",
     "incomplete": "此历史回复未完成。"
   },
+  "Browser": {
+    "label": "浏览器",
+    "back": "后退",
+    "forward": "前进",
+    "reload": "刷新",
+    "address": "地址",
+    "addressPlaceholder": "输入网址",
+    "selectElement": "选择元素",
+    "close": "关闭浏览器",
+    "frameTitle": "网页",
+    "note": "给 {label} 写备注",
+    "notePlaceholder": "写备注",
+    "addNote": "放进对话",
+    "removeNote": "移除备注 {n}"
+  },
   "MobilePush": {
     "verificationCode": "收到一条验证码"
+  },
+  "MobileHandoff": {
+    "title": "登录 Mikka",
+    "confirm": "使用此账号继续",
+    "cancel": "取消"
   },
   "DeviceAuthorization": {
     "title": "连接这台电脑",
@@ -2762,59 +2816,5 @@
     "failed": "连接失败，请重试",
     "enterAgain": "重新输入",
     "retry": "重试"
-  },
-  "SuggestionsPage": {
-    "title": "建议",
-    "refresh": "刷新建议",
-    "loadError": "建议加载失败。",
-    "retry": "重试",
-    "loading": "正在加载建议",
-    "empty": "暂时没有要看的消息",
-    "connect": "连接应用",
-    "action": {
-      "reply": "回复",
-      "review": "Review",
-      "handle": "处理",
-      "read": "查看"
-    },
-    "original": "原文：「{title}」"
-  },
-  "ArtifactsPage": {
-    "title": "Artifact",
-    "category": {
-      "all": "全部",
-      "documents": "文档",
-      "pages": "网页"
-    },
-    "columns": {
-      "name": "名称",
-      "source": "来源",
-      "updated": "上次活动"
-    },
-    "loadError": "Artifact 加载失败。",
-    "retry": "重试",
-    "loading": "正在加载 Artifact",
-    "empty": "还没有 Artifact",
-    "threadEntry": "Artifact · {count}"
-  },
-  "Browser": {
-    "label": "浏览器",
-    "back": "后退",
-    "forward": "前进",
-    "reload": "刷新",
-    "address": "地址",
-    "addressPlaceholder": "输入网址",
-    "selectElement": "选择元素",
-    "close": "关闭浏览器",
-    "frameTitle": "网页",
-    "note": "给 {label} 写备注",
-    "notePlaceholder": "写备注",
-    "addNote": "放进对话",
-    "removeNote": "移除备注 {n}"
-  },
-  "MobileHandoff": {
-    "title": "登录 Mikka",
-    "confirm": "使用此账号继续",
-    "cancel": "取消"
   }
 }

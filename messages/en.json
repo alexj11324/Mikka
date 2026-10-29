@@ -2366,9 +2366,6 @@
     "createWorkspace": "Create workspace"
   },
   "IssueThreads": {
-    "pullRequest": "PR #{number}",
-    "moreOutputs": "+{count}",
-    "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}",
     "title": "Threads",
     "agent": "Bot",
     "hidden": "Thread",
@@ -2387,7 +2384,10 @@
     "composer": "Tell {agent} what to do next…",
     "sendFailed": "Not sent. Your draft is still here",
     "stopping": "Stopping…",
-    "stopFailed": "Couldn't stop it. Try again"
+    "stopFailed": "Couldn't stop it. Try again",
+    "pullRequest": "PR #{number}",
+    "moreOutputs": "+{count}",
+    "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}"
   },
   "Computer": {
     "status": {
@@ -2674,6 +2674,40 @@
       "unassigned": "Unassigned"
     }
   },
+  "SuggestionsPage": {
+    "title": "Suggestions",
+    "refresh": "Refresh suggestions",
+    "loadError": "Suggestions failed to load.",
+    "retry": "Retry",
+    "loading": "Loading suggestions",
+    "empty": "Nothing to look at right now",
+    "connect": "Connect apps",
+    "action": {
+      "reply": "Reply",
+      "review": "Review",
+      "handle": "Handle",
+      "read": "Read"
+    },
+    "original": "Original: “{title}”"
+  },
+  "ArtifactsPage": {
+    "title": "Artifact",
+    "category": {
+      "all": "All",
+      "documents": "Documents",
+      "pages": "Web pages"
+    },
+    "columns": {
+      "name": "Name",
+      "source": "Source",
+      "updated": "Last activity"
+    },
+    "loadError": "Artifacts failed to load.",
+    "retry": "Retry",
+    "loading": "Loading artifacts",
+    "empty": "No artifacts yet",
+    "threadEntry": "Artifact · {count}"
+  },
   "Artifact": {
     "kindDocument": "Document",
     "kindPage": "Web page",
@@ -2742,8 +2776,28 @@
     "retry": "Retry",
     "incomplete": "This saved reply did not finish."
   },
+  "Browser": {
+    "label": "Browser",
+    "back": "Back",
+    "forward": "Forward",
+    "reload": "Reload",
+    "address": "Address",
+    "addressPlaceholder": "Enter a URL",
+    "selectElement": "Select element",
+    "close": "Close browser",
+    "frameTitle": "Web page",
+    "note": "Note on {label}",
+    "notePlaceholder": "Add a note",
+    "addNote": "Add to chat",
+    "removeNote": "Remove note {n}"
+  },
   "MobilePush": {
     "verificationCode": "A verification code arrived"
+  },
+  "MobileHandoff": {
+    "title": "Sign in to Mikka",
+    "confirm": "Continue with this account",
+    "cancel": "Cancel"
   },
   "DeviceAuthorization": {
     "title": "Connect this computer",
@@ -2762,59 +2816,5 @@
     "failed": "Connection failed. Try again",
     "enterAgain": "Enter another code",
     "retry": "Retry"
-  },
-  "SuggestionsPage": {
-    "title": "Suggestions",
-    "refresh": "Refresh suggestions",
-    "loadError": "Suggestions failed to load.",
-    "retry": "Retry",
-    "loading": "Loading suggestions",
-    "empty": "Nothing to look at right now",
-    "connect": "Connect apps",
-    "action": {
-      "reply": "Reply",
-      "review": "Review",
-      "handle": "Handle",
-      "read": "Read"
-    },
-    "original": "Original: “{title}”"
-  },
-  "ArtifactsPage": {
-    "title": "Artifact",
-    "category": {
-      "all": "All",
-      "documents": "Documents",
-      "pages": "Web pages"
-    },
-    "columns": {
-      "name": "Name",
-      "source": "Source",
-      "updated": "Last activity"
-    },
-    "loadError": "Artifacts failed to load.",
-    "retry": "Retry",
-    "loading": "Loading artifacts",
-    "empty": "No artifacts yet",
-    "threadEntry": "Artifact · {count}"
-  },
-  "Browser": {
-    "label": "Browser",
-    "back": "Back",
-    "forward": "Forward",
-    "reload": "Reload",
-    "address": "Address",
-    "addressPlaceholder": "Enter a URL",
-    "selectElement": "Select element",
-    "close": "Close browser",
-    "frameTitle": "Web page",
-    "note": "Note on {label}",
-    "notePlaceholder": "Add a note",
-    "addNote": "Add to chat",
-    "removeNote": "Remove note {n}"
-  },
-  "MobileHandoff": {
-    "title": "Sign in to Mikka",
-    "confirm": "Continue with this account",
-    "cancel": "Cancel"
   }
 }

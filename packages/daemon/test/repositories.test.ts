@@ -13,11 +13,11 @@ import { WorktreeManager } from '../src/worktrees'
 import { worktreeGitWritePaths } from '../src/agents/publish'
 import { runPolicy } from '../src/permissions'
 import { RunContext } from '../src/agents/run-context'
-import { cleanupTempDirs, makeRepo, tempDir, waitFor } from './helpers'
+import { makeRepo, tempDir, waitFor } from './helpers'
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const daemons: Daemon[] = []
-afterEach(async () => { for (const daemon of daemons.splice(0)) await daemon.stop(); cleanupTempDirs() })
+afterEach(async () => { for (const daemon of daemons.splice(0)) await daemon.stop() })
 
 describe('repository URL boundary', () => {
   it('expands GitHub shorthand and matches HTTPS, SSH and scp identities', () => {

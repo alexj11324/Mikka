@@ -142,7 +142,10 @@ jobs:
           MIKKA_SANDBOX_ACCEPTANCE: '1'
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/daemon build
+        id: daemon-package
       - run: pnpm --filter @mikka/daemon test:package
+        env:
+          MIKKA_DAEMON_DIST_DIR: ${{ steps.daemon-package.outputs.package-directory }}
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm --filter @mikka/mobile typecheck
       - run: pnpm test:active-agents
@@ -289,7 +292,7 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:agent-kit-db,test:approved-writes-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:local-repository-migration-db,test:migration-steps-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:run-publication-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db,test:suggestion-artifact-db
+          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:agent-kit-db,test:approved-writes-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:local-repository-migration-db,test:migration-steps-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:run-publication-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db,test:suggestion-artifact-db,test:coordinator-task-binding-db
       - run: pnpm build
 
   browser-tests:
