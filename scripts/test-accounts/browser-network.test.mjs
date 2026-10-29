@@ -2,14 +2,18 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import test from 'node:test'
 import { installAccountOriginFence } from '../../tests/e2e/test-account-network.ts'
+import { SYNTHETIC_PNG } from '../../tests/helpers/browser-image.ts'
 
 // Protocol event interleavings only. Actual Chromium and reachable loopback
 // sinks remain covered by test-account-origin-fence.spec.ts in Browser CI.
-async function fixture({ failAbort = false } = {}) {
+async function fixture({ failAbort = false, failFulfill = false, failLease = false, images = [] } = {}) {
   let blocked = 0, failures = 0, closed = false, routeHandler
   const consoleSnapshots = []
+  const transport = []
   const session = new EventEmitter()
-  session.send = async method => {
+  session.send = async (method, params) => {
+    if (method !== 'Fetch.enable') transport.push({ method, params })
+    if (method === 'Fetch.fulfillRequest' && failFulfill) throw new Error('SYNTHETIC_PROTOCOL_FULFILL_FAILURE')
     if (method !== 'Fetch.failRequest') return
     if (failAbort) throw new Error('SYNTHETIC_PROTOCOL_ABORT_FAILURE')
     // Chromium can report its blocked resource before the CDP reply arrives.
@@ -24,27 +28,87 @@ async function fixture({ failAbort = false } = {}) {
     route: async (_pattern, handler) => { routeHandler = handler },
     routeWebSocket: async () => {},
   }
-  await installAccountOriginFence(context, { assertActive: async () => {} }, 'http://localhost:3100',
-    () => { blocked++ }, () => { failures++ })
+  await installAccountOriginFence(context, { assertActive: async () => { if (failLease) throw new Error('SYNTHETIC_LEASE_LOST') } }, 'http://localhost:3100',
+    () => { blocked++ }, () => { failures++ }, images)
   await context.newPage()
+  const defaults = { url: 'http://localhost:3199/foreign', method: 'GET', resourceType: 'image' }
+  async function protocolRequest(request = {}) {
+    const value = { ...defaults, ...request }
+    session.emit('Fetch.requestPaused', { requestId: 'synthetic-request', request: { url: value.url, method: value.method }, resourceType: value.resourceType })
+    await new Promise(resolve => setImmediate(resolve))
+  }
+  async function routeRequest(request = {}) {
+    const value = { ...defaults, ...request }
+    await routeHandler({
+      request: () => ({ url: () => value.url, method: () => value.method, resourceType: () => value.resourceType, frame: () => ({ page: () => page }) }),
+      abort: async () => {
+        transport.push({ method: 'route.abort' })
+        if (failAbort) throw new Error('SYNTHETIC_ROUTE_ABORT_FAILURE')
+        consoleSnapshots.push(blocked)
+      },
+      continue: async () => { transport.push({ method: 'route.continue' }) },
+      fulfill: async params => {
+        transport.push({ method: 'route.fulfill', params })
+        if (failFulfill) throw new Error('SYNTHETIC_ROUTE_FULFILL_FAILURE')
+      },
+    })
+  }
   return {
-    async protocolRefusal() {
-      session.emit('Fetch.requestPaused', { requestId: 'synthetic-request', request: { url: 'http://localhost:3199/foreign' } })
-      // Drain the protocol listener's asynchronous work without a timer race.
-      await new Promise(resolve => setImmediate(resolve))
-    },
-    async routeRefusal() {
-      await routeHandler({
-        request: () => ({ url: () => 'http://localhost:3199/foreign' }),
-        abort: async () => {
-          if (failAbort) throw new Error('SYNTHETIC_ROUTE_ABORT_FAILURE')
-          consoleSnapshots.push(blocked)
-        },
-      })
-    },
+    protocolRefusal: protocolRequest, routeRefusal: routeRequest, protocolRequest, routeRequest,
+    transport: () => transport,
     state: () => ({ blocked, failures, closed, consoleSnapshots }),
   }
 }
+
+const imageURL = 'http://localhost:3199/fixture.png'
+for (const channel of ['protocolRequest', 'routeRequest']) {
+  test(`${channel} fulfills a copied exact static PNG without continuing or aborting`, async () => {
+    const body = Buffer.from(SYNTHETIC_PNG)
+    const f = await fixture({ images: [{ url: imageURL, body }] })
+    body.fill(0)
+    await f[channel]({ url: imageURL, resourceType: channel === 'protocolRequest' ? 'Image' : 'image' })
+    assert.deepEqual(f.state(), { blocked: 0, failures: 0, closed: false, consoleSnapshots: [] })
+    assert.equal(f.transport().length, 1)
+    const result = f.transport()[0]
+    assert.equal(result.method, channel === 'protocolRequest' ? 'Fetch.fulfillRequest' : 'route.fulfill')
+    assert.deepEqual(channel === 'protocolRequest' ? Buffer.from(result.params.body, 'base64') : result.params.body, SYNTHETIC_PNG)
+    const headers = channel === 'protocolRequest' ? result.params.responseHeaders : result.params.headers
+    assert.equal(JSON.stringify(headers).toLowerCase().includes('cookie'), false)
+    assert.equal(JSON.stringify(headers).toLowerCase().includes('location'), false)
+  })
+
+  test(`${channel} keeps unregistered URLs, methods and resource types denied`, async () => {
+    for (const patch of [{ url: `${imageURL}?extra=1` }, { url: `${imageURL}/other` }, { method: 'POST' }, { resourceType: 'Fetch' }, { resourceType: 'Document' }]) {
+      const f = await fixture({ images: [{ url: imageURL, body: SYNTHETIC_PNG }] })
+      await f[channel]({ url: imageURL, ...patch })
+      assert.deepEqual(f.state(), { blocked: 1, failures: 0, closed: false, consoleSnapshots: [1] })
+      assert.equal(f.transport().length, 1)
+      assert.equal(f.transport()[0].method, channel === 'protocolRequest' ? 'Fetch.failRequest' : 'route.abort')
+    }
+  })
+
+  test(`${channel} checks the lease before any static fulfillment and closes on fulfillment failure`, async () => {
+    for (const failure of [{ failLease: true }, { failFulfill: true }]) {
+      const f = await fixture({ ...failure, images: [{ url: imageURL, body: SYNTHETIC_PNG }] })
+      await f[channel]({ url: imageURL })
+      assert.equal(f.state().failures, 1)
+      assert.equal(f.state().closed, true)
+      assert.equal(f.transport().some(call => call.method.endsWith('continue') || call.method === 'Fetch.continueRequest'), false)
+      assert.equal(f.transport().filter(call => call.method === 'Fetch.fulfillRequest' || call.method === 'route.fulfill').length, failure.failLease ? 0 : 1)
+      assert.equal(f.transport().at(-1).method, channel === 'protocolRequest' ? 'Fetch.failRequest' : 'route.abort')
+    }
+  })
+}
+
+test('static image fixture configuration rejects credentials, queries, fragments and non-PNG bytes', async () => {
+  for (const value of [
+    { url: 'http://private:secret@localhost:3199/fixture.png', body: SYNTHETIC_PNG },
+    { url: `${imageURL}?secret=value`, body: SYNTHETIC_PNG },
+    { url: `${imageURL}#fragment`, body: SYNTHETIC_PNG },
+    { url: 'data:image/png;base64,ignored', body: SYNTHETIC_PNG },
+    { url: imageURL, body: Buffer.from('<html>not an image</html>') },
+  ]) await assert.rejects(fixture({ images: [value] }))
+})
 
 for (const channel of ['protocolRefusal', 'routeRefusal']) {
   test(`${channel} announces the refusal before the browser reports its blocked resource`, async () => {

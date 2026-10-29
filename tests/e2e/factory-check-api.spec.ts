@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { test, expect, app } from "./fixtures";
+import { test, expect, app, register } from "./fixtures";
 import { createFactoryStore, type FactoryTask } from "../../lib/factory/store";
 import { createFactoryDispatch } from "../../lib/factory/dispatch";
 import { createFactoryReconciler } from "../../lib/factory/reconcile";
@@ -14,6 +14,7 @@ import { remoteKey } from "@mikka/protocol/repository";
 
 // Real HTTP + PG, explicit synthetic daemon reports. Not real Harness acceptance.
 test("Factory check claim pins SHA/read-only/command and preserves trusted receipt through completion", async ({
+  page,
   playwright,
   baseURL,
 }, testInfo) => {
@@ -26,9 +27,9 @@ test("Factory check claim pins SHA/read-only/command and preserves trusted recei
   expect(target.pathname).toBe("/mikka_e2e");
   expect(process.env.MIKKA_FACTORY_ROUTING_ENABLED).toBe("1");
   expect(process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED).toBe("1");
+  const { email } = await register(page);
   const pool = new Pool({ connectionString: target.toString(), max: 3 });
-  const userId = `factory-check-ci-${randomUUID()}`,
-    issueId = randomUUID(),
+  const issueId = randomUUID(),
     agentId = randomUUID(),
     deviceId = randomUUID(),
     repoId = randomUUID(),
@@ -49,6 +50,11 @@ test("Factory check claim pins SHA/read-only/command and preserves trusted recei
     candidateId: t.candidateId,
   });
   try {
+    // Claim materializes the real owner's CLI policy. An invented user ID
+    // fails its FK before any Factory check or token boundary is exercised.
+    const owners = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email=$1', [email]);
+    expect(owners.rows).toHaveLength(1);
+    const userId = owners.rows[0].id;
     await pool.query(
       `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Check HTTP fixture','{}','todo','normal')`,
       [issueId, userId],
@@ -126,8 +132,24 @@ test("Factory check claim pins SHA/read-only/command and preserves trusted recei
       [repoId],
     );
     const claim = await client.post(claimPath);
-    expect(claim.status()).toBe(200);
     const assignment = await claim.json();
+    // Only reviewed constants may enter a failed assertion; a successful
+    // response contains a real MCP token and must never be dumped wholesale.
+    const denialCategories = new Map([
+      ["daemonUpgradeRequired", "daemon_upgrade_required"],
+      ["Agent policy unavailable.", "agent_policy_unavailable"],
+      ["Repository or execution harness unavailable.", "execution_harness_unavailable"],
+      ["Run approval capability unavailable.", "approval_capability_unavailable"],
+      ["Run is no longer queued for this device.", "factory_claim_unavailable"],
+      ["Frozen execution policy is no longer permitted.", "frozen_policy_unavailable"],
+      ["Run access changed before claim response.", "response_access_changed"],
+      ["issue_unavailable", "publication_issue_unavailable"],
+      ["publication_mismatch", "publication_mismatch"],
+      ["workerCapabilityRequired", "skill_capability_required"],
+    ]);
+    const denialCategory = claim.status() === 200 ? "none"
+      : denialCategories.get(assignment?.code) ?? denialCategories.get(assignment?.error) ?? "other_claim_denial";
+    expect(claim.status(), `Factory check claim: ${denialCategory}`).toBe(200);
     // A failed assertion must not print the real MCP credential in the response.
     expect({
       baseBranch: assignment.baseBranch,

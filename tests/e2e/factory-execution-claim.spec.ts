@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { test, expect, app } from "./fixtures";
+import { test, expect, register, app } from "./fixtures";
 import { createFactoryStore, type FactoryTask } from "../../lib/factory/store";
 import { createFactoryDispatch } from "../../lib/factory/dispatch";
 import { factoryCheckGates } from "../../lib/factory/checks";
@@ -15,6 +15,7 @@ import { remoteKey } from "@mikka/protocol/repository";
 
 // Real HTTP + PG, explicit synthetic daemon reports. Not real Harness acceptance.
 test("Factory execution claims reject stopped tasks and unadopted retry children before token issuance", async ({
+  page,
   playwright,
   baseURL,
 }, testInfo) => {
@@ -27,9 +28,11 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
   expect(target.pathname).toBe("/mikka_e2e");
   expect(process.env.MIKKA_FACTORY_ROUTING_ENABLED).toBe("1");
   expect(process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED).toBe("1");
+  // Claim policy materialization requires the real account's owner FK before
+  // the request can reach the Factory task lock exercised below.
+  const { email } = await register(page);
   const pool = new Pool({ connectionString: target.toString(), max: 3 });
-  const userId = `factory-check-ci-${randomUUID()}`,
-    issueId = randomUUID(),
+  const issueId = randomUUID(),
     agentId = randomUUID(),
     deviceId = randomUUID(),
     repoId = randomUUID(),
@@ -49,7 +52,9 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
     candidateId: t.candidateId,
   });
   const fixtureIssues = [issueId];
+  const fixtureEvents = [sourceEventId];
   try {
+    const userId = (await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email=$1', [email])).rows[0].id;
     await pool.query(
       `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Check HTTP fixture','{}','todo','normal')`,
       [issueId, userId],
@@ -90,6 +95,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
       const fixtureIssue = randomUUID(),
         event = randomUUID();
       fixtureIssues.push(fixtureIssue);
+      fixtureEvents.push(event);
       await pool.query(
         `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Execution HTTP fixture','{}','todo','normal')`,
         [fixtureIssue, userId],
@@ -224,6 +230,16 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
         )
       ).rows[0].n;
       if (!allowed) {
+        // A policy/FK failure must not satisfy a Factory rejection case.
+        const error = mode === "access-revoked"
+          ? "The task is no longer available to this thread."
+          : ["cancel", "revoke", "ordinary-stop", "selected-cancel"].includes(mode)
+            ? "Run is not queued for this device."
+            : "Run is no longer queued for this device.";
+        expect({ error: body.error, code: body.code }).toEqual({
+          error,
+          code: mode === "access-revoked" ? "issue_unavailable" : undefined,
+        });
         expect(body.skillReceipt).toBeUndefined();
         expect(body.skills).toBeUndefined();
         expect(receipts).toHaveLength(0);
@@ -266,9 +282,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
     await pool.query(`DELETE FROM agents WHERE id=$1`, [agentId]);
     await pool.query(`DELETE FROM device_tokens WHERE id=$1`, [tokenId]);
     await pool.query(`DELETE FROM devices WHERE id=$1`, [deviceId]);
-    await pool.query(`DELETE FROM coordinator_events WHERE "userId"=$1`, [
-      userId,
-    ]);
+    await pool.query(`DELETE FROM coordinator_events WHERE id=ANY($1::uuid[])`, [fixtureEvents]);
     await pool.end();
   }
 });

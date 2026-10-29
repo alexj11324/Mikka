@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
 import type { Page, Route, TestInfo } from '@playwright/test'
 import { app, openCreateIssue } from '../e2e/fixtures'
-import { test, expect } from './accounts'
+import { test, expect, GITHUB_FAVICON } from './accounts'
 import type { AccountScope } from '../../scripts/test-accounts/session.mjs'
 import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 import { assertMvpEnvironment, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from './isolated-env.mjs'
@@ -16,9 +16,6 @@ import { RepositoryCache } from '../../packages/daemon/src/repositories'
 import { finishMvpResources, indexMvpResource } from './retention.mjs'
 
 const execute = promisify(execFile)
-const GITHUB_FAVICON = 'https://github.com/favicon.ico'
-// A decoded raster response for this one synthetic asset; no external fetch.
-const GITHUB_FAVICON_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=', 'base64')
 type Device = { id: string; name: string; protocolVersion: number }
 type Run = { id: string; issueId: string; deviceId: string; deviceRepoId: string; baseBranch: string | null; status: string; stopReason: string | null; report: { summary: string; verify: { status: string }; publish?: { pushed: boolean; commit: string; branch: string } } | null; worktreePath: string | null; stopRequestedAt: string | null }
 type Observation = { kind: string; toolName?: string; deviceId?: string; runId?: string; issueId?: string; url?: string; commit?: string; branch?: string; requestId?: string }
@@ -43,7 +40,6 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     // in the existing evidence attachment, and the log is audited before cat.
     console.info(`MVP checkpoint: ${code}`)
   }
-  await page.route(GITHUB_FAVICON, route => route.fulfill({ contentType: 'image/png', body: GITHUB_FAVICON_PNG }))
   const startedAt = new Date().toISOString()
   const marker = `mvp-${randomUUID()}`
   const title = `MVP ${marker.slice(4, 12)}`
