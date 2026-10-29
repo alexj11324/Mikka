@@ -22,11 +22,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = c303e7a9e465280a91d841b4604009d9a01cd20b
+          test "$(git rev-parse HEAD)" = 608cf7b198199bfbc44a18909411b0d45be709f2
           curl --fail --silent --show-error --max-time 60 --proto '=https' \
-            'https://sb-6fx93q3zrnl0.vercel.run/f2cf861287b0ba604a22cf25f9e20ca9f490492817494b9a6bfd2d3e3fc7e8c1.patch' \
+            'https://sb-6fx93q3zrnl0.vercel.run/2199c34abda3b8c075c9d4c33b3645e167c6a7fab57f8949fe201aceeb34c807.patch' \
             -o "$RUNNER_TEMP/source.patch"
-          echo "f2cf861287b0ba604a22cf25f9e20ca9f490492817494b9a6bfd2d3e3fc7e8c1  $RUNNER_TEMP/source.patch" | sha256sum --check --strict
+          echo "2199c34abda3b8c075c9d4c33b3645e167c6a7fab57f8949fe201aceeb34c807  $RUNNER_TEMP/source.patch" | sha256sum --check --strict
           git apply --check --index "$RUNNER_TEMP/source.patch"
           git apply --index "$RUNNER_TEMP/source.patch"
           python3 - <<'PY'
