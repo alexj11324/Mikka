@@ -25,3 +25,18 @@ Layout:
   and thread cards, swipe-for-times), the composer, settings rows, icons.
 - `lib/`: the auth client, `api()` and `useApi()`, response types, push
   registration, theme colours.
+
+## Push
+
+Registering a phone for pushes needs the EAS project id. `app.config.ts`
+reads it from `EAS_PROJECT_ID` into `extra.eas.projectId`; set it as an EAS
+environment variable (`eas env:create --name EAS_PROJECT_ID ...`) or in the
+shell for a local build. `eas init` prints the id. Without it the app runs but
+cannot register, and Settings shows 「推送无法送达」. The server sends through
+Expo's push service (`lib/mobile-push.ts`, optional `EXPO_ACCESS_TOKEN`).
+
+The app asks iOS for permission after the Coordinator's first message of its
+own, or when the person turns a push on in 通知; never at launch. A tapped
+push opens what it is about (`lib/push-route.ts`): a proposal's card
+(`pendingActionId`), a finished thread (`runId`), or the chat it came from
+(`botId`).

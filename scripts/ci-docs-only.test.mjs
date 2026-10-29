@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -173,18 +173,33 @@ test('all required gates reject failed classification and skipped full jobs', ()
   }
 })
 
-test('workflow temporary classifier paths execute as ES modules on the actual Node runtime', () => {
-  const root = mkdtempSync(join(tmpdir(), 'docs-classifier-entry-retained-'))
-  console.log(`Retained classifier entrypoint evidence: ${root}`)
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
-    const source = readFileSync(file, 'utf8')
-    const entry = source.split('\n').find(line => line.trimStart().startsWith('trusted="$(mktemp'))
-    assert.ok(entry, 'the immutable main classifier must be copied to a temporary entrypoint')
-    // Exercise the real mktemp expression from the workflow. A plain mktemp
-    // creates an unknown random extension and Node 24 refuses to load the ESM.
-    const output = execFileSync('bash', ['-e', '-c', `${entry.trim()}\ncp "$1" "$trusted"\nnode "$trusted" --base HEAD --head HEAD`, 'classifier-entry', resolve('scripts/ci-docs-only.mjs')], {
-      env: { PATH:process.env.PATH, TMPDIR:root }, encoding:'utf8',
-    })
-    assert.match(output, /docs_only=false \(no changed files\)/)
+
+test('the exact trusted-classifier workflow step executes ESM from a retained temporary file', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'docs-gate-launch-retained-'))
+  console.log(`Retained workflow launcher fixture: ${dir}`)
+  const bin = join(dir, 'bin')
+  mkdirSync(bin)
+  const git = join(bin, 'git')
+  writeFileSync(git, `#!/bin/sh
+case "$1" in
+  fetch|diff) exit 0 ;;
+  show) cat "$FIXTURE_CLASSIFIER" ;;
+  *) exit 1 ;;
+esac
+`, { flag: 'wx' })
+  chmodSync(git, 0o700)
+  for (const name of ['ui-policy', 'browser-tests']) {
+    const source = readFileSync(`.github/workflows/${name}.yml`, 'utf8')
+    const block = /      - id: docs[\s\S]*?        run: \|\n([\s\S]*?)(?=\n  [a-z][a-z0-9-]*:)/.exec(source)
+    assert.ok(block, 'trusted classifier step must be present')
+    const script = block[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
+    const outputFile = join(dir, `${name}.output`)
+    const output = execFileSync('bash', ['-e', '-c', script], { cwd: dir, encoding: 'utf8', env: {
+      PATH: `${bin}:${process.env.PATH}`, FIXTURE_CLASSIFIER: resolve('scripts/ci-docs-only.mjs'),
+      GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_OUTPUT: outputFile,
+    } })
+    assert.match(output, /Retained trusted classifier: .*\.mjs/)
+    assert.match(readFileSync(outputFile, 'utf8'), /docs_only=false/)
+    writeFileSync(join(dir, `${name}.log`), output, { flag: 'wx' })
   }
 })
