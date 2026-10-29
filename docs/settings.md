@@ -23,7 +23,7 @@ supplies content.
 
 ## Sections
 
-- **Personal:** Preferences, Profile, Account (账户), Integrations, Devices (设备).
+- **Personal:** Preferences, Profile, Memory (记忆), Account (账户), Integrations, Devices (设备).
 - **Administration:** Workspace, Teams, Members.
 
 Account holds how the person signs in: linking Google to the Mikka account.
