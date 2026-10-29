@@ -4,6 +4,7 @@ import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from 
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
 import { splitQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
+import { splitBrowserNotes, type BrowserNote } from '@/lib/browser/note'
 import { splitSuggestion, type SuggestionCard } from '@/lib/suggestions/card'
 
 // What the Coordinator's model sees. Everything here depends only on the
@@ -207,6 +208,8 @@ export interface ChatItem {
   pending?: true
   /** What the person quoted from an artifact, shown above their text. */
   quote?: ArtifactQuote
+  /** Notes the person pinned on pages in the browser, shown as chips above their text. */
+  notes?: BrowserNote[]
   /** The 建议 card the person tapped, drawn above their instruction (R-21). */
   suggestion?: SuggestionCard
   /** Artifacts shown as cards under this entry, in order. */
@@ -276,8 +279,9 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') })
       else {
         const { quote, text: unquoted } = splitQuote(raw)
-        const { suggestion, text } = splitSuggestion(unquoted)
-        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(suggestion ? { suggestion } : {}) })
+        const { notes, text: rest } = splitBrowserNotes(unquoted)
+        const { suggestion, text } = splitSuggestion(rest)
+        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}) })
       }
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
