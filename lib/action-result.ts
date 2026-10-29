@@ -112,6 +112,23 @@ export const ACTION_ERROR_CODES = [
   'workspaceMembershipSuspended',
   'inviteInvalidEmails',
   'workspaceReadFailed',
+  'workspaceSlugTaken',
+  'workspaceIconInvalid',
+  'workspaceDeleteNameMismatch',
+  'workspaceHasActiveSubscription',
+  'workspaceCannotRemoveSelf',
+  'workspaceTransferTargetInvalid',
+  'botTransferBusy',
+  'botTransferNameConflict',
+  'teamNotFound',
+  'teamDeleteNameMismatch',
+  'botDefaultRepositoryUnavailable',
+  'usageLimitReached',
+  'usageCreditsExhausted',
+  'billingNotConfigured',
+  'billingNoSubscription',
+  'billingPlanInvalid',
+  'billingProviderFailed',
 ] as const
 
 export type ActionErrorCode = (typeof ACTION_ERROR_CODES)[number]

@@ -1049,7 +1049,24 @@
     "runAlreadyActive": "This task already has an active run.",
     "runDispatchKeyConflict": "This request key was already used for different run parameters.",
     "runNotActive": "This run has ended and has no answerable question.",
-    "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response."
+    "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
+    "workspaceSlugTaken": "This URL is already in use. Choose another.",
+    "workspaceIconInvalid": "The icon must be a PNG, JPEG, WebP or GIF image of 200 KB or less.",
+    "workspaceDeleteNameMismatch": "The name you entered does not match the workspace name.",
+    "workspaceHasActiveSubscription": "This workspace still has an active subscription. Cancel it in Billing before deleting the workspace.",
+    "workspaceCannotRemoveSelf": "You cannot remove yourself. To go, use Leave workspace.",
+    "workspaceTransferTargetInvalid": "The new owner must be another active member of this workspace.",
+    "botTransferBusy": "This member’s bots still have running threads or background tasks. They can be handed over once those finish.",
+    "botTransferNameConflict": "The new owner already has a bot with the same name. Rename one of them, then hand it over.",
+    "teamNotFound": "This team does not exist.",
+    "teamDeleteNameMismatch": "The name you entered does not match the team name.",
+    "botDefaultRepositoryUnavailable": "This repository is not in any workspace member’s GitHub App installation.",
+    "usageLimitReached": "The usage limit has been reached. New tasks are paused; running tasks will finish.",
+    "usageCreditsExhausted": "Credits have run out. New tasks are paused; running tasks will finish.",
+    "billingNotConfigured": "Billing is not set up.",
+    "billingNoSubscription": "This workspace has no subscription yet.",
+    "billingPlanInvalid": "This plan is not available.",
+    "billingProviderFailed": "The payment service could not complete the request."
   },
   "Overview": {
     "sections": {
