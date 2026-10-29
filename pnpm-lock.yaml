@@ -328,6 +328,9 @@ importers:
       happy-dom:
         specifier: 15.11.7
         version: 15.11.7
+      js-yaml:
+        specifier: 4.3.2
+        version: 4.3.2
       oxlint:
         specifier: ^1.89.0
         version: 1.89.0

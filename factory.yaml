@@ -1,0 +1,29 @@
+# Mikka factory definition. Reviewed in pull requests and applied as one unit.
+# See docs/factory/warp-aligned-factory.md.
+schemaVersion: v1alpha1
+name: mikka
+
+repositories:
+  - owner: alexj11324
+    name: Mikka
+
+agentDefaults:
+  harness:
+    type: codex
+    # Logical profile in v1alpha1; the host maps it to a concrete provider model.
+    model: default
+  runner: linux-default
+  secrets: []
+
+credentialStrategy: creator
+
+runners:
+  - name: linux-default
+    os: linux
+    arch: x64
+    instanceShape:
+      vcpus: 2
+      memoryGb: 4
+
+# Names only. Values live in the managed secret store.
+secrets: []
