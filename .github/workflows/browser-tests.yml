@@ -1,7 +1,9 @@
 name: Browser tests
 
 # PRs run critical flows plus scoped regressions; unknown/shared changes run
-# full functionality. Code-bearing main pushes, nightly/manual integration and
+# full functionality. Schema-only migrations use critical flows after the
+# migration/bootstrap gates. The full layer is sharded across four isolated jobs.
+# Code-bearing main pushes, nightly/manual integration and
 # integration PRs also run performance. Docs-only main pushes keep lightweight
 # gates. See CONTRIBUTING.md for the required, fail-closed gate policy.
 on:
@@ -106,6 +108,12 @@ jobs:
     needs: changes
     if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
+    # Four independent shards: each matrix job gets its own PostgreSQL service
+    # and test-account directory, so no fixture or lease is shared across shards.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # OS/browser setup took 9–10 minutes in runs 40320688470/40324658490.
     # Budget setup separately without weakening any Playwright test limits.
     timeout-minutes: 45
@@ -179,11 +187,13 @@ jobs:
       - run: pnpm build
         id: build
       - name: Factory HTTP regressions against the built application (no skips)
+        if: ${{ matrix.shard == 1 }}
         run: pnpm test:factory-http
       - name: Real HTTP authentication, account reuse and isolation
+        if: ${{ matrix.shard == 1 }}
         run: node scripts/test-accounts/run-http.mjs
       - name: Validate real subset execution when browser selection policy changes
-        if: needs.changes.outputs.verify_selection == 'true'
+        if: needs.changes.outputs.verify_selection == 'true' && matrix.shard == 1
         run: |
           umask 077
           mkdir -p .cache/e2e
@@ -199,7 +209,7 @@ jobs:
           cat "$log_file"
           exit "$test_status"
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
-        if: needs.changes.outputs.browser_performance == 'true'
+        if: needs.changes.outputs.browser_performance == 'true' && matrix.shard == 1
         run: |
           umask 077
           mkdir -p .cache/e2e
@@ -217,7 +227,7 @@ jobs:
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
       - name: MVP real-daemon core loop
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 1 }}
         run: |
           umask 077
           mkdir -p .cache/e2e
@@ -238,16 +248,16 @@ jobs:
           MIKKA_ISSUE_TOOLS_ENABLED: '1'
       - name: Audit MVP evidence before the remaining browser suite
         id: mvp-evidence-audit
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 1 }}
         run: |
           node scripts/test-accounts/cli.mjs audit-evidence --evidence playwright-mvp-report
           node scripts/test-accounts/cli.mjs audit-evidence --evidence mvp-test-results
           node scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/e2e/playwright-mvp.log
       - name: Preserve audited MVP evidence
-        if: ${{ !cancelled() && steps.mvp-evidence-audit.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.mvp-evidence-audit.outcome == 'success' && matrix.shard == 1 }}
         uses: actions/upload-artifact@v4
         with:
-          name: mvp-test-report-${{ github.sha }}
+          name: mvp-test-report-${{ github.sha }}-shard-${{ matrix.shard }}
           path: |
             playwright-mvp-report/
             mvp-test-results/
@@ -271,7 +281,7 @@ jobs:
           : > "$log_file"
           chmod 600 "$log_file"
           test_status=0
-          node scripts/ci-browser-tests.mjs > "$log_file" 2>&1 || test_status=$?
+          node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/4 > "$log_file" 2>&1 || test_status=$?
           if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
             if [ "$test_status" -eq 0 ]; then test_status=1; fi
             exit "$test_status"
@@ -280,13 +290,15 @@ jobs:
           exit "$test_status"
       - name: Scan account evidence before artifact upload
         id: account-evidence-audit
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        # Shard 1 always has evidence (selection validation, performance, MVP or
+        # its browser shard). Other shards only have it when the regression ran.
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && (matrix.shard == 1 || needs.changes.outputs.verify_selection != 'true' || needs.changes.outputs.browser_tier == 'full') }}
         run: node scripts/test-accounts/evidence.mjs
       - name: Upload browser failure evidence
         if: ${{ !cancelled() && steps.account-evidence-audit.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
-          name: browser-test-report
+          name: browser-test-report-shard-${{ matrix.shard }}-${{ github.sha }}
           path: |
             playwright-report/
             test-results/

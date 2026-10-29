@@ -19,6 +19,16 @@ test('documentation alone skips browser runtime; mixed source tests retain every
   }
 })
 
+test('schema-only migrations run migration gates plus critical flows; any application code still runs full', () => {
+  assert.deepEqual(browserPlan(['drizzle/202610290001.sql']), { tier: 'smoke', specs: smoke, performance: false })
+  assert.deepEqual(browserPlan(['README.md', 'drizzle/202610290001.sql']), { tier: 'smoke', specs: smoke, performance: false })
+  assert.deepEqual(browserPlan(['drizzle/202610290001.sql', 'drizzle/202610290002.sql']), { tier: 'smoke', specs: smoke, performance: false })
+  for (const file of ['app/page.tsx', 'lib/db/schema.ts', 'tests/e2e/fixtures.ts', 'playwright.config.ts']) {
+    assert.deepEqual(browserPlan(['drizzle/202610290001.sql', file]), full, file)
+  }
+  assert.deepEqual(browserPlan(['drizzle/202610290001.sql'], { unsafeModes: true }), full)
+})
+
 test('scoped backend and settings paths add complete relevant specs to the critical flows', () => {
   for (const [file, expected] of [
     ['app/api/search/route.ts', 'site-search.spec.ts'],
@@ -78,6 +88,7 @@ test('every existing spec either adds its complete file or escalates to the full
 
 test('runner selects only fixed files, refuses partial critical flows, and never narrows a full run', () => {
   assert.deepEqual(browserArguments('full', '[]'), ['exec', 'playwright', 'test', '--grep-invert', '@performance'])
+  assert.deepEqual(browserArguments('full', '[]', '2/4'), ['exec', 'playwright', 'test', '--grep-invert', '@performance', '--shard=2/4'])
   const args = browserArguments('smoke', JSON.stringify(smoke))
   assert.deepEqual(args.slice(3, -2), smoke.map(spec => `tests/e2e/${spec}`))
   for (const [tier, list] of [
@@ -88,6 +99,10 @@ test('runner selects only fixed files, refuses partial critical flows, and never
   ]) assert.throws(() => browserArguments(tier, JSON.stringify(list)))
   assert.throws(() => browserArguments('full', 'not JSON'))
   assert.throws(() => browserArguments('full', '{}'))
+  for (const shard of ['0/4', '4/3', '1/0', '1', '1/x', '../1/2', '01/4', ' 1/4']) {
+    assert.throws(() => browserArguments('full', '[]', shard), shard)
+  }
+  assert.deepEqual(browserArguments('full', '[]', '4/4').at(-1), '--shard=4/4')
 })
 
 test('runner invokes pnpm without a shell and preserves actual command failure', () => {
@@ -102,6 +117,12 @@ test('runner invokes pnpm without a shell and preserves actual command failure',
     assert.equal(result.status, status, result.stderr)
     assert.deepEqual(JSON.parse(readFileSync(trace, 'utf8')), browserArguments('smoke', JSON.stringify(smoke)))
   }
+})
+
+test('selection validation cannot be sharded', () => {
+  const result = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs'), '--verify-selection', '--shard=1/4'], { encoding: 'utf8' })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /must run unsharded/)
 })
 
 test('trusted classifier writes actual GitHub outputs for event ranges and integration, failing closed on missing ranges', () => {
@@ -183,8 +204,16 @@ test('policy validation exercises both subsets and covers every scoped spec with
   }
   assert(source.includes("needs.changes.outputs.verify_selection != 'true' || needs.changes.outputs.browser_tier == 'full'"))
   assert(source.includes('node scripts/ci-browser-tests.mjs --verify-selection'))
-  assert(source.includes('node scripts/ci-browser-tests.mjs > "$log_file"'))
+  assert(source.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/4'))
   assert(source.includes('if: needs.changes.outputs.verify_selection == \'true\''))
+  // Independent shards: each matrix job keeps its own PostgreSQL service,
+  // account directory and artifact name, so no fixture is shared concurrently.
+  assert(source.includes('matrix:\n        shard: [1, 2, 3, 4]'))
+  assert(source.includes('if: ${{ matrix.shard == 1 }}'))
+  assert(source.includes('name: browser-test-report-shard-${{ matrix.shard }}-${{ github.sha }}'))
+  // Shards without browser output must not fail the evidence audit during a
+  // selection-policy run; shard 1 and every shard that ran the regression still audit.
+  assert(source.includes("matrix.shard == 1 || needs.changes.outputs.verify_selection != 'true' || needs.changes.outputs.browser_tier == 'full'"))
 })
 
 
