@@ -8,7 +8,9 @@ import { linearGraphQL } from '@/lib/linear-sync/graphql'
 import { linearAccessToken } from '@/lib/linear-sync/tokens'
 import { linearSyncEnabled } from '@/lib/linear-sync/flags'
 import { githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, type ExternalNotification } from './notification'
+import { disabledSuggestionSources } from './source-settings'
 import { ingestNotifications, recordTimeZone, writeFirstBriefing } from './store'
+import { manualTimeZone } from './time-zone'
 import { missingTriggers, TRIGGER_CHECK_INTERVAL_MS, TRIGGER_PATTERNS, triggerSlugs } from './triggers'
 
 // Where notifications come from. Linear and GitHub webhooks carry full
@@ -63,8 +65,7 @@ export async function ensureComposioTriggers(userId: string, { force = false } =
   } else {
     await db.insert(suggestionTriggerChecks).values({ userId, checkedAt: now }).onConflictDoUpdate({ target: suggestionTriggerChecks.userId, set: { checkedAt: now } })
   }
-  const accounts = (await listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], statuses: ['ACTIVE'], cursor })))
-    .filter(account => account.status === 'ACTIVE' && !account.isDisabled)
+  const accounts = await activeComposioAccounts(composio, userId)
   const toolkits = [...new Set(accounts.map(account => account.toolkit.slug))]
   const watched = toolkits.filter(toolkit => TRIGGER_PATTERNS[toolkit])
   if (!watched.length) return toolkits
@@ -81,6 +82,18 @@ export async function ensureComposioTriggers(userId: string, { force = false } =
     }
   }
   return toolkits
+}
+
+async function activeComposioAccounts(composio: NonNullable<ReturnType<typeof getComposio>>, userId: string) {
+  return (await listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], statuses: ['ACTIVE'], cursor })))
+    .filter(account => account.status === 'ACTIVE' && !account.isDisabled)
+}
+
+/** The Composio toolkits the person has an active account for; empty without Composio. */
+export async function connectedComposioApps(userId: string): Promise<string[]> {
+  const composio = getComposio()
+  if (!composio) return []
+  return [...new Set((await activeComposioAccounts(composio, userId)).map(account => account.toolkit.slug.toLowerCase()))]
 }
 
 /** Important mail from the last two days, as Gmail sees it now. */
@@ -123,13 +136,15 @@ export async function bootstrapSuggestions(userId: string, app: 'composio' | 'li
   try {
     // The callbacks only know the IP-derived zone; it fills a gap until the browser reports one.
     await recordTimeZone(userId, timeZone, { replace: false }).catch((error: unknown) => console.error('Time zone could not be saved', error instanceof Error ? error.message : error))
+    // A source the person turned off in Settings is not read (lib/suggestions/source-settings.ts).
+    const gmailOn = async () => !(await disabledSuggestionSources(userId)).has('gmail')
     const notifications = app === 'linear'
       ? await read('Linear', () => currentLinear(userId))
-      : (await read('Composio', () => ensureComposioTriggers(userId, { force: true }))).includes('gmail') ? await read('Gmail', () => currentGmail(userId)) : []
+      : (await read('Composio', () => ensureComposioTriggers(userId, { force: true }))).includes('gmail') && await gmailOn() ? await read('Gmail', () => currentGmail(userId)) : []
     // What was already there goes into the first briefing, not to the Coordinator one by one.
     await ingestNotifications(notifications, { route: false })
     // Loaded here so the webhook routes that import this module do not pull in the Coordinator workflow.
-    if (await writeFirstBriefing(userId, timeZone)) await (await import('@/lib/coordinator/wake')).wakeCoordinator(userId)
+    if (await writeFirstBriefing(userId, await manualTimeZone(userId) ?? timeZone)) await (await import('@/lib/coordinator/wake')).wakeCoordinator(userId)
   } catch (error) {
     console.error('First briefing failed', error instanceof Error ? error.message : error)
   }
