@@ -58,14 +58,32 @@ jobs:
             exit 0
           fi
           if ! git diff --quiet origin/main -- scripts/ci-docs-only.mjs; then
-            echo "docs_only=false (classifier differs from main)"
-            {
-              echo "docs_only=false"
-              echo "browser_tier=full"
-              echo 'browser_specs=[]'
-              echo "browser_performance=true"
-              echo "verify_selection=true"
-            } >> "$GITHUB_OUTPUT"
+            # Fixed CI-only allowlist + mode checks from trusted main. Never let
+            # a changed classifier turn its own check into documentation-only.
+            node --input-type=module - "$trusted" <<'BROWSER_BOOTSTRAP'
+          import { execFileSync } from 'node:child_process'
+          import { appendFileSync, readFileSync } from 'node:fs'
+          import { pathToFileURL } from 'node:url'
+          const { isDocsOnly, hasUnsafeModes } = await import(pathToFileURL(process.argv[2]).href)
+          const infra = new Set([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "AGENTS.md", "CONTRIBUTING.md"])
+          const critical = ["routes.spec.ts", "sign-out.spec.ts", "test-account-pool.spec.ts", "workspace.spec.ts"]
+          const integration = process.env.GITHUB_EVENT_NAME !== 'pull_request'
+          let ciOnly = false, performance = integration
+          try {
+            const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
+            const base = event.pull_request?.base?.sha, head = event.pull_request?.head?.sha
+            if (!base || !head || /^0+$/.test(base) || /^0+$/.test(head)) throw new Error('missing range')
+            const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+            const files = execFileSync('git', ['diff', '--no-renames', '-z', '--name-only', `${base}...${head}`], options).split('\0').filter(Boolean)
+            const raw = execFileSync('git', ['diff', '--no-renames', '-z', '--raw', '--no-abbrev', `${base}...${head}`], options)
+            ciOnly = !integration && files.length > 0 && !hasUnsafeModes(raw) && files.every(file => infra.has(file) || isDocsOnly([file]))
+            performance ||= files.some(file => ['tests/e2e/navigation-performance.spec.ts', 'tests/e2e/agent-performance.spec.ts'].includes(file))
+          } catch { /* Unknown ranges always run full functionality. */ }
+          const tier = ciOnly ? 'smoke' : 'full', specs = ciOnly ? critical : []
+          const outputs = `docs_only=false\nbrowser_tier=${tier}\nbrowser_specs=${JSON.stringify(specs)}\nbrowser_performance=${performance}\nverify_selection=true\n`
+          appendFileSync(process.env.GITHUB_OUTPUT, outputs)
+          console.log(`Trusted policy bootstrap: ${tier}; performance=${performance}; verify both subsets`)
+          BROWSER_BOOTSTRAP
             exit 0
           fi
           node "$trusted"
@@ -181,7 +199,7 @@ jobs:
         env:
           BROWSER_TIER: ${{ needs.changes.outputs.browser_tier }}
           BROWSER_SPECS: ${{ needs.changes.outputs.browser_specs }}
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && (needs.changes.outputs.verify_selection != 'true' || needs.changes.outputs.browser_tier == 'full') }}
         run: |
           umask 077
           mkdir -p .cache/e2e
@@ -241,6 +259,7 @@ jobs:
           BROWSER_TIER: ${{ needs.changes.outputs.browser_tier }}
           BROWSER_PERFORMANCE: ${{ needs.changes.outputs.browser_performance }}
           EVENT_NAME: ${{ github.event_name }}
+          VERIFY_SELECTION: ${{ needs.changes.outputs.verify_selection }}
         run: |
           if [ "$CHANGES_RESULT" != "success" ]; then
             echo "Changed files job did not succeed: $CHANGES_RESULT"
@@ -250,6 +269,7 @@ jobs:
             echo "Integration runs require full functionality and performance"
             exit 1
           fi
+          case "$VERIFY_SELECTION" in true|false) ;; *) echo "Missing selection validation plan"; exit 1 ;; esac
           case "$BROWSER_TIER:$DOCS_ONLY:$BROWSER_PERFORMANCE" in
             docs:true:false) echo "Documentation-only change; no browser runtime changed."; exit 0 ;;
             smoke:false:false|targeted:false:false|full:false:false|full:false:true) ;;

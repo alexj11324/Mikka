@@ -47,9 +47,9 @@ cannot.
    | Change | Browser acceptance before merge |
    | --- | --- |
    | Documentation only | No browser runtime; the required gate confirms classification |
-   | Source-only unit tests or unrelated workflow files | Critical flows |
+   | Source-only tests, CI workflows, CI policy and test-runner changes | Critical flows; selection-policy changes also validate both browser subsets |
    | Search, settings, Slack webhook paths | Critical flows plus complete relevant specs |
-   | Authentication, permissions, shared UI/runtime, dependencies, migrations, browser infrastructure or unknown paths | Full functionality |
+   | Authentication, permissions, shared UI/runtime, dependencies, migrations, shared browser fixtures or unknown paths | Full functionality |
 
    Critical flows cover anonymous redirects, registration/login, task creation,
    search/navigation, account isolation, and sign-out with server revocation.
@@ -57,11 +57,15 @@ cannot.
    Known browser spec changes include that spec; new specs and shared fixtures
    fall back to full functionality. Mixed changes take the union of scenarios
    or escalate to full. Unsafe file modes and unavailable comparisons also
-   escalate. Changes to the classifier itself run full functionality and
-   performance, using a conservative workflow fallback rather than the PR's
-   proposed skip policy; they also execute both critical-only and combined
-   scoped browser subsets to validate selection itself. Failed classification or a skipped/failed selected
-   test job fails the required gate.
+   escalate. Pure CI policy changes run dedicated classifier/runner/gate tests,
+   real HTTP authentication, critical browser flows and both actual browser
+   subsets; they do not require full functionality or performance. The critical
+   subset is not rerun after selection validation has already exercised it.
+   During policy updates the workflow uses a fixed CI-only allowlist plus the
+   trusted main classifier's documentation/mode checks; it cannot classify its
+   own change as documentation-only. Any application or unknown file in that
+   update escalates to full functionality. Failed classification or a
+   skipped/failed selected test job fails the required gate.
 4. **Integration** (CI): every push to main, nightly on main, and manual
    Actions → Browser tests → Run workflow run full functionality **and** the
    desktop/mobile performance suite. A PR changing a performance spec also

@@ -38,6 +38,9 @@ export function isDocsOnly(files, unsafeModes = false) {
 export const BROWSER_SMOKE = Object.freeze([
   'routes.spec.ts', 'workspace.spec.ts', 'test-account-pool.spec.ts', 'sign-out.spec.ts',
 ])
+export const BROWSER_INFRA_FILES = Object.freeze([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "AGENTS.md", "CONTRIBUTING.md"])
+const SELECTION_POLICY_FILES = new Set([".github/workflows/browser-tests.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/test-accounts/evidence.mjs"])
+export const needsSelectionValidation = files => files.some(file => SELECTION_POLICY_FILES.has(file))
 const SCOPED_BROWSER = [
   { paths: [/^lib\/(?:search|federated-search)\//, /^lib\/issue-search(?:\.|-)/, /^app\/api\/(?:search|issues\/search)\//], specs: ['site-search.spec.ts'] },
   { paths: [/^components\/settings\//, /^app\/\[locale\]\/settings\//], specs: ['settings.spec.ts', 'settings-surface.spec.ts', 'members.spec.ts', 'teams.spec.ts', 'workspace-menu.spec.ts'] },
@@ -55,12 +58,10 @@ export function browserPlan(files, { unsafeModes = false, integration = false } 
   const specs = new Set(BROWSER_SMOKE)
   let targeted = false
   for (const file of files) {
-    if (isDocsOnly([file])) continue
-    // Test selection, fixtures, build/dependency/auth/shared runtime and unknown
-    // paths deliberately fall back to full. Policy changes cannot skip themselves.
-    if (/^scripts\/ci-(?:docs-only|browser-tests)(?:\.test)?\.mjs$/.test(file) ||
-        file.startsWith('tests/e2e/') ||
-        /^\.github\/workflows\/(?:browser-tests|ui-policy)\.ya?ml$/.test(file)) {
+    if (isDocsOnly([file]) || BROWSER_INFRA_FILES.includes(file)) continue
+    // Shared fixtures and unknown browser specs still require full functionality.
+    // Pure CI changes use critical flows; selection changes also verify subsets.
+    if (file.startsWith('tests/e2e/')) {
       if (file.startsWith('tests/e2e/') && [...BROWSER_SMOKE, ...BROWSER_SCOPED_SPECS].some(spec => file === `tests/e2e/${spec}`)) {
         specs.add(file.slice('tests/e2e/'.length)); targeted = true; continue
       }
@@ -110,10 +111,10 @@ function arg(name) {
   return index === -1 ? undefined : process.argv[index + 1]
 }
 
-function output(docsOnly, reason, plan = browserPlan([])) {
+function output(docsOnly, reason, plan = browserPlan([]), verifySelection = false) {
   const value = docsOnly ? 'true' : 'false'
   console.log(`docs_only=${value} (${reason})`)
-  const outputs = `docs_only=${value}\nbrowser_tier=${plan.tier}\nbrowser_specs=${JSON.stringify(plan.specs)}\nbrowser_performance=${plan.performance}\n`
+  const outputs = `docs_only=${value}\nbrowser_tier=${plan.tier}\nbrowser_specs=${JSON.stringify(plan.specs)}\nbrowser_performance=${plan.performance}\nverify_selection=${verifySelection}\n`
   console.log(`browser_tier=${plan.tier}; performance=${plan.performance}; specs=${JSON.stringify(plan.specs)}`)
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, outputs)
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY,
@@ -173,7 +174,7 @@ export function main() {
   const reason = result.files.length
     ? `${result.files.length} changed file(s)`
     : 'no changed files'
-  output(isDocsOnly(result.files, result.unsafeModes), result.unsafeModes ? `${reason}; non-regular path or unmerged entry` : reason, browserPlan(result.files, { unsafeModes: result.unsafeModes }))
+  output(isDocsOnly(result.files, result.unsafeModes), result.unsafeModes ? `${reason}; non-regular path or unmerged entry` : reason, browserPlan(result.files, { unsafeModes: result.unsafeModes }), needsSelectionValidation(result.files))
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()

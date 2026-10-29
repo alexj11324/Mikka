@@ -4,7 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { browserPlan, BROWSER_SMOKE, BROWSER_SCOPED_SPECS } from './ci-docs-only.mjs'
+import { browserPlan, BROWSER_SMOKE, BROWSER_SCOPED_SPECS, BROWSER_INFRA_FILES, needsSelectionValidation } from './ci-docs-only.mjs'
 import { browserArguments, selectionValidationPlans } from './ci-browser-tests.mjs'
 
 const smoke = [...BROWSER_SMOKE].sort()
@@ -48,8 +48,6 @@ test('unknown, shared, auth, permission, dependency, schema and test infrastruct
     'next.config.mjs', 'pnpm-lock.yaml', 'package.json', 'messages/zh.json',
     'drizzle/202610290001.sql', 'packages/protocol/src/events.ts',
     'scripts/setup-e2e-db.mjs', 'tests/e2e/fixtures.ts', 'playwright.config.ts',
-    'scripts/ci-docs-only.mjs', 'scripts/ci-browser-tests.test.mjs',
-    '.github/workflows/browser-tests.yml', '.github/workflows/ui-policy.yml',
     'docs/generate.mjs', 'docs/AGENTS.md', 'new/unknown.ts',
   ]) assert.deepEqual(browserPlan(['README.md', 'lib/search/search.ts', file]), full, file)
   assert.deepEqual(browserPlan([]), full)
@@ -148,14 +146,16 @@ test('protected browser gate rejects failed/cancelled/skipped jobs, malformed pl
   const source = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
   const block = source.split('      - name: Require the selected browser layer\n')[1]
   const script = block.split('        run: |\n')[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
-  const result = (tier, docs, performance, job, changes = 'success', event = 'pull_request') => spawnSync('bash', ['-e', '-c', script], {
-    env: { PATH: process.env.PATH, CHANGES_RESULT: changes, DOCS_ONLY: docs, BROWSER_TIER: tier, BROWSER_PERFORMANCE: performance, FULL_RESULT: job, EVENT_NAME: event },
+  const result = (tier, docs, performance, job, changes = 'success', event = 'pull_request', verify = 'false') => spawnSync('bash', ['-e', '-c', script], {
+    env: { PATH: process.env.PATH, CHANGES_RESULT: changes, DOCS_ONLY: docs, BROWSER_TIER: tier, BROWSER_PERFORMANCE: performance, FULL_RESULT: job, EVENT_NAME: event, VERIFY_SELECTION: verify },
   }).status === 0
   for (const tier of ['smoke', 'targeted', 'full']) {
     assert(result(tier, 'false', 'false', 'success'))
     for (const job of ['failure', 'cancelled', 'skipped', '']) assert(!result(tier, 'false', 'false', job))
     assert(!result(tier, 'false', 'false', 'success', 'failure'))
   }
+  assert(!result('smoke', 'false', 'false', 'success', 'success', 'pull_request', ''))
+  assert(result('smoke', 'false', 'false', 'success', 'success', 'pull_request', 'true'))
   assert(result('docs', 'true', 'false', 'skipped'))
   assert(!result('docs', 'true', 'false', 'skipped', 'failure'))
   for (const [tier, docs, perf] of [['', 'false', 'false'], ['docs', 'false', 'false'], ['full', 'true', 'false'], ['smoke', 'false', 'true'], ['targeted', 'false', 'true']]) assert(!result(tier, docs, perf, 'success'))
@@ -168,7 +168,7 @@ test('protected browser gate rejects failed/cancelled/skipped jobs, malformed pl
 })
 
 
-test('policy validation exercises both subsets and covers every scoped spec without replacing the full gate', () => {
+test('policy validation exercises both subsets and covers every scoped spec without duplicating critical flows or replacing a required full layer', () => {
   const [critical, scoped] = selectionValidationPlans()
   assert.equal(critical.tier, 'smoke')
   assert.equal(scoped.tier, 'targeted')
@@ -179,6 +179,7 @@ test('policy validation exercises both subsets and covers every scoped spec with
     assert(source.includes(path))
     assert(readFileSync('scripts/test-accounts/evidence.mjs', 'utf8').includes(path))
   }
+  assert(source.includes("needs.changes.outputs.verify_selection != 'true' || needs.changes.outputs.browser_tier == 'full'"))
   assert(source.includes('node scripts/ci-browser-tests.mjs --verify-selection'))
   assert(source.includes('node scripts/ci-browser-tests.mjs > "$log_file"'))
   assert(source.includes('if: needs.changes.outputs.verify_selection == \'true\''))
@@ -209,5 +210,63 @@ process.exit(targeted ? Number(process.env.TEST_EXIT) : 0);
     if (receipt) {
       assert.equal(readFileSync(join(dir, 'selection-targeted-results/site-search-fixtures.json'), 'utf8'), readFileSync(join(dir, 'test-results/site-search-fixtures.json'), 'utf8'))
     } else assert(result.stderr.includes('MISSING_SELECTION_RECEIPT'))
+  }
+})
+
+
+test('CI-only updates use dedicated policy validation and critical flows, without full functionality or performance', () => {
+  for (const file of BROWSER_INFRA_FILES) {
+    assert.deepEqual(browserPlan([file]), { tier:'smoke', specs:smoke, performance:false }, file)
+    assert.deepEqual(browserPlan([file, 'app/page.tsx']), full, `${file} mixed with application code`)
+  }
+  assert(needsSelectionValidation(['scripts/ci-docs-only.mjs']))
+  assert(needsSelectionValidation(['.github/workflows/browser-tests.yml']))
+  assert.equal(needsSelectionValidation(['.github/workflows/analytics-ci.yml']), false)
+  assert.equal(needsSelectionValidation(['README.md']), false)
+})
+
+test('actual workflow bootstrap cannot let an edited classifier skip app changes, unknown modes, or integration', () => {
+  const workflow = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
+  const wrapper = workflow.split(`<<'BROWSER_BOOTSTRAP'\n`)[1].split('          BROWSER_BOOTSTRAP')[0].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
+  const dir = mkdtempSync(join(tmpdir(), 'browser-bootstrap-retained-'))
+  console.log(`Retained workflow bootstrap evidence: ${dir}`)
+  const trusted = join(dir, 'trusted-main.mjs')
+  writeFileSync(trusted, readFileSync('scripts/ci-docs-only.mjs'))
+  const env = { PATH:process.env.PATH, GIT_CONFIG_NOSYSTEM:'1', GIT_CONFIG_GLOBAL:'/dev/null', GIT_AUTHOR_NAME:'Test', GIT_AUTHOR_EMAIL:'test@example.invalid', GIT_COMMITTER_NAME:'Test', GIT_COMMITTER_EMAIL:'test@example.invalid' }
+  const git = (args, input) => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', ...args], {cwd:dir, env, input, encoding:'utf8'}).trim()
+  git(['init', '--bare', '--template=', '.'])
+  const blob = git(['hash-object', '-w', '--stdin'], 'synthetic fixture')
+  const tree = files => {
+    const groups = new Map()
+    for (const [path, mode] of files) {
+      const [name, ...rest] = path.split('/')
+      if (!groups.has(name)) groups.set(name, [])
+      groups.get(name).push([rest.join('/'), mode])
+    }
+    return git(['mktree'], [...groups].map(([name, entries]) => entries[0][0] ? `040000 tree ${tree(entries)}\t${name}\n` : `${entries[0][1]} blob ${blob}\t${name}\n`).join(''))
+  }
+  const base = git(['commit-tree', tree([['README.md','100644']]), '-m', 'base'])
+  let count = 0
+  for (const [files, mode, event, tier, performance] of [
+    [BROWSER_INFRA_FILES, '100644', 'pull_request', 'smoke', 'false'],
+    [['scripts/ci-docs-only.mjs', 'app/page.tsx'], '100644', 'pull_request', 'full', 'false'],
+    [['scripts/ci-docs-only.mjs', 'new/unknown.ts'], '100644', 'pull_request', 'full', 'false'],
+    [['scripts/ci-docs-only.mjs'], '100755', 'pull_request', 'full', 'false'],
+    [['scripts/ci-docs-only.mjs'], '120000', 'pull_request', 'full', 'false'],
+    [['scripts/ci-docs-only.mjs', 'tests/e2e/navigation-performance.spec.ts'], '100644', 'pull_request', 'full', 'true'],
+    [BROWSER_INFRA_FILES, '100644', 'push', 'full', 'true'],
+    [BROWSER_INFRA_FILES, '100644', 'schedule', 'full', 'true'],
+    [BROWSER_INFRA_FILES, '100644', 'workflow_dispatch', 'full', 'true'],
+  ]) {
+    const head = git(['commit-tree', tree([['README.md','100644'], ...files.map(file => [file,mode])]), '-p', base, '-m', 'change'])
+    const eventFile = join(dir, `${count}-event.json`), outputFile = join(dir, `${count++}-output`)
+    writeFileSync(eventFile, JSON.stringify({pull_request:{base:{sha:base},head:{sha:head}}}))
+    execFileSync(process.execPath, ['--input-type=module','-',trusted], {cwd:dir, encoding:'utf8', input:wrapper, env:{...env,GITHUB_EVENT_NAME:event,GITHUB_EVENT_PATH:eventFile,GITHUB_OUTPUT:outputFile}})
+    const outputs = Object.fromEntries(readFileSync(outputFile,'utf8').trim().split('\n').map(line => { const at=line.indexOf('='); return [line.slice(0,at),line.slice(at+1)] }))
+    assert.equal(outputs.docs_only, 'false')
+    assert.equal(outputs.verify_selection, 'true')
+    assert.equal(outputs.browser_tier, tier)
+    assert.equal(outputs.browser_performance, performance)
+    assert.deepEqual(JSON.parse(outputs.browser_specs), tier==='smoke' ? smoke : [])
   }
 })

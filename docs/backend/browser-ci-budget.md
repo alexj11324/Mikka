@@ -3,8 +3,9 @@
 The selected browser job has a 45-minute total budget. PRs run critical flows
 and known affected scenarios, escalating shared or unknown paths to full
 functionality. Main, nightly and manual runs add the full performance suite;
-PRs that change a performance spec also run it. Changes to the classifier itself
-use a conservative full functionality plus performance fallback.
+PRs that change a performance spec also run it. Pure CI and classifier changes use dedicated policy checks, critical flows
+and actual subset execution, without full functionality or performance.
+Mixed application changes still escalate according to their risk.
 See [CONTRIBUTING.md](../../CONTRIBUTING.md#how-changes-are-tested) for the gate policy.
 
 The original full browser job has a 45-minute total budget. Its official Chromium/system
