@@ -21,7 +21,7 @@ component library with no demo frames.
 | 7 | Connect a computer and device approval | `346:4792`, frames `01`–`11` | 待 Alex 确认 |
 | 8 | Stop a thread | `364:4869`, frame `372:4786` (running / stopping / timeout × light, dark, narrow) | 待 Alex 确认 |
 | 9 | Thread output: artifact, Factory approval, Live Diff | `395:15023` (artifact placement and share `11a`–`11e`), `357:4750`, `497:4860` | 待 Alex 确认; Live Diff 待审核 |
-| 10 | Settings | `551:6857` 设置 v4 · 全部接通 (V01–V15, N1–N6, S-A…S-Q); v3 `476:4860` kept as history | Current; every control maps to a real backend (see `docs/settings-backend/*.md`) |
+| 10 | Settings | `551:6857` 设置 v4 · 全部接通 (V01–V15, N1–N6, S-A…S-Q); v3 `476:4860` kept as history | Current; clickable prototype (nav + dialogs linked, start frame `551:6858`) |
 | 11 | Mobile | `358:9186`, frames `01`–`22` | Current |
 
 ## Archived on 2026-10-29
