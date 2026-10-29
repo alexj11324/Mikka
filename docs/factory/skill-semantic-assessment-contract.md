@@ -43,20 +43,26 @@ model assessment. Their existing immutable result slots require an explicitly
 versioned future assessment lineage before reevaluation; this patch performs no
 ledger rewrite, delete, or production SQL. It does not manufacture old mounts.
 
-The isolated projection includes the exact parent-supplied #331 decision source
-and main dd6d8d4 artifact storage source/dependency. Integration must consume the
-current owners' actual fixed sources. #364 owns shared migration/retain/session/
-pool work; #161 owns daemon helper/broker changes. This patch does not replace
-those sources or publish over #316's active branch. Its old migration timestamps
-still require the current-main compatibility composition from the shared owner.
+The composition includes the supplied #331 decision source and existing main
+artifact storage source/dependency. It preserves current main subscription and
+claim interfaces, with Factory terminal/lineage fences in the same transaction.
+The fourteen historical feature migrations retain their exact SQL bytes under
+canonical later filenames; the runner recognizes only audited filename/hash
+aliases without manufacturing applied ledger entries. No production SQL is run.
+Shared migration/retain/session/pool work and daemon helper/broker work remain
+with their existing owners. This branch consumes their published sources and
+does not publish over #316's active branch.
 
 ## Verification and remaining gates
 
 `test:self-improvement-semantic-source` explicitly disables tsx disk cache, whose
-old default can delete expired/legacy cache directories. Its five source-only
-entries use synthetic/in-memory dependencies; no PG, provider or destructive
-setup/teardown runs. Use the actual local protocol source when dependencies come
-from another worktree. This does not make historical broad test wrappers safe.
+old default can delete expired/legacy cache directories. Its six entries use
+synthetic evidence and exercise the actual daemon Skill compiler in newly
+created, retained private directories. That compiler regression performs a
+read-only git lookup; it does not dispatch a Harness or call a provider. Separate
+PostgreSQL projections and managed CI suites test persistence and claim
+composition. Use the actual protocol source when dependencies come from another
+worktree. This does not make historical broad test wrappers safe.
 
 Before any related broad test/build/CI/push, independently audit the complete
 setup/body/teardown/dynamic imports and managed-host lifecycle. Preserve existing

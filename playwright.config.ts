@@ -15,7 +15,9 @@ export default defineConfig({
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3100',
     locale: 'zh-CN',
-    trace: 'retain-on-failure',
+    // Authenticated acceptance traces embed cookies and are rejected by the
+    // existing evidence scanner. Keep safe screenshots/error context instead.
+    trace: process.env.MIKKA_TEST_ENVIRONMENT_FILE ? 'off' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     actionTimeout: 15000,
     navigationTimeout: 45000,

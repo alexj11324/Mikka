@@ -171,14 +171,17 @@ test(
         questionId: f.questionId,
         humanSessionId: "model-forged-session",
       };
-      for (const origin of ["https://untrusted.example", ""]) {
+      // The existing Coordinator contract accepts only text/submissionId. Reject
+      // injected question/provenance fields before they can become a user event;
+      // the Factory answer endpoint below separately enforces same-origin 403.
+      for (const requestOrigin of ["https://untrusted.example", "", origin]) {
         assert.equal(
           (
             await owner("/api/coordinator/messages", "POST", message, {
-              origin,
+              origin: requestOrigin,
             })
           ).status,
-          403,
+          400,
         );
       }
       assert.equal(
@@ -191,7 +194,7 @@ test(
         0,
       );
       assert.equal(
-        (await owner("/api/coordinator/messages", "POST", message)).status,
+        (await owner("/api/coordinator/messages", "POST", {text: message.text})).status,
         202,
       );
       const attested = (
