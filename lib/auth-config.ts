@@ -27,6 +27,18 @@ export function authTrustedOrigins(env: AuthEnvironment) {
   ].filter((value): value is string => Boolean(value)).map(value => httpsOrigin(value, env.NODE_ENV === 'development' || env.CI === 'true')))]
 }
 
+/**
+ * WebAuthn relying party for passkeys: the app origin (BETTER_AUTH_URL, else the
+ * deployment URL resolveAppOrigin picks) and its host name. Without an origin the
+ * plugin falls back to the request's Origin header and rpID "localhost".
+ */
+export function passkeyRelyingParty(env: AuthEnvironment): { rpID?: string; origin?: string; rpName: string } {
+  const origin = resolveAppOrigin(env)
+  if (!origin) return { rpName: 'Mikka' }
+  const url = new URL(origin)
+  return { rpID: url.hostname, origin: url.origin, rpName: 'Mikka' }
+}
+
 export function authOAuthProxyOptions(env: AuthEnvironment) {
   if (!env.BETTER_AUTH_OAUTH_PROXY_URL || !env.BETTER_AUTH_OAUTH_PROXY_SECRET) return undefined
   const productionURL = httpsOrigin(env.BETTER_AUTH_OAUTH_PROXY_URL)

@@ -112,6 +112,13 @@ export const ACTION_ERROR_CODES = [
   'workspaceMembershipSuspended',
   'inviteInvalidEmails',
   'workspaceReadFailed',
+  'securityPasswordRequired',
+  'securityPasswordInvalid',
+  'securityReauthRequired',
+  'twoFactorCodeInvalid',
+  'twoFactorAlreadyEnabled',
+  'twoFactorNotEnabled',
+  'passkeyNotFound',
 ] as const
 
 export type ActionErrorCode = (typeof ACTION_ERROR_CODES)[number]

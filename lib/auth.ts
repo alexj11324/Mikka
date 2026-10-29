@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth'
 import { createAuthMiddleware } from 'better-auth/api'
-import { deviceAuthorization, multiSession } from 'better-auth/plugins'
+import { deviceAuthorization, multiSession, twoFactor } from 'better-auth/plugins'
+import { passkey } from '@better-auth/passkey'
 import { nextCookies } from 'better-auth/next-js'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { expo } from '@better-auth/expo'
@@ -8,7 +9,8 @@ import { oAuthProxy, oneTimeToken } from 'better-auth/plugins'
 import { pool } from '@/lib/db'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
-import { authOAuthProxyOptions, authTrustedOrigins } from '@/lib/auth-config'
+import { authOAuthProxyOptions, authTrustedOrigins, passkeyRelyingParty } from '@/lib/auth-config'
+import { markPasskeyUsed, recordPasskeyRegistration } from '@/lib/security/passkey-events'
 import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
 import { after } from 'next/server'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
@@ -88,6 +90,15 @@ export const auth = betterAuth({
     // The app opens a web page signed in as the person (app/api/mobile/open): a one-minute, single-use token, stored hashed.
     oneTimeToken({ expiresIn: 1, storeToken: 'hashed' }),
     multiSession(),
+    // 设置 › 安全: an authenticator app (TOTP) plus backup codes. Email sign-in
+    // answers { twoFactorRedirect: true } and the session starts only after
+    // /two-factor/verify-totp or /two-factor/verify-backup-code (lib/two-factor-client.ts).
+    // Passkey-only people manage it without a password (they have none).
+    twoFactor({ issuer: 'Mikka', allowPasswordless: true, backupCodeOptions: { storeBackupCodes: 'encrypted' } }),
+    passkey({
+      ...passkeyRelyingParty(process.env),
+      authentication: { afterVerification: async ({ clientData }) => markPasskeyUsed(clientData.id) },
+    }),
     deviceAuthorization(daemonAuthorizationOptions(BASE_PATH)),
     oauthProvider({
       loginPage: withBasePath('/sign-in'),
@@ -120,6 +131,7 @@ export const auth = betterAuth({
         ctx.setHeader('pragma', 'no-cache')
         return ctx.json(deviceToken)
       }
+      if (ctx.path === '/passkey/verify-registration') await recordPasskeyRegistration(ctx.context.returned, ctx.context.session?.user.id)
       if (ctx.path === '/verify-email' || ctx.path?.startsWith('/reset-password')) {
         ctx.setHeader('referrer-policy', 'no-referrer')
         ctx.setHeader('cache-control', 'no-store')

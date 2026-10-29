@@ -143,6 +143,7 @@
     "@better-auth/core": "1.7.12",
     "@better-auth/expo": "1.7.12",
     "@better-auth/oauth-provider": "1.7.12",
+    "@better-auth/passkey": "1.7.12",
     "@chat-adapter/slack": "4.43.0",
     "@chat-adapter/state-pg": "^4.43.0",
     "@chat-adapter/telegram": "^4.43.0",
@@ -239,6 +240,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/react-syntax-highlighter": "15.5.13",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "esbuild": "0.28.2",
     "happy-dom": "15.11.7",
     "oxlint": "^1.89.0",
     "postcss": "^8",
@@ -248,7 +250,6 @@
     "tsx": "4.23.15",
     "tw-animate-css": "^1.3.4",
     "typescript": "^5.9.3",
-    "wrangler": "^4.151.3",
-    "esbuild": "0.28.2"
+    "wrangler": "^4.151.3"
   }
 }

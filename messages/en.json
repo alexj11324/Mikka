@@ -1049,7 +1049,14 @@
     "runAlreadyActive": "This task already has an active run.",
     "runDispatchKeyConflict": "This request key was already used for different run parameters.",
     "runNotActive": "This run has ended and has no answerable question.",
-    "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response."
+    "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
+    "securityPasswordRequired": "Enter your current password.",
+    "securityPasswordInvalid": "The current password is incorrect.",
+    "securityReauthRequired": "You signed in more than a day ago. Sign in again to change security settings.",
+    "twoFactorCodeInvalid": "The code is incorrect or has expired.",
+    "twoFactorAlreadyEnabled": "Two-step verification is already on.",
+    "twoFactorNotEnabled": "Two-step verification is off.",
+    "passkeyNotFound": "This passkey does not exist."
   },
   "Overview": {
     "sections": {

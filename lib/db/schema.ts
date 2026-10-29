@@ -933,3 +933,6 @@ export const userPreferences = pgTable('user_preferences', {
   memoryEnabled: boolean('memoryEnabled').notNull().default(true),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+// 设置 › 安全 / 开发者 / 权限与审批 / 密钥与环境 / 审计日志 (docs/settings-backend/security.md).
+export * from './security-schema'

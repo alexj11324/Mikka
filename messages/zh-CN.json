@@ -1049,7 +1049,14 @@
     "runAlreadyActive": "此任务已有正在执行的线程。",
     "runDispatchKeyConflict": "此请求标识已用于不同的运行参数。",
     "runNotActive": "此运行已结束，且没有可回答的问题。",
-    "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。"
+    "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。",
+    "securityPasswordRequired": "需要输入当前密码。",
+    "securityPasswordInvalid": "当前密码不正确。",
+    "securityReauthRequired": "登录已超过一天，请重新登录后再修改安全设置。",
+    "twoFactorCodeInvalid": "验证码不正确或已过期。",
+    "twoFactorAlreadyEnabled": "两步验证已开启。",
+    "twoFactorNotEnabled": "两步验证未开启。",
+    "passkeyNotFound": "通行密钥不存在。"
   },
   "Overview": {
     "sections": {
