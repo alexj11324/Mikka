@@ -15,6 +15,8 @@ test('paused Linear settings do not poll state or start OAuth', async ({ page })
   await expect(section.getByText('同步已暂停', { exact: true })).toBeVisible()
   await expect(section.getByRole('button', { name: '连接 Linear', exact: true })).toBeDisabled()
   expect(availabilityReads).toBe(1)
+  // The issue-prefix settings action is unrelated; wait for it before counting idle actions.
+  await expect(page.locator('#issue-prefix')).toBeEnabled()
   const stateActions: string[] = []
   page.on('request', request => {
     if (request.method() === 'POST' && request.headers()['next-action']) stateActions.push(request.url())
