@@ -183,3 +183,31 @@ test('policy validation exercises both subsets and covers every scoped spec with
   assert(source.includes('node scripts/ci-browser-tests.mjs > "$log_file"'))
   assert(source.includes('if: needs.changes.outputs.verify_selection == \'true\''))
 })
+
+
+test('real subset entrypoint retains search receipts before full initialization and rejects missing evidence or failed subsets', () => {
+  for (const [receipt, status, expected] of [[true, 0, 0], [false, 0, 1], [true, 7, 7]]) {
+    const dir = mkdtempSync(join(tmpdir(), 'browser-subset-retained-'))
+    console.log(`Retained subset entrypoint evidence: ${dir}`)
+    const stub = `#!${process.execPath}
+import { mkdirSync, writeFileSync } from 'node:fs';
+const targeted = process.argv.includes('--output=selection-targeted-results');
+if (targeted) {
+  mkdirSync('selection-targeted-results', {recursive:true});
+  if (process.env.TEST_RECEIPT === 'true') {
+    mkdirSync('test-results', {recursive:true});
+    writeFileSync('test-results/site-search-fixtures.json', JSON.stringify({retained:'synthetic evidence'}));
+  }
+}
+process.exit(targeted ? Number(process.env.TEST_EXIT) : 0);
+`
+    writeFileSync(join(dir, 'pnpm'), stub, { mode: 0o700 })
+    const result = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs'), '--verify-selection'], {
+      cwd: dir, encoding: 'utf8', env: { PATH: dir, TEST_RECEIPT: String(receipt), TEST_EXIT: String(status) },
+    })
+    assert.equal(result.status, expected, result.stderr)
+    if (receipt) {
+      assert.equal(readFileSync(join(dir, 'selection-targeted-results/site-search-fixtures.json'), 'utf8'), readFileSync(join(dir, 'test-results/site-search-fixtures.json'), 'utf8'))
+    } else assert(result.stderr.includes('MISSING_SELECTION_RECEIPT'))
+  }
+})
