@@ -28,7 +28,13 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const state = desktopAuthState(url.searchParams.get('state')) ?? ''
   const next = safeAuthReturn(url.searchParams.get('next') ?? '/')
-  const fail = () => NextResponse.redirect(new URL(withBasePath('/sign-in?oauth=failed'), url.origin), { status: 303, headers: safeHeaders })
+  const fail = () => {
+    const query = new URLSearchParams({ oauth: 'failed' })
+    if (state) query.set('desktop', '1')
+    if (state) query.set('desktop_state', state)
+    if (state) query.set('desktop_next', next)
+    return NextResponse.redirect(new URL(withBasePath(`/sign-in?${query}`), url.origin), { status: 303, headers: safeHeaders })
+  }
 
   if (!state) return fail()
 
