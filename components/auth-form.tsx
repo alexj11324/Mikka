@@ -8,7 +8,7 @@ import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { SignInCard } from '@/components/blocks/auth-19/components/sign-in-card'
 import { safeAuthReturn } from '@/lib/auth-return'
 import { withBasePath } from '@/lib/base-path'
-import { desktopAuthReturnPath } from '@/lib/desktop-auth'
+import { desktopAuthCallbackPath, desktopAuthReturnPath } from '@/lib/desktop-auth'
 import { bridgeFromWindow } from '@/lib/platform/detect'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
@@ -107,7 +107,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
     if (!beginSubmit()) return
     try {
-      const callbackURL = desktopFlow ? desktopAuthReturnPath(desktopFlow.state, desktopFlow.next) : home
+      const callbackURL = desktopFlow ? desktopAuthCallbackPath(desktopFlow.state, desktopFlow.next) : home
       const result = await authClient.signIn.social({ provider: 'google', callbackURL, errorCallbackURL: oauthErrorCallbackURL('google'), disableRedirect: true })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
@@ -147,7 +147,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
     if (!beginSubmit()) return
     try {
-      const callbackURL = desktopFlow ? desktopAuthReturnPath(desktopFlow.state, desktopFlow.next) : home
+      const callbackURL = desktopFlow ? desktopAuthCallbackPath(desktopFlow.state, desktopFlow.next) : home
       const result = await authClient.signIn.social({ provider: 'github', callbackURL, errorCallbackURL: oauthErrorCallbackURL('github'), disableRedirect: true })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
