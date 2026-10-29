@@ -15,6 +15,9 @@ test('a cursor the server did not issue is rejected', () => {
   assert.equal(decodeActivityCursor(forged({ micros: '1', id: "credential:1' OR 1=1" })), null)
   assert.equal(decodeActivityCursor(forged({ micros: '1', id: 'credential:1', extra: true })), null)
   assert.equal(decodeActivityCursor('A'.repeat(300)), null)
+  // Past the year 2286 the SQL timestamp math overflows; such a cursor is refused, not a 500.
+  assert.equal(decodeActivityCursor(forged({ micros: '9'.repeat(17), id: 'credential:1' })), null)
+  assert.deepEqual(decodeActivityCursor(forged({ micros: '9'.repeat(16), id: 'credential:1' })), { micros: '9'.repeat(16), id: 'credential:1' })
 })
 
 test('input defaults to all, the default page and no cursor', () => {

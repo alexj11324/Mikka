@@ -50,6 +50,8 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    // Lock in run admission's order (agents, then devices) so the two never deadlock.
+    await client.query(`SELECT id FROM agents WHERE "deviceId"=$1 AND "userId"=$2 FOR UPDATE`, [target, userId])
     // Run admission reads this row FOR SHARE and requires enabled, so no run
     // can be admitted between the check below and the commit.
     const device = await client.query(`SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL FOR UPDATE`, [target, userId])

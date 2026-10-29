@@ -18,7 +18,8 @@ export interface ActivityPosition {
 }
 
 const positionSchema = z.object({
-  micros: z.string().regex(/^-?\d{1,19}$/),
+  // 16 digits reaches past the year 2286; longer values overflow the timestamp math in SQL.
+  micros: z.string().regex(/^-?\d{1,16}$/),
   id: z.string().regex(/^(credential|action|reminder):[A-Za-z0-9-]{1,64}$/),
 }).strict()
 
