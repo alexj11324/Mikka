@@ -8,7 +8,8 @@ test('every v4 nav item has exactly one section, in Figma order', () => {
 })
 
 test('old links keep landing on the page that now holds their content', () => {
-  for (const [old, now] of [['profile', 'account'], ['account', 'security'], ['integrations', 'connections'], ['devices', 'computers'], ['workspace', 'general']]) {
+  // v4 reuses `account` for 账户, so v3's account link lands there; its sign-in rows are one click away under 安全.
+  for (const [old, now] of [['profile', 'account'], ['integrations', 'connections'], ['devices', 'computers'], ['workspace', 'general']]) {
     assert.equal(resolveSettingsSection('/settings', old), now, old)
   }
 })
@@ -32,4 +33,9 @@ test('members do not see admin-only sections; admins see all of them', () => {
   for (const id of ['permissions', 'secrets', 'audit', 'billing']) assert.equal(member.includes(id), false, id)
   for (const id of ['general', 'members', 'teams', 'bots', 'usage']) assert.equal(member.includes(id), true, id)
   assert.equal(visibleSettingsSections({ admin: true }).length, SETTINGS_SECTIONS.length)
+})
+
+test('a current id wins over a legacy alias with the same name', () => {
+  assert.equal(resolveSettingsSection('/settings', 'account'), 'account')
+  assert.equal(resolveSettingsSection('/settings', 'profile'), 'account')
 })

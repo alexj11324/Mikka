@@ -46,7 +46,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
 /** Section ids from before v4. Old links open the page that now holds the content. */
 const LEGACY: Record<string, SettingsSectionId> = {
   profile: 'account',
-  account: 'security',
+  // v3's ?section=account was the identity + sign-in page, now split into 账户 and 安全.
+  // A current id always wins, so this only catches ids v4 does not use.
   integrations: 'connections',
   devices: 'computers',
   workspace: 'general',
@@ -58,8 +59,8 @@ const ids = new Set<string>(SETTINGS_SECTIONS.map(s => s.id))
 export function resolveSettingsSection(pathname: string, section: string | null | undefined): SettingsSectionId {
   if (pathname.endsWith('/settings/members')) return 'members'
   if (pathname.endsWith('/settings/teams')) return 'teams'
-  if (section && section in LEGACY) return LEGACY[section]
   if (section && ids.has(section)) return section as SettingsSectionId
+  if (section && section in LEGACY) return LEGACY[section]
   return 'preferences'
 }
 

@@ -8,7 +8,6 @@ import { AppShellContent } from '@/components/app-shell'
 import { SettingsContent } from '@/components/ui/settings-layout'
 import { SettingsSidebar } from './settings-sidebar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { WorkspaceSettings } from '@/components/settings/workspace-settings'
 import { MembersPanel } from '@/components/settings/members-panel'
 import { LinearSettings } from '@/components/settings/linear-settings'
@@ -17,6 +16,11 @@ import { IntegrationsSettings } from '@/components/settings/integrations-setting
 import { ComputerPolicySettings } from '@/components/settings/computer-policy-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
+import { AccountSettings } from '@/components/settings/account-settings'
+import { SecuritySettings } from '@/components/settings/security-settings'
+import { PrivacySettings } from '@/components/settings/privacy-settings'
+import { ActivitySettings } from '@/components/settings/activity-settings'
+import { SavedLoginsSettings } from '@/components/settings/saved-logins-settings'
 import { TelegramSettings } from '@/components/settings/telegram-settings'
 import { DevicesSettings } from '@/components/devices/devices-settings'
 import { MemorySettings } from '@/components/settings/memory-settings'
@@ -62,16 +66,19 @@ export function SettingsView({ user, userKey, googleEnabled = false, onBack, onS
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {routedBody ? children ?? (section === 'members' ? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} /> : null) : <SettingsContent className="gap-6">
         {section === 'computers' ? <DevicesSettings /> : <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
-        <SectionBody section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={workspaceId} linearNotice={linearNotice} preview={preview} />
+        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={workspaceId} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} />
       </SettingsContent>}
     </AppShellContent>
   </>
 }
 
-function SectionBody({ section, user, userKey, googleEnabled, workspaceId, linearNotice, preview }: Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview'> & { section: SettingsSectionId; googleEnabled: boolean }) {
+function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, linearNotice, preview, onSignOut, signingOut }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean }) {
   switch (section) {
-    case 'account': return <AccountSection user={user} />
-    case 'security': return <GoogleSignInSettings googleEnabled={googleEnabled} />
+    case 'account': return <AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />
+    case 'security': return <><SecuritySettings /><GoogleSignInSettings googleEnabled={googleEnabled} /></>
+    case 'privacy': return <PrivacySettings />
+    case 'activity': return <ActivitySettings />
+    case 'logins': return <SavedLoginsSettings />
     case 'preferences': return <><AppearanceSection /><IssuePrefixSettings /></>
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
@@ -79,17 +86,8 @@ function SectionBody({ section, user, userKey, googleEnabled, workspaceId, linea
     case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : null
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
     case 'permissions': return workspaceId && !preview ? <ComputerPolicySettings key={workspaceId} workspaceId={workspaceId} /> : null
-    default: return null
+    default: return <p className="py-8 text-sm text-muted-foreground">{t('sectionUnavailable')}</p>
   }
-}
-
-function AccountSection({ user }: { user: SettingsViewProps['user'] }) {
-  const t = useTranslations('Settings.profile')
-  return <SettingsSection id="profile-heading" title={t('heading')}>
-    <SettingRow title={t('avatar')} description={t('avatarDescription')}><Avatar className="size-10">{user.image && <AvatarImage src={user.image} alt="" />}<AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow>
-    <SettingRow title={t('name')}><ProfileName name={user.name || ''} /></SettingRow>
-    <SettingRow title={t('email')}><span className="break-all">{user.email}</span></SettingRow>
-  </SettingsSection>
 }
 
 function AppearanceSection() {
