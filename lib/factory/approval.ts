@@ -102,6 +102,22 @@ async function browserSession(tx: PoolClient, actor: FactoryActor) {
   );
   if (!rows.length) fail("factoryHumanRequired");
 }
+
+/** Warp-aligned approval: a person approving in the browser is the decision.
+ * The session must be live and linked to GitHub or Google; no external policy
+ * issuer or decision credential is involved on this path. */
+async function humanApproval(
+  tx: PoolClient,
+  actor: { userId: string; sessionId?: string | null },
+) {
+  if (!actor.userId || !actor.sessionId) fail("factoryHumanRequired");
+  const { rows } = await tx.query(
+    `SELECT s.id FROM "session" s WHERE s.id=$1 AND s."userId"=$2 AND s."expiresAt">clock_timestamp()
+     AND EXISTS (SELECT 1 FROM account a WHERE a."userId"=s."userId" AND a."providerId" IN ('github','google')) FOR SHARE`,
+    [actor.sessionId, actor.userId],
+  );
+  if (!rows.length) fail("factoryHumanRequired");
+}
 function decisionScope(
   task: FactoryTask,
   req: z.infer<typeof approvalRequest>,
@@ -164,6 +180,15 @@ async function validApproval(
     digest(current.manifest) !== digest(a.evidence)
   )
     fail("factoryApprovalInvalid");
+  // A row without policy fields is a human approval: the live linked session
+  // that granted it is the authority, exactly as in the Warp-aligned model.
+  if (!a.decisionCredentialId && !a.decisionScope && !a.decisionEvidence) {
+    await humanApproval(tx, {
+      userId: a.userId,
+      sessionId: a.humanSessionId,
+    });
+    return { a, current };
+  }
   if (!a.decisionCredentialId || !a.decisionScope || !a.decisionEvidence)
     fail("factoryPolicyDecisionUnavailable");
   const expected = decisionScope(
@@ -464,7 +489,6 @@ export function createFactoryApprovals(
         )
           fail("factoryTransition");
         const current = await approvalEvidence(tx, task);
-        if (!req.decisionCredentialId) fail("factoryPolicyDecisionUnavailable");
         const {
           rows: [read],
         } = await tx.query(
@@ -491,13 +515,24 @@ export function createFactoryApprovals(
           [req.expiresAt],
         );
         if (!expiry.valid) fail("factoryApprovalExpiry");
-        const scope = decisionScope(task, req, current);
-        const decision = await authorizeFactoryDecision(
-          tx,
-          authority,
-          req.decisionCredentialId,
-          scope,
-        );
+        // Warp-aligned default: a live linked browser session is the human
+        // decision. A caller-supplied credential instead asks the optional
+        // policy authority, for deployments that install one.
+        let scope: FactoryDecisionScope | null = null;
+        let decision: Awaited<
+          ReturnType<typeof authorizeFactoryDecision>
+        > | null = null;
+        if (req.decisionCredentialId) {
+          scope = decisionScope(task, req, current);
+          decision = await authorizeFactoryDecision(
+            tx,
+            authority,
+            req.decisionCredentialId,
+            scope,
+          );
+        } else {
+          await humanApproval(tx, actor);
+        }
         const approvalId = randomUUID();
         const inserted = await tx.query(
           `INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","decisionCredentialId","decisionScope","decisionEvidence","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,$16,$17,$18,$19,$7,$8,$9,$10,$11,$12,$13,$14,$4,$14,$15) ON CONFLICT DO NOTHING RETURNING id`,
@@ -517,12 +552,14 @@ export function createFactoryApprovals(
             JSON.stringify(current.manifest),
             task.revision,
             req.expiresAt,
-            decision.decision === "ask"
+            decision?.decision === "ask"
               ? decision.confirmation!.sessionId
-              : null,
-            req.decisionCredentialId,
-            JSON.stringify(scope),
-            JSON.stringify(decision),
+              : decision
+                ? null
+                : (actor.sessionId ?? null),
+            req.decisionCredentialId ?? null,
+            scope ? JSON.stringify(scope) : null,
+            decision ? JSON.stringify(decision) : null,
           ],
         );
         if (!inserted.rowCount) fail("factoryPolicyDecisionAlreadyConsumed");
@@ -533,8 +570,9 @@ export function createFactoryApprovals(
           {
             action: "finish",
             status: "passed",
-            reason:
-              "Existing policy authorized exact candidate and model-grounded evidence",
+            reason: decision
+              ? "Existing policy authorized exact candidate and model-grounded evidence"
+              : "Live human session approved exact candidate and evidence",
             evidence: current.evidence,
             output: { approvalId },
           },
