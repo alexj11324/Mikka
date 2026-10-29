@@ -33,6 +33,7 @@ jobs:
       browser_tier: ${{ steps.docs.outputs.browser_tier }}
       browser_specs: ${{ steps.docs.outputs.browser_specs }}
       browser_performance: ${{ steps.docs.outputs.browser_performance }}
+      verify_selection: ${{ steps.docs.outputs.verify_selection }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,6 +52,7 @@ jobs:
               echo "browser_tier=full"
               echo 'browser_specs=[]'
               echo "browser_performance=true"
+              echo "verify_selection=true"
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -61,6 +63,7 @@ jobs:
               echo "browser_tier=full"
               echo 'browser_specs=[]'
               echo "browser_performance=true"
+              echo "verify_selection=true"
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -139,6 +142,22 @@ jobs:
         id: build
       - name: Real HTTP authentication, account reuse and isolation
         run: node scripts/test-accounts/run-http.mjs
+      - name: Validate real subset execution when browser selection policy changes
+        if: needs.changes.outputs.verify_selection == 'true'
+        run: |
+          umask 077
+          mkdir -p .cache/e2e
+          log_file=.cache/e2e/playwright-selection.log
+          : > "$log_file"
+          chmod 600 "$log_file"
+          test_status=0
+          node scripts/ci-browser-tests.mjs --verify-selection > "$log_file" 2>&1 || test_status=$?
+          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
+            if [ "$test_status" -eq 0 ]; then test_status=1; fi
+            exit "$test_status"
+          fi
+          cat "$log_file"
+          exit "$test_status"
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
         if: needs.changes.outputs.browser_performance == 'true'
         run: |
@@ -190,8 +209,13 @@ jobs:
             test-results/
             playwright-performance-report/
             performance-results/
+            playwright-selection-smoke-report/
+            selection-smoke-results/
+            playwright-selection-targeted-report/
+            selection-targeted-results/
             .cache/e2e/http-acceptance-summary.json
             .cache/e2e/account-http-evidence.json
+            .cache/e2e/playwright-selection.log
             .cache/e2e/playwright-performance.log
             .cache/e2e/playwright-browser.log
           # Only the explicit scanned paths above; never the private account directory.

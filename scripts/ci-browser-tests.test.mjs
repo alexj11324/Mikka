@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync } fro
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { browserPlan, BROWSER_SMOKE, BROWSER_SCOPED_SPECS } from './ci-docs-only.mjs'
-import { browserArguments } from './ci-browser-tests.mjs'
+import { browserArguments, selectionValidationPlans } from './ci-browser-tests.mjs'
 
 const smoke = [...BROWSER_SMOKE].sort()
 const full = { tier: 'full', specs: [], performance: false }
@@ -165,4 +165,21 @@ test('protected browser gate rejects failed/cancelled/skipped jobs, malformed pl
     assert(!result('smoke', 'false', 'false', 'success', 'success', event))
     assert(!result('docs', 'true', 'false', 'skipped', 'success', event))
   }
+})
+
+
+test('policy validation exercises both subsets and covers every scoped spec without replacing the full gate', () => {
+  const [critical, scoped] = selectionValidationPlans()
+  assert.equal(critical.tier, 'smoke')
+  assert.equal(scoped.tier, 'targeted')
+  for (const spec of [...BROWSER_SMOKE, ...BROWSER_SCOPED_SPECS]) assert(scoped.specs.includes(spec), spec)
+  assert.equal(browserArguments(critical.tier, JSON.stringify(critical.specs)).length, 9)
+  const source = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
+  for (const path of ['playwright-selection-smoke-report', 'selection-smoke-results', 'playwright-selection-targeted-report', 'selection-targeted-results', '.cache/e2e/playwright-selection.log']) {
+    assert(source.includes(path))
+    assert(readFileSync('scripts/test-accounts/evidence.mjs', 'utf8').includes(path))
+  }
+  assert(source.includes('node scripts/ci-browser-tests.mjs --verify-selection'))
+  assert(source.includes('node scripts/ci-browser-tests.mjs > "$log_file"'))
+  assert(source.includes('if: needs.changes.outputs.verify_selection == \'true\''))
 })

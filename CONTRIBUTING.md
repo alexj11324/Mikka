@@ -59,7 +59,8 @@ cannot.
    or escalate to full. Unsafe file modes and unavailable comparisons also
    escalate. Changes to the classifier itself run full functionality and
    performance, using a conservative workflow fallback rather than the PR's
-   proposed skip policy. Failed classification or a skipped/failed selected
+   proposed skip policy; they also execute both critical-only and combined
+   scoped browser subsets to validate selection itself. Failed classification or a skipped/failed selected
    test job fails the required gate.
 4. **Integration** (CI): every push to main, nightly on main, and manual
    Actions → Browser tests → Run workflow run full functionality **and** the

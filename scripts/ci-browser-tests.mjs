@@ -1,7 +1,7 @@
 // Execute a trusted classifier's fixed spec list as argv, never as shell code.
 import { spawnSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
-import { BROWSER_SMOKE, BROWSER_SCOPED_SPECS } from './ci-docs-only.mjs'
+import { browserPlan, BROWSER_SMOKE, BROWSER_SCOPED_SPECS } from './ci-docs-only.mjs'
 
 export function browserArguments(tier, encodedSpecs) {
   const specs = JSON.parse(encodedSpecs)
@@ -17,11 +17,29 @@ export function browserArguments(tier, encodedSpecs) {
   return ['exec', 'playwright', 'test', ...specs.map(spec => `tests/e2e/${spec}`), '--grep-invert', '@performance']
 }
 
-export function main() {
-  const args = browserArguments(process.env.BROWSER_TIER, process.env.BROWSER_SPECS)
-  console.log(`Browser acceptance layer: ${process.env.BROWSER_TIER}; ${args.join(' ')}`)
-  const result = spawnSync('pnpm', args, { stdio: 'inherit', env: process.env })
-  if (result.error) throw result.error
-  process.exitCode = result.status ?? 1
+// Policy changes must exercise actual subset execution as well as the full
+// fallback. These two plans cover the critical-only and union-of-scopes paths.
+export function selectionValidationPlans() {
+  return [browserPlan(['lib/model.test.ts']), browserPlan([
+    'app/api/search/route.ts', 'app/[locale]/settings/page.tsx', 'lib/slack/webhook.ts',
+  ])]
 }
+
+export function main() {
+  const validating = process.argv[2] === '--verify-selection'
+  const plans = validating
+    ? selectionValidationPlans()
+    : [{ tier: process.env.BROWSER_TIER, specs: JSON.parse(process.env.BROWSER_SPECS) }]
+  for (const plan of plans) {
+    const args = browserArguments(plan.tier, JSON.stringify(plan.specs))
+    console.log(`Browser acceptance layer: ${plan.tier}; ${args.join(' ')}`)
+    // Keep each subset's reports separate from subsequent full regression.
+    if (validating) args.push(`--output=selection-${plan.tier}-results`)
+    const env = validating ? { ...process.env, PLAYWRIGHT_HTML_OUTPUT_DIR: `playwright-selection-${plan.tier}-report` } : process.env
+    const result = spawnSync('pnpm', args, { stdio: 'inherit', env })
+    if (result.error) throw result.error
+    if (result.status !== 0) { process.exitCode = result.status ?? 1; return }
+  }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()
