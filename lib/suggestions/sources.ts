@@ -6,6 +6,7 @@ import { getComposio, runComposioAction } from '@/lib/composio'
 import { listComposioPages } from '@/lib/composio-pagination'
 import { linearGraphQL } from '@/lib/linear-sync/graphql'
 import { linearAccessToken } from '@/lib/linear-sync/tokens'
+import { linearSyncEnabled } from '@/lib/linear-sync/flags'
 import { githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, type ExternalNotification } from './notification'
 import { ingestNotifications, recordTimeZone, writeFirstBriefing } from './store'
 import { missingTriggers, TRIGGER_CHECK_INTERVAL_MS, TRIGGER_PATTERNS, triggerSlugs } from './triggers'
@@ -17,6 +18,7 @@ import { missingTriggers, TRIGGER_CHECK_INTERVAL_MS, TRIGGER_PATTERNS, triggerSl
 
 /** Notifications for everyone a Linear webhook concerns. */
 export async function linearWebhookNotifications(organizationId: string, payload: Record<string, unknown>): Promise<ExternalNotification[]> {
+  if (!await linearSyncEnabled()) return []
   if (payload.type === 'Issue') {
     const recipients = await db.select({ userId: linearConnections.userId, linearUserId: linearConnections.linearUserId }).from(linearConnections)
       .where(and(eq(linearConnections.organizationId, organizationId), isNull(linearConnections.revokedAt)))
@@ -111,6 +113,7 @@ async function currentLinear(userId: string): Promise<ExternalNotification[]> {
  * Coordinator then delivers in its chat. Never throws; a source that fails just adds nothing.
  */
 export async function bootstrapSuggestions(userId: string, app: 'composio' | 'linear', timeZone: string | null) {
+  if (app === 'linear' && !await linearSyncEnabled()) return
   const read = async <T,>(label: string, load: () => Promise<T[]>): Promise<T[]> => {
     try { return await load() } catch (error) {
       console.error(`First briefing could not read ${label}`, error instanceof Error ? error.message : error)

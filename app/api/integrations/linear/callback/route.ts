@@ -5,10 +5,12 @@ import { requireUser } from '@/lib/issue-access'
 import { exchangeLinearCode, LINEAR_OAUTH_CALLBACK_PATH, LINEAR_OAUTH_STATE_COOKIE } from '@/lib/linear-sync/oauth'
 import { withBasePath } from '@/lib/base-path'
 import { bootstrapSuggestions } from '@/lib/suggestions/sources'
+import { linearSyncDisabledResponse, linearSyncEnabled } from '@/lib/linear-sync/flags'
 
 export const runtime = 'nodejs'
 
 async function handleGET(request: Request) {
+  if (!await linearSyncEnabled()) return linearSyncDisabledResponse()
   const url = new URL(request.url)
   const failure = new URL(withBasePath('/?linear=error'), url.origin)
   const cookieStore = await cookies()

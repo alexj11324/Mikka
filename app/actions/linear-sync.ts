@@ -9,8 +9,10 @@ import { issues, linearConnections, linearIssueLinks, linearSyncInbox, linearSyn
 import { createLinearAuthorizationUrl, disconnectLinear, LINEAR_OAUTH_CALLBACK_PATH, LINEAR_OAUTH_STATE_COOKIE, linearAccessToken, linearOAuthConfigured } from '@/lib/linear-sync/oauth'
 import { linearTeams } from '@/lib/linear-sync/client'
 import { dispatchLinearIssueSync, dispatchLinearWebhook } from '@/lib/linear-sync/dispatch'
+import { linearSyncEnabled } from '@/lib/linear-sync/flags'
 
 export async function getLinearIntegrationState() {
+  if (!await linearSyncEnabled()) return { enabled: false, configured: false, connected: false, organizationName: null, syncs: [], errors: [], inboundErrors: [] }
   const user = await requireUser()
   const [connection] = await db.select({ organizationName: linearConnections.organizationName, connected: linearConnections.userId })
     .from(linearConnections).where(and(eq(linearConnections.userId, user.id), isNull(linearConnections.revokedAt))).limit(1)
@@ -25,10 +27,11 @@ export async function getLinearIntegrationState() {
     .from(linearSyncInbox).innerJoin(linearConnections, and(eq(linearConnections.organizationId, linearSyncInbox.organizationId), eq(linearConnections.userId, user.id)))
     .where(and(eq(linearSyncInbox.status, 'failed'), isNull(linearConnections.revokedAt)))
     .orderBy(desc(linearSyncInbox.receivedAt)).limit(20)
-  return { configured: linearOAuthConfigured(), connected: Boolean(connection), organizationName: connection?.organizationName ?? null, syncs, errors, inboundErrors }
+  return { enabled: true, configured: linearOAuthConfigured(), connected: Boolean(connection), organizationName: connection?.organizationName ?? null, syncs, errors, inboundErrors }
 }
 
 export async function startLinearOAuth() {
+  if (!await linearSyncEnabled()) throw new Error('Linear sync is disabled')
   const user = await requireUser()
   const authorization = await createLinearAuthorizationUrl(user.id)
   ;(await cookies()).set(LINEAR_OAUTH_STATE_COOKIE, authorization.state, { httpOnly: true, sameSite: 'lax', secure: true, path: LINEAR_OAUTH_CALLBACK_PATH, maxAge: 600 })
@@ -36,12 +39,14 @@ export async function startLinearOAuth() {
 }
 
 export async function listLinearTeamOptions() {
+  if (!await linearSyncEnabled()) return []
   const user = await requireUser()
   const token = await linearAccessToken(user.id)
   return (await linearTeams(token)).map(({ id, key, name }) => ({ id, key, name }))
 }
 
 export async function enableLinearTeam(input: { teamId: string }) {
+  if (!await linearSyncEnabled()) return { error: 'linearSyncDisabled' as const }
   const user = await requireUser()
   const parsed = z.object({ teamId: z.string().uuid() }).safeParse(input)
   if (!parsed.success) return { error: 'linearTeamInvalid' as const }
@@ -68,6 +73,7 @@ export async function disableLinearTeam(id: string) {
 }
 
 export async function retryLinearIssue(issueId: string) {
+  if (!await linearSyncEnabled()) return { error: 'linearSyncDisabled' as const }
   const user = await requireUser()
   const parsed = z.uuid().safeParse(issueId)
   if (!parsed.success) return { error: 'linearIssueInvalid' as const }
@@ -90,6 +96,7 @@ export async function retryLinearIssue(issueId: string) {
 }
 
 export async function retryLinearDelivery(deliveryId: string) {
+  if (!await linearSyncEnabled()) return { error: 'linearSyncDisabled' as const }
   const user = await requireUser()
   const parsed = z.string().min(1).max(200).safeParse(deliveryId)
   if (!parsed.success) return { error: 'linearDeliveryInvalid' as const }

@@ -1610,6 +1610,7 @@
       "teamDescription": "One team can sync with this Mikka account at a time. Only workspace tasks sync; personal tasks stay in Mikka.",
       "enable": "Enable two-way sync",
       "pause": "Pause sync",
+      "syncDisabled": "Sync paused",
       "syncActive": "Syncing {team}",
       "failedIssues": "Issues that need attention",
       "inboundFailures": "Linear updates that need attention",
