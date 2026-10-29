@@ -45,7 +45,8 @@ flavor. `MIKKA_DESKTOP_APP_URL` overrides the URL.
 ```bash
 pnpm desktop:build                 # dist/main.cjs, dist/preload.cjs
 pnpm --filter @mikka/desktop package:dir   # unpacked app under release/
-pnpm --filter @mikka/desktop package       # macOS dmg/zip
+pnpm --filter @mikka/desktop package:mac   # signed Apple Silicon dmg/zip (release)
+pnpm --filter @mikka/desktop package       # local dmg/zip, never publishes
 ```
 
 A production build must use an HTTPS app URL. Signing and notarization

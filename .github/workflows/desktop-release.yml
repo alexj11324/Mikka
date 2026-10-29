@@ -104,7 +104,15 @@ jobs:
             exit 1
           fi
       - name: Package signed macOS app
-        run: pnpm --filter @mikka/desktop package -- --mac --arm64 --publish never
+        run: pnpm --filter @mikka/desktop package:mac
+      - name: Verify updater metadata
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          test -f apps/desktop/release/latest-mac.yml
+          test -f "apps/desktop/release/mac-arm64/Mikka.app/Contents/Resources/app-update.yml"
+          test -f "apps/desktop/release/Mikka-${version}-mac-arm64.zip"
+          grep -q "Mikka-${version}-mac-arm64.zip" apps/desktop/release/latest-mac.yml
+          echo "Updater metadata matches Mikka ${version} (arm64)"
       - uses: actions/upload-artifact@v4
         with:
           name: mikka-desktop-macos
