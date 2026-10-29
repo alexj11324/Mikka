@@ -88,16 +88,17 @@ function supervisorFixture(f: ReturnType<typeof fixture>, failingClose = false, 
     opened(value)
     return { sessionId: 'synthetic', async *events() { entered(); await ending; yield { type: 'exit' as const, outcome: 'cancelled' as const } }, async send() {}, async cancel() { finish() } }
   }, async resume(): Promise<AgentSession> { throw Error('Unexpected resume') } }
-  const root = join(retained, f.assignment.runId), repoPath = join(root, 'repository'), worktree = join(root, 'worktree')
-  mkdirSync(repoPath, { recursive: true })
+  const repoPath = join(retained, 'supervisor-' + f.assignment.runId)
+  mkdirSync(repoPath)
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repoPath, stdio: 'pipe' })
-  git('init', '-b', 'main')
-  git('-c', 'user.name=Mikka Fixture', '-c', 'user.email=fixture@mikka.invalid', 'commit', '--allow-empty', '-m', 'fixture')
-  git('worktree', 'add', '-b', `mikka/run-${f.assignment.runId}`, worktree)
+  git('init', '-q', '-b', 'main')
+  git('-c', 'user.name=Synthetic', '-c', 'user.email=test@mikka.invalid', 'commit', '-q', '--allow-empty', '-m', 'fixture')
+  const worktree = join(retained, 'worktree-' + f.assignment.runId)
+  git('worktree', 'add', '-q', '-b', 'mikka/run-' + f.assignment.runId, worktree, 'main')
   const repo = { repoId: 'repo', name: 'synthetic', path: repoPath }
   const supervisor = new RunSupervisor({ journal, outbox: { push(_id: string, record: { kind: string }) { records.push(record) }, async compact() {}, lastChunkSeq() { return 0 } },
     worktrees: { pathFor: () => worktree, async changedFiles() { return [] } }, adapters: new Map([['mock', adapter]]),
-    repository: () => repo, async prepareRepository() {}, async baseRef() { return 'main' }, log: createLogger({ level: 'silent' }),
+    repository: () => repo, prepareRepository: async () => {}, baseRef: async () => 'main', log: createLogger({ level: 'silent' }),
     prepareRunMailbox: async (assignment: RunAssignment, signal: AbortSignal, check: () => void) => {
       const mailbox = await createRunMailbox({ assignment, endpoint, signal, check, fetch: f.transport })
       if (controls.pause) { controls.pause.entered(); await controls.pause.wait }
