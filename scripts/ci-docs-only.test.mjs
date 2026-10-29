@@ -155,7 +155,7 @@ test('trusted workflow classifier executes as an ES module from its retained tem
 })
 
 test('all required gates reject failed classification and skipped full jobs', () => {
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+  for (const file of ['.github/workflows/ui-policy.yml']) {
     const source = readFileSync(file, 'utf8')
     const blocks = [...source.matchAll(/      - name: Require the full suite unless only documentation changed\n([\s\S]*?)(?=\n  [a-z][a-z-]*:|$)/g)]
     assert.equal(blocks.length, file.includes('ui-policy') ? 2 : 1)

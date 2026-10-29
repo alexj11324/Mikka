@@ -1,11 +1,8 @@
 name: Browser tests
 
-# The full Playwright suite, the slowest layer of CI (CONTRIBUTING.md, "How
-# changes are tested"). Its own workflow, so a branch push does not report it
-# at all: a skipped check would count as passed for the required check.
-# Runs on a pull request once it is ready for review (not a draft) against the
-# PR merged with the latest main, on main after merging, every night on main,
-# and by hand (Actions → Browser tests → Run workflow).
+# PRs run critical flows plus scoped regressions; unknown/shared changes run
+# full functionality. Main, nightly and manual integration runs also measure
+# performance. See CONTRIBUTING.md for the required, fail-closed gate policy.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -33,6 +30,9 @@ jobs:
       contents: read
     outputs:
       docs_only: ${{ steps.docs.outputs.docs_only }}
+      browser_tier: ${{ steps.docs.outputs.browser_tier }}
+      browser_specs: ${{ steps.docs.outputs.browser_specs }}
+      browser_performance: ${{ steps.docs.outputs.browser_performance }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,18 +46,28 @@ jobs:
           trusted="$(mktemp --suffix=.mjs)"
           if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
             echo "docs_only=false (classifier is not on main yet)"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "docs_only=false"
+              echo "browser_tier=full"
+              echo 'browser_specs=[]'
+              echo "browser_performance=true"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if ! git diff --quiet origin/main -- scripts/ci-docs-only.mjs; then
             echo "docs_only=false (classifier differs from main)"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "docs_only=false"
+              echo "browser_tier=full"
+              echo 'browser_specs=[]'
+              echo "browser_performance=true"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           node "$trusted"
 
   browser-e2e-full:
-    name: Browser tests (full)
+    name: Browser tests (selected layer)
     needs: changes
     if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
@@ -104,7 +114,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: node --test scripts/ci-docs-only.test.mjs
+      - run: node --test scripts/ci-docs-only.test.mjs scripts/ci-browser-tests.test.mjs
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'
@@ -130,6 +140,7 @@ jobs:
       - name: Real HTTP authentication, account reuse and isolation
         run: node scripts/test-accounts/run-http.mjs
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
+        if: needs.changes.outputs.browser_performance == 'true'
         run: |
           umask 077
           mkdir -p .cache/e2e
@@ -147,6 +158,9 @@ jobs:
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
       - name: Browser functionality regression
+        env:
+          BROWSER_TIER: ${{ needs.changes.outputs.browser_tier }}
+          BROWSER_SPECS: ${{ needs.changes.outputs.browser_specs }}
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           umask 077
@@ -155,7 +169,7 @@ jobs:
           : > "$log_file"
           chmod 600 "$log_file"
           test_status=0
-          pnpm test:e2e --grep-invert @performance > "$log_file" 2>&1 || test_status=$?
+          node scripts/ci-browser-tests.mjs > "$log_file" 2>&1 || test_status=$?
           if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
             if [ "$test_status" -eq 0 ]; then test_status=1; fi
             exit "$test_status"
@@ -186,29 +200,37 @@ jobs:
           retention-days: 7
 
   browser-e2e:
-    # The required check name. It reports success when only documentation
-    # changed; otherwise it mirrors the full suite's result.
+    # Preserve the protected check name. Classification errors or a missing
+    # selected test job fail; documentation is the only test-free tier.
     name: Browser tests (before merge)
     needs: [changes, browser-e2e-full]
     if: always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require the full suite unless only documentation changed
+      - name: Require the selected browser layer
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           FULL_RESULT: ${{ needs.browser-e2e-full.result }}
+          BROWSER_TIER: ${{ needs.changes.outputs.browser_tier }}
+          BROWSER_PERFORMANCE: ${{ needs.changes.outputs.browser_performance }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           if [ "$CHANGES_RESULT" != "success" ]; then
             echo "Changed files job did not succeed: $CHANGES_RESULT"
             exit 1
           fi
-          if [ "$DOCS_ONLY" = "true" ]; then
-            echo "Documentation-only change; the full browser suite is skipped."
-            exit 0
+          if [ "$EVENT_NAME" != "pull_request" ] && [ "$BROWSER_TIER:$BROWSER_PERFORMANCE" != "full:true" ]; then
+            echo "Integration runs require full functionality and performance"
+            exit 1
           fi
+          case "$BROWSER_TIER:$DOCS_ONLY:$BROWSER_PERFORMANCE" in
+            docs:true:false) echo "Documentation-only change; no browser runtime changed."; exit 0 ;;
+            smoke:false:false|targeted:false:false|full:false:false|full:false:true) ;;
+            *) echo "Invalid browser test plan"; exit 1 ;;
+          esac
           if [ "$FULL_RESULT" != "success" ]; then
-            echo "The full browser suite did not succeed: $FULL_RESULT"
+            echo "The selected browser layer did not succeed: $FULL_RESULT"
             exit 1
           fi
