@@ -1,6 +1,7 @@
 import 'server-only'
+import { retryWorkerDefinition } from '@/lib/agent-kit/worker'
 import { after } from 'next/server'
-import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, agents, deviceRepos, devices, runCheckpoints } from '@/lib/db/schema'
@@ -77,16 +78,18 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
  * Another online machine of the owner with the run's repository and its
  * agent's harness, or null when only the run's own device fits.
  */
-async function takeoverTarget(run: { userId: string; agentId: string; deviceId: string | null; deviceRepoId: string | null }, now: Date): Promise<TakeoverCandidate | null> {
+async function takeoverTarget(run: { id: string; userId: string; agentId: string; deviceId: string | null; deviceRepoId: string | null; agentDefinition?: Run['agentDefinition'] }, now: Date): Promise<TakeoverCandidate | null> {
   if (!run.deviceRepoId) return null
   const [repo] = await db.select({ remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
   const [agent] = await db.select({ harness: agents.harness }).from(agents).where(eq(agents.id, run.agentId)).limit(1)
   if (!repo?.remoteUrl || !agent) return null
+  const bound = await db.execute(sql`select 1 from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
+  if (bound.rows.length) return null
   const candidates = await db.select({ deviceId: devices.id, deviceRepoId: deviceRepos.id, remoteUrl: deviceRepos.remoteUrl, harnesses: devices.harnesses })
     .from(deviceRepos).innerJoin(devices, eq(devices.id, deviceRepos.deviceId))
     .where(and(eq(devices.ownerId, run.userId), eq(devices.enabled, true), gt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS))))
     .orderBy(desc(devices.lastSeenAt))
-  return pickTakeover(candidates, { remoteUrl: repo.remoteUrl, harness: agent.harness, lostDeviceId: run.deviceId })
+  return pickTakeover(run.agentDefinition?.subscription ? candidates.filter(candidate => candidate.harnesses.some(info => info.harness === run.agentDefinition?.harness && info.subscriptionBroker)) : candidates, { remoteUrl: repo.remoteUrl, harness: run.agentDefinition?.harness ?? agent.harness, lostDeviceId: run.deviceId })
 }
 
 /**
@@ -125,10 +128,12 @@ async function reclaimLostRun(run: Run, now: Date) {
       .returning({ id: agentRuns.id })
     if (!ended) return false
     await tx.insert(agentRuns).values({
-      id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId,
+      id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
+      agentDefinition: retryWorkerDefinition(run.agentDefinition, retryPrompt(run.prompt, outcome.attempt)),
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
       prompt: retryPrompt(run.prompt, outcome.attempt), attempt: outcome.attempt, retryOf: run.id,
     })
+    await tx.execute(sql`insert into computer_run_bindings ("runId","botId","workspaceId","ownerId") select ${retryId},"botId","workspaceId","ownerId" from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
     await recordCoordinatorEvent(tx, runRetriedEvent(run, { runId: retryId, attempt: outcome.attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedToDeviceId: target?.deviceId ?? null }))
     return true
   })

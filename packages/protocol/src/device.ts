@@ -162,6 +162,8 @@ export const heartbeatResultSchema = z.object({
    * stops them now instead of when their lease runs out.
    */
   revoked: z.array(id).max(500).optional(),
+  /** Short-lived cloud device token, returned only over its authenticated link. */
+  cloudCredential: z.string().regex(/^orv_[A-Za-z0-9_-]{43}$/).optional(),
 })
 export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
 
@@ -254,6 +256,17 @@ export const runAssignmentSchema = z.object({
    * (zod strips unknown keys), so this needs no version gate.
    */
   model: modelNameSchema.optional(),
+  /** Owner-bound selection only; no subscription credential enters the assignment. */
+  subscriptionBinding: z.object({
+    bindingId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
+    consumerId: z.uuid(), route: z.enum(['codex_cli', 'claude_code_cli']),
+  }).strict().optional(),
+  /** Trusted server assignment; the model cannot choose a Bot or display. */
+  computer: z.object({
+    botId: z.uuid(), ownerId: z.string().min(1).max(128),
+    display: z.string().regex(/^:[1-9][0-9]{0,2}$/),
+    policyVersion: z.number().int().nonnegative().max(2147483647),
+  }).strict().optional(),
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
   fixture: z.string().max(200).optional(),
   /**
@@ -274,7 +287,7 @@ export const runAssignmentSchema = z.object({
    * it stops working when the run ends. Absent: the server could not issue
    * one, and the run goes ahead without it.
    */
-  mcp: z.object({ url: z.url(), token: z.string().min(1).max(200) }).optional(),
+  mcp: z.object({ url: z.url(), token: z.string().min(1).max(200), mailbox: z.literal(true).optional() }).optional(),
   /**
    * What the orchestrator dispatched this run for (ADR 0023). `plan` writes a
    * spec and proposes a split instead of changing code (ADR ORV-205).

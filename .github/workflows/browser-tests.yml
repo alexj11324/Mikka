@@ -25,9 +25,42 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  browser-e2e:
-    name: Browser tests (before merge)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+  changes:
+    name: Changed files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      docs_only: ${{ steps.docs.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: docs
+        # Run the classifier from main, never from this checkout: a pull
+        # request must not be able to rewrite the script that skips its own
+        # required checks.
+        run: |
+          git fetch origin main --no-tags
+          trusted="$(mktemp --suffix=.mjs)"
+          echo "Retained trusted classifier: $trusted"
+          if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
+            echo "docs_only=false (classifier is not on main yet)"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git diff --quiet origin/main -- scripts/ci-docs-only.mjs; then
+            echo "docs_only=false (classifier differs from main)"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node "$trusted"
+
+  browser-e2e-full:
+    name: Browser tests (full)
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     # OS/browser setup took 9–10 minutes in runs 40320688470/40324658490.
     # Budget setup separately without weakening any Playwright test limits.
@@ -52,6 +85,8 @@ jobs:
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
       # Isolated Slack callback fixtures; these tests make no Slack API calls.
       SLACK_BOT_TOKEN: ci-only-slack-bot-token
       SLACK_SIGNING_SECRET: ci-only-slack-signing-secret
@@ -70,8 +105,15 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: node --test scripts/ci-docs-only.test.mjs
       - name: Generate ephemeral test-only auth secret
-        run: node -e "console.log('BETTER_AUTH_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> "$GITHUB_ENV"
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
       - name: Install Chromium and official system dependencies
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium
@@ -80,17 +122,53 @@ jobs:
         env:
           MIGRATION_BOOTSTRAP_CI: '1'
       - run: pnpm test:e2e:setup
+      - name: Bind the disposable test environment to the exact checkout
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Test account allocation across independent PostgreSQL clients
+        run: pnpm test:test-accounts-db
       - run: pnpm build
         id: build
+      - name: Real HTTP authentication, account reuse and isolation
+        run: node scripts/test-accounts/run-http.mjs
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
-        run: pnpm test:performance --output=performance-results
+        run: |
+          umask 077
+          mkdir -p .cache/e2e
+          log_file=.cache/e2e/playwright-performance.log
+          : > "$log_file"
+          chmod 600 "$log_file"
+          test_status=0
+          pnpm test:performance --output=performance-results > "$log_file" 2>&1 || test_status=$?
+          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
+            if [ "$test_status" -eq 0 ]; then test_status=1; fi
+            exit "$test_status"
+          fi
+          cat "$log_file"
+          exit "$test_status"
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
       - name: Browser functionality regression
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: pnpm test:e2e --grep-invert @performance
+        run: |
+          umask 077
+          mkdir -p .cache/e2e
+          log_file=.cache/e2e/playwright-browser.log
+          : > "$log_file"
+          chmod 600 "$log_file"
+          test_status=0
+          pnpm test:e2e --grep-invert @performance > "$log_file" 2>&1 || test_status=$?
+          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
+            if [ "$test_status" -eq 0 ]; then test_status=1; fi
+            exit "$test_status"
+          fi
+          cat "$log_file"
+          exit "$test_status"
+      - name: Scan account evidence before artifact upload
+        id: account-evidence-audit
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: node scripts/test-accounts/evidence.mjs
       - name: Upload browser failure evidence
-        if: always()
+        if: ${{ !cancelled() && steps.account-evidence-audit.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: browser-test-report
@@ -99,5 +177,39 @@ jobs:
             test-results/
             playwright-performance-report/
             performance-results/
+            .cache/e2e/http-acceptance-summary.json
+            .cache/e2e/account-http-evidence.json
+            .cache/e2e/playwright-performance.log
+            .cache/e2e/playwright-browser.log
+          # Only the explicit scanned paths above; never the private account directory.
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7
+
+  browser-e2e:
+    # The required check name. It reports success when only documentation
+    # changed; otherwise it mirrors the full suite's result.
+    name: Browser tests (before merge)
+    needs: [changes, browser-e2e-full]
+    if: always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the full suite unless only documentation changed
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          FULL_RESULT: ${{ needs.browser-e2e-full.result }}
+        run: |
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "Changed files job did not succeed: $CHANGES_RESULT"
+            exit 1
+          fi
+          if [ "$DOCS_ONLY" = "true" ]; then
+            echo "Documentation-only change; the full browser suite is skipped."
+            exit 0
+          fi
+          if [ "$FULL_RESULT" != "success" ]; then
+            echo "The full browser suite did not succeed: $FULL_RESULT"
+            exit 1
+          fi

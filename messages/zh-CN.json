@@ -124,6 +124,8 @@
     "members": "成员管理",
     "inviteMembers": "邀请成员",
     "plugins": "插件",
+    "suggestions": "建议",
+    "artifacts": "Artifact",
     "toggleTeam": "展开或收起 {name} 团队",
     "sidebarRail": "展开或收起侧栏边轨",
     "rail": "主导航",
@@ -912,6 +914,7 @@
     "generic": "操作未成功，请稍后重试。",
     "authRequired": "请先登录。",
     "validationGeneric": "请检查填写内容。",
+    "issueToolsDisabled": "暂时无法创建任务。",
     "validationTitleRequired": "请填写任务标题。",
     "validationNameRequired": "请填写名称。",
     "teamIdentifierInvalid": "标识须为 2–12 位大写字母或数字，并以字母开头。",
@@ -942,7 +945,10 @@
     "runInvalid": "运行参数不正确。",
     "runNotFound": "运行不存在。",
     "artifactNotFound": "找不到这个成果。",
+    "suggestionNotFound": "这条建议已经处理过了。",
+    "coordinatorUnavailable": "Coordinator 现在不可用，稍后再试。",
     "messageRequired": "消息不能为空。",
+    "submissionConflict": "此提交标识已用于另一条消息。",
     "pendingActionUnavailable": "这项操作已处理或已过期。",
     "deviceSaveFailed": "保存失败，请重试。",
     "tokenCreateFailed": "生成 token 失败，请重试。",
@@ -1484,6 +1490,9 @@
         "title": "个人资料",
         "description": "查看你在工作区中的账户信息。"
       },
+      "memory": {
+        "title": "记忆"
+      },
       "account": {
         "title": "账户",
         "description": "管理登录 Mikka 的方式。"
@@ -1527,6 +1536,24 @@
       "notSet": "未设置",
       "readOnly": "账户信息为只读，当前版本暂不支持在此修改。"
     },
+    "memory": {
+      "enabled": "使用记忆",
+      "learn": "从已连接的 App 中学习",
+      "error": "无法更新记忆",
+      "empty": "暂无记忆",
+      "correct": "更正",
+      "delete": "删除",
+      "kinds": {
+        "interest": "兴趣",
+        "routine": "习惯",
+        "place": "地点",
+        "subscription": "订阅",
+        "deadline": "截止日期",
+        "tool": "工具",
+        "person": "常联系的人",
+        "preference": "偏好"
+      }
+    },
     "workspaceForm": {
       "id": "工作区 ID",
       "readOnlyNote": "当前工作区信息为只读。切换或新建工作区，请返回应用后点击左上角的工作区名称。",
@@ -1536,6 +1563,16 @@
       "urlHelp": "URL 中的标识用于访问工作区。修改地址会影响现有链接。",
       "previewNote": "表单预览：尚未连接工作区存储，修改不会保存。",
       "previewLabel": "工作区表单预览"
+    },
+    "computerPolicy": {
+      "heading": "云电脑",
+      "description": "控制工作区内的 Bot 是否可以操作电脑。",
+      "label": "Bot 操作电脑",
+      "help": "禁止后，电脑任务会停止，已有授权也会失效。你仍然可以接管电脑。",
+      "adminOnly": "只有工作区管理员可以修改此设置。",
+      "ask": "操作前审批",
+      "deny": "禁止",
+      "error": "无法读取或更新电脑设置。"
     },
     "issuePrefix": {
       "title": "个人任务编号",
@@ -1573,6 +1610,32 @@
       "loadError": "无法加载 Linear 设置。",
       "operationError": "Linear 同步操作失败，请重试。",
       "teamAlreadyLinked": "此 Linear 团队已连接到另一个 Mikka 账号。"
+    },
+    "subscriptions": {
+      "heading": "订阅",
+      "description": "连接你自己的订阅，供此工作区中获授权的 Bot 任务使用。",
+      "codex": "ChatGPT / Codex",
+      "claude": "Claude",
+      "providerDescription": "在服务商的网站登录并同意授权。",
+      "unavailable": "此连接暂不可用。",
+      "connected": "已连接",
+      "notConnected": "未连接",
+      "connect": "连接",
+      "connectAnother": "连接另一个",
+      "reconnect": "重新连接",
+      "disconnect": "断开连接",
+      "deviceInstructions": "打开服务商页面并输入以下代码。请保持此页面打开，Mikka 会检查连接状态。",
+      "callbackInstructions": "打开服务商页面并同意授权。如果浏览器最后停在 localhost 回调页面，请将地址栏中的完整地址粘贴到下方。",
+      "callbackLabel": "回调页面地址",
+      "openProvider": "打开服务商页面",
+      "finish": "完成连接",
+      "close": "关闭",
+      "expired": "连接已过期，请重新开始。",
+      "loadFailed": "无法加载订阅设置。",
+      "connectionFailed": "无法完成连接，请重新开始。",
+      "disconnectFailed": "无法断开订阅连接。",
+      "connectedNotice": "订阅已连接。",
+      "disconnectedNotice": "已从 Mikka 断开。你可能还需要在服务商网站撤销授权。"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",
@@ -2306,8 +2369,9 @@
     "started": "开始于 {time}",
     "steps": "交给 {harness} · 执行了 {count} 步",
     "composer": "告诉 {agent} 下一步做什么…",
-    "send": "发送",
-    "sendFailed": "没发出去，草稿还在"
+    "sendFailed": "没发出去，草稿还在",
+    "stopping": "正在停止…",
+    "stopFailed": "没停下来，再试一次"
   },
   "Computer": {
     "status": {
@@ -2347,6 +2411,7 @@
       "handbackFailed": "没能交还，请重试。"
     },
     "approval": {
+      "action": { "click": "点击屏幕", "type": "输入文字", "key": "按键", "scroll": "滚动", "screenshot": "查看屏幕" },
       "allowRun": "本任务内都允许",
       "deny": "拒绝",
       "allow": "允许",
@@ -2358,9 +2423,14 @@
       "title": "线程",
       "empty": "还没有线程",
       "untitled": "未命名线程",
-      "waiting": "等你回复",
-      "failed": "失败",
-      "screen": "屏幕"
+      "justNow": "刚刚",
+      "yesterday": "昨天",
+      "group": {
+        "waiting": "等待回复（{count}）",
+        "running": "进行中（{count}）",
+        "idle": "空闲（{count}）",
+        "resolved": "已解决（{count}）"
+      }
     },
     "newBot": {
       "title": "新建 Bot",
@@ -2426,25 +2496,30 @@
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
     "panel": {
       "label": "右栏",
+      "views": "右栏视图",
+      "overview": "概览",
+      "allThreads": "全部线程",
       "tabs": "右栏内容",
       "details": "详情",
-      "tasks": "任务",
-      "browser": "浏览器",
-      "knowledge": "知识库",
-      "schedules": "定时任务",
+      "threads": "线程",
+      "prs": "PR",
+      "computer": "电脑",
+      "routines": "例行",
+      "library": "资料库",
+      "expand": "展开",
+      "noRoutines": "还没有例行",
+      "noLibrary": "还没有资料",
+      "noPullRequests": "还没有 PR",
+      "prGroup": {
+        "review": "等待审查（{count}）",
+        "running": "进行中（{count}）",
+        "merged": "已合并（{count}）"
+      },
       "search": "搜索",
       "widen": "加宽右栏",
       "narrow": "恢复右栏宽度",
       "close": "关闭右栏",
       "open": "打开右栏"
-    },
-    "details": {
-      "conversation": "当前对话",
-      "kind": "类型",
-      "coordinatorKind": "Coordinator",
-      "agentKind": "Agent 对话",
-      "updated": "最近活动",
-      "none": "还没有消息"
     },
     "suggestions": {
       "title": "建议",
@@ -2469,32 +2544,6 @@
         "github": "GitHub",
         "linear": "Linear"
       }
-    },
-    "tasks": {
-      "mine": "任务",
-      "waiting": "等你",
-      "running": "运行中",
-      "failed": "出错",
-      "doneToday": "已完成",
-      "today": "今天 {count}",
-      "empty": "还没有任务",
-      "status": {
-        "waiting_input": "等你回复",
-        "queued": "排队中",
-        "preparing": "准备中",
-        "running": "运行中",
-        "finishing": "收尾中",
-        "failed": "失败",
-        "succeeded": "已完成"
-      }
-    },
-    "empty": {
-      "browser": "还没打开过网页",
-      "knowledge": "还没有资料",
-      "schedules": "还没有定时任务",
-      "arrange": "让 Agent 安排",
-      "knowledgePrompt": "帮我把常用的资料整理进知识库：",
-      "schedulesPrompt": "帮我设一个定时任务："
     },
     "newTaskDialog": {
       "title": "新建任务",
@@ -2603,6 +2652,40 @@
       "unassigned": "未分配"
     }
   },
+  "SuggestionsPage": {
+    "title": "建议",
+    "refresh": "刷新建议",
+    "loadError": "建议加载失败。",
+    "retry": "重试",
+    "loading": "正在加载建议",
+    "empty": "暂时没有要看的消息",
+    "connect": "连接应用",
+    "action": {
+      "reply": "回复",
+      "review": "Review",
+      "handle": "处理",
+      "read": "查看"
+    },
+    "original": "原文：「{title}」"
+  },
+  "ArtifactsPage": {
+    "title": "Artifact",
+    "category": {
+      "all": "全部",
+      "documents": "文档",
+      "pages": "网页"
+    },
+    "columns": {
+      "name": "名称",
+      "source": "来源",
+      "updated": "上次活动"
+    },
+    "loadError": "Artifact 加载失败。",
+    "retry": "重试",
+    "loading": "正在加载 Artifact",
+    "empty": "还没有 Artifact",
+    "threadEntry": "Artifact · {count}"
+  },
   "Artifact": {
     "kindDocument": "文档",
     "kindPage": "网页",
@@ -2670,5 +2753,13 @@
     "loadError": "无法加载已保存的历史对话。",
     "retry": "重试",
     "incomplete": "此历史回复未完成。"
+  },
+  "MobilePush": {
+    "verificationCode": "收到一条验证码"
+  },
+  "MobileHandoff": {
+    "title": "登录 Mikka",
+    "confirm": "使用此账号继续",
+    "cancel": "取消"
   }
 }

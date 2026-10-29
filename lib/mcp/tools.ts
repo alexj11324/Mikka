@@ -1,10 +1,11 @@
+import { modelMessage } from '@/lib/coordinator/message-safety'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { readRun, visibleRuns } from '@/lib/agent-runs'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
-import { userMessageEvent } from '@/lib/coordinator-events'
+import { peerCoordinatorMessageEvent } from '@/lib/coordinator-events'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { db } from '@/lib/db'
 import { coordinatorMessages, coordinatorSessions, issueMembers, issues } from '@/lib/db/schema'
@@ -32,7 +33,7 @@ async function lastPosition(userId: string): Promise<number> {
  */
 export async function sendToCoordinator(userId: string, text: string) {
   const after = await lastPosition(userId)
-  await recordCoordinatorEvent(db, userMessageEvent(userId, text))
+  await recordCoordinatorEvent(db, peerCoordinatorMessageEvent(userId, text))
   await wakeCoordinator(userId)
   return { queued: true, coordinatorRunning: coordinatorEnabled(), after }
 }
@@ -40,9 +41,10 @@ export async function sendToCoordinator(userId: string, text: string) {
 /** One stored message as text: what was said, and which tools the Coordinator called. */
 function displayMessage(message: ModelMessage): { role: 'user' | 'assistant'; text: string; toolCalls?: string[] } | null {
   if (message.role !== 'user' && message.role !== 'assistant') return null
-  if (typeof message.content === 'string') return { role: message.role, text: message.content }
-  const text = message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
-  const toolCalls = message.content.flatMap(part => part.type === 'tool-call' ? [part.toolName] : [])
+  const projected = modelMessage(message)
+  if (typeof projected.content === 'string') return { role: message.role, text: projected.content }
+  const text = projected.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+  const toolCalls = projected.content.flatMap(part => part.type === 'tool-call' ? [part.toolName] : [])
   if (!text && !toolCalls.length) return null
   return { role: message.role, text, ...(toolCalls.length ? { toolCalls } : {}) }
 }

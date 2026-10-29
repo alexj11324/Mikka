@@ -40,3 +40,8 @@ next-env.d.ts
 # Workflow SDK local world
 /.workflow-data/
 /.swc
+
+# Pinned CPA checkout and worker build artifacts.
+/packages/subscription-worker/.upstream/
+/packages/subscription-worker/.cache/
+/packages/subscription-worker/bin/

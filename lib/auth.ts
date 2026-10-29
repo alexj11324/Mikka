@@ -3,7 +3,8 @@ import { createAuthMiddleware } from 'better-auth/api'
 import { multiSession } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
 import { oauthProvider } from '@better-auth/oauth-provider'
-import { oAuthProxy } from 'better-auth/plugins'
+import { expo } from '@better-auth/expo'
+import { oAuthProxy, oneTimeToken } from 'better-auth/plugins'
 import { pool } from '@/lib/db'
 import { withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
@@ -12,6 +13,9 @@ import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
 import { after } from 'next/server'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
 import { newUserAvatar } from '@/lib/default-avatar'
+
+/** The iOS app's URL scheme: OAuth returns here, and its requests carry it as their origin. */
+export const MOBILE_APP_ORIGIN = 'mikka://'
 
 export const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
 export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
@@ -67,6 +71,9 @@ export const auth = betterAuth({
   trustedOrigins: [
     ...authTrustedOrigins(process.env),
     ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : []),
+    // The iOS app's deep link (apps/mobile app.json scheme); Expo Go uses exp:// while developing.
+    MOBILE_APP_ORIGIN,
+    ...(process.env.NODE_ENV === 'development' ? ['exp://'] : []),
   ],
   // Makes the app an OAuth 2.1 server so agents (Claude Code, Codex…) can sign
   // in to the MCP server at /api/mcp as the person. Clients register
@@ -74,6 +81,10 @@ export const auth = betterAuth({
   // the database, and lib/mcp/auth.ts checks them.
   plugins: [
     ...(proxyOptions ? [oAuthProxy(proxyOptions)] : []),
+    // The iOS app signs in through the system browser and keeps its session cookie in the keychain.
+    expo(),
+    // The app opens a web page signed in as the person (app/api/mobile/open): a one-minute, single-use token, stored hashed.
+    oneTimeToken({ expiresIn: 1, storeToken: 'hashed' }),
     multiSession(),
     oauthProvider({
       loginPage: withBasePath('/sign-in'),

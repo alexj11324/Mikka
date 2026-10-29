@@ -1,42 +1,65 @@
 import 'server-only'
 import { and, desc, eq, gte, inArray, isNull, lt, ne, or } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { decide } from '@/lib/coordinator/decide'
-import { decisionInput } from '@/lib/coordinator/decision'
+import { continuedLevel } from '@/lib/attention/judgment'
+import { scoreNotification } from '@/lib/attention/score'
+import { judgmentContext, matterContext, recordNotice } from '@/lib/attention/store'
 import { briefingEvent } from '@/lib/coordinator-events'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { db } from '@/lib/db'
+import { extractFacts } from '@/lib/profile/extract'
 import { briefings, suggestions, users, userTimeZones } from '@/lib/db/schema'
+import { displayTitle, type ActionTitleInput } from './action-title'
+import { writeActionTitles } from './action-title-server'
 import { BRIEFING_HOUR, BRIEFING_WINDOW_MS, briefingContent, dueBriefingZones, localClock, localDate, localInstant, safeTimeZone } from './briefing'
 import type { ExternalNotification } from './notification'
-import { fallbackVerdict, modelVerdict, ruleVerdict, suggestionQuestions, suggestionState, type Verdict } from './rules'
 
 /** How far back the list reaches; older suggestions drop off. */
 const LIST_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 const LIST_LIMIT = 100
 
-async function judge(notification: ExternalNotification): Promise<Verdict> {
-  const ruled = ruleVerdict(notification)
-  if (ruled) return ruled
-  const answers = await decide('suggestion', decisionInput(suggestionState(notification)), suggestionQuestions())
-  const answer = answers?.get('worthShowing')
-  return answer?.type === 'predicate' ? modelVerdict(answer.probability) : fallbackVerdict(notification)
-}
-
-/** Judges each new notification once and stores the verdict; repeats are skipped before any model call. */
-export async function ingestNotifications(notifications: readonly ExternalNotification[]) {
+/**
+ * Rates each new notification once with the attention model (R-20) and
+ * stores it; repeats are skipped before any model call. Every level but low
+ * shows in 建议. Critical, high and ask go on their matter, which the person's
+ * Coordinator is handed (lib/attention/store.ts); a later notice on a matter
+ * the person has not answered never rates below it. Each stored item is then
+ * read once for facts about the person (lib/profile). `route: false` does not
+ * hand anything over, for what was already there when an app was connected.
+ */
+export async function ingestNotifications(notifications: readonly ExternalNotification[], { route = true } = {}) {
+  const woken = new Set<string>()
+  const actionItems = new Map<string, ActionTitleInput[]>()
   await Promise.all(notifications.map(async notification => {
     const [seen] = await db.select({ id: suggestions.id }).from(suggestions)
       .where(and(eq(suggestions.userId, notification.userId), eq(suggestions.source, notification.source), eq(suggestions.externalId, notification.externalId))).limit(1)
     if (seen) return
-    const verdict = await judge(notification)
-    await db.insert(suggestions).values({
-      id: randomUUID(), userId: notification.userId, source: notification.source, externalId: notification.externalId,
+    const now = new Date()
+    const { same, matters, ids } = await judgmentContext(notification.userId, notification.matterKey, now)
+    const score = await scoreNotification(notification, matters, same, now)
+    const continuesId = score.continues ? ids.get(score.continues) ?? null : null
+    const earlier = same ?? (continuesId ? await matterContext(notification.userId, continuesId) : null)
+    const level = continuedLevel(score.level, earlier)
+    const id = randomUUID()
+    const [stored] = await db.insert(suggestions).values({
+      id, userId: notification.userId, source: notification.source, externalId: notification.externalId, matterKey: notification.matterKey,
       action: notification.action, title: notification.title, url: notification.url, actor: notification.actor,
-      shown: verdict.shown, decidedBy: verdict.decidedBy, probability: verdict.probability, required: notification.required,
+      shown: level !== 'low', decidedBy: score.decidedBy, level, required: notification.required,
       occurredAt: notification.occurredAt,
-    }).onConflictDoNothing()
+    }).onConflictDoNothing().returning({ id: suggestions.id })
+    if (stored && level !== 'low') actionItems.set(notification.userId, [...actionItems.get(notification.userId) ?? [], { id, source: notification.source, action: notification.action, title: notification.title, actor: notification.actor, excerpt: notification.excerpt }])
+    if (stored && route && await recordNotice(notification, id, { ...score, level }, continuesId)) woken.add(notification.userId)
+    // R-73: what the item says about the person, low ones included (receipts are usually low).
+    if (stored) await extractFacts(notification, id)
   }))
+  // One batched call per person writes the shown items as actions (R-45).
+  await Promise.all([...actionItems].map(([userId, items]) => writeActionTitles(userId, items)))
+  // The Coordinator's wake hands the next waiting matter over, one at a time.
+  // Loaded here so the webhook routes that import this module do not pull in the Coordinator workflow.
+  if (woken.size) {
+    const { wakeCoordinator } = await import('@/lib/coordinator/wake')
+    for (const userId of woken) await wakeCoordinator(userId)
+  }
 }
 
 const visible = (userId: string, since: Date) => and(eq(suggestions.userId, userId), eq(suggestions.shown, true), isNull(suggestions.dismissedAt), gte(suggestions.createdAt, since))
@@ -46,9 +69,23 @@ export async function listSuggestions(userId: string) {
   return db.select().from(suggestions).where(visible(userId, new Date(Date.now() - LIST_WINDOW_MS))).orderBy(desc(suggestions.occurredAt)).limit(LIST_LIMIT)
 }
 
+/** Atomically claim a visible suggestion for sending inside the caller's transaction. */
+export async function claimSuggestion(userId: string, id: string, executor: Pick<typeof db, 'update'>) {
+  const [row] = await executor.update(suggestions).set({ dismissedAt: new Date() })
+    .where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), eq(suggestions.shown, true), isNull(suggestions.dismissedAt)))
+    .returning()
+  return row ?? null
+}
+
+/** Read only an owned, shown suggestion, including one already dismissed. */
+export async function readClaimedSuggestion(userId: string, id: string, executor: Pick<typeof db, 'select'>) {
+  const [row] = await executor.select().from(suggestions).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), eq(suggestions.shown, true))).limit(1)
+  return row ?? null
+}
+
 /** Takes a suggestion off the person's list. False when it is not theirs. */
-export async function dismissSuggestion(userId: string, id: string) {
-  const rows = await db.update(suggestions).set({ dismissedAt: new Date() }).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), isNull(suggestions.dismissedAt))).returning({ id: suggestions.id })
+export async function dismissSuggestion(userId: string, id: string, executor: Pick<typeof db, 'update'> = db) {
+  const rows = await executor.update(suggestions).set({ dismissedAt: new Date() }).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), isNull(suggestions.dismissedAt))).returning({ id: suggestions.id })
   return rows.length > 0
 }
 
@@ -73,7 +110,7 @@ const pending = (row: Briefing | undefined, dueAt: Date) => !row || (row.kind ==
  */
 async function pushBriefing(row: Briefing): Promise<boolean> {
   if (!row.total) return false
-  const items = (await briefingHighlights(row.userId, row.highlights)).map(item => ({ suggestionId: item.id, source: item.source, action: item.action, title: item.title, actor: item.actor, url: item.url, required: item.required }))
+  const items = (await briefingHighlights(row.userId, row.highlights)).map(item => ({ suggestionId: item.id, source: item.source, action: item.action, title: displayTitle(item), actor: item.actor, url: item.url, required: item.required }))
   const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, row.userId)).limit(1)
   await recordCoordinatorEvent(db, briefingEvent({ ...row, counts: row.counts as Record<string, number> }, items, person?.name?.trim() || null))
   return true

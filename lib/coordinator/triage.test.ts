@@ -1,10 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { chatItems, eventPrompt, promptMessages, type StoredMessage } from './context'
-import { ATTENTION_THRESHOLD, eventsForInbox, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
+import { ATTENTION_THRESHOLD, eventsForInbox, isolateTaskRequest, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
 import { briefingEvent } from '@/lib/coordinator-events'
 
 const run = (payload: Record<string, unknown>) => ({ kind: 'run_finished' as const, payload: { stopReason: 'submitted', ...payload } })
+
+test('machine-selected requests get separate turns in inbox order', () => {
+  const normal = { kind: 'user_message', payload: { text: 'hello' } }
+  const first = { kind: 'user_message', payload: { taskDestination: { kind: 'cloud' } } }
+  const second = { kind: 'user_message', payload: { taskDestination: { kind: 'device', deviceId: 'device' } } }
+  assert.deepEqual(isolateTaskRequest([normal, first, second]), [normal])
+  assert.deepEqual(isolateTaskRequest([first, second, normal]), [first])
+  assert.deepEqual(isolateTaskRequest([second, normal]), [second])
+  assert.deepEqual(isolateTaskRequest([normal]), [normal])
+})
 
 test('clear cases follow the rules', () => {
   assert.equal(ruleTier({ kind: 'user_message', payload: { text: 'hi' } }), 'attention')
@@ -98,6 +108,6 @@ test('the morning briefing is pushed to the person once a day', () => {
       ['coordinator', 'Good morning. Four things need your attention.'],
     ])
     assert.doesNotMatch(JSON.stringify(chatItems(rows)), /Kevin|secretary|Triage:|Write the briefing/)
-    assert.ok(promptMessages(null, rows).some(message => message.content === content), 'the model still receives briefing instructions')
+    assert.ok(promptMessages(null, rows).some(message => message.role === 'user' && typeof message.content === 'string' && JSON.parse(message.content).untrustedData?.content === content), 'the model still receives briefing instructions')
   }
 })

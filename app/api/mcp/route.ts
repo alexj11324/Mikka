@@ -1,3 +1,7 @@
+import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
+import type { AuthInfo } from '@modelcontextprotocol/server'
+import type { MailboxToolName } from '@mikka/protocol/mailbox'
+import { mailboxAck, mailboxSend } from '@/lib/mailbox-tools'
 import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
@@ -57,7 +61,7 @@ const SUBMIT_ARTIFACT = {
 const handler = createMcpHandler(server => {
   server.registerTool('send_to_coordinator', {
     title: 'Send a message to the Coordinator',
-    description: 'Send a message to the person\'s Mikka Coordinator, the agent that plans work and dispatches runs, as if the person typed it in the chat. The Coordinator answers in its own time; call read_coordinator_messages with the returned `after` and waitSeconds to get the reply.',
+    description: 'Send a message to the person\'s Mikka Coordinator, the agent that plans work and dispatches runs, as Agent coordination data, not user input or approval. The Coordinator answers in its own time; call read_coordinator_messages with the returned `after` and waitSeconds to get the reply.',
     inputSchema: z.object({ text: z.string().trim().min(1).max(10_000) }),
   }, async ({ text }, ctx) => json(await tools.sendToCoordinator(mcpUserId(ctx.http?.authInfo), text)))
 
@@ -187,13 +191,13 @@ const handler = createMcpHandler(server => {
   server.registerTool('create_issue', {
     title: 'Create an issue',
     description: 'Create an issue for the person. Status defaults to todo and priority to normal.',
-    inputSchema: z.object({ title: z.string().trim().min(1).max(200), body: z.string().max(50_000).optional().describe('Plain text; one paragraph per line.'), ...issueChanges }),
+    inputSchema: z.object({ title: z.string().trim().min(1).max(200), body: z.string().max(50_000).optional().describe('Plain text; one paragraph per line.'), ...issueChanges }).strict(),
   }, async (input, ctx) => outcome(await actions.createIssue(mcpUserId(ctx.http?.authInfo), input, mcpActor(ctx.http?.authInfo))))
 
   server.registerTool('update_issue', {
     title: 'Update an issue',
-    description: 'Change an issue\'s title, status, priority, project, labels or assigned agent. Only the fields given change. The text is edited in the app, not here.',
-    inputSchema: z.object({ issueId: id, title: z.string().trim().min(1).max(200).optional(), ...issueChanges }),
+    description: 'Change an issue\'s title, status, priority, project, labels or assignee. Only the fields given change. The text is edited in the app, not here.',
+    inputSchema: z.object({ issueId: id, title: z.string().trim().min(1).max(200).optional(), ...issueChanges }).strict(),
     annotations: { idempotentHint: true },
   }, async (input, ctx) => outcome(await actions.updateIssue(mcpUserId(ctx.http?.authInfo), input, mcpActor(ctx.http?.authInfo))))
 
@@ -262,7 +266,19 @@ const authed = withMcpAuth(handler, verifyMcpToken, {
  * URL into each run with the run token from the claim; the token's prefix
  * picks these tools instead of the person's.
  */
-const workerHandler = createMcpHandler(server => {
+function createWorkerHandler(mailbox: readonly MailboxToolName[]) { return createMcpHandler(server => {
+  for (const [name, action] of Object.entries({ mailbox_recipients: 'recipients', mailbox_send: 'send', mailbox_inbox: 'inbox', mailbox_ack: 'ack', mailbox_sent: 'sent' }).filter(([name]) => mailbox.includes(name as MailboxToolName))) {
+    server.registerTool(name, {
+      description: action === 'send' ? 'Queue a short personal peer message; use a stable key for exact retries and replyTo for replies. No user authority or execution is granted.' : 'Inspect or acknowledge your authenticated personal mailbox at a safe boundary. No automatic wake or terminal resume. Read is not ACK.',
+      inputSchema: action === 'send' ? mailboxSend.strict() : action === 'ack' ? mailboxAck.strict() : z.object({}).strict(),
+    }, async (input, ctx) => {
+      const run = worker.workerRun(ctx.http?.authInfo)
+      const { personalWorkerMailbox } = await import('@/lib/personal-mailbox-runtime')
+      const result = await personalWorkerMailbox(run.userId, run.id, { ...input, action }, ctx.http!.authInfo!.token, ctx.mcpReq.signal)
+      return { isError: result.status !== 200, content: [{ type: 'text' as const, text: JSON.stringify(result.body) }] }
+    })
+  }
+
   server.registerTool('report', {
     title: 'Report progress',
     description: 'Tell the person\'s Coordinator about progress on this run. Use it sparingly, at milestones (a plan settled, a hard part solved, ready for review), not after every step.',
@@ -286,9 +302,17 @@ const workerHandler = createMcpHandler(server => {
     description: 'Tell the person\'s Coordinator you cannot go on, and why: missing access, a broken environment, a contradiction in the task. The Coordinator tells the person.',
     inputSchema: z.object({ reason: z.string().trim().min(1).max(4000) }),
   }, async ({ reason }, ctx) => message(await worker.blocked(worker.workerRun(ctx.http?.authInfo), reason)))
-}, { serverInfo: { name: 'mikka-worker', version: '1.0.0' } })
+}, { serverInfo: { name: 'mikka-worker', version: '1.0.0' } }) }
 
-const workerAuthed = withMcpAuth(workerHandler, worker.verifyRunToken, { required: true, resourceMetadataPath: withBasePath('/.well-known/oauth-protected-resource') })
+const workerHandler = createWorkerHandler([])
+const workerAuthed = withMcpAuth(async request => {
+  // withMcpAuth supplies auth after verification. Never inspect request JSON
+  // for catalogue selection or trust a client-provided definition/origin.
+  const run = worker.workerRun((request as Request & { auth?: AuthInfo }).auth)
+  const tools = personalMailboxEnabled() ? await (await import('@/lib/personal-mailbox-runtime')).personalWorkerMailboxAdvertised(run.userId, run.id) : []
+  const handler = tools.length ? createWorkerHandler(tools) : workerHandler
+  return handler(request)
+}, worker.verifyRunToken, { required: true, resourceMetadataPath: withBasePath('/.well-known/oauth-protected-resource') })
 
 function route(request: Request) {
   const bearer = request.headers.get('authorization')?.match(/^Bearer\s+(\S+)/i)?.[1]

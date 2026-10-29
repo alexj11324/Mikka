@@ -1,3 +1,4 @@
+import { sourcedEventMessage } from './message-safety'
 import { visibleRuns } from '@/lib/agent-runs'
 import { issueForUser } from '@/lib/issue-access'
 import { issueVisibility } from '@/lib/issue-visibility'
@@ -9,7 +10,7 @@ import { db } from '@/lib/db'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
-import { eventsForInbox } from '@/lib/coordinator/triage'
+import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
@@ -17,6 +18,8 @@ import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
 import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
+import { readPreferences } from '@/lib/preferences'
+import { pushReasons, type PushReason } from '@/lib/push-reasons'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -67,7 +70,24 @@ export async function wakingChats(userId: string): Promise<(string | null)[]> {
  * but do not count: with nothing else waiting, nothing moves. `held` is false
  * when another turn holds the lease; that turn will pick the events up.
  */
-export async function takeInbox(userId: string, holder: string, botId: string | null = null): Promise<{ held: boolean; added: number; telegramTargets: TelegramReplyTarget[] }> {
+export interface InboxTake {
+  held: boolean
+  added: number
+  telegramTargets: TelegramReplyTarget[]
+  /** Matters from connected apps handed over in this take (lib/attention). */
+  handoffMatterIds: string[]
+  /** Every event in the take is a handoff: a reply can only be telling the person about one. */
+  handoffOnly: boolean
+  /** Why the reply may go to the person's phones (lib/push-reasons.ts); empty when it answers the person. */
+  pushReasons: PushReason[]
+  /** A handed-over verification code: the push says only that one came, the code stays in the app chat. */
+  pushHidesText: boolean
+  taskEventId?: string
+}
+
+const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushReasons: [], pushHidesText: false }
+
+export async function takeInbox(userId: string, holder: string, botId: string | null = null): Promise<InboxTake> {
   return db.transaction(async tx => {
     const now = new Date()
     await tx.insert(coordinatorSessions).values({ userId, botId }).onConflictDoNothing()
@@ -75,24 +95,45 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
       .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
       .where(and(sessionOf(userId, botId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
-    if (!taken) return { held: false, added: 0, telegramTargets: [] }
-    const due = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
+    if (!taken) return { held: false, ...NO_TAKE }
+    const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
-    if (!due.length) return { held: true, added: 0, telegramTargets: [] }
-    const backgroundLimit = INBOX_BATCH - due.length
+    const due = isolateTaskRequest(candidates)
+    if (!due.length) return { held: true, ...NO_TAKE }
+    const isolatedTask = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined
+    const backgroundLimit = isolatedTask ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
-    if (!events.length) return { held: true, added: 0, telegramTargets: [] }
+    if (!events.length) return { held: true, ...NO_TAKE }
     const first = await nextPosition(tx, userId, botId)
     await tx.insert(coordinatorMessages).values(events.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
-      message: { role: 'user', content: eventPrompt(event) } satisfies ModelMessage,
+      message: sourcedEventMessage({ ...event, deliveredAt: now }, eventPrompt(event)),
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
-    return { held: true, added: events.length, telegramTargets: telegramReplyTargets(events) }
+    const handoffs = events.filter(event => isHandoff(event.kind))
+    return {
+      held: true, added: events.length,
+      ...(isolatedTask ? { taskEventId: due[0].id } : {}),
+      // A verification code is told in the app chat only, never on Telegram.
+      telegramTargets: handoffs.some(carriesCode) ? [] : telegramReplyTargets(events),
+      handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
+      handoffOnly: handoffs.length === events.length,
+      pushReasons: pushReasons(events),
+      pushHidesText: handoffs.some(carriesCode),
+    }
   })
+}
+
+function isHandoff(kind: string): boolean {
+  return kind === 'matter_handoff'
+}
+
+function carriesCode(event: { payload: Record<string, unknown> }): boolean {
+  const assessment = event.payload.assessment
+  return Boolean(assessment && typeof assessment === 'object' && (assessment as { verificationCode?: unknown }).verificationCode)
 }
 
 /** Lets go of the lease. Returns whether events that need a turn arrived meanwhile, so the caller can take them. */
@@ -145,7 +186,9 @@ export async function loadConversation(userId: string, botId: string | null = nu
     .from(coordinatorMessages)
     .where(and(messagesOf(userId, botId), gt(coordinatorMessages.position, through)))
     .orderBy(asc(coordinatorMessages.position))
-  return { summary: session?.summary ?? null, memory: session?.memory ?? '', messages: rows.map(row => ({ position: row.position, message: row.message as unknown as ModelMessage })) }
+  // 使用记忆 off (the app's 记忆 setting): the prompt leaves the memory out; it stays saved.
+  const memory = (await readPreferences(userId)).memoryEnabled ? session?.memory ?? '' : ''
+  return { summary: session?.summary ?? null, memory, messages: rows.map(row => ({ position: row.position, message: row.message as unknown as ModelMessage })) }
 }
 
 /** Replaces every message at or before `through` with `summary`. The messages stay stored. */
@@ -234,7 +277,8 @@ export async function chatView(userId: string, limit = 200, botId: string | null
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   return {
     items,
-    working: leased || waiting.some(event => event.tier !== 'background'),
+    // A handoff waiting in the inbox is not shown as a reply coming: the Coordinator may decide to stay quiet.
+    working: leased || waiting.some(event => event.tier !== 'background' && !isHandoff(event.kind)),
     error: session?.lastError ?? null,
     sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text), items.flatMap(item => item.threads)),
     artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),

@@ -78,7 +78,7 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     assert.ok(await tools.getRun(member,sharedRun))
     assert.equal(await actions.getRunEvents(member,{runId:sharedRun}),null)
     await assert.rejects(addRunMessage(member,{runId:sharedRun,text:'must not send'}))
-    await requestRunStop(member,sharedRun)
+    await assert.rejects(requestRunStop(member,sharedRun), /runNotFound/)
     assert.equal((await pool.query('select "stopRequestedAt" from agent_runs where id=$1',[sharedRun])).rows[0].stopRequestedAt,null)
     const choices = await issuePropertyChoices(member)
     assert.deepEqual(choices.agents.map(row=>row.id),[ownAgent])

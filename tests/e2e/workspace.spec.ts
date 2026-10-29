@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch, seedTask } from './fixtures'
+import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch, seedTask, fillSecretPassword, captureAuthenticationCookies } from './fixtures'
 
 test('未登录访问受保护页面、注册和登录链接', async ({ page }) => {
   await page.goto(app('/settings/members'))
@@ -68,13 +68,16 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await expect(page.getByRole('button', { name: /^Coordinator/ })).toHaveAttribute('aria-current', 'page')
   await rail(page, '看板').click()
   await expect(page.getByRole('heading', { name: '看板', exact: true })).toBeVisible()
-  // A new task is a sentence for the Coordinator; it lands in the board's conversation.
+  // The issue-tool gate is off in this suite; the request must not be queued.
   const dialog = await openCreateIssue(page)
   const request = `把群聊未读数接到侧栏 ${randomUUID()}`
   await dialog.getByLabel('任务描述', { exact: true }).fill(request)
   await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
+  await expect(page.getByText('暂时无法创建任务。', { exact: true })).toBeVisible()
+  await expect(dialog).toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true }).getByText(request)).toHaveCount(0)
+  await page.keyboard.press('Escape')
   await expect(dialog).not.toBeVisible()
-  await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true }).getByText(request)).toBeVisible()
   const title = `按钮回归 ${randomUUID()}`
   await seedTask(page, title, { status: 'doing' })
   await page.reload()
@@ -99,9 +102,10 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
   await expect(page).toHaveURL(/\/sign-in/)
   await page.getByLabel('邮箱', { exact: true }).fill(account.email)
-  await page.getByLabel('密码', { exact: true }).fill(account.password)
+  await fillSecretPassword(page, account.password)
   await page.getByRole('button', { name: '登录工作台', exact: true }).click()
   await expect(page).toHaveURL(url => url.pathname === app('/'))
+  await captureAuthenticationCookies(page.context())
   await rail(page, '看板').click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
 })

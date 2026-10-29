@@ -14,6 +14,8 @@ interface TriageEvent { kind: CoordinatorEventKind; payload: Record<string, unkn
 export function ruleTier(event: TriageEvent): CoordinatorEventTier | null {
   switch (event.kind) {
     case 'user_message':
+    // Hidden evidence the Coordinator must decide on (lib/attention); it was rated before it was handed over.
+    case 'matter_handoff':
       return 'attention'
     case 'issue_done':
     // A retry after the device went offline is the system handling it.
@@ -67,4 +69,11 @@ export function tierFromDecision(needsPerson: number, kind: CoordinatorEventKind
 export function eventsForInbox<T extends { createdAt: Date }>(waking: readonly T[], background: readonly T[], limit: number): T[] {
   return [...waking.slice(0, limit), ...background.slice(0, Math.max(0, limit - waking.length))]
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+}
+
+/** A machine-selected task request gets its own turn; do not blend two requests. */
+export function isolateTaskRequest<T extends { kind: string; payload: Record<string, unknown> }>(waking: readonly T[]): T[] {
+  const index = waking.findIndex(event => event.kind === 'user_message' && event.payload.taskDestination !== undefined)
+  if (index < 0) return [...waking]
+  return index === 0 ? waking.slice(0, 1) : waking.slice(0, index)
 }

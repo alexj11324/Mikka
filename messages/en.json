@@ -124,6 +124,8 @@
     "members": "Members",
     "inviteMembers": "Invite members",
     "plugins": "Plugins",
+    "suggestions": "Suggestions",
+    "artifacts": "Artifact",
     "toggleTeam": "Expand or collapse the {name} team",
     "sidebarRail": "Expand or collapse the sidebar rail",
     "rail": "Main navigation",
@@ -912,6 +914,7 @@
     "generic": "Something went wrong. Please try again.",
     "authRequired": "Please sign in first.",
     "validationGeneric": "Please check the information you entered.",
+    "issueToolsDisabled": "Task creation is unavailable.",
     "validationTitleRequired": "Please enter a task title.",
     "validationNameRequired": "Please enter a name.",
     "teamIdentifierInvalid": "Use 2–12 uppercase letters or digits, starting with a letter.",
@@ -942,7 +945,10 @@
     "runInvalid": "The run parameters are invalid.",
     "runNotFound": "This run does not exist.",
     "artifactNotFound": "This artifact does not exist.",
+    "suggestionNotFound": "This suggestion was already handled.",
+    "coordinatorUnavailable": "The Coordinator is not available right now. Try again later.",
     "messageRequired": "A message cannot be empty.",
+    "submissionConflict": "This submission ID was already used for a different message.",
     "pendingActionUnavailable": "This action was already handled or has expired.",
     "deviceSaveFailed": "The save failed. Please try again.",
     "tokenCreateFailed": "Could not create a token. Please try again.",
@@ -1484,6 +1490,9 @@
         "title": "Profile",
         "description": "See the account details used in your workspace."
       },
+      "memory": {
+        "title": "Memory"
+      },
       "account": {
         "title": "Account",
         "description": "Manage how you sign in to Mikka."
@@ -1527,6 +1536,24 @@
       "notSet": "Not set",
       "readOnly": "Account details are read-only; this version does not support editing them here."
     },
+    "memory": {
+      "enabled": "Use memory",
+      "learn": "Learn from connected apps",
+      "error": "Could not update memory",
+      "empty": "No memories yet",
+      "correct": "Correct",
+      "delete": "Delete",
+      "kinds": {
+        "interest": "Interests",
+        "routine": "Routines",
+        "place": "Places",
+        "subscription": "Subscriptions",
+        "deadline": "Deadlines",
+        "tool": "Tools",
+        "person": "People",
+        "preference": "Preferences"
+      }
+    },
     "workspaceForm": {
       "id": "Workspace ID",
       "readOnlyNote": "Workspace information is read-only. To switch or create a workspace, return to the app and select the workspace name at the top left.",
@@ -1536,6 +1563,16 @@
       "urlHelp": "The URL slug identifies the workspace. Changing it affects existing links.",
       "previewNote": "Form preview: workspace storage is not connected, so changes are not saved.",
       "previewLabel": "Workspace form preview"
+    },
+    "computerPolicy": {
+      "heading": "Cloud computers",
+      "description": "Control whether Bots may operate computers in this workspace.",
+      "label": "Bot computer use",
+      "help": "Denying stops computer tasks and revokes their approvals. People can still take control.",
+      "adminOnly": "Only workspace admins can change this setting.",
+      "ask": "Ask for approval",
+      "deny": "Deny",
+      "error": "Could not update or load the computer setting."
     },
     "issuePrefix": {
       "title": "Personal task ids",
@@ -1573,6 +1610,32 @@
       "loadError": "Could not load Linear settings.",
       "operationError": "The Linear sync action failed. Try again.",
       "teamAlreadyLinked": "This Linear team is already connected to another Mikka account."
+    },
+    "subscriptions": {
+      "heading": "Subscriptions",
+      "description": "Connect your own subscription for authorized Bot tasks in this workspace.",
+      "codex": "ChatGPT / Codex",
+      "claude": "Claude",
+      "providerDescription": "Sign in and approve access on the provider's website.",
+      "unavailable": "This connection is not available yet.",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "connect": "Connect",
+      "connectAnother": "Connect another",
+      "reconnect": "Reconnect",
+      "disconnect": "Disconnect",
+      "deviceInstructions": "Open the provider page and enter this code. Keep this page open while Mikka checks the connection.",
+      "callbackInstructions": "Open the provider page and approve access. If the browser ends on a localhost callback page, copy its full address into the field below.",
+      "callbackLabel": "Callback page address",
+      "openProvider": "Open the provider page",
+      "finish": "Complete connection",
+      "close": "Close",
+      "expired": "The connection attempt expired. Start again.",
+      "loadFailed": "Could not load subscription settings.",
+      "connectionFailed": "The connection could not be completed. Start a new attempt.",
+      "disconnectFailed": "The subscription could not be disconnected.",
+      "connectedNotice": "Subscription connected.",
+      "disconnectedNotice": "Disconnected from Mikka. The provider's authorization may still need to be revoked on its website."
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
@@ -2306,8 +2369,9 @@
     "started": "started {time}",
     "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
     "composer": "Tell {agent} what to do next…",
-    "send": "Send",
-    "sendFailed": "Not sent. Your draft is still here"
+    "sendFailed": "Not sent. Your draft is still here",
+    "stopping": "Stopping…",
+    "stopFailed": "Couldn't stop it. Try again"
   },
   "Computer": {
     "status": {
@@ -2347,6 +2411,7 @@
       "handbackFailed": "Couldn't hand back. Try again."
     },
     "approval": {
+      "action": { "click": "Click the screen", "type": "Type text", "key": "Press a key", "scroll": "Scroll", "screenshot": "View the screen" },
       "allowRun": "Allow for this task",
       "deny": "Deny",
       "allow": "Allow",
@@ -2358,9 +2423,14 @@
       "title": "Threads",
       "empty": "No threads yet",
       "untitled": "Untitled thread",
-      "waiting": "Needs you",
-      "failed": "Failed",
-      "screen": "Screen"
+      "justNow": "just now",
+      "yesterday": "yesterday",
+      "group": {
+        "waiting": "Waiting on you ({count})",
+        "running": "In progress ({count})",
+        "idle": "Idle ({count})",
+        "resolved": "Resolved ({count})"
+      }
     },
     "newBot": {
       "title": "New bot",
@@ -2426,25 +2496,30 @@
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
     "panel": {
       "label": "Right panel",
+      "views": "Right panel views",
+      "overview": "Overview",
+      "allThreads": "All threads",
       "tabs": "Right panel content",
       "details": "Details",
-      "tasks": "Tasks",
-      "browser": "Browser",
-      "knowledge": "Knowledge",
-      "schedules": "Schedules",
+      "threads": "Threads",
+      "prs": "PRs",
+      "computer": "Computer",
+      "routines": "Routines",
+      "library": "Library",
+      "expand": "Show all",
+      "noRoutines": "No routines yet",
+      "noLibrary": "No files yet",
+      "noPullRequests": "No PRs yet",
+      "prGroup": {
+        "review": "Waiting for review ({count})",
+        "running": "In progress ({count})",
+        "merged": "Merged ({count})"
+      },
       "search": "Search",
       "widen": "Widen panel",
       "narrow": "Restore panel width",
       "close": "Close panel",
       "open": "Open panel"
-    },
-    "details": {
-      "conversation": "This conversation",
-      "kind": "Type",
-      "coordinatorKind": "Coordinator",
-      "agentKind": "Agent conversation",
-      "updated": "Last activity",
-      "none": "No messages yet"
     },
     "suggestions": {
       "title": "Suggestions",
@@ -2469,32 +2544,6 @@
         "github": "GitHub",
         "linear": "Linear"
       }
-    },
-    "tasks": {
-      "mine": "Tasks",
-      "waiting": "Waiting on you",
-      "running": "Running",
-      "failed": "Failed",
-      "doneToday": "Done",
-      "today": "today {count}",
-      "empty": "No tasks yet",
-      "status": {
-        "waiting_input": "needs your reply",
-        "queued": "queued",
-        "preparing": "preparing",
-        "running": "running",
-        "finishing": "finishing",
-        "failed": "failed",
-        "succeeded": "done"
-      }
-    },
-    "empty": {
-      "browser": "No web pages opened yet",
-      "knowledge": "No documents yet",
-      "schedules": "No scheduled tasks yet",
-      "arrange": "Let an agent set it up",
-      "knowledgePrompt": "Help me put the documents I use often into the knowledge base: ",
-      "schedulesPrompt": "Help me set up a scheduled task: "
     },
     "newTaskDialog": {
       "title": "New task",
@@ -2603,6 +2652,40 @@
       "unassigned": "Unassigned"
     }
   },
+  "SuggestionsPage": {
+    "title": "Suggestions",
+    "refresh": "Refresh suggestions",
+    "loadError": "Suggestions failed to load.",
+    "retry": "Retry",
+    "loading": "Loading suggestions",
+    "empty": "Nothing to look at right now",
+    "connect": "Connect apps",
+    "action": {
+      "reply": "Reply",
+      "review": "Review",
+      "handle": "Handle",
+      "read": "Read"
+    },
+    "original": "Original: “{title}”"
+  },
+  "ArtifactsPage": {
+    "title": "Artifact",
+    "category": {
+      "all": "All",
+      "documents": "Documents",
+      "pages": "Web pages"
+    },
+    "columns": {
+      "name": "Name",
+      "source": "Source",
+      "updated": "Last activity"
+    },
+    "loadError": "Artifacts failed to load.",
+    "retry": "Retry",
+    "loading": "Loading artifacts",
+    "empty": "No artifacts yet",
+    "threadEntry": "Artifact · {count}"
+  },
   "Artifact": {
     "kindDocument": "Document",
     "kindPage": "Web page",
@@ -2670,5 +2753,13 @@
     "loadError": "Unable to load saved chat history.",
     "retry": "Retry",
     "incomplete": "This saved reply did not finish."
+  },
+  "MobilePush": {
+    "verificationCode": "A verification code arrived"
+  },
+  "MobileHandoff": {
+    "title": "Sign in to Mikka",
+    "confirm": "Continue with this account",
+    "cancel": "Cancel"
   }
 }
