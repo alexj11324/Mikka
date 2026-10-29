@@ -206,6 +206,8 @@ next/font 在构建期把字体自托管到本地，运行时同样不联网；�
 
 # Agents 界面 + 设备 harness 检测（daemon 移植）— 2026-10-20
 
+> 已过时：已无 `/agents` 页面，Agent 增删改没有 UI 入口；线程由 Coordinator/Bot 通过 `dispatch_run` 派发（#334）。
+
 ## 目标
 
 侧边栏新增 **Agents** 界面：设备列表显示 daemon 检测到的 harness（本轮只展示 Claude Code / Codex），并能在设备上添加具名 Agent。
@@ -388,10 +390,7 @@ Review 结论 **REQUEST CHANGES**，3 Critical + 4 Important，已全部修掉�
 | `BETTER_AUTH_SECRET` | 原值（未动） | 独立随机值 | 独立随机值 |
 | `BETTER_AUTH_URL` | **不设** | **不设** | `http://localhost:3000` |
 
-`BETTER_AUTH_URL` 只在 Development 设置是**故意的**：`lib/auth.ts:5` 自带
-`BETTER_AUTH_URL ?? VERCEL_PROJECT_PRODUCTION_URL ?? VERCEL_URL ?? V0_RUNTIME_URL`
-这条 fallback，部署环境（Prod / Preview）由 Vercel 的 system 变量兜住；
-只有本地 dev 拿不到 `VERCEL_*`，才需要显式给值。多设反而制造第二份真相。
+（已过时，2026-10-27）Preview 现在用自己的 `VERCEL_URL` 并经 OAuth 代理中心登录；见 `lib/auth-config.ts` `resolveAppOrigin` 与 `docs/cloud-preview.md`。
 
 ## 一次配错与修正
 
@@ -401,10 +400,7 @@ Review 结论 **REQUEST CHANGES**，3 Critical + 4 Important，已全部修掉�
 1. **`orvilo.aspectlylabs.com` 不属于这个项目**。它的响应是 10 字节的 `Orvilo API`，
    `server: cloudflare` 且无 `x-vercel-id` —— 是 Cloudflare 上的另一个服务。
    设成 `BETTER_AUTH_URL` 会让 better-auth 生成指向该域名的 OAuth 回调，登录必挂。
-2. **Preview 不需要也不能用 `$VERCEL_URL`**。官方文档写明
-   `VERCEL_PROJECT_PRODUCTION_URL` **"is always set, even in preview deployments"**，
-   所以 Preview 的 fallback 本来就指向 production 域名 —— 这正是
-   「GitHub OAuth App 只能注册一个 callback URL」下的设计，覆盖它只会更糟。
+2. （已过时，2026-10-27）Preview 现在用自己的 `VERCEL_URL` 并经 OAuth 代理中心登录；见 `lib/auth-config.ts` `resolveAppOrigin` 与 `docs/cloud-preview.md`。
 
 移除时机是安全的：官方文档说明 env 变更**只对新部署生效**，
 所以那次配错没有污染当时正在跑的 production 部署。
