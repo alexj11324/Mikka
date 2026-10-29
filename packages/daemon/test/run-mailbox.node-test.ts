@@ -181,7 +181,7 @@ for (const kind of ['claude_code', 'codex'] as const) test(`${kind} actual fake 
   const log = createLogger({ level: 'silent' })
   const adapter = kind === 'codex'
     ? new CodexAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-codex.mjs'), userHome: home })
-    : new ClaudeAdapter({ stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
+    : new ClaudeAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
   const args = { to: '00000000-0000-4000-8000-000000000001', key: randomUUID(), text: 'normal peer work' }
   const calls = [
     { name: '__mailbox_catalog' }, { name: 'mailbox_recipients', foreignNotice: true },
@@ -249,7 +249,7 @@ for (const kind of ['claude_code', 'codex'] as const) test(`${kind} actual fake 
   const log = createLogger({ level: 'silent' })
   const adapter = kind === 'codex'
     ? new CodexAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-codex.mjs'), userHome: home })
-    : new ClaudeAdapter({ stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
+    : new ClaudeAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
   try {
     const session = await adapter.start({ runId: f.assignment.runId, toolApproval: syntheticApproval(f.assignment.runId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox,
       prompt: 'MAILBOX_TEST ' + JSON.stringify([{ name: '__mailbox_catalog' }, { name: 'mailbox_inbox' }, { name: 'mailbox_send', arguments: { to: randomUUID(), key: randomUUID(), text: 'Not granted' } }]) })
@@ -269,7 +269,7 @@ for (const kind of ['claude_code', 'codex'] as const) test(`${kind} fake CLI has
   const log = createLogger({ level: 'silent' })
   const adapter = kind === 'codex'
     ? new CodexAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-codex.mjs'), userHome: home })
-    : new ClaudeAdapter({ stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
+    : new ClaudeAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
   const noMailboxRunId = randomUUID()
   const session = await adapter.start({ runId: noMailboxRunId, toolApproval: syntheticApproval(noMailboxRunId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, prompt: 'MAILBOX_TEST ' + JSON.stringify([{ name: '__mailbox_catalog' }, { name: 'mailbox_inbox' }]) })
   const chunks = []

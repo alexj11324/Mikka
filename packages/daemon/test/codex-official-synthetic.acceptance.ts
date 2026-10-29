@@ -148,7 +148,7 @@ async function provider(command: string, native: "enabled" | "disabled" | "restr
   return { ...listening, requests, failures, toolOutput }
 }
 
-function wrapper(dir: string, binary: string, baseUrl: string, native: "enabled" | "disabled" | "restricted") {
+function wrapper(dir: string, binary: string, baseUrl: string, native: "enabled" | "disabled" | "restricted", stderrPath: string) {
   const file = join(dir, "official-codex-wrapper.sh")
   const config = [
     'model_provider="synthetic_acceptance"',
@@ -167,7 +167,7 @@ function wrapper(dir: string, binary: string, baseUrl: string, native: "enabled"
   // sandbox-runtime inserts loopback NO_PROXY entries. Clear these inside
   // its boundary so the real CLI's local provider request uses the real proxy.
   // This script only execs the pinned binary; it never implements CLI/RPC/tools.
-  writeFileSync(file, `#!/bin/sh\nexport NO_PROXY='' no_proxy=''\nexec ${shellQuote(binary)} "$@" ${shellJoin(config)} 2>>${shellQuote(join(dir, "official-cli.stderr.log"))}\n`, { mode: 0o700 })
+  writeFileSync(file, `#!/bin/sh\nexport NO_PROXY='' no_proxy=''\nexec ${shellQuote(binary)} "$@" ${shellJoin(config)} 2>>${shellQuote(stderrPath)}\n`, { mode: 0o700 })
   return file
 }
 
@@ -255,7 +255,7 @@ async function diagnostic(binary: string, decision: Decision, native: "enabled" 
   try {
     const adapter = new CodexAdapter({
       sandbox: new SandboxRuntime(), stateDir: dir, userHome: dir,
-      binary: wrapper(dir, binary, synthetic.url, native),
+      binary: wrapper(dir, binary, synthetic.url, native, join(dir,'runs',runId,'official-cli.stderr.log')),
       networkCeiling: [`127.0.0.1:${synthetic.port}`, ...(decision === 'outside-ceiling' ? [] : [`127.0.0.1:${origin.port}`])],
     })
     session = await deadline(adapter.start({
