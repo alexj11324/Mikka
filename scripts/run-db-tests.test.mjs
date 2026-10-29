@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
+import { browserArguments } from './ci-browser-tests.mjs'
 import { BOOTSTRAP, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
 
 const target = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
@@ -96,7 +97,8 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.match(workflow, /MIGRATION_BOOTSTRAP_CI: '1'/)
   assert.match(workflow, /REQUIRE_DB: '1'/)
   assert.match(browser, /pnpm test:performance --output=performance-results/)
-  assert.match(browser, /pnpm test:e2e --grep-invert @performance/)
+  assert.match(browser, /node scripts\/ci-browser-tests\.mjs > "\$log_file"/)
+  assert.deepEqual(browserArguments('full', '[]'), ['exec', 'playwright', 'test', '--grep-invert', '@performance'], 'integration retains every non-performance browser spec through the selected-layer runner')
   assert.match(workflow, /image: postgres:17/)
   for (const name of ['test:agent', 'test:suggestions', 'test:integrations', 'test:issues', 'test:db-runner']) {
     assert.ok(workflow.includes(`pnpm ${name}`), `${name} strict gate retained`)
