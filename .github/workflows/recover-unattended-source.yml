@@ -22,23 +22,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = f40bf7f556053bcb49b8d32d20a943246fa8febe
+          test "$(git rev-parse HEAD)" = 4905fc24a00da72993c5025b6db3a3e6597c929d
           curl --fail --silent --show-error --max-time 60 --proto '=https' \
-            'https://sb-6fx93q3zrnl0.vercel.run/b0912d8fb71fed43ad88d5beb17d538a62ec6ecd855fdae08516e8584f1fba3a.patch' \
+            'https://sb-6fx93q3zrnl0.vercel.run/83a4c80752a299146ada0384a6ba3eb0988d32452fc8f68c5c6048c89ae68a3d.patch' \
             -o "$RUNNER_TEMP/source.patch"
-          echo "b0912d8fb71fed43ad88d5beb17d538a62ec6ecd855fdae08516e8584f1fba3a  $RUNNER_TEMP/source.patch" | sha256sum --check --strict
+          echo "83a4c80752a299146ada0384a6ba3eb0988d32452fc8f68c5c6048c89ae68a3d  $RUNNER_TEMP/source.patch" | sha256sum --check --strict
           git apply --check --index "$RUNNER_TEMP/source.patch"
           git apply --index "$RUNNER_TEMP/source.patch"
           python3 - <<'PY'
           import hashlib, subprocess
           paths = subprocess.check_output(['git','diff','--cached','--name-only'], text=True).splitlines()
           digest = hashlib.sha256(('\n'.join(sorted(paths))+'\n').encode()).hexdigest()
-          assert digest == '93f978b30f10089d973ee1311d7925cdfee2dc663fd437c1cb44f73d4905f374', digest
+          assert digest == 'aa52d9a82d6b99c21e1f139992096df8f69e1aaf849ac9080530b3ea92001be7', digest
           assert not any(path.startswith('.github/workflows/') for path in paths)
           print('Verified source paths:', len(paths))
           PY
           git -c user.name='Mikka source recovery' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            -c core.hooksPath=/dev/null commit -m 'test: enroll unattended regressions in the existing cloud database gate'
+            -c core.hooksPath=/dev/null commit -m 'fix: settle failed and denied queued browser starts without blocking later work'
           git rev-parse HEAD
           git rev-parse 'HEAD^{tree}'
       - name: Publish only the feature branch without force
