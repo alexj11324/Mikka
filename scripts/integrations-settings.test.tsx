@@ -12,7 +12,7 @@ mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExpor
   linkSocial: async () => ({ error: true }),
 } } })
 mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
-mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ render, children, disabled, onClick }: { render?: ReactElement; children?: React.ReactNode; disabled?: boolean; onClick?: () => void }) => render ? cloneElement(render, {}, children) : <button disabled={disabled} onClick={onClick}>{children}</button> } })
+mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ render, children, disabled, onClick, role }: { render?: ReactElement; children?: React.ReactNode; disabled?: boolean; onClick?: () => void; role?: string }) => render ? cloneElement(render, { role }, children) : <button disabled={disabled} onClick={onClick}>{children}</button> } })
 
 const browser = new Window({ url: 'https://mikka.example/en?settings=integrations' })
 const originalFetch = globalThis.fetch
@@ -67,6 +67,15 @@ test('unconfirmed and signed-out sessions neither request nor display GitHub rep
   assert.equal(composioRequests, 0)
   assert.ok(container.textContent?.includes('githubSignInRequired'))
   assert.ok([...container.querySelectorAll('button')].find(button => button.textContent === 'githubRefresh')?.disabled)
+})
+
+test('GitHub installation management is exposed as a link with the exact destination', async () => {
+  await render()
+  await respond(0, 'viewer-a', 'a/private')
+  const link = container.querySelector('a[role=\"link\"]')
+  assert.ok(link)
+  assert.equal(link?.textContent, 'githubManage')
+  assert.equal(link?.getAttribute('href'), 'https://github.com/apps/mikka-github/installations/new')
 })
 
 test('sign-out does not start another Composio request', async () => {
