@@ -23,6 +23,7 @@ if (appOrigin && window.location.origin === appOrigin) {
       runtime: 'electron',
       serverUrl: __MIKKA_APP_URL__,
       zeroUrl: '',
+      openExternal: (url: unknown) => ipcRenderer.invoke(IPC.appOpenExternal, url),
     },
     notifications: {
       show: (notification: unknown) => ipcRenderer.invoke(IPC.notificationsShow, notification),

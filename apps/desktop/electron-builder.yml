@@ -16,6 +16,10 @@ publish:
   repo: Mikka
   releaseType: release
 
+protocols:
+  - name: Mikka desktop sign-in
+    schemes: [mikka-desktop]
+
 mac:
   category: public.app-category.productivity
   icon: build/icon.png

@@ -52,6 +52,15 @@ pnpm --filter @mikka/desktop package       # local dmg/zip, never publishes
 A production build must use an HTTPS app URL. Signing and notarization
 credentials belong to the release pipeline, never the repository.
 
+## Sign-in
+
+Google and GitHub sign-in open in the system browser, never in an embedded
+window. The browser finishes OAuth on the web app, mints a one-minute,
+single-use token and returns through the `mikka-desktop://auth` protocol. The
+shell loads `/api/desktop/finish`, exchanges that token for its own session
+cookie and continues to the requested page. The packaged app declares the URL
+scheme in `electron-builder.yml`; the shell also registers it at launch.
+
 ## Release
 
 Bump `apps/desktop/package.json`, push a tag named `desktop-vX.Y.Z`, and run the
@@ -91,9 +100,9 @@ Before publishing the draft:
   `ipcRenderer`, `require` or file paths.
 - Main accepts IPC only from the app's main frame and validates every payload
   with the protocol schemas.
-- Navigation: the app origin and the configured sign-in providers stay in the
-  window; other HTTPS/mailto links open in the system browser; everything else
-  is denied.
+- Navigation: only the app origin stays in the window; every other HTTPS or
+  mailto link, including Google and GitHub sign-in, opens in the system
+  browser; everything else is denied.
 - Permissions are denied except clipboard writes; system notifications come
   from main, not the renderer.
 - No auth token, device credential or arbitrary path crosses the bridge.

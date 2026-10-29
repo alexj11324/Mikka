@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'
+import { openSettingsInBrowser } from '@/lib/platform/open-settings'
 import { ConnectedAppsList, ConnectedAppsStatus, useConnectedApps, usePluginHref } from '@/components/plugins/connected-apps'
 
 type GitHubState = { viewerId: string; configured: boolean; connected: boolean; installed: boolean; repositories: { id: string; fullName: string; installationId: string; htmlUrl: string; private: boolean }[] }
@@ -72,6 +73,9 @@ function ViewerIntegrationsSettings({ showWebhookDetails, showConnectedApps, use
   async function linkGitHub() {
     setGithubLinking(true); setGithubLinkError('')
     try {
+      const handoff = await openSettingsInBrowser('integrations')
+      if (handoff === 'desktop') return
+      if (handoff === 'unsupported') { setGithubLinkError(t('browserUpdateRequired')); return }
       const callbackURL = new URL(window.location.href)
       callbackURL.searchParams.delete('github')
       const errorURL = new URL(callbackURL)
@@ -81,6 +85,7 @@ function ViewerIntegrationsSettings({ showWebhookDetails, showConnectedApps, use
       window.location.assign(result.data.url)
     } catch {
       setGithubLinkError(t('githubLinkFailed'))
+    } finally {
       setGithubLinking(false)
     }
   }

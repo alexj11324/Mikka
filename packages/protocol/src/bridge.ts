@@ -203,6 +203,11 @@ export interface MikkaBridge {
     serverUrl: string
     /** zero-cache origin. */
     zeroUrl: string
+    /**
+     * Opens an app-origin URL in the system browser. Used for OAuth, which
+     * must not run in an embedded Electron window. Main rejects other origins.
+     */
+    openExternal(url: string): Promise<void>
   }
   /**
    * Login. The long-lived session token stays in the main process (macOS

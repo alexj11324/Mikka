@@ -216,6 +216,9 @@
     "githubAccountNotLinked": "此 GitHub 账号尚未关联 Mikka。请使用已关联的方式登录，或先创建 Mikka 账号。",
     "continueNotice": "请点击下方对应的登录按钮，在此标签页完成授权。",
     "tabOpened": "请在新标签页完成登录；完成后可刷新此预览。",
+    "browserOpened": "已在浏览器中打开登录页；完成后会自动返回 Mikka。",
+    "browserFailed": "无法打开浏览器，请重试。",
+    "browserUpdateRequired": "请更新 Mikka 后再使用 Google 或 GitHub 登录。",
     "tabBlocked": "浏览器阻止了新标签页，请允许弹出窗口后重试。",
     "githubStartFailed": "暂时无法开始 GitHub 登录，请稍后重试。",
     "googleStartFailed": "暂时无法开始 Google 登录，请稍后重试。",
@@ -1649,7 +1652,8 @@
       "retry": "重试同步",
       "loadError": "无法加载 Linear 设置。",
       "operationError": "Linear 同步操作失败，请重试。",
-      "teamAlreadyLinked": "此 Linear 团队已连接到另一个 Mikka 账号。"
+      "teamAlreadyLinked": "此 Linear 团队已连接到另一个 Mikka 账号。",
+      "browserUpdateRequired": "请更新 Mikka 后再从桌面端连接 Linear。"
     },
     "subscriptions": {
       "heading": "模型订阅",
@@ -1783,7 +1787,9 @@
       "takeoverNone": "Bot 将无法再使用 {name}",
       "turnedOff": "已停用 {name}",
       "madeDefault": "{account} 已设为默认",
-      "openInSettings": "在设置中管理"
+      "openInSettings": "在设置中管理",
+      "linkInBrowser": "请在刚打开的浏览器窗口中完成关联，完成后回到这里。",
+      "browserUpdateRequired": "请更新 Mikka 后再从桌面端关联账号。"
     },
     "telegram": {
       "heading": "消息平台",
@@ -2939,6 +2945,15 @@
     "title": "登录 Mikka",
     "confirm": "使用此账号继续",
     "cancel": "取消"
+  },
+  "DesktopHandoff": {
+    "returnTitle": "返回 Mikka",
+    "returnBody": "登录完成。正在打开 Mikka…",
+    "openApp": "打开 Mikka",
+    "finishTitle": "正在返回 Mikka",
+    "finishBody": "正在完成登录…",
+    "finishFailed": "登录未完成，请回到 Mikka 重新登录。",
+    "openSignIn": "打开登录页"
   },
   "DeviceAuthorization": {
     "title": "连接这台电脑",

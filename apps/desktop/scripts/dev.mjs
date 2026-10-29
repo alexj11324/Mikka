@@ -13,7 +13,6 @@ const define = {
   __MIKKA_APP_URL__: JSON.stringify(process.env.MIKKA_DESKTOP_APP_URL ?? 'http://localhost:3000/mikka'),
   __MIKKA_APP_VERSION__: JSON.stringify(pkg.version),
   __MIKKA_FLAVOR__: JSON.stringify('dev'),
-  __MIKKA_AUTH_ORIGINS__: JSON.stringify(['https://github.com', 'https://accounts.google.com']),
 }
 
 let child

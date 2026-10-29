@@ -216,6 +216,9 @@
     "githubAccountNotLinked": "This GitHub account is not linked to Mikka. Sign in with the method already linked to your account, or create a Mikka account first.",
     "continueNotice": "Click the provider button to finish OAuth authorization in this tab.",
     "tabOpened": "Finish sign-in in the new tab; refresh this preview when done.",
+    "browserOpened": "Sign-in is open in your browser. You'll return to Mikka automatically.",
+    "browserFailed": "The browser could not be opened. Try again.",
+    "browserUpdateRequired": "Update Mikka before using Google or GitHub sign-in.",
     "tabBlocked": "The browser blocked the new tab. Allow pop-ups and try again.",
     "githubStartFailed": "Could not start GitHub sign-in. Please try again shortly.",
     "googleStartFailed": "Could not start Google sign-in. Please try again shortly.",
@@ -1649,7 +1652,8 @@
       "retry": "Retry sync",
       "loadError": "Could not load Linear settings.",
       "operationError": "The Linear sync action failed. Try again.",
-      "teamAlreadyLinked": "This Linear team is already connected to another Mikka account."
+      "teamAlreadyLinked": "This Linear team is already connected to another Mikka account.",
+      "browserUpdateRequired": "Update Mikka before connecting Linear from the desktop app."
     },
     "subscriptions": {
       "heading": "Model subscriptions",
@@ -1783,7 +1787,9 @@
       "takeoverNone": "Bots can no longer use {name}",
       "turnedOff": "Turned off {name}",
       "madeDefault": "{account} is now the default",
-      "openInSettings": "Manage in Settings"
+      "openInSettings": "Manage in Settings",
+      "linkInBrowser": "Continue in the browser window to finish linking. Return here when you’re done.",
+      "browserUpdateRequired": "Update Mikka before linking accounts from the desktop app."
     },
     "telegram": {
       "heading": "Messaging",
@@ -2939,6 +2945,15 @@
     "title": "Sign in to Mikka",
     "confirm": "Continue with this account",
     "cancel": "Cancel"
+  },
+  "DesktopHandoff": {
+    "returnTitle": "Return to Mikka",
+    "returnBody": "You are signed in. Opening Mikka…",
+    "openApp": "Open Mikka",
+    "finishTitle": "Returning to Mikka",
+    "finishBody": "Finishing sign-in…",
+    "finishFailed": "Sign-in did not finish. Return to Mikka and try again.",
+    "openSignIn": "Open sign-in"
   },
   "DeviceAuthorization": {
     "title": "Connect this computer",
