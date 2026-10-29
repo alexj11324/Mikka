@@ -26,7 +26,7 @@ export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | nu
     let active = true
     let inFlight = false
     let loadedTeams = false
-    let timer: ReturnType<typeof setTimeout> | undefined
+    let timer: number | undefined
     const loadState = async () => {
       if (inFlight || document.hidden) return
       inFlight = true

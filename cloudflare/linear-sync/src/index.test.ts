@@ -53,7 +53,7 @@ test('disabled Worker webhook, protected cron and scheduler never read Hyperdriv
     NEXT_PUBLIC_POSTHOG_KEY: 'test-worker-disabled',
     LINEAR_WEBHOOK_SECRET: webhookSecret,
     CRON_SECRET: 'test-worker-cron',
-    get HYPERDRIVE() { throw new Error('Disabled worker must not initialize or inspect its database') },
+    get HYPERDRIVE(): { connectionString: string } { throw new Error('Disabled worker must not initialize or inspect its database') },
   }
   const body = JSON.stringify({ action: 'update', type: 'Issue', organizationId: 'org', webhookTimestamp: Date.now(), data: { id: 'issue' } })
   const response = await handleRequest(new Request('https://sync.example.test/mikka/api/webhooks/linear', {

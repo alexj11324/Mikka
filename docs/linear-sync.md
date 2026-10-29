@@ -30,6 +30,9 @@ When paused:
 - Protected crons return `{ inbox: 0, outbox: 0, disabled: true }`; the
   Cloudflare schedule exits before loading its database runtime. Dispatch
   callbacks and all worker entry points check the same flag.
+- The suggestions recovery cron skips its Linear inbox scan and notification
+  replay; a delayed Linear connection briefing exits before database/provider
+  reads. This switch does not pause the other suggestion sources.
 - Each worker checks again **before every claim**. A job already claimed
   completes its normal processing and bookkeeping; disabling does not turn
   it into a failure, reset attempts, mark waiting jobs done or cancel it
