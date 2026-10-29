@@ -74,7 +74,8 @@ export function eventsForInbox<T extends { createdAt: Date }>(waking: readonly T
 
 /** A machine-selected task request gets its own turn; do not blend two requests. */
 export function isolateTaskRequest<T extends { kind: string; payload: Record<string, unknown> }>(waking: readonly T[]): T[] {
-  const index = waking.findIndex(event => event.kind === 'user_message' && event.payload.taskDestination !== undefined)
+  const index = waking.findIndex(event => (event.kind === 'user_message' && event.payload.taskDestination !== undefined)
+    || (event.kind === 'action_decided' && event.payload.action === 'approve_repository_push' && event.payload.status === 'done' && typeof event.payload.requestEventId === 'string'))
   if (index < 0) return [...waking]
   return index === 0 ? waking.slice(0, 1) : waking.slice(0, index)
 }

@@ -174,9 +174,10 @@ export function artifactSubmittedEvent(
 export function actionDecidedEvent(
   action: { id: string; userId: string; action: string; input: Record<string, unknown> },
   decision: { status: 'done' | 'failed' | 'declined'; error: string | null; outcome: Record<string, string> },
+  task?: { eventId: string; botId: string | null; issueId: string | null },
 ): CoordinatorEventInput {
   return {
-    userId: action.userId, kind: 'action_decided', dedupeKey: `action_decided:${action.id}`, issueId: null, runId: null,
-    payload: { actionId: action.id, action: action.action, input: action.input, status: decision.status, ...(decision.error ? { error: decision.error } : {}), outcome: decision.outcome },
+    userId: action.userId, ...(task ? { botId: task.botId } : {}), kind: 'action_decided', dedupeKey: `action_decided:${action.id}${task ? ':' + task.eventId : ''}`, issueId: task?.issueId ?? null, runId: null,
+    payload: { actionId: action.id, action: action.action, input: action.input, status: decision.status, ...(task ? { requestEventId: task.eventId } : {}), ...(decision.error ? { error: decision.error } : {}), outcome: decision.outcome },
   }
 }

@@ -19,7 +19,6 @@ import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { runPrompt } from '@/lib/run-prompt'
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
 import { runBotName } from '@/lib/run-bot-name'
-import { acceptLocalRun } from '@/lib/run-admission-store'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -59,9 +58,12 @@ export const runViewColumns = {
  * `note` is extra direction for this run only, after the issue.
  */
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
-export async function queueRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null): Promise<{ runId: string }> {
+export async function queueRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string): Promise<{ runId: string }> {
   const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional() }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
+  let requestedRepositoryKey: string
+  try { requestedRepositoryKey = normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }).key } catch { throw new ActionFailureError('repoPathInvalid') }
+  if (approvedRepositoryKey && (!requestEventId || requestedRepositoryKey !== approvedRepositoryKey)) throw new ActionFailureError('runInvalid')
   const issue = await issueForUser(userId, parsed.data.issueId)
   if (!issue) throw new ActionFailureError('issueNotFound')
   const [agent] = await db.select().from(agents)
@@ -69,7 +71,6 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
   const [device] = await db.select().from(devices).where(and(eq(devices.id, agent.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).limit(1)
   if (!device?.enabled || !localExecutionHarnesses(device.harnesses).includes(agent.harness)) throw new ActionFailureError('agentHarnessMissing')
-  try { normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }) } catch { throw new ActionFailureError('repoPathInvalid') }
   const repo = await ensureDeviceRepository(userId, agent.deviceId, parsed.data.repo)
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
@@ -86,8 +87,8 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   const agentDefinition = captureDefinition
     ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, mailboxEnabled, mailboxScope })
     : null
-  return acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}) })
+  return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
+    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}) })
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,

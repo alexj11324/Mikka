@@ -11,7 +11,7 @@ import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { personalMailboxTools } from '@/lib/mailbox-tools'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
 
-export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; taskEventId?: string; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[] }
+export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; taskEventId?: string; approvedRepositoryKey?: string; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[] }
 
 export function createCoordinatorRegistry(userId: string, botId: string | null, scope?: NativeToolScope, options: CoordinatorToolOptions = {}) {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
@@ -56,7 +56,9 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
     request_repository_push_approval: tool({
       description: 'Request the person’s explicit approval to push to this repository. This only creates a confirmation; never claim approval until the person decides.',
       inputSchema: z.object({ repo: z.string().trim().min(1).max(4000) }).strict(),
-      execute: input => steps.proposeRepositoryPushApproval(userId, input, scope),
+      execute: input => options.taskEventId
+        ? steps.proposeRepositoryPushApproval(userId, input, scope, { eventId: options.taskEventId, botId })
+        : steps.proposeRepositoryPushApproval(userId, input, scope),
     }),
     list_agents: tool({
       description: 'List available local execution tools and their computers. Use the internal id as agentId for dispatch_run with a repository URL; no repository registration is needed. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, never an Agent.',
@@ -108,7 +110,9 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
       }),
       execute: input => options.taskEventId
-        ? steps.dispatchRun(userId, input, scope, botId, execution ?? undefined, options.taskEventId)
+        ? options.approvedRepositoryKey
+          ? steps.dispatchRun(userId, input, scope, botId, execution ?? undefined, options.taskEventId, options.approvedRepositoryKey)
+          : steps.dispatchRun(userId, input, scope, botId, execution ?? undefined, options.taskEventId)
         : steps.dispatchRun(userId, input, scope, botId, execution ?? undefined),
     }),
     list_runs: tool({

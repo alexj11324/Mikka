@@ -16,7 +16,7 @@ import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
 /** Existing rows and JSON only: admission, run and publication commit together. */
 export async function acceptLocalRun(input: {
   id: string; userId: string; issueId: string; agentId: string; deviceId: string; deviceRepoId: string
-  source?: 'mcp' | null; botId: string | null; prompt: string; definition: WorkerDefinitionSnapshot; requestEventId?: string
+  source?: 'mcp' | null; botId: string | null; prompt: string; definition: WorkerDefinitionSnapshot; requestEventId?: string; approvedRepositoryKey?: string
 }): Promise<{ runId: string }> {
   return db.transaction(async tx => withDatabaseTransaction(tx, async () => {
     const invalid = () => new ActionFailureError('runInvalid')
@@ -35,6 +35,7 @@ export async function acceptLocalRun(input: {
     if (!agent || agent.deviceId !== input.deviceId || agent.harness !== input.definition.harness || !device?.enabled || !localExecutionHarnesses(device.harnesses).includes(agent.harness)) throw invalid()
     const [repo] = await tx.select().from(deviceRepos).where(and(eq(deviceRepos.id, input.deviceRepoId), eq(deviceRepos.userId, input.userId), eq(deviceRepos.deviceId, input.deviceId))).for('share')
     if (!repo?.remoteUrl || !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) throw invalid()
+    if (input.approvedRepositoryKey && (!input.requestEventId || repo.repoPath !== input.approvedRepositoryKey)) throw invalid()
     const [bot] = input.botId ? await tx.select().from(bots).where(and(eq(bots.id, input.botId), eq(bots.ownerId, input.userId))).for('share') : []
     if (input.botId && !bot) throw invalid()
     const context = { ...(bot ? { workspaceId: bot.workspaceId } : {}), ...(input.requestEventId ? { requestEventId: input.requestEventId } : {}) }

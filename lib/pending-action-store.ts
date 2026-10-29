@@ -1,9 +1,10 @@
 import 'server-only'
-import { and, desc, eq, gt, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
 import { isApprovalAction, parseActionInput } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
-import { pendingActions, repositorySettings } from '@/lib/db/schema'
+import { coordinatorEvents, pendingActions, repositorySettings } from '@/lib/db/schema'
+import { taskDestinationSchema } from './task-destination'
 import { repositoryPushApproved } from '@/lib/run-publication-policy'
 import { calendarEventSummary, PENDING_ACTION_TTL_MS, type PendingActionView } from '@/lib/pending-action-view'
 import { prepareRepositoryApproval, validateRepositoryApproval } from '@/lib/repository-approval-proposal'
@@ -12,25 +13,36 @@ import { prepareRepositoryApproval, validateRepositoryApproval } from '@/lib/rep
 const MAX_PENDING = 20
 
 /** Prepare only: the repository permission is never changed by the model. */
-export async function proposeRepositoryPush(userId: string, input: unknown) {
+export async function proposeRepositoryPush(userId: string, input: unknown, task?: { eventId: string; botId: string | null }) {
   const parsed = prepareRepositoryApproval(input)
   if (!parsed) return { error: 'repositoryInvalid' }
   return db.transaction(async tx => {
+    if (task) {
+      const [event] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, task.eventId), eq(coordinatorEvents.userId, userId), task.botId ? eq(coordinatorEvents.botId, task.botId) : isNull(coordinatorEvents.botId))).for('update')
+      const destination = taskDestinationSchema.safeParse(event?.payload.taskDestination)
+      if (!event || event.kind !== 'user_message' || !event.deliveredAt || !destination.success || destination.data.kind !== 'device') return { error: 'runInvalid' }
+    }
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['repository-approval', userId, parsed.remoteKey])}, 0))`)
     const [settings] = await tx.select({ push: repositorySettings.push }).from(repositorySettings)
       .where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, parsed.remoteKey))).limit(1)
     if (settings?.push?.approved === false) return { status: 'denied' as const }
     if (repositoryPushApproved(settings?.push, userId)) return { status: 'approved' as const }
-    const [existing] = await tx.select({ id: pendingActions.id }).from(pendingActions).where(and(
+    const [existing] = await tx.select({ id: pendingActions.id, context: pendingActions.context }).from(pendingActions).where(and(
       eq(pendingActions.userId, userId), eq(pendingActions.action, 'approve_repository_push'), eq(pendingActions.status, 'pending'),
       gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS)),
       sql`${pendingActions.input}->>'remoteKey' = ${parsed.remoteKey}`,
     )).limit(1)
-    if (existing) return { status: 'awaiting_approval' as const, actionId: existing.id }
+    if (existing) {
+      if (task) {
+        const ids = Array.isArray(existing.context?.taskEventIds) ? existing.context.taskEventIds.filter((id): id is string => typeof id === 'string') : []
+        await tx.update(pendingActions).set({ context: { ...existing.context, taskEventIds: [...new Set([...ids, task.eventId])] } }).where(eq(pendingActions.id, existing.id))
+      }
+      return { status: 'awaiting_approval' as const, actionId: existing.id }
+    }
     const waiting = await tx.$count(pendingActions, and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
     if (waiting >= MAX_PENDING) return { error: 'tooManyPendingActions' }
     const id = crypto.randomUUID()
-    await tx.insert(pendingActions).values({ id, userId, action: 'approve_repository_push', input: parsed, context: null })
+    await tx.insert(pendingActions).values({ id, userId, action: 'approve_repository_push', input: parsed, context: task ? { taskEventIds: [task.eventId] } : null })
     return { status: 'awaiting_approval' as const, actionId: id }
   })
 }

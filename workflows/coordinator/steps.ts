@@ -206,10 +206,10 @@ export async function proposeAccountAction(userId: string, action: ApprovalActio
   return proposeAction(userId, action, input)
 }
 
-export async function proposeRepositoryPushApproval(userId: string, input: { repo: string }, scope?: NativeToolScope) {
+export async function proposeRepositoryPushApproval(userId: string, input: { repo: string }, scope?: NativeToolScope, task?: { eventId: string; botId: string | null }) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  return proposeRepositoryPush(userId, input)
+  return proposeRepositoryPush(userId, input, task)
 }
 
 export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope) {
@@ -258,10 +258,10 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
 }
 
 /** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution, requestEventId?: string) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId, execution, requestEventId)), status: 'queued' }))
+  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId, execution, requestEventId, null, approvedRepositoryKey)), status: 'queued' }))
 }
 
 /** Only the person's own Bots in workspaces they still belong to are listed. */

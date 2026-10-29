@@ -14,6 +14,10 @@ test('machine-selected requests get separate turns in inbox order', () => {
   assert.deepEqual(isolateTaskRequest([first, second, normal]), [first])
   assert.deepEqual(isolateTaskRequest([second, normal]), [second])
   assert.deepEqual(isolateTaskRequest([normal]), [normal])
+  const approval = { kind: 'action_decided', payload: { action: 'approve_repository_push', status: 'done', requestEventId: 'one' } }
+  const otherApproval = { ...approval, payload: { ...approval.payload, requestEventId: 'two' } }
+  assert.deepEqual(isolateTaskRequest([normal, approval, otherApproval]), [normal])
+  assert.deepEqual(isolateTaskRequest([approval, otherApproval, second]), [approval], 'an approved task resumes in its own host turn')
 })
 
 test('clear cases follow the rules', () => {

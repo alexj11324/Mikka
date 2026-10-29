@@ -7,7 +7,10 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
-import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, pendingActions, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { z } from 'zod'
+import { taskDestinationSchema } from '@/lib/task-destination'
+import { validateRepositoryApproval } from '@/lib/repository-approval-proposal'
 import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
@@ -83,6 +86,7 @@ export interface InboxTake {
   /** A handed-over verification code: the push says only that one came, the code stays in the app chat. */
   pushHidesText: boolean
   taskEventId?: string
+  approvedRepositoryKey?: string
 }
 
 const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushReasons: [], pushHidesText: false }
@@ -100,7 +104,23 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
     const due = isolateTaskRequest(candidates)
     if (!due.length) return { held: true, ...NO_TAKE }
-    const isolatedTask = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined
+    let taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
+    let approvedRepositoryKey: string | undefined
+    const approval = due.length === 1 && due[0].kind === 'action_decided' && due[0].payload.action === 'approve_repository_push' && due[0].payload.status === 'done' ? due[0] : undefined
+    if (approval && z.uuid().safeParse(approval.payload.requestEventId).success && z.uuid().safeParse(approval.payload.actionId).success) {
+      const [request] = await tx.select().from(pendingActions).where(and(eq(pendingActions.id, approval.payload.actionId as string), eq(pendingActions.userId, userId), eq(pendingActions.action, 'approve_repository_push'), eq(pendingActions.status, 'done'))).limit(1)
+      const taskIds = z.array(z.uuid()).safeParse(request?.context?.taskEventIds)
+      const binding = validateRepositoryApproval(request?.input)
+      if (binding && taskIds.success && taskIds.data.includes(approval.payload.requestEventId as string)) {
+        const [original] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, approval.payload.requestEventId as string), eventsOf(userId, botId), eq(coordinatorEvents.kind, 'user_message'))).limit(1)
+        const destination = taskDestinationSchema.safeParse(original?.payload.taskDestination)
+        if (original?.deliveredAt && destination.success && destination.data.kind === 'device') {
+          taskEventId = original.id
+          approvedRepositoryKey = binding.remoteKey
+        }
+      }
+    }
+    const isolatedTask = Boolean(taskEventId) || Boolean(approval)
     const backgroundLimit = isolatedTask ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
@@ -116,7 +136,8 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     const handoffs = events.filter(event => isHandoff(event.kind))
     return {
       held: true, added: events.length,
-      ...(isolatedTask ? { taskEventId: due[0].id } : {}),
+      ...(taskEventId ? { taskEventId } : {}),
+      ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : telegramReplyTargets(events),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),

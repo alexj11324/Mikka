@@ -7,7 +7,9 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { actionDecidedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { db } from '@/lib/db'
-import { pendingActions, repositorySettings } from '@/lib/db/schema'
+import { coordinatorEvents, pendingActions, repositorySettings } from '@/lib/db/schema'
+import { z } from 'zod'
+import { taskDestinationSchema } from './task-destination'
 import { validateRepositoryApproval } from '@/lib/repository-approval-proposal'
 import { actionOutcome, PENDING_ACTION_TTL_MS } from '@/lib/pending-action-view'
 
@@ -33,6 +35,15 @@ export async function decidePendingAction(userId: string, id: string, approve: b
       if (!request) throw new ActionFailureError('pendingActionUnavailable')
       const decidedInput = validateRepositoryApproval(request.input)
       if (!decidedInput || decidedInput.remoteKey !== input.remoteKey || decidedInput.repo !== input.repo) throw new ActionFailureError('pendingActionUnavailable')
+      const taskIds = z.array(z.uuid()).safeParse(request.context?.taskEventIds ?? [])
+      if (!taskIds.success) throw new ActionFailureError('pendingActionUnavailable')
+      const tasks: { eventId: string; botId: string | null; issueId: string | null }[] = []
+      for (const id of new Set(taskIds.data)) {
+        const [event] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, id), eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.kind, 'user_message'))).limit(1)
+        const destination = taskDestinationSchema.safeParse(event?.payload.taskDestination)
+        if (!event?.deliveredAt || !destination.success || destination.data.kind !== 'device') throw new ActionFailureError('pendingActionUnavailable')
+        tasks.push({ eventId: event.id, botId: event.botId, issueId: event.issueId })
+      }
       if (approve) {
         const push = { approved: true, remote: 'origin', approvedByUserId: userId, approvedAt: new Date().toISOString() }
         await tx.insert(repositorySettings).values({ userId, remoteKey: input.remoteKey, push }).onConflictDoUpdate({
@@ -40,7 +51,10 @@ export async function decidePendingAction(userId: string, id: string, approve: b
         })
       }
       const status = approve ? 'done' as const : 'declined' as const
-      await recordCoordinatorEvent(tx, actionDecidedEvent({ id: request.id, userId, action: request.action, input: request.input }, { status, error: null, outcome: {} }))
+      const action = { id: request.id, userId, action: request.action, input: request.input }
+      if (tasks.length) {
+        for (const task of tasks) await recordCoordinatorEvent(tx, actionDecidedEvent(action, { status, error: null, outcome: {} }, task))
+      } else await recordCoordinatorEvent(tx, actionDecidedEvent(action, { status, error: null, outcome: {} }))
     })
     const status = approve ? 'done' as const : 'declined' as const
     await wakeCoordinator(userId)

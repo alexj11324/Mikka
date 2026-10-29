@@ -4,6 +4,7 @@ import { ActionFailureError } from './action-error'
 import { agentRuns, bots, deviceRepos, repositorySettings, runMessages } from './db/schema'
 import { matchesRepositoryAdmission } from './repository-admission'
 import { repositoryPushApproved } from './run-publication-policy'
+import { remoteKey } from '@mikka/protocol/repository'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import type { db } from './db'
 
@@ -20,13 +21,15 @@ export async function sendOwnedRunMessage(database: RunControlDatabase, userId: 
     if (run.deviceRepoId) {
       const [repo] = await tx.select().from(deviceRepos).where(and(eq(deviceRepos.id, run.deviceRepoId), eq(deviceRepos.userId, userId))).limit(1)
       if (!repo || !repo.remoteUrl) throw new ActionFailureError('runInvalid')
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['repository-approval', userId, repo.repoPath])}, 0))`)
-      const [setting] = await tx.select().from(repositorySettings).where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, repo.repoPath))).limit(1)
+      let key: string
+      try { key = remoteKey(repo.remoteUrl) } catch { throw new ActionFailureError('runInvalid') }
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['repository-approval', userId, key])}, 0))`)
+      const [setting] = await tx.select().from(repositorySettings).where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, key))).limit(1)
       const receipt = run.agentDefinition?.repositoryAdmission
       if (receipt) {
         const [bot] = run.botId ? await tx.select().from(bots).where(and(eq(bots.id, run.botId), eq(bots.ownerId, userId))).for('share') : []
-        if (!run.issueId || !run.deviceId || repo.deviceId !== run.deviceId || !matchesRepositoryAdmission(receipt, { userId, issueId: run.issueId, deviceId: run.deviceId, agentId: run.agentId,
-          remoteKey: repo.repoPath, remoteUrl: repo.remoteUrl, targetBranch: receipt.targetBranch, workspaceId: bot?.workspaceId, workspaceLinked: receipt.workspaceLinked, requestEventId: receipt.requestEventId })
+        if (!run.issueId || !run.deviceId || repo.deviceId !== run.deviceId || repo.repoPath !== key || !matchesRepositoryAdmission(receipt, { userId, issueId: run.issueId, deviceId: run.deviceId, agentId: run.agentId,
+          remoteKey: key, remoteUrl: repo.remoteUrl, targetBranch: receipt.targetBranch, workspaceId: bot?.workspaceId, workspaceLinked: receipt.workspaceLinked, requestEventId: receipt.requestEventId })
           || !await (await import('./run-admission-store')).acceptedEventStillMatches(receipt, run.botId, tx) || !repositoryPushApproved(setting?.push, userId)) throw new ActionFailureError('runInvalid')
       } else if (setting?.push?.approved === false) throw new ActionFailureError('runInvalid')
     }
