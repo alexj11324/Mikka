@@ -1,4 +1,5 @@
 import { withBasePath } from '@/lib/base-path'
+import { UPLOADED_AVATAR_PATH } from '@/lib/account/avatar-file'
 
 /** The default avatars in public/avatars (scripts/generate-default-avatars.py draws them). */
 export const DEFAULT_AVATARS = ['blue', 'green', 'purple', 'orange', 'red'] as const
@@ -16,8 +17,11 @@ export function newUserAvatar(key: string) {
   return `/avatars/${DEFAULT_AVATARS[Math.abs(hash) % DEFAULT_AVATARS.length]}.webp`
 }
 
-/** Where to load a user's stored image from: a stored default avatar sits under the app's base path. */
+/**
+ * Where to load a user's stored image from: a stored default avatar and an
+ * uploaded picture (lib/account/avatar-file.ts) sit under the app's base path.
+ */
 export function avatarImageSrc(image: string | null | undefined) {
   if (!image) return undefined
-  return STORED.test(image) ? withBasePath(image) : image
+  return STORED.test(image) || UPLOADED_AVATAR_PATH.test(image) ? withBasePath(image) : image
 }

@@ -112,6 +112,20 @@ export const ACTION_ERROR_CODES = [
   'workspaceMembershipSuspended',
   'inviteInvalidEmails',
   'workspaceReadFailed',
+  'avatarInvalidType',
+  'avatarTooLarge',
+  'passwordIncorrect',
+  'passwordTooShort',
+  'passwordTooLong',
+  'passwordNotSet',
+  'passwordAlreadySet',
+  'sessionNotFound',
+  'sessionIsCurrent',
+  'emailUnavailable',
+  'emailDeliveryFailed',
+  'dataExportRateLimited',
+  'accountEmailMismatch',
+  'accountSoleAdmin',
 ] as const
 
 export type ActionErrorCode = (typeof ACTION_ERROR_CODES)[number]
