@@ -95,3 +95,13 @@ export function runTitle(run: RunSource): string {
   const key = run.issue.identifier ?? (run.issue.number === null ? null : `#${run.issue.number}`)
   return key ? `${key} ${run.issue.title}` : run.issue.title
 }
+
+/** A proposal waiting for the person (`GET /api/pending-actions`; lib/pending-action-view.ts on the server). */
+export interface PendingAction {
+  id: string
+  action: 'send_email' | 'create_calendar_event' | 'update_calendar_event' | (string & {})
+  input: Record<string, unknown>
+  context: { summary?: string; start?: string; end?: string } | null
+  status: string
+  createdAt: string
+}

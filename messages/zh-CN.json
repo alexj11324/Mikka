@@ -124,6 +124,8 @@
     "members": "成员管理",
     "inviteMembers": "邀请成员",
     "plugins": "插件",
+    "suggestions": "建议",
+    "artifacts": "Artifact",
     "toggleTeam": "展开或收起 {name} 团队",
     "sidebarRail": "展开或收起侧栏边轨",
     "rail": "主导航",
@@ -919,6 +921,7 @@
     "generic": "操作未成功，请稍后重试。",
     "authRequired": "请先登录。",
     "validationGeneric": "请检查填写内容。",
+    "issueToolsDisabled": "暂时无法创建任务。",
     "validationTitleRequired": "请填写任务标题。",
     "validationNameRequired": "请填写名称。",
     "teamIdentifierInvalid": "标识须为 2–12 位大写字母或数字，并以字母开头。",
@@ -949,6 +952,8 @@
     "runInvalid": "运行参数不正确。",
     "runNotFound": "运行不存在。",
     "artifactNotFound": "找不到这个成果。",
+    "suggestionNotFound": "这条建议已经处理过了。",
+    "coordinatorUnavailable": "Coordinator 现在不可用，稍后再试。",
     "messageRequired": "消息不能为空。",
     "submissionConflict": "此提交标识已用于另一条消息。",
     "pendingActionUnavailable": "这项操作已处理或已过期。",
@@ -2439,9 +2444,14 @@
       "title": "线程",
       "empty": "还没有线程",
       "untitled": "未命名线程",
-      "waiting": "等你回复",
-      "failed": "失败",
-      "screen": "屏幕"
+      "justNow": "刚刚",
+      "yesterday": "昨天",
+      "group": {
+        "waiting": "等待回复（{count}）",
+        "running": "进行中（{count}）",
+        "idle": "空闲（{count}）",
+        "resolved": "已解决（{count}）"
+      }
     },
     "newBot": {
       "title": "新建 Bot",
@@ -2507,25 +2517,30 @@
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
     "panel": {
       "label": "右栏",
+      "views": "右栏视图",
+      "overview": "概览",
+      "allThreads": "全部线程",
       "tabs": "右栏内容",
       "details": "详情",
-      "tasks": "任务",
-      "browser": "浏览器",
-      "knowledge": "知识库",
-      "schedules": "定时任务",
+      "threads": "线程",
+      "prs": "PR",
+      "computer": "电脑",
+      "routines": "例行",
+      "library": "资料库",
+      "expand": "展开",
+      "noRoutines": "还没有例行",
+      "noLibrary": "还没有资料",
+      "noPullRequests": "还没有 PR",
+      "prGroup": {
+        "review": "等待审查（{count}）",
+        "running": "进行中（{count}）",
+        "merged": "已合并（{count}）"
+      },
       "search": "搜索",
       "widen": "加宽右栏",
       "narrow": "恢复右栏宽度",
       "close": "关闭右栏",
       "open": "打开右栏"
-    },
-    "details": {
-      "conversation": "当前对话",
-      "kind": "类型",
-      "coordinatorKind": "Coordinator",
-      "agentKind": "Agent 对话",
-      "updated": "最近活动",
-      "none": "还没有消息"
     },
     "suggestions": {
       "title": "建议",
@@ -2550,32 +2565,6 @@
         "github": "GitHub",
         "linear": "Linear"
       }
-    },
-    "tasks": {
-      "mine": "任务",
-      "waiting": "等你",
-      "running": "运行中",
-      "failed": "出错",
-      "doneToday": "已完成",
-      "today": "今天 {count}",
-      "empty": "还没有任务",
-      "status": {
-        "waiting_input": "等你回复",
-        "queued": "排队中",
-        "preparing": "准备中",
-        "running": "运行中",
-        "finishing": "收尾中",
-        "failed": "失败",
-        "succeeded": "已完成"
-      }
-    },
-    "empty": {
-      "browser": "还没打开过网页",
-      "knowledge": "还没有资料",
-      "schedules": "还没有定时任务",
-      "arrange": "让 Agent 安排",
-      "knowledgePrompt": "帮我把常用的资料整理进知识库：",
-      "schedulesPrompt": "帮我设一个定时任务："
     },
     "newTaskDialog": {
       "title": "新建任务",
@@ -2684,6 +2673,40 @@
       "unassigned": "未分配"
     }
   },
+  "SuggestionsPage": {
+    "title": "建议",
+    "refresh": "刷新建议",
+    "loadError": "建议加载失败。",
+    "retry": "重试",
+    "loading": "正在加载建议",
+    "empty": "暂时没有要看的消息",
+    "connect": "连接应用",
+    "action": {
+      "reply": "回复",
+      "review": "Review",
+      "handle": "处理",
+      "read": "查看"
+    },
+    "original": "原文：「{title}」"
+  },
+  "ArtifactsPage": {
+    "title": "Artifact",
+    "category": {
+      "all": "全部",
+      "documents": "文档",
+      "pages": "网页"
+    },
+    "columns": {
+      "name": "名称",
+      "source": "来源",
+      "updated": "上次活动"
+    },
+    "loadError": "Artifact 加载失败。",
+    "retry": "重试",
+    "loading": "正在加载 Artifact",
+    "empty": "还没有 Artifact",
+    "threadEntry": "Artifact · {count}"
+  },
   "Artifact": {
     "kindDocument": "文档",
     "kindPage": "网页",
@@ -2754,5 +2777,10 @@
   },
   "MobilePush": {
     "verificationCode": "收到一条验证码"
+  },
+  "MobileHandoff": {
+    "title": "登录 Mikka",
+    "confirm": "使用此账号继续",
+    "cancel": "取消"
   }
 }

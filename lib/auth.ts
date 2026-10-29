@@ -4,7 +4,7 @@ import { multiSession } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { expo } from '@better-auth/expo'
-import { oAuthProxy } from 'better-auth/plugins'
+import { oAuthProxy, oneTimeToken } from 'better-auth/plugins'
 import { pool } from '@/lib/db'
 import { withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
@@ -83,6 +83,8 @@ export const auth = betterAuth({
     ...(proxyOptions ? [oAuthProxy(proxyOptions)] : []),
     // The iOS app signs in through the system browser and keeps its session cookie in the keychain.
     expo(),
+    // The app opens a web page signed in as the person (app/api/mobile/open): a one-minute, single-use token, stored hashed.
+    oneTimeToken({ expiresIn: 1, storeToken: 'hashed' }),
     multiSession(),
     oauthProvider({
       loginPage: withBasePath('/sign-in'),
