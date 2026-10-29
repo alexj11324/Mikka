@@ -9,10 +9,10 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Job | Use | Notes |
 | --- | --- | --- |
 | App shell (window, top bar, rail, content card) | `components/app-shell.tsx`, `components/nav/icon-rail.tsx` | Comma structure, R-35 |
-| Bot list (left) | `components/nav/conversation-list.tsx` | Lists bots; the file name is old, the model is the glossary's |
+| Bot list (left) | `components/nav/bot-list.tsx` | Coordinator and bots, R-01 |
 | Centre chat title | `components/nav/conversation-pill.tsx` | Borderless, centred |
 | Right panel | `components/nav/context-panel.tsx` | No input box in the thread list or under a screen; an open thread ends in the composer, R-10 |
-| Composer | the composer in `components/coordinator/coordinator-chat.tsx` (`InputGroup` + `InputGroupTextarea`) | Attachment button, no model picker. Reuse it for every chat |
+| Composer | `ChatComposer` in `components/coordinator/chat-composer.tsx` (`InputGroup` + `InputGroupTextarea`) | Attachment button, no model picker. Reuse it for every chat |
 | Messages | `components/ui/message.tsx`, `components/ui/bubble.tsx`, `MessageScroller*` | R-13, R-14 |
 | Task, run and source chips in chat | OpenUI `TaskChip`, `RunChip`, `SourceChip` (`components/workspace/agent-ui-library.tsx`, data from `agent-citations.tsx`) | R-15 |
 | Thread card under a Coordinator reply | `components/coordinator/thread-card.tsx`; opens `IssueThreadPanel` in the centre | R-66 |
@@ -21,22 +21,22 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Board | reUI `Kanban` (`components/reui/kanban.tsx`) | R-25 |
 | Status | StatusBadge set; `components/nav/status-dot.tsx` for devices | R-24, R-34 |
 | People avatars | `components/nav/letter-avatar.tsx`, `components/user-avatar.tsx` | |
-| Bot avatars | `BotAvatar` (bloub, Figma `196:3571`) | R-36. Not on main yet: it lands with the bot list PR |
+| Bot avatars | `BotAvatar` (`components/nav/bot-avatar.tsx`, bloub, Figma `196:3571`) | R-36 |
 | Buttons, badges, dialogs, menus, tabs, switches | reUI first, then `components/ui/*` | Figma style guide rule 4 |
 | Brand mark | inline SVG per `brand.md` | |
+| 建议 page (rail) | `components/suggestions/suggestion-feed.tsx`; cards from `components/suggestions/mobile-card.tsx` (`SuggestionCardBody`, `SourceMark`) | Figma F8 `420:5831`, R-21. A tapped card heads the person's message in the Coordinator chat (`lib/suggestions/card.ts`) |
+| Artifact page (rail) | `components/artifacts/artifact-library.tsx`, opening `ArtifactWindow` (the reader beside the thread or Coordinator chat) | Figma F2 `395:27790`, F4 `395:27525`. Rail icon `components/icons/artifact-icon.tsx`, never lucide Copy/Library |
 | Agent outputs (documents, web pages) | `components/artifacts/`: `ArtifactCard` (in chat), `ArtifactChip` (chat beside the reader), `ArtifactViewer` (reader), `ArtifactQuoteChip` / `ArtifactQuoteLine` | Figma `178:11626`. Quoted text is marked by `remarkMarks`, never by touching the DOM |
 
 ## Do not use
 
-These still exist in the repo, mostly for the old agent page. Copying from
-them is how retired designs came back. Do not import them into new UI; delete
-them when their last caller goes.
+Files and patterns that brought retired designs back. Do not import them into
+new UI; check remaining source and test references before a cleanup removes them.
 
 | Component | Why not | What brought it back |
 | --- | --- | --- |
 | `components/agents/prompt-input.tsx` (`models`, `onModelChange`) | Has a model picker (R-11) | Model picker reappeared in a bot chat |
-| `components/workspace/agent-welcome.tsx`, `agent-starters.tsx` | Starter cards (R-12) | "试试从这些事情开始" in a bot chat |
-| `components/workspace/agent-composer.tsx` | Starters in the `+` menu; second composer (R-10, R-12) | |
+| `components/workspace/agent-starters.tsx` | Starter cards (R-12) | "试试从这些事情开始" in a bot chat |
 | `components/workspace/agent-demo*.tsx` | Demo content | |
 | `components/app-sidebar.tsx`, `nav-main.tsx`, `nav-secondary.tsx` | shadcn sidebar shell, replaced by the Comma shell; no callers left, safe to delete | Shell that "looked like a wireframe" |
 | reUI Pro App Shell blocks (`app-shell-*`) | Extensible shells that do not fit Mikka (Alex 2026-10-23) | |

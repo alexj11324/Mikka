@@ -1,0 +1,13 @@
+# Personal write transaction foundation
+
+Related #177, #208, #308. This first independent batch adds cancellation-safe transaction ownership; the approved-write product endpoint, operation ledger and durable Coordinator receipt remain separate candidates. No product caller, tool registration, feature enablement, schema/column, migration, workspace membership helper or authorization policy is added here. Existing application, session and pending-action reads/writes are byte-for-byte unchanged from main.
+
+`writeTransaction(pool, work, options)` consumes an existing Pool, optional host request AbortSignal, optional host-owned lease guard and optional same-client final authorization callback. It never derives authority from JSON, an owner string, model output or a cancellation result. Callers must hold their existing authorization locks and supply their own final permission check. The host lease is acquired after APP parent/head locks and held through COMMIT; no model/provider work should run while it is held.
+
+A client is owned before an abortable checkout wait; late checkout, pending-query cancellation and unknown outcomes discard the client. Late authorization leases share one close Promise, and finalization failures cannot report success. The default control cancellation helper uses only the checked-out connection endpoint/PID/key, with1000ms bound; it sends neither SQL nor login and does not weaken TLS verification. `closed-after-send`/EOF is not ACK or business cancellation evidence.
+
+Sent but unacknowledged COMMIT throws MailboxError409/commitState=unconfirmed; acknowledged COMMIT followed by finalization failure reports503/committed. Do not retry either transaction body automatically. No new intent, ledger row, credential or connection selector is created by these helpers.
+
+Four shared helper source files came from owner287 frozen0f9492d13d69bc95245dd196de45fab539b4bfe6 and retain exact content. Its workspace membership implementation is deliberately not included: the original owner is fixing a separate checkout/abort race, while the larger308 candidate has an independently tested ownership wrapper. This PR neither imports the old287 stack nor changes its branch.
+
+Pure tests use in-memory EventEmitters/query results and injected cancellation wire; no actual PG, TLS, model/provider or cancellation latency acceptance is claimed. Existing CI retains its full required PG/browser suites on disposable runner resources. No retained local test database, World evidence, production resource or real user credential is a test target. Real PG/WS cancellation latency, native STOP signal propagation and the product route require later reviewed batches/acceptance; no schema-dependent ordinary path ships here.
