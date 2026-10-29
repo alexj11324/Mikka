@@ -373,12 +373,43 @@ Enable with `MIKKA_CLOUD_THREAD_MACHINES=1`. Enqueue then writes one
 `thread_machines` row in `starting`, and `claimCloudRun` accepts the run only
 from that dedicated cloud device.
 
-Cost boundaries that exist today: one machine per cloud thread; idle pause after
-15 minutes, with the provider timeout refreshed only while the run is active; a
-hard end after 24 hours, a terminal run state, or an explicit `end`. A paused
-machine still bills for disk, so ending is the only way to stop it. There is no
-spend budget in code or schema: do not enable the flag on a workspace whose
-provider spend is not already approved.
+Cost boundaries: one machine per cloud thread; idle pause after 15 minutes, with
+the provider timeout refreshed only while the run is active; a hard end after 12
+hours, a terminal run state, or an explicit `end`.
+
+E2B bills per second only while a sandbox is running: "You only pay while a
+sandbox is actively running. Once a sandbox is paused, killed or times out,
+billing stops immediately." Storage is included, and a paused sandbox is kept
+indefinitely, so a paused machine costs nothing and counts only against state,
+never against the compute budget.
+
+`ensureThreadMachine` enforces hard spend guards before any provider call. The
+workspace and owner advisory locks make the count race-free, so two provisioning
+runs cannot both take the last slot:
+
+| Setting | Default | Blocks |
+| --- | --- | --- |
+| `MIKKA_THREAD_MACHINES_PER_OWNER` | `3` | A 4th running machine for one owner |
+| `MIKKA_THREAD_MACHINES_PER_WORKSPACE` | `20` | A 21st running machine in one workspace |
+| `MIKKA_THREAD_MACHINE_MONTHLY_COMPUTE_HOURS` | `60` | The owner's rolling 30-day E2B-billed compute hours |
+
+A blocked request returns `429` (`Thread machine limit reached`, `Workspace
+machine limit reached`, or `Thread machine budget exhausted`); it never
+provisions or bills. Invalid, zero or negative settings fall back to the
+defaults, so there is no "unlimited" configuration.
+
+Compute hours are tracked, not assumed: the migration adds `runningSince` and
+`computeSeconds` to `thread_machines`. Provisioning sets `runningSince`; a
+provider auto-pause detected on resume, a manual pause and an end accumulate the
+elapsed running interval and clear `runningSince`, so paused time is never
+counted. The budget sums `computeSeconds` plus any interval still running.
+
+The defaults follow comparable products, adjusted for the 2 vCPU shape: Cursor
+Pro runs up to 8 concurrent Cloud Agents per account, so one owner gets 3;
+GitHub Codespaces grants free accounts 120 core-hours a month (60 real hours on
+a 2-core machine) and a 12-hour maximum lifetime, which matches the 60-hour
+budget and the 12-hour end; E2B enforces concurrent running sandboxes per team,
+and 20 stays inside the Hobby ceiling.
 
 Disable by draining first. The flag is read at enqueue and at claim, so turning
 it off while a thread run is still queued sends that run down the Bot-machine

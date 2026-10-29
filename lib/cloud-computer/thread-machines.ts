@@ -1,11 +1,12 @@
 import 'server-only'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { Sandbox } from 'e2b'
 import { z } from 'zod'
 import { ComputerError } from '@/lib/computer/store'
 import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant, ensureHostedRunnerImage } from '@/lib/computer/e2b-provider'
 import { installSubagentRuntime, runtimeRequest } from './runtime'
+import { threadMachineLimits, threadMachineViolation, type ThreadMachineLimits } from './thread-machine-limits'
 import type { Actor } from './subagents'
 function options() {
   const key = process.env.E2B_API_KEY
@@ -34,6 +35,36 @@ async function workspaceSnapshot(pool: Pool, actor: Actor, source: Sandbox, repo
     ON CONFLICT ("workspaceId","ownerId") DO UPDATE SET "sourceRevision"=$3,"lockDigest"=$4,"snapshotId"=$5,"createdAt"=now()`, [actor.workspaceId, actor.userId, revision, lockDigest, snapshot.snapshotId])
   return snapshot.snapshotId
 }
+/** Hard spend guard. Counts running machines and E2B-billed compute seconds:
+ * paused sandboxes are not billed, so only tracked running intervals count.
+ * The caller holds the workspace and owner advisory locks so two provisioning
+ * runs cannot both observe the last slot. */
+export async function assertThreadMachineCapacity(
+  client: Pick<PoolClient, 'query'>,
+  actor: Actor,
+  runId: string,
+  limits: ThreadMachineLimits = threadMachineLimits(),
+) {
+  const { rows: [active] } = await client.query<{ ownerActive: number; workspaceActive: number }>(
+    `SELECT count(*) FILTER (WHERE "ownerId"=$2)::int AS "ownerActive", count(*)::int AS "workspaceActive"
+      FROM thread_machines WHERE "workspaceId"=$1 AND state IN ('starting','running') AND "runId"<>$3`,
+    [actor.workspaceId, actor.userId, runId],
+  )
+  const { rows: [used] } = await client.query<{ ownerComputeHours: number | string }>(
+    `SELECT COALESCE(sum("computeSeconds" + CASE WHEN "runningSince" IS NULL THEN 0 ELSE EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")) END),0) / 3600.0 AS "ownerComputeHours"
+      FROM thread_machines WHERE "ownerId"=$1 AND "createdAt">clock_timestamp()-interval '30 days'`,
+    [actor.userId],
+  )
+  const violation = threadMachineViolation({
+    ownerActive: active.ownerActive,
+    workspaceActive: active.workspaceActive,
+    ownerComputeHours: Number(used.ownerComputeHours),
+  }, limits)
+  if (violation === 'owner') throw new ComputerError(429, 'Thread machine limit reached')
+  if (violation === 'workspace') throw new ComputerError(429, 'Workspace machine limit reached')
+  if (violation === 'budget') throw new ComputerError(429, 'Thread machine budget exhausted')
+}
+
 /** The queued run is moved to a dedicated device before any worker can claim
  * it. Bot workers are denied these runs by claimCloudRun. */
 export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: string) {
@@ -54,9 +85,17 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (machine?.state === 'running' && machine.sandboxId) {
       const state = await Sandbox.getInfo(machine.sandboxId, options())
       if (state.state !== 'paused') { await client.query('COMMIT'); return { runId, state: 'running' } }
+      // The provider paused this sandbox on its own timeout. E2B stops billing
+      // at pause, so persist the end of the running interval before resuming.
+      await client.query(`UPDATE thread_machines SET "computeSeconds"="computeSeconds"+GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,"runningSince"=NULL,state='paused' WHERE "runId"=$1 AND "runningSince" IS NOT NULL`, [runId])
       machine.state = 'paused'
     }
     if (machine?.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now() && machine.state !== 'paused') throw new ComputerError(409, 'Thread provisioning in progress')
+    // The workspace lock is taken first so owners in one workspace cannot race
+    // the shared slot; the owner lock then covers their own budget.
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machines:ws:${actor.workspaceId}`])
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machines:owner:${actor.userId}`])
+    await assertThreadMachineCapacity(client, actor, runId)
     if (!machine || machine.snapshotId === 'pending') {
       const source = await connectComputer(run.botSandboxId)
       const snapshotId = await workspaceSnapshot(client as unknown as Pool, actor, source, run.repoPath)
@@ -116,7 +155,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       if (!ready) await new Promise(resolve => setTimeout(resolve, 500))
     } while (!ready && Date.now() < deadline)
     if (!ready) throw new Error('Thread worker did not register')
-    const finished = await pool.query('UPDATE thread_machines SET state=\'running\',"lastActiveAt"=now(),"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\' RETURNING "runId"', [runId, leaseId])
+    const finished = await pool.query('UPDATE thread_machines SET state=\'running\',"lastActiveAt"=now(),"runningSince"=now(),"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\' RETURNING "runId"', [runId, leaseId])
     if (!finished.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
     return { runId, state: 'running' }
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
@@ -175,7 +214,7 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
       creationPending = !sandboxId && Boolean(locked.workerLeaseId || locked.workerLeaseUntil)
       await client.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=COALESCE("stopRequestedAt",now()),"finishedAt"=COALESCE("finishedAt",now())
         WHERE id=$1 AND "userId"=$2 AND status NOT IN ('succeeded','failed','stopped','cancelled')`, [runId, actor.userId])
-      await client.query('UPDATE thread_machines SET state=\'ended\',"endedAt"=COALESCE("endedAt",now()),"workerLeaseId"=NULL,"workerLeaseUntil"=CASE WHEN $2 THEN COALESCE("workerLeaseUntil",now()) ELSE NULL END WHERE "runId"=$1', [runId, creationPending])
+      await client.query('UPDATE thread_machines SET state=\'ended\',"endedAt"=COALESCE("endedAt",now()),"computeSeconds"="computeSeconds"+GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,"runningSince"=NULL,"workerLeaseId"=NULL,"workerLeaseUntil"=CASE WHEN $2 THEN COALESCE("workerLeaseUntil",now()) ELSE NULL END WHERE "runId"=$1', [runId, creationPending])
       await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [locked.deviceId])
       await client.query('COMMIT')
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
@@ -198,7 +237,7 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
       const run = (await client.query('SELECT status FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
       if (run?.status !== 'queued') throw new ComputerError(409, 'Only an idle unclaimed thread can pause; an active run keeps its lease')
       await sandbox.pause()
-      await client.query('UPDATE thread_machines SET state=\'paused\' WHERE "runId"=$1', [runId])
+      await client.query(`UPDATE thread_machines SET state='paused',"computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL WHERE "runId"=$1`, [runId])
       await client.query('COMMIT')
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   }
