@@ -147,6 +147,8 @@ export const ACTION_ERROR_CODES = [
   'billingNoSubscription',
   'billingPlanInvalid',
   'billingProviderFailed',
+  'savedLoginNotFound',
+  'deviceHasActiveRuns',
 ] as const
 
 export type ActionErrorCode = (typeof ACTION_ERROR_CODES)[number]

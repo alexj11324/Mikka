@@ -206,6 +206,10 @@ export const devices = pgTable('devices', {
   computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),
   /** Off: the device stays registered but the orchestrator gives it no runs. */
   enabled: boolean('enabled').notNull().default(true),
+  /** The person renamed it; a daemon re-register keeps this name. */
+  nameLocked: boolean('nameLocked').notNull().default(false),
+  /** Removed from settings: a tombstone that keeps run history (lib/device-removal.ts). */
+  removedAt: timestamp('removedAt', { withTimezone: true }),
   maxConcurrentRuns: integer('maxConcurrentRuns').notNull().default(3),
   lastSeenAt: timestamp('lastSeenAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
@@ -234,6 +238,14 @@ export const deviceTokens = pgTable('device_tokens', {
   revokedAt: timestamp('revokedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('device_tokens_hash_key').on(table.tokenHash), index('device_tokens_user_idx').on(table.userId)])
+
+/** Which daemon credential has acted as which device; removing the device revokes these. */
+export const deviceTokenDevices = pgTable('device_token_devices', {
+  tokenId: uuid('tokenId').notNull().references(() => deviceTokens.id, { onDelete: 'cascade' }),
+  deviceId: uuid('deviceId').notNull().references(() => devices.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.tokenId, table.deviceId] }), index('device_token_devices_device_idx').on(table.deviceId)])
 
 /** A git repo on a device that agents may work in. */
 export const deviceRepos = pgTable('device_repos', {

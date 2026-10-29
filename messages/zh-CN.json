@@ -1050,6 +1050,8 @@
     "runDispatchKeyConflict": "此请求标识已用于不同的运行参数。",
     "runNotActive": "此运行已结束，且没有可回答的问题。",
     "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。",
+    "savedLoginNotFound": "此登录信息不存在或已删除。",
+    "deviceHasActiveRuns": "此设备上有正在运行的线程，停止后才能移除。",
     "workspaceSlugTaken": "这个链接地址已被使用，换一个。",
     "workspaceIconInvalid": "图标须为不超过 200 KB 的 PNG、JPEG、WebP 或 GIF 图片。",
     "workspaceDeleteNameMismatch": "输入的名称与工作区名称不一致。",
