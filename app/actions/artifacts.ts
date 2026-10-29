@@ -1,15 +1,28 @@
 'use server'
 
 import { headers } from 'next/headers'
+import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
-import { createShare, readArtifact, readArtifactContent, revokeShares, type ArtifactDetail } from '@/lib/artifacts/store'
+import { createShare, listArtifacts as listOwnArtifacts, listRunArtifacts as listOwnRunArtifacts, readArtifact, readArtifactContent, revokeShares, type ArtifactDetail, type ArtifactListItem } from '@/lib/artifacts/store'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   return session.user.id
+}
+
+/** Every artifact of the person's, last changed first, for the Artifact page. */
+export async function listArtifacts(): Promise<ArtifactListItem[]> {
+  return listOwnArtifacts(await getUserId())
+}
+
+/** What one of the person's runs handed over, for that thread's 「Artifact · N」. */
+export async function listRunArtifacts(runId: string): Promise<ArtifactListItem[]> {
+  const userId = await getUserId()
+  const parsed = z.uuid().safeParse(runId)
+  return parsed.success ? listOwnRunArtifacts(userId, parsed.data) : []
 }
 
 /** One of the person's artifacts with its versions, or null. */

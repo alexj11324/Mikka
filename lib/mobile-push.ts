@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { bots, mobilePushTokens } from '@/lib/db/schema'
 import { readPreferences, type Preferences } from '@/lib/preferences'
 import type { PushReason } from '@/lib/push-reasons'
+import { openUIText, parseOpenUI } from '@/lib/openui-lang'
 import type { ActionLocale } from '@/lib/suggestions/action-title'
 import { personLocale } from '@/lib/suggestions/action-title-server'
 
@@ -31,11 +32,17 @@ export function pushAllowed(preferences: Preferences, reasons: readonly PushReas
   return preferences.proactive && reasons.some(reason => preferences[FLAG[reason]] === true)
 }
 
-/** The push text: the reply's first lines, without citation tokens or Markdown marks. Pushes have no buttons (mobile.md). */
+/**
+ * The push text: the reply's first lines, without citation tokens or Markdown
+ * marks. A card (OpenUI) is read as its words: its text, question and options.
+ * Pushes have no buttons (mobile.md).
+ */
 export function pushBody(text: string): string {
-  const plain = text
+  const card = parseOpenUI(text)
+  const plain = (card === null ? text : openUIText(card))
     .replace(/\[\[(?:issue|run|artifact):[0-9a-f-]{36}\]\]/gi, '')
     .replace(/\[([^\]\n]+)\]\((?:[^)\s]+)\)/g, '$1')
+    .replace(/^\s*[-*]\s+/gm, '')
     .replace(/[*_`#>]+/g, '')
     .replace(/\s+/g, ' ')
     .trim()

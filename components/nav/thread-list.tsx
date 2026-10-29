@@ -1,13 +1,17 @@
 'use client'
 
-import { Hash } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { ChevronRight, Hash } from 'lucide-react'
+import { useFormatter, useNow, useTranslations } from 'next-intl'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
+import type { BotView } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
+import { activityLabel, groupThreads, lastActivity, THREAD_GROUPS } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
-import { StatusDot } from './status-dot'
+import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
+import { GroupHeader } from './group-header'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
@@ -22,13 +26,6 @@ export function threadName(thread: Thread, issues: Issue[], fallback: string) {
   return thread.prompt.split('\n').find(line => line.trim())?.trim().slice(0, 80) || fallback
 }
 
-function dotStatus(thread: Thread) {
-  if (thread.status === 'waiting_input') return 'waiting'
-  if (['queued', 'preparing', 'running', 'finishing'].includes(thread.status)) return 'running'
-  if (thread.status === 'failed') return 'failed'
-  return thread.status === 'succeeded' ? 'done' : 'idle'
-}
-
 /** A thread's mark: an orange disc with # (Figma 188:3192), 72px on its 详情. */
 export function ThreadMark({ size = 'profile' }: { size?: 'profile' | 'row' }) {
   return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center rounded-full bg-avatar-5 text-avatar-foreground', size === 'profile' && 'size-18', size === 'row' && 'size-4')}>
@@ -37,23 +34,57 @@ export function ThreadMark({ size = 'profile' }: { size?: 'profile' | 'row' }) {
 }
 
 /**
- * The right column's thread list: one bot's threads, newest first, each with
- * its status dot and its own name. Picking one shows it, with the bot's
- * computer, in 详情.
+ * One row: the thread's name, then the opening of its last reply on one line,
+ * verbatim. No status word, no bot name. In 全部线程 a 16px avatar in its
+ * bot's colour leads the name and the last activity sits on the right.
  */
-export function ThreadList({ threads, issues, current, onPick }: { threads: Thread[]; issues: Issue[]; current: string | null; onPick: (id: string) => void }) {
+function ThreadRow({ thread, issues, bots, all, now, onOpenIssue }: { thread: Thread; issues: Issue[]; bots: BotView[]; all: boolean; now: Date; onOpenIssue: (id: string) => void }) {
   const t = useTranslations('Shell.threads')
-  if (!threads.length) return <p className="text-xs text-muted-foreground">{t('empty')}</p>
-  return <ul aria-label={t('title')} className="flex flex-col">
-    {threads.map(thread => {
-      const waiting = thread.status === 'waiting_input'
-      return <li key={thread.id}>
-        <Button variant="ghost" aria-current={thread.id === current ? 'true' : undefined} className={cn('h-8 w-full justify-start gap-3 rounded-lg px-2 font-normal', thread.id === current && 'bg-muted')} onClick={() => onPick(thread.id)}>
-          <StatusDot status={dotStatus(thread)} />
-          <span className="min-w-0 flex-1 truncate text-left">{threadName(thread, issues, t('untitled'))}</span>
-          {(waiting || thread.status === 'failed') && <span className={cn('shrink-0 text-xs', waiting ? 'text-muted-foreground' : 'text-destructive')}>{t(waiting ? 'waiting' : 'failed')}</span>}
-        </Button>
-      </li>
+  const format = useFormatter()
+  const bot = thread.botId ? bots.find(item => item.id === thread.botId) : undefined
+  const name = threadName(thread, issues, t('untitled'))
+  const at = new Date(lastActivity(thread))
+  const when = activityLabel(at, now)
+  const body = <>
+    <span className="flex w-full min-w-0 items-center gap-2">
+      {all && (thread.botId ? <BotAvatar color={bot?.color} shape={bot?.shape} size="row" /> : <CoordinatorAvatar size="row" />)}
+      <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
+      {all && <span className="shrink-0 text-xs text-muted-foreground">{when === 'relative' ? format.relativeTime(at, now) : t(when)}</span>}
+    </span>
+    {thread.lastReply && <span className={cn('block w-full truncate text-xs text-muted-foreground', all && 'pl-6')}>{thread.lastReply}</span>}
+  </>
+  const row = 'flex h-auto w-full flex-col items-stretch justify-start gap-0.5 rounded-lg px-2 py-1.5 text-left font-normal whitespace-normal'
+  return <li>
+    {thread.issueId
+      ? <Button variant="ghost" className={row} aria-label={name} onClick={() => onOpenIssue(thread.issueId!)}>{body}</Button>
+      : <div className={row}>{body}</div>}
+  </li>
+}
+
+/**
+ * The right column's thread list: 等待回复 → 进行中 → 空闲 → 已解决, each
+ * with its count; 已解决 starts collapsed. A failed thread waits for the
+ * person, so it sits under 等待回复. Picking a thread opens its task.
+ */
+export function ThreadList({ threads, issues, bots, all = false, onOpenIssue }: { threads: Thread[]; issues: Issue[]; bots: BotView[]; all?: boolean; onOpenIssue: (id: string) => void }) {
+  const t = useTranslations('Shell.threads')
+  // One clock for every row's time.
+  const now = useNow({ updateInterval: 60_000 })
+  if (!threads.length) return <p className="px-2 text-xs text-muted-foreground">{t('empty')}</p>
+  const groups = groupThreads(threads, id => issues.find(issue => issue.id === id))
+  const rows = (list: Thread[]) => <ul className="flex flex-col">{list.map(thread => <ThreadRow key={thread.id} thread={thread} issues={issues} bots={bots} all={all} now={now} onOpenIssue={onOpenIssue} />)}</ul>
+  return <div role="group" aria-label={t('title')} className="flex flex-col gap-3">
+    {THREAD_GROUPS.map(group => {
+      const list = groups[group]
+      if (!list.length) return null
+      const label = t(`group.${group}`, { count: list.length })
+      if (group === 'resolved') return <Collapsible key={group} className="flex flex-col gap-1">
+        <CollapsibleTrigger render={<Button variant="ghost" className="group flex h-auto w-full p-0 text-left font-normal hover:bg-transparent" />}>
+          <GroupHeader>{label}<ChevronRight aria-hidden="true" className="size-3.5 transition-transform group-data-panel-open:rotate-90" /></GroupHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>{rows(list)}</CollapsibleContent>
+      </Collapsible>
+      return <section key={group} aria-label={label} className="flex flex-col gap-1"><GroupHeader>{label}</GroupHeader>{rows(list)}</section>
     })}
-  </ul>
+  </div>
 }

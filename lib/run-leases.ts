@@ -134,7 +134,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       .returning({ id: agentRuns.id })
     if (!ended) return false
     await tx.insert(agentRuns).values({
-      id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId,
+      id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
       agentDefinition: retryWorkerDefinition(run.agentDefinition, retryPrompt(run.prompt, outcome.attempt)),
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
       prompt: retryPrompt(run.prompt, outcome.attempt), attempt: outcome.attempt, retryOf: run.id,

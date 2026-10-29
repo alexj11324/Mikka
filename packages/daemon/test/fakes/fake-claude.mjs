@@ -83,6 +83,11 @@ lines.on("line", async (line) => {
   const asked = JSON.parse(line)?.message?.content?.[0]?.text
   if (typeof asked !== "string") return
   const message = asked
+  if (message === 'COMPUTER_CONFIG_TEST') {
+    text(JSON.stringify({ computer: mcpServers.mikka_computer ?? null }))
+    result()
+    return
+  }
   if (message.startsWith('MAILBOX_TEST ')) {
     const results = []
     const enabled = mcpServers.mikka_mailbox?.type === 'sdk' || sdkInitialization?.sdkMcpServers?.includes('mikka_mailbox')

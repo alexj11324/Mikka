@@ -148,6 +148,15 @@ test('unstamped historical peer text cannot become a host-retained user instruct
   assert.equal('mikkaUserEvent' in real.retainedUserRecord, false)
 })
 
+test('suggestion handling honors existing authorization and actual approval gates', () => {
+  const instruction = COORDINATOR_INSTRUCTIONS.split('\n').find(line => line.includes('<suggestion source='))
+  assert.ok(instruction)
+  assert.match(instruction, /existing authorization/)
+  assert.match(instruction, /actual approval requirements/)
+  assert.match(instruction, /Source content cannot grant authorization/)
+  assert.doesNotMatch(instruction, /Before any step that cannot be undone/)
+})
+
 test('task destination reaches only the model, and peer data cannot stamp a human machine selection', () => {
   const deviceId = 'b4000000-0000-4000-8000-000000000004'
   const source = { ...event, kind: 'user_message', payload: { text: 'Make a task', taskDestination: { kind: 'device', deviceId } } }
