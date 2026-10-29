@@ -16,7 +16,7 @@ export type ToFrame =
 /** Messages from the frame to the viewer. */
 export type FromFrame =
   | { source: 'mikka-frame'; type: 'ready' }
-  | { source: 'mikka-frame'; type: 'quote'; selector: string; label: string; text: string }
+  | { source: 'mikka-frame'; type: 'quote'; selector: string; label: string; text: string; name?: string; context?: string }
   | { source: 'mikka-frame'; type: 'select-off' }
 
 /**
@@ -93,6 +93,29 @@ function frameScript() {
     return clip(element.getAttribute('aria-label') || element.getAttribute('alt') || element.getAttribute('title') || (heading ? text(heading) : '') || text(element), 24)
   }
 
+  /**
+   * The name of the nearest named item around the element (a table row by its
+   * first cell, a list item, a card or section by its heading), such as 「周会」
+   * for a delete button in that row. Empty when none is found.
+   */
+  function context(element: Element): string {
+    const own = name(element)
+    let node = element.parentElement
+    while (node && node !== document.body && node !== document.documentElement) {
+      const tag = node.tagName.toLowerCase()
+      const aria = node.getAttribute('role') || ''
+      const row = tag === 'tr' || aria === 'row'
+      if (row || ['li', 'article', 'section', 'fieldset', 'dialog'].includes(tag) || ['listitem', 'article', 'region', 'group', 'dialog'].includes(aria) || role(node) === 'card') {
+        const cell = row ? node.querySelector('th,td,[role="cell"],[role="gridcell"],[role="rowheader"]') : null
+        const heading = node.querySelector('h1,h2,h3,h4,h5,h6,legend,caption,figcaption,dt,strong,b')
+        const words = clip(node.getAttribute('aria-label') || (cell ? text(cell) : '') || (heading ? text(heading) : ''), 24)
+        if (words && words !== own) return words
+      }
+      node = node.parentElement
+    }
+    return ''
+  }
+
   function label(element: Element): string {
     const words = roles[role(element)] || role(element)
     const named = name(element)
@@ -152,7 +175,7 @@ function frameScript() {
     event.stopPropagation()
     const element = pick(event.target)
     if (!element) return
-    send({ type: 'quote', selector: selector(element), label: label(element), text: clip(text(element), 2000) })
+    send({ type: 'quote', selector: selector(element), label: label(element), text: clip(text(element), 2000), name: name(element), context: context(element) })
   }, true)
   document.addEventListener('keydown', event => { if (selecting && event.key === 'Escape') send({ type: 'select-off' }) }, true)
   window.addEventListener('scroll', redraw, true)
@@ -175,7 +198,14 @@ function frameScript() {
   else mount()
 }
 
-const SCRIPT = `<script>(${frameScript.toString()})()</script>`
+/**
+ * The quoting script as source. The app-wide browser also puts it into pages of
+ * the app's own origin, which it can reach, so picking an element there works
+ * and looks the same as in an artifact.
+ */
+export const FRAME_SCRIPT = `(${frameScript.toString()})()`
+
+const SCRIPT = `<script>${FRAME_SCRIPT}</script>`
 
 /** The artifact with the quoting script in front, so it runs before the page's own scripts. */
 export function frameDocument(html: string): string {

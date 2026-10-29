@@ -85,13 +85,10 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
    Cloudflare 开了代理时 `server: cloudflare` 不代表后端不是 Vercel，但**缺 `x-vercel-id`
    基本可以断定不是**。
 
-2. **代码里已经有 fallback 时，别再加冗余的 env 变量**。
-   `lib/auth.ts:5` 本来就是
-   `BETTER_AUTH_URL ?? VERCEL_PROJECT_PRODUCTION_URL ?? VERCEL_URL ?? V0_RUNTIME_URL`。
-   官方文档写明 `VERCEL_PROJECT_PRODUCTION_URL`
-   **"is always set, even in preview deployments"** —— 所以 Preview 上的 fallback
-   本来就指向 production 域名，这正是「GitHub OAuth App 只能注册一个 callback URL」
-   约束下的设计。我把它改成 `https://$VERCEL_URL`，反而**覆盖掉**了这条设计。
+2. **代码里已经有 fallback 时，别再加冗余的 env 变量**。先读 `lib/auth-config.ts` 的
+   `resolveAppOrigin`：Preview 默认用自己的 `VERCEL_URL`，Production 用
+   `VERCEL_PROJECT_PRODUCTION_URL`；Preview 登录经 `BETTER_AUTH_OAUTH_PROXY_URL`
+   回调中心（见 `docs/cloud-preview.md`）。
 
 **规则**：
 
@@ -141,6 +138,8 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
    `h-px bg-*`。分组用间距（`gap-*`）或背景（`bg-muted/*`）。
 2. 竖线（`border-l/r`、`orientation="vertical"`）和盒状边框（`border`）可以保留。
 3. 这条已经落在 `style/no-horizontal-rule`；先跑 `node scripts/lint-ui.mjs`，不要靠肉眼。
+4. 例外（已在 `scripts/ui-policy.mjs` 豁免）：设置页的 `divide-y` 行分隔（`docs/settings.md`）、
+   任务页头部线与评论卡片内的线（R-61/R-63）、未读「新」分隔线。设置页字段不要用 `bg-muted` 分组。
 
 
 ---
