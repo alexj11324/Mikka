@@ -13,6 +13,7 @@ import * as projectSchema from '../lib/db/project-schema.ts'
 import * as teamSchema from '../lib/db/team-schema.ts'
 import { APPLICATION_BASELINE } from '../scripts/migration-order.mjs'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '../lib/issue-meta.ts'
+import { validateTarget } from '../scripts/run-db-tests.mjs'
 
 const run = promisify(execFile)
 const directory = new URL('../drizzle/', import.meta.url)
@@ -21,6 +22,7 @@ const enabled = process.env.MIGRATION_BOOTSTRAP_CI === '1'
 // Never default to DATABASE_URL or a developer/production service. The workflow
 // opts in only against its disposable postgres:17 service, before E2E setup.
 function ciTarget() {
+  validateTarget(process.env)
   assert.equal(process.env.CI, 'true', 'Database regression is CI-only')
   const target = new URL(process.env.E2E_DATABASE_URL)
   assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(target.hostname), 'Requires loopback CI Postgres')
@@ -71,23 +73,44 @@ for (const separateTargets of [false, true]) {
   test(`pnpm migrate bootstraps empty ${separateTargets ? 'separate targets' : 'shared target'} and safely reruns`, {
     skip: !enabled, timeout: 180000,
   }, async () => {
-    const target = ciTarget()
+    const rootTarget = ciTarget()
+    const rootAdmin = new Pool({ connectionString: rootTarget.toString(), max: 1 })
+    const fixtureDatabase = `bootstrap_${randomUUID().replaceAll('-', '')}`
+    try {
+      assert.equal((await rootAdmin.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+      const identity = (await rootAdmin.query('select current_database() as database, session_user as role')).rows[0]
+      assert.deepEqual(identity, { database: 'mikka_e2e', role: 'e2e' })
+      // Each scenario needs its own catalog: historical SQL checks some
+      // constraint names database-wide. Never rewrite that executed SQL.
+      await rootAdmin.query(`create database "${fixtureDatabase}"`)
+      console.error(`Created retained migration test database: ${fixtureDatabase}`)
+    } finally { await rootAdmin.end() }
+    const target = new URL(rootTarget)
+    target.pathname = `/${fixtureDatabase}`
     const admin = new Pool({ connectionString: target.toString(), max: 1 })
     const applicationSchema = `bootstrap_app_${randomUUID().replaceAll('-', '')}`
     const workspaceSchemaName = separateTargets ? `bootstrap_ws_${randomUUID().replaceAll('-', '')}` : applicationSchema
     const schemas = [...new Set([applicationSchema, workspaceSchemaName])]
+    const createdSchemas = []
     const applicationURL = schemaURL(target, applicationSchema)
     const workspaceURL = schemaURL(target, workspaceSchemaName)
     const app = new Pool({ connectionString: applicationURL, max: 1 })
     const workspace = new Pool({ connectionString: workspaceURL, max: 1 })
     try {
       assert.equal((await admin.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
-      for (const schema of schemas) await admin.query(`create schema "${schema}"`)
+      for (const schema of schemas) {
+        await admin.query(`create schema "${schema}"`)
+        createdSchemas.push(schema)
+        console.error(`Created migration test schema: ${schema}`)
+      }
       // No setup-e2e-db, Better Auth migrator or schema push is called here.
       assert.deepEqual((await app.query(`select tablename from pg_tables where schemaname = current_schema()`)).rows, [])
       assert.match(await migrate(applicationURL, workspaceURL), new RegExp(`applied ${APPLICATION_BASELINE}`))
       await assertSchema(app, [issueSchema])
       await assertSchema(workspace, [workspaceSchema, projectSchema, teamSchema])
+      for (const [table, constraint] of [['coordinator_sessions', 'coordinator_sessions_chat_key'], ['coordinator_messages', 'coordinator_messages_position_key']]) {
+        assert.equal((await app.query('select 1 from pg_constraint where conrelid=to_regclass($1) and conname=$2', [table, constraint])).rowCount, 1, `Missing isolated ${constraint}`)
+      }
       for (const name of ['session', 'account', 'verification', 'oauthRefreshToken', 'oauthAccessToken', 'oauthConsent', 'chat_state_locks', 'chat_state_queues']) {
         assert.ok((await app.query('select to_regclass($1) as relation', [`"${name}"`])).rows[0].relation, `Missing ${name}`)
       }
@@ -127,7 +150,8 @@ for (const separateTargets of [false, true]) {
     } finally {
       await app.end()
       await workspace.end()
-      for (const schema of schemas) await admin.query(`drop schema if exists "${schema}" cascade`)
+      // Preserve both schemas and their data for inspection, including on failure.
+      if (createdSchemas.length) console.error(`Retained migration test schemas: ${createdSchemas.join(', ')}`)
       await admin.end()
     }
   })
