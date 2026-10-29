@@ -79,9 +79,11 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
     if (context) {
       const { rows: [event] } = await tx.query(`SELECT e.payload FROM coordinator_events e
         JOIN factory_tasks t ON t."sourceEventId"=e.id AND t."userId"=e."userId" AND t."botId" IS NOT DISTINCT FROM e."botId"
+        JOIN issues i ON i.id=t."issueId"
         JOIN factory_attempts a ON a."taskId"=t.id AND a.id=t."attemptId"
         WHERE e.id=$1 AND e."userId"=$2 AND (e."issueId" IS NULL OR e."issueId"=$3) AND e."botId" IS NOT DISTINCT FROM $4::uuid
-          AND e.kind='user_message' AND t."issueId"=$3 AND a.id=$5`, [context.sourceEventId, userId, parsed.data.issueId, botId, context.attemptId])
+          AND e.kind='user_message' AND t."issueId"=$3 AND a.id=$5 AND t.status NOT IN ('cancelled','revoked')
+          AND (i."userId"=t."userId" OR (i.scope='workspace' AND t."scopeVersion" IS NOT NULL AND t."scopeVersion"=i."scopeVersion"))`, [context.sourceEventId, userId, parsed.data.issueId, botId, context.attemptId])
       if (!event) throw new ActionFailureError('runInvalid')
       // Even malformed destination data must reach the strict host-bound
       // admission check; an unbound ordinary chat request remains valid intake.

@@ -910,6 +910,18 @@ test(
               reason: "Contract fixture monitoring",
             },
           );
+          const monitorRunId = randomUUID();
+          await pool.query(
+            `INSERT INTO agent_runs (id,"userId","issueId","agentId",kind,status,"sessionId","startedAt") VALUES ($1,$2,$3,$4,'acceptance','running',$5,clock_timestamp())`,
+            [monitorRunId, actor.userId, issueId, agentId, `fixture-monitor-${randomUUID()}`],
+          );
+          repaired = await store.apply(actor.userId, binding(repaired.task), randomUUID(), {
+            action: "bind_run", runId: monitorRunId,
+          });
+          await pool.query(
+            `UPDATE agent_runs SET status='failed',"stopReason"='error',"finishedAt"=clock_timestamp() WHERE id=$1`,
+            [monitorRunId],
+          );
           repaired = await store.apply(
             actor.userId,
             binding(repaired.task),

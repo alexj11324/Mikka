@@ -457,6 +457,25 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }, { eventId, botId: null }), proposal)
       assert.equal((await decidePendingAction(f.userId, proposal.actionId, true)).status, 'done')
       const { takeInbox } = await import('../lib/coordinator/store')
+      assert.equal((await takeInbox(f.userId,'retained-admission-suite')).added,0,'a decision event remains pending without model classification')
+      // This PG suite disables Coordinator/model network execution. Supply a
+      // declared provider substitute through the real triage client and CAS;
+      // do not turn an action_decided event into an automatic runtime tier.
+      const { triageInbox } = await import('../lib/coordinator/wake')
+      const { DECISION_MODEL, DECISIONS_URL } = await import('../lib/coordinator/decision')
+      const originalFetch=globalThis.fetch,originalDecisionKey=process.env.DECISION_GATEWAY_API_KEY
+      let decisions=0
+      process.env.DECISION_GATEWAY_API_KEY='synthetic-publication-triage'
+      globalThis.fetch=(async(url,init)=>{
+        assert.equal(String(url),DECISIONS_URL,'only the declared synthetic decision provider may be called')
+        const request=JSON.parse(String(init?.body))
+        assert.equal(request.model,DECISION_MODEL)
+        assert.equal(request.questions[0].name,'tier')
+        decisions++
+        return Response.json({model:DECISION_MODEL,provider_metadata:{gateway:{generationId:`synthetic-admission-${decisions}`}},answers:[{type:'choice',name:'tier',choice:'result'}]})
+      }) as typeof fetch
+      try {await triageInbox(f.userId);assert.equal(decisions,1)}
+      finally {globalThis.fetch=originalFetch;if(originalDecisionKey===undefined)delete process.env.DECISION_GATEWAY_API_KEY;else process.env.DECISION_GATEWAY_API_KEY=originalDecisionKey}
       const resumed = await takeInbox(f.userId, 'retained-admission-suite')
       assert.equal(resumed.taskEventId, eventId, 'approval resumes the original host request, without asking the model for its event ID')
       assert.equal(resumed.approvedRepositoryKey, f.remoteKey)

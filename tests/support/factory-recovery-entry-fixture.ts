@@ -67,6 +67,7 @@ export async function exerciseFactoryRecoveryEntry(
     stub("../../lib/agent-runs.ts", {
       addRunMessage: unused,
       queueRun: unused,
+      queueFactoryRun: unused,
       readRun: unused,
       requestRunStop: unused,
       visibleRuns: unused,
@@ -98,7 +99,7 @@ export async function exerciseFactoryRecoveryEntry(
     stub("../../lib/device-link.ts", { DEVICE_ONLINE_WINDOW_MS: 60000 });
     stub("../../lib/search/index.ts", { webSearch: unused });
     stub("../../lib/composio.ts", { runComposioAction: unused });
-    stub("../../lib/pending-action-store.ts", { proposeAction: unused });
+    stub("../../lib/pending-action-store.ts", { proposeAction: unused, proposeRepositoryPush: unused });
     stub("../../lib/telegram/client.ts", { postTelegramText: unused });
     stub("../../lib/attention/store.ts", {
       recordDecision: unused,

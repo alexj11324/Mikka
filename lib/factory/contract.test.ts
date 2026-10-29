@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { routeSchema, routeStage } from "./contract";
+import { bindingSchema, routeSchema, routeStage } from "./contract";
+import { factoryScopeAllows } from "./scope";
 import { handleFactory } from "./http";
 import type { FactoryStore } from "./http";
 
@@ -26,6 +27,29 @@ test("clear authorization routes directly; only missing items clarify, spec is o
     routeStage({ ...base, missingPermissions: ["Target write grant"] }),
     "clarify",
   );
+});
+test("Factory teammate grants stay in their original issue generation", () => {
+  const task = { userId: "member", scopeVersion: 1 };
+  const issue = { userId: "owner", scope: "workspace", scopeVersion: 1 };
+  assert.equal(factoryScopeAllows(task, issue), true);
+  assert.equal(factoryScopeAllows(task, { ...issue, scope: "personal", scopeVersion: 2 }), false);
+  assert.equal(factoryScopeAllows(task, { ...issue, scopeVersion: 3 }), false);
+  assert.equal(factoryScopeAllows({ ...task, scopeVersion: null }, issue), false);
+  assert.equal(factoryScopeAllows({ userId: "member" }, issue), false);
+  assert.equal(factoryScopeAllows(task, undefined), false);
+});
+test("Factory issue owners keep their own authority without renewing teammate grants", () => {
+  for (const scope of ["personal", "workspace"]) {
+    const issue = { userId: "owner", scope, scopeVersion: 3 };
+    for (const scopeVersion of [1, null, undefined]) {
+      assert.equal(factoryScopeAllows({ userId: "owner", scopeVersion }, issue), true);
+      assert.equal(factoryScopeAllows({ userId: "member", scopeVersion }, issue), false);
+    }
+  }
+});
+test("Factory scope generation is captured by the host, never accepted from route or binding input", () => {
+  assert.equal(routeSchema.safeParse({ issueId: randomUUID(), eventId: randomUUID(), sourceEventId: randomUUID(), rationale: "Requested task", scopeVersion: 3 }).success, false);
+  assert.equal(bindingSchema.safeParse({ taskId: randomUUID(), issueId: randomUUID(), attemptId: randomUUID(), revision: 1, candidateId: null, scopeVersion: 3 }).success, false);
 });
 const noDatabase = new Proxy(
   {},

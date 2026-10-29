@@ -109,7 +109,7 @@ function bridgeFixture() {
   const dispatch:Parameters<typeof createImprovementFactoryBridge>[2]=async(_userId,input)=>{
     state.notes.push(input.note!)
     return {runId:randomUUID(),status:'queued',replayed:false,contractVersion:1,binding,
-      task:{id:binding.taskId,userId,botId:null,issueId,sourceEventId:randomUUID(),stage:'execute',status:'running',
+      task:{id:binding.taskId,userId,botId:null,issueId,scopeVersion:1,sourceEventId:randomUUID(),stage:'execute',status:'running',
         revision:binding.revision,attemptId:binding.attemptId,candidateId:null,reason:'Candidate generation fixture',
         route:{issueId,eventId:randomUUID(),sourceEventId:randomUUID(),rationale:'Candidate generation fixture',
           missingInformation:[],missingPermissions:[],needsSpec:false}},attempts:[],candidates:[]}

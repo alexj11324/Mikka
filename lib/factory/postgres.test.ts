@@ -19,6 +19,9 @@ import { factoryDispatchDatabase } from "./transaction";
 import { createExecutionClaim } from "./execution-claim";
 import { createFactoryReconciler } from "./reconcile";
 import { insertRunOnce } from "../run-dispatch";
+import { runPrompt } from "../run-prompt";
+import { tiptapToText } from "../tiptap-text";
+import { digest } from "../agent-kit/definition";
 
 const localDB = process.env.FACTORY_TEST_DATABASE_URL;
 if (localDB) {
@@ -98,13 +101,15 @@ test(
       const issueId = randomUUID(),
         otherIssueId = randomUUID(),
         agentId = randomUUID();
+      const issueBody = "Describe the fixture change and its acceptance criterion";
+      const instructions = "Keep the fixture plan within the original issue scope";
       await pool.query(
-        `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Factory test','{}','todo','normal'),($2,'other','Foreign issue','{}','todo','normal')`,
-        [issueId, otherIssueId],
+        `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Factory test',$3,'todo','normal'),($2,'other','Foreign issue','{}','todo','normal')`,
+        [issueId, otherIssueId, JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: issueBody }] }] })],
       );
       await pool.query(
-        `INSERT INTO agents (id,"userId",name,harness) VALUES ($1,'owner','Factory fixture','codex')`,
-        [agentId],
+        `INSERT INTO agents (id,"userId",name,harness,instructions) VALUES ($1,'owner','Factory fixture','codex',$2)`,
+        [agentId, instructions],
       );
       const source = async (owner = "owner") => {
         const id = randomUUID();
@@ -205,25 +210,35 @@ test(
       const dispatcher = createFactoryDispatch(
         pool,
         store,
-        (tx, userId, input) =>
-          insertRunOnce(factoryDispatchDatabase(tx), userId, input, {
+        async (tx, userId, input, botId, context) => {
+          const { rows: [issue] } = await tx.query('SELECT title,content FROM issues WHERE id=$1 AND "userId"=$2', [input.issueId, userId]);
+          const { rows: [agent] } = await tx.query('SELECT instructions FROM agents WHERE id=$1 AND "userId"=$2', [input.agentId, userId]);
+          assert.ok(issue && agent);
+          return insertRunOnce(factoryDispatchDatabase(tx), userId, { ...input, requestKey: `factory:${context.attemptId}` }, {
             deviceId,
             baseBranch: "main",
-            prompt: "Fixture dispatch with real #191 transaction",
-          }),
+            botId,
+            prompt: runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, input.note),
+          });
+        },
       );
+      const planningNote = "Plan the fixture change before implementation";
       const planned = await dispatcher("owner", {
         binding: binding(spec.task),
         agentId,
         deviceRepoId: repoId,
+        note: planningNote,
       });
       const planRun = (
-        await pool.query("SELECT kind,prompt FROM agent_runs WHERE id=$1", [
+        await pool.query('SELECT kind,prompt,"agentDefinition","dispatchKey" FROM agent_runs WHERE id=$1', [
           planned.runId,
         ])
       ).rows[0];
       assert.equal(planRun.kind, "plan");
-      assert.match(planRun.prompt, /Factory stage: spec/);
+      assert.equal(planRun.prompt, runPrompt("Factory test", issueBody, instructions, planningNote));
+      assert.equal(planRun.agentDefinition.promptDigest, digest(planRun.prompt));
+      assert.equal(planRun.agentDefinition.instructions, instructions);
+      assert.equal(planRun.dispatchKey, `factory:${spec.task.attemptId}`);
       await pool.query(
         'UPDATE agent_runs SET status=\'succeeded\',"stopReason"=\'submitted\',"sessionId"=$2,report=$3,"finishedAt"=now() WHERE id=$1',
         [
@@ -416,7 +431,7 @@ test(
       assert.equal(
         (
           await pool.query('SELECT id FROM agent_runs WHERE "dispatchKey"=$1', [
-            `factory:${dispatchRollback.task.id}:${dispatchRollback.task.attemptId}`,
+            `factory:${dispatchRollback.task.attemptId}`,
           ])
         ).rowCount,
         0,
@@ -450,15 +465,15 @@ test(
       assert.equal(dispatched.candidates[0].sha, completionSha);
       assert.equal(dispatched.attempts[0].sessionId, completionSession);
       assert.equal((await reconcile("owner")).recovered, 0);
-      assert.equal(
-        (
-          await dispatcher("owner", {
+      const afterCompletionCount = (await pool.query("SELECT count(*) FROM agent_runs")).rows[0].count;
+      await rejects(
+        () => dispatcher("owner", {
             ...dispatchInput,
             binding: binding(dispatchRollback.task),
-          })
-        ).runId,
-        dispatchedRetry.runId,
+          }),
+        "factoryStale",
       );
+      assert.equal((await pool.query("SELECT count(*) FROM agent_runs")).rows[0].count, afterCompletionCount);
       const lost = await route();
       const lostRun = await dispatcher("owner", {
         ...dispatchInput,
@@ -471,7 +486,7 @@ test(
         [lostRun.runId, `lost-${randomUUID()}`],
       );
       await pool.query(
-        `INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"stopReason","sessionId",report,"retryOf",attempt,"finishedAt") VALUES ($1,'owner',$2,$3,$4,$5,'succeeded','submitted',$6,$7,$8,2,now())`,
+        `INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"stopReason","sessionId",report,"retryOf",attempt,"finishedAt",kind,"baseBranch","agentDefinition") SELECT $1,'owner',$2,$3,$4,$5,'succeeded','submitted',$6,$7,$8,2,clock_timestamp(),kind,"baseBranch","agentDefinition" FROM agent_runs WHERE id=$8`,
         [
           childId,
           issueId,

@@ -40,6 +40,11 @@ test('tracked public consumer upgrade preserves historical grants and enforces n
     await pool.query('COMMIT')
     const migration=await sql('_factory_public_consumers.sql')
     await pool.query(migration);await pool.query(migration)
+    const scopeMigration=await sql('_factory_scope_generation.sql')
+    await pool.query(scopeMigration);await pool.query(scopeMigration)
+    assert.equal((await pool.query('SELECT "scopeVersion" FROM factory_tasks WHERE id=$1',[task])).rows[0].scopeVersion,null)
+    const scopeColumn=(await pool.query("SELECT column_default,is_nullable FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='factory_tasks' AND column_name='scopeVersion'")).rows[0]
+    assert.deepEqual(scopeColumn,{column_default:null,is_nullable:'YES'})
     const historical=(await pool.query('SELECT * FROM factory_approvals WHERE id=$1',[grant])).rows[0]
     assert.equal(historical.principalId,'session:legacy-session');assert.equal(historical.humanSessionId,'legacy-session')
     assert.equal(historical.decisionCredentialId,null);assert.equal(historical.decisionScope,null);assert.equal(historical.decisionEvidence,null)

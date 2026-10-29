@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { assertDatabaseIdentity, databaseTarget, deploymentAttestation, environmentFingerprint, loadEnvironment, validateEnvironment } from './environment.mjs'
 import { readBoundedBody } from './http-body.mjs'
+import { MVP_DECISION_KEY, installMvpTransport, verifyMvpTransport, hasBoundMvpTransport } from '../../tests/mvp/transport.mjs'
 
 function withSyntheticCredentials(value) {
   const target = new URL(value)
@@ -105,4 +106,64 @@ test('HTTP body bounds cancel an oversized or endless stream before consuming it
   const value = new TextEncoder().encode('bounded UTF-8: 修')
   assert.deepEqual(await readBoundedBody(new Response(value), value.byteLength), value)
   await assert.rejects(readBoundedBody(new Response('x', { headers: { 'content-length': '4097' } }), 4096), /RESPONSE_BODY_TOO_LARGE/)
+})
+
+test('only the exact isolated MVP key with a proven current loopback transport can attest its environment', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-mvp-environment-guard-'))
+  const file = join(directory, 'environment.json')
+  const fixtureEnv = {
+    ...env, MIKKA_TEST_ENVIRONMENT_FILE: file,
+    CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_E2E: '1', MIKKA_TEST_MODE: '1',
+    DECISION_GATEWAY_API_KEY: MVP_DECISION_KEY,
+  }
+  let upstreamCalls = 0
+  // This is a pure transport/descriptor fixture. No database, app server or
+  // provider is started, and no test-only flags are installed in process.env.
+  const upstream = async () => { upstreamCalls++; return new Response(null, { status: 204 }) }
+  let restore
+  try {
+    await writeFile(file, JSON.stringify(descriptor), { mode: 0o600 })
+    assert.equal(await verifyMvpTransport(fixtureEnv), false)
+    assert.throws(() => validateEnvironment(descriptor, fixtureEnv), /EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN/)
+    await assert.rejects(loadEnvironment(fixtureEnv), /EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN/)
+
+    restore = installMvpTransport(fixtureEnv, upstream)
+    assert.equal(hasBoundMvpTransport(fixtureEnv), false)
+    assert.throws(() => validateEnvironment(descriptor, fixtureEnv), /EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN/)
+    assert.deepEqual(await loadEnvironment(fixtureEnv), descriptor)
+    assert.equal(hasBoundMvpTransport(fixtureEnv), true)
+    assert.equal(upstreamCalls, 0, 'attestation challenge must be answered inside the transport, without a server request')
+
+    for (const change of [
+      { DECISION_GATEWAY_API_KEY: 'synthetic-live-key-canary' },
+      { CI: undefined }, { GITHUB_ACTIONS: undefined }, { MIKKA_MVP_E2E: undefined }, { MIKKA_TEST_MODE: undefined },
+      { VERCEL: '1' }, { VERCEL_ENV: 'production' }, { MIKKA_NATIVE_COORDINATOR: '1' },
+      { E2E_BASE_URL: 'https://outside.invalid' }, { BETTER_AUTH_URL: 'https://outside.invalid' },
+      { MIKKA_TEST_DEPLOYMENT_SHA: 'b'.repeat(40) }, { DATABASE_URL: 'postgresql://outside.invalid/production' },
+      ...['AI_GATEWAY_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY', 'RESEND_API_KEY'].map(name => ({ [name]: 'synthetic-live-key-canary' })),
+    ]) {
+      assert.throws(() => validateEnvironment(descriptor, { ...fixtureEnv, ...change }))
+      await assert.rejects(loadEnvironment({ ...fixtureEnv, ...change }))
+    }
+    assert.throws(() => validateEnvironment({ ...descriptor, kind: 'production' }, fixtureEnv), /ENVIRONMENT_KIND_FORBIDDEN/)
+    assert.throws(() => validateEnvironment({ ...descriptor, kind: 'isolated-preview' }, fixtureEnv), /PREVIEW_APPROVAL_REQUIRED/)
+    assert.equal(upstreamCalls, 0, 'rejected environments cannot reach a provider or server')
+
+    const boundary = globalThis.fetch
+    globalThis.fetch = (input, init) => boundary(input, init)
+    assert.equal(hasBoundMvpTransport(fixtureEnv), false, 'a new Next-style wrapper must establish its own current-path proof')
+    assert.throws(() => validateEnvironment(descriptor, fixtureEnv), /EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN/)
+    assert.deepEqual(await loadEnvironment(fixtureEnv), descriptor)
+    assert.equal(hasBoundMvpTransport(fixtureEnv), true)
+    assert.equal(upstreamCalls, 0)
+
+    globalThis.fetch = upstream
+    assert.equal(hasBoundMvpTransport(fixtureEnv), false)
+    assert.equal(await verifyMvpTransport(fixtureEnv), false, 'a replacement fetch cannot guess the private challenge response')
+    assert.throws(() => validateEnvironment(descriptor, fixtureEnv), /EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN/)
+    await assert.rejects(loadEnvironment(fixtureEnv), /EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN/)
+  } finally {
+    restore?.()
+    console.error(`Retained test fixture directory: ${directory}`)
+  }
 })

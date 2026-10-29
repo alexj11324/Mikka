@@ -1,7 +1,7 @@
 import { reconcileFactoryCheck } from "./reconcile-check";
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
@@ -10,7 +10,10 @@ import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { FactoryError, type FactoryBinding } from "./contract";
 import { createFactoryStore, type FactoryTask } from "./store";
 import { createFactoryDispatch } from "./dispatch";
+import { observeFactoryCheckDispatch } from "./check-dispatch";
+import { createFactoryCheckRecovery } from "./check-recovery";
 import { createFactoryReconciler } from "./reconcile";
+import { DECISION_MODEL, decisionRequestInput } from "../coordinator/decision";
 import {
   createFactoryCheckClaim,
   factoryCheckAssignment,
@@ -87,14 +90,54 @@ test(
       const authorize = async (user: string, issue: string) =>
         user === "owner" && issue === issueId;
       const store = createFactoryStore(pool, authorize, factoryCheckGates);
-      const dispatcher = createFactoryDispatch(pool, store, (tx, user, input) =>
-        insertRunOnce(factoryDispatchDatabase(tx), user, input, {
+      const dispatcher = observeFactoryCheckDispatch(store, createFactoryDispatch(pool, store, (tx, user, input, botId, context) =>
+        insertRunOnce(factoryDispatchDatabase(tx), user, { ...input, requestKey: `factory:${context.attemptId}` }, {
           deviceId,
           baseBranch: "main",
+          botId,
           prompt: "Fixture issue with explicit criterion",
         }),
-      );
+      ));
       const reconcile = createFactoryReconciler(pool, store, undefined, { review: reconcileFactoryCheck, verify: reconcileFactoryCheck });
+      let syntheticChoice: "repair_code" | "retry_check" = "repair_code";
+      let syntheticModelCalls = 0;
+      const recoverCheck = createFactoryCheckRecovery(pool, store, {
+        // Explicit synthetic decision transport for this PG contract suite.
+        // The real host recovery still validates request/receipt provenance and
+        // applies the choice transactionally; no provider acceptance is claimed.
+        async invoke(purpose, input, questions) {
+          assert.equal(pool.totalCount - pool.idleCount, 0, "model transport runs outside a checked-out transaction");
+          assert.equal(purpose, "factory-check-recovery");
+          assert.notEqual(typeof input, "string");
+          if (typeof input !== "string") {
+            assert.equal(input.requiresVisual, false);
+            assert.deepEqual(input.images, []);
+            assert.ok(JSON.parse(input.text).hostObservation.runId);
+          }
+          syntheticModelCalls++;
+          const observedAt = new Date().toISOString();
+          return {
+            answers: new Map([["recovery", { type: "choice" as const, name: "recovery", choice: syntheticChoice }]]),
+            execution: {
+              executionId: randomUUID(), modelId: DECISION_MODEL,
+              providerGenerationId: `synthetic_contract_${syntheticModelCalls}`,
+              startedAt: observedAt, completedAt: observedAt,
+              requestDigest: createHash("sha256").update(JSON.stringify({ model: DECISION_MODEL, input: decisionRequestInput(input), questions })).digest("hex"),
+              imageDigests: [], vision: "no-image-input" as const,
+            },
+          };
+        },
+      });
+      const recover = async (state: Awaited<ReturnType<typeof store.read>>, choice: typeof syntheticChoice) => {
+        syntheticChoice = choice;
+        const calls = syntheticModelCalls;
+        const original = state.attempts.find(attempt => attempt.id === state.task.attemptId)!;
+        const result = await recoverCheck("owner", { binding: binding(state.task) }, "synthetic_pg_contract_context");
+        assert.ok("task" in result, JSON.stringify(result));
+        assert.equal(syntheticModelCalls, calls + 1);
+        assert.deepEqual(result.attempts.find(attempt => attempt.id === original.id), original, "recovery retains the original failed observation");
+        return result;
+      };
       const route = async () => {
         const sourceEventId = randomUUID();
         await pool.query(
@@ -289,6 +332,9 @@ test(
         undefined, { review: reconcileFactoryCheck, verify: reconcileFactoryCheck },
       )("owner");
       state = await store.read("owner", state.task.id);
+      assert.equal(state.task.stage, "verify");
+      assert.equal(state.task.status, "failed", "reconciliation records failure without choosing a repair strategy");
+      state = await recover(state, "repair_code");
       assert.equal(state.task.stage, "execute");
       assert.equal(state.task.candidateId, null);
       const failure = state.attempts.find((a) => a.stage === "verify")!;
@@ -366,7 +412,7 @@ test(
           blocked.attempts.length,
         );
       }
-      // Automatic repair is bounded; a person sees the original failure and takeover reason.
+      // Explicit model-selected repairs still obey the existing shared budget.
       const bounded = await route();
       let boundedState = bounded;
       for (let round = 0; round < 4; round++) {
@@ -379,13 +425,22 @@ test(
         await complete(check.runId, sha, { failed: true });
         await reconcile("owner");
         boundedState = await store.read("owner", bounded.task.id);
+        assert.equal(boundedState.task.stage, "review");
+        assert.equal(boundedState.task.status, "failed");
+        if (round < 3) boundedState = await recover(boundedState, "repair_code");
+        else {
+          await rejects(() => recover(boundedState, "repair_code"), "factoryRecoveryBudgetExceeded");
+          assert.deepEqual(await store.read("owner", bounded.task.id), boundedState);
+        }
         assert.equal(boundedState.task.stage, round < 3 ? "execute" : "review");
       }
       assert.equal(boundedState.task.status, "failed");
       assert.match(
         boundedState.task.reason,
-        /repair limit reached; manual takeover/,
+        /Independent review failed/,
       );
+      // The model may retry the same SHA, but the old failed check cannot serve
+      // as fresh evidence or be changed into a pass.
       const unchanged = await route();
       let same = unchanged;
       const firstExecute = await dispatch(same.task);
@@ -396,18 +451,21 @@ test(
       await complete(bad.runId, sha1, { failed: true });
       await reconcile("owner");
       same = await store.read("owner", same.task.id);
-      const unchangedRepair = await dispatch(same.task);
-      await complete(unchangedRepair.runId, sha1);
+      const originalFailure = same.attempts.find(attempt => attempt.id === same.task.attemptId)!;
+      const originalCandidate = same.task.candidateId;
+      same = await recover(same, "retry_check");
+      assert.equal(same.task.stage, "review");
+      assert.equal(same.task.candidateId, originalCandidate);
+      const independentRetry = await dispatch(same.task);
+      assert.notEqual(independentRetry.runId, bad.runId);
+      assert.equal((await factoryCheckAssignment(pool, "owner", independentRetry.runId)).baseBranch, sha1);
+      await complete(independentRetry.runId, sha1);
       await reconcile("owner");
       same = await store.read("owner", same.task.id);
-      await rejects(
-        () => dispatch(same.task),
-        "factoryCheckUnchangedCandidate",
-      );
-      assert.equal(
-        (await store.read("owner", same.task.id)).task.status,
-        "blocked",
-      );
+      assert.equal(same.task.stage, "verify");
+      assert.equal(same.task.status, "pending");
+      assert.equal(same.task.candidateId, originalCandidate);
+      assert.deepEqual(same.attempts.find(attempt => attempt.id === originalFailure.id), originalFailure);
 
       const findingTask = await route();
       const findingImpl = await dispatch(findingTask.task);
@@ -418,6 +476,9 @@ test(
       await complete(findingReview.runId, sha1, { finding: true });
       await reconcile("owner");
       found = await store.read("owner", found.task.id);
+      assert.equal(found.task.stage, "review");
+      assert.equal(found.task.status, "failed");
+      found = await recover(found, "repair_code");
       assert.equal(found.task.stage, "execute");
       const findingRepair = await dispatch(found.task);
       assert.match(
@@ -524,7 +585,7 @@ test(
         (
           await pool.query(
             `SELECT count(*)::int AS n FROM agent_runs WHERE "dispatchKey"=$1`,
-            [`factory:${pending.task.id}:${pending.task.attemptId}`],
+            [`factory:${pending.task.attemptId}`],
           )
         ).rows[0].n,
         0,

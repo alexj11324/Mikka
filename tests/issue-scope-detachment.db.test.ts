@@ -10,6 +10,9 @@ import { promisify } from 'node:util'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { readIssueMetadata } from '../lib/issue-metadata'
+import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
+import { REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
+import { remoteKey } from '@mikka/protocol/repository'
 
 // Only the dedicated cloud-Linux test DB or Actions' ephemeral service. Never
 // fall back to business credentials. Fixtures are intentionally retained.
@@ -89,10 +92,20 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const issue = randomUUID(), memberRun = randomUUID(), ownerRun = randomUUID()
   const fixtureIds: string[] = [issue]
   const noExternalFetch = globalThis.fetch
+  const originalFlagKey = process.env.NEXT_PUBLIC_POSTHOG_KEY
+  const flagKey = `synthetic-scope-flag-${randomUUID()}`
+  process.env.NEXT_PUBLIC_POSTHOG_KEY = flagKey
+  t.after(() => { if(originalFlagKey===undefined) delete process.env.NEXT_PUBLIC_POSTHOG_KEY;else process.env.NEXT_PUBLIC_POSTHOG_KEY=originalFlagKey })
   let rejectedExternalRequests = 0
   let linearLoopbackOrigin: string | undefined
   globalThis.fetch = (async (input, init) => {
     const target = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
+    // Keep the real feature gate and its parsing/cache. Only the external
+    // provider response is synthetic, so scope checks actually run when on.
+    if (target.href === 'https://us.i.posthog.com/flags?v=2') {
+      assert.equal(JSON.parse(String(init?.body)).api_key,flagKey)
+      return Response.json({errorsWhileComputingFlags:false,flags:{'mikka-linear-sync':{enabled:true}}})
+    }
     if (target.origin === 'https://api.linear.app' && target.pathname === '/graphql' && linearLoopbackOrigin) return noExternalFetch(new URL('/graphql', linearLoopbackOrigin), init)
     if (target.hostname !== '127.0.0.1') { rejectedExternalRequests++; throw new Error('External network prohibited in scope acceptance') }
     return noExternalFetch(input, init)
@@ -131,12 +144,15 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   await pool.query(await readFile(new URL('../drizzle/20261029043644_team_issue_promotions.sql',import.meta.url),'utf8'))
   assert.equal((await pool.query('select "externalTargetVerified" from linear_issue_links where id=$1',[legacyLink])).rows[0].externalTargetVerified,true)
   fixtureIds.push(legacyImported)
-  await pool.query('insert into devices (id,"ownerId",name) values ($1,$2,\'Synthetic\')', [device,member])
+  const claimHarnesses = JSON.stringify([{harness:'codex',installed:true,toolApproval:true}])
+  const memberRemote = `https://github.com/mikka-ci/scope-member-${device}.git`
+  const ownerRemote = `https://github.com/mikka-ci/scope-owner-${ownerDevice}.git`
+  await pool.query('insert into devices (id,"ownerId",name,"protocolVersion",harnesses) values ($1,$2,\'Synthetic\',$3,$4)', [device,member,DAEMON_PROTOCOL_VERSION,claimHarnesses])
   await pool.query('insert into agents (id,"userId",harness,name,"deviceId") values ($1,$2,\'codex\',\'Synthetic\',$3)', [agent,member,device])
-  await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","baseBranch") values ($1,$2,$3,\'/synthetic/issue184\',\'main\')', [repo,device,member])
-  await pool.query('insert into devices (id,"ownerId",name) values ($1,$2,\'Synthetic owner\')', [ownerDevice,owner])
+  await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") values ($1,$2,$3,$4,$5,\'main\')', [repo,device,member,remoteKey(memberRemote),memberRemote])
+  await pool.query('insert into devices (id,"ownerId",name,"protocolVersion",harnesses) values ($1,$2,\'Synthetic owner\',$3,$4)', [ownerDevice,owner,DAEMON_PROTOCOL_VERSION,claimHarnesses])
   await pool.query('insert into agents (id,"userId",harness,name,"deviceId") values ($1,$2,\'codex\',\'Synthetic owner\',$3)', [ownerAgent,owner,ownerDevice])
-  await pool.query('insert into device_repos (id,"deviceId","userId","repoPath") values ($1,$2,$3,\'/synthetic/owner\')', [ownerRepo,ownerDevice,owner])
+  await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl") values ($1,$2,$3,$4,$5)', [ownerRepo,ownerDevice,owner,remoteKey(ownerRemote),ownerRemote])
   const deviceToken = `synthetic-${randomUUID()}`
   await pool.query('insert into device_tokens (id,"userId","tokenHash") values ($1,$2,$3)', [randomUUID(),member,hashDeviceToken(deviceToken)])
   const [teamSync] = await db.select().from(linearTeamSyncs).where(eq(linearTeamSyncs.id,sync))
@@ -164,7 +180,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const ownerToken = (await issueRunToken({id:ownerRun,userId:owner})).token
   async function withClaimServer(check: (origin: string)=>Promise<void>, runId = memberRun) {
     const server = createServer(async (incoming,outgoing) => {
-      const request = new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{authorization:incoming.headers.authorization??''}})
+      const request = new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{authorization:incoming.headers.authorization??'',[REPO_ORIGIN_HEADER]:incoming.headers[REPO_ORIGIN_HEADER]?.toString()??''}})
       try {
         const response = await claim.POST(request,{params:Promise.resolve({deviceId:device,runId})})
         outgoing.writeHead(response.status,Object.fromEntries(response.headers));outgoing.end(await response.text())
@@ -219,8 +235,8 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   })
   await scopeSubtest(t, 'the same native claim route succeeds while workspace access is still active', async () => {
     await withClaimServer(async origin=>{
-      const response=await fetch(`${origin}/claim`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`}})
-      assert.equal(response.status,200)
+      const response=await fetch(`${origin}/claim`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`,[REPO_ORIGIN_HEADER]:'1'}})
+      assert.equal(response.status,200,await response.clone().text())
       const claimed=await response.json()
       assert.equal(claimed.runId,memberRun)
       assert.ok(await verifyRunToken(new Request(`${origin}/`),claimed.mcp.token))
@@ -243,7 +259,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       const pid=(await blocker.query('select pg_backend_pid() pid')).rows[0].pid
       await withClaimServer(async origin=>{
         try {
-          responsePromise=fetch(`${origin}/claim`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`}})
+          responsePromise=fetch(`${origin}/claim`,{method:'POST',headers:{authorization:`Bearer ${deviceToken}`,[REPO_ORIGIN_HEADER]:'1'}})
           await waitFor(async()=>Boolean((await pool.query("select 1 from pg_stat_activity a where a.wait_event_type='Lock' and $1=any(pg_blocking_pids(a.pid))",[pid])).rowCount),'claim did not pause before token issuance')
           assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'preparing')
           const preview=await actAs(owner,()=>previewIssuePersonalScope(id))
@@ -448,6 +464,76 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
       assert.equal((await pool.query('select count(*)::int n from coordinator_events where "runId"=$1',[run])).rows[0].n,0)
     } finally {release.resolve();if(responsePromise) await Promise.allSettled([responsePromise]);await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()))}
+  })
+  await scopeSubtest(t, 'Factory teammate tasks cannot revive after a real scope round trip, while owners retain their own grants', async () => {
+    const { factoryStore } = await import('../lib/factory/server')
+    const { FactoryError } = await import('../lib/factory/contract')
+    const id = randomUUID()
+    fixtureIds.push(id)
+    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Factory scope fixture\',$3,\'todo\',\'normal\',\'personal\')', [id,owner,doc])
+    const promoted = await promoteExistingIssueForUser(owner, { requestId:randomUUID(),issueId:id,revision:1,teamId:team,expectedTeamId:null })
+    assert.ok('issue' in promoted && promoted.issue)
+    const generation = promoted.issue.scopeVersion
+    async function source(userId: string) {
+      const sourceEventId = randomUUID()
+      await pool.query('insert into coordinator_events (id,"userId","issueId",kind,payload,"dedupeKey") values ($1,$2,$3,\'user_message\',$4,$5)', [sourceEventId,userId,id,JSON.stringify({text:'Synthetic authorized Factory request'}),`factory-scope:${sourceEventId}`])
+      return { issueId:id,eventId:randomUUID(),sourceEventId,rationale:'Synthetic authorized Factory request' }
+    }
+    const memberRoute = await source(member), ownerRoute = await source(owner)
+    const memberTask = (await factoryStore.route(member,memberRoute)).task
+    const ownerTask = (await factoryStore.route(owner,ownerRoute)).task
+    const binding = (task: typeof memberTask) => ({ taskId:task.id,issueId:task.issueId,attemptId:task.attemptId,candidateId:task.candidateId,revision:task.revision })
+    assert.equal(memberTask.scopeVersion,generation)
+    assert.equal(ownerTask.scopeVersion,generation)
+    assert.equal((await factoryStore.read(member,memberTask.id)).task.id,memberTask.id)
+    assert.deepEqual((await factoryStore.listForIssue(member,id)).tasks.map(task=>task.id),[memberTask.id])
+    const denied = (error: unknown) => error instanceof FactoryError && error.code === 'factoryNotFound'
+    const counts = async () => (await pool.query(`select
+      (select count(*)::int from factory_tasks where "issueId"=$1) tasks,
+      (select count(*)::int from factory_attempts a join factory_tasks t on t.id=a."taskId" where t."issueId"=$1) attempts,
+      (select count(*)::int from factory_events e join factory_tasks t on t.id=e."taskId" where t."issueId"=$1) events,
+      (select count(*)::int from agent_runs where "issueId"=$1) runs`,[id])).rows[0]
+    const retired = await changeIssueScopeLocally(owner, {id,revision:promoted.issue.revision,scope:'personal'}, {allowLinkedPersonal:false})
+    assert.ok('issue' in retired && retired.issue)
+    await assert.rejects(factoryStore.read(member,memberTask.id),denied)
+    assert.equal((await factoryStore.read(owner,ownerTask.id)).task.id,ownerTask.id)
+    const restored = await promoteExistingIssueForUser(owner, {requestId:randomUUID(),issueId:id,revision:retired.issue.revision,teamId:team,expectedTeamId:team})
+    assert.ok('issue' in restored && restored.issue)
+    assert.equal(restored.issue.scopeVersion,generation+2)
+    assert.ok(await issueForUser(member,id), 'membership access is restored; only the old Factory grant stays retired')
+    const before = await counts()
+    await assert.rejects(factoryStore.read(member,memberTask.id),denied)
+    await assert.rejects(factoryStore.route(member,memberRoute),denied)
+    await assert.rejects(factoryStore.apply(member,binding(memberTask),randomUUID(),{action:'cancel',reason:'Stale generation request'}),denied)
+    const tx = await pool.connect()
+    try {
+      await tx.query('begin')
+      await assert.rejects(factoryStore.lockForDispatch(member,binding(memberTask),randomUUID(),tx),denied)
+    } finally { await tx.query('rollback');tx.release() }
+    assert.deepEqual((await factoryStore.listForIssue(member,id)).tasks,[])
+    assert.deepEqual(await counts(),before)
+    assert.equal((await pool.query('select "scopeVersion" from factory_tasks where id=$1',[memberTask.id])).rows[0].scopeVersion,generation)
+    assert.equal((await factoryStore.route(owner,ownerRoute)).task.id,ownerTask.id)
+    const renewedRoute = await source(member)
+    const renewed = (await factoryStore.route(member,renewedRoute)).task
+    assert.equal(renewed.scopeVersion,restored.issue.scopeVersion)
+    assert.equal((await factoryStore.read(member,renewed.id)).task.id,renewed.id)
+    assert.deepEqual((await factoryStore.listForIssue(member,id)).tasks.map(task=>task.id),[renewed.id])
+    // Only these isolated synthetic rows are changed to represent pre-migration
+    // grants whose historical generation is unknown. The upgrade never backfills.
+    await pool.query('update factory_tasks set "scopeVersion"=null where id=any($1::uuid[])',[[renewed.id,ownerTask.id]])
+    const legacyBefore = await counts()
+    await assert.rejects(factoryStore.read(member,renewed.id),denied)
+    await assert.rejects(factoryStore.route(member,renewedRoute),denied)
+    await assert.rejects(factoryStore.apply(member,binding(renewed),randomUUID(),{action:'cancel',reason:'Unknown historical grant'}),denied)
+    assert.deepEqual((await factoryStore.listForIssue(member,id)).tasks,[])
+    assert.deepEqual(await counts(),legacyBefore)
+    assert.equal((await factoryStore.read(owner,ownerTask.id)).task.scopeVersion,null)
+    assert.equal((await factoryStore.route(owner,ownerRoute)).task.id,ownerTask.id)
+    const stopped = await factoryStore.apply(owner,binding(ownerTask),randomUUID(),{action:'cancel',reason:'Owner retains cancellation authority'})
+    assert.equal(stopped.task.status,'cancelled')
+    assert.equal(stopped.task.scopeVersion,null)
+    assert.equal((await pool.query('select "scopeVersion" from factory_tasks where id=$1',[renewed.id])).rows[0].scopeVersion,null)
   })
   const passedReport={summary:'Synthetic completion',filesChanged:[],verify:{status:'passed' as const},openQuestions:[],nextStep:null}
   async function completionFixture(issueOwner: string, actor: string, scope='workspace', kind='implement', withIssue=true) {

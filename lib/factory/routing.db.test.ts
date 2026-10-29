@@ -1,4 +1,5 @@
 import { lifecycleCases } from "./lifecycle.db-cases";
+import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
@@ -24,11 +25,12 @@ test(
   "isolated PG: durable intake, Bot/source provenance, resolution, restart and stop fences",
   { skip: !url, timeout: 120000 },
   async (t) => {
-    const admin = new Pool({ connectionString: url }),
+    const fixtureURL = await isolatedPostgresURL(url!);
+    const admin = new Pool({ connectionString: fixtureURL }),
       schema = "routing_" + randomUUID().replaceAll("-", "");
     await admin.query(`CREATE SCHEMA "${schema}"`);
     const pool = new Pool({
-      connectionString: url,
+      connectionString: fixtureURL,
       options: `-c search_path=${schema}`,
       max: 12,
     });
@@ -111,7 +113,7 @@ test(
             "factoryNotFound",
           );
           const reconnected = new Pool({
-            connectionString: url,
+            connectionString: fixtureURL,
             options: `-c search_path=${schema}`,
           });
           try {

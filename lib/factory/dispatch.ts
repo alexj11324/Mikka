@@ -22,6 +22,7 @@ export type FactoryQueue = (tx: PoolClient, userId: string, input: {
 export interface FactoryDispatchAdapters {
   lockAdmission?: (tx: PoolClient, userId: string, input: FactoryDispatchInput) => Promise<void>;
   configure: Partial<Record<FactoryStage, (tx: PoolClient, task: FactoryTask, runId: string) => Promise<void>>>;
+  replay?: Partial<Record<FactoryStage, (tx: PoolClient, task: FactoryTask, runId: string) => Promise<void>>>;
   freeze: (tx: PoolClient, task: FactoryTask, runId: string) => Promise<void>;
 }
 export const defaultFactoryDispatchAdapters: FactoryDispatchAdapters = {
@@ -29,6 +30,9 @@ export const defaultFactoryDispatchAdapters: FactoryDispatchAdapters = {
     spec: async(tx,_task,id)=>{await tx.query("UPDATE agent_runs SET kind='plan' WHERE id=$1",[id]);},
     execute: factoryRepairBrief, review: configureFactoryCheck, verify: configureFactoryCheck,
     monitor: async(tx,task,id)=>{const {configureFactoryMonitorDispatch,readMonitorDispatchPublication}=await import('./monitor-dispatch');await configureFactoryMonitorDispatch(tx,task,id,await readMonitorDispatchPublication(tx,task),false);},
+  },
+  replay: {
+    monitor: async(tx,task,id)=>{const {configureFactoryMonitorDispatch,readMonitorDispatchPublication}=await import('./monitor-dispatch');await configureFactoryMonitorDispatch(tx,task,id,await readMonitorDispatchPublication(tx,task),true);},
   },
   freeze: async(tx,task,id)=>{
     const {rows:[run]}=await tx.query('SELECT r.*,a.harness,a.instructions FROM agent_runs r JOIN agents a ON a.id=r."agentId" AND a."userId"=r."userId" WHERE r.id=$1 AND r."userId"=$2 FOR UPDATE OF r FOR SHARE OF a',[id,task.userId]);
@@ -66,6 +70,11 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       if (receipt) {
         if (!receipt.same) fail('factoryReplayMismatch');
         if (task.revision !== receipt.result.binding.revision || task.attemptId !== binding.attemptId || task.candidateId !== binding.candidateId) fail('factoryStale');
+        // A monitor replay must retain its original, still-valid publication
+        // binding. This validates the frozen run without granting new authority.
+        const replay = adapters.replay?.[task.stage];
+        if (task.stage === 'monitor' && !replay) fail('factoryDispatchAdapterRequired');
+        await replay?.(tx,task,receipt.result.runId);
         if (!existing) await tx.query('COMMIT');
         return { ...receipt.result, replayed: true };
       }

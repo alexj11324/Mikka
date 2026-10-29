@@ -53,11 +53,11 @@ export async function factory194Fixture(connectionString: string) {
     options: `-c search_path=${schema}`,
   });
   await pool.query(`
-    CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,title text,content jsonb,revision integer);
+    CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,title text,content jsonb,revision integer,scope text NOT NULL DEFAULT 'personal',"scopeVersion" integer NOT NULL DEFAULT 1);
     CREATE TABLE coordinator_events (id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,kind text,payload jsonb);
     CREATE TABLE "session" (id text PRIMARY KEY,"userId" text,"expiresAt" timestamptz);
     CREATE TABLE account (id text,"userId" text,"providerId" text);
-    CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"attemptId" uuid,"candidateId" uuid,revision integer,stage text,status text,"botId" uuid,"sourceEventId" uuid);
+    CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"attemptId" uuid,"candidateId" uuid,revision integer,stage text,status text,"botId" uuid,"sourceEventId" uuid,"scopeVersion" integer);
     CREATE TABLE factory_candidates (id uuid PRIMARY KEY,"taskId" uuid,sha text,repository text,environment text,scope text,UNIQUE("taskId",id));
     CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid,"candidateId" uuid,stage text,position integer,"runId" uuid,"sessionId" text,status text,evidence jsonb,output jsonb,"finishedAt" timestamptz,UNIQUE("taskId",id));
     CREATE TABLE factory_events ("taskId" uuid,"eventId" uuid,request jsonb NOT NULL DEFAULT '{}',result jsonb NOT NULL DEFAULT '{}',PRIMARY KEY("taskId","eventId"));
@@ -251,7 +251,7 @@ export async function factory194Fixture(connectionString: string) {
       scope: "synthetic upstream approval contract",
     };
     const sourceEventId = randomUUID();
-    await pool.query("INSERT INTO issues VALUES($1,$2,$3,$4,1)", [
+    await pool.query('INSERT INTO issues (id,"userId",title,content,revision) VALUES($1,$2,$3,$4,1)', [
       task.issueId,
       task.userId,
       "Synthetic publication task",

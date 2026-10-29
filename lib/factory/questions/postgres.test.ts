@@ -65,6 +65,7 @@ test(
         )
       ).rowCount === 1;
     const evaluationRuns = new Map<string, string>();
+    const originRuns = new Map<string, string>();
     const make = (p: Pool, withSkills = true) => {
       const assignments = createSkillAssignments(
         p,
@@ -73,11 +74,12 @@ test(
           owner === userId && evaluationRuns.get(run.id) === evaluationId,
       );
       const store = createFactoryStore(p, authorize, null, factoryTestLifecycle);
-      const dispatch = createFactoryDispatch(p, store, (tx, owner, input) =>
-        insertRunOnce(factoryDispatchDatabase(tx), owner, input, {
+      const dispatch = createFactoryDispatch(p, store, (tx, owner, input, botId, context) =>
+        insertRunOnce(factoryDispatchDatabase(tx), owner, { ...input, requestKey: `factory:${context.attemptId}` }, {
           deviceId,
           baseBranch: "main",
           prompt: "Explicit Harness fixture",
+          botId,
         }),
       );
       return {
@@ -98,7 +100,7 @@ test(
         ),
       };
     };
-    const { store, questions, assignments } = make(pool);
+    const { store, dispatch, questions, assignments } = make(pool);
     try {
       const dir = new URL("../../../drizzle/", import.meta.url);
       for (const name of orderMigrations(
@@ -139,7 +141,6 @@ test(
       ) => {
         const issueId = randomUUID(),
           eventId = randomUUID(),
-          runId = randomUUID(),
           questionId = randomUUID();
         await pool.query(
           `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Use existing HTTP API','{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Keep the existing public API"}]}]}','todo','normal')`,
@@ -155,15 +156,27 @@ test(
           sourceEventId: eventId,
           rationale: "Explicit fixture",
         });
-        await pool.query(
-          `INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"sessionId") VALUES ($1,'owner',$2,$3,$4,$5,'queued',$6)`,
-          [runId, issueId, agentId, deviceId, repoId, `session:${runId}`],
-        );
+        // Freeze and bind the origin through the same dispatch consumer used
+        // by its continuation. The stopped CLI hand-in below is synthetic.
+        const dispatched = await dispatch(userId, {
+          binding: {
+            taskId: state.task.id,
+            issueId,
+            attemptId: state.task.attemptId,
+            revision: state.task.revision,
+            candidateId: state.task.candidateId,
+          },
+          agentId,
+          deviceRepoId: repoId,
+        });
+        state = dispatched;
+        const runId = dispatched.runId;
+        originRuns.set(issueId, runId);
         await selectSkill(runId, issueId);
         const lease = new Date(Date.now() + 60000).toISOString();
         await pool.query(
-          `UPDATE agent_runs SET status='preparing',"startedAt"=now(),"leaseExpiresAt"=$2 WHERE id=$1`,
-          [runId, lease],
+          `UPDATE agent_runs SET status='preparing',"startedAt"=now(),"leaseExpiresAt"=$2,"sessionId"=$3 WHERE id=$1`,
+          [runId, lease, `session:${runId}`],
         );
         const { skillReceipt } = await assignments.recordClaim(
           userId,
@@ -172,17 +185,6 @@ test(
           lease,
           true,
         );
-        const b = {
-          taskId: state.task.id,
-          issueId,
-          attemptId: state.task.attemptId,
-          revision: state.task.revision,
-          candidateId: state.task.candidateId,
-        };
-        state = await store.apply(userId, b, randomUUID(), {
-          action: "bind_run",
-          runId,
-        });
         await pool.query(
           `UPDATE agent_runs SET status='stopped',"stopReason"=$2,report=$3,"finishedAt"=now() WHERE id=$1`,
           [
@@ -221,8 +223,8 @@ test(
       const queued = async (issueId: string) =>
         (
           await pool.query(
-            `SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1 AND "dispatchKey" IS NOT NULL`,
-            [issueId],
+            `SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1 AND "dispatchKey" IS NOT NULL AND id<>$2::uuid`,
+            [issueId, originRuns.get(issueId)],
           )
         ).rows[0].n;
 

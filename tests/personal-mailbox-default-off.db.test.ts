@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
+import { REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
 import { normalizeRepository } from '@mikka/protocol/repository'
+import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
 import { revokeSyntheticMailboxCredentials } from '../scripts/personal-mailbox-ci-cleanup.mjs'
 import { assertPersonalMailboxCITarget } from '../scripts/personal-mailbox-ci-target.mjs'
 import { loadEnvironment, assertDatabaseIdentity } from '../scripts/test-accounts/environment.mjs'
@@ -27,7 +29,8 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
   let runToken: string | undefined
   let deviceTokenCreated = false
   const tokenHash = (value: string) => createHash('sha256').update(value).digest('hex')
-  const request = (path: string, token?: string, body: unknown = {}) => new Request(`http://127.0.0.1:3100/mikka${path}`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) })
+  const request = (path: string, token?: string, body: unknown = {}, capabilityHeaders: Record<string, string> = {}) => new Request(`http://127.0.0.1:3100/mikka${path}`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(token ? { authorization: `Bearer ${token}` } : {}), ...capabilityHeaders }, body: JSON.stringify(body) })
+  const claimRequest = () => request(`/v1/devices/${deviceId}/runs/${runId}/claim`, deviceToken, {}, { [REPO_ORIGIN_HEADER]: '1', [SKILL_ARTIFACT_HEADER]: '1' })
   try {
     await assertDatabaseIdentity(pool, environment)
     assert.equal((await pool.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
@@ -47,8 +50,15 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
     await pool.query('insert into agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"agentDefinition") values($1,$2,$3,$4,$5,$6,\'queued\',$7)', [runId, owner, issueId, agentId, deviceId, repoId, JSON.stringify(definition)])
     await pool.query('insert into device_tokens(id,"userId",name,"tokenHash","lastUsedAt","expiresAt") values($1,$2,$3,$4,now(),now()+interval \'5 minutes\')', [deviceTokenId, owner, 'Mailbox default-off CI', tokenHash(deviceToken)])
     deviceTokenCreated = true
-    await t.test('a legacy CLI device without run approval transport cannot claim or receive a run token', async () => {
+    await t.test('a current daemon without repository-origin transport cannot claim or receive a run token', async () => {
       const response=await claim(request(`/v1/devices/${deviceId}/runs/${runId}/claim`,deviceToken),{params:Promise.resolve({deviceId,runId})})
+      assert.equal(response.status,409)
+      assert.deepEqual(await response.json(),{error:'Device update required for repository verification.'})
+      assert.equal((await pool.query('select status from agent_runs where id=$1',[runId])).rows[0].status,'queued')
+      assert.equal((await pool.query('select count(*)::int as count from run_tokens where "runId"=$1',[runId])).rows[0].count,0)
+    })
+    await t.test('a repository-capable legacy CLI without run approval transport cannot claim or receive a run token', async () => {
+      const response=await claim(claimRequest(),{params:Promise.resolve({deviceId,runId})})
       assert.equal(response.status,409)
       assert.deepEqual(await response.json(),{error:'Run approval capability unavailable.'})
       assert.equal((await pool.query('select status from agent_runs where id=$1',[runId])).rows[0].status,'queued')
@@ -59,11 +69,12 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
     // verified separately by the real launcher acceptance gate.
     await pool.query('update devices set harnesses=$2::jsonb where id=$1 and "ownerId"=$3',[deviceId,JSON.stringify([{harness:'codex',installed:true,version:'0.163.0',toolApproval:true}]),owner])
     await t.test('actual device-authenticated claim keeps ordinary MCP and omits mailbox capability', async () => {
-      const response = await claim(request(`/v1/devices/${deviceId}/runs/${runId}/claim`, deviceToken), { params: Promise.resolve({ deviceId, runId }) })
+      const response = await claim(claimRequest(), { params: Promise.resolve({ deviceId, runId }) })
       assert.equal(response.status, 200, response.status === 200 ? undefined : await response.text())
       const assignment = await response.json()
       assert.equal(assignment.runId, runId)
       assert.equal(assignment.remoteUrl, repository.remoteUrl)
+      assert.equal(assignment.policy.permissions.git_push, 'ask', 'a legacy claim does not invent repository push approval')
       assert.ok(assignment.mcp && typeof assignment.mcp.token === 'string')
       assert.equal(Object.hasOwn(assignment.mcp, 'mailbox'), false)
       runToken = assignment.mcp.token

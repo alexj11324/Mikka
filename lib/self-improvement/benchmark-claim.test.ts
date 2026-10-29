@@ -3,37 +3,53 @@ import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 import test from 'node:test'
 import { transpileModule, ModuleKind } from 'typescript'
+import * as daemonProtocol from '@mikka/protocol/daemon'
+import * as deviceProtocol from '@mikka/protocol/device'
+import * as repositoryProtocol from '@mikka/protocol/repository'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
+import { constrainedAssignmentPolicy } from '../run-assignment-policy'
 
 // Execute the actual route in memory, with its database/auth boundaries replaced.
 async function routeFixture(unavailable=false,stopped=false) {
   const calls:string[]=[]
   const run={id:'run',userId:'owner',issueId:'issue',agentId:'agent',deviceRepoId:'repo',deviceId:'device',status:'queued',kind:'implement',baseBranch:'frozen-sha',prompt:'frozen task',attempt:1}
-  const agent={id:'agent',userId:'owner',harness:'codex'},repo={id:'repo',userId:'owner',deviceId:'device',verifyCommand:'mutable-repo-command'}
+  const agent={id:'agent',userId:'owner',harness:'codex'},repo={id:'repo',userId:'owner',deviceId:'device',repoPath:'v2/github.com/mikka-ci/benchmark-claim',remoteUrl:'https://github.com/mikka-ci/benchmark-claim.git',verifyCommand:'mutable-repo-command'}
   const selections=[run,agent,repo]
   class ImprovementError extends Error {constructor(public code:string){super(code)}}
   class FactoryError extends Error {}
   const db={select:()=>({from:()=>({where:()=>({limit:async()=>[selections.shift()]})})}),update:()=>({set:(values:object)=>({where:async()=>{calls.push('block');Object.assign(run,values)}})})}
-  const benchmark={harness:'codex',model:'actual-observed-model',verifyCommand:'git diff --exit-code HEAD --',policy:{readOnly:true},benchmark:{caseId:'case',benchmarkDigest:'digest',sourceCommit:'frozen-sha'}}
+  const benchmark={harness:'codex',model:'actual-observed-model',verifyCommand:'git diff --exit-code HEAD --',policy:{readOnly:true,networkAllow:[],permissions:{install_dependency:'deny',write_outside_repo:'deny',git_push:'deny',network:'ask'}},benchmark:{caseId:'case',benchmarkDigest:'digest',sourceCommit:'frozen-sha'}}
   const modules:Record<string,unknown>={
     'next/server':{NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
-    '@mikka/protocol/device':{RUN_LEASE_MS:60000},
+    '@mikka/protocol/device':deviceProtocol,
+    '@mikka/protocol/daemon':daemonProtocol,
+    '@mikka/protocol/repository':repositoryProtocol,
+    '@/lib/device-agents':{localExecutionHarnesses:()=>['codex']},
+    '@/lib/device-repositories':{readRepositorySettings:async()=>({verifyCommand:repo.verifyCommand})},
+    '@/lib/run-test-fixture':{runTestFixture:()=>undefined},
+    '@/lib/agent-tool-approval/policy-store':{readCliRunPolicy:async()=>({policy:defaultRunPolicy(),revision:'synthetic-current-policy'})},
+    '@/lib/run-assignment-policy':{constrainedAssignmentPolicy},
+    '@/lib/run-claim-response':{authorizedClaimResponse:async(_user:string,_run:unknown,_lease:string,respond:(current:typeof run)=>Response)=>respond(run)},
+    '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{throw Error('unexpected publication failure')}},
+    '@/lib/run-publication-result':{PublicationError:class extends Error {}},
     '@/lib/db':{db,pool:{},withDatabaseClient:async(_tx:unknown,fn:()=>Promise<unknown>)=>fn()},'@/lib/db/schema':{agentRuns:{},agents:{},deviceRepos:{}},
-    '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner'}),ownedDevice:async()=>({enabled:true})},
+    '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner'}),ownedDevice:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]})},
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},
     '@/lib/mcp/worker':{issueRunToken:async()=>{calls.push('token');return {token:'synthetic-test-token'}}},
     '@/lib/run-leases':{},'@/lib/run-retry':{},
     '@/lib/factory/checks':{isFactoryCheckRun:async()=>false},
     '@/lib/factory/runtime':{guardFactoryClaim:async()=>{calls.push('guard');if(stopped)throw new FactoryError('stopped');return {preserveQuestionWorktree:true}}},
-    '@mikka/protocol/agent-policy':{defaultRunPolicy:()=>({})},
+    '@mikka/protocol/agent-policy':{defaultRunPolicy},
     '@/lib/computer/local-authority':{localComputerAuthority:async()=>null},
     '@/lib/computer/claim':{claimLocalRun:async(_pool:unknown,_runId:string,_deviceId:string,_lease:Date,_subscription:unknown,guard:(tx:object)=>Promise<boolean>,after:(tx:object)=>Promise<void>)=>{if(!await guard({}))return 'unavailable';calls.push('claim');run.status='preparing';await after({});return 'claimed'}},
     '@/lib/subscription-runtime':{},
+    '@/lib/computer/native-run-binding':{},
     '@/lib/personal-mailbox-config':{personalMailboxEnabled:()=>false},
     '@/lib/factory/questions/retry':{},'@mikka/protocol/skill':{SKILL_ARTIFACT_HEADER:'x-mikka-skill-artifacts'},
     '@/lib/self-improvement/contract':{ImprovementError},'@/lib/factory/contract':{FactoryError},
     '@/lib/self-improvement/server':{
-      skillAssignments:{preflight:async()=>{calls.push('preflight');assert.equal(run.status,'queued')},recordClaim:async()=>{calls.push('receipt');assert.equal(run.status,'preparing');return {skills:[],skillReceipt:{id:'receipt'}}}},
+      skillAssignments:{preflight:async(_user:string,_run:string,supportsArtifacts:boolean)=>{calls.push('preflight');assert.equal(supportsArtifacts,true);assert.equal(run.status,'queued')},recordClaim:async(_user:string,_device:string,_run:string,_lease:string,supportsArtifacts:boolean)=>{calls.push('receipt');assert.equal(supportsArtifacts,true);assert.equal(run.status,'preparing');return {skills:[],skillReceipt:{id:'receipt'}}}},
       claimBenchmarkAssignment:async()=>{calls.push('benchmark');assert.equal(run.status,'preparing');if(unavailable)throw new ImprovementError('runUnavailable');return benchmark},
     },
   }
@@ -44,21 +60,26 @@ async function routeFixture(unavailable=false,stopped=false) {
   return {calls,run,benchmark,post:exports.POST as (request:Request,context:{params:Promise<{deviceId:string;runId:string}>})=>Promise<Response>}
 }
 
+const claimRequest=()=>new Request('https://fixture.invalid/v1/claim',{headers:{[deviceProtocol.REPO_ORIGIN_HEADER]:'1','x-mikka-skill-artifacts':'1'}})
+
 test('actual claim route resolves frozen benchmark exactly once after claim and receipt and overrides mutable config',async()=>{
   const {post,calls,benchmark}=await routeFixture()
-  const response=await post(new Request('https://fixture.invalid/v1/claim'),{params:Promise.resolve({deviceId:'device',runId:'run'})})
+  const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,200)
   const assignment=await response.json()
   assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark'])
   assert.equal(assignment.verifyCommand,benchmark.verifyCommand)
   assert.equal(assignment.model,benchmark.model)
+  assert.equal(assignment.remoteUrl,'https://github.com/mikka-ci/benchmark-claim.git')
+  assert.equal(assignment.expectedRepoRemote,assignment.remoteUrl)
+  assert.equal(assignment.policyRevision,'synthetic-current-policy')
   assert.deepEqual(assignment.benchmark,benchmark.benchmark)
-  assert.deepEqual(assignment.policy,{readOnly:true})
+  assert.deepEqual(assignment.policy,benchmark.policy)
 })
 
 test('actual claim route withholds all assignment bytes when frozen configuration becomes unavailable after claim',async()=>{
   const {post,calls,run}=await routeFixture(true)
-  const response=await post(new Request('https://fixture.invalid/v1/claim'),{params:Promise.resolve({deviceId:'device',runId:'run'})})
+  const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
   assert.deepEqual(await response.json(),{error:'runUnavailable'})
   assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark','block'])
@@ -68,7 +89,7 @@ test('actual claim route withholds all assignment bytes when frozen configuratio
 
 test('actual claim route refuses a stopped Factory before receipt, benchmark or token issuance',async()=>{
   const {post,calls,run}=await routeFixture(false,true)
-  const response=await post(new Request('https://fixture.invalid/v1/claim'),{params:Promise.resolve({deviceId:'device',runId:'run'})})
+  const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
   assert.deepEqual(await response.json(),{error:'Run is no longer queued for this device.'})
   assert.deepEqual(calls,['preflight','guard'])

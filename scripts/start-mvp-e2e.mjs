@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertMvpEnvironment, MVP_ORIGIN } from '../tests/mvp/isolated-env.mjs'
 import { startMvpServices } from '../tests/mvp/services.mjs'
+import { MVP_DECISION_KEY } from '../tests/mvp/transport.mjs'
 import { finishMvpResources, indexMvpResource } from '../tests/mvp/retention.mjs'
 import { Pool } from 'pg'
 import { loadEnvironment } from './test-accounts/environment.mjs'
@@ -28,7 +29,7 @@ const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const preload = fileURLToPath(new URL('../tests/mvp/preload.mjs', import.meta.url))
 const child = spawn(process.execPath, ['--import', preload, 'node_modules/next/dist/bin/next', 'start', '--port', '3100'], {
   cwd: fileURLToPath(new URL('..', import.meta.url)), stdio: 'inherit',
-  env: { ...process.env, AI_GATEWAY_API_KEY: '', DECISION_GATEWAY_API_KEY: 'mvp-synthetic-decisions',
+  env: { ...process.env, AI_GATEWAY_API_KEY: '', DECISION_GATEWAY_API_KEY: MVP_DECISION_KEY,
     GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
     WORKFLOW_TARGET_WORLD: 'local', WORKFLOW_LOCAL_BASE_URL: `${MVP_ORIGIN}/mikka`, WORKFLOW_LOCAL_DATA_DIR: workflowDirectory },
 })

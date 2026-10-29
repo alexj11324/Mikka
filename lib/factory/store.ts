@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { factoryCheckIndependent } from "./check-independence";
+import { factoryScopeAllows, type FactoryIssueScope } from "./scope";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import {
@@ -21,6 +22,7 @@ export interface FactoryTask {
   userId: string;
   botId: string | null;
   issueId: string;
+  scopeVersion: number | null;
   sourceEventId: string;
   route: z.infer<typeof routeSchema>;
   stage: FactoryStage;
@@ -137,15 +139,20 @@ export function createFactoryStore(
       'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
       [taskId, userId],
     );
-    if (task) await tx.query('SELECT id FROM issues WHERE id=$1 FOR SHARE', [task.issueId]);
+    const issue = task ? await lockedIssue(tx, task.issueId) : undefined;
     if (
       !task ||
       task.botId !== botId ||
+      !factoryScopeAllows(task, issue) ||
       !(await authorize(userId, task.issueId, tx)) ||
       !(await sourceAllowed(tx, userId, task.sourceEventId, task.issueId))
     )
       fail("factoryNotFound");
     return task;
+  }
+  async function lockedIssue(tx: PoolClient, issueId: string) {
+    const { rows: [issue] } = await tx.query<FactoryIssueScope>('SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1 FOR SHARE', [issueId]);
+    return issue;
   }
   async function snapshot(
     tx: PoolClient,
@@ -225,12 +232,19 @@ export function createFactoryStore(
       if (!parsed.success) fail("factoryInvalid");
       const route = parsed.data;
       return transaction(async (tx) => {
-        if (!(await authorize(userId, route.issueId, tx)))
-          fail("factoryNotFound");
         // Owner/issue lock serializes competing routes before a task row exists.
         await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
           JSON.stringify([userId, route.issueId]),
         ]);
+        // Replays take task -> issue, like cancellation/dispatch. New routes
+        // freeze the issue generation under the same issue lock before INSERT.
+        const { rows: [prior] } = await tx.query<FactoryTask>(
+          'SELECT * FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 AND "sourceEventId"=$3 FOR UPDATE',
+          [userId, route.issueId, route.sourceEventId],
+        );
+        const issue = await lockedIssue(tx, route.issueId);
+        if (!issue || !(await authorize(userId, route.issueId, tx))) fail("factoryNotFound");
+        if (prior && !factoryScopeAllows(prior, issue)) fail("factoryNotFound");
         const {
           rows: [source],
         } = await tx.query(
@@ -242,12 +256,6 @@ export function createFactoryStore(
           !(await sourceAllowed(tx, userId, route.sourceEventId, route.issueId))
         )
           fail("factorySourceMismatch");
-        const {
-          rows: [prior],
-        } = await tx.query<FactoryTask>(
-          'SELECT * FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 AND "sourceEventId"=$3 FOR UPDATE',
-          [userId, route.issueId, route.sourceEventId],
-        );
         if (prior) {
           if (prior.botId !== botId) fail("factoryNotFound");
           if (terminal(prior)) fail("factoryStopped");
@@ -261,6 +269,7 @@ export function createFactoryStore(
           userId,
           botId,
           issueId: route.issueId,
+          scopeVersion: issue.scopeVersion,
           sourceEventId: route.sourceEventId,
           route,
           stage: routeStage(route),
@@ -271,7 +280,7 @@ export function createFactoryStore(
           reason: route.rationale,
         };
         await tx.query(
-          `INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId",route,stage,status,revision,"attemptId",reason,"botId") VALUES ($1,$2,$3,$4,$5,$6,$7,1,$8,$9,$10)`,
+          `INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId",route,stage,status,revision,"attemptId",reason,"botId","scopeVersion") VALUES ($1,$2,$3,$4,$5,$6,$7,1,$8,$9,$10,$11)`,
           [
             task.id,
             userId,
@@ -283,6 +292,7 @@ export function createFactoryStore(
             task.attemptId,
             task.reason,
             botId,
+            task.scopeVersion,
           ],
         );
         await tx.query(
@@ -300,14 +310,15 @@ export function createFactoryStore(
     async listForIssue(userId: string, issueId: string) {
       uuid(issueId);
       return transaction(async (tx) => {
-        if (!(await authorize(userId, issueId, tx))) fail("factoryNotFound");
+        const issue = await lockedIssue(tx, issueId);
+        if (!issue || !(await authorize(userId, issueId, tx))) fail("factoryNotFound");
         const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean }>(
-          'SELECT t.*, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
+          'SELECT t.*, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
           [userId, issueId, botId],
         );
         const tasks: FactoryTaskSummary[] = [];
         for (const row of rows)
-          if (await sourceAllowed(tx, userId, row.sourceEventId, issueId)) {
+          if (factoryScopeAllows(row, issue) && await sourceAllowed(tx, userId, row.sourceEventId, issueId)) {
             const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate } = row;
             tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason,isSkillCandidate});
           }

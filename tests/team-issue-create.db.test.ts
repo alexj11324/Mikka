@@ -33,7 +33,19 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   if(!resumed)await promisify(execFile)(process.execPath,['scripts/migrate.mjs'],{env:{...process.env,MIGRATE:'1',VERCEL_ENV:''},maxBuffer:4<<20})
   const app=new Pool({connectionString:appUrl.toString(),max:5}), workspace=new Pool({connectionString:workspaceUrl.toString(),max:6})
   const originalFetch=globalThis.fetch;let externalCalls=0
-  globalThis.fetch=(async(input,init)=>{ const target=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url); if(target.hostname==='127.0.0.1') return originalFetch(input,init); externalCalls++;throw new Error('Real provider requests prohibited') }) as typeof fetch
+  const originalFlagKey=process.env.NEXT_PUBLIC_POSTHOG_KEY,flagKey=`synthetic-team-flag-${randomUUID()}`
+  process.env.NEXT_PUBLIC_POSTHOG_KEY=flagKey
+  t.after(()=>{if(originalFlagKey===undefined)delete process.env.NEXT_PUBLIC_POSTHOG_KEY;else process.env.NEXT_PUBLIC_POSTHOG_KEY=originalFlagKey})
+  globalThis.fetch=(async(input,init)=>{
+    const target=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url)
+    // Exercise the real on-state gate before the task scope/target checks.
+    if(target.href==='https://us.i.posthog.com/flags?v=2') {
+      assert.equal(JSON.parse(String(init?.body)).api_key,flagKey)
+      return Response.json({errorsWhileComputingFlags:false,flags:{'mikka-linear-sync':{enabled:true}}})
+    }
+    if(target.hostname==='127.0.0.1') return originalFetch(input,init)
+    externalCalls++;throw new Error('Real provider requests prohibited')
+  }) as typeof fetch
   t.after(async()=>{globalThis.fetch=originalFetch;await Promise.all([app.end(),workspace.end()])})
   const {auth}=await import('../lib/auth')
   const restoreAuth=installTeamSessionFixture(auth)

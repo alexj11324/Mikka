@@ -298,7 +298,9 @@ export async function auditEvidence(paths, { environment, stateDirectory } = {})
   environment ??= await loadEnvironment()
   const directory = resolve(stateDirectory ?? join('.cache/e2e/test-accounts', environment.instanceId))
   const secrets = new Set()
-  const root = await lstat(directory)
+  let root
+  try { root = await lstat(directory) }
+  catch (error) { fail(error.code === 'ENOENT' ? 'SECRET_AUDIT_MISSING' : 'SECRET_AUDIT_UNREADABLE') }
   if (!root.isDirectory() || root.isSymbolicLink() || (root.mode & 0o077) || (process.getuid && root.uid !== process.getuid())) fail('PRIVATE_DIRECTORY_UNSAFE')
   let credentialNames = []
   try {

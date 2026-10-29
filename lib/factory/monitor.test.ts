@@ -515,14 +515,14 @@ test(
           reason: "Independent gate integration",
         });
         const id = await run(owner, issueId, 'acceptance');
-        state = await store.apply(owner, binding(state.task), randomUUID(), {
-          action: "bind_run",
-          runId: id,
-        });
         const tx = await pool.connect();
         try {
           await tx.query("BEGIN");
           await configureFactoryCheck(tx, state.task, id);
+          state = await store.apply(owner, binding(state.task), randomUUID(), {
+            action: "bind_run",
+            runId: id,
+          }, tx);
           await tx.query("COMMIT");
         } catch (e) {
           await tx.query("ROLLBACK");

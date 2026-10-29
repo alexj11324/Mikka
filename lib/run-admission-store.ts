@@ -43,7 +43,9 @@ export async function acceptLocalRun(input: {
       const destination = taskDestinationSchema.safeParse(event?.payload.taskDestination)
       if (!input.requestEventId || !event || event.userId !== input.userId || event.botId !== input.botId || (event.issueId !== input.issueId && !(input.continuation && event.issueId === null)) || event.kind !== 'user_message' || !event.deliveredAt || !destination.success || destination.data.kind !== 'device' || destination.data.deviceId !== input.deviceId) throw invalid()
       if (event.issueId === null) {
-        const { rows: [binding] } = await client.query(`SELECT id FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 AND "sourceEventId"=$3 AND "botId" IS NOT DISTINCT FROM $4::uuid`, [input.userId, input.issueId, event.id, input.botId])
+        const { rows: [binding] } = await client.query(`SELECT t.id FROM factory_tasks t JOIN issues i ON i.id=t."issueId"
+          WHERE t."userId"=$1 AND t."issueId"=$2 AND t."sourceEventId"=$3 AND t."botId" IS NOT DISTINCT FROM $4::uuid
+            AND (i."userId"=t."userId" OR (i.scope='workspace' AND t."scopeVersion" IS NOT NULL AND t."scopeVersion"=i."scopeVersion"))`, [input.userId, input.issueId, event.id, input.botId])
         if (!binding) throw invalid()
       }
     }
@@ -115,7 +117,7 @@ export async function acceptLocalRun(input: {
 /** A resumed task retains its original, server-bound device selection. */
 export async function acceptedEventStillMatches(admission: import('./repository-admission').RepositoryAdmission, botId: string | null, executor: Pick<typeof db, 'select'> = db) {
   if (!admission.requestEventId) return true
-  const [event] = await executor.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, admission.requestEventId), eq(coordinatorEvents.userId, admission.userId), sql`(${coordinatorEvents.issueId} = ${admission.issueId} or (${coordinatorEvents.issueId} is null and exists (select 1 from factory_tasks t where t."userId" = ${admission.userId} and t."issueId" = ${admission.issueId} and t."sourceEventId" = ${admission.requestEventId} and t."botId" is not distinct from ${botId}::uuid)))`, eq(coordinatorEvents.kind, 'user_message'), botId ? eq(coordinatorEvents.botId, botId) : isNull(coordinatorEvents.botId))).limit(1)
+  const [event] = await executor.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, admission.requestEventId), eq(coordinatorEvents.userId, admission.userId), sql`(${coordinatorEvents.issueId} = ${admission.issueId} or (${coordinatorEvents.issueId} is null and exists (select 1 from factory_tasks t join issues i on i.id=t."issueId" where t."userId" = ${admission.userId} and t."issueId" = ${admission.issueId} and t."sourceEventId" = ${admission.requestEventId} and t."botId" is not distinct from ${botId}::uuid and (i."userId"=t."userId" or (i.scope='workspace' and t."scopeVersion" is not null and t."scopeVersion"=i."scopeVersion")))))`, eq(coordinatorEvents.kind, 'user_message'), botId ? eq(coordinatorEvents.botId, botId) : isNull(coordinatorEvents.botId))).limit(1)
   const destination = taskDestinationSchema.safeParse(event?.payload.taskDestination)
   return Boolean(event?.deliveredAt && destination.success && destination.data.kind === 'device' && destination.data.deviceId === admission.deviceId)
 }

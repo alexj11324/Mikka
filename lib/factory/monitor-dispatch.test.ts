@@ -17,7 +17,6 @@ import { createFactoryTestAuthority } from "../../tests/helpers/factory-test-aut
 import { createLocalPublicationAdapter } from "./local-publication";
 import {
   createFactoryCheckClaim,
-  factoryCheckAssignment,
   isFactoryCheckRun,
 } from "./checks";
 import { createFactoryMonitor, monitorGate } from "./monitor";
@@ -97,11 +96,12 @@ test(
         candidateEnvironment: `device:${deviceId}`,
       }),
     ]);
-    const dispatch = createFactoryDispatch(pool, store, (tx, owner, input) =>
-      insertRunOnce(factoryDispatchDatabase(tx), owner, input, {
+    const dispatch = createFactoryDispatch(pool, store, (tx, owner, input, botId, context) =>
+      insertRunOnce(factoryDispatchDatabase(tx), owner, { ...input, requestKey: `factory:${context.attemptId}` }, {
         deviceId,
         baseBranch: "main",
         prompt: "Explicit local Harness fixture",
+        botId,
       }),
     );
     const claim = createFactoryCheckClaim(pool, authorize);
@@ -381,7 +381,7 @@ test(
           const passed = await store.read("owner", task.id);
           await rejects(
             () => dispatch("owner", input(task)),
-            "factoryTransition",
+            "factoryStale",
           );
           const next = await store.apply(
             "owner",
@@ -644,11 +644,12 @@ test(
             const restarted = createFactoryDispatch(
               other,
               createFactoryStore(other, authorize),
-              (tx, owner, request) =>
-                insertRunOnce(factoryDispatchDatabase(tx), owner, request, {
+              (tx, owner, request, botId, context) =>
+                insertRunOnce(factoryDispatchDatabase(tx), owner, { ...request, requestKey: `factory:${context.attemptId}` }, {
                   deviceId,
                   baseBranch: "main",
                   prompt: "Explicit local Harness fixture",
+                  botId,
                 }),
             );
             assert.equal(
@@ -660,7 +661,7 @@ test(
             await other.end();
           }
           assert.equal(
-            (await factoryCheckAssignment(pool, "owner", result.runId)).policy
+            (await claim("owner", deviceId, result.runId, new Date(Date.now() + 60000).toISOString())).policy
               .readOnly,
             true,
           );

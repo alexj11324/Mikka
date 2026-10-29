@@ -68,7 +68,7 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
       const audit = (await tx.query('SELECT request FROM factory_monitor_observations WHERE "sourceEventId"=$1',[factoryEventId("monitor-v2-observation","recovery-evidence")])).rows[0].request.identity;
       assert.match(audit.evidenceDigest,/^[a-f0-9]{64}$/); assert.equal(audit.publicationId,r.publicationId); assert.equal(audit.runId,monitorRun); assert.equal(audit.candidateId,r.candidateId);
       await tx.query('ALTER TABLE agent_runs ADD COLUMN "baseBranch" text');
-      const lifecycleTask:FactoryTask={...task,stage:"monitor",status:"running",botId:null,revision:1,reason:"fixture",route:{issueId:r.issueId,eventId:randomUUID(),sourceEventId:randomUUID(),rationale:"fixture",missingInformation:[],missingPermissions:[],needsSpec:false}};
+      const lifecycleTask:FactoryTask={...task,scopeVersion:null,stage:"monitor",status:"running",botId:null,revision:1,reason:"fixture",route:{issueId:r.issueId,eventId:randomUUID(),sourceEventId:randomUUID(),rationale:"fixture",missingInformation:[],missingPermissions:[],needsSpec:false}};
       const proof={observation:o,incident:input,artifact:`run-report:${monitorRun}`,sessionId:"synthetic-monitor",recordedAt:at};
       const adapters=createFactoryMonitorConsumers({productionOrigin:"https://app.example.com",readProbe:async()=>proof});
       await tx.query("UPDATE agent_runs SET status='queued' WHERE id=$1",[monitorRun]);

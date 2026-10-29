@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
-import { randomBytes } from 'node:crypto'
-import { mkdtemp, mkdir, writeFile, chmod, symlink } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
+import { randomBytes, randomUUID } from 'node:crypto'
+import { mkdtemp, mkdir, writeFile, chmod, symlink, readdir, lstat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { auditEvidence } from './session.mjs'
 
@@ -75,4 +77,76 @@ test('evidence scanner rejects an unsafe credential source instead of silently o
     await chmod(credentialFile, 0o644)
     await assert.rejects(audit([evidence]), { code: 'PRIVATE_FILE_UNSAFE' })
   })
+})
+
+test('a pre-account startup log uses the real runner secret inventory and keeps missing stores fail closed', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mikka-pre-account-evidence-'))
+  const environment = {
+    version: 1, id: 'pre-account-fixture', kind: 'isolated-ci', origin: 'http://localhost:3100', basePath: '/mikka',
+    deploymentSha: 'a'.repeat(40), database: { host: '127.0.0.1', port: 5432, name: 'mikka_e2e', schema: 'public', user: 'e2e' },
+    instanceId: randomUUID(), capabilities: { provision: true, mail: 'disabled', reset: true },
+  }
+  const authSecret = `${randomBytes(32).toString('base64url')}/+=`
+  const databasePassword = randomBytes(32).toString('base64url')
+  const cookie = `${randomBytes(32).toString('base64url')}.session`
+  const databaseURL = `postgresql://e2e:${databasePassword}@127.0.0.1:5432/mikka_e2e`
+  const environmentFile = join(root, 'environment.json')
+  const evidence = join(root, 'startup.log')
+  // No CI-only flags or database connection: these child processes exercise only
+  // the real filesystem registry and the read-only audit CLI with synthetic data.
+  const env = {
+    PATH: process.env.PATH,
+    E2E_DATABASE_URL: databaseURL, MIKKA_DATABASE_URL: databaseURL, DATABASE_URL: databaseURL,
+    BETTER_AUTH_URL: environment.origin, BETTER_AUTH_SECRET: authSecret,
+    MIKKA_TEST_DEPLOYMENT_SHA: environment.deploymentSha, MIKKA_TEST_ENVIRONMENT_FILE: environmentFile,
+    FIXTURE_COOKIE: cookie,
+  }
+  const run = args => spawnSync(process.execPath, args, { cwd: root, env, encoding: 'utf8', timeout: 10_000 })
+  const audit = () => run([fileURLToPath(new URL('./cli.mjs', import.meta.url)), 'audit-evidence', '--evidence', evidence])
+  try {
+    await writeFile(environmentFile, JSON.stringify(environment), { mode: 0o600 })
+    await writeFile(evidence, 'Synthetic startup failure before account acquisition\n', { mode: 0o600 })
+    const missing = audit()
+    assert.equal(missing.status, 1)
+    assert.deepEqual(JSON.parse(missing.stderr), { status: 'blocked', code: 'SECRET_AUDIT_MISSING' })
+
+    const initialized = run(['--input-type=module', '--eval', `
+      import { recordRunnerEvidenceSecrets } from ${JSON.stringify(new URL('./bootstrap.mjs', import.meta.url).href)}
+      import { loadEnvironment } from ${JSON.stringify(new URL('./environment.mjs', import.meta.url).href)}
+      await recordRunnerEvidenceSecrets(await loadEnvironment())
+    `])
+    assert.equal(initialized.status, 0, initialized.stderr)
+    assert.equal(initialized.stdout, '')
+    const stateDirectory = join(root, '.cache/e2e/test-accounts', environment.instanceId)
+    assert.deepEqual(await readdir(stateDirectory), ['secret-audit.jsonl'], 'runner registration does not invent account credentials or sessions')
+    assert.equal((await lstat(stateDirectory)).mode & 0o077, 0)
+    assert.equal((await lstat(join(stateDirectory, 'secret-audit.jsonl'))).mode & 0o077, 0)
+    const clean = audit()
+    assert.equal(clean.status, 0, clean.stderr)
+    assert.equal(JSON.parse(clean.stdout).result, 'passed')
+
+    const appended = run(['--input-type=module', '--eval', `
+      import { recordAuthenticationSecrets } from ${JSON.stringify(new URL('./session.mjs', import.meta.url).href)}
+      await recordAuthenticationSecrets([process.env.FIXTURE_COOKIE])
+    `])
+    assert.equal(appended.status, 0, appended.stderr)
+    for (const value of [authSecret, databasePassword, encodeURIComponent(authSecret), Buffer.from(databasePassword).toString('base64'), cookie]) {
+      await writeFile(evidence, `Synthetic failure includes ${value}\n`)
+      const blocked = audit()
+      assert.equal(blocked.status, 1)
+      assert.equal(blocked.stdout, '')
+      assert.deepEqual(JSON.parse(blocked.stderr), { status: 'blocked', code: 'EVIDENCE_SECRET_DETECTED' })
+    }
+  } finally { console.error(`Retained test fixture directory: ${root}`) }
+})
+
+test('an empty private registry cannot authorize evidence publication', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mikka-empty-evidence-registry-'))
+  const stateDirectory = join(root, 'private')
+  const evidence = join(root, 'startup.log')
+  try {
+    await mkdir(stateDirectory, { mode: 0o700 })
+    await writeFile(evidence, 'Synthetic startup failure\n', { mode: 0o600 })
+    await assert.rejects(auditEvidence([evidence], { environment: { instanceId: 'synthetic' }, stateDirectory }), { code: 'SECRET_AUDIT_MISSING' })
+  } finally { console.error(`Retained test fixture directory: ${root}`) }
 })

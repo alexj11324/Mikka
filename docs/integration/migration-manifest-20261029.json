@@ -67,6 +67,13 @@
         "20261025051205_factory_192_questions.sql",
         "20261028231553_factory_192_questions.sql"
       ]
+    },
+    {
+      "issue": 192,
+      "component": "scope-generation",
+      "migration": "20261029044018_factory_scope_generation.sql",
+      "action": "Add nullable host-captured Factory task scope generation. Preserve unknown historical pins as NULL; no default or backfill.",
+      "sha256": "6f71cf25a84c434bb2cf25633d7b18aef573c2974db54754c443c12f3ea8965e"
     }
   ],
   "reserved": [],

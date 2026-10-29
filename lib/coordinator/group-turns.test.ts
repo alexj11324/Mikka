@@ -69,8 +69,13 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await Promise.all([scoped.query(migration),scoped.query(migration)]); await scoped.query(migration)
     // Minimal real agent_runs columns used by the bridge; full tracked schema
     // bootstrap is an independent gate in the same ephemeral-PG17 CI job.
-    await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid)`)
+    await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid)`)
     await scoped.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text, "lastSeenAt" timestamptz); CREATE TABLE coordinator_sessions ("userId" text, "botId" uuid, "leaseHolder" text, "leaseUntil" timestamptz, "updatedAt" timestamptz)` )
+    // The current active-agent reader resolves public Bot names before its
+    // legacy execution-name fallback. Keep those real SQL dependencies present.
+    await scoped.query(`CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text NOT NULL,name text NOT NULL);
+      CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"botId" uuid NOT NULL,"ownerId" text NOT NULL);
+      CREATE TABLE bot_cloud_runtimes ("agentId" uuid,"botId" uuid,"ownerId" text)`)
     for (const member of members) await scoped.query('INSERT INTO agents (id,"userId",name) VALUES ($1,$2,$3)', [member.id, 'owner', member.name])
     const workspaceId = randomUUID()
     const base: GroupRequest = { userId: 'owner', method: 'POST', resource: 'conversations', origin: 'http://localhost:3100', host: 'localhost:3100' }

@@ -48,7 +48,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
   async function addEvent(f: Pick<Fixture, 'userId' | 'issueId' | 'deviceId'>, options: { destination?: unknown; bound?: boolean; delivered?: boolean; botId?: string } = {}) {
     const id = randomUUID()
     await pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey","issueId",payload,"deliveredAt")
-      VALUES ($1,$2,$3,'user_message','admission:'||$1::text,$4,$5,$6)`, [id, f.userId, options.botId ?? null, options.bound ? f.issueId : null,
+      VALUES ($1::uuid,$2,$3,'user_message','admission:'||$1::text,$4,$5,$6)`, [id, f.userId, options.botId ?? null, options.bound ? f.issueId : null,
       JSON.stringify({ text: 'Synthetic owner request; no provider invocation', ...(options.destination === undefined ? {} : { taskDestination: options.destination }) }),
       options.delivered === false ? null : new Date()])
     return id

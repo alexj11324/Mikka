@@ -6,6 +6,9 @@ import { z } from 'zod'
 import { assertMvpEnvironment, REPOSITORY } from './isolated-env.mjs'
 import { answerModel } from './model.mjs'
 import { startMvpServices } from './services.mjs'
+import { hasBoundMvpTransport, installMvpTransport, MVP_DECISION_KEY, verifyMvpTransport } from './transport.mjs'
+import { createDedupeFetch } from 'next/dist/server/lib/dedupe-fetch.js'
+import { createPatchedFetcher } from 'next/dist/server/lib/patch-fetch.js'
 
 const database = 'postgresql://ci:fixture@127.0.0.1:5432/mikka_e2e'
 const isolated = { CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_E2E: '1', MIKKA_TEST_MODE: '1', E2E_DATABASE_URL: database, MIKKA_DATABASE_URL: database, DATABASE_URL: database }
@@ -13,6 +16,54 @@ test('fixture refuses remote targets, split databases, native runtime and every 
   assert.doesNotThrow(() => assertMvpEnvironment(isolated))
   for (const patch of [{ GITHUB_ACTIONS: '' }, { MIKKA_TEST_MODE: '' }, { VERCEL_ENV: 'preview' }, { VERCEL_ENV: 'production' }, { VERCEL: '1' }, { MIKKA_NATIVE_COORDINATOR: '1' }, { E2E_BASE_URL: 'https://example.com' }, { DATABASE_URL: 'postgresql://127.0.0.1/business' }, { MIKKA_DATABASE_URL: `${database}?options=-csearch_path=business` }]) {
     assert.throws(() => assertMvpEnvironment({ ...isolated, ...patch }))
+  }
+})
+
+test('synthetic MVP transport binds the active fetch path, preserves requests and refuses other external services', async () => {
+  const env = { ...isolated, DECISION_GATEWAY_API_KEY: MVP_DECISION_KEY }
+  const requests = []
+  const nextPatch = Symbol.for('next-patch')
+  const previousNextPatch = Object.getOwnPropertyDescriptor(globalThis, nextPatch)
+  const restore = installMvpTransport(env, async (request, options) => {
+    requests.push({ url: request.url, method: request.method, authorization: request.headers.get('authorization'), body: await request.text(), redirect: options?.redirect })
+    return new Response('{}', { headers: { 'content-type': 'application/json' } })
+  })
+  try {
+    assert.equal(hasBoundMvpTransport(env), false, 'installation alone is not evidence of the active fetch path')
+    assert.equal(await verifyMvpTransport(env), true)
+    assert.equal(hasBoundMvpTransport(env), true)
+    assert.equal(requests.length, 0, 'the transport challenge does not contact a server')
+    const transport = globalThis.fetch
+    // Exercise the installed Next wrapper and its opaque dedupe closure.
+    // The proof must work through its real delegation, without property names.
+    const noRequestStore = { getStore: () => undefined }
+    globalThis.fetch = createPatchedFetcher(createDedupeFetch(transport), { workAsyncStorage: noRequestStore, workUnitAsyncStorage: noRequestStore })
+    assert.equal(hasBoundMvpTransport(env), false)
+    assert.equal(await verifyMvpTransport(env), true)
+    assert.equal(hasBoundMvpTransport(env), true)
+    await fetch('https://ai-gateway.vercel.sh/v1/decisions', {
+      method: 'POST', headers: { authorization: `Bearer ${MVP_DECISION_KEY}`, 'content-type': 'application/json' }, body: '{"synthetic":true}',
+    })
+    await fetch(new Request('https://api.github.com/repos/mikka-e2e/core-loop/pulls?page=1', { headers: { authorization: 'Bearer initial-fixture' } }), {
+      method: 'POST', headers: { authorization: 'Bearer overridden-fixture' }, body: '{"draft":true}',
+    })
+    await fetch('http://localhost:3100/mikka/api/test-environment')
+    assert.deepEqual(requests, [
+      { url: 'http://127.0.0.1:3191/decisions', method: 'POST', authorization: `Bearer ${MVP_DECISION_KEY}`, body: '{"synthetic":true}', redirect: 'error' },
+      { url: 'http://127.0.0.1:3191/github/repos/mikka-e2e/core-loop/pulls?page=1', method: 'POST', authorization: 'Bearer overridden-fixture', body: '{"draft":true}', redirect: 'error' },
+      { url: 'http://localhost:3100/mikka/api/test-environment', method: 'GET', authorization: null, body: '', redirect: 'error' },
+    ])
+    for (const url of ['https://example.invalid', 'https://ai-gateway.vercel.sh/v1/decisions?unexpected=1', 'https://api.github.com.attacker.invalid'])
+      await assert.rejects(async () => fetch(url), /unstubbed external request/)
+    assert.equal(requests.length, 3)
+    globalThis.fetch = async (_input, options) => new Response(null, { status: 204, headers: { 'x-mikka-fixture-response': options.headers['x-mikka-fixture-challenge'] } })
+    assert.equal(hasBoundMvpTransport(env), false)
+    assert.equal(await verifyMvpTransport(env), false, 'echoing a public challenge cannot forge the private response')
+    assert.equal(hasBoundMvpTransport(env), false)
+  } finally {
+    restore()
+    if (previousNextPatch) Object.defineProperty(globalThis, nextPatch, previousNextPatch)
+    else delete globalThis[nextPatch]
   }
 })
 

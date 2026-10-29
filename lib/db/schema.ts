@@ -852,6 +852,7 @@ export const factoryTasks = pgTable('factory_tasks', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   botId: uuid('botId'),
   issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  scopeVersion: integer('scopeVersion'),
   sourceEventId: uuid('sourceEventId').notNull(),
   route: jsonb('route').$type<import('../factory/contract').FactoryRoute>().notNull(),
   stage: text('stage').$type<import('../factory/contract').FactoryStage>().notNull(),

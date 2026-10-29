@@ -36,6 +36,7 @@ export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLif
   const dispatch = createFactoryDispatch(pool,store,
     (tx,userId,input,scopeBot,context) => queueFactoryRun(tx,userId,input,scopeBot,context), {
       lockAdmission: async (tx,userId,input) => { await lockCliAgentPolicy(tx,userId,input.agentId,botId); },
+      replay: defaultFactoryDispatchAdapters.replay,
       configure: {
         ...defaultFactoryDispatchAdapters.configure,
         execute: factoryRepairBrief,
