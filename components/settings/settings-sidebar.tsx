@@ -5,38 +5,30 @@ import { useEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from './settings-link'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { ArrowLeft, Bell, Brain, Building2, KeyRound, Monitor, Plus, Plug, Search, SlidersHorizontal, SquareUserRound, UserRound, Users } from 'lucide-react'
+import { ArrowLeft, Bell, Blocks, Bot, Brain, Building2, ChartColumn, CircleCheck, CreditCard, FileText, Gauge, HardDrive, History, KeyRound, Lock, Monitor, Plus, Search, Shield, SlidersHorizontal, SquareTerminal, SquareUserRound, UserRound, Users, type LucideIcon } from 'lucide-react'
 import { listTeams } from '@/app/actions/teams'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { settingsItemVisible } from '@/lib/settings-sidebar-search'
-import type { SettingsSection } from './settings-view'
+import { resolveSettingsSection, settingsHref, visibleSettingsSections, type SettingsSectionId } from '@/lib/settings-sections'
 
-const navigation = [
-  { title: 'Personal', key: 'personal', items: [
-    { title: 'Preferences', section: 'preferences', icon: SlidersHorizontal },
-    { title: 'Profile', section: 'profile', icon: UserRound },
-    { title: 'Memory', section: 'memory', icon: Brain },
-    { title: 'Notifications', section: 'notifications', icon: Bell },
-    { title: 'Account', section: 'account', icon: KeyRound },
-    { title: 'Integrations', section: 'integrations', icon: Plug },
-    { title: 'Devices', section: 'devices', icon: Monitor },
-  ] },
-  { title: 'Administration', key: 'administration', items: [
-    { title: 'Workspace', section: 'workspace', icon: Building2 },
-    { title: 'Teams', section: 'teams', icon: SquareUserRound },
-    { title: 'Members', section: 'members', icon: Users },
-  ] },
-] as const
+const icons: Record<SettingsSectionId, LucideIcon> = {
+  account: UserRound, security: Shield, preferences: SlidersHorizontal, notifications: Bell, memory: Brain, connections: Blocks,
+  models: Gauge, logins: KeyRound, privacy: Lock, activity: History, computers: Monitor, developer: SquareTerminal,
+  general: Building2, members: Users, teams: SquareUserRound, bots: Bot, permissions: CircleCheck, secrets: HardDrive,
+  audit: FileText, usage: ChartColumn, billing: CreditCard,
+}
 
-export function SettingsSidebar({ user, section, activeSection, selectedTeamId, workspaceId, onSectionChange, onBack, onSignOut, signingOut }: {
+export function SettingsSidebar({ user, section, activeSection, admin, selectedTeamId, workspaceId, onSectionChange, onBack, onSignOut, signingOut }: {
   user: { name: string; email: string; image?: string | null }
-  section: SettingsSection
-  activeSection?: SettingsSection
+  section: SettingsSectionId
+  activeSection?: SettingsSectionId
+  /** Viewer is a workspace admin. Admin-only sections stay hidden until this is known (S-P). */
+  admin: boolean
   selectedTeamId?: string
   workspaceId?: string
-  onSectionChange: (section: SettingsSection) => void
+  onSectionChange: (section: SettingsSectionId) => void
   onBack: () => void
   onSignOut: () => void
   signingOut: boolean
@@ -53,11 +45,7 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
   }, [creating, section, selectedTeamId, teams.length])
   const normalizedQuery = query.trim().toLowerCase()
   const joinedTeams = teams.filter(team => team.role && (!workspaceId || team.workspaceId === workspaceId) && `${team.name} ${team.identifier}`.toLowerCase().includes(normalizedQuery))
-  function href(id: SettingsSection) {
-    const search = new URLSearchParams(workspaceId ? { workspace: workspaceId } : {})
-    if (id !== 'members' && id !== 'teams') search.set('section', id)
-    return `${id === 'members' || id === 'teams' ? `/settings/${id}` : '/settings'}?${search}`
-  }
+  const href = (id: SettingsSectionId) => settingsHref(id, workspaceId)
   function openSettings(href = '/settings') {
     const destination = new URL(href, window.location.origin)
     if (activeSection) {
@@ -65,8 +53,7 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
       pushSettingsHistory(`${destination.pathname}${destination.search}`, workspaceId)
       return
     }
-    const next = destination.pathname.endsWith('/members') ? 'members' : destination.searchParams.get('section')
-    onSectionChange(next === 'profile' || next === 'memory' || next === 'account' || next === 'workspace' || next === 'members' || next === 'integrations' || next === 'devices' ? next : 'preferences')
+    onSectionChange(resolveSettingsSection(destination.pathname, destination.searchParams.get('section')))
   }
   return <Sidebar variant="sidebar" aria-label={i18nText("FeatureCopy.c_a8c7ae4f")}>
     <SidebarHeader className="px-4 pt-3 pb-2">
@@ -75,17 +62,19 @@ export function SettingsSidebar({ user, section, activeSection, selectedTeamId, 
       <div className="relative mt-3"><Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" aria-hidden="true" /><SidebarInput className="pl-8" aria-label={i18nText("Settings.searchLabel")} placeholder={i18nText("Settings.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} /></div>
     </SidebarHeader>
     <SidebarContent ref={contentRef} className="px-2 pb-6">
-      {navigation.map(group => {
-        const items = group.items.filter(item => {
-          const label = i18nText(`Settings.sections.${item.section}.title` as never)
-          const keywords = item.section === 'integrations' ? i18nText('Settings.sections.integrations.keywords') : ''
-          return settingsItemVisible({ query, groupTitle: group.title, groupLabel: i18nText(`Settings.groups.${group.key}`), itemTitle: item.title, label, keywords, section: item.section, routed: Boolean(activeSection) })
-        })
-        return items.length > 0 && <SidebarGroup key={group.key} className="py-2"><SidebarGroupLabel>{i18nText(`Settings.groups.${group.key}`)}</SidebarGroupLabel><SidebarMenu>{items.map(item => {
-          const id = item.section
-          const label = i18nText(`Settings.sections.${id}.title` as never)
-          const selected = id === section && !selectedTeamId && !creating
-          return <SidebarMenuItem key={item.title}><SidebarMenuButton aria-label={label} render={activeSection ? <Link href={href(id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => { if (!activeSection) onSectionChange(id); setOpenMobile(false) }}><item.icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
+      {(['personal', 'workspace'] as const).map(group => {
+        const groupLabel = i18nText(`Settings.groups.${group}`)
+        const items = visibleSettingsSections({ admin }).filter(item => item.group === group && settingsItemVisible({
+          query, groupTitle: group === 'personal' ? 'Personal' : 'Workspace', groupLabel, itemTitle: item.title,
+          label: i18nText(`Settings.sections.${item.id}.title` as never),
+          keywords: i18nText.has(`Settings.sections.${item.id}.keywords` as never) ? i18nText(`Settings.sections.${item.id}.keywords` as never) : '',
+          section: item.id, routed: Boolean(activeSection),
+        }))
+        return items.length > 0 && <SidebarGroup key={group} className="py-2"><SidebarGroupLabel>{groupLabel}</SidebarGroupLabel><SidebarMenu>{items.map(item => {
+          const Icon = icons[item.id]
+          const label = i18nText(`Settings.sections.${item.id}.title` as never)
+          const selected = item.id === section && !selectedTeamId && !creating
+          return <SidebarMenuItem key={item.id}><SidebarMenuButton aria-label={label} render={activeSection ? <Link href={href(item.id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => { if (!activeSection) onSectionChange(item.id); setOpenMobile(false) }}><Icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
         })}</SidebarMenu></SidebarGroup>
       })}
       {activeSection && <SidebarGroup className="py-2"><SidebarGroupLabel>{i18nText("Settings.groups.yourTeams")}</SidebarGroupLabel><SidebarMenu>{joinedTeams.map(team => {

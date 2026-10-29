@@ -1516,44 +1516,69 @@
       "createTeam": "Create a team"
     },
     "sections": {
-      "members": {
-        "title": "Members",
-        "description": "Manage workspace members, roles, and invitations."
+      "account": {
+        "title": "Account"
+      },
+      "security": {
+        "title": "Security"
       },
       "preferences": {
-        "title": "Preferences",
-        "description": "Make Mikka fit the way you work."
-      },
-      "profile": {
-        "title": "Profile",
-        "description": "See the account details used in your workspace."
-      },
-      "memory": {
-        "title": "Memory"
-      },
-      "account": {
-        "title": "Account",
-        "description": "Manage how you sign in to Mikka."
-      },
-      "integrations": {
-        "title": "Integrations",
-        "description": "Manage connected apps and message platforms.",
-        "keywords": "model subscriptions subscription quota usage"
-      },
-      "devices": {
-        "title": "Devices",
-        "description": "Machines you connected."
-      },
-      "workspace": {
-        "title": "Workspace",
-        "description": "Basic information about the current workspace."
-      },
-      "teams": {
-        "title": "Teams",
-        "description": "Organize teams and the work they own together."
+        "title": "Preferences"
       },
       "notifications": {
         "title": "Notifications"
+      },
+      "memory": {
+        "title": "Memory and suggestions"
+      },
+      "connections": {
+        "title": "Connections"
+      },
+      "models": {
+        "title": "Models and quota",
+        "keywords": "model subscriptions subscription quota usage"
+      },
+      "logins": {
+        "title": "Logins and keys"
+      },
+      "privacy": {
+        "title": "Data and privacy"
+      },
+      "activity": {
+        "title": "Activity"
+      },
+      "computers": {
+        "title": "My computers"
+      },
+      "developer": {
+        "title": "Developer"
+      },
+      "general": {
+        "title": "General"
+      },
+      "members": {
+        "title": "Members"
+      },
+      "teams": {
+        "title": "Teams"
+      },
+      "bots": {
+        "title": "Bots"
+      },
+      "permissions": {
+        "title": "Permissions and approvals"
+      },
+      "secrets": {
+        "title": "Secrets and environment"
+      },
+      "audit": {
+        "title": "Audit log"
+      },
+      "usage": {
+        "title": "Usage"
+      },
+      "billing": {
+        "title": "Billing"
       }
     },
     "appearance": {
@@ -1829,7 +1854,9 @@
       "always": "Immediately",
       "away": "When the computer is away",
       "loadError": "Notification settings could not load",
-      "saveFailed": "Could not save"
+      "loading": "Loading notification settings",
+      "notSaved": "This setting wasn't saved and is back to its previous value.",
+      "retry": "Retry"
     }
   },
   "TelegramBot": {

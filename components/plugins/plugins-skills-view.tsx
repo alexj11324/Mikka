@@ -99,7 +99,7 @@ export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean })
             {app
               ? <ConnectedAppDetail apps={apps} app={app} rootLabel={t('pluginsTab')} rootHref={pluginHref(null)} onBack={() => openApp(null)} />
               : <ConnectedAppsList apps={apps} title={tApps('heading')} appHref={pluginHref} onOpen={openApp} action={
-                <Button variant="ghost" size="sm" nativeButton={false} role="link" render={<Link href="/settings?section=integrations" />}>{tApps('openInSettings')}</Button>
+                <Button variant="ghost" size="sm" nativeButton={false} role="link" render={<Link href="/settings?section=connections" />}>{tApps('openInSettings')}</Button>
               } />}
             <ConnectedAppsStatus apps={apps} />
           </TabsContent>

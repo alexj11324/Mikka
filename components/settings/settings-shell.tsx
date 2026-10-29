@@ -7,7 +7,8 @@ import { usePathname, useRouter } from '@/i18n/navigation'
 import { useSWRConfig } from 'swr'
 import { endSession } from '@/lib/auth-client'
 import { AppShell, SignOutBoundary } from '@/components/app-shell'
-import { SettingsView, type SettingsSection } from './settings-view'
+import { SettingsView } from './settings-view'
+import { resolveSettingsSection } from '@/lib/settings-sections'
 import { TeamDirectory } from '@/components/teams/team-directory'
 import { MembersSettings } from '@/components/workspace/members-settings'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
@@ -21,8 +22,7 @@ export function SettingsShell({ user, defaultWorkspaceId, googleEnabled = false,
   const [signingOut, setSigningOut] = useState(false)
   const [error, setError] = useState('')
   const workspaceId = params.get('workspace') ?? defaultWorkspaceId
-  const requested = params.get('section')
-  const section: SettingsSection = pathname === '/settings/teams' ? 'teams' : pathname === '/settings/members' ? 'members' : requested === 'profile' || requested === 'memory' || requested === 'notifications' || requested === 'account' || requested === 'workspace' || requested === 'integrations' || requested === 'devices' ? requested : 'preferences'
+  const section = resolveSettingsSection(pathname, params.get('section'))
   async function signOut() {
     if (signingOut) return
     setSigningOut(true); setError('')

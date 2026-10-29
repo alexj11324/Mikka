@@ -1516,44 +1516,69 @@
       "createTeam": "创建团队"
     },
     "sections": {
-      "members": {
-        "title": "成员",
-        "description": "管理工作区成员、角色与邀请。"
+      "account": {
+        "title": "账户"
+      },
+      "security": {
+        "title": "安全"
       },
       "preferences": {
-        "title": "偏好设置",
-        "description": "让 Mikka 更符合你的工作习惯。"
-      },
-      "profile": {
-        "title": "个人资料",
-        "description": "查看你在工作区中的账户信息。"
-      },
-      "memory": {
-        "title": "记忆"
-      },
-      "account": {
-        "title": "账户",
-        "description": "管理登录 Mikka 的方式。"
-      },
-      "integrations": {
-        "title": "集成",
-        "description": "管理已连接的应用与消息平台。",
-        "keywords": "模型订阅 订阅 额度 用量"
-      },
-      "devices": {
-        "title": "设备",
-        "description": "你自己接入的机器。"
-      },
-      "workspace": {
-        "title": "工作区",
-        "description": "当前工作区的基本信息。"
-      },
-      "teams": {
-        "title": "团队",
-        "description": "组织团队与共同负责的工作。"
+        "title": "偏好设置"
       },
       "notifications": {
         "title": "通知"
+      },
+      "memory": {
+        "title": "记忆与建议"
+      },
+      "connections": {
+        "title": "连接"
+      },
+      "models": {
+        "title": "模型与额度",
+        "keywords": "模型订阅 订阅 额度 用量"
+      },
+      "logins": {
+        "title": "登录与密钥"
+      },
+      "privacy": {
+        "title": "数据与隐私"
+      },
+      "activity": {
+        "title": "活动"
+      },
+      "computers": {
+        "title": "我的电脑"
+      },
+      "developer": {
+        "title": "开发者"
+      },
+      "general": {
+        "title": "常规"
+      },
+      "members": {
+        "title": "成员"
+      },
+      "teams": {
+        "title": "团队"
+      },
+      "bots": {
+        "title": "Bot"
+      },
+      "permissions": {
+        "title": "权限与审批"
+      },
+      "secrets": {
+        "title": "密钥与环境"
+      },
+      "audit": {
+        "title": "审计日志"
+      },
+      "usage": {
+        "title": "用量"
+      },
+      "billing": {
+        "title": "计费"
       }
     },
     "appearance": {
@@ -1829,7 +1854,9 @@
       "always": "立即",
       "away": "电脑不在用时",
       "loadError": "通知设置加载失败",
-      "saveFailed": "保存失败"
+      "loading": "正在加载通知设置",
+      "notSaved": "这项设置没有保存，已恢复为原来的值。",
+      "retry": "重试"
     }
   },
   "TelegramBot": {

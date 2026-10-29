@@ -52,7 +52,7 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
   await page.getByRole('link', { name: '成员', exact: true }).click()
   await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible()
   await openSidebar()
-  await page.getByRole('link', { name: '工作区', exact: true }).click()
+  await page.getByRole('link', { name: '常规', exact: true }).click()
   await expect(page.getByLabel('名称', { exact: true })).toHaveValue(name)
   await openSidebar()
   await page.getByRole('link', { name: '返回工作台', exact: true }).click()
