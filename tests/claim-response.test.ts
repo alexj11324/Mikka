@@ -10,7 +10,7 @@ import { POST } from '../app/v1/devices/[deviceId]/runs/[runId]/claim/route'
 function fixture() {
   const repository = normalizeRepository('https://github.com/synthetic/claim-fixture.git')
   const probe = {
-    run: { id:'run',userId:'member',issueId:'issue',agentId:'agent',deviceId:'device',deviceRepoId:'repo',status:'queued',prompt:'private claim instructions',kind:'implement',retryOf:null,stopRequestedAt:null as Date|null,leaseExpiresAt:null as Date|null },
+    run: { id:'run',userId:'member',issueId:'issue',agentId:'agent',deviceId:'device',deviceRepoId:'repo',status:'queued',prompt:'private claim instructions',kind:'implement',retryOf:null as string|null,stopReason:null as string|null,stopRequestedAt:null as Date|null,leaseExpiresAt:null as Date|null },
     issue: {id:'issue',userId:'owner',scope:'workspace',content:{type:'doc'}},
     device: {id:'device',ownerId:'member',enabled:true,kind:'local',protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]},
     agent: {id:'agent',userId:'member',deviceId:'device',harness:'codex'},
@@ -18,19 +18,37 @@ function fixture() {
     cliPolicy: {revision:'a'.repeat(64),policy:defaultRunPolicy()},
     publication: {pushBranch:'synthetic-claim-branch',policy:defaultRunPolicy()},
     preparation:[] as string[],
-    memberAllowed:true,tokenError:false,locks:[] as string[],transactions:0,transactionErrors:[] as Error[],beforeToken:undefined as (()=>Promise<void>)|undefined,
+    memberAllowed:true,questionRetryBlocked:false,tokenError:false,locks:[] as string[],transactions:0,transactionErrors:[] as Error[],beforeToken:undefined as (()=>Promise<void>)|undefined,
   }
   Object.assign(globalThis,{claimResponseProbe:probe})
   return probe
 }
-async function claim(probe: ReturnType<typeof fixture>) {
+async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings']) {
   try { return await POST(new Request('http://127.0.0.1/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1'}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
   finally {
-    // Every scenario must reach the response fence, including its 409 paths.
-    // A failed prerequisite must not masquerade as successful revocation.
-    assert.deepEqual(probe.preparation,['skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'])
+    // Trace the intended gate: an unrelated failed prerequisite must not
+    // masquerade as a successful lineage, scope or lease rejection.
+    assert.deepEqual(probe.preparation,preparation)
   }
 }
+
+test('historical question retries stop before publication, leases or worker credentials',async()=>{
+  const probe=fixture();probe.run.retryOf='strict-question-parent';probe.questionRetryBlocked=true
+  const response=await claim(probe,['question-retry'])
+  assert.equal(response.status,409)
+  assert.equal(probe.run.status,'failed');assert.equal(probe.run.stopReason,'blocked')
+  assert.equal(probe.run.leaseExpiresAt,null)
+  const body=await response.json()
+  for(const field of ['prompt','mcp','skills','skillReceipt'])assert.equal(Object.hasOwn(body,field),false)
+})
+
+test('ordinary retries retain the normal claim path after question lineage validation',async()=>{
+  const probe=fixture();probe.run.retryOf='ordinary-parent'
+  const response=await claim(probe,['question-retry','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','checkpoint','settings'])
+  assert.equal(response.status,200)
+  assert.equal(probe.run.status,'preparing')
+  assert.equal((await response.json()).continuesRunId,'ordinary-parent')
+})
 
 test('claim committed before retirement cannot return its old prompt when token issuance fails',async()=>{
   const probe=fixture()

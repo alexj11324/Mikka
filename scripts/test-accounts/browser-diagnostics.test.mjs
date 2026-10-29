@@ -35,6 +35,48 @@ test('query strings, credentials, dynamic paths and unknown diagnostics never re
   assert.deepEqual(browserConsoleDiagnostic(`Failed to load resource: net::ERR_${secret}`, '', origin), { category: 'console-error', route: 'unknown-location' })
 })
 
+test('known favicon classification requires its exact HTTPS origin and resource path', () => {
+  assert.equal(browserRouteClass('https://github.com/favicon.ico?token=synthetic-secret#private', origin), 'github-favicon')
+  for (const location of [
+    'http://github.com/favicon.ico', 'https://github.com:444/favicon.ico',
+    'https://github.com.example.test/favicon.ico', 'https://github.com/other/favicon.ico',
+    'https://github.com/favicon.ico/',
+  ]) assert.equal(browserRouteClass(location, origin), 'other-origin')
+  assert.equal(browserRouteClass('https://private:secret@github.com/favicon.ico', origin), 'credential-url')
+})
+
+test('ORB and reviewed response-block reasons remain classified failures, while unknown suffixes stay generic', () => {
+  const location = 'https://github.com/favicon.ico'
+  assert.deepEqual(browserConsoleDiagnostic('Failed to load resource: net::ERR_BLOCKED_BY_ORB', location, origin), { category: 'resource-network', code: 'ERR_BLOCKED_BY_ORB', route: 'github-favicon' })
+  for (const code of ['ERR_INVALID_RESPONSE', 'ERR_INSUFFICIENT_RESOURCES']) {
+    assert.deepEqual(browserConsoleDiagnostic(`Failed to load resource: net::${code}`, location, origin), { category: 'resource-network', code, route: 'github-favicon' })
+  }
+  assert.deepEqual(browserConsoleDiagnostic('Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.CorpNotSameOrigin', location, origin), { category: 'resource-network', code: 'ERR_BLOCKED_BY_RESPONSE', reason: 'CorpNotSameOrigin', route: 'github-favicon' })
+  assert.deepEqual(browserConsoleDiagnostic('Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep', location, origin), { category: 'resource-network', code: 'ERR_BLOCKED_BY_RESPONSE', reason: 'NotSameOriginAfterDefaultedToSameOriginByCoep', route: 'github-favicon' })
+  assert.deepEqual(browserConsoleDiagnostic('Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.PrivateSecret', location, origin), { category: 'console-error', route: 'github-favicon' })
+})
+
+test('browser policy and MIME diagnostics discard all embedded origins, URLs and private values', () => {
+  const secret = 'synthetic-secret-do-not-print'
+  const resource = `https://${secret}.example.test/${secret}?token=${secret}#${secret}`
+  const examples = [
+    [`Mixed Content: The page at '${resource}' was loaded over HTTPS, but requested an insecure image '${resource}'.`, 'mixed-content'],
+    [`Unsafe attempt to load URL ${resource} from frame with URL ${origin}. Domains, protocols and ports must match.`, 'unsafe-resource-url'],
+    [`The resource at '${resource}' was blocked by Cross-Origin-Resource-Policy.`, 'cross-origin-resource-policy'],
+    [`Refused to load the image '${resource}' because it violates the following Content Security Policy directive: img-src 'self'.`, 'content-security-policy'],
+    [`Access to image at '${resource}' from origin '${origin}' has been blocked by CORS policy: missing header.`, 'cors-policy'],
+    [`Refused to execute script from '${resource}' because its MIME type ('text/html') is not executable.`, 'resource-mime'],
+    [`Failed to load module script: Expected a JavaScript module script but the server responded with a MIME type of '${secret}'.`, 'resource-mime'],
+  ]
+  for (const [message, category] of examples) {
+    const result = browserConsoleDiagnostic(message, 'https://github.com/favicon.ico', origin)
+    assert.deepEqual(result, { category, route: 'github-favicon' })
+    assert.equal(JSON.stringify(result).includes(secret), false)
+    assert.equal(JSON.stringify(result).includes('http'), false)
+  }
+  assert.deepEqual(browserConsoleDiagnostic(`Unknown error ${secret}`, resource, origin), { category: 'console-error', route: 'other-origin' })
+})
+
 test('body errors keep their failure category and reviewed source position before teardown', () => {
   const error = { message: 'Error: expect(received).toBe(expected)\nExpected: secret-value', stack: 'Error: private detail\n at setup (/home/runner/work/Mikka/Mikka/tests/mvp/core-loop.spec.ts:143:27)' }
   assert.deepEqual(browserTestErrorDiagnostic(error), { category: 'assertion', location: { file: 'tests/mvp/core-loop.spec.ts', line: 143, column: 27 } })

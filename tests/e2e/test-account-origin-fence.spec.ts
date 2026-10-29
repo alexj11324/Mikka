@@ -200,7 +200,11 @@ test('origin fence blocks a browser fetch redirect before it can carry cookies t
   await fixture(browser, async f => {
     const page = await f.context.newPage()
     await page.goto(`${f.origin}/final`)
+    const refusalsAtRequestFailure: number[] = []
     const refusalsAtConsoleError: number[] = []
+    page.on('requestfailed', request => {
+      if (request.resourceType() === 'fetch') refusalsAtRequestFailure.push(f.blocked())
+    })
     page.on('console', message => {
       if (message.type() === 'error' && message.text() === 'Failed to load resource: net::ERR_BLOCKED_BY_CLIENT') refusalsAtConsoleError.push(f.blocked())
     })
@@ -211,7 +215,12 @@ test('origin fence blocks a browser fetch redirect before it can carry cookies t
       expect(result).toBe('blocked')
     } finally { expect(f.foreignHits()).toBe(0) }
     await expect.poll(f.blocked).toBe(1)
-    await expect.poll(() => refusalsAtConsoleError.length).toBeGreaterThan(0)
+    // Chromium reports this rejected request through Network.loadingFailed /
+    // requestfailed. A caught fetch need not also print a console error.
+    // Require an actual browser failure event and its refusal snapshot; retain
+    // the same ordering check for any console event Chromium does emit.
+    await expect.poll(() => refusalsAtRequestFailure.length).toBeGreaterThan(0)
+    expect(refusalsAtRequestFailure.every(count => count === 1)).toBe(true)
     expect(refusalsAtConsoleError.every(count => count === 1)).toBe(true)
   })
 })

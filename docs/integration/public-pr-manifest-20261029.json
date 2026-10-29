@@ -2,6 +2,7 @@
   "repository": "alexj11324/Mikka",
   "snapshot_date": "2026-10-29",
   "base_commit": "142e1304f5d647264ffa62fdce37b1fab2222003",
+  "validation_base_commit": "cbfcacc7f35a69f475078b29921703fc2989d6cc",
   "pr_count": 36,
   "policy": "One aggregate tree on current main. Preserve public deltas and current architecture; exclude enterprise quota/audit/export ancestry. Superseded work is recorded explicitly, not described as a byte-for-byte merge.",
   "prs": [

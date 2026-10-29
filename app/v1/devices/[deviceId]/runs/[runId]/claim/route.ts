@@ -23,6 +23,7 @@ import { ImprovementError } from '@/lib/self-improvement/contract'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { FactoryError } from '@/lib/factory/contract'
+import { blockQuestionRetry } from '@/lib/factory/questions/retry'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { PublicationError } from '@/lib/run-publication-result'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
@@ -65,6 +66,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId || repo.deviceId !== deviceId) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
   if (device.kind === 'local' && !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) return NextResponse.json({ error: 'Repository identity must be confirmed before scheduling a new thread.' }, { status: 409 })
   if (repo.remoteUrl && request.headers.get(REPO_ORIGIN_HEADER) !== '1') return NextResponse.json({ error: 'Device update required for repository verification.' }, { status: 409 })
+  // Historical generic retries cannot turn an original-session answer into
+  // a fresh execution, even when their Factory attempt is no longer present.
+  if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
   try { await skillAssignments.preflight(caller.userId, runId, supportsSkillArtifacts) } catch (error) {
     if (!(error instanceof ImprovementError)) throw error

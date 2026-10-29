@@ -10,7 +10,16 @@ const ROUTES = new Map([
 const NETWORK_ERRORS = new Set([
   'ERR_BLOCKED_BY_CLIENT', 'ERR_FAILED', 'ERR_ABORTED', 'ERR_CONNECTION_CLOSED',
   'ERR_CONNECTION_REFUSED', 'ERR_CONNECTION_RESET', 'ERR_EMPTY_RESPONSE',
-  'ERR_NAME_NOT_RESOLVED', 'ERR_TIMED_OUT',
+  'ERR_NAME_NOT_RESOLVED', 'ERR_TIMED_OUT', 'ERR_BLOCKED_BY_ORB', 'ERR_BLOCKED_BY_RESPONSE',
+  'ERR_INVALID_RESPONSE', 'ERR_INSUFFICIENT_RESOURCES',
+])
+// Fixed CDP response-block reasons and Chromium's shortened console names.
+const BLOCKED_RESPONSE_REASONS = new Set([
+  'CoepFrameResourceNeedsCoepHeader', 'CoopSandboxedIFrameCannotNavigateToCoopPage',
+  'CorpNotSameOrigin', 'CorpNotSameOriginAfterDefaultedToSameOriginByCoep',
+  'CorpNotSameOriginAfterDefaultedToSameOriginByDip', 'CorpNotSameOriginAfterDefaultedToSameOriginByCoepAndDip',
+  'CorpNotSameSite', 'SRIMessageSignatureMismatch',
+  'NotSameOrigin', 'NotSameOriginAfterDefaultedToSameOriginByCoep', 'NotSameSite',
 ])
 const TEST_FILES = new Set([
   'tests/mvp/core-loop.spec.ts', 'tests/mvp/accounts.ts',
@@ -22,6 +31,7 @@ export function browserRouteClass(value, origin) {
   try {
     const url = new URL(value)
     if (url.username || url.password) return 'credential-url'
+    if (url.origin === 'https://github.com' && url.pathname === '/favicon.ico') return 'github-favicon'
     if (url.origin !== origin) return 'other-origin'
     const path = url.pathname.replace(/\/$/, '')
     if (ROUTES.has(path)) return ROUTES.get(path)
@@ -33,14 +43,22 @@ export function browserRouteClass(value, origin) {
 }
 
 export function browserConsoleDiagnostic(message, location, origin) {
-  const text = typeof message === 'string' ? message : ''
+  const text = typeof message === 'string' ? message.slice(0, 8192) : ''
   const route = browserRouteClass(location, origin)
   const http = /^Failed to load resource: the server responded with a status of ([45]\d\d)(?: \([A-Za-z ]*\))?$/.exec(text)
   if (http) return { category: 'resource-http', status: Number(http[1]), route }
-  const network = /^Failed to load resource: net::(ERR_[A-Z_]+)$/.exec(text)
-  if (network && NETWORK_ERRORS.has(network[1])) return { category: 'resource-network', code: network[1], route }
+  const network = /^Failed to load resource: net::(ERR_[A-Z_]+)(?:\.([A-Za-z]+))?$/.exec(text)
+  if (network && NETWORK_ERRORS.has(network[1]) && (!network[2] || (network[1] === 'ERR_BLOCKED_BY_RESPONSE' && BLOCKED_RESPONSE_REASONS.has(network[2])))) {
+    return { category: 'resource-network', code: network[1], ...(network[2] ? { reason: network[2] } : {}), route }
+  }
   const react = /^Minified React error #(\d{1,4});/.exec(text)
   if (react) return { category: 'react-minified', code: Number(react[1]), route }
+  if (text.startsWith('Mixed Content:')) return { category: 'mixed-content', route }
+  if (/^Unsafe attempt to load URL\b/.test(text)) return { category: 'unsafe-resource-url', route }
+  if (/\bCross-Origin-Resource-Policy\b/.test(text)) return { category: 'cross-origin-resource-policy', route }
+  if (/\bContent Security Policy\b/.test(text)) return { category: 'content-security-policy', route }
+  if (/\bblocked by CORS policy:|^Cross-Origin Request Blocked:/.test(text)) return { category: 'cors-policy', route }
+  if (/^(?:Refused to (?:execute script|apply style)|Failed to load module script:)[\s\S]*\bMIME type\b/.test(text)) return { category: 'resource-mime', route }
   return { category: 'console-error', route }
 }
 

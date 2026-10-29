@@ -3,7 +3,7 @@ name: CI
 # Three layers, as in large monorepos:
 # - presubmit: every push to any branch runs CI, with or without a PR;
 # - merge queue: merge_group tests the change on top of the latest main;
-# - postsubmit: every push to main runs CI again.
+# - postsubmit: every push to main runs CI gates; docs-only changes skip heavy jobs.
 # A PR from a branch in this repo is already covered by its push run, so the
 # pull_request run is kept only for PRs from forks (see the job conditions).
 # Browser tests (Playwright) are the slow part and live in browser-tests.yml,
@@ -57,8 +57,9 @@ jobs:
 
   cloud-secret-access:
     name: Cloud credential access (OIDC)
-    # This migration-only candidate must not retrieve live provider credentials.
-    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
+    # Credential checks do not run for documentation-only changes.
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:

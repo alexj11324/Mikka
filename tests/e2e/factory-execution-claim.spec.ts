@@ -9,6 +9,9 @@ import { insertRunOnce } from "../../lib/run-dispatch";
 import { createSkillAssignments } from "../../lib/self-improvement/assignments";
 import { BASELINE_ARTIFACT } from "../../lib/self-improvement/builtin-skill";
 import { SKILL_ARTIFACT_HEADER, skillAssignmentReceiptSchema } from "@mikka/protocol/skill";
+import { DAEMON_PROTOCOL_VERSION } from "@mikka/protocol/daemon";
+import { REPO_ORIGIN_HEADER } from "@mikka/protocol/device";
+import { remoteKey } from "@mikka/protocol/repository";
 
 // Real HTTP + PG, explicit synthetic daemon reports. Not real Harness acceptance.
 test("Factory execution claims reject stopped tasks and unadopted retry children before token issuance", async ({
@@ -22,6 +25,8 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
   const target = new URL(process.env.E2E_DATABASE_URL!);
   expect(target.hostname).toBe("127.0.0.1");
   expect(target.pathname).toBe("/mikka_e2e");
+  expect(process.env.MIKKA_FACTORY_ROUTING_ENABLED).toBe("1");
+  expect(process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED).toBe("1");
   const pool = new Pool({ connectionString: target.toString(), max: 3 });
   const userId = `factory-check-ci-${randomUUID()}`,
     issueId = randomUUID(),
@@ -31,9 +36,10 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
     sourceEventId = randomUUID(),
     tokenId = randomUUID();
   const token = `orv_${randomBytes(32).toString("base64url")}`;
+  const remoteUrl = `https://github.com/mikka-ci/factory-claim-${repoId}.git`;
   const client = await playwright.request.newContext({
     baseURL,
-    extraHTTPHeaders: { authorization: `Bearer ${token}` },
+    extraHTTPHeaders: { authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: "1" },
   });
   const bind = (t: FactoryTask) => ({
     taskId: t.id,
@@ -53,8 +59,8 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
       [sourceEventId, userId, `check-ci:${sourceEventId}`],
     );
     await pool.query(
-      `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Check HTTP fixture',true,now(),'[{"harness":"codex","installed":true,"version":"fixture"}]')`,
-      [deviceId, userId],
+      `INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt","protocolVersion",harnesses) VALUES ($1,$2,'Check HTTP fixture','local',true,now(),$3,'[{"harness":"codex","installed":true,"version":"fixture","toolApproval":true}]')`,
+      [deviceId, userId, DAEMON_PROTOCOL_VERSION],
     );
     await pool.query(
       `INSERT INTO device_tokens (id,"userId","tokenHash") VALUES ($1,$2,$3)`,
@@ -65,8 +71,8 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
       [agentId, userId, deviceId],
     );
     await pool.query(
-      `INSERT INTO device_repos (id,"deviceId","userId","repoPath","verifyCommand") VALUES ($1,$2,$3,'/ci/check-http','node acceptance.mjs')`,
-      [repoId, deviceId, userId],
+      `INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl","verifyCommand") VALUES ($1,$2,$3,$4,$5,'node acceptance.mjs')`,
+      [repoId, deviceId, userId, remoteKey(remoteUrl), remoteUrl],
     );
     const evidence = [];
     for (const mode of [
@@ -221,7 +227,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
         expect(body.skillReceipt).toBeUndefined();
         expect(body.skills).toBeUndefined();
         expect(receipts).toHaveLength(0);
-        expect(body.mcp).toBeUndefined();
+        expect(Object.hasOwn(body, "mcp")).toBe(false);
         expect(body.prompt).toBeUndefined();
         expect(tokens).toBe(0);
         expect(

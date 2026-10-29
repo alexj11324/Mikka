@@ -1,10 +1,11 @@
 # Public PR consolidation — 2026-10-29
 
-Base: `142e1304f5d647264ffa62fdce37b1fab2222003`. Snapshot: 36 open PRs.
+Snapshot base: `142e1304f5d647264ffa62fdce37b1fab2222003` (36 open PRs).
+Main was subsequently synchronized through `cbfcacc7f35a69f475078b29921703fc2989d6cc`, the public CI/documentation update from #403, before final verification. The source PR snapshot and enterprise exclusions remain unchanged.
 
 ## Scope
 
-This integration collects public changes into one tree on current main. The final aggregate commit is parented to current main, so excluded enterprise branch ancestry is not imported. #265 is excluded. #287 and #313 contain mixed enterprise ancestry; their public behavior is retained from current implementations and their enterprise residue remains outside this PR.
+This integration collects public changes into one tree on current main. Its initial aggregate commit starts directly from the snapshot base; subsequent main synchronization retains the public main history without importing excluded enterprise PR ancestry. #265 is excluded. #287 and #313 contain mixed enterprise ancestry; their public behavior is retained from current implementations and their enterprise residue remains outside this PR.
 
 An older PR marked covered is superseded by current main or a named successor. It does not mean every obsolete file or interface was reintroduced.
 
