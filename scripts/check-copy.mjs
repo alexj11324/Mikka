@@ -1,41 +1,89 @@
 /**
- * Guards the UI copy rules in docs/design/copy.md (C-01…C-08). Run it with
- * `node scripts/check-copy.mjs`; it exits non-zero and lists every offender.
+ * Guards the parts of docs/design/copy.md that a script can decide without
+ * reading the component. Run it with `node scripts/check-copy.mjs`; it exits
+ * non-zero and lists every offender.
  *
- * Only user-facing message catalogues are checked. Archived content and model
- * output are not UI copy.
+ * Whether a sentence needs 「请」 depends on what the component renders next to
+ * it (C-04), so this script does not guess with a regex. It checks only:
+ *
+ * - C-04 label keys: button, label, placeholder, title and heading strings
+ *   (picked by key name) never contain an imperative 「请」.
+ * - C-04 retry-button keys: strings listed in `retryButtonKeys` are rendered
+ *   next to a retry or matching action button, so they must not repeat the
+ *   action as 「请重试」 / "try again". Add a key here when you put its text
+ *   beside such a button; remove it when the button goes away.
+ * - C-02 colloquial words in zh-CN (「没能」「打不开了」, sentence-final 吧/呢/哦/啊).
+ * - C-03 apologies and interjections (「抱歉」「请稍等」, "sorry", "oops").
+ *
+ * It does not check English contractions (Microsoft recommends them), 「请」 in
+ * full sentences, or whether a status line offers a next step. Reviewers judge
+ * those against copy.md.
  */
 import { readFileSync } from 'node:fs'
 
-const politeImperative = /请(先|使用|检查|选择|输入|重新|允许|点击|在|刷新|根据|确认|修改|发送|关闭|据此|稍候|添加|重试|稍后|用|到|按|从|开启|更新|登录|创建|联系|填|设|把|将|留|等|参|保|删|移|打|查|给|告|点|勾|拖|复|连|关|开|试)/
-const apologetic = /(Please\b|Oops|Sorry|Couldn't|didn't|can't|won't)/i
-const fillerTail = /[，。]请(稍后)?重试。$/
+const imperativeQing = /(?<![邀申])请(?!求)/
+const labelKey = /(Button|Label|Placeholder|Title|Heading|Tab|Tooltip|Cta)\d*$|^(label|placeholder|title|heading|button|cta)\d*$/
+const zhRetry = /请.{0,12}(重试|再试)/
+const enRetry = /\b(try again|retry)\b/i
+const zhColloquial = /没能|没发出去|打不开了|[吧呢哦啊](?=[。！？!?，]|$)/
+const zhApology = /抱歉|对不起|不好意思|哎呀|哎哟|请稍等|请稍候/
+const enApology = /\b(sorry|oops|whoops|uh-oh|apologi[sz]e)\b/i
 
-/** Strings that are legitimately phrased this way. */
-const allowed = new Set([
-  'Auth.retryIn', // a countdown, not a request
+/** Keys whose component renders a retry or matching action button beside the text. */
+const retryButtonKeys = new Set([
+  'Issue.create.createError',
+  'Auth.oauthFailed',
+  'Auth.githubStartFailed',
+  'Auth.googleStartFailed',
+  'Auth.connectionFailed',
+  'Auth.testWorkspaceFailed',
+  'Invite.signOutFailed',
+  'Invite.acceptFailed',
+  'Invite.errors.createFailed',
+  'Workspace.detail.documentNotConnected',
+  'Workspace.detail.autosaveFailed',
+  'IssueDetail.restoreFailed',
+  'IssueDetail.history.restoreFailed',
+  'IssueDetail.history.restoreIncomplete',
+  'Members.readFailed',
+  'Members.keptPrevious',
+  'Members.addFailed',
+  'Members.removeFailed',
+  'Plugins.loadFailedDescription',
+  'Projects.loadErrorDescription',
+  'DeviceAuthorization.failed',
+  'Shell.newTaskDialog.failed',
+  'FeatureCopy.c_85f5c4d3',
+  'FeatureCopy.c_281364f7',
+  'FeatureCopy.c_3f765954',
+  'AgentCopy.aCardOrTableInThisResponse',
+  'AgentCopy.unableToCreateWorkspacePleaseTryAgain',
+  'AgentCopy.submissionFailedYourChoicesAndAnswersAre',
 ])
 
-const files = ['messages/zh-CN.json', 'messages/en.json']
+const flatten = (node, path = [], out = new Map()) => {
+  if (typeof node === 'string') out.set(path.join('.'), node)
+  else if (node && typeof node === 'object') for (const [key, value] of Object.entries(node)) flatten(value, [...path, key], out)
+  return out
+}
+
 const problems = []
-for (const file of files) {
-  const catalog = JSON.parse(readFileSync(file, 'utf8'))
-  const walk = (node, path) => {
-    if (typeof node === 'string') {
-      const key = path.join('.')
-      if (allowed.has(key)) return
-      const issues = []
-      if (politeImperative.test(node)) issues.push('C-04 祈使句用了「请」')
-      if (fillerTail.test(node)) issues.push('C-04 句尾「请重试」应由按钮承担')
-      if (file.endsWith('en.json') && apologetic.test(node)) issues.push('C-03 道歉/口语化表达')
-      if (issues.length) problems.push(`${file} ${key}: ${issues.join('、')} — ${node}`)
-      return
-    }
-    if (node && typeof node === 'object') {
-      for (const [key, value] of Object.entries(node)) walk(value, [...path, key])
+const report = (file, key, rule, value) => problems.push(`${file} ${key}: ${rule} — ${value}`)
+for (const [file, lang] of [['messages/zh-CN.json', 'zh'], ['messages/en.json', 'en']]) {
+  const strings = flatten(JSON.parse(readFileSync(file, 'utf8')))
+  for (const key of retryButtonKeys) if (!strings.has(key)) report(file, key, 'retryButtonKeys 中的 key 不存在', '')
+  for (const [key, value] of strings) {
+    const leaf = key.split('.').at(-1)
+    if (lang === 'zh') {
+      if (labelKey.test(leaf) && imperativeQing.test(value)) report(file, key, 'C-04 标签/按钮/占位符/标题里不写「请」', value)
+      if (retryButtonKeys.has(key) && zhRetry.test(value)) report(file, key, 'C-04 旁边已有重试按钮，文字不写「请重试」', value)
+      if (zhColloquial.test(value)) report(file, key, 'C-02 口语化', value)
+      if (zhApology.test(value)) report(file, key, 'C-03 道歉/客套', value)
+    } else {
+      if (retryButtonKeys.has(key) && enRetry.test(value)) report(file, key, 'C-04 retry button already rendered; drop "try again"', value)
+      if (enApology.test(value)) report(file, key, 'C-03 apology or interjection', value)
     }
   }
-  walk(catalog, [])
 }
 
 if (problems.length) {
@@ -43,4 +91,4 @@ if (problems.length) {
   for (const problem of problems) console.error(`- ${problem}`)
   process.exit(1)
 }
-console.log('Copy check passed: no polite imperatives, apologies or filler retry tails.')
+console.log('Copy check passed: labels without 「请」, no retry text beside retry buttons, no colloquial or apologetic copy.')
