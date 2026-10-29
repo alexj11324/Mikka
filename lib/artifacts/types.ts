@@ -25,3 +25,14 @@ export interface ArtifactDetail extends ArtifactSummary {
   /** A share link is live. Only the owner's reads say; tokens are stored hashed, so a link can't be shown again. */
   shared?: boolean
 }
+
+/** A row on the Artifact page: what it is, where it came from, when it last changed. */
+export interface ArtifactListItem extends ArtifactSummary {
+  runId: string | null
+  issueId: string | null
+  /** Who made the latest version: the agent's name. */
+  authorName: string | null
+  /** The task it was made for, as 「MIK-41」; null without one. */
+  issueKey: string | null
+  updatedAt: string
+}
