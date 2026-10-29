@@ -63,6 +63,8 @@
     "test:issue-search": "node --import ./scripts/server-test.mjs --import tsx --test lib/issue-search.test.ts lib/site-search.test.ts lib/group-messages.test.ts lib/issue-relation-search.test.ts",
     "test:issue-search-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/issue-search.db.test.ts",
     "test:visibility-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/team-visibility.db.test.ts",
+    "test:settings-prefs": "node --import ./tests/support/server-only.mjs --import tsx --test lib/settings-preferences.test.ts",
+    "test:settings-prefs-db": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/settings-preferences.db.test.ts",
     "test:user-facts-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/profile/store.db.test.ts",
     "test:bot-chats-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/bot-chats.db.test.ts",
     "test:active-agents": "node --import ./tests/support/server-only.mjs --import tsx --test lib/active-agents.test.ts",

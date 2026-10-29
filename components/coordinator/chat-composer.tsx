@@ -11,6 +11,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } fro
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { MESSAGE_MAX } from '@/lib/message-limits'
+import { sendsMessage, type SendKey } from '@/lib/send-key'
 
 const MAX_LENGTH = MESSAGE_MAX
 
@@ -19,7 +20,7 @@ const MAX_LENGTH = MESSAGE_MAX
  * bar, attach on the left, send on the right. No model picker: the model is
  * ours unless the person picks their own in settings.
  */
-export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, onStop, quote }: {
+export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, onStop, quote, sendKey = 'enter' }: {
   ref: Ref<HTMLTextAreaElement | null>
   value: string
   onChange: (value: string) => void
@@ -37,6 +38,8 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   onStop?: () => void
   /** Something quoted into the message (an artifact quote chip): it sits on top, the buttons move to a row below. */
   quote?: ReactNode
+  /** The person's send key (偏好设置); the caller reads it from their preferences. */
+  sendKey?: SendKey
 }) {
   const t = useTranslations('Coordinator')
   const tShell = useTranslations('Shell')
@@ -61,7 +64,8 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
     inputRef.current?.focus()
   }
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+    const { key, shiftKey, metaKey, ctrlKey } = event
+    if (!sendsMessage({ key, shiftKey, metaKey, ctrlKey, isComposing: event.nativeEvent.isComposing }, sendKey)) return
     event.preventDefault()
     if (!sending && !submitDisabled && value.trim()) onSubmit()
   }

@@ -112,6 +112,10 @@ export const ACTION_ERROR_CODES = [
   'workspaceMembershipSuspended',
   'inviteInvalidEmails',
   'workspaceReadFailed',
+  'timeZoneInvalid',
+  'personalInstructionsTooLong',
+  'dailySuggestionsNeedMemory',
+  'suggestionSourceInvalid',
 ] as const
 
 export type ActionErrorCode = (typeof ACTION_ERROR_CODES)[number]

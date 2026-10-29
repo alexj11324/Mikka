@@ -1035,6 +1035,10 @@
     "workspaceMembershipSuspended": "成员资格已停用，请联系管理员恢复。",
     "inviteInvalidEmails": "邮箱地址无效、为空或数量过多，请检查后重试。",
     "workspaceReadFailed": "无法读取工作区设置，请稍后重试。",
+    "timeZoneInvalid": "时区名称无效。",
+    "personalInstructionsTooLong": "个人指令不能超过 2000 字。",
+    "dailySuggestionsNeedMemory": "每日建议需要先打开记忆。",
+    "suggestionSourceInvalid": "不支持该数据来源。",
     "suggestionNotFound": "这条建议已经处理过了。",
     "coordinatorUnavailable": "Coordinator 现在不可用，稍后再试。",
     "messageTooLong": "消息过长，请缩短后重试。",
@@ -1516,20 +1520,26 @@
       "createTeam": "创建团队"
     },
     "sections": {
-      "account": {
-        "title": "账户"
-      },
-      "security": {
-        "title": "安全"
+      "members": {
+        "title": "成员"
       },
       "preferences": {
         "title": "偏好设置"
       },
+      "memory": {
+        "title": "记忆与建议"
+      },
+      "account": {
+        "title": "账户"
+      },
+      "teams": {
+        "title": "团队"
+      },
       "notifications": {
         "title": "通知"
       },
-      "memory": {
-        "title": "记忆与建议"
+      "security": {
+        "title": "安全"
       },
       "connections": {
         "title": "连接"
@@ -1555,12 +1565,6 @@
       },
       "general": {
         "title": "常规"
-      },
-      "members": {
-        "title": "成员"
-      },
-      "teams": {
-        "title": "团队"
       },
       "bots": {
         "title": "Bot"

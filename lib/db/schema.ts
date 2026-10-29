@@ -1,4 +1,5 @@
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
+import type { SendKey } from '../send-key'
 import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
@@ -630,9 +631,16 @@ export const composioAccounts = pgTable('composio_accounts', {
  * suggestions list loads, replaces any earlier value; the connect callbacks'
  * IP-derived zone only fills a gap.
  */
+export const TIME_ZONE_SOURCES = ['auto', 'manual'] as const
+export type TimeZoneSource = (typeof TIME_ZONE_SOURCES)[number]
+
 export const userTimeZones = pgTable('user_time_zones', {
   userId: text('userId').primaryKey(),
   timeZone: text('timeZone').notNull(),
+  /** 'manual' once the person picked the zone in Settings; reports then only update detectedTimeZone. */
+  source: text('source').$type<TimeZoneSource>().notNull().default('auto'),
+  /** The zone the browser or IP last reported. */
+  detectedTimeZone: text('detectedTimeZone'),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('user_time_zones_zone_idx').on(table.timeZone)])
 
@@ -917,6 +925,7 @@ export const mobilePushTokens = pgTable('mobile_push_tokens', {
 
 export const PUSH_WHEN = ['always', 'away'] as const
 export type PushWhen = (typeof PUSH_WHEN)[number]
+export { SEND_KEYS, type SendKey } from '../send-key'
 
 /**
  * The app's 通知 and 记忆 settings (docs/design/mobile.md). The push flags pick
@@ -931,5 +940,13 @@ export const userPreferences = pgTable('user_preferences', {
   pushBriefing: boolean('pushBriefing').notNull().default(true),
   pushWhen: text('pushWhen').$type<PushWhen>().notNull().default('always'),
   memoryEnabled: boolean('memoryEnabled').notNull().default(true),
+  /** The chat composer's send key: Enter (Shift+Enter breaks the line) or ⌘/Ctrl+Enter (Enter breaks the line). */
+  sendKey: text('sendKey').$type<SendKey>().notNull().default('enter'),
+  /** The person's own instructions for the Coordinator and their Bots, at most 2000 characters. */
+  personalInstructions: text('personalInstructions').notNull().default(''),
+  /** 每日建议: the 08:00 briefing. Needs memoryEnabled. */
+  dailySuggestions: boolean('dailySuggestions').notNull().default(true),
+  /** Composio app id -> false for each app turned off as a suggestions source; a missing app is on. */
+  suggestionSources: jsonb('suggestionSources').$type<Record<string, boolean>>().notNull().default({}),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })

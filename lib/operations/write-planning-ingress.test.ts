@@ -25,6 +25,7 @@ stub('../agent-kit/service.ts',{agentScope:async(ownerId:string,botId:string|nul
 stub('../subscription-runtime.ts',{subscriptionRuntime:unavailable,authorizeSubscriptionWorkspace:unavailable})
 stub('../coordinator/wake.ts',{coordinatorEnabled:()=>true,wakeCoordinator:unavailable})
 stub('../coordinator/bot-instructions.ts',{botInstructions:async(_owner:string,_bot:string|null,base:string)=>base})
+stub('../coordinator/personal-instructions.ts',{withPersonalInstructions:async(_owner:string,base:string)=>base})
 stub('../issue-visibility.ts',{issueVisibility:unavailable})
 stub('../agent-runs.ts',{addRunMessage:unavailable,queueRun:unavailable,queueFactoryRun:unavailable,readRun:unavailable,requestRunStop:unavailable,visibleRuns:unavailable})
 stub('../search/index.ts',{webSearch:unavailable})
