@@ -30,6 +30,10 @@ mock.module(new URL('./device-repositories.ts', import.meta.url).href, { exports
   assert.equal(userId, owner); assert.equal(deviceId, 'device'); assert.equal(repo, repoUrl)
   return { id: repoId, baseBranch: 'main' }
 } } })
+// This suite owns producer snapshots. Real admission/locking is tested separately against PostgreSQL.
+mock.module(new URL('./run-admission-store.ts', import.meta.url).href, { exports: { acceptLocalRun: async (input: { id: string; definition: unknown }) => {
+  inserted.push({ agentDefinition: input.definition }); return { runId: input.id }
+} } })
 mock.module(new URL('./issue-access.ts', import.meta.url).href, { exports: { requireUser: () => { throw Error('Unexpected user session lookup') }, issueForUser: async (id: string) => { assert.equal(id, owner); return { id: issueId, title: 'Fixture', content: null } } } })
 mock.module(new URL('./subscription-repository.ts', import.meta.url).href, { exports: { SubscriptionRepository: class { async nativeBinding() { return { id: '28700000-0000-4000-8000-000000000018', modelId: 'fixture', route: 'codex_cli' } } } } })
 const flags = ['MIKKA_PERSONAL_MAILBOX_ENABLED', 'MIKKA_BYOS_ENABLED', 'MIKKA_AGENT_KIT'] as const

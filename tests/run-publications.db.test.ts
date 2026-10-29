@@ -379,14 +379,82 @@ test('run result publication commits one owner-scoped result through retries and
       await assert.rejects(decidePendingAction(owner.userId, expired.actionId, true), 'expired confirmations cannot authorize a push')
       assert.equal((await pool.query('select count(*)::int as n from repository_settings where "userId"=$1 and "remoteKey"=$2', [owner.userId, repositoryKey('expired/repository')])).rows[0].n, 0)
     })
+    await t.test('real approval chain freezes admission, serializes revocation and rejects new prompts without blocking stop', async () => {
+      const { queueRun } = await import('../lib/agent-runs')
+      const { sendOwnedRunMessage, stopOwnedRun } = await import('../lib/run-control')
+      const { db } = await import('../lib/db')
+      const { proposeRepositoryPush } = await import('../lib/pending-action-store')
+      const { decidePendingAction } = await import('../lib/pending-actions')
+      const { writeRepositoryPushApproval } = await import('../lib/repository-approval-write')
+      const { coordinatorEnabled } = await import('../lib/coordinator/wake')
+      assert.equal(coordinatorEnabled(), false, 'this DB suite cannot invoke a real model')
+      const f = await fixture({ prefix: 'ADMIT' })
+      await pool.query('update devices set "protocolVersion"=3 where id=$1', [f.deviceId])
+      const input = { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl }
+      const eventId = randomUUID()
+      await pool.query('insert into coordinator_events (id,"userId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,\'user_message\',$5,$3,$4,now())', [eventId, f.userId, f.issueId, JSON.stringify({ text: 'Synthetic owner task; no provider invocation', taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + eventId])
+      const before = Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n)
+      await assert.rejects(queueRun(f.userId, input, null, undefined, eventId), /runInvalid/, 'ask cannot execute before its human decision')
+      const proposal = await proposeRepositoryPush(f.userId, { repo: f.remoteUrl })
+      assert.ok('actionId' in proposal && proposal.actionId)
+      assert.deepEqual(await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }), proposal)
+      assert.equal((await decidePendingAction(f.userId, proposal.actionId, true)).status, 'done')
+      const admitted = await Promise.all([queueRun(f.userId, input, null, undefined, eventId), queueRun(f.userId, input, null, undefined, eventId)])
+      assert.equal(admitted[0].runId, admitted[1].runId, 'host replay cannot enqueue a second execution')
+      const runId = admitted[0].runId
+      const accepted = (await pool.query('select * from agent_runs where id=$1', [runId])).rows[0]
+      assert.equal(accepted.agentDefinition.repositoryAdmission.requestEventId, eventId)
+      assert.equal(accepted.agentDefinition.repositoryAdmission.deviceId, f.deviceId)
+      assert.equal(accepted.agentDefinition.repositoryAdmission.targetBranch, f.branch)
+      assert.equal(Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n), before + 1)
+      await sendOwnedRunMessage(db, f.userId, { runId, text: 'Accepted before revocation' })
+      await assert.rejects(queueRun(f.userId, input), /runInvalid/, 'attributed tasks cannot omit their host event')
+      await assert.rejects(queueRun(f.userId, input, null, undefined, randomUUID()), /runInvalid/)
+      await writeRepositoryPushApproval(f.userId, f.remoteKey, false)
+      assert.deepEqual(await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }), { status: 'denied' })
+      await assert.rejects(sendOwnedRunMessage(db, f.userId, { runId, text: 'New authority after revocation' }), /runInvalid/)
+      assert.equal(Number((await pool.query('select count(*) as n from run_messages where "runId"=$1', [runId])).rows[0].n), 1)
+      assert.deepEqual(await queueRun(f.userId, input, null, undefined, eventId), { runId }, 'old host replay preserves the already accepted execution')
+      assert.equal((await prepareRunPublication(accepted, f.remoteUrl)).policy.permissions.git_push, 'allow', 'old admitted scope survives later revocation')
+      await assert.rejects(prepareRunPublication({ ...accepted, deviceId: randomUUID() }, f.remoteUrl), /does not match/)
+      const nextIssue = randomUUID(), nextEvent = randomUUID()
+      await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'New prompt\',$3,\'todo\',\'normal\',\'personal\')', [nextIssue, f.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 2 } }, content: [] })])
+      await pool.query('insert into coordinator_events (id,"userId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,\'user_message\',$5,$3,$4,now())', [nextEvent, f.userId, nextIssue, JSON.stringify({ taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + nextEvent])
+      await assert.rejects(queueRun(f.userId, { ...input, issueId: nextIssue }, null, undefined, nextEvent), /runInvalid/)
+      await stopOwnedRun(db, f.userId, runId)
+      assert.ok((await pool.query('select "stopRequestedAt" from agent_runs where id=$1', [runId])).rows[0].stopRequestedAt)
+
+      // Actual Postgres contention: admission must wait behind revocation's lock.
+      await writeRepositoryPushApproval(f.userId, f.remoteKey, true)
+      const locker = await pool.connect()
+      let attempt: Promise<unknown> | undefined
+      try {
+        await locker.query('begin')
+        const pid = (await locker.query('select pg_backend_pid() as pid')).rows[0].pid
+        await locker.query('select pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['repository-approval', f.userId, f.remoteKey])])
+        attempt = queueRun(f.userId, { ...input, issueId: nextIssue }, null, undefined, nextEvent)
+        const settled = attempt.then(() => ({ accepted: true }), error => ({ accepted: false, error }))
+        let blocked = false
+        for (let i = 0; i < 100 && !blocked; i++) {
+          blocked = (await pool.query('select exists(select 1 from pg_stat_activity where $1::int=any(pg_blocking_pids(pid))) as blocked', [pid])).rows[0].blocked
+          if (!blocked) await new Promise(resolve => setTimeout(resolve, 10))
+        }
+        assert.equal(blocked, true, 'admission really waits for the repository approval lock')
+        await locker.query('update repository_settings set push=$3 where "userId"=$1 and "remoteKey"=$2', [f.userId, f.remoteKey, JSON.stringify({ approved: false })])
+        await locker.query('commit')
+        const result = await settled
+        assert.equal(result.accepted, false)
+        assert.ok('error' in result && result.error instanceof Error && result.error.message === 'runInvalid')
+      } finally {
+        await locker.query('rollback')
+        locker.release()
+        await attempt?.catch(() => {})
+      }
+      assert.equal(Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n), before + 1)
+    })
   } finally {
-    const users = fixtures.map(fixture => fixture.userId)
-    if (users.length) {
-      // All identifiers belong to this test's disposable fixtures.
-      for (const table of ['pending_actions', 'coordinator_events', 'run_publications', 'run_tokens', 'agent_runs', 'issue_versions', 'issues', 'repository_settings', 'github_repository_installations', 'device_repos', 'agents']) await pool.query(`delete from ${table} where "userId"=any($1::text[])`, [users])
-      await pool.query('delete from devices where "ownerId"=any($1::text[])', [users])
-      await pool.query('delete from "user" where id=any($1::text[])', [users])
-    }
+    // Fixture rows and audit history remain; credential invalidation is non-deleting.
+    if (fixtures.length) await pool.query('update run_tokens set "revokedAt"=coalesce("revokedAt",now()) where "userId"=any($1::text[])', [fixtures.map(row => row.userId)])
     await pool.end()
     const workspacePool = (globalThis as { workspacePool?: { end(): Promise<void> } }).workspacePool
     if (workspacePool) await workspacePool.end()

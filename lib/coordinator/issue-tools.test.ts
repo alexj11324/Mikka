@@ -8,7 +8,8 @@ import { COORDINATOR_INSTRUCTIONS } from './instructions'
 
 const created = mock.fn(async () => ({ id: 'created' }))
 const updated = mock.fn(async () => ({ id: 'updated' }))
-mock.module('@/workflows/coordinator/steps', { namedExports: { createIssue: created, updateIssue: updated } })
+const dispatched = mock.fn(async () => ({ runId: 'queued' }))
+mock.module('@/workflows/coordinator/steps', { namedExports: { createIssue: created, updateIssue: updated, dispatchRun: dispatched } })
 mock.module('@/workflows/coordinator/agent-kit-steps', { namedExports: {} })
 mock.module('@/lib/composio-actions', { namedExports: { createComposioAITools: () => ({}), createGoogleAITools: () => ({}) } })
 let registry: typeof import('@/workflows/coordinator/tools')
@@ -65,4 +66,12 @@ test('create tool forwards only the host-provided request event, never a model a
   assert.equal(createIssueInput.safeParse({ title: 'Task', taskEventId: 'forged' }).success, false)
   await tools.create_issue!.execute!({ title: 'Task' }, options)
   assert.deepEqual(created.mock.calls.at(-1)!.arguments, ['owner', { title: 'Task' }, 'event-call', undefined, null, eventId])
+})
+
+test('dispatch uses the same host event as task creation and exposes no event argument to the model', async () => {
+  const eventId = 'b4000000-0000-4000-8000-000000000004'
+  const tools = registry.createCoordinatorRegistry('owner', null, undefined, { taskEventId: eventId })
+  const input = { issueId: 'b4000000-0000-4000-8000-000000000005', agentId: 'b4000000-0000-4000-8000-000000000006', repo: 'example/repository' }
+  await tools.dispatch_run!.execute!(input, { toolCallId: 'dispatch', messages: [], context: {} })
+  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', input, undefined, null, undefined, eventId])
 })

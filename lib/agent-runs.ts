@@ -19,6 +19,7 @@ import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { runPrompt } from '@/lib/run-prompt'
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
 import { runBotName } from '@/lib/run-bot-name'
+import { acceptLocalRun } from '@/lib/run-admission-store'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -58,7 +59,7 @@ export const runViewColumns = {
  * `note` is extra direction for this run only, after the issue.
  */
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
-export async function queueRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, botId: string | null = null, execution?: AgentExecution): Promise<{ runId: string }> {
+export async function queueRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, botId: string | null = null, execution?: AgentExecution, requestEventId?: string): Promise<{ runId: string }> {
   const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional() }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   const issue = await issueForUser(userId, parsed.data.issueId)
@@ -72,7 +73,7 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   const repo = await ensureDeviceRepository(userId, agent.deviceId, parsed.data.repo)
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
-  const captureDefinition = process.env.MIKKA_AGENT_KIT === '1' || Boolean(execution)
+  const captureDefinition = true
   const subscription = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
   const mailboxEnabled = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1'
   let mailboxScope: { botId: string | null; workspaceId: string } | undefined
@@ -85,12 +86,8 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   const agentDefinition = captureDefinition
     ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, mailboxEnabled, mailboxScope })
     : null
-  await db.insert(agentRuns).values({
-    id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
-    prompt, agentDefinition,
-  })
-  return { runId }
+  return acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
+    deviceRepoId: repo.id, prompt, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}) })
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,

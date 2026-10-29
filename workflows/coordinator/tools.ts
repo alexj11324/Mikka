@@ -107,7 +107,9 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
         repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo or an HTTPS/SSH git URL. The daemon clones it; no repository registration is needed.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
       }),
-      execute: input => steps.dispatchRun(userId, input, scope, botId, execution ?? undefined),
+      execute: input => options.taskEventId
+        ? steps.dispatchRun(userId, input, scope, botId, execution ?? undefined, options.taskEventId)
+        : steps.dispatchRun(userId, input, scope, botId, execution ?? undefined),
     }),
     list_runs: tool({
       description: 'List recent runs, newest first, optionally for one issue or only those still going.',
