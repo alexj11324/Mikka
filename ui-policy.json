@@ -9,6 +9,9 @@
     "weights": ["normal", "medium", "semibold", "bold"],
     "families": ["sans", "mono", "heading"],
     "googleFonts": ["Geist"],
+    "localFonts": [
+      { "family": "Geist", "src": "app/fonts/Geist-Variable.woff2", "variable": "--font-geist" }
+    ],
     "leading": ["none", "tight", "snug", "normal", "relaxed", "loose", "3", "4", "5", "5.5", "6", "7", "8", "9", "10"],
     "tracking": ["tighter", "tight", "normal", "wide", "wider", "widest"]
   }

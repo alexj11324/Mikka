@@ -15,7 +15,7 @@ test('allows supported local destinations with validated settings context', () =
   assert.equal(safeAuthReturn(`/settings/members?workspace=${workspaceId}&invite=1`), `/settings/members?workspace=${workspaceId}&invite=1`)
   assert.equal(safeAuthReturn(`/?issue=${issueId}`), `/?issue=${issueId}`)
   assert.equal(safeAuthReturn(`/invite/${'a'.repeat(64)}`), `/invite/${'a'.repeat(64)}`)
-  assert.equal(safeAuthReturn('/devices'), '/devices')
+  assert.equal(safeAuthReturn('/devices'), '/settings?section=devices')
   assert.equal(safeAuthReturn('/device'), '/device')
   assert.equal(safeAuthReturn('/device?user_code=ABCD-EFGH'), '/device?user_code=ABCD-EFGH')
   assert.equal(safeAuthReturn('/w/design-team'), '/w/design-team')

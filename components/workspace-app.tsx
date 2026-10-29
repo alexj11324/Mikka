@@ -8,6 +8,7 @@ import { SWRConfig, unstable_serialize } from 'swr'
 import type { listIssues } from '@/app/actions/issues'
 import type { loadTeamDirectory } from '@/app/actions/teams'
 import type { WorkspaceSettings } from '@/lib/workspace-access'
+import { DesktopIntegration } from '@/components/desktop/desktop-integration'
 import { IssueWorkspace } from '@/components/workspace/issue-workspace'
 import { SettingsShell } from '@/components/settings/settings-shell'
 import { SettingsDataPreloader } from '@/components/settings/settings-data-preloader'
@@ -36,6 +37,7 @@ export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers
     return { provider: () => new Map(), fallback }
   })
   return <SWRConfig value={cacheConfig}>
+    <DesktopIntegration />
     <SettingsDataPreloader workspaceId={params.get('workspace') ?? initialWorkspaceId} onWorkspaceResolved={setWorkspaceId} />
     {pathname.startsWith('/settings')
       ? <SettingsShell user={user} defaultWorkspaceId={workspaceId} googleEnabled={googleEnabled} />

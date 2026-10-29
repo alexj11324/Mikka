@@ -40,6 +40,9 @@ const nextConfig = {
       // The app's previous address; keep its links working.
       { source: '/:path*', has: [{ type: 'host', value: 'mikka.aspectlylabs.com' }], destination: `https://app.aspectlylabs.com${basePath}/:path*`, basePath: false, permanent: true },
       { source: '/', destination: basePath, basePath: false, permanent: false },
+      // Devices is one section of Settings, not a page of its own (Figma 503:7105).
+      { source: '/devices', destination: '/settings?section=devices', permanent: false },
+      { source: '/:locale(en|zh-CN)/devices', destination: '/:locale/settings?section=devices', permanent: false },
       // OAuth discovery for agents signing in to the MCP server (app/api/mcp).
       // RFC 8414 and RFC 9728 put the documents at the origin's root with the
       // issuer or resource path appended; they live under the base path.

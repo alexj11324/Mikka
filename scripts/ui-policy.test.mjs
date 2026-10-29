@@ -70,6 +70,15 @@ for (const [label, source, rule] of [
   ['font family allowlist', 'import { Roboto } from "next/font/google";', 'typography/font-family'],
 ]) test(label, () => has(`${prefix}\n${source}`, rule))
 
+test('local fonts must be registered with their CSS variable', () => {
+  const approved = `import localFont from 'next/font/local';
+    const fontSans = localFont({ src: '../fonts/Geist-Variable.woff2', variable: '--font-geist', weight: '100 900' });`
+  assert.deepEqual(auditSource('app/[locale]/layout.tsx', approved, policy), [])
+  for (const source of [approved.replace('Geist-Variable.woff2', 'Other-Variable.woff2'), approved.replace('--font-geist', '--font-other')]) {
+    assert.ok(auditSource('app/[locale]/layout.tsx', source, policy).some(d => d.rule === 'typography/font-family'))
+  }
+})
+
 test('component composition + business data/event wiring + layout are allowed', () => {
   const source = `${prefix}
     import { FieldGroup, Field, FieldLabel } from '@/components/ui/field';

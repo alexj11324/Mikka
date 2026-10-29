@@ -3,9 +3,8 @@
 import * as React from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { Link } from '@/i18n/navigation'
 import { listTeams } from '@/app/actions/teams'
-import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, MonitorSmartphone, Puzzle, Scan, Search, Send, SquarePen, SquareUserRound, Workflow } from 'lucide-react'
+import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Puzzle, Scan, Search, Send, SquarePen, SquareUserRound, Workflow } from 'lucide-react'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
@@ -72,7 +71,6 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
   <SidebarFooter>
     <SidebarMenu>
       <SidebarMenuItem><SidebarMenuButton isActive={section === 'plugins'} aria-current={section === 'plugins' ? 'page' : undefined} onClick={() => navigate('plugins')} tooltip={i18nText("Nav.plugins")}><Puzzle /><span>{i18nText("Nav.plugins")}</span></SidebarMenuButton></SidebarMenuItem>
-      <SidebarMenuItem><SidebarMenuButton render={<Link href="/devices" />} tooltip={i18nText("Nav.devices")}><MonitorSmartphone /><span>{i18nText("Nav.devices")}</span></SidebarMenuButton></SidebarMenuItem>
     </SidebarMenu>
   </SidebarFooter>
   <SidebarRail aria-label={i18nText("Nav.sidebarRail")} title={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />

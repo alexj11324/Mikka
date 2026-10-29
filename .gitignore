@@ -51,6 +51,9 @@ next-env.d.ts
 /packages/daemon/dist/
 /packages/daemon/.retained-build-*/
 /packages/daemon/.retained-package-test-*/
+# Electron shell build output and packaged apps.
+/apps/desktop/dist/
+/apps/desktop/release/
 # Generated standalone credential broker bundles.
 /services/credential-broker/dist/
 /services/credential-broker/public/

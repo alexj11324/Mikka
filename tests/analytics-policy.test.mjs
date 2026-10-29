@@ -72,3 +72,8 @@ test('the locale layout mounts the pageview tracker whenever PostHog is configur
   const layout = readFileSync(new URL('../app/[locale]/layout.tsx', import.meta.url), 'utf8')
   assert.match(layout, /posthogConfig\.token && <PostHogAnalytics \/>/)
 })
+
+test('runtime separates the desktop shell and still drops other client details', () => {
+  const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: { runtime: 'electron', isDesktop: true, userAgent: 'private', platform: 'Mozilla/5.0' } })
+  assert.deepEqual(event.properties, { runtime: 'electron' })
+})

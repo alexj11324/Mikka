@@ -1,0 +1,32 @@
+appId: com.aspectlylabs.mikka
+productName: Mikka
+copyright: Copyright © 2026 Aspectly Labs
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+asar: true
+npmRebuild: false
+compression: normal
+publish:
+  provider: github
+  owner: alexj11324
+  repo: Mikka
+  releaseType: release
+
+mac:
+  category: public.app-category.productivity
+  icon: build/icon.png
+  target: [dmg, zip]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Signs with CSC_LINK / CSC_KEY_PASSWORD. Notarization runs only when
+  # APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID (or an App Store
+  # Connect key) are present; otherwise electron-builder warns and skips it.
+  notarize: true
+
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}

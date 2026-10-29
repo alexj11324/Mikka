@@ -3,14 +3,12 @@ import { test, expect, register, rail, app, seedTask, openIssueFromSearch } from
 
 test.use({ expectedConsoleErrors: [{ path: app('/api/auth/sign-out'), message: 'Failed to load resource: the server responded with a status of 400 (Bad Request)' }] })
 
-for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
+for (const path of ['/', '/settings/members', '/en/settings?section=devices']) {
   test(`sign-out hides private UI while pending, restores failures, and revokes the session: ${path}`, async ({ page, context }) => {
     const english = path.startsWith('/en/')
-    const mobile = path === '/devices'
-    if (mobile) await page.setViewportSize({ width: 390, height: 844 })
-    await register(page, english ? '/devices' : path)
+    await register(page, english ? '/settings?section=devices' : path)
     if (english) await page.goto(app(path))
-    const accountMenu = page.getByRole('button', { name: path.includes('devices') ? english ? 'Account menu' : '账户菜单' : '工作区菜单', exact: true })
+    const accountMenu = page.getByRole('button', { name: english ? 'Workspace menu' : '工作区菜单', exact: true })
     const pending = page.getByRole('status', { name: english ? 'Signing out…' : '正在退出…', exact: true })
     const cookie = (await context.cookies()).map(value => `${value.name}=${value.value}`).join('; ')
     const session = await page.request.get(app('/api/auth/get-session'))
@@ -26,22 +24,11 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
         if (await gate) await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'SIGN_OUT_FAILED', message: 'Sign out failed' }) })
         else await route.continue()
       })
-      if (mobile && !await accountMenu.isVisible()) await page.getByRole('button', { name: '展开或收起侧栏', exact: true }).click()
       await accountMenu.click()
       await page.getByRole('menuitem', { name: english ? 'Sign out' : '退出登录', exact: true }).click()
       await expect(pending).toBeVisible()
       await page.keyboard.press('ControlOrMeta+k')
       await page.keyboard.press('c')
-      if (mobile) {
-        const sheet = page.locator('[data-slot="sidebar"][data-mobile="true"]')
-        await expect(sheet).toHaveAttribute('data-open', '')
-        for (let attempt = 0; attempt < 2; attempt++) {
-          await page.keyboard.press('ControlOrMeta+b')
-          // Let the Sheet's 200 ms close transition finish before attempting to reopen it.
-          await page.waitForTimeout(250)
-          await expect(sheet).toHaveAttribute('data-open', '')
-        }
-      }
       const pendingDialog = page.getByRole('dialog', { name: english ? 'Signing out…' : '正在退出…', exact: true })
       await expect(pendingDialog).toBeVisible()
       for (const key of ['Tab', 'Shift+Tab', 'Escape']) {
@@ -62,11 +49,7 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
     await hold()
     release(true)
     await expect(pending).not.toBeVisible()
-    if (mobile) {
-      await page.keyboard.press('Escape')
-      await expect(page.locator('[data-slot="sidebar"][data-mobile="true"]')).not.toBeVisible()
-    }
-    if (!mobile) await expect(accountMenu).toBeVisible()
+    await expect(accountMenu).toBeVisible()
     await expect(page.getByRole('alert').filter({ hasText: english ? 'Sign out failed. Please try again.' : '退出失败，请稍后重试。' })).toBeVisible()
     expect((await (await page.request.get(app('/api/auth/get-session'))).json()).user).toBeTruthy()
     await page.unroute(routePattern)

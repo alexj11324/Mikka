@@ -51,8 +51,9 @@ function DeviceGroup({ title, devices, onChanged, onReconnect }: { title: string
 }
 
 /**
- * 设置 › 设备 (Figma 108:563): only machines the user connected. The bots'
- * cloud computer is ours and never listed here.
+ * 设置 › 设备 (Figma 503:7105): only machines the user connected. The bots'
+ * cloud computer is ours and never listed here. The retired standalone
+ * /devices page redirects here.
  */
 export function DevicesSettings() {
   const t = useTranslations('Devices')
@@ -66,15 +67,14 @@ export function DevicesSettings() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-  const own = devices.filter(device => (device as DeviceView & { kind?: string }).kind !== 'cloud')
   return <div className="flex flex-col gap-6">
     <div className="flex items-center justify-between gap-3">
       <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
       <Button size="sm" aria-keyshortcuts="Meta+N Control+N" className="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setAdding(true)}><Plus data-icon="inline-start" />{t('connect.trigger')}</Button>
     </div>
     {error && <p role="alert" className="text-xs text-destructive">{t('listError')}</p>}
-    {own.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> :
-      <DeviceGroup title={t('thisMachine')} devices={own} onChanged={() => { void mutate() }} onReconnect={reconnect} />}
+    {devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> :
+      <DeviceGroup title={t('thisMachine')} devices={devices} onChanged={() => { void mutate() }} onReconnect={reconnect} />}
     <ConnectDeviceDialog open={adding} onOpenChange={setAdding} hideTrigger />
   </div>
 }
