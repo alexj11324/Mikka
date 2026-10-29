@@ -1,5 +1,5 @@
 """Real local Chromium and WebSocket regression; all data is synthetic."""
-import asyncio, importlib.util, json, shutil, ssl, subprocess, tempfile
+import asyncio, importlib.util, json, os, signal, shutil, ssl, subprocess, tempfile
 from pathlib import Path
 from aiohttp import ClientSession, WSMsgType, web
 from aiohttp.test_utils import TestClient, TestServer
@@ -26,7 +26,7 @@ async def main():
         fixture_site=web.TCPSite(fixture_runner,'127.0.0.1',0,ssl_context=tls);await fixture_site.start()
         fixture_port=fixture_site._server.sockets[0].getsockname()[1]
         origin=f'https://127.0.0.1:{fixture_port}'
-        process=await asyncio.create_subprocess_exec(chromium,'--headless','--no-sandbox','--disable-gpu','--no-first-run','--ignore-certificate-errors','--remote-debugging-address=127.0.0.1','--remote-debugging-port=0',f'--user-data-dir={path}/chrome','about:blank',stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL)
+        process=await asyncio.create_subprocess_exec(chromium,'--headless','--no-sandbox','--disable-gpu','--no-first-run','--ignore-certificate-errors','--remote-debugging-address=127.0.0.1','--remote-debugging-port=0',f'--user-data-dir={path}/chrome','about:blank',start_new_session=True,stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL)
         try:
             active=path/'chrome'/'DevToolsActivePort'
             for _ in range(150):
@@ -208,6 +208,19 @@ async def main():
                 unix.close();await unix.wait_closed()
             print('PASS: real Chromium through local broker WebSocket: fixed templates and session storage; wrong target/session/origin, scripts and extra parameters rejected')
         finally:
-            process.terminate();await process.wait();await fixture_runner.cleanup()
+            # Chromium's browser PID may exit before its profile-writing children.
+            # Only signal this test's private process group, never other lanes.
+            try:os.killpg(process.pid,signal.SIGTERM)
+            except ProcessLookupError:pass
+            await process.wait()
+            for _ in range(100):
+                try:os.killpg(process.pid,0)
+                except ProcessLookupError:break
+                await asyncio.sleep(.05)
+            else:
+                try:os.killpg(process.pid,signal.SIGKILL)
+                except ProcessLookupError:pass
+                await asyncio.sleep(.2)
+            await fixture_runner.cleanup()
 
 asyncio.run(main())
