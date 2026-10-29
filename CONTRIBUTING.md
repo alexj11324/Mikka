@@ -52,10 +52,13 @@ cannot.
    | Schema-only migrations (`drizzle/*.sql`, with documentation) | Migration bootstrap and database checks, then critical flows |
    | Authentication, permissions, shared UI/runtime, dependencies, mixed schema and application changes, shared browser fixtures or unknown paths | Full functionality |
 
-   The full layer runs as four isolated shards. Each matrix job has its own
-   PostgreSQL service, test-account directory and artifact name, so no database,
-   lease or fixture is shared concurrently. Sharding changes wall-clock time, not
-   which assertions run.
+   The browser layer runs as parallel jobs: one build, one runtime-gate job
+   (Factory HTTP, real HTTP authentication, MVP daemon and performance), two
+   selection-validation jobs (critical and scoped subsets) and four regression
+   shards. Every job has its own PostgreSQL service, test-account directory and
+   artifact name, so no database, lease or fixture is shared concurrently. The
+   build runs once and its `.next` artifact is reused; parallelism changes
+   wall-clock time, not which assertions run.
 
    Critical flows cover anonymous redirects, registration/login, task creation,
    search/navigation, account isolation, and sign-out with server revocation.
