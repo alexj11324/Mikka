@@ -6,14 +6,10 @@ import {
   publicationBindingHash,
   type PublicationInput,
 } from "./publication-operation";
+import { MIKKA_VERCEL, vercelTarget } from "./vercel-target";
 
-export const MIKKA_VERCEL = {
-  teamId: "team_C7lwxVVvnUicFli6112mvxpv",
-  projectId: "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
-  projectName: "mikka",
-  repository: "https://github.com/alexj11324/Mikka.git",
-  repoId: "1427517699",
-} as const;
+// Re-exported for the existing tests and server composition.
+export { MIKKA_VERCEL, vercelTarget } from "./vercel-target";
 const configSchema = z
   .object({
     teamId: z.string().regex(/^team_[\w]+$/),
@@ -25,9 +21,6 @@ const configSchema = z
   })
   .strict();
 export type VercelPublicationConfig = z.infer<typeof configSchema>;
-export const vercelTarget = (
-  c: Pick<VercelPublicationConfig, "teamId" | "projectId" | "environment">,
-) => `vercel:${c.teamId}:${c.projectId}:${c.environment}`;
 export interface VercelClient {
   request(
     path: string,
