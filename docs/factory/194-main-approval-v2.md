@@ -1,5 +1,11 @@
 # Factory authorization and publication consumer contract
 
+> Update 2026-10-29: the mandatory signed review and trusted `reviewKey` below
+> are now the optional strict deployment. Mikka's default follows the Warp
+> Factories model: advisory review, registered policy as the authority, no
+> application merge. See `warp-aligned-factory.md` for the current behavior;
+> this page remains the record of the #194 batch.
+
 This #194 batch extracts non-enterprise publication consumers from closed PR229
 and PR316, then removes the unconditional human-approval requirement. It does not
 register an application route, migration, issuer, model or enabled adapter.

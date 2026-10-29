@@ -47,7 +47,9 @@ export const verifiedFactoryDecision = z
     verification: z
       .object({
         receiptId: identifier,
-        signatureDigest: hash,
+        // Absent on historical records, which were all signed.
+        attestation: z.enum(["signed", "advisory"]).optional(),
+        signatureDigest: hash.optional(),
         runBinding: z
           .object({
             runId: z.uuid(),
@@ -64,6 +66,7 @@ export const verifiedFactoryDecision = z
       .strict(),
     // Recorded by the host from an actual vision-capable model invocation, never
     // accepted as a model's assertion about its own capabilities or input.
+    // Absent only in advisory mode, where the review cannot grant authority.
     judgment: z
       .object({
         receiptId: identifier,
@@ -80,7 +83,8 @@ export const verifiedFactoryDecision = z
           .optional(),
         execution: factoryDecisionExecution.optional(),
       })
-      .strict(),
+      .strict()
+      .optional(),
     confirmation: z
       .object({
         decisionId: identifier,
@@ -144,6 +148,7 @@ export async function authorizeFactoryDecision(
         "factoryPolicyDecisionExpired",
         "factoryPolicyDecisionInvalid",
         "factoryPolicyCheckReceiptRequired",
+        "factoryPolicyAttestationRequired",
         "factoryPolicyDecisionUnavailable",
       ].includes(error.code)
     )
@@ -155,16 +160,23 @@ export async function authorizeFactoryDecision(
   if (!parsed.success) throw new FactoryError("factoryPolicyDecisionInvalid");
   const d = parsed.data;
   const scopeDigest = digest(expected);
+  const attestation = d.verification.attestation ?? "signed";
   if (
     d.credentialId !== credentialId ||
     d.permissionAction !== expected.action ||
     d.ownerId !== expected.ownerId ||
     d.scopeDigest !== scopeDigest ||
-    d.judgment.scopeDigest !== scopeDigest ||
-    d.judgment.evidenceDigest !== expected.evidenceDigest ||
-    digest(d.judgment.imageDigests) !==
-      digest(expected.visualEvidenceDigests) ||
-    (d.judgment.visualInputRequired && d.judgment.imageDigests.length === 0)
+    (attestation === "signed" &&
+      (!d.verification.signatureDigest || !d.judgment))
+  )
+    throw new FactoryError("factoryPolicyDecisionMismatch");
+  if (
+    d.judgment &&
+    (d.judgment.scopeDigest !== scopeDigest ||
+      d.judgment.evidenceDigest !== expected.evidenceDigest ||
+      digest(d.judgment.imageDigests) !==
+        digest(expected.visualEvidenceDigests) ||
+      (d.judgment.visualInputRequired && d.judgment.imageDigests.length === 0))
   )
     throw new FactoryError("factoryPolicyDecisionMismatch");
   const {

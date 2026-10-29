@@ -195,6 +195,7 @@ test("owner/candidate/action/target/environment/evidence/expiry cannot be substi
 });
 test("visual task needs actual recorded image-input digests from the trusted model invocation", async () => {
   const d = decision();
+  assert.ok(d.judgment);
   d.judgment.imageDigests = [];
   await rejects(
     () =>
