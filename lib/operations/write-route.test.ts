@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { POST } from '../../app/api/approved-writes/route'
 import { createPersonalWriteRoute, PERSONAL_WRITES_ENABLED } from './write-route'
+import { personalWritesEnabled } from './write-feature'
 
 const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 function request(body: unknown, headers: Record<string, string> = {}) {
@@ -21,9 +22,9 @@ test('actual product POST is registered but disabled without initializing runtim
   assert.equal(loads, 0)
 })
 
-test('synthetic enabled route delegates browser authority and durable IDs to the existing HTTP service', async () => {
+test('production rollout delegates browser authority and durable IDs to the existing HTTP service', async () => {
   const calls: unknown[] = []
-  const handler = createPersonalWriteRoute({ enabled: () => true, load: async () => ({
+  const handler = createPersonalWriteRoute({ enabled: () => personalWritesEnabled({VERCEL_ENV:'production',MIKKA_PERSONAL_WRITES_ENABLED:'1'}), load: async () => ({
     auth: { api: { getSession: async ({ query }) => { assert.equal(query.disableCookieCache, true); return { user: { id: 'owner' }, session: { id: 'session' } } } } },
     operations: action => ({
       propose: async (ownerId, input, intentId) => { calls.push({ action, ownerId, input, intentId }); return { status: 'awaiting_approval', actionId: id } },

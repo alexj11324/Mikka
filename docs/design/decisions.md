@@ -198,3 +198,12 @@ stay behind the existing broker; unknown mutation outcomes are not blindly retri
 
 Do not add proactive recommendations, habit/location triggers, background research,
 full onboarding, a new knowledge base, or local-browser-session import in this work.
+
+## 2026-10-29 — Open implemented non-Linear capabilities
+
+Alex requested opening the implemented capabilities discussed in the README's
+task-flow and architecture diagrams, with Linear bidirectional sync excepted.
+Preserve Linear's existing state. Availability follows the existing owner,
+workspace and allow/ask/deny checks; it does not create provider or publication
+authority. Track the concrete rollout prerequisites and verification in
+[the rollout record](../integration/non-linear-rollout-20261029.md).

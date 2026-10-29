@@ -1,0 +1,55 @@
+{
+  "revision": "04d7b67d286f9c0453f4709f04b1f046b218de48",
+  "target": {
+    "name": "MIKKA_DATABASE_URL",
+    "host": "ep-twilight-violet-b5lbqgbv-pooler.c-7.us-east-2.aws.neon.tech",
+    "database": "orvilo_mvp",
+    "sameDatabaseAs": [
+      "DATABASE_URL",
+      "ORVILO_DATABASE_URL"
+    ]
+  },
+  "mode": "candidate-only; not executed or approved",
+  "files": [
+    {
+      "name": "20261029011635_subagents_thread_machines.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "1d48526f9212a7d7342c501ec69d37b9b7fa550f923168645cf804daf6ef33f3"
+    },
+    {
+      "name": "20261029012027_account_credential_vault.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "68a735ed78ad3d6c5f9b0344f57931b8975fd84ce4331a757fa80610c4ff4233"
+    },
+    {
+      "name": "20261029043646_agent_external_write_policy.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "58868e1fcc9fdb256c77e144bdfda8a461d797cc5c4f11f481197aa05118d158"
+    },
+    {
+      "name": "20261029043647_workspace_external_write_policy.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "7e76838ecbce763d05e0983e0cb148232961772d80fb4d0bb7bc5c5b9a0456f9"
+    },
+    {
+      "name": "20261029044016_factory_public_consumers.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "fac25b384b65fa4df9ac8dad985aa8c6ac349ab9d6c5437547af762c71551aa1"
+    },
+    {
+      "name": "20261029044018_factory_scope_generation.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "6f71cf25a84c434bb2cf25633d7b18aef573c2974db54754c443c12f3ea8965e"
+    },
+    {
+      "name": "20261029080000_unattended_browser_runtime.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "f873386cdae499ab04b2b94ec13a03b4cedb8225b5ce1ac316c2ed0b8c4eb384"
+    },
+    {
+      "name": "20261029080001_owner_cloud_machines.sql",
+      "target": "MIKKA_DATABASE_URL",
+      "sha256": "9431a96ee92321f8d71973bd148525cceb96e1277b20c1c1046c315b5eabd606"
+    }
+  ]
+}
