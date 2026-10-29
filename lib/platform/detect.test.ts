@@ -7,7 +7,7 @@ import { bridgeFromWindow, detectPlatform, platformFromBridge } from './detect'
 
 function bridge(overrides: Partial<MikkaBridge> = {}): MikkaBridge {
   return {
-    app: { version: '0.1.0', flavor: 'dev', runtime: 'electron', serverUrl: 'https://app.example/mikka', zeroUrl: 'https://zero.example' },
+    app: { version: '0.1.0', flavor: 'dev', runtime: 'electron', serverUrl: 'https://app.example/mikka', zeroUrl: 'https://zero.example', openExternal: async () => {} },
     auth: {} as MikkaBridge['auth'],
     settings: { getAll: async () => ({}) as never, set: async () => ({}) as never },
     notifications: { show: async () => {}, setBadge: async () => {}, onClick: () => () => {}, consumePendingClick: async () => null },

@@ -4,21 +4,21 @@
 
 import { app, BrowserWindow, Menu, Notification, dialog, session, shell } from 'electron'
 import { autoUpdater } from 'electron-updater'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import { IPC } from '@mikka/protocol/ipc'
 
 import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
 import { NotificationCenter } from './notification-center'
-import { externalUrl, navigationDecision } from './security'
+import { appExternalUrl, desktopAuthFinishUrl, externalUrl, navigationDecision } from './security'
 
 const APP_URL = __MIKKA_APP_URL__
 const APP_VERSION = __MIKKA_APP_VERSION__
 const FLAVOR = __MIKKA_FLAVOR__
-const AUTH_ORIGINS = __MIKKA_AUTH_ORIGINS__
 const PARTITION = FLAVOR === 'dev' ? 'persist:mikka-dev' : 'persist:mikka'
 const APP_ORIGIN = new URL(APP_URL).origin
+const AUTH_PROTOCOL = 'mikka-desktop'
 
 app.setName(FLAVOR === 'dev' ? 'Mikka Dev' : 'Mikka')
 if (process.platform === 'win32') app.setAppUserModelId('com.aspectlylabs.mikka')
@@ -30,7 +30,29 @@ app.on('web-contents-created', (_event, contents) => {
 
 let mainWindow: BrowserWindow | null = null
 let pendingClick: string | null = null
+let pendingProtocol: string | null = null
 let retrying: NodeJS.Timeout | null = null
+
+function handleProtocolUrl(raw: string): void {
+  const finish = desktopAuthFinishUrl(raw, APP_URL)
+  if (!finish) return
+  if (!app.isReady() || !mainWindow || mainWindow.isDestroyed()) {
+    pendingProtocol = finish
+    return
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+  void mainWindow.loadURL(finish)
+}
+
+function registerProtocol(): void {
+  if (process.defaultApp && process.argv[1]) {
+    app.setAsDefaultProtocolClient(AUTH_PROTOCOL, process.execPath, [resolve(process.argv[1])])
+    return
+  }
+  app.setAsDefaultProtocolClient(AUTH_PROTOCOL)
+}
 
 function deliverClick(href: string): void {
   if (!mainWindow || mainWindow.isDestroyed()) {
@@ -78,7 +100,7 @@ function registerSession(): void {
 }
 
 function handleNavigation(event: Electron.Event, url: string): void {
-  const decision = navigationDecision(url, APP_URL, AUTH_ORIGINS)
+  const decision = navigationDecision(url, APP_URL)
   if (decision === 'allow') return
   event.preventDefault()
   if (decision === 'external') {
@@ -116,7 +138,7 @@ function openChild(url: string): void {
 }
 
 function openWindow(url: string): void {
-  const decision = navigationDecision(url, APP_URL, AUTH_ORIGINS)
+  const decision = navigationDecision(url, APP_URL)
   if (decision === 'allow') openChild(url)
   else if (decision === 'external') {
     const target = externalUrl(url)
@@ -295,9 +317,15 @@ function installMenu(): void {
 }
 
 function start(): void {
+  registerProtocol()
   registerSession()
   registerBridge({
     appUrl: APP_URL,
+    openExternal: url => {
+      const target = appExternalUrl(url, APP_URL)
+      if (!target) throw new Error('openExternal accepts only app-origin HTTP(S) URLs')
+      return shell.openExternal(target)
+    },
     localDevice: localDeviceStatus,
     quota: localQuota,
     notifications,
@@ -308,6 +336,11 @@ function start(): void {
     },
   })
   createMainWindow()
+  if (pendingProtocol) {
+    const finish = pendingProtocol
+    pendingProtocol = null
+    void mainWindow?.loadURL(finish)
+  }
   installMenu()
   setupUpdates()
   if (app.isPackaged) setTimeout(() => { void checkForUpdates(false) }, 15_000)
@@ -319,7 +352,14 @@ function start(): void {
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
+  app.on('open-url', (event, url) => {
+    event.preventDefault()
+    handleProtocolUrl(url)
+  })
+  app.on('second-instance', (_event, argv) => {
+    for (const argument of argv) {
+      if (argument.startsWith(`${AUTH_PROTOCOL}://`)) handleProtocolUrl(argument)
+    }
     if (!mainWindow) return
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
@@ -328,5 +368,8 @@ if (!app.requestSingleInstanceLock()) {
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
   })
+  for (const argument of process.argv) {
+    if (argument.startsWith(`${AUTH_PROTOCOL}://`)) handleProtocolUrl(argument)
+  }
   void app.whenReady().then(start)
 }

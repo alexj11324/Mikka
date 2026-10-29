@@ -17,6 +17,7 @@ function bridge(overrides: Partial<MikkaBridge> = {}): MikkaBridge {
       runtime: "electron",
       serverUrl: "https://app.example/mikka",
       zeroUrl: "https://zero.example",
+      openExternal: async () => {},
     },
     auth: {} as MikkaBridge["auth"],
     settings: { getAll: async () => ({}) as never, set: async () => ({}) as never },

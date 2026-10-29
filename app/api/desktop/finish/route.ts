@@ -1,0 +1,61 @@
+import { BASE_PATH } from '@/lib/base-path'
+
+export const dynamic = 'force-dynamic'
+
+const safeHeaders = {
+  'Cache-Control': 'private, no-store',
+  'Referrer-Policy': 'no-referrer',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Robots-Tag': 'noindex, nofollow',
+  'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+}
+
+/**
+ * Loaded inside the desktop shell after the `mikka-desktop://auth` callback.
+ * The token is in the fragment, so it never reaches this server or a proxy
+ * log. The page checks the nonce the renderer stored before opening the
+ * browser, exchanges the one-minute token for the Electron session cookie,
+ * then returns to the requested in-app page.
+ */
+export async function GET(request: Request) {
+  const zh = request.headers.get('accept-language')?.startsWith('zh')
+  const copy = zh
+    ? { title: '正在返回 Mikka', body: '正在完成登录…', failed: '登录未完成，请回到 Mikka 重新登录。', signIn: '打开登录页' }
+    : { title: 'Returning to Mikka', body: 'Finishing sign-in…', failed: 'Sign-in did not finish. Return to Mikka and try again.', signIn: 'Open sign-in' }
+  const html = `<!doctype html><html lang="${zh ? 'zh-CN' : 'en'}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${copy.title}</title><style>body{font:16px/1.5 -apple-system,BlinkMacSystemFont,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f5f4;color:#1c1917}main{max-width:28rem;padding:2rem;text-align:center}a{display:inline-block;margin-top:1rem;padding:.7rem 1.2rem;border-radius:.75rem;background:#1c1917;color:#fff;text-decoration:none}</style><main><h1>${copy.title}</h1><p id="status">${copy.body}</p><a id="signin" href="${BASE_PATH}/sign-in?oauth=failed" hidden>${copy.signIn}</a></main><script>
+(() => {
+  const base = ${JSON.stringify(BASE_PATH)};
+  const key = 'mikka:desktop-oauth';
+  const status = document.getElementById('status');
+  const signin = document.getElementById('signin');
+  const fail = () => { status.textContent = ${JSON.stringify(copy.failed)}; signin.hidden = false; };
+  const safeNext = value => {
+    if (!value || value[0] !== '/' || value.startsWith('//') || value.includes('\\\\') || value.includes('#')) return '/';
+    try {
+      const url = new URL(value, location.origin);
+      if (url.origin !== location.origin) return '/';
+      let path = url.pathname + url.search;
+      if (base && (path === base || path.startsWith(base + '/'))) path = path.slice(base.length) || '/';
+      return path;
+    } catch { return '/'; }
+  };
+  const params = new URLSearchParams(location.hash.slice(1));
+  const token = params.get('token') || '';
+  const state = params.get('state') || '';
+  const next = params.get('next') || '/';
+  history.replaceState(null, '', location.pathname + location.search);
+  let saved = null;
+  try { saved = JSON.parse(sessionStorage.getItem(key) || 'null'); } catch {}
+  if (!token || !state || !saved || saved.state !== state || typeof saved.expires !== 'number' || saved.expires < Date.now()) { fail(); return; }
+  fetch(base + '/api/auth/one-time-token/verify', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ token }) })
+    .then(response => {
+      if (!response.ok) throw new Error('token rejected');
+      try { sessionStorage.removeItem(key); } catch {}
+      const path = safeNext(next);
+      location.replace(base ? base + (path === '/' ? '' : path) : path);
+    })
+    .catch(fail);
+})()
+</script></html>`
+  return new Response(html, { headers: { ...safeHeaders, 'Content-Type': 'text/html; charset=utf-8' } })
+}
