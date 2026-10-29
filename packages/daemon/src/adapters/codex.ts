@@ -263,7 +263,8 @@ export class CodexAdapter implements AgentAdapter {
     options: SessionOptions &
       Partial<Pick<StartOptions, "prompt" | "continueSession">>
   ): Promise<AgentSession> {
-    requireRunToolApproval(options.runId, options.toolApproval)
+    const approval = requireRunToolApproval(options.runId, options.toolApproval)
+    if (!await approval.checkLive()) { approval.revoke(); throw new Error('Run tool approval unavailable') }
     const log = options.log.child({ harness: "codex" })
     if (options.mailbox && mode !== 'new') throw new Error('Run mailbox requires a fresh Codex thread; resume capability is unverified')
     const paths = runPaths(this.options.stateDir, options.runId)

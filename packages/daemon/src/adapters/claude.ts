@@ -421,7 +421,8 @@ export class ClaudeAdapter implements AgentAdapter {
     firstMessage: string,
     options: SessionOptions & { prompt?: string }
   ): Promise<AgentSession> {
-    requireRunToolApproval(options.runId, options.toolApproval)
+    const approval = requireRunToolApproval(options.runId, options.toolApproval)
+    if (!await approval.checkLive()) { approval.revoke(); throw new Error('Run tool approval unavailable') }
     const paths = runPaths(this.options.stateDir, options.runId)
     const runDir = await claimRunDir(paths)
     const externalAuth = this.options.subscriptionAuth
