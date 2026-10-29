@@ -1,4 +1,4 @@
-import { parseLinearWebhookRequest, verifyBearer } from '@/lib/linear-sync/webhook'
+import { isLinearOAuthRevocation, parseLinearWebhookRequest, verifyBearer } from '@/lib/linear-sync/webhook'
 import { linearSyncDisabledResponse, linearSyncEnabled, linearSyncState } from '@/lib/linear-sync/flags'
 
 const WEBHOOK_PATH = '/mikka/api/webhooks/linear'
@@ -78,7 +78,27 @@ async function webhook(request: Request, env: Env, ctx: WorkerContext) {
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: parsed.status })
   if ('ignored' in parsed) return new Response(null, { status: 200 })
   const state = await linearSyncState(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')
-  if (state === 'disabled') return Response.json({ disabled: true })
+  if (state === 'disabled') {
+    if (!isLinearOAuthRevocation(parsed.payload)) return Response.json({ disabled: true })
+    try {
+      const connectionString = env.HYPERDRIVE?.connectionString
+      if (!connectionString) return linearSyncDisabledResponse()
+      process.env.MIKKA_DATABASE_URL = connectionString
+      const [database, revocations] = await Promise.all([
+        import('@/lib/db'),
+        import('@/lib/linear-sync/oauth-revocation'),
+      ])
+      const scope = database.createRequestDatabaseScope(connectionString)
+      try {
+        await scope.run(() => revocations.processLinearOAuthRevocation(parsed.payload))
+      } finally {
+        await scope.close()
+      }
+      return new Response(null, { status: 200 })
+    } catch {
+      return linearSyncDisabledResponse()
+    }
+  }
   if (state !== 'enabled') return linearSyncDisabledResponse()
   if (!syncConfigured(env)) return Response.json({ error: 'Linear sync is not configured' }, { status: 503 })
 

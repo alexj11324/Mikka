@@ -75,6 +75,12 @@ test('disabled Worker webhook, protected cron and scheduler never read Hyperdriv
   }), env, { waitUntil: () => { background++ } })
   assert.equal(response.status, 200)
   assert.deepEqual(await response.json(), { disabled: true })
+  const revokedBody = JSON.stringify({ action: 'remove', type: 'OAuthAuthorization', organizationId: 'org', webhookTimestamp: Date.now(), data: { userId: 'user' } })
+  const revoked = await handleRequest(new Request('https://sync.example.test/mikka/api/webhooks/linear', {
+    method: 'POST', body: revokedBody, headers: { 'linear-event': 'OAuthAuthorization', 'linear-delivery': 'revoked-delivery', 'linear-signature': createHmac('sha256', webhookSecret).update(revokedBody).digest('hex') },
+  }), env, ctx)
+  assert.equal(revoked.status, 503)
+  assert.equal(revoked.headers.get('retry-after'), '60')
   const cron = await handleRequest(new Request('https://sync.example.test/mikka/api/cron/linear-sync', { headers: { authorization: 'Bearer test-worker-cron' } }), env, ctx)
   assert.deepEqual(await cron.json(), { inbox: 0, outbox: 0, disabled: true })
   await runScheduled(env)

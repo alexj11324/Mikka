@@ -9,6 +9,8 @@ let claims = 0
 let syncs = 0
 let finishClaimed = false
 let finished = 0
+let revocations = 0
+let failRevocation = false
 let scheduled: Array<() => Promise<void>> = []
 const unexpected = () => { reads++; throw new Error('Unexpected database, authentication or provider access') }
 let worker: typeof import('./worker')
@@ -60,6 +62,9 @@ before(async () => {
   } })
   mock.module('@/lib/suggestions/sources', { namedExports: { linearWebhookNotifications: unexpected, bootstrapSuggestions: unexpected } })
   mock.module('@/lib/suggestions/store', { namedExports: { ingestNotifications: unexpected } })
+  mock.module('./oauth-revocation', { namedExports: {
+    processLinearOAuthRevocation: async () => { revocations++; if (failRevocation) throw new Error('database unavailable') },
+  } })
   worker = await import('./worker')
   dispatch = await import('./dispatch')
   actions = await import('../../app/actions/linear-sync')
@@ -124,16 +129,36 @@ test('Next routes authenticate before returning disabled without queuing, draini
   const cronRequest = (token: string) => new Request('https://app.invalid/mikka/api/cron/linear-sync', { headers: { authorization: `Bearer ${token}` } })
   assert.equal((await cron.GET(cronRequest('wrong'))).status, 401)
   assert.deepEqual(await (await cron.GET(cronRequest('test-cron'))).json(), { inbox: 0, outbox: 0, disabled: true })
-  const body = JSON.stringify({ action: 'update', type: 'Issue', organizationId: 'org', webhookTimestamp: Date.now(), data: { id: 'issue' } })
-  const request = (signature: string) => new Request('https://app.invalid/mikka/api/webhooks/linear', { method: 'POST', headers: { 'linear-event': 'Issue', 'linear-delivery': 'delivery', 'linear-signature': signature }, body })
-  assert.equal((await webhook.POST(request('0'.repeat(64)))).status, 401)
-  const signature = createHmac('sha256', 'test-webhook').update(body).digest('hex')
-  const response = await webhook.POST(request(signature))
+  const makeRequest = (payload: Record<string, unknown>, eventType: string, signatureOverride?: string) => {
+    const body = JSON.stringify(payload)
+    const signature = signatureOverride ?? createHmac('sha256', 'test-webhook').update(body).digest('hex')
+    return new Request('https://app.invalid/mikka/api/webhooks/linear', {
+      method: 'POST', headers: { 'linear-event': eventType, 'linear-delivery': 'delivery', 'linear-signature': signature }, body,
+    })
+  }
+  const ordinary = { action: 'update', type: 'Issue', organizationId: 'org', webhookTimestamp: Date.now(), data: { id: 'issue' } }
+  assert.equal((await webhook.POST(makeRequest(ordinary, 'Issue', '0'.repeat(64)))).status, 401)
+  const response = await webhook.POST(makeRequest(ordinary, 'Issue'))
   assert.equal(response.status, 200)
   assert.deepEqual(await response.json(), { disabled: true })
+  assert.equal(revocations, 0)
+
+  const revoked = { action: 'remove', type: 'OAuthAuthorization', organizationId: 'org', webhookTimestamp: Date.now(), data: { userId: 'linear-user' } }
+  const revokeResponse = await webhook.POST(makeRequest(revoked, 'OAuthAuthorization'))
+  assert.equal(revokeResponse.status, 200)
+  assert.equal(revocations, 1)
+
+  failRevocation = true
+  try {
+    const retry = await webhook.POST(makeRequest(revoked, 'OAuthAuthorization'))
+    assert.equal(retry.status, 503)
+    assert.equal(retry.headers.get('retry-after'), '60')
+    assert.deepEqual(await retry.json(), { disabled: true })
+  } finally { failRevocation = false }
+
   unavailable = true
   try {
-    const uncertain = await webhook.POST(request(signature))
+    const uncertain = await webhook.POST(makeRequest(ordinary, 'Issue'))
     assert.equal(uncertain.status, 503)
     assert.equal(uncertain.headers.get('retry-after'), '60')
   } finally { unavailable = false }

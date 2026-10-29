@@ -22,17 +22,21 @@ the background and flag evaluation never opens a database connection.
 
 When paused:
 
-- Next and Cloudflare validate webhook signatures, then acknowledge a
-  confirmed off/missing flag with `200 { disabled: true }` without inserting
-  an inbox row or ingesting suggestions. Events arriving during this pause
-  are intentionally skipped, including OAuth revocations; they are not an
-  archive or an automatic remote backfill on resume. A missing token,
-  evaluation error or timeout instead returns `503` with `Retry-After: 60`,
-  preserving retries during an outage. Unsupported event types retain `200`.
-  Linear retries non-200 deliveries after 1 minute, 1 hour and 6 hours, and
-  may then disable a failing webhook. After a long evaluation outage, check
-  Linear's webhook status and manually re-enable it if necessary. Confirmed
-  PostHog pauses use 200 so they do not trigger this provider disablement.
+- Next and Cloudflare validate webhook signatures. With a confirmed off
+  flag, ordinary issue/comment events are acknowledged with `200 { disabled:
+  true }` without inserting inbox rows or ingesting suggestions. A signed
+  OAuth authorization/app revocation is the exception: it immediately marks
+  the matching local connection revoked and disables its active team syncs in
+  one database transaction, so a pause cannot hide lost authorization. It
+  does not perform ordinary sync work or remote backfill. If this cleanup
+  cannot be committed, the endpoint returns `503` with `Retry-After: 60` so
+  Linear retries it. A missing token, evaluation error or timeout also returns
+  `503`, preserving retries during an outage. Unsupported event types retain
+  `200`. Linear retries non-200 deliveries after 1 minute, 1 hour and 6 hours,
+  and may then disable a failing webhook. After a long evaluation outage,
+  check Linear's webhook status and manually re-enable it if necessary.
+  Confirmed PostHog pauses use 200 for ordinary events so they do not trigger
+  this provider disablement.
 - Protected crons return `{ inbox: 0, outbox: 0, disabled: true }`; the
   Cloudflare schedule exits before loading its database runtime. Dispatch
   callbacks and all worker entry points check the same flag.

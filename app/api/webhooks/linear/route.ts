@@ -3,7 +3,8 @@ import { after } from 'next/server'
 import { db } from '@/lib/db'
 import { linearSyncInbox } from '@/lib/db/schema'
 import { dispatchLinearWebhook } from '@/lib/linear-sync/dispatch'
-import { parseLinearWebhookRequest } from '@/lib/linear-sync/webhook'
+import { isLinearOAuthRevocation, parseLinearWebhookRequest } from '@/lib/linear-sync/webhook'
+import { processLinearOAuthRevocation } from '@/lib/linear-sync/oauth-revocation'
 import { linearWebhookNotifications } from '@/lib/suggestions/sources'
 import { ingestNotifications } from '@/lib/suggestions/store'
 import { linearSyncDisabledResponse, linearSyncEnabled, linearSyncState } from '@/lib/linear-sync/flags'
@@ -15,7 +16,15 @@ async function handlePOST(request: Request) {
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: parsed.status })
   if ('ignored' in parsed) return new Response(null, { status: 200 })
   const state = await linearSyncState()
-  if (state === 'disabled') return Response.json({ disabled: true })
+  if (state === 'disabled') {
+    if (!isLinearOAuthRevocation(parsed.payload)) return Response.json({ disabled: true })
+    try {
+      await processLinearOAuthRevocation(parsed.payload)
+      return new Response(null, { status: 200 })
+    } catch {
+      return linearSyncDisabledResponse()
+    }
+  }
   if (state !== 'enabled') return linearSyncDisabledResponse()
   const [saved] = await db.insert(linearSyncInbox).values({
     deliveryId: parsed.deliveryId,
