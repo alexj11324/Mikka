@@ -273,7 +273,9 @@ test('Stopping a thread reaches the real daemon and keeps the draft editable whi
       await testInfo.attach('04-stop-requested-draft-editable', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
     } finally {
       releaseResponse()
-      await page.unroute(matcher, holdStop)
+      // This is the only page route. Drain its real fetch/fulfill callback
+      // before removing the last interceptor, which resumes pending requests.
+      await page.unrouteAll({ behavior: 'wait' })
       await page.clock.resume()
     }
     await expect.poll(async () => (await loop.run()).status, { timeout: 30_000 }).toMatch(/^(cancelled|stopped)$/)
