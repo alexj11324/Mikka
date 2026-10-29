@@ -9,7 +9,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
-import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
+import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { botChats, chatView, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import { and, eq } from 'drizzle-orm'
 import { bots, devices } from '@/lib/db/schema'
@@ -18,7 +18,7 @@ import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/q
 import { NOTE_MAX, NOTES_MAX, withBrowserNotes, type BrowserNote } from '@/lib/browser/note'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { coordinatorWelcome } from '@/lib/agent-welcome'
-import { dismissSuggestion, readSuggestion } from '@/lib/suggestions/store'
+import { claimSuggestion, readClaimedSuggestion } from '@/lib/suggestions/store'
 import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 
@@ -135,13 +135,14 @@ export async function sendSuggestion(suggestionId: string): Promise<ActionResult
     const id = z.uuid().safeParse(suggestionId)
     if (!id.success) throw new ActionFailureError('validationGeneric')
     if (!coordinatorEnabled()) throw new ActionFailureError('coordinatorUnavailable')
-    const item = await readSuggestion(userId, id.data)
-    if (!item) throw new ActionFailureError('suggestionNotFound')
-    const text = suggestionMessage({ source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle, actor: item.actor, url: item.url })
     try {
       await db.transaction(async tx => {
-        await recordPersonalSubmission(tx, userId, text, { submissionId: item.id })
-        await dismissSuggestion(userId, item.id, tx)
+        const claimed = await claimSuggestion(userId, id.data, tx)
+        const item = claimed ?? await readClaimedSuggestion(userId, id.data, tx)
+        if (!item) throw new ActionFailureError('suggestionNotFound')
+        const text = suggestionMessage({ source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle, actor: item.actor, url: item.url })
+        if (claimed) await recordPersonalSubmission(tx, userId, text, { submissionId: item.id })
+        else if (!await personalSubmissionRecorded(tx, userId, text, item.id)) throw new ActionFailureError('suggestionNotFound')
       })
     } catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')

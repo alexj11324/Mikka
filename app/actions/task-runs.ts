@@ -68,7 +68,7 @@ export async function listThreads(): Promise<Thread[]> {
     superseded: sql<boolean>`exists (select 1 from agent_runs retry where retry."retryOf" = ${agentRuns.id})`,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
     .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
-    .orderBy(desc(sql`coalesce(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)
+    .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)
   return rows.map(row => ({
     ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
     lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null, superseded: Boolean(row.superseded),
