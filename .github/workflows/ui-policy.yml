@@ -57,8 +57,9 @@ jobs:
 
   cloud-secret-access:
     name: Cloud credential access (OIDC)
-    # This migration-only candidate must not retrieve live provider credentials.
-    if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
+    # Credential checks do not run for documentation-only changes.
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
