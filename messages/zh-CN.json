@@ -1603,6 +1603,7 @@
       "teamDescription": "每个 Mikka 账号目前可同步一个 Linear 团队。只有工作区任务会同步，个人任务只留在 Mikka。",
       "enable": "开启双向同步",
       "pause": "暂停同步",
+      "syncDisabled": "同步已暂停",
       "syncActive": "正在同步 {team}",
       "failedIssues": "需要处理的任务",
       "inboundFailures": "需要处理的 Linear 更新",

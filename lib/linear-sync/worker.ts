@@ -7,6 +7,7 @@ import { applyLinearCommentToApp } from './comment-sync'
 import { createAppIssueFromLinear, applyLinearIssueToApp, LinearSyncConflictError, syncAppIssueToLinear } from './issue-sync'
 import { linearAccessToken } from './tokens'
 import { linearComment, linearIssue } from './client'
+import { linearSyncEnabled } from './flags'
 
 type InboxRow = typeof linearSyncInbox.$inferSelect
 type OutboxJob = { id: string; issueId: string; attempts: number }
@@ -69,6 +70,9 @@ async function failOutbox(job: OutboxJob, issueId: string, error: unknown) {
 }
 
 async function processOutboxOne(issueId?: string) {
+  // A claimed job finishes at the existing job boundary. Check again
+  // before each claim so disabling never burns queued jobs or retry attempts.
+  if (!await linearSyncEnabled()) return false
   const job = await claimOutbox(issueId)
   if (!job) return false
   const [issue] = await db.select({ updatedAt: issues.updatedAt }).from(issues).where(eq(issues.id, job.issueId)).limit(1)
@@ -243,6 +247,7 @@ async function claimInbox(deliveryId?: string): Promise<InboxRow | null> {
 }
 
 async function processInboxOne(deliveryId?: string) {
+  if (!await linearSyncEnabled()) return false
   const row = await claimInbox(deliveryId)
   if (!row) return false
   try {
@@ -262,6 +267,7 @@ async function processInboxOne(deliveryId?: string) {
 }
 
 export async function processLinearSyncBatch(limit = 3) {
+  if (!await linearSyncEnabled()) return { inbox: 0, outbox: 0, disabled: true }
   let inbox = 0
   let outbox = 0
   for (let index = 0; index < limit; index++) {

@@ -1,9 +1,11 @@
 import { parseLinearWebhookRequest, verifyBearer } from '@/lib/linear-sync/webhook'
+import { linearSyncDisabledResponse, linearSyncEnabled } from '@/lib/linear-sync/flags'
 
 const WEBHOOK_PATH = '/mikka/api/webhooks/linear'
 const CRON_PATH = '/mikka/api/cron/linear-sync'
 
 export interface Env {
+  NEXT_PUBLIC_POSTHOG_KEY?: string
   HYPERDRIVE?: { connectionString: string }
   CRON_SECRET?: string
   LINEAR_CLIENT_ID?: string
@@ -45,6 +47,8 @@ function loadSyncRuntime(env: Env) {
   process.env.LINEAR_CLIENT_ID = env.LINEAR_CLIENT_ID!
   process.env.LINEAR_CLIENT_SECRET = env.LINEAR_CLIENT_SECRET!
   process.env.LINEAR_TOKEN_ENCRYPTION_KEY = env.LINEAR_TOKEN_ENCRYPTION_KEY!
+  // The shared worker claim gate must use this Worker's project, too.
+  process.env.NEXT_PUBLIC_POSTHOG_KEY = env.NEXT_PUBLIC_POSTHOG_KEY ?? ''
   syncRuntime ??= Promise.all([
     import('@/lib/db'),
     import('@/lib/db/schema'),
@@ -72,6 +76,7 @@ async function webhook(request: Request, env: Env, ctx: WorkerContext) {
   const parsed = await parseLinearWebhookRequest(request, env.LINEAR_WEBHOOK_SECRET)
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: parsed.status })
   if ('ignored' in parsed) return new Response(null, { status: 200 })
+  if (!await linearSyncEnabled(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')) return linearSyncDisabledResponse()
   if (!syncConfigured(env)) return Response.json({ error: 'Linear sync is not configured' }, { status: 503 })
 
   try {
@@ -96,6 +101,7 @@ async function webhook(request: Request, env: Env, ctx: WorkerContext) {
 async function cron(request: Request, env: Env) {
   if (!env.CRON_SECRET) return Response.json({ error: 'Cron is not configured' }, { status: 503 })
   if (!await verifyBearer(request.headers.get('authorization'), env.CRON_SECRET)) return new Response(null, { status: 401 })
+  if (!await linearSyncEnabled(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')) return Response.json({ inbox: 0, outbox: 0, disabled: true })
   if (!syncConfigured(env)) return Response.json({ error: 'Linear sync is not configured' }, { status: 503 })
   try {
     const runtime = await loadSyncRuntime(env)
@@ -115,9 +121,15 @@ export async function handleRequest(request: Request, env: Env, ctx: WorkerConte
 export default {
   fetch: handleRequest,
   scheduled(_controller: WorkerSchedule, env: Env, ctx: WorkerContext) {
-    if (!env.CRON_SECRET || !syncConfigured(env)) return
-    ctx.waitUntil(loadSyncRuntime(env).then(runtime => withRequestDatabase(runtime, env.HYPERDRIVE!.connectionString, () => runtime.processLinearSyncBatch())).catch(() => {
+    ctx.waitUntil(runScheduled(env).catch(() => {
       console.error('Linear sync scheduled batch failed')
     }))
   },
+}
+
+export async function runScheduled(env: Env) {
+  if (!await linearSyncEnabled(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')) return
+  if (!env.CRON_SECRET || !syncConfigured(env)) return
+  const runtime = await loadSyncRuntime(env)
+  await withRequestDatabase(runtime, env.HYPERDRIVE!.connectionString, () => runtime.processLinearSyncBatch())
 }
