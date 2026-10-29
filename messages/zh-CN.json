@@ -955,6 +955,7 @@
     "suggestionNotFound": "这条建议已经处理过了。",
     "coordinatorUnavailable": "Coordinator 现在不可用，稍后再试。",
     "messageRequired": "消息不能为空。",
+    "messageTooLong": "消息过长，请缩短后重试。",
     "submissionConflict": "此提交标识已用于另一条消息。",
     "pendingActionUnavailable": "这项操作已处理或已过期。",
     "deviceSaveFailed": "保存失败，请重试。",
@@ -2774,6 +2775,21 @@
     "loadError": "无法加载已保存的历史对话。",
     "retry": "重试",
     "incomplete": "此历史回复未完成。"
+  },
+  "Browser": {
+    "label": "浏览器",
+    "back": "后退",
+    "forward": "前进",
+    "reload": "刷新",
+    "address": "地址",
+    "addressPlaceholder": "输入网址",
+    "selectElement": "选择元素",
+    "close": "关闭浏览器",
+    "frameTitle": "网页",
+    "note": "给 {label} 写备注",
+    "notePlaceholder": "写备注",
+    "addNote": "放进对话",
+    "removeNote": "移除备注 {n}"
   },
   "MobilePush": {
     "verificationCode": "收到一条验证码"

@@ -955,6 +955,7 @@
     "suggestionNotFound": "This suggestion was already handled.",
     "coordinatorUnavailable": "The Coordinator is not available right now. Try again later.",
     "messageRequired": "A message cannot be empty.",
+    "messageTooLong": "The message is too long. Shorten it and try again.",
     "submissionConflict": "This submission ID was already used for a different message.",
     "pendingActionUnavailable": "This action was already handled or has expired.",
     "deviceSaveFailed": "The save failed. Please try again.",
@@ -2774,6 +2775,21 @@
     "loadError": "Unable to load saved chat history.",
     "retry": "Retry",
     "incomplete": "This saved reply did not finish."
+  },
+  "Browser": {
+    "label": "Browser",
+    "back": "Back",
+    "forward": "Forward",
+    "reload": "Reload",
+    "address": "Address",
+    "addressPlaceholder": "Enter a URL",
+    "selectElement": "Select element",
+    "close": "Close browser",
+    "frameTitle": "Web page",
+    "note": "Note on {label}",
+    "notePlaceholder": "Add a note",
+    "addNote": "Add to chat",
+    "removeNote": "Remove note {n}"
   },
   "MobilePush": {
     "verificationCode": "A verification code arrived"
