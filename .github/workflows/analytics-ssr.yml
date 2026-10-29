@@ -10,7 +10,32 @@ concurrency:
   group: analytics-ssr-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  analytics-ssr:
+  changes:
+    name: Changed files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.docs.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: docs
+        run: |
+          git fetch origin main --no-tags
+          trusted="$(mktemp --suffix=.mjs)"
+          if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
+            echo 'docs_only=false' >> "$GITHUB_OUTPUT"
+          elif ! git diff --quiet origin/main -- scripts/ci-docs-only.mjs; then
+            echo 'docs_only=false' >> "$GITHUB_OUTPUT"
+          else
+            node "$trusted"
+          fi
+
+  analytics-ssr-full:
+    name: Analytics SSR (full)
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -49,3 +74,24 @@ jobs:
       - run: pnpm build
       - name: Render real Next HTTP pages with analytics enabled
         run: node scripts/check-analytics-ssr.mjs
+
+  analytics-ssr:
+    # Preserve the historical status-check name even for docs-only PRs.
+    name: analytics-ssr
+    needs: [changes, analytics-ssr-full]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require classification and full regression unless docs-only
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          FULL_RESULT: ${{ needs.analytics-ssr-full.result }}
+        run: |
+          if [ "$CHANGES_RESULT" != 'success' ]; then exit 1; fi
+          if [ "$DOCS_ONLY" = 'true' ]; then
+            test "$FULL_RESULT" = 'skipped'
+          else
+            test "$FULL_RESULT" = 'success'
+          fi

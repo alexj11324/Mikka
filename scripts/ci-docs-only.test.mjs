@@ -10,6 +10,7 @@ import { hasUnsafeModes, isDocsOnly } from './ci-docs-only.mjs'
 test('approved documentation paths are documentation-only', () => {
   const files = [
     'README.md',
+    'AGENTS.md',
     'README.zh-CN.md',
     'docs/design/glossary.md',
     'tasks/lessons.md',
@@ -17,6 +18,10 @@ test('approved documentation paths are documentation-only', () => {
     '.github/pull_request_template.md',
   ]
   assert.equal(isDocsOnly(files), true)
+  assert.equal(isDocsOnly(['AGENTS.md']), true)
+  assert.equal(isDocsOnly(['AGENTS.md', 'docs/README.md']), true)
+  assert.equal(isDocsOnly(['AGENTS.md', 'scripts/ci-docs-only.mjs']), false)
+  assert.equal(isDocsOnly(['AGENTS.md'], true), false)
 })
 
 test('code, workflows, configuration, messages and public assets are not documentation-only', () => {
@@ -35,6 +40,7 @@ test('code, workflows, configuration, messages and public assets are not documen
     'docs/generated.js',
     'docs/assets/architecture-light.svg',
     'docs/AGENTS.md',
+    'tasks/AGENTS.md',
     'scripts/generate-diagrams.mjs',
     'scripts/diagram-svg.mjs',
   ]) {
@@ -127,6 +133,30 @@ test('real git diffs retain all fixtures while testing rename, deletion and even
   const unavailable = classify('missing', docsHead)
   record('missing-base.json', { output: unavailable })
   assert.match(unavailable, /docs_only=false/)
+  // Docs-only main pushes retain small status gates but skip heavy postsubmit jobs.
+  // Missing or rewritten history must still take the full integration path.
+  const changedCodeTree = root([oldDocs], false)
+  const codeHead = git(['commit-tree', changedCodeTree, '-p', base, '-m', 'remove-code'])
+  const unrelatedHead = git(['commit-tree', root([oldDocs]), '-m', 'unrelated-history'])
+  for (const [name, before, after, expectedDocs, tier, performance] of [
+    ['main-docs', base, docsHead, true, 'docs', 'false'],
+    ['main-code', base, codeHead, false, 'full', 'true'],
+    ['main-unknown', '0'.repeat(40), docsHead, false, 'full', 'true'],
+    ['main-nonancestor', unrelatedHead, docsHead, false, 'full', 'true'],
+  ]) {
+    const eventFile = join(dir, `${name}-event.json`)
+    record(`${name}-event.json`, { before, after })
+    const output = execFileSync(process.execPath, [script], {
+      cwd: dir, encoding: 'utf8', env: {
+        ...env, GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main',
+        GITHUB_EVENT_PATH: eventFile, GITHUB_SHA: after,
+      },
+    })
+    record(`${name}-result.json`, { output })
+    assert.match(output, new RegExp(`docs_only=${expectedDocs}`), name)
+    assert.match(output, new RegExp(`browser_tier=${tier}`), name)
+    assert.match(output, new RegExp(`performance=${performance}`), name)
+  }
   for (const [name, baseSha, expected] of [['fork', base, true], ['empty-base', '0'.repeat(40), false]]) {
     const eventFile = join(dir, `${name}-event.json`)
     record(`${name}-event.json`, { pull_request: { base: { sha: baseSha }, head: { sha: docsHead, repo: { full_name: 'fork/repo' } } } })
