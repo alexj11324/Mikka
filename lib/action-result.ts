@@ -35,6 +35,7 @@ export const ACTION_ERROR_CODES = [
   'suggestionNotFound',
   'coordinatorUnavailable',
   'messageRequired',
+  'messageTooLong',
   'submissionConflict',
   'pendingActionUnavailable',
   'deviceSaveFailed',

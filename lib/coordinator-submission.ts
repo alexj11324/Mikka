@@ -5,11 +5,12 @@ import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { coordinatorEvents } from './db/schema'
 import type { db } from './db'
+import { MESSAGE_MAX } from './message-limits'
 import { taskDestinationSchema, type TaskDestination } from './task-destination'
 
 /** Personal Coordinator HTTP contract. Question/approval fields are not supported. */
 export const personalSubmissionInput = z.object({
-  text: z.string().trim().min(1).max(10_000),
+  text: z.string().trim().min(1).max(MESSAGE_MAX),
   submissionId: z.uuid().transform(value => value.toLowerCase()).optional(),
 }).strict()
 
