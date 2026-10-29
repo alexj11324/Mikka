@@ -1,0 +1,213 @@
+# Mikka MVP core-loop acceptance (#181)
+
+This plan tracks the implementation in [PR #362](https://github.com/alexj11324/Mikka/pull/362);
+publishing this record does not mean that implementation has merged. Ordinary
+core-loop acceptance uses a cloud Linux local application, real isolated database
+and real daemon with automatic test identities. A deployed site or provider OAuth
+is not a prerequisite for those business checks. A scripted fixture does not prove
+that a real GitHub App or model worked; provider-specific evidence remains separate.
+Production acceptance requires Alex's permission.
+
+## Current execution status
+
+The deterministic real-daemon loop has passed on a historical PR6 revision.
+[Browser run 40628462076](https://github.com/alexj11324/Mikka/actions/runs/40628462076)
+tested PR head `49cdb9b387613a46878188d0751a0b6e7e760525` at actual checkout
+`b60ccdb04a4696bbf8e9195049f642fce22c97db` from **2026-10-28 03:50:36 to
+03:52:19 UTC**. Both completion/publication and stop scenarios passed, with no
+retries or skipped cases. The full browser job was subsequently cancelled when
+a newer revision was published; it is not a complete green gate for the final
+commit. Its screenshots exposed an internal completion prompt rendered in chat,
+which PR5 fixes and the final MVP test explicitly guards against.
+
+Current CI status and the complete screenshot artifact belong to
+[PR #362](https://github.com/alexj11324/Mikka/pull/362). Use its Git-linked workflow
+results and record the tested environment before accepting the delivery. Reuse
+valid unchanged-code results. Provider fixtures do not complete the separate
+real-provider scenarios below, and those scenarios do not force ordinary local
+acceptance onto a deployed site.
+
+| Gate | Actual result | Evidence |
+| --- | --- | --- |
+| Integrated migration, source and browser CI | Final exact-head result pending; see PR #362 | Record final workflow URL, checkout SHA and all job results |
+| Real-daemon MVP browser loop | Historical revision: both scenarios passed; final revision still requires its own evidence | Run 40628462076, `browser-test-report`, Playwright report, screenshots and `mvp-acceptance-evidence.json`; actual checkout SHA above |
+| Additional deployed-origin run | Not executed; not a prerequisite for ordinary local acceptance | Existing provisioned target recorded below; any specific run needs its matching schema/configuration |
+| Production | Not requested or executed | Requires Alex's prior permission |
+
+## Deterministic CI gate
+
+The MVP-owned teardown retains daemon, repository and workflow directories.
+Fixture HTTP sockets close without removing their directories. Device-token
+revocation remains a separate non-deleting operation. The daemon receives
+`--retain-resources`, preserving worktrees, refs, failed clones and outbox files.
+The private resource index records identifiers and paths only; by default it is
+created under `.cache/mvp-retained`, or at an absolute `MIKKA_MVP_RESOURCE_INDEX`.
+
+The shared account helpers, Playwright output lifecycle and Actions service
+lifecycle retain their separate acceptance scope. This wrapper does not grant
+permission to clean up an existing shared or retained resource.
+No local browser or DB run on this retained candidate is claimed below.
+
+### Retained Preview database provisioned on 2026-10-28
+
+The user authorized creation, tracked migrations and Preview binding. Neon
+project `long-recipe-96305188`, branch `br-ancient-sea-b50a21nt`
+(`acceptance/pr362-retained-20261028`), database `mikka_acceptance`, was created
+from the acceptance template after confirming zero users, accounts, issues and
+sessions. Production and Staging were not used. Nine pending repository
+migrations from source `b7258bab35554fcf0590f4b2ce8d67822ab576cc` committed through
+the Neon SQL channel, including their migration receipts; the template's direct
+TCP connection was refused by the execution environment. The resulting ledger
+has 71 entries and the repository settings, device authorization, issue-tool
+receipt and publication tables exist. No account was seeded during provisioning.
+
+The connection is stored in Infisical Mikka/dev `/vercel` under
+`MIKKA_PR362_DATABASE_URL`. Vercel project `prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH`
+has branch-specific, sensitive `DATABASE_URL` and `MIKKA_DATABASE_URL` variables
+for `codex/mvp-e2e`, targeting Preview only. Neither values nor connection URLs
+are part of this record. Provisioning and binding are infrastructure evidence;
+the deployed login, model, daemon and GitHub App scenarios remain pending.
+
+The `Browser tests (before merge)` job runs `pnpm test:e2e:mvp` after the
+production build and performance gate, before the existing functional browser
+suite. It uses the job's disposable
+Postgres 17 service, with tracked migrations applied before the existing setup.
+No test points at a developer, Preview or production database. The source-only
+fixture checks run under `pnpm test:mvp-fixtures` and `pnpm check`.
+
+The current MVP browser fixture uses `register()` to sign up through the existing
+email/password form using an automatically generated disposable account. The
+shared allocation/reuse/lease helper is the default where its adapter is supported;
+this fixture's normal registration is not evidence that it uses shared-pool leases.
+Its credential never enters a committed file or artifact.
+The fixture provides an ephemeral daemon token and a synthetic linked GitHub subject.
+It creates a push proposal through the real proposal store and confirms it through
+the authenticated browser card, checking the stored receipt and that dispatch does
+not create a second proposal. This is not GitHub OAuth or a real-provider acceptance.
+Daemon browser login is covered by its separate device-authorization tests; this
+gate exercises the existing `daemon login --token` route.
+
+### What actually runs
+
+1. The real daemon CLI logs in with the test token, registers over HTTP and reports
+   the built-in `mock` harness. Registration creates its hidden execution identity.
+2. The browser opens the accepted new-task dialog, checks **Mikka Cloud** is the
+   default, and deliberately selects the actual registered local device.
+3. The form sends a real Coordinator message. The test checks the stored event's
+   `taskDestination` and the host-supplied model context contain that exact device
+   ID, so a scripted response cannot conceal a broken destination picker.
+4. Mikka's existing AI SDK `WorkflowAgent` invokes real `create_issue`,
+   `list_agents` and `dispatch_run` tools and their durable steps. No issue, run,
+   conversation, output chunk or completion is seeded. The test checks that one
+   task and one run were created on the selected device. It also checks the
+   delivered host event's issue binding against the create-tool receipt and run.
+5. Claim sends fixture `mvp-core-loop`; a real daemon started with
+   `--mock-speed 1 --fixtures-dir tests/mvp/fixtures` claims it, clones into its
+   private cache, resolves `origin/HEAD` to **trunk**, and creates its own worktree.
+   The test checks the worktree's `.git` points into that cache.
+6. The browser reads progress and replies. The daemon consumes the real command,
+   the recording acknowledges it, and the test checks the durable delivery receipt.
+7. The recording writes `MIKKA_MOCK.md`. The daemon actually runs the repository's
+   fixture verification command, `test -f MIKKA_MOCK.md`, commits and pushes.
+8. The real server publication workflow verifies GitHub App installation and owner
+   access through a stub, then requests a PR. The stub reads the **actual pushed
+   commit** from the bare repo, checks the changed file and run/task commit footers,
+   and only then returns PR #41. The server persists it on the task.
+9. The actual completion event wakes the Coordinator. Its tools read the real run
+   and task; the reply uses the PR receipt from that event. Playwright checks the
+   result in chat and the PR chip on the R-66 card, without a progress line.
+10. A second test stops an active real daemon run, checks the draft remains
+    editable while stopping, waits for the terminal run state, and verifies no PR
+    was opened. For the draft assertion only, it pauses browser polling and holds
+    delivery of the real server-action response; the actual stop request and
+    daemon proceed normally. It then releases the unchanged response and polling.
+
+### Explicit substitutes and isolation
+
+- **Model:** `tests/mvp/preload.mjs` supplies a scripted AI SDK default provider
+  through a loopback Gateway-compatible service. The Coordinator engine, tool
+  loop, workflow steps, authorization, DB and event delivery remain real.
+  `MIKKA_NATIVE_COORDINATOR` stays unset. Provider-contract unit tests exercise
+  the installed AI SDK against the same fixture protocol.
+- **GitHub:** only requests to `https://api.github.com` are redirected by the
+  test-only Node preload. The application has no configurable fake GitHub host.
+  The fixture validates repository-scoped read/write token usage. Its App private
+  key is generated in memory for this process and never persisted or printed.
+- **Git:** the assignment uses the synthetic identity
+  `https://github.com/mikka-e2e/core-loop.git` so production GitHub repository
+  validation executes. Only the daemon child gets `GIT_CONFIG_COUNT` entries
+  mapping that exact URL to a newly created `file://` bare repo. No user's global
+  git configuration, `HOME`, credentials or checkout is changed. The explicit
+  `MIKKA_TEST_MODE=1` gate is required to permit the file transport.
+- **Fixture gate:** `MIKKA_MVP_E2E=1`, `MIKKA_TEST_MODE=1`, `CI=true` and
+  `GITHUB_ACTIONS=true` must all be present. All three DB URLs must name the same
+  loopback `/mikka_e2e` database. Vercel deployments, native Coordinator and remote
+  browser targets are refused. Production harnesses never receive a fixture.
+
+CI emits screenshots and `mvp-acceptance-evidence.json` as Playwright attachments.
+They include the checkout SHA, UTC times, steps, device/run/task IDs, publication
+workflow ID and fixture request IDs. Actual browser request IDs are included only
+when the server returned them; the CI loopback server does not supply Vercel IDs.
+Daemon credentials, `device.json`, `daemon.secret` and raw Workflow storage are
+excluded. Device credentials are revoked separately from resource retention.
+The MVP runner retains its daemon/workflow/repository directories; the Actions
+runner and service lifecycle are managed by the hosting platform.
+
+## Real-provider scenarios — remaining evidence
+
+Use the ordinary local application, real isolated database/daemon and automatic
+test identities from `docs/acceptance.md` for business behavior. Keep existing
+environment and ownership checks. The current shared account adapter implements
+loopback `isolated-ci`; that implementation scope is not a user prohibition on
+other environments or a reason to require provider OAuth for ordinary checks.
+Do not fabricate session rows/cookies to get around an unsupported adapter.
+
+A scenario that specifically tests the real model or GitHub App must record that
+provider's actual behavior using the existing authorized identity, repository and
+permissions. A scripted provider result is not that evidence. Real Google/GitHub
+OAuth is needed only when the check concerns OAuth rules, provider linking or
+OAuth proxy/callback routing; reuse an authorized provider session for that check.
+The existing Infisical account reference in `docs/acceptance.md` is available when
+a specific identity is needed, rather than a mandatory manual login for every run.
+
+The retained deployed database above is historical infrastructure evidence and
+remains retained. A deployed-origin scenario uses its matching schema and
+configuration, but it is an additional target, not the default acceptance gate.
+Record only actual runs; no real-provider or deployed-origin pass is claimed here.
+
+| Field | Value |
+| --- | --- |
+| Status | Real-provider scenarios pending; local functional acceptance recorded separately; no deployed-origin pass claimed |
+| Branch | Pending |
+| Revision / linked CI | Pending; identify the tested code through Git and its CI run |
+| Application origin / environment | Pending; local isolated runtime or the specific deployed target under test |
+| Application/database/daemon identity | Pending; use the selected environment's existing checks |
+| UTC start / finish | Pending |
+| Test identity reference | Automatically assigned identity/lease or existing authorized session; vault reference only when needed; no values |
+| Test repository / App installation | Pending; no installation token |
+| Daemon package / version / OS | Pending |
+| Device ID | Pending |
+| Task ID / identifier | Pending |
+| Run ID / publication workflow ID | Pending |
+| Request IDs | Pending; copy observed IDs only |
+| PR URL / state / pushed SHA | Pending |
+
+| Step | Expected | Actual | Evidence |
+| --- | --- | --- | --- |
+| Existing login | Assigned test identity obtains a real application session under `/mikka`; OAuth only for OAuth-specific rules | Pending | Redacted screenshot + request ID |
+| Connect computer | Approved install/login commands register an online device with Claude Code or Codex | Pending | Package version, device ID, screenshot |
+| New task | Dialog defaults to Mikka Cloud; explicitly choose this local device | Pending | Screenshot with selected computer |
+| Coordinator dispatch | One task and a thread on exactly that device; no user-facing Agent management | Pending | Task/run/device IDs, screenshot |
+| Progress and reply | Progress appears; reply reaches the same thread | Pending | Screenshot, delivered message/run ID |
+| Stop | Stop takes effect immediately; draft remains editable | Pending | Screenshot, request/run ID |
+| Offline stop | Around 30 seconds without acknowledgement shows failure; retry works after reconnect | Pending | UTC timings, screenshots, request IDs |
+| Result | Real verification result returns to Coordinator chat | Pending | Report and screenshot |
+| Publish | Local git pushes task branch; installed GitHub App creates PR | Pending | Branch/commit, PR URL, request IDs |
+| Thread card | PR chip has correct GitHub state color; no progress row; extra PRs fold to +N | Pending | Screenshot |
+
+Record every failure with expected/actual behavior, UTC timestamp, task/run/request
+IDs and a screenshot. Keep the tested code/environment fixed while reproducing.
+If the chosen environment lacks the App installation, permission or delivered
+configuration required for that provider-specific scenario, record that concrete
+gap and continue independent ordinary checks. Do not treat infrastructure readiness
+or fixture success as a real-provider result, or use production as a substitute.
