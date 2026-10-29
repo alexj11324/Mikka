@@ -8,9 +8,12 @@ on:
       - 'packages/daemon/**'
       - 'packages/protocol/**'
       - 'scripts/e2b/**'
+      - 'lib/agent-tool-approval/**'
       - 'lib/cloud-computer/**'
       - 'lib/computer/**'
       - 'lib/credentials/**'
+      - 'components/settings/computer-policy-settings.tsx'
+      - 'tests/e2e/computer-policy-settings.spec.ts'
       - 'workflows/subagent/**'
       - 'pnpm-lock.yaml'
   workflow_dispatch:
