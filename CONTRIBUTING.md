@@ -66,7 +66,7 @@ cannot.
    own change as documentation-only. Any application or unknown file in that
    update escalates to full functionality. Failed classification or a
    skipped/failed selected test job fails the required gate.
-4. **Integration** (CI): every non-documentation push to main, nightly on main, and manual
+4. **Integration** (CI): every code-bearing push to main, nightly on main, and manual
    Actions → Browser tests → Run workflow run full functionality **and** the
    desktop/mobile performance suite. A PR changing a performance spec also
    runs performance before merge. Other PRs defer performance to integration;
@@ -75,7 +75,7 @@ cannot.
 A pull request that only changes documentation — non-executable Markdown in
 `docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`, or
 the pull request template — skips the heavy unit, build and browser jobs. The
-required status checks report success from a small gate job (also on a docs-only main push). Other changes
+required status checks report success from small gate jobs (also on a docs-only main push). Other changes
 retain every source, production build, migration and database integration gate;
 only browser scenario selection and performance timing are tiered. Test selection
 is printed in the Changed files job and its summary. The browser environment
