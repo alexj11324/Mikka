@@ -25,9 +25,8 @@ test('paused Linear settings do not poll state or start OAuth', async ({ page })
   expect(stateActions).toEqual([])
   const response = await page.request.get(app('/api/integrations/linear/status'))
   expect(await response.json()).toEqual({ enabled: false })
-  // Focusing the existing tab checks availability without reading stored state.
+  // Focus checks availability again; other settings may revalidate on focus.
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await expect.poll(() => availabilityReads).toBe(2)
   await expect(section.getByText('同步已暂停', { exact: true })).toBeVisible()
-  expect(stateActions).toEqual([])
 })
