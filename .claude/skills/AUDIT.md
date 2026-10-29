@@ -1,6 +1,6 @@
 # Vendored skill audit — 2026-10-29
 
-Scope: the 39 skills under this directory, pinned in [`README.md`](README.md).
+Scope: the 41 skills under this directory, pinned in [`README.md`](README.md).
 
 ## Validation
 
@@ -13,7 +13,7 @@ Scope: the 39 skills under this directory, pinned in [`README.md`](README.md).
 
 ## Static safety review
 
-The skill bodies and their five scripts were read before vendoring. No
+The skill bodies and their six scripts were read before vendoring. No
 credential harvesting, secret exfiltration, prompt-injection instruction,
 network callback, or destructive shell command was found in the installed
 files.
@@ -25,6 +25,7 @@ Scripts that require a manual decision before running:
 | `systematic-debugging/find-polluter.sh` | Runs `npm test` for each matching test file to find state pollution | Starts many test processes; review the pattern before running |
 | `brainstorming/scripts/start-server.sh`, `stop-server.sh`, `helper.js` | Starts/stops a localhost collaboration server | Local server, session files; do not bind publicly without review |
 | `writing-skills/render-graphs.js` | Invokes Graphviz `dot` on Markdown diagrams | Requires Graphviz; only writes SVG output |
+| `roundtable/table.py` | Sets up a private mock-VC case, validates quoted votes, tallies results and writes `.roundtable/REPORT.md` | Local files only; no network or subprocess calls. The agent supplies the role-play prompts |
 
 None of these scripts is run by application code, CI or `pnpm install`.
 They run only if an agent or person explicitly invokes them.
@@ -42,6 +43,11 @@ They run only if an agent or person explicitly invokes them.
 - **Heavy references**: `writing-skills` (399 lines) and
   `saas-design/components.md` (44 KB) are intentionally progressive-disclosure
   references, not loaded into every prompt.
+- **Roadshow boundary**: `yc-pitch-deck` is prompt-only and contains no
+  script or network call; its frontmatter mentions a vendor MCP server, which
+  this project does not install or require. `roundtable` is a rehearsal tool,
+  not a source of real investor interest, and its generated files belong
+  outside the repository (`.roundtable/`).
 - **Provenance drift**: upstream skills change. Update by replacing a whole
   skill directory from a new pinned commit and rerunning this audit; do not
   edit vendored files in place without recording the patch.

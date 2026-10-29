@@ -14,6 +14,8 @@ Vendored on 2026-10-29 from these pinned commits:
 | [param087/saas-ui-skills](https://github.com/param087/saas-ui-skills) | `4017eaf1e1167a56a5271839053d888faeb1f44a` | MIT | All 15 SaaS UI skills |
 | [mbennell/claude-field-kit](https://github.com/mbennell/claude-field-kit) | `58da5e874ccb5261fd41af75c1d2c12456e36017` | MIT | `saas-design` |
 | [anthropics/skills](https://github.com/anthropics/skills) | `ca45fc496a3436251f191354091d557da31c15b5` | Apache-2.0 | `frontend-design` |
+| [guia-matthieu/clawfu-skills](https://github.com/guia-matthieu/clawfu-skills) | `4108f5c010ccaa8b5707fa05ca1d888ae167e548` | MIT | `yc-pitch-deck` |
+| [alexyc9381/vc-roundtable-skill](https://github.com/alexyc9381/vc-roundtable-skill) | `d338fbbb54baf7b2646279a315d6227a3a404ebe` | MIT | `roundtable` |
 
 Full license texts are in [`../skill-licenses/`](../skill-licenses/).
 
@@ -32,6 +34,10 @@ Full license texts are in [`../skill-licenses/`](../skill-licenses/).
   `design-tokens-theming` and `navigation-patterns` cover the details.
 - **Broader SaaS UI**: `saas-design` (component patterns) and
   `frontend-design` (visual direction/craft).
+- **YC / investor roadshow**: `yc-pitch-deck` for the 10–15 slide narrative and
+  a timed 2-minute Demo Day script. Use `roundtable` only for a private
+  rehearsal: it spawns 15–17 sub-agents to role-play VC partners and writes
+  its report under `.roundtable/`; it never contacts real investors.
 - **Writing or reviewing a skill**: `writing-skills`. It is the standard used
   for the skill audit; run the validator and the trigger/no-trigger checks it
   describes before accepting a new skill.
