@@ -21,14 +21,14 @@
 
 </div>
 
-Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只需用自然语言向 bot 描述需求，它会规划工作，并将每个任务交给 Claude Code、Codex 或 Cursor 执行。任务运行在你自己的设备上；每个 bot 专属的云端电脑处于早期体验阶段，需开启 flag 后使用。
+Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI agent 连接成一个协同工作的团队。向 Bot 描述需求，它会为已连接设备上的 Claude Code、Codex 和 Cursor 安排编码任务。每个 bot 专属的云端电脑处于早期体验阶段，需开启 flag 后使用。
 
-你可以实时跟进每项工作的进展，在需要决策时介入，并在完成后审阅结果。
+在同一个地方跟进进展、回应问题并审阅结果。
 
 ## 工作方式
 
 - **Bot 负责协调，线程负责执行。**
-  - Bot 与你对话，制定计划并分派任务，本身不直接执行工作。
+  - Bot 与你对话，制定计划，并将编码任务派发给不同设备上的 agent。
   - 每项工作在独立的**线程**中运行。线程对应一次工作运行，拥有独立的名称，通常关联一个任务。一个 bot 可以同时管理多个线程。
   - 完整定义参见 [术语表](docs/design/glossary.md)。
   - **Harness 是执行层，不是另一个 Bot。** 所有 bot 都通过 Mikka 的 AI SDK / Workflow harness（即 Coordinator harness）处理对话和工具；派发的编码线程由 daemon 选择 Claude Code、Codex 或 Cursor CLI harness 执行。旧的独立 Agent 聊天已退役，历史记录仅供查看。让 Coordinator 本身跑在 Claude Code 或 Codex 上（[#312](docs/architecture/native-coordinator.md)）是已废弃的方案：代码保留但保持关闭，不要启用。
@@ -64,7 +64,7 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 
 - **将需求转化为运行。** Coordinator 为你的任务派发运行，并判断每个新任务归属于工作区还是个人。如判断有误，可一键修改。让 Coordinator 自行创建和更新任务的功能已经完成，但由一个默认关闭的开关控制。
 - **自建 bot。** 左栏列出 Coordinator 和你创建的 bot。每个 bot 都有独立的对话，并标出未读消息。
-- **完整呈现执行过程。** 派发出的线程会以卡片形式出现在对话中，并随运行实时更新；点开即可进入该线程自己的对话。Worker 通过 Mikka 的 MCP 工具汇报进度、提出问题或报告阻塞，由 Coordinator 逐一处理。
+- **完整呈现执行过程。** 派发出的线程会以卡片形式出现在对话中，并随运行实时更新；点开即可进入该线程自己的对话。Worker 通过 Mikka 的 MCP 工具汇报进度、提出问题或报告阻塞，由 Coordinator 逐一处理。你可以直接回复或停止自己的线程。
 - **线程内容仅自己可见。** 在工作区任务上，同事只能看到线程的归属人、状态和时间，看不到指令、对话记录或结果。
 - **注明信息来源。** 回复中引用的任务、运行记录和网页以可点击的标签形式展示。需要最新信息时，bot 可以搜索网页。
 - **交付「Artifact」。** Bot 可以将文档或 HTML 页面作为「Artifact」交付，支持版本记录和分享链接。
@@ -89,6 +89,7 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
 
 | 方向 | 规划内容 | 跟踪 |
 | --- | --- | --- |
+| **设备接入与交付** | 连接设备，将编码工作交给 Claude Code 或 Codex，并经你批准后发布 GitHub PR。 | [#357](https://github.com/alexj11324/Mikka/issues/357) |
 | **云端电脑** | 上文的 bot 专属桌面处于早期体验阶段。下一步：每个云端线程拥有独立的机器，向所有人开放云端编码线程，以及替 bot 浏览网页的网页分身，每个分身使用独立的浏览器。 | [#172](https://github.com/alexj11324/Mikka/issues/172)、[#342](https://github.com/alexj11324/Mikka/issues/342) |
 | **本机 computer use** | Agent 在你自己的电脑上操作应用，并沿用云端电脑的对话内审批：允许一次、拒绝，或在本次运行内始终允许。 | [#147](https://github.com/alexj11324/Mikka/issues/147) |
 | **群聊** | 支持多个 bot 与多名成员在同一对话中协作，提供轮流发言、@ 提及以及「正在工作」状态栏。 | [#105](https://github.com/alexj11324/Mikka/issues/105) |

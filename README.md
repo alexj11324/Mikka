@@ -21,19 +21,18 @@ Every agent, from laptop to cloud, working as one team.
 
 </div>
 
-Mikka coordinates the coding agents you already use as a single team. Describe
-what you need to a bot in natural language. The bot plans the work and hands
-each task to Claude Code, Codex or Cursor. Tasks run on your
-own machines. A cloud computer for each bot is in early access, behind a flag.
+Mikka connects AI agents across your computers, remote servers and cloud
+infrastructure into one coordinated team. Describe the work to a bot, and it
+organizes coding tasks for Claude Code, Codex and Cursor on connected devices.
+A cloud computer for each bot is in early access, behind a flag.
 
-You can follow each task in real time, step in when a decision is needed, and
-review the results.
+Track progress, respond when needed and review results in one place.
 
 ## How Mikka works
 
 - **Bots coordinate. Threads execute.**
-  - A bot chats with you, plans the work and hands it out. It does not do the
-    work directly.
+  - A bot chats with you, plans the work and dispatches coding tasks to
+    agents across connected devices.
   - Each piece of work runs in a **thread**: one work run with its own name,
     usually tied to a task. One bot can run many threads at once.
   - The full definitions are in the [glossary](docs/design/glossary.md).
@@ -97,7 +96,8 @@ dashed loop is the planned Factory process: independent review and verification
 - **Makes progress visible.** A dispatched thread appears in the chat as a card
   that follows the run; open it to see the thread's own conversation. Workers
   report progress, ask questions and flag blocks through Mikka's MCP tools,
-  and the Coordinator triages each one.
+  and the Coordinator triages each one. You can reply to or stop your thread
+  directly.
 - **Keeps threads private.** On a workspace task, teammates see whose thread it
   is, its status and its time, but not its instructions, transcript or result.
 - **Cites its sources.** Replies show the tasks, runs and web pages they draw
@@ -147,6 +147,7 @@ Linear (`MIK-xx`).
 
 | Area | Planned | Tracking |
 | --- | --- | --- |
+| **Device onboarding and delivery** | Connect a machine, dispatch coding work to Claude Code or Codex, and publish a GitHub PR with your approval. | [#357](https://github.com/alexj11324/Mikka/issues/357) |
 | **Cloud computer** | The per-bot desktop above is in early access. Next: each cloud thread on a machine of its own, hosted coding threads turned on for everyone, and web sub-agents that browse for a bot, each in its own browser. | [#172](https://github.com/alexj11324/Mikka/issues/172), [#342](https://github.com/alexj11324/Mikka/issues/342) |
 | **Computer use on your machines** | Agents operate apps on your own computer, with the same approvals in chat as the cloud computer: allow once, deny, or allow for the rest of the run. | [#147](https://github.com/alexj11324/Mikka/issues/147) |
 | **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
