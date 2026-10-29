@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { withBasePath } from '@/lib/base-path'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
+import { resolveSlugRedirect } from '@/lib/workspace-admin/general'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const i18nText = await getTranslations();
@@ -15,6 +16,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const [workspace] = await workspaceDb.select({ id: workspaces.id }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
     .where(and(eq(workspaces.slug, slug), eq(workspaceMembers.userId, session.user.id), eq(workspaceMembers.status, 'active'))).limit(1)
+  if (!workspace) {
+    // A renamed workspace keeps its old slugs: send members on to the current address.
+    const current = await resolveSlugRedirect(slug, session.user.id)
+    if (current && current !== slug) {
+      const moved = NextResponse.redirect(new URL(withBasePath(`/w/${current}`), request.url), 308)
+      moved.headers.set('Cache-Control', 'private, no-store')
+      return moved
+    }
+  }
   if (!workspace) return new NextResponse(i18nText("FeatureCopy.c_5893c8c0"), { status: 404, headers: { 'Cache-Control': 'private, no-store' } })
   const response = NextResponse.redirect(new URL(withBasePath('/'), request.url))
   response.headers.set('Cache-Control', 'private, no-store')

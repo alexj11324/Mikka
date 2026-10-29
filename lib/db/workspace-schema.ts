@@ -5,6 +5,8 @@ export const workspaces = pgTable('mikka_workspaces', {
   userId: text('userId').notNull(),
   name: varchar('name', { length: 120 }).notNull(),
   slug: varchar('slug', { length: 64 }).unique('mikka_workspaces_slug_unique'),
+  /** A small image data URL (≤200 KB decoded); see lib/workspace-admin/icon.ts. */
+  icon: text('icon'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -29,3 +31,10 @@ export const workspaceInvitations = pgTable('mikka_workspace_invitations', {
   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique().on(table.workspaceId, table.email)])
+
+/** Slugs a workspace used before; /w/<old-slug> redirects to its current slug. */
+export const workspaceSlugRedirects = pgTable('mikka_workspace_slug_redirects', {
+  slug: varchar('slug', { length: 64 }).primaryKey(),
+  workspaceId: uuid('workspaceId').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('mikka_workspace_slug_redirects_workspace_idx').on(table.workspaceId)])

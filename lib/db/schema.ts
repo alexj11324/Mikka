@@ -80,6 +80,12 @@ export const bots = pgTable('bots', {
   /** A bloub colour id, see components/nav/bot-avatar.tsx. */
   color: text('color').notNull().default('encre'),
   shape: text('shape').notNull().default('cercle'),
+  /** Model family a new bot starts with ('mikka' | 'codex' | 'claude'); copied from workspace_settings. */
+  model: text('model').$type<WorkspaceBotModel | null>(),
+  /** GitHub repository (owner/repo remote key) a new bot starts with; copied from workspace_settings. */
+  repository: text('repository'),
+  /** Monthly credit cap for this bot; null uses workspace_settings.botMonthlyCreditLimit. */
+  monthlyCreditLimit: integer('monthlyCreditLimit'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
@@ -978,3 +984,48 @@ export const accountDataExports = pgTable('account_data_exports', {
   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
   downloadedAt: timestamp('downloadedAt', { withTimezone: true }),
 }, table => [uniqueIndex('account_data_exports_token_key').on(table.tokenHash), index('account_data_exports_user_created_idx').on(table.userId, table.createdAt)])
+export const WORKSPACE_BOT_MODELS = ['mikka', 'codex', 'claude'] as const
+export type WorkspaceBotModel = (typeof WORKSPACE_BOT_MODELS)[number]
+
+/** Workspace-level defaults and usage limits (settings › Bots, Usage). Null means unset / unlimited. */
+export const workspaceSettings = pgTable('workspace_settings', {
+  workspaceId: uuid('workspaceId').primaryKey(),
+  defaultModel: text('defaultModel').$type<WorkspaceBotModel | null>(),
+  defaultRepository: text('defaultRepository'),
+  monthlyCreditLimit: integer('monthlyCreditLimit'),
+  botMonthlyCreditLimit: integer('botMonthlyCreditLimit'),
+  backgroundDailyCreditLimit: integer('backgroundDailyCreditLimit'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Stripe subscription state for a workspace, written by the billing webhook. */
+export const workspaceBilling = pgTable('workspace_billing', {
+  workspaceId: uuid('workspaceId').primaryKey(),
+  stripeCustomerId: text('stripeCustomerId').unique(),
+  stripeSubscriptionId: text('stripeSubscriptionId').unique(),
+  plan: text('plan'),
+  status: text('status'),
+  seats: integer('seats').notNull().default(0),
+  currentPeriodEnd: timestamp('currentPeriodEnd', { withTimezone: true }),
+  autoRechargeEnabled: boolean('autoRechargeEnabled').notNull().default(false),
+  autoRechargeThreshold: integer('autoRechargeThreshold'),
+  autoRechargePacks: integer('autoRechargePacks'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Credit grants: 'plan' per paid invoice (replaces the previous period's), 'purchased' never expires. */
+export const workspaceCreditGrants = pgTable('workspace_credit_grants', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspaceId').notNull(),
+  bucket: text('bucket').$type<'plan' | 'purchased'>().notNull(),
+  points: integer('points').notNull(),
+  reason: text('reason').notNull(),
+  externalId: text('externalId').notNull().unique(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('workspace_credit_grants_workspace_idx').on(table.workspaceId, table.createdAt)])
+
+export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
+  id: text('id').primaryKey(),
+  type: text('type').notNull(),
+  processedAt: timestamp('processedAt', { withTimezone: true }).notNull().defaultNow(),
+})

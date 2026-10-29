@@ -9,6 +9,9 @@ import { teams, teamMembers } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { loadWorkspaceContext, requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { accessibleTeams, requireTeam } from '@/lib/team-access'
+import type { ActionResult } from '@/lib/action-result'
+import { workspaceAction } from '@/lib/workspace-admin/action'
+import { deleteTeamData, teamDeletionImpact, type TeamDeletion, type TeamDeletionImpact } from '@/lib/workspace-admin/teams'
 
 const fields = z.object({ name: z.string().trim().min(1, 'validationNameRequired').max(100), identifier: z.string().trim().toUpperCase().regex(/^[A-Z][A-Z0-9]{1,11}$/, 'teamIdentifierInvalid'), description: z.string().trim().max(500) })
 async function result<T>(operation: () => Promise<T>) {
@@ -95,4 +98,14 @@ export async function changeTeamMember(input: { teamId: string; userId?: string;
       else await tx.update(teamMembers).set({ role: action === 'owner' ? 'owner' : 'member' }).where(scope)
     })
   })
+}
+
+/** 删除团队 dialog: how many tasks and projects go with the team. Workspace admins only. */
+export async function getTeamDeletionImpact(teamId: string): Promise<ActionResult<TeamDeletionImpact>> {
+  return workspaceAction(async () => teamDeletionImpact((await requireUser()).id, teamId))
+}
+
+/** 删除团队 and its tasks and own projects. `confirmName` must equal the team name. Workspace admins only. */
+export async function deleteTeam(teamId: string, confirmName: string): Promise<ActionResult<TeamDeletion>> {
+  return workspaceAction(async () => deleteTeamData((await requireUser()).id, teamId, confirmName))
 }
