@@ -50,10 +50,10 @@ function database() {
 }
 
 /**
- * Tasks are created by the Coordinator, which e2e cannot run, so tests write
- * them straight into the signed-in person's tasks, numbered like the app does.
+ * Unrelated browser tests seed tasks directly to stay focused. The separate
+ * tests/mvp suite runs the actual Coordinator workflow and must not use this.
  */
-export async function seedTask(page: Page, title: string, { status = 'todo', priority = 'normal' }: { status?: string; priority?: string } = {}) {
+export async function seedTask(page: Page, title: string, { status = 'todo', priority = 'normal', parentId }: { status?: string; priority?: string; parentId?: string } = {}) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   if (!cookie) throw new Error('seedTask 需要已登录的页面。')
   const db = database()
@@ -61,7 +61,7 @@ export async function seedTask(page: Page, title: string, { status = 'todo', pri
   if (!session) throw new Error('找不到当前登录会话。')
   const { rows: [{ number }] } = await db.query<{ number: number }>(`SELECT COALESCE(MAX((content->'attrs'->'mikka'->>'number')::int), 0) + 1 AS number FROM issues WHERE "userId" = $1`, [session.userId])
   const id = randomUUID()
-  const content = { type: 'doc', content: [{ type: 'paragraph' }], attrs: { mikka: { number } } }
+  const content = { type: 'doc', content: [{ type: 'paragraph' }], attrs: { mikka: parentId ? { number, parentId } : { number } } }
   await db.query('INSERT INTO issues (id, "userId", title, content, status, priority) VALUES ($1, $2, $3, $4, $5, $6)', [id, session.userId, title, content, status, priority])
   await db.query('INSERT INTO issue_versions (id, "issueId", "userId", revision, title, content, status, priority) VALUES ($1, $2, $3, 1, $4, $5, $6, $7)', [randomUUID(), id, session.userId, title, content, status, priority])
   return id

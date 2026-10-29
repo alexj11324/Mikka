@@ -72,7 +72,16 @@ export async function botChatSummaries(): Promise<Record<string, BotChatSummary>
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
 export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
-    const userId = await getUserId()
+    const requestHeaders=await headers()
+    const session=await auth.api.getSession({headers:requestHeaders})
+    if(!session?.user)throw new ActionFailureError('authRequired')
+    const userId=session.user.id
+    let humanSessionId:string|undefined
+    if(!requestHeaders.has('authorization')&&requestHeaders.get('cookie')){
+      try{const origin=new URL(requestHeaders.get('origin')??'');const host=requestHeaders.get('x-forwarded-host')??requestHeaders.get('host')
+        if(['http:','https:'].includes(origin.protocol)&&origin.host===host)humanSessionId=session.session.id
+      }catch{/* Missing/malformed origin is no approval provenance. */}
+    }
     const bot = await ownBot(userId, botId)
     const parsed = personalSubmissionInput.safeParse({ text, submissionId })
     if (!parsed.success) throw new ActionFailureError('messageRequired')
@@ -91,7 +100,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
         .where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true))).limit(1)
       if (!device) throw new ActionFailureError('deviceNotFound')
     }
-    try { await recordPersonalSubmission(db, userId, withQuote(withNotes, quoted?.data), { botId: bot?.id ?? null, submissionId: parsed.data.submissionId, taskDestination: destination.data }) }
+    try { await recordPersonalSubmission(db, userId, withQuote(withNotes, quoted?.data), { botId: bot?.id ?? null, submissionId: parsed.data.submissionId, taskDestination: destination.data, ...(humanSessionId ? { humanSessionId } : {}) }) }
     catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error

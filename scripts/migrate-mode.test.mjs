@@ -5,15 +5,20 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync } from '
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+// Preserve fixtures for audit on both success and failure. Retention must not
+// depend on a caller remembering an environment flag; this suite never deletes.
+const scopeStub = 'export const validateScopeMigrationHistory = () => {}; export const validateScopeMigrationSources = () => {}; export const scopeMigrationBeforeCommit = () => null'
+
 test('explicit MIGRATE=0 exits before filesystem or database work in production', () => {
   const dir = mkdtempSync(join(tmpdir(), 'migration-mode-'))
   try {
     // Real entrypoint in an isolated directory: absent drizzle and an instrumented
     // pg module make any file scan or Pool construction fail this regression.
     const source = readFileSync(new URL('./migrate.mjs', import.meta.url), 'utf8')
-      .replace("'pg'", "'./pg.mjs'")
+      .replace("'pg'", "'./pg.mjs'").replace("from './scope-migration-history.mjs'", "from './scope.mjs'")
       .replace("from './migration-order.mjs'", "from './order.mjs'")
     writeFileSync(join(dir, 'migrate.mjs'), source)
+    writeFileSync(join(dir, 'scope.mjs'), scopeStub)
     writeFileSync(join(dir, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url), 'utf8'))
     writeFileSync(join(dir, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
     writeFileSync(join(dir, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
@@ -50,9 +55,10 @@ test('explicit Preview migration never connects to the global application target
     const scripts = join(dir, 'scripts'), migrations = join(dir, 'drizzle')
     mkdirSync(scripts); mkdirSync(migrations)
     const source = readFileSync(new URL('./migrate.mjs', import.meta.url), 'utf8')
-      .replace("'pg'", "'./pg.mjs'")
+      .replace("'pg'", "'./pg.mjs'").replace("from './scope-migration-history.mjs'", "from './scope.mjs'")
       .replace("from './migration-order.mjs'", "from './order.mjs'")
     writeFileSync(join(scripts, 'migrate.mjs'), source)
+    writeFileSync(join(scripts, 'scope.mjs'), scopeStub)
     writeFileSync(join(scripts, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
@@ -110,8 +116,9 @@ test('all files preflight before a database connection, even if an earlier file 
     // Imported lazily to keep the original fixtures above unchanged.
     const { mkdirSync } = process.getBuiltinModule('node:fs')
     mkdirSync(scripts); mkdirSync(drizzle)
-    const source = readFileSync(new URL('./migrate.mjs', import.meta.url), 'utf8').replace("'pg'", "'./pg.mjs'")
+    const source = readFileSync(new URL('./migrate.mjs', import.meta.url), 'utf8').replace("'pg'", "'./pg.mjs'").replace("from './scope-migration-history.mjs'", "from './scope.mjs'")
     writeFileSync(join(scripts, 'migrate.mjs'), source)
+    writeFileSync(join(scripts, 'scope.mjs'), scopeStub)
     writeFileSync(join(scripts, 'migration-order.mjs'), 'export const orderMigrations = x => x.sort(); export const alreadyApplied = (name, applied) => applied.has(name)')
     writeFileSync(join(scripts, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url), 'utf8'))
     writeFileSync(join(scripts, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))

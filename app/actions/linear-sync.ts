@@ -8,6 +8,7 @@ import { db } from '@/lib/db'
 import { issues, linearConnections, linearIssueLinks, linearSyncInbox, linearSyncOutbox, linearTeamSyncs } from '@/lib/db/schema'
 import { createLinearAuthorizationUrl, disconnectLinear, LINEAR_OAUTH_CALLBACK_PATH, LINEAR_OAUTH_STATE_COOKIE, linearAccessToken, linearOAuthConfigured } from '@/lib/linear-sync/oauth'
 import { linearTeams } from '@/lib/linear-sync/client'
+import { readIssueMetadata } from '@/lib/issue-metadata'
 import { dispatchLinearIssueSync, dispatchLinearWebhook } from '@/lib/linear-sync/dispatch'
 import { linearSyncEnabled } from '@/lib/linear-sync/flags'
 
@@ -79,18 +80,31 @@ export async function retryLinearIssue(issueId: string) {
   if (!parsed.success) return { error: 'linearIssueInvalid' as const }
   const { issue } = await requireIssueAccess(parsed.data)
   if (issue.userId !== user.id) return { error: 'issueOwnerOnly' as const }
-  await db.transaction(async tx => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${issue.id}, 0))`)
+  const result = await db.transaction(async tx => {
+    // Match scope/publication writers: task first, then outbox. The access
+    // snapshot above may predate retirement or another publication generation.
+    const [latest] = await tx.select().from(issues).where(eq(issues.id, issue.id)).for('update')
+    if (!latest || latest.userId !== user.id) return { error: 'issueOwnerOnly' as const }
+    if (latest.linearSyncBlocked || latest.scope !== 'workspace' || readIssueMetadata(latest.content).deletedAt) return { error: 'linearIssueInvalid' as const }
+    const [verifiedLink] = await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId))
+      .where(and(eq(linearIssueLinks.issueId, issue.id), eq(linearIssueLinks.ownerId, user.id), eq(linearIssueLinks.externalTargetVerified, true), eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.active, true))).limit(1)
+    if (!verifiedLink) return { error: 'linearIssueInvalid' as const }
+    // Never relabel a retired claim as current work. Supersede any stale open
+    // row before inserting into the issue-wide partial unique index.
+    await tx.update(linearSyncOutbox).set({ status: 'done', claimToken: null, updatedAt: new Date() })
+      .where(and(eq(linearSyncOutbox.issueId, issue.id), sql`${linearSyncOutbox.scopeVersion} <> ${latest.scopeVersion}`, sql`${linearSyncOutbox.status} in ('queued', 'processing')`))
     const [open] = await tx.select({ id: linearSyncOutbox.id }).from(linearSyncOutbox)
-      .where(and(eq(linearSyncOutbox.issueId, issue.id), sql`${linearSyncOutbox.status} in ('queued', 'processing')`)).limit(1)
+      .where(and(eq(linearSyncOutbox.issueId, issue.id), eq(linearSyncOutbox.scopeVersion, latest.scopeVersion), sql`${linearSyncOutbox.status} in ('queued', 'processing')`)).limit(1)
     if (!open) {
       const [failed] = await tx.select({ id: linearSyncOutbox.id }).from(linearSyncOutbox)
-        .where(and(eq(linearSyncOutbox.issueId, issue.id), eq(linearSyncOutbox.status, 'failed'))).orderBy(desc(linearSyncOutbox.updatedAt)).limit(1)
-      if (failed) await tx.update(linearSyncOutbox).set({ status: 'queued', attempts: 0, availableAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(linearSyncOutbox.id, failed.id))
-      else await tx.insert(linearSyncOutbox).values({ id: crypto.randomUUID(), issueId: issue.id }).onConflictDoNothing()
+        .where(and(eq(linearSyncOutbox.issueId, issue.id), eq(linearSyncOutbox.status, 'failed'), eq(linearSyncOutbox.scopeVersion, latest.scopeVersion))).orderBy(desc(linearSyncOutbox.updatedAt)).limit(1)
+      if (failed) await tx.update(linearSyncOutbox).set({ status: 'queued', claimToken: null, attempts: 0, availableAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(linearSyncOutbox.id, failed.id))
+      else await tx.insert(linearSyncOutbox).values({ id: crypto.randomUUID(), issueId: issue.id, scopeVersion: latest.scopeVersion }).onConflictDoNothing()
     }
     await tx.update(linearIssueLinks).set({ syncStatus: 'pending', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.issueId, issue.id))
+    return { success: true as const }
   })
+  if ('error' in result) return result
   dispatchLinearIssueSync(issue.id)
   return { success: true as const }
 }

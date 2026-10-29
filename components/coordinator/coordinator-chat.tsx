@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from '
 import useSWR, { useSWRConfig } from 'swr'
 import { withBasePath } from '@/lib/base-path'
 import { useTranslations } from 'next-intl'
-import { getCoordinatorChat, sendCoordinatorMessage, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { getCoordinatorChat, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,7 @@ import { AgentThemeProvider } from '@/components/workspace/agent-theme'
 import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
+import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { ThreadCard } from './thread-card'
 import { PendingActions } from './pending-actions'
 import { UnreadDivider } from '@/components/chat/unread-divider'
@@ -70,6 +71,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const { submit, failureMessage } = useCoordinatorSubmit()
   const { mutate: mutateAll } = useSWRConfig()
   // A thread card opens its conversation in place of the chat; back returns here (R-66).
   const [openThread, setOpenThread] = useState<{ issueId: string; runId: string } | null>(null)
@@ -120,8 +122,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     setSendError(null)
     const notes = withNotes && browser?.notes.length ? [...browser.notes] : undefined
     try {
-      const result = await sendCoordinatorMessage(text, embedded?.quote, botId, undefined, undefined, notes)
-      if (result.error) { setSendError(actionError(result.error)); return false }
+      const outcome = await submit(text, { quote: embedded?.quote, botId, notes })
+      if (outcome.kind !== 'accepted') { setSendError(failureMessage(outcome)); return false }
       embedded?.clearQuote()
       if (notes) browser?.removeMany(notes.map(note => note.n))
       await mutate()

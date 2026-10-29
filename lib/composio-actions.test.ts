@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { executeComposioAction, isApprovalAction, parseActionInput } from './composio-actions'
+import { createComposioAITools, createGoogleAITools, executeComposioAction, isApprovalAction, parseActionInput } from './composio-actions'
 import type { ComposioActionClient } from './composio-actions'
 
 const activeNotion = {
@@ -43,7 +43,7 @@ test('executes only for the signed-in user’s active, enabled account and pins 
     client([activeNotion], calls),
   )
 
-  assert.deepEqual(result, { data: { results: [] } })
+  assert.deepEqual(result, { data: { results: [] }, accountId: 'notion-account' })
   assert.deepEqual(calls.accountQuery, {
     userIds: ['user-1'],
     toolkitSlugs: ['notion'],
@@ -61,24 +61,34 @@ test('executes only for the signed-in user’s active, enabled account and pins 
   })
 })
 
-test('does not execute if no active connection exists or the toolkit has multiple accounts', async () => {
+test('does not execute without an active, enabled connection or with invalid input', async () => {
   let executed = false
   const noAccounts = await executeComposioAction('user-1', 'search_notion_pages', { query: 'roadmap' }, client([
     { ...activeNotion, status: 'REVOKED' },
     { ...activeNotion, id: 'disabled-notion-account', isDisabled: true },
   ]))
-  const multipleAccounts = await executeComposioAction('user-1', 'search_notion_pages', { query: 'roadmap' }, client([
-    activeNotion,
-    { ...activeNotion, id: 'second-notion-account' },
-  ]))
-
   assert.deepEqual(noAccounts, { error: 'integrationNotConnected' })
-  assert.deepEqual(multipleAccounts, { error: 'integrationMultipleAccounts' })
   const noCalls = client([activeNotion], {})
   noCalls.tools.execute = async () => { executed = true; return { successful: true, error: null, data: {} } }
   const invalidInput = await executeComposioAction('user-1', 'search_notion_pages', { page_size: 0 }, noCalls)
   assert.deepEqual(invalidInput, { error: 'invalidIntegrationInput' })
   assert.equal(executed, false)
+})
+
+test('ambiguous or unavailable account never silently falls back to the oldest', async () => {
+  const older = { ...activeNotion, id: 'older', alias: 'work', createdAt: '2026-09-01T00:00:00Z' }
+  const newer = { ...activeNotion, id: 'newer', alias: 'personal', createdAt: '2026-10-01T00:00:00Z' }
+  for (const chosen of [null, 'missing']) {
+    const calls: Record<string, unknown> = {}
+    const result = await executeComposioAction('user-1', 'search_notion_pages', { query: 'roadmap' }, client([older, newer], calls), async () => chosen)
+    assert.deepEqual(result, { error: 'integrationAccountSelectionRequired', accounts: [{ id: 'older', alias: 'work' }, { id: 'newer', alias: 'personal' }] })
+    assert.equal(calls.execution, undefined)
+  }
+  const calls: Record<string, unknown> = {}
+  await executeComposioAction('user-1', 'search_notion_pages', { query: 'roadmap' }, client([older, newer], calls), async () => 'newer')
+  assert.equal((calls.execution as { params: { connectedAccountId: string } }).params.connectedAccountId, 'newer')
+  const unavailable = await executeComposioAction('user-1', 'search_notion_pages', { query: 'x' }, client([older]), async () => 'newer')
+  assert.equal('error' in unavailable && unavailable.error, 'integrationAccountSelectionRequired')
 })
 
 test('rejects tool slugs outside Mikka’s fixed allowlist', async () => {
@@ -123,4 +133,31 @@ test('only sending mail and writing the calendar need approval', () => {
   assert.equal(isApprovalAction('update_calendar_event'), true)
   assert.equal(isApprovalAction('list_calendar_events'), false)
   assert.equal(isApprovalAction('fetch_recent_gmail'), false)
+})
+
+
+test('bound actions never follow a changed default or use a disabled, missing, or wrong-toolkit account', async () => {
+  const older = { ...activeNotion, id: 'older', createdAt: '2026-09-01T00:00:00Z' }
+  const newer = { ...activeNotion, id: 'newer', createdAt: '2026-10-01T00:00:00Z' }
+  const calls: Record<string, unknown> = {}
+  await executeComposioAction('user-1', 'search_notion_pages', { query: 'x' }, client([older, newer], calls), async () => 'newer', 'older')
+  assert.equal((calls.execution as { params: { connectedAccountId: string } }).params.connectedAccountId, 'older')
+  for (const accounts of [[newer], [{ ...older, isDisabled: true }, newer], [{ ...older, toolkit: { slug: 'gmail' } }, newer]]) {
+    const attempted: Record<string, unknown> = {}
+    const result = await executeComposioAction('user-1', 'search_notion_pages', { query: 'x' }, client(accounts, attempted), async () => 'newer', 'older')
+    assert.equal('error' in result && result.error, 'integrationAccountSelectionRequired')
+    assert.equal(attempted.execution, undefined)
+  }
+})
+
+
+test('model tools pass explicit account choices separately from provider input', async () => {
+  const calls: unknown[][] = []
+  const call = async (...args: unknown[]) => { calls.push(args); return {} }
+  const notion = createComposioAITools(call)
+  const google = createGoogleAITools(call, call)
+  const options = { toolCallId: 'synthetic', messages: [], context: {} }
+  await notion.search_notion_pages.execute!({ query: 'roadmap', account_id: 'account-a' }, options)
+  await google.send_email.execute!({ to: ['test@example.invalid'], subject: 's', body: 'b', account_id: 'account-b' }, options)
+  assert.deepEqual(calls, [['search_notion_pages', { query: 'roadmap' }, 'account-a'], ['send_email', { to: ['test@example.invalid'], subject: 's', body: 'b' }, 'account-b']])
 })

@@ -4,12 +4,14 @@ import { cancelMailboxBackend } from '@/lib/mailbox-pg-cancel'
 import { waitForMailboxGuard, type MailboxTransactionGuard, type MailboxTransactionLease } from '@/lib/mailbox-transaction-guard'
 
 export interface WriteActor { userId: string; sessionId: string }
-export interface WriteRequestContext { signal?: AbortSignal; actor?: WriteActor }
-export interface WriteTransactionOptions {
+export interface WriteRequestContext { signal?: AbortSignal; actor?: WriteActor; guard?: MailboxTransactionGuard; modelRun?: { ownerId: string; botId: string | null; workspaceId: string | null; runId: string }; guardForRun?: (run: { ownerId: string; botId: string | null; workspaceId: string | null; runId: string }) => MailboxTransactionGuard | undefined }
+export interface WriteTransactionOptions<T = unknown> {
   signal?: AbortSignal
   /** Acquired only after work holds APP authorization locks; retained through COMMIT. */
   guard?: MailboxTransactionGuard
   authorizeCommit?: (client: PoolClient) => Promise<void>
+  /** Runs after host authorization lease acquisition and before COMMIT. */
+  guardedWork?: (client: PoolClient, value: T, lease: MailboxTransactionLease | undefined, signal: AbortSignal) => Promise<T>
   begin?: 'BEGIN' | 'BEGIN ISOLATION LEVEL REPEATABLE READ'
   /** Host/test dependency only. Never selected by request arguments. */
   cancel?: typeof cancelMailboxBackend
@@ -19,7 +21,7 @@ const cancelled = () => new MailboxError('writeTransactionCancelled', 409)
 /** Transaction ownership only, never approval/effect authority. A cancelled or
  * uncertain connection is discarded, never returned to another pool borrower.
  * No retry, new credentials, session claim writer or secondary ledger. */
-export async function writeTransaction<T>(pool: Pick<Pool, 'connect'>, work: (client: PoolClient) => Promise<T>, options: WriteTransactionOptions = {}): Promise<T> {
+export async function writeTransaction<T>(pool: Pick<Pool, 'connect'>, work: (client: PoolClient) => Promise<T>, options: WriteTransactionOptions<T> = {}): Promise<T> {
   const controller = new AbortController()
   const signals = [options.signal, options.guard?.signal].filter((s): s is AbortSignal => !!s)
   const abort = () => controller.abort()
@@ -78,6 +80,8 @@ export async function writeTransaction<T>(pool: Pick<Pool, 'connect'>, work: (cl
       if (lease.signal?.aborted) abort()
       await waitForMailboxGuard(lease.check(), controller.signal)
     }
+    if (options.guardedWork) result = await waitForMailboxGuard(options.guardedWork(tx, result, lease, controller.signal), controller.signal)
+    if (lease && options.guardedWork) await waitForMailboxGuard(lease.check(), controller.signal)
     if (options.authorizeCommit) await waitForMailboxGuard(options.authorizeCommit(tx), controller.signal)
     check()
     // No awaited host work between the final check and dispatching COMMIT.

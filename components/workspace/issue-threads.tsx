@@ -10,6 +10,7 @@ import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { Badge } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
 import { RUN_BADGES } from './agent-citations'
+import { ThreadStatusIcon } from './thread-status-icon'
 import { cn } from '@/lib/utils'
 
 export function useIssueThreads(issueId: string) {
@@ -44,7 +45,7 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
         // The bot runs the thread; the coding agent it hands work to is a step inside it, not the runner (R-05).
         const meta = thread.detail?.summary ?? null
         const body = <>
-          <BotAvatar color={colorFor(thread.detail?.agentName ?? t('agent'))} size="pill" still />
+          <ThreadStatusIcon status={thread.status} />
           <span className="flex min-w-0 flex-1 flex-col text-left">
             <span className="truncate text-sm font-medium">{name}</span>
             {meta && <span className="truncate text-xs font-normal text-muted-foreground">{meta}</span>}

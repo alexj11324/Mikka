@@ -46,10 +46,12 @@ import { MockAdapter } from "./adapters/mock"
 import type { AgentAdapter } from "./adapters/types"
 import { publishRun, snapshotTree } from "./agents/publish"
 import { runPaths } from "./agents/run-context"
+import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
 import { SandboxRuntime, type AgentSandbox } from "./agents/sandbox"
+import { SandboxManager } from '@anthropic-ai/sandbox-runtime'
 import { buildChildEnv } from "./env"
-import { browseFolder } from "./fs-browse"
+import { browseFolder, verifyExpectedOrigin } from "./fs-browse"
 import {
   DaemonError,
   InvalidIdError,
@@ -76,6 +78,9 @@ import {
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
+import { RepositoryCache } from "./repositories"
+import { daemonTestMode, normalizeRepository } from "@mikka/protocol/repository"
+import type { RunAssignment } from "./server-link"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
 import { ComputerBroker } from "./computer/broker.mjs"
 import { detectComputerDriver, executeDriver, type ComputerDriver } from "./computer/driver.mjs"
@@ -102,6 +107,8 @@ export interface DaemonOptions {
   stallMs?: number
   /** Finished worktrees older than this are removed. */
   retentionMs?: number
+  /** Keep acceptance worktrees, refs and failed clones for later inspection. */
+  retainResources?: boolean
   /** Skip CLI detection (tests). */
   harnesses?: HarnessInfo[]
   /**
@@ -150,7 +157,7 @@ interface DeviceFile {
   deviceId?: string
   /** Set by `mikka daemon login --workspace` for multi-workspace users. */
   workspaceId?: string
-  /** Last allow-list from the server, so runs resume while offline. */
+  /** Last repository settings from the server; paths are logical keys locally. */
   repos?: DeviceRepo[]
 }
 
@@ -180,7 +187,9 @@ export class Daemon {
   private rpc: RpcServer | null = null
   private outbox!: Outbox
   private journal!: RunJournal
+  private captureUploader!: CaptureUploader
   private worktrees!: WorktreeManager
+  private repositories!: RepositoryCache
   supervisor!: RunSupervisor
   private device: DeviceFile = {}
   private harnesses: HarnessInfo[] = []
@@ -254,14 +263,17 @@ export class Daemon {
       this.saveDevice({ credential: this.options.credential })
 
     this.journal = new RunJournal(paths.journal)
+    this.captureUploader = new CaptureUploader((runId) => join(runPaths(paths.adapterState, runId).runDir, CAPTURES_DIR), this.options.link, this.log, join(paths.dataDir, "capture-pending"))
     this.outbox = new Outbox(
       paths.outbox,
       this.options.link,
       this.log,
       undefined,
-      (runId, _item, error) => this.supervisor.markUndeliverable(runId, error)
+      (runId, _item, error) => this.supervisor.markUndeliverable(runId, error),
+      this.options.retainResources
     )
-    this.worktrees = new WorktreeManager(paths.worktrees)
+    this.worktrees = new WorktreeManager(paths.worktrees, this.options.retainResources)
+    this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
     // Hosted subscriptions use their dedicated container sandbox. Local
     // adapters require the separately probed sandbox-runtime from main.
     this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
@@ -318,6 +330,18 @@ export class Daemon {
           return Boolean(!this.stopped && this.registered && entry?.assignment.computer && this.supervisor?.computerRunAllowed(runId))
         },
         execute: createHostedComputerExecutor({ liveComputer, executeOrdinary, authority: this.options.credentialExecutorAuthority }),
+        // The server picks the desktop from the run's binding; the call names none.
+        capture: async (runId, call, signal) => {
+          const entry = this.journal.get(runId)
+          if (!entry?.assignment.computer || !this.supervisor.computerRunAllowed(runId) || !this.options.link.screenCapture) throw new Error('Cloud computer run unavailable')
+          try {
+            return await this.options.link.screenCapture(runId, call, signal)
+          } catch (error) {
+            // A refusal carries the server's own fixed wording (a recording already going, the person holds the desktop).
+            const detail = error instanceof DaemonError && typeof (error.data as { error?: unknown } | undefined)?.error === 'string' ? (error.data as { error: string }).error : undefined
+            throw Object.assign(new Error('Capture failed'), detail ? { safeMessage: detail } : {})
+          }
+        },
       })
     }
     const hosted = this.options.hostedSubscriptions
@@ -332,14 +356,14 @@ export class Daemon {
     await this.cloudComputerBroker?.listen()
     if (this.stopped) throw new Error("daemon stopped during startup")
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([
-      [
+      ...(daemonTestMode(process.env) ? [[
         "mock",
         new MockAdapter({
           stateDir: paths.adapterState,
           fixturesDir: this.options.fixturesDir,
           speed: this.options.mockSpeed,
         }),
-      ],
+      ] as [Harness, AgentAdapter]] : []),
       ...(hosted
         ? hosted.harnesses.map(
             (harness) =>
@@ -365,11 +389,13 @@ export class Daemon {
     ]))
     this.supervisor = new RunSupervisor({
       journal: this.journal,
+      adapterStateDir: this.paths.adapterState,
       outbox: this.outbox,
       worktrees: this.worktrees,
       adapters,
       startSubscription: hosted?.start,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
+      prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
       bootstrap: hosted
         ? async (worktree, repo) => {
             if (
@@ -397,9 +423,22 @@ export class Daemon {
             return result
           }
         : undefined,
-      repos: () => this.device.repos ?? [],
+      repository: assignment => this.repository(assignment),
+      prepareRepository: async (assignment, signal) => {
+        if (assignment.remoteUrl) await this.repositories.prepare(assignment.remoteUrl, signal)
+      },
+      baseRef: assignment => assignment.remoteUrl
+        ? this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch)
+        : Promise.resolve(assignment.baseBranch ?? 'HEAD'),
       log: this.log,
+      captures: this.captureUploader,
       stallMs: this.options.stallMs,
+      revalidateSkillAssignment:async assignment=>{
+        const link=this.options.link
+        if (!assignment.skillReceipt||!link.validateSkillReceipt||!this.device.credential) throw new Error('Current Skill receipt validation unavailable')
+        if (!this.registered||!this.device.deviceId) await this.register(this.device.credential)
+        return link.validateSkillReceipt(assignment.runId,assignment.skillReceipt.id)
+      },
       verify: hosted
         ? (run) =>
             hosted.command(
@@ -412,7 +451,7 @@ export class Daemon {
         : this.verifier(),
       publisher: {
         snapshot: ({ worktree, repo }) => snapshotTree(repo.path, worktree),
-        publish: ({ runId, worktree, repo, assignment, report, tree }) =>
+        publish: async ({ runId, worktree, repo, assignment, report, tree }) =>
           publishRun({
             runId,
             repoPath: repo.path,
@@ -421,7 +460,7 @@ export class Daemon {
             issueId: assignment.issueId,
             summary: report.summary,
             pushBranch: assignment.pushBranch,
-            baseBranch: assignment.baseBranch,
+            baseBranch: assignment.remoteUrl ? await this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch) : assignment.baseBranch,
             push: (() => {
               const decision = pushDecision(
                 runPolicy(assignment.policy),
@@ -458,9 +497,21 @@ export class Daemon {
       ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
       : (this.options.harnesses ?? (await detectHarnesses()))
     if (this.stopped) throw new Error("daemon stopped during startup")
-    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({ ...info, coordinator: hosted ? false : coordinatorCapable(info) }))
+    // A callback alone is insufficient: the host must own the enforcement
+    // boundary and bind its lifetime to the run's authenticated gate.
+    const runApprovalTransport = typeof this.options.link.prepareRunToolApproval === 'function'
+    const localIsolation = this.ownedSandbox !== null && this.sandbox === this.ownedSandbox
+    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
+      ...info,
+      // Local enforcement requires the successful owned SRT probe. Hosted
+      // enforcement uses its existing network-none/read-only Docker boundary
+      // and gate-bound broker/container teardown; general egress stays outside
+      // that ceiling. Codex also verifies its pinned interface at initialize.
+      toolApproval: runApprovalTransport && (hosted || (localIsolation && (info.harness === 'claude_code' || (info.harness === 'codex' && /(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(info.version ?? ''))))) ? true as const : undefined,
+      coordinator: hosted ? false : coordinatorCapable(info),
+    }))
     // Runs survive restarts: pick up what the journal says was active.
-    this.supervisor.resumeAll()
+    await this.supervisor.resumeAll()
     if (!hosted && this.options.quotaSource !== null) {
       this.quota = new QuotaPoller(
         this.options.quotaSource ??
@@ -662,12 +713,16 @@ export class Daemon {
       return false
     })
     try {
+      if (process.platform === 'linux') {
+        const dependencies = SandboxManager.checkDependencies()
+        if (dependencies.warnings.length) throw new Error(`Run sandbox isolation unavailable: ${dependencies.warnings.join('; ')}`)
+      }
       await sandbox.probe()
       this.ownedSandbox = sandbox
       return sandbox
     } catch (err) {
       this.log.warn({ err }, "agent sandbox unavailable")
-      await sandbox.reset().catch((resetError: unknown) => {
+      if (!this.options.retainResources) await sandbox.reset().catch((resetError: unknown) => {
         this.log.warn({ err: resetError }, "agent sandbox cleanup failed")
       })
       return null
@@ -695,7 +750,7 @@ export class Daemon {
         privateDir: paths.privateDir,
         pidFile: paths.pidFile.replace(/\.pgid$/, ".verify.pgid"),
         networkAllow: repo.networkAllow,
-        env: buildChildEnv(),
+        env: { ...buildChildEnv(), MIKKA_HANDOFF_FILE: join(paths.runDir, "handoff.json") },
         timeoutMs,
         signal,
         readOnly,
@@ -704,9 +759,8 @@ export class Daemon {
   }
 
   /**
-   * Claude Code, Codex and Cursor. Claude Code is confined by the sandbox
-   * its own SDK turns on (the adapter's `settings`); the other two run
-   * inside the daemon's `AgentSandbox`.
+   * Claude Code and Codex enclose the whole CLI in a run-owned official
+   * sandbox. Cursor retains the existing daemon AgentSandbox boundary.
    */
   private realAdapters(): [Harness, AgentAdapter][] {
     const sandbox = this.agentSandbox()
@@ -721,7 +775,7 @@ export class Daemon {
         proxyPath: fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url)), nodeBinary: process.execPath })
     }
     return [
-      ["claude_code", new ClaudeAdapter({ stateDir, binary: bin.claude_code, computerProvider })],
+      ["claude_code", new ClaudeAdapter({ sandbox, stateDir, binary: bin.claude_code, computerProvider })],
       ["codex", new CodexAdapter({ sandbox, stateDir, binary: bin.codex, computerProvider })],
       ["cursor", new CursorAdapter({ sandbox, stateDir, binary: bin.cursor, computerProvider })],
     ]
@@ -848,7 +902,13 @@ export class Daemon {
       this.saveDevice({ repos: await link.listRepos(deviceId) })
       this.server = "online"
       await this.outbox.flushAll()
+      // Resume only reservations already made while a run was live. Do not
+      // hold the heartbeat or recreate uploads after a run has ended.
+      for (const entry of this.journal.all()) if (isTerminalRunState(entry.state)) void this.captureUploader.flush(entry.assignment.runId, true)
       if (!this.draining) {
+        // A receipted run blocked while offline may resume only after its
+        // server authorization is available; no second recovery scheduler.
+        await this.supervisor.resumeAll(true)
         this.startCoordinatorPass(deviceId)
         for (const runId of await link.pendingRuns(deviceId)) {
           if (this.refusedRuns.has(runId)) continue
@@ -889,6 +949,32 @@ export class Daemon {
     if (existing) return this.supervisor.summary(existing)
     const assignment = await this.options.link.claimRun(deviceId, runId)
     if (assignment.runId !== runId) return this.refuseRun(runId)
+    if (assignment.expectedRepoRemote) {
+      let matches = false
+      if (assignment.remoteUrl) {
+        // Local runs execute only in the daemon-owned cache. Compare the
+        // authorized URLs; prepareRepository fixes that cache's origin before
+        // any worktree or child process starts. A user's checkout is irrelevant.
+        try {
+          const options = { allowFile: daemonTestMode(process.env) }
+          matches = normalizeRepository(assignment.remoteUrl, options).key ===
+            normalizeRepository(assignment.expectedRepoRemote, options).key
+        } catch { /* Invalid or unsupported identities fail closed. */ }
+      } else if (this.options.hostedSubscriptions && assignment.computer) {
+        // Hosted subscriptions retain their isolated, registered workspace.
+        let repo = this.device.repos?.find(item => item.repoId === assignment.repoId)
+        if (!repo) {
+          this.saveDevice({ repos: await this.options.link.listRepos(deviceId) })
+          repo = this.device.repos?.find(item => item.repoId === assignment.repoId)
+        }
+        matches = Boolean(repo && await verifyExpectedOrigin(repo.path, assignment.expectedRepoRemote))
+      }
+      if (!matches) {
+        const message = "Repository origin does not match the approved repository"
+        await this.options.link.completeRun(runId, { stopReason: "error", report: baseReport(message) })
+        throw new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
+      }
+    }
     if (assignment.computer && (!this.cloudComputerBroker || !assignment.subscriptionBinding || assignment.computer.ownerId !== assignment.subscriptionBinding.ownerId)) throw new Error('Cloud computer runtime unavailable')
     return this.supervisor.start(assignment)
   }
@@ -936,15 +1022,18 @@ export class Daemon {
       await this.supervisor.discardIfEmpty(entry.assignment.runId)
     }
     // Run branches the journal has no worktree or no record for.
-    for (const repo of this.device.repos ?? []) {
+    const paths = this.options.hostedSubscriptions
+      ? (this.device.repos ?? []).map(repo => repo.path)
+      : this.repositories.paths()
+    for (const repoPath of paths) {
       const branches = await this.worktrees
-        .runBranches(repo.path)
+        .runBranches(repoPath)
         .catch(() => [])
       for (const { runId, worktree } of branches) {
         if (active.has(runId)) continue
         const known = this.journal.get(runId)
         if (!known) {
-          await this.supervisor.discardOrphan(runId, worktree, repo.path)
+          await this.supervisor.discardOrphan(runId, worktree, repoPath)
         } else if (!known.worktree) {
           await this.supervisor.discardIfEmpty(runId)
         }
@@ -952,11 +1041,18 @@ export class Daemon {
     }
   }
 
+  private repository(assignment: RunAssignment): DeviceRepo {
+    const settings = this.device.repos?.find(repo => repo.repoId === assignment.repoId)
+    if (assignment.remoteUrl) {
+      const { key } = normalizeRepository(assignment.remoteUrl, { allowFile: daemonTestMode(process.env) })
+      return { ...settings, repoId: assignment.repoId, name: key.split('/').at(-1)!, path: this.repositories.pathFor(assignment.remoteUrl) }
+    }
+    if (this.options.hostedSubscriptions && assignment.computer && settings) return settings
+    throw new DaemonError(DAEMON_RPC_ERRORS.repoNotAllowed, 'Repository URL required; dispatch a new thread.')
+  }
+
   private async pruneWorktrees() {
     const retentionMs = this.options.retentionMs ?? 7 * 24 * 60 * 60 * 1000
-    const repos = new Map(
-      (this.device.repos ?? []).map((r) => [r.repoId, r.path])
-    )
     const entries = this.journal.all()
     // Follow-up runs work in the worktree of the run they continue: keep it
     // while any of them is unfinished, and count retention from the last.
@@ -978,7 +1074,8 @@ export class Daemon {
       .filter((e) => isTerminalRunState(e.state))
       .flatMap((e) => {
         const path = this.worktrees.pathFor(e.assignment.runId)
-        const repoPath = repos.get(e.assignment.repoId)
+        let repoPath: string | undefined
+        try { repoPath = this.repository(e.assignment).path } catch { /* Legacy checkout is never touched. */ }
         return repoPath && !inUse.has(path)
           ? [
               {
@@ -1081,7 +1178,7 @@ export class Daemon {
         const runId = memory.queueRun(deviceId, {
           issueId: `dev-issue-${randomUUID()}`,
           repoId: params.repoId,
-          baseBranch: params.baseBranch ?? "HEAD",
+          baseBranch: params.baseBranch,
           harness: "mock",
           prompt: "Mock run",
           fixture: params.fixture ?? "success-edit",
@@ -1149,7 +1246,7 @@ export class Daemon {
       } finally {
         const sandbox = this.ownedSandbox
         this.ownedSandbox = null
-        await sandbox?.reset().catch((err: unknown) => {
+        if (!this.options.retainResources) await sandbox?.reset().catch((err: unknown) => {
           this.log.warn({ err }, "agent sandbox cleanup failed")
         })
       }

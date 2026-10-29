@@ -10,7 +10,8 @@ const toggleVariants = cva(
     variants: {
       variant: {
         default: "bg-transparent",
-        outline: "border border-input bg-transparent hover:bg-muted",
+        // R-31: grey fill, no stroke; the pressed item is a step darker.
+        outline: "border border-transparent bg-control text-muted-foreground hover:bg-control-hover hover:text-foreground aria-pressed:bg-control-hover aria-pressed:text-foreground data-[state=on]:bg-control-hover",
       },
       size: {
         default:

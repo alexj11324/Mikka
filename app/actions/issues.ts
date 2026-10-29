@@ -10,7 +10,7 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
-import { issues, issueVersions, issueMembers, linearIssueLinks, users } from '@/lib/db/schema'
+import { issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { issueChecklist } from '@/lib/issue-checklist'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
@@ -19,15 +19,19 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
 import { ensureIssueNumbers } from '@/lib/issue-numbering'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
+import { createTeamIssueForUser } from '@/lib/team-issue-create'
+import { promoteExistingIssueForUser } from '@/lib/team-issue-promotion'
 import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { issueDoneEvent } from '@/lib/coordinator-events'
+import { changeIssueScopeLocally, previewPersonalScope } from '@/lib/issue-scope-store'
 import { TASK_SCOPES } from '@/lib/task-identifier'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
-import { activityActor } from '@/lib/activity-actor'
+import { actingContext, activityActor } from '@/lib/activity-actor'
+import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
 
 type IssueRow = typeof issues.$inferSelect
-type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null }
+type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null; linearTargetVerified: boolean }
 
 async function getUserId() {
   const user = await currentUser()
@@ -62,7 +66,7 @@ export async function listIssues() {
   const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
   const links = await issueTeamScope(userId, rows.map(row => row.id))
   const visibleRows = rows.filter(row => { const link = links.find(item => item.issueId === row.id); return row.scope === 'personal' || !link || teams.some(team => team.id === link.teamId) })
-  const ownersWithoutNumbers = [...new Set(visibleRows.filter(row => !readIssueMetadata(row.content).number).map(row => row.ownerId))]
+  const ownersWithoutNumbers = [...new Set(visibleRows.filter(row => row.ownerId === userId && !readIssueMetadata(row.content).number).map(row => row.ownerId))]
   if (ownersWithoutNumbers.length) {
     for (const ownerId of ownersWithoutNumbers) await ensureIssueNumbers(ownerId)
     return listIssues()
@@ -73,12 +77,18 @@ export async function listIssues() {
 }
 
 export async function getIssue(id: string) {
-  let { issue } = await requireIssueAccess(id)
-  if (!readIssueMetadata(issue.content).number) {
+  let { issue, user } = await requireIssueAccess(id)
+  // Reading another owner's legacy task must not initiate maintenance writes:
+  // that entry ACL may be retired while the numbering transaction waits.
+  if (issue.userId === user.id && !readIssueMetadata(issue.content).number) {
     await ensureIssueNumbers(issue.userId)
     issue = (await requireIssueAccess(id)).issue
   }
-  return issueView(issue)
+  return db.transaction(async tx => {
+    const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
+    requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+    return issueView(locked, tx)
+  })
 }
 
 export async function saveIssue(input: { id?: string; revision?: number; title: string; content: JSONContent; status: string; priority: string }): Promise<ActionResult<{ issue: IssueView }>> {
@@ -92,7 +102,9 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
       if (!parsedId.success) return { error: 'issueNotFound' }
       id = parsedId.data
     }
-    const ownerId = id ? (await requireIssueAccess(id)).issue.userId : userId
+    const existing = id ? (await requireIssueAccess(id)).issue : null
+    const ownerId = existing?.userId ?? userId
+    const observedScopeVersion = existing?.scopeVersion ?? null
     if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
     let doneEvent = false
     try {
@@ -104,6 +116,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         let issue
         const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
         if (!latest) return { error: 'issueNotFound' }
+        requireLockedIssueScope(latest, userId, observedScopeVersion!)
         ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
         const done = issue && issueDoneEvent(latest, issue)
         if (done) {
@@ -114,7 +127,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
         return { issue: await issueView(issue, tx) }
       })
-      if ('issue' in result && result.issue) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
+      if ('issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
       if (!id && 'issue' in result && result.issue) scheduleIssueEffect({ kind: 'scope', issueId: result.issue.id })
       if (doneEvent && 'issue' in result) scheduleIssueEffect({ kind: 'wake', userId: ownerId })
       return result
@@ -123,6 +136,26 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
       console.error('Failed to save issue', error instanceof Error ? error.message : 'database error')
       return { error: 'issueSaveFailed' }
     }
+  })
+}
+
+/** Explicit local team choice. Use a stable requestId on retries. No Linear
+ * destination is inferred; the returned task is blocked from provider sync. */
+export async function createIssueForTeam(input: { requestId: string; teamId: string; title: string; content: JSONContent; status: string; priority: string }) {
+  return runAction(async () => {
+    // An actAs context can represent an agent or a trusted internal caller;
+    // neither is evidence of a signed-in human choosing this team.
+    if (actingContext.getStore()) return { error: 'teamIssueAccessDenied' as const }
+    const userId = await getUserId()
+    return createTeamIssueForUser(userId, input)
+  })
+}
+
+/** Explicitly move an existing personal issue to a Mikka team. */
+export async function promoteIssueToTeam(input: { requestId: string; issueId: string; revision: number; teamId: string; expectedTeamId: string | null }) {
+  return runAction(async () => {
+    if (actingContext.getStore()) return { error: 'teamIssueAccessDenied' as const }
+    return promoteExistingIssueForUser(await getUserId(), input)
   })
 }
 
@@ -148,17 +181,41 @@ export async function changeIssuePriority(input: { id: string; priority: string;
   })
 }
 
+/** Preview is owner-only and does not make a provider request. A positive
+ * externalCopyPossible means an old remote copy may still be team-visible. */
+export async function previewIssuePersonalScope(id: string) {
+  return runAction(async () => {
+    const userId = await getUserId()
+    if (!z.uuid().safeParse(id).success) return { error: 'issueScopeInvalid' as const }
+    return previewPersonalScope(userId, id)
+  })
+}
+
+/** The linked case remains closed until the archive/unlink policy is chosen. */
+export async function confirmIssuePersonalScope(input: { id: string; revision: number; confirmation: string }) {
+  return runAction(async () => {
+    const userId = await getUserId()
+    const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), confirmation: z.string().regex(/^[a-f0-9]{64}$/) }).safeParse(input)
+    if (!parsed.success) return { error: 'issueScopeInvalid' as const }
+    return changeIssueScopeLocally(userId, { id: parsed.data.id, revision: parsed.data.revision, scope: 'personal' }, { allowLinkedPersonal: false, confirmation: parsed.data.confirmation })
+  })
+}
+
 export async function listIssueVersions(id: string) {
-  const { issue } = await requireIssueAccess(id)
+  const { issue, user } = await requireIssueAccess(id)
   const userId = issue.userId
-  const versions = await db.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
+  const versions = await db.transaction(async tx => {
+    const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
+    requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+    return tx.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
+  })
   return enrichActivityActors(versions, userId)
 }
 
 /**
  * The one-click scope change (MIK-47). The person's choice wins over the
- * agent's and becomes an example for its next judgment. A task already in
- * Linear stays a workspace task: it cannot be taken back out.
+ * agent's and becomes an example for its next judgment. Linked transitions
+ * await the archive/unlink decision in #184.
  */
 export async function setIssueScope(input: { id: string; revision: number; scope: string }): Promise<ActionResult<{ issue: IssueView }>> {
   return runAction(async () => {
@@ -167,18 +224,12 @@ export async function setIssueScope(input: { id: string; revision: number; scope
     const userId = await getUserId()
     const { issue } = await requireIssueAccess(parsed.data.id)
     if (issue.userId !== userId) return { error: 'issueScopeOwnerOnly' }
-    if (parsed.data.scope === 'personal') {
-      const [link] = await db.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(eq(linearIssueLinks.issueId, issue.id)).limit(1)
-      if (link) return { error: 'issueScopeInLinear' }
-    }
-    const result = await db.transaction(async tx => {
-      const [saved] = await tx.update(issues).set({ scope: parsed.data.scope, scopeSetBy: 'user', scopeConfidence: null, revision: parsed.data.revision + 1, updatedAt: new Date() })
-        .where(and(eq(issues.id, issue.id), eq(issues.userId, userId), eq(issues.revision, parsed.data.revision))).returning()
-      if (!saved) return { error: 'issueStale' as const }
-      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })
-      return { issue: await issueView(saved, tx) }
-    })
-    if ('issue' in result && parsed.data.scope === 'workspace') scheduleIssueEffect({ kind: 'sync', issueId: issue.id })
-    return result
+    // This legacy action has no team target or team permission check. It must
+    // not infer the owner's active Linear team or publish an unassigned task.
+    if (parsed.data.scope === 'workspace') return { error: 'issueScopeTeamRequired' }
+    // #184 leaves archive vs unlink open. Keep linked transitions closed until
+    // the provider disposition is confirmed and reviewed.
+    return changeIssueScopeLocally(userId, parsed.data, { allowLinkedPersonal: false })
+
   })
 }

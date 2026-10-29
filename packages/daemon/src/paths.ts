@@ -56,6 +56,7 @@ export function daemonPaths(dataDir: string) {
     journal: join(dataDir, "runs.json"),
     outbox: join(dataDir, "outbox"),
     worktrees: join(dataDir, "worktrees"),
+    repos: join(dataDir, "repos"),
     adapterState: join(dataDir, "adapters"),
     logs: join(dataDir, "logs"),
     devRepos: join(dataDir, "dev-repos.json"),

@@ -42,6 +42,8 @@
 --color-border: var(--border);
 --color-rule: var(--rule);
 --color-input: var(--input);
+--color-control: var(--control);
+--color-control-hover: var(--control-hover);
 --color-ring: var(--ring);
 --color-chart-1: var(--chart-1);
 --color-chart-2: var(--chart-2);
@@ -73,6 +75,11 @@
 --color-info: var(--info);
 --color-success-foreground: var(--success-foreground);
 --color-success: var(--success);
+/* GitHub PR status colors (Primer), independent of application status tones. */
+--color-github-pr-open: var(--github-pr-open);
+--color-github-pr-draft: var(--github-pr-draft);
+--color-github-pr-merged: var(--github-pr-merged);
+--color-github-pr-closed: var(--github-pr-closed);
 --color-label-violet: var(--label-violet);
 --color-label-blue: var(--label-blue);
 --color-attention: var(--attention);
@@ -120,6 +127,10 @@
 }
 
 :root {
+--github-pr-open: #1a7f37;
+--github-pr-draft: #59636e;
+--github-pr-merged: #8250df;
+--github-pr-closed: #d1242f;
 --bot-encre: #0a0a0c;
 --bot-brun: #8b5e3c;
 --bot-rouge: #e8483f;
@@ -191,6 +202,10 @@
 /* R-61/R-63 lines on the issue page; dark is a solid grey, never white at low opacity (R-31). */
 --rule: oklch(0.922 0 0);
 --input: oklch(0.922 0 0);
+/* R-31: secondary buttons are a grey fill with no stroke (Claude desktop's 「Add folder…」).
+   A neutral translucent overlay (R-30), so the button still reads on grey cards and sidebars. */
+--control: oklch(0 0 0 / 6%);
+--control-hover: oklch(0 0 0 / 10%);
 --ring: oklch(0.708 0 0);
 --chart-1: oklch(0.87 0 0);
 --chart-2: oklch(0.556 0 0);
@@ -225,6 +240,10 @@
 }
 
 .dark {
+--github-pr-open: #3fb950;
+--github-pr-draft: #9198a1;
+--github-pr-merged: #ab7df8;
+--github-pr-closed: #f85149;
 --settings-background: oklch(0.17 0 0);
 --settings-foreground: oklch(0.94 0 0);
 --settings-card: var(--card);
@@ -263,6 +282,8 @@
 --border: oklch(1 0 0 / 6%);
 --rule: oklch(0.269 0 0);
 --input: oklch(1 0 0 / 6%);
+--control: oklch(1 0 0 / 9%);
+--control-hover: oklch(1 0 0 / 14%);
 --ring: oklch(0.556 0 0);
 --chart-1: oklch(0.87 0 0);
 --chart-2: oklch(0.556 0 0);

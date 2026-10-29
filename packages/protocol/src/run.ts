@@ -8,6 +8,23 @@
 // and `agent_run.report` stores exactly this shape.
 import { z } from "zod"
 
+export const RUN_QUESTION_KINDS = [
+  "context",
+  "decision",
+  "permission",
+  "external",
+] as const
+export const runQuestion = z
+  .object({
+    questionId: z.uuid(),
+    kind: z.enum(RUN_QUESTION_KINDS).default("decision"),
+    question: z.string().trim().min(1).max(4000),
+    context: z.string().trim().max(4000).optional(),
+    options: z.array(z.string().trim().min(1).max(4000)).max(20).default([]),
+  })
+  .strict()
+export type RunQuestion = z.infer<typeof runQuestion>
+
 import { planHandoff } from "./plan"
 
 /** Why a run stopped. Must match `agent_run.stop_reason` in packages/db. */
@@ -52,6 +69,39 @@ export const runPublish = z.object({
 })
 export type RunPublish = z.infer<typeof runPublish>
 
+/** Frozen server assignment context for the concrete report benchmark. */
+export const runBenchmarkContext = z.object({
+  sourceCommit: z.string().regex(/^[a-f0-9]{40}$/),
+  benchmarkDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  caseId: z.string().min(1).max(200),
+  fixtureDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  policyDigest: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict()
+
+/** Requested configuration and separately observed adapter protocol model. */
+export const runExecution = runBenchmarkContext.extend({
+  harness: z.enum(["codex", "claude_code", "cursor"]),
+  requestedModel: z.string().min(1).max(500).nullable(),
+  observedModel: z.string().min(1).max(500).nullable(),
+  verifyCommand: z.string().min(1).max(2_000),
+}).strict()
+export type RunExecution = z.infer<typeof runExecution>
+
+/** Host-observed runtime used to freeze the first baseline's execution settings. */
+export const runRuntime = runExecution.pick({ harness: true, requestedModel: true, observedModel: true,
+  policyDigest: true, sourceCommit: true }).strict()
+export type RunRuntime = z.infer<typeof runRuntime>
+
+/** Host reread of the mounted bytes after the actual adapter session opens. */
+export const runSkillMount = z.object({
+  receiptId: z.uuid(),
+  versionId: z.uuid(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  sessionId: z.string().min(1).max(500),
+  mountedAt: z.iso.datetime(),
+}).strict()
+export type RunSkillMount = z.infer<typeof runSkillMount>
+
 /**
  * The handoff report sent with every run completion. The agent fills what
  * it can through its submit / ask / blocker call (summary, open questions,
@@ -60,6 +110,11 @@ export type RunPublish = z.infer<typeof runPublish>
  * cannot report its own verify as passed.
  */
 export const runReport = z.object({
+  /** Worktree base journaled before the adapter started; never agent-supplied. */
+  sourceCommit: z.string().regex(/^[a-f0-9]{40}$/).optional(),
+  skillMount: runSkillMount.optional(),
+  execution: runExecution.optional(),
+  runtime: runRuntime.optional(),
   /** What was done, in a few sentences. Empty when the run crashed early. */
   summary: z.string().max(10_000),
   /** Paths relative to the worktree root (from `git status`). */
@@ -68,14 +123,24 @@ export const runReport = z.object({
   verify: z.object({
     status: verifyStatus,
     command: z.string().max(2_000).optional(),
+    /** Actual process outcome from the daemon, never the agent. */
+    exitCode: z.number().int().nullable().optional(),
+    signal: z.string().max(100).nullable().optional(),
+    timedOut: z.boolean().optional(),
     /** Tail of the command output. */
     output: z.string().max(10_000).optional(),
   }),
   openQuestions: z.array(z.string().max(2_000)).max(50),
   /** What should happen next, from the agent's point of view. */
+  question: runQuestion.optional(),
   nextStep: z.string().max(2_000).nullable(),
   /** For `blocked`: the external condition, e.g. `quota_exhausted`. */
   blockedOn: z.string().max(500).optional(),
+  /** Daemon-owned receipt for an exact, unchanged read-only candidate. */
+  check: z.object({
+    sha: z.string().regex(/^[a-f0-9]{40}$/),
+    readOnly: z.literal(true),
+  }).optional(),
   /** Acceptance criteria the agent checked, with evidence. */
   criteria: z
     .array(
@@ -84,7 +149,7 @@ export const runReport = z.object({
         text: z.string().max(2_000).optional(),
         passed: z.boolean(),
         evidence: z.string().max(10_000).optional(),
-      })
+      }),
     )
     .max(200)
     .optional(),
@@ -104,7 +169,7 @@ export const runReport = z.object({
         title: z.string().trim().min(1).max(500),
         goal: z.string().max(2_000).optional(),
         reason: z.string().max(2_000).optional(),
-      })
+      }),
     )
     .max(50)
     .optional(),
@@ -152,7 +217,7 @@ export type RunCompleteRequest = z.infer<typeof runCompleteRequest>
  */
 export function reachesReview(
   stopReason: RunStopReason,
-  report: Pick<RunReport, "verify"> | undefined
+  report: Pick<RunReport, "verify"> | undefined,
 ): boolean {
   return (
     stopReason === "submitted" && !!report && report.verify.status !== "failed"

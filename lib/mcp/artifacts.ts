@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { agentRuns, agents, oauthClients, type ArtifactKind } from '@/lib/db/schema'
 import { submitArtifact, type ArtifactSubmitter } from '@/lib/artifacts/store'
 import { withBasePath } from '@/lib/base-path'
+import { runBotName } from '@/lib/run-bot-name'
 
 // submit_artifact, the one way any harness hands a document or web page to
 // Mikka. From a run it is the run's artifact, by the run's agent; from an
@@ -14,15 +15,15 @@ export interface SubmitInput { title: string; kind: ArtifactKind; content: strin
 
 /** The submitter for a run token: the run's agent. */
 export async function runSubmitter(run: { id: string; userId: string; botId?: string | null; issueId: string | null }): Promise<ArtifactSubmitter> {
-  const [row] = await db.select({ name: agents.name }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, run.id)).limit(1)
-  return { userId: run.userId, botId: run.botId ?? null, runId: run.id, issueId: run.issueId, authorName: row?.name ?? 'Agent' }
+  const [row] = await db.select({ name: runBotName }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, run.id)).limit(1)
+  return { userId: run.userId, botId: run.botId ?? null, runId: run.id, issueId: run.issueId, authorName: row?.name ?? 'Coordinator' }
 }
 
 /** The submitter for an OAuth token: the person, by the client's registered name. */
 export async function oauthSubmitter(userId: string, authInfo: AuthInfo | undefined): Promise<ArtifactSubmitter> {
   const clientId = authInfo?.clientId
   const [row] = clientId ? await db.select({ name: oauthClients.name }).from(oauthClients).where(eq(oauthClients.clientId, clientId)).limit(1) : []
-  return { userId, runId: null, issueId: null, authorName: row?.name?.trim() || 'Agent' }
+  return { userId, runId: null, issueId: null, authorName: row?.name?.trim() || 'Mikka' }
 }
 
 export async function submit(submitter: ArtifactSubmitter, input: SubmitInput) {

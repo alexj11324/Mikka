@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 
 import {
   APPROVAL_MODES,
+  defaultRunPolicy,
+  runPolicyDigestInput,
   CONFIGURABLE_ACTIONS,
   DEFAULT_NETWORK_ALLOW,
   FIXED_PERMISSIONS,
@@ -265,4 +267,15 @@ describe("a person's own instructions (ADR 0060)", () => {
     expect(resolveDefaultHarness("")).toBeNull()
     expect(resolveDefaultHarness(undefined)).toBeNull()
   })
+})
+
+it("canonicalizes resolved execution policy independent of object key order", () => {
+  const policy = defaultRunPolicy()
+  expect(runPolicyDigestInput()).toBe(runPolicyDigestInput(policy))
+  const reordered = { networkAllow: policy.networkAllow, permissions: {
+    network: policy.permissions.network, git_push: policy.permissions.git_push,
+    write_outside_repo: policy.permissions.write_outside_repo, install_dependency: policy.permissions.install_dependency,
+  } }
+  expect(runPolicyDigestInput(reordered)).toBe(runPolicyDigestInput(policy))
+  expect(runPolicyDigestInput({ ...policy, readOnly: true })).not.toBe(runPolicyDigestInput(policy))
 })

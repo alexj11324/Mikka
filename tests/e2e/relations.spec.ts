@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
 import { test, expect, register, rail, seedTask, openIssueFromSearch } from './fixtures'
 
+/** The relation pickers' server-side search (GET /api/issues/search). */
+const SEARCH = /\/api\/issues\/search\?/
+
 async function openIssue(page: Page, title: string) {
   await openIssueFromSearch(page, title)
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
@@ -66,22 +69,18 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await parentPicker.getByRole('button', { name: '关闭', exact: true }).click()
     await children.getByRole('button', { name: `移除子任务关系：${child}`, exact: true }).click()
     await expect(children.getByRole('button', { name: '子任务 0 / 0', exact: true })).toBeVisible()
-    // Regression: reopening the picker right after unlinking must not filter against the board snapshot cached
-    // by the earlier "设置父任务" picker (where the child still had this parent). Hold the server actions
-    // (listIssues / listIssueConnections) so we observe the picker before fresh data arrives.
+    // Regression: reopening the picker right after unlinking must not show results from before the unlink
+    // (where the child still had this parent). Hold the search request so we observe the picker before fresh data arrives.
     let releaseActions!: () => void
     const actionsHeld = new Promise<void>(resolve => { releaseActions = resolve })
     let heldActions = 0
-    await page.route('**/*', async route => {
-      if (route.request().method() === 'POST' && route.request().headers()['next-action']) { heldActions++; await actionsHeld }
-      await route.fallback()
-    })
+    await page.route(SEARCH, async route => { heldActions++; await actionsHeld; await route.fallback() })
     await children.getByRole('button', { name: '添加现有任务', exact: true }).click()
     const existing = page.getByRole('dialog', { name: '添加现有子任务', exact: true })
     await expect.poll(() => heldActions).toBeGreaterThan(0)
     await expect(existing.getByText('正在读取任务…', { exact: true }).or(existing.getByRole('option').filter({ hasText: child }))).toBeVisible()
     releaseActions()
-    await page.unroute('**/*')
+    await page.unroute(SEARCH)
     await expect(existing.getByRole('option').filter({ hasText: child })).toBeVisible()
     await existing.getByRole('combobox', { name: '搜索关联任务', exact: true }).fill(child)
     await existing.getByRole('option').filter({ hasText: child }).click()
@@ -156,14 +155,10 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await page.reload()
     await expect(page.getByRole('button', { name: '更多任务操作', exact: true })).toBeEnabled()
 
-    // Fail every server action while the picker loads (listIssueConnections + listIssues). A non-RSC 200 body makes the action promise reject
+    // Fail the picker's search request. A non-JSON 200 body makes the read reject
     // without a browser 'Failed to load resource' console error, which the runtime guard would flag.
     let failing = true
-    await page.route('**/*', route => {
-      const request = route.request()
-      if (failing && request.method() === 'POST' && request.headers()['next-action']) return route.fulfill({ status: 200, contentType: 'text/plain', body: 'mocked failure' })
-      return route.fallback()
-    })
+    await page.route(SEARCH, route => failing ? route.fulfill({ status: 200, contentType: 'text/plain', body: 'mocked failure' }) : route.fallback())
     await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
     await page.getByRole('menuitem', { name: '设置父任务…', exact: true }).click()
     const picker = page.getByRole('dialog', { name: '设置父任务', exact: true })
@@ -182,6 +177,101 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
   })
 }
 
+test('关系选择器在服务端搜索：编号和标题片段都能找到，父任务选择器不提供后代任务，选中后建立关系', async ({ page }) => {
+  test.setTimeout(120000)
+  await register(page)
+  const suffix = randomUUID().slice(0, 8)
+  const current = `搜索当前任务 ${suffix}`
+  const target = `搜索目标任务 ${suffix}`
+  const child = `搜索子任务 ${suffix}`
+  const grandchild = `搜索孙任务 ${suffix}`
+  const currentId = await seedTask(page, current)
+  await seedTask(page, target)
+  const childId = await seedTask(page, child, { parentId: currentId })
+  await seedTask(page, grandchild, { parentId: childId })
+  await page.reload()
+  await rail(page, '看板').click()
+  await openIssue(page, current)
+
+  // Parent picker: the server leaves out the task's descendants at every depth.
+  await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+  await page.getByRole('menuitem', { name: '设置父任务…', exact: true }).click()
+  const parentPicker = page.getByRole('dialog', { name: '设置父任务', exact: true })
+  const parentSearch = parentPicker.getByRole('combobox', { name: '搜索关联任务', exact: true })
+  await expect(parentPicker.getByRole('option').filter({ hasText: target })).toBeVisible()
+  await expect(parentPicker.getByRole('option').filter({ hasText: suffix })).toHaveCount(1)
+  for (const descendant of [child, grandchild]) {
+    await parentSearch.fill(descendant)
+    await expect(parentPicker.getByText('没有匹配的任务', { exact: true })).toBeVisible()
+    await expect(parentPicker.getByRole('option')).toHaveCount(0)
+  }
+  await parentPicker.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(parentPicker).toHaveCount(0)
+
+  await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+  await page.getByRole('menuitem', { name: '添加任务关系', exact: true }).click()
+  await page.getByRole('menuitem', { name: '添加关联任务…', exact: true }).click()
+  const picker = page.getByRole('dialog', { name: '添加关联任务', exact: true })
+  const search = picker.getByRole('combobox', { name: '搜索关联任务', exact: true })
+  const option = picker.getByRole('option').filter({ hasText: target })
+  const identifier = (await option.locator('span').first().innerText()).trim()
+  const number = /(\d+)$/.exec(identifier)?.[1]
+  expect(number).toBeTruthy()
+  // A title fragment, the displayed identifier and the bare number each find exactly the target.
+  for (const query of [`目标任务 ${suffix}`, identifier, number!]) {
+    await search.fill(query)
+    await expect(picker.getByRole('option')).toHaveCount(1)
+    await expect(option).toBeVisible()
+  }
+  // One Latin letter is too short for the server; the picker keeps showing recent tasks instead of an error.
+  await search.fill('x')
+  await expect(option).toBeVisible()
+  await expect(picker.getByRole('alert')).toHaveCount(0)
+  await search.fill(number!)
+  await expect(picker.getByRole('option')).toHaveCount(1)
+  await option.click()
+  await expect(picker).not.toBeVisible()
+  await properties(page)
+  const related = page.getByRole('region', { name: '关联任务', exact: true })
+  await expect(related.getByRole('button').filter({ hasText: target })).toBeVisible()
+  await page.reload()
+  await properties(page)
+  await expect(related.getByRole('button').filter({ hasText: target })).toBeVisible()
+})
+
+test('子任务选择器跨过已关联任务占满的第一页，读取真实后续页并保存', async ({ page }) => {
+  test.setTimeout(180000)
+  await register(page)
+  const suffix = randomUUID().slice(0, 8)
+  const current = `分页当前任务 ${suffix}`
+  const target = `分页可选任务 ${suffix}`
+  const currentId = await seedTask(page, current)
+  await seedTask(page, target)
+  // Newer, already-linked children fill the first server page. The selectable
+  // target remains on a later page; no search response is mocked or rewritten.
+  for (let i = 0; i < 51; i++) await seedTask(page, `分页已有子任务 ${suffix} ${i}`, { parentId: currentId })
+  await page.reload()
+  await rail(page, '看板').click()
+  await openIssue(page, current)
+  const children = page.getByRole('region', { name: '子任务', exact: true })
+  await expect(children.getByRole('button', { name: '子任务 0 / 51', exact: true })).toBeVisible()
+  const cursors: string[] = []
+  page.on('request', request => {
+    const url = new URL(request.url())
+    if (url.pathname.endsWith('/api/issues/search') && url.searchParams.get('cursor')) cursors.push(url.searchParams.get('cursor')!)
+  })
+  await children.getByRole('button', { name: '添加现有任务', exact: true }).click()
+  const picker = page.getByRole('dialog', { name: '添加现有子任务', exact: true })
+  const option = picker.getByRole('option').filter({ hasText: target })
+  await expect(option).toBeVisible()
+  expect(cursors.length).toBeGreaterThan(0)
+  await option.click()
+  await expect(picker).not.toBeVisible()
+  await expect(children.getByRole('button', { name: '子任务 0 / 52', exact: true })).toBeVisible()
+  await page.reload()
+  await expect(children.getByRole('button', { name: '子任务 0 / 52', exact: true })).toBeVisible()
+})
+
 test('402x400 短视口：关系选择器标题和关闭按钮不被裁切，列表在内部滚动，状态高度不跳', async ({ page }) => {
   test.setTimeout(120000)
   await register(page)
@@ -197,8 +287,8 @@ test('402x400 短视口：关系选择器标题和关闭按钮不被裁切，列
   let releaseReads!: () => void
   const readsHeld = new Promise<void>(resolve => { releaseReads = resolve })
   let holding = true
-  await page.route('**/*', async route => {
-    if (holding && route.request().method() === 'POST' && route.request().headers()['next-action']) await readsHeld
+  await page.route(SEARCH, async route => {
+    if (holding) await readsHeld
     return route.fallback()
   })
   await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
@@ -208,7 +298,7 @@ test('402x400 短视口：关系选择器标题和关闭按钮不被裁切，列
   await expect(loading).not.toHaveClass(/text-muted-foreground/)
   holding = false
   releaseReads()
-  await page.unroute('**/*')
+  await page.unroute(SEARCH)
   // The dialog opens only after the menu has closed (no menu ghosting over it).
   const picker = page.getByRole('dialog', { name: '设置父任务', exact: true })
   await expect(picker).toBeVisible()

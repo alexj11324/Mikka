@@ -1,4 +1,5 @@
 import { after, NextResponse } from 'next/server'
+import { pool } from '@/lib/db'
 import { getSession } from '@/lib/session'
 import type { SuggestionSource } from '@/lib/db/schema'
 import { ACTION_LOCALES, type ActionLocale } from '@/lib/suggestions/action-title'
@@ -46,10 +47,13 @@ export async function GET(request: Request) {
   }
   const timeZone = browserTimeZone ?? request.headers.get('x-vercel-ip-timezone')
   const [, items] = await Promise.all([todaysBriefing(user.id, timeZone, { onPushed: () => after(() => wakeCoordinator(user.id)) }), listSuggestions(user.id)])
+  const executions = items.length ? (await pool.query('SELECT "suggestionId",status,"runId","subagentId" FROM suggestion_executions WHERE "ownerId"=$1 AND "suggestionId"=ANY($2::uuid[])', [user.id, items.map(item => item.id)])).rows : []
+  const execution = new Map(executions.map(row => [row.suggestionId as string, row]))
   const groups = new Map<SuggestionSource, typeof items>()
-  for (const item of items) groups.set(item.source, [...groups.get(item.source) ?? [], item])
+  for (const item of items) if (!execution.has(item.id)) groups.set(item.source, [...groups.get(item.source) ?? [], item])
   const view = (item: (typeof items)[number]) => ({ id: item.id, source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle, url: item.url, actor: item.actor, required: item.required, occurredAt: item.occurredAt })
   return NextResponse.json({
+    inProgress: items.filter(item => ['starting', 'running'].includes(execution.get(item.id)?.status)).map(item => ({ ...view(item), state: execution.get(item.id)?.status, runId: execution.get(item.id)?.runId, subagentId: execution.get(item.id)?.subagentId })),
     groups: [...groups].map(([source, list]) => ({ source, items: list.map(view) })),
   }, { headers })
 }

@@ -7,12 +7,17 @@
 // that file when the turn ends; the file, not the CLI's event stream, is the
 // one source of truth for every harness.
 //
-//   node mikka-mcp.mjs --handoff <file>
+//   node mikka-mcp.mjs --handoff <file> [--captures <dir> --capture-root <dir>...]
+//
+// `submit_capture` copies a screenshot or recording the agent made into the
+// captures dir; the daemon checks it again and uploads it to the run.
 //
 // Protocol: MCP over stdio, newline-delimited JSON-RPC 2.0.
 import { randomUUID } from "node:crypto"
-import { writeFileSync, renameSync } from "node:fs"
+import { closeSync, fstatSync, openSync, readSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync, constants } from "node:fs"
+import { join, sep } from "node:path"
 import { createInterface } from "node:readline"
+import { copyCaptureFd } from "./capture-copy.mjs"
 
 const handoffIndex = process.argv.indexOf("--handoff")
 const handoffFile = handoffIndex > 0 ? process.argv[handoffIndex + 1] : null
@@ -20,6 +25,11 @@ if (!handoffFile) {
   process.stderr.write("mikka-mcp: --handoff <file> is required\n")
   process.exit(2)
 }
+const flagValues = (flag) => process.argv.flatMap((arg, i) => (arg === flag && process.argv[i + 1] ? [process.argv[i + 1]] : []))
+const capturesDir = flagValues("--captures")[0] ?? null
+const captureRoots = flagValues("--capture-root").flatMap((root) => {
+  try { return [realpathSync(root)] } catch { return [] }
+})
 
 const stringArray = { type: "array", items: { type: "string" } }
 
@@ -153,6 +163,20 @@ const TOOLS = [
     },
   },
   {
+    name: "request_help",
+    description:
+      "Stop and request missing task context from the Orchestrator. It first checks the issue and existing facts; only genuinely unresolved input is escalated to the person. Work is preserved for the original session.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        question: { type: "string" },
+        context: { type: "string" },
+        summary: { type: "string" },
+      },
+      required: ["question"],
+    },
+  },
+  {
     name: "ask_human",
     description:
       "Stop and ask a human a question you cannot answer yourself (a product decision, missing access). Your work so far is kept; the run continues after the answer.",
@@ -160,6 +184,7 @@ const TOOLS = [
       type: "object",
       properties: {
         question: { type: "string" },
+        kind: { type: "string", enum: ["context", "decision", "permission", "external"] },
         summary: { type: "string", description: "Where you are so far." },
       },
       required: ["question"],
@@ -183,9 +208,67 @@ const TOOLS = [
   },
 ]
 
-const KINDS = { submit: "submit", ask_human: "ask", report_blocked: "blocked" }
+// The same limits as @mikka/protocol/capture; this file has no dependencies.
+const CAPTURE_LIMITS = { png: 10_000_000, jpg: 10_000_000, webp: 10_000_000, mp4: 100_000_000, webm: 100_000_000 }
+const MAX_QUEUED_CAPTURES = 20
+const CAPTURE_TOOL = {
+  name: "submit_capture",
+  description:
+    "Attach a screenshot or screen recording you made (for example with Playwright) to this thread as evidence for the person. PNG, JPEG or WebP up to 10 MB; MP4 or WebM up to 100 MB. Pass a file inside the worktree or your temp directory.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "The file's path." },
+      title: { type: "string", description: "What it shows, for the person." },
+    },
+    required: ["path", "title"],
+  },
+}
 
-function record(kind, args) {
+function sniff(head) {
+  const ascii = (at, text) => [...text].every((c, i) => head[at + i] === c.charCodeAt(0))
+  if (head.length >= 8 && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => head[i] === b)) return "png"
+  if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return "jpg"
+  if (head.length >= 12 && ascii(0, "RIFF") && ascii(8, "WEBP")) return "webp"
+  if (head.length >= 12 && ascii(4, "ftyp")) return "mp4"
+  if (head.length >= 4 && head[0] === 0x1a && head[1] === 0x45 && head[2] === 0xdf && head[3] === 0xa3 && Buffer.from(head).toString("latin1").includes("webm")) return "webm"
+  return null
+}
+
+/** Copies the file into the captures dir after the checks the daemon repeats. */
+function queueCapture(args) {
+  if (!capturesDir) throw new Error("Captures are not available in this run.")
+  const title = typeof args.title === "string" ? args.title.replace(/\s+/g, " ").trim().slice(0, 200) : ""
+  if (!title) throw new Error("A title is required.")
+  if (typeof args.path !== "string" || !args.path) throw new Error("A path is required.")
+  const real = realpathSync(args.path)
+  if (!captureRoots.some((root) => real === root || real.startsWith(root + sep)))
+    throw new Error("The file must be inside the worktree or your temp directory.")
+  const fd = openSync(real, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
+  let ext, id
+  try {
+    const stat = fstatSync(fd)
+    if (!stat.isFile()) throw new Error("Not a regular file.")
+    const head = Buffer.alloc(64)
+    ext = sniff(head.subarray(0, readSync(fd, head, 0, 64, 0)))
+    if (!ext) throw new Error("Not a PNG, JPEG or WebP image, or an MP4 or WebM video.")
+    if (stat.size === 0 || stat.size > CAPTURE_LIMITS[ext]) throw new Error(`At most ${CAPTURE_LIMITS[ext]} bytes for a .${ext} file.`)
+    if (readdirSync(capturesDir).filter((name) => name.endsWith(".json")).length >= MAX_QUEUED_CAPTURES)
+      throw new Error("Too many captures waiting to upload; try again shortly.")
+    id = randomUUID()
+    copyCaptureFd(fd, join(capturesDir, `${id}.${ext}`), stat.size)
+  } finally {
+    closeSync(fd)
+  }
+  // The metadata lands last: the daemon only takes files that have one.
+  const meta = join(capturesDir, `${id}.json`)
+  writeFileSync(`${meta}.tmp`, JSON.stringify({ title, at: new Date().toISOString() }))
+  renameSync(`${meta}.tmp`, meta)
+}
+
+const KINDS = { submit: "submit", request_help: "ask", ask_human: "ask", report_blocked: "blocked" }
+
+function record(kind, args, toolName) {
   // A planning hand-in carries the spec and the split it proposes. The id is
   // generated here, once, so the cards the daemon puts in the conversation
   // and the row the server stores name the same spec.
@@ -197,8 +280,46 @@ function record(kind, args) {
     args.split !== null
       ? { specId: randomUUID(), spec: args.spec, split: args.split }
       : null
+  const questionText = String(
+    kind === "blocked"
+      ? (args.blockedOn ?? "External condition")
+      : (args.question ?? "Missing task input"),
+  )
+    .trim()
+    .slice(0, 4000)
+  const questionKind =
+    kind === "blocked"
+      ? "external"
+      : toolName === "request_help"
+        ? "context"
+        : args.kind === "permission"
+          ? "permission"
+          : "decision"
+  let questionId = randomUUID()
+  try {
+    const existing = JSON.parse(readFileSync(handoffFile, "utf8"))
+    if (
+      existing.kind === kind &&
+      existing.question?.question === questionText &&
+      existing.question.kind === questionKind
+    )
+      questionId = existing.question.questionId
+  } catch {
+    /* First durable hand-in; a retry reads the same id above. */
+  }
   const handoff = {
     kind,
+    ...(kind === "ask" || kind === "blocked"
+      ? {
+          question: {
+            questionId,
+            kind: questionKind,
+            question: questionText,
+            context: String(args.context ?? args.summary ?? "").slice(0, 4000),
+            options: [],
+          },
+        }
+      : {}),
     summary: typeof args.summary === "string" ? args.summary : "",
     nextStep: typeof args.nextStep === "string" ? args.nextStep : null,
     openQuestions: Array.isArray(args.openQuestions)
@@ -226,7 +347,7 @@ function reply(id, result) {
 
 function fail(id, code, message) {
   process.stdout.write(
-    `${JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } })}\n`
+    `${JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } })}\n`,
   )
 }
 
@@ -243,13 +364,21 @@ function handle(message) {
     case "ping":
       return reply(id, {})
     case "tools/list":
-      return reply(id, { tools: TOOLS })
+      return reply(id, { tools: capturesDir ? [...TOOLS, CAPTURE_TOOL] : TOOLS })
     case "tools/call": {
+      if (capturesDir && params?.name === CAPTURE_TOOL.name) {
+        try {
+          queueCapture(params.arguments ?? {})
+        } catch (error) {
+          return reply(id, { isError: true, content: [{ type: "text", text: `Not attached: ${error instanceof Error ? error.message : error}` }] })
+        }
+        return reply(id, { content: [{ type: "text", text: "Attached to this thread. Keep working; it uploads in the background." }] })
+      }
       const kind = KINDS[params?.name]
       if (!kind) return fail(id, -32602, `Unknown tool: ${params?.name}`)
       let planned
       try {
-        planned = record(kind, params.arguments ?? {})
+        planned = record(kind, params.arguments ?? {}, params.name)
       } catch (error) {
         return reply(id, {
           isError: true,

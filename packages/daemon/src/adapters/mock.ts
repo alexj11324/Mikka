@@ -43,9 +43,11 @@ import type {
   StartOptions,
 } from "./types"
 
+// Defined only in the distributable; source tests retain their existing path.
+declare const __MIKKA_DAEMON_BUNDLE__: boolean | undefined
 export const DEFAULT_FIXTURES_DIR = resolve(
   import.meta.dirname,
-  "../../fixtures"
+  typeof __MIKKA_DAEMON_BUNDLE__ !== 'undefined' && __MIKKA_DAEMON_BUNDLE__ ? './fixtures' : '../../fixtures'
 )
 
 export interface FixtureLine {

@@ -16,6 +16,13 @@ import { AgentInteractionContext } from './agent-interaction'
 /** Legacy URLs can select existing history; they can never start another generation. */
 export type LegacyChatRequest = { sessionId: string | null; nonce: number }
 
+/** A search hit can open a session older than the recent 100 in `sessions`. #310's
+ * GET returns its title as `selectedSession`; optional while servers roll forward. */
+function selectedTitle(history: AgentHistory | undefined, selectedId: string | null | undefined) {
+  const selected = (history as (AgentHistory & { selectedSession?: { id: string; title: string } | null }) | undefined)?.selectedSession
+  return selected && selected.id === selectedId && selected.title ? selected.title : null
+}
+
 export function LegacyChatArchive({ userId, initialHistory, request, onActive, onSessions }: {
   userId: string; initialHistory?: AgentHistory; request?: LegacyChatRequest
   onActive?: (sessionId: string | null) => void; onSessions?: (sessions: SavedAgentSession[]) => void
@@ -33,7 +40,7 @@ export function LegacyChatArchive({ userId, initialHistory, request, onActive, o
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: true, continueFromAnswer: async () => false }}>
     <section aria-label={t('title')} data-testid="legacy-chat-archive" className="mikka-agent relative flex size-full min-h-0 flex-col">
-      <ConversationPill name={history?.sessions.find(session => session.id === selectedId)?.title ?? t('title')} />
+      <ConversationPill name={history?.sessions.find(session => session.id === selectedId)?.title ?? selectedTitle(history, selectedId) ?? t('title')} />
       <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
       <p role="status" className="px-4 py-2 text-sm text-muted-foreground">{t('readOnly')}</p>
       {error ? <><p role="alert">{t('loadError')}</p><Button variant="outline" onClick={() => { void latest.mutate(); void selected.mutate() }}>{t('retry')}</Button></>

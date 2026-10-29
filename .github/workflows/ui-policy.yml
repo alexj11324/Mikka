@@ -95,7 +95,8 @@ jobs:
     name: UI policy (full)
     needs: changes
     if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
-    runs-on: ubuntu-latest
+    # Fixed standard Linux image; host namespace/security policy stays unchanged.
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
     env:
       BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
@@ -112,6 +113,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm test:factory-check-independence
+      - run: pnpm test:factory-check-recovery
+      - run: pnpm test:factory-routing
+      - run: pnpm test:self-improvement-semantic-source
       - run: node --test scripts/ci-docs-only.test.mjs scripts/ci-browser-tests.test.mjs
       - run: pnpm test:ui-policy
       - run: pnpm test:motion
@@ -121,24 +126,72 @@ jobs:
       - run: pnpm test:linear-sync
       - run: pnpm check:agent-definitions
       - run: pnpm test:mailbox-verification
+      - run: pnpm test:factory-approval
       - run: pnpm test:personal-mailbox-core
+      - run: pnpm test:factory-monitor
       - run: pnpm test:agent-kit
       - run: pnpm test:agent-kit-compat
       - run: pnpm test:coordinator-events
+      - run: pnpm test:mvp-fixtures
+      - run: pnpm test:credentials
+      - run: pnpm test:run-publication
+      - name: Factory daemon check regressions and shared report contract
+        run: |
+          pnpm --filter @mikka/protocol exec vitest run src/run.test.ts
+          pnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts
       - run: pnpm test:mobile-push
       - run: pnpm test:coordinator-native-relay
       - run: pnpm test:coordinator-native-scope
       - run: pnpm test:coordinator-issue-tools
       - name: Prepare pinned hosted-runner test image
         run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
-      - run: pnpm --filter @mikka/daemon test
+      - name: Daemon unit and transport regression tests
+        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
+      - name: Existing mailbox CLI integration tests
+        run: pnpm --filter @mikka/daemon test:mailbox-cli
+      - name: Local computer authority through actual daemon and adapter protocol
+        run: pnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts src/computer/proxy.test.mjs
       - name: Install sandbox runtime dependencies without changing host namespace policy
+        if: ${{ !cancelled() }}
         run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
+      - name: Install pinned official CLI for offline protocol diagnostics
+        if: ${{ !cancelled() }}
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pr13-codex-contract" --no-audit --no-fund --ignore-scripts @openai/codex@0.163.0
+          echo "CODEX_CONTRACT_BIN=$RUNNER_TEMP/pr13-codex-contract/node_modules/.bin/codex" >> "$GITHUB_ENV"
       - name: Require real sandbox probe and daemon lifecycle acceptance (no skips)
-        run: pnpm --filter @mikka/daemon test
+        if: ${{ !cancelled() }}
+        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-sandbox-results.json"
         env:
           MIKKA_SANDBOX_ACCEPTANCE: '1'
+      - name: Preserve offline CLI diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr13-cli-diagnostics-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/pr13-sandbox-results.json
+            ${{ runner.temp }}/pr13-daemon-unit-results.json
+            /tmp/mikka-official-codex-synthetic-*/evidence.json
+            /tmp/mikka-official-codex-synthetic-*/runs/*/official-cli.stderr.log
+            /tmp/mikka-official-codex-computer-*/evidence.json
+            /tmp/mikka-official-codex-computer-*/runs/*/official-cli.stderr.log
+            /tmp/mikka-official-claude-synthetic-*/evidence.json
+            /tmp/mikka-official-claude-synthetic-*/adapters/runs/*/official-cli.stderr.log
+            /tmp/mikka-official-claude-computer-*/evidence.json
+            /tmp/mikka-official-claude-computer-*/adapters/runs/*/official-cli.stderr.log
+            /tmp/mikka-hosted-approval-*/evidence.json
+            /tmp/mikka-hosted-approval-*/docker.jsonl
+            /tmp/mikka-hosted-approval-*/created-id
+            /tmp/mikka-hosted-approval-*/adapters/native-resources/*.json
+            /tmp/mikka-launcher-computer-*/evidence.json
+          if-no-files-found: warn
       - run: pnpm --filter @mikka/daemon typecheck
+      - run: pnpm --filter @mikka/daemon build
+        id: daemon-package
+      - run: pnpm --filter @mikka/daemon test:package
+        env:
+          MIKKA_DAEMON_DIST_DIR: ${{ steps.daemon-package.outputs.package-directory }}
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm --filter @mikka/mobile typecheck
       - run: pnpm test:active-agents
@@ -151,6 +204,7 @@ jobs:
       - name: Authentication email integration tests (isolated Postgres)
         run: node scripts/test-auth-email.mjs
       - run: pnpm test:groups
+      - run: pnpm test:group-turns
       - run: pnpm test:integrations
       - run: pnpm test:github
       - run: pnpm test:request-log
@@ -159,6 +213,7 @@ jobs:
       - run: pnpm test:agent
       - run: pnpm test:acceptance
       - run: pnpm test:suggestions
+      - run: pnpm test:captures
       - run: pnpm test:db-runner
       - run: pnpm test:csv
       - run: pnpm test:settings
@@ -226,7 +281,7 @@ jobs:
     name: Production build and browser interactions (full)
     needs: changes
     if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 25
     services:
       postgres:
@@ -263,6 +318,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install native dependencies for the CLI approval database roundtrip
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'
@@ -278,13 +335,28 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Verify local execution identities and repository records (isolated Postgres)
+        run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/local-runtime.integration.ts
       - name: Verify thread sharing, membership and privacy against isolated database
-        run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-threads.integration.ts
+        run: node --experimental-test-module-mocks --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-threads.integration.ts
       - name: Required DB suites (temporary Postgres 17, no skips)
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:approved-writes-db,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:migration-steps-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db,test:suggestion-artifact-db
+          RUN_DISPATCH_DB_TESTS: '1'
+          FACTORY_MONITOR_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+          CREDENTIAL_TEST_RETAIN_RESOURCES: '1'
+          DB_TEST_EXPECTED: test:active-agents,test:activity-actor-db,test:agent-kit-db,test:approved-writes-db,test:artifact-migration-db,test:bot-chats-db,test:captures-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:group-turns,test:groups,test:issue-search-db,test:local-repository-migration-db,test:migration-steps-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:run-publication-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db,test:suggestion-artifact-db,test:coordinator-task-binding-db,test:agent-tool-approval-db,test:credentials-db,test:cloud-backend-db,test:scope-detachment-db,test:coordinator-issue-create-db,test:factory,test:run-dispatch,test:self-improvement-db,test:self-improvement-unit,test:skill-semantic-db,test:factory-check-independence-db,test:factory-checks-db,test:factory-routing-db,test:factory-approval-db,test:factory-monitor-db
+      - name: Preserve synthetic CLI approval database evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr13-http-cli-approval-${{ github.sha }}
+          path: |
+            /tmp/mikka-http-network-approval-*/evidence.json
+            /tmp/mikka-http-network-approval-*/*/repo/cli.stderr.log
+            ${{ runner.temp }}/pr13-personal-mailbox-results.xml
+          if-no-files-found: warn
       - run: pnpm build
 
   browser-tests:

@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"time"
+
+	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 )
 
 type QuotaResult struct {
@@ -24,6 +27,58 @@ func (w *Worker) Quota(ctx context.Context, epoch int64) (QuotaResult, error) {
 	if err != nil {
 		return QuotaResult{}, err
 	}
+	result, err := w.fetchQuota(ctx, auth)
+	if err != nil {
+		return QuotaResult{}, err
+	}
+	if err = w.authorizeRuntime(ctx, epoch, "quota", ""); err != nil {
+		return QuotaResult{}, err
+	}
+	return result, nil
+}
+
+// UsageResult is the owner's Settings view: the same projection as Quota and
+// the account's sign-in email. No token, account id or provider text.
+type UsageResult struct {
+	Status  int            `json:"status"`
+	Body    map[string]any `json:"body"`
+	Account string         `json:"account,omitempty"`
+}
+
+var emailPattern = regexp.MustCompile(`^[^\s@<>"\x00-\x1f\x7f]{1,64}@[^\s@<>"\x00-\x1f\x7f]{1,190}$`)
+
+// Usage reads the connection's own allowance for its owner's Settings page. It
+// needs no model binding: the custody scope (owner, workspace, connection) and
+// the connected epoch are the authorization, as for status. It never forces a
+// refresh and never changes the connection: a provider 401/403 is reported for
+// this read only. (readyAuth renews only a token about to expire, as every
+// runtime read does.) Status 0 means the provider could not be reached.
+func (w *Worker) Usage(ctx context.Context, epoch int64) (UsageResult, error) {
+	if w.ExecutionOnly || w.Use != nil {
+		return UsageResult{}, ErrUnsupported
+	}
+	_, auth, err := w.readyAuth(ctx, epoch)
+	if err != nil {
+		return UsageResult{}, err
+	}
+	result := UsageResult{Body: map[string]any{}, Account: accountEmail(auth)}
+	if quota, err := w.fetchQuota(ctx, auth); err == nil {
+		result.Status, result.Body = quota.Status, quota.Body
+	}
+	if current, err := w.Repo.Lookup(ctx, w.Scope); err != nil || current.Epoch != epoch || current.State != "connected" {
+		return UsageResult{}, ErrUnavailable
+	}
+	return result, nil
+}
+
+func accountEmail(auth *core.Auth) string {
+	if email, ok := auth.Metadata["email"].(string); ok && emailPattern.MatchString(email) {
+		return email
+	}
+	return ""
+}
+
+func (w *Worker) fetchQuota(ctx context.Context, auth *core.Auth) (QuotaResult, error) {
 	endpoint := "https://chatgpt.com/backend-api/wham/usage"
 	if w.Scope.Provider == "claude" {
 		endpoint = "https://api.anthropic.com/api/oauth/usage"
@@ -131,9 +186,6 @@ func (w *Worker) Quota(ctx context.Context, epoch int64) (QuotaResult, error) {
 			}
 			result.Body["limits"] = out
 		}
-	}
-	if err = w.authorizeRuntime(ctx, epoch, "quota", ""); err != nil {
-		return QuotaResult{}, err
 	}
 	return result, nil
 }

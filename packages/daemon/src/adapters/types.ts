@@ -14,7 +14,9 @@ import type {
   StopReason,
 } from "@mikka/protocol"
 
+import type { ToolApprovalGate } from "../agents/tool-approval"
 import type { RunChunk } from "../chunks"
+import type { SkillAssignmentReceipt } from '@mikka/protocol/skill'
 import type { Logger } from "../log"
 import type { RunMailbox } from '../run-mailbox'
 
@@ -37,7 +39,7 @@ export interface ExitEvent {
 export type AgentReport = Partial<
   Pick<
     HandoffReport,
-    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria"
+    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria" | "question"
   >
 >
 
@@ -55,9 +57,13 @@ export interface AgentCapabilities {
 }
 
 export interface SessionOptions {
+  /** Trusted, run-bound host gate. Never populated from model input. */
+  toolApproval?: ToolApprovalGate
   /** Host-created run-bound control callbacks; no serialized token/URL/model input. */
   mailbox?: RunMailbox
   runId: string
+  /** Question answers must not fall back to a fresh conversation. */
+  requireSessionResume?: boolean
   /**
    * What the orchestrator dispatched this run for (ADR 0023). A `plan` run
    * is told to write a spec instead of code (ADR ORV-205).
@@ -70,6 +76,8 @@ export interface SessionOptions {
   log: Logger
   /** Domains the repo lets this run reach, on top of the harness's own. */
   networkAllow?: readonly string[]
+  /** Validated cache git directories for this run, supplied by the daemon. */
+  gitWritePaths?: readonly string[]
   /**
    * The workspace's agent policy from the assignment (ADR 0028): domains,
    * the CLI's own permission rules where it has them, the agent's rules.
@@ -80,6 +88,9 @@ export interface SessionOptions {
    * written under the run dir and read into the agent's instructions.
    */
   skills?: readonly RunSkill[]
+  skillReceipt?: SkillAssignmentReceipt
+  /** Persist an authentic root-session protocol observation before more output is processed. */
+  onRuntimeModel?: (sessionId: string, model: string) => void
   /** Mock harness only: fixture to replay. */
   fixture?: string
   /**
@@ -110,6 +121,10 @@ export interface StartOptions extends SessionOptions {
 
 export interface AgentSession {
   readonly sessionId: string
+  /** Observed from the harness protocol, never copied from requested options. */
+  readonly runtimeModel?: string | null
+  /** Existing durable handoff replayed on restart; no new model turn ran. */
+  readonly replayedHandoff?: true
   /** Single-consumer stream; ends after the `exit` event. */
   events(): AsyncIterable<AgentEvent>
   /** User message / interjection. */

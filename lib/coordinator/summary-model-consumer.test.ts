@@ -8,29 +8,30 @@ const stub = (path: string, namedExports: Record<string, unknown>) => mock.modul
 const conversation: { summary: string | null; memory: string; messages: StoredMessage[] } = { summary: null, memory: '', messages: [] }
 const saved: unknown[][] = [], enqueued: unknown[][] = [], forwarded: unknown[][] = []
 let streamed=0, deny=false, streamFailure=false
+let streamFinishOverride:string|undefined, streamErrorEvent=false
 const model={synthetic:true}
 const resolved: unknown[][]=[]
 let modelCalls = 0
 stub('./store.ts', { loadConversation: async () => conversation, saveSummary: async (...args: unknown[]) => { saved.push(args) } })
 stub('./native.ts', { nativeCoordinatorEnabled: () => true, nativeCoordinatorStore: { enqueue: async (...args: unknown[]) => { enqueued.push(args); return 'pure-turn' } } })
 stub('./bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })
-stub('../db/index.ts', { db: null, pool: null })
+stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: () => { throw Error('No database transaction in prompt fixture') } })
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('No database in pure test') } })
-stub('../agent-runs.ts', { addRunMessage: async (...args: unknown[]) => { forwarded.push(args) }, queueRun: () => {}, readRun: () => {}, requestRunStop: () => {}, visibleRuns: () => {} })
+stub('../agent-runs.ts', { addRunMessage: async (...args: unknown[]) => { forwarded.push(args) }, queueRun: () => {}, queueFactoryRun: () => { throw Error('No Factory dispatch in prompt fixture') }, readRun: () => {}, requestRunStop: () => {}, visibleRuns: () => {} })
 stub('../search/index.ts', { webSearch: () => {} })
 stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synthetic-unused' })
 stub('../composio.ts', { runComposioAction: () => {} })
-stub('../pending-action-store.ts', { proposeAction: () => {} })
+stub('../pending-action-store.ts', { proposeAction: () => {}, proposeRepositoryPush: () => {} })
 stub('../issue-access.ts', { issueForUser: () => {} })
 stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })
-stub('../subscription-model-snapshot.ts', { resolveFrozenHostedModel: async (...args:unknown[])=>{resolved.push(args);if(deny)throw new Error('binding_mismatch');return model} })
+stub('../subscription-model-snapshot.ts', { resolveFrozenHostedModel: async (...args:unknown[])=>{resolved.push(args);if(deny)throw new Error('binding_mismatch');const runtime=args[1] as {model:string;modelSelection?:unknown};return runtime.modelSelection?model:runtime.model} })
 stub('../subscription-runtime.ts', { subscriptionRuntime:()=>{throw new Error('No real custody')}, authorizeSubscriptionWorkspace:()=>{throw new Error('No real workspace') } })
 import * as actualAI from 'ai'
 mock.module('ai', { namedExports: { ...actualAI,
- generateText:async(options:{model:unknown})=>{modelCalls++;assert.equal(options.model,'saved-default');return {text:'default summary'}},
- streamText:(options:{model:unknown,maxRetries:number})=>{streamed++;assert.equal(options.model,model);assert.equal(options.maxRetries,0);return {text:Promise.resolve('subscription summary'),finishReason:Promise.resolve(streamFailure?'error':'stop')}},
+ generateText:async(options:{model:unknown})=>{modelCalls++;assert.equal(options.model,'saved-default');return {text:'default summary',finishReason:'stop'}},
+ streamText:(options:{model:unknown,maxRetries:number,onError?:(event:{error:Error})=>void})=>{streamed++;assert.equal(options.model,model);assert.equal(options.maxRetries,0);if(streamErrorEvent)options.onError?.({error:new Error('Synthetic stream error')});return {text:Promise.resolve('subscription summary'),finishReason:Promise.resolve(streamFinishOverride??(streamFailure?'error':'stop'))}},
  pruneMessages:({messages}:{messages:unknown[]})=>messages,
 } })
 
@@ -56,6 +57,18 @@ test('actual preparePrompt compacts with frozen subscription, preserves provenan
  await assert.rejects(sdk.preparePrompt('owner',id(1),snapshot()),/subscription_generation_failed/)
  assert.equal(saved.length,1);assert.equal(modelCalls,0)
  streamFailure=false
+ for(const reason of ['length','content-filter','other','tool-calls']){
+  streamFinishOverride=reason
+  await assert.rejects(sdk.preparePrompt('owner',id(1),snapshot()),/subscription_generation_failed/)
+  assert.equal(saved.length,1,'partial or abnormal summary cannot advance the cursor')
+  assert.equal(modelCalls,0,'an abnormal subscription finish cannot fall back')
+ }
+ streamFinishOverride=undefined
+ streamErrorEvent=true
+ await assert.rejects(sdk.preparePrompt('owner',id(1),snapshot()),/subscription_generation_failed/)
+ assert.equal(saved.length,1,'stream error callback wins over a contradictory stop envelope')
+ assert.equal(modelCalls,0)
+ streamErrorEvent=false
  await sdk.preparePrompt('owner',id(1),snapshot(false))
  assert.equal(modelCalls,1)
  const malformed=snapshot();malformed.runtime.modelSelection=null as never

@@ -14,6 +14,7 @@ from pathlib import Path
 from aiohttp import web, WSMsgType
 
 STATE = Path('/run/mikka-viewer')
+VIEWERS = {}
 
 def decode(value):
     return base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))
@@ -32,6 +33,7 @@ def authorize(token, now=None):
     display = grant['display']
     if type(display) is not int or not 1 <= display <= 999:
         raise ValueError('invalid display')
+    if (STATE / f'{display}.guard').exists(): raise ValueError('credentials are private')
     state = json.loads((STATE / f'{display}.json').read_text())
     if grant['botId'] != state['botId'] or grant['ownerId'] != state['ownerId'] or grant['epoch'] != state['epoch']:
         raise ValueError('revoked grant')
@@ -51,6 +53,12 @@ async def viewer(request):
         reader, writer = await asyncio.open_unix_connection(socket)
     except OSError:
         raise web.HTTPServiceUnavailable()
+    display=grant['display']
+    VIEWERS[display]=VIEWERS.get(display,0)+1
+    (STATE/f'{display}-viewers').write_text(str(VIEWERS[display]))
+    try: authorize(token)
+    except Exception:
+        VIEWERS[display]-=1;(STATE/f'{display}-viewers').write_text(str(VIEWERS[display]));writer.close();await writer.wait_closed();raise web.HTTPUnauthorized()
     ws = web.WebSocketResponse(protocols=('binary',), max_msg_size=1024 * 1024)
     await ws.prepare(request)
 
@@ -68,7 +76,7 @@ async def viewer(request):
 
     async def lease():
         while True:
-            await asyncio.sleep(.5)
+            await asyncio.sleep(.05)
             authorize(token)
 
     tasks = [asyncio.create_task(fn()) for fn in (receive, send, lease)]
@@ -81,9 +89,12 @@ async def viewer(request):
         writer.close()
         await writer.wait_closed()
         await ws.close()
+        VIEWERS[display]-=1;(STATE/f'{display}-viewers').write_text(str(VIEWERS[display]))
     return ws
 
 def main():
+    (STATE/'guard-protocol').write_text('1')
+    for path in STATE.glob('*-viewers'): path.write_text('0')
     app = web.Application()
     app.router.add_get('/vnc', viewer)
     # URL contains a bearer grant: access logging must stay disabled.

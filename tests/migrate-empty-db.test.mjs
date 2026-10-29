@@ -12,6 +12,7 @@ import * as workspaceSchema from '../lib/db/workspace-schema.ts'
 import * as projectSchema from '../lib/db/project-schema.ts'
 import * as teamSchema from '../lib/db/team-schema.ts'
 import { APPLICATION_BASELINE } from '../scripts/migration-order.mjs'
+import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '../lib/issue-meta.ts'
 import { validateTarget } from '../scripts/run-db-tests.mjs'
 
 const run = promisify(execFile)
@@ -31,7 +32,7 @@ function ciTarget() {
 
 function schemaURL(target, schema) {
   const url = new URL(target)
-  url.searchParams.set('options', `-c search_path=${schema}`)
+  url.searchParams.set('options', `-c search_path=${schema},public`)
   return url.toString()
 }
 
@@ -97,6 +98,10 @@ for (const separateTargets of [false, true]) {
     const workspace = new Pool({ connectionString: workspaceURL, max: 1 })
     try {
       assert.equal((await admin.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+      // Extensions are database-wide. Retained fixture schemas must not own
+      // pg_trgm: later isolated runs need its operator class on their path too.
+      await admin.query('CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public')
+      assert.equal((await admin.query("SELECT n.nspname FROM pg_extension e JOIN pg_namespace n ON n.oid=e.extnamespace WHERE e.extname='pg_trgm'")).rows[0].nspname, 'public')
       for (const schema of schemas) {
         await admin.query(`create schema "${schema}"`)
         createdSchemas.push(schema)
@@ -127,6 +132,11 @@ for (const separateTargets of [false, true]) {
       const issue = randomUUID()
       await app.query(`insert into issues (id, "userId", title, content, status, priority)
         values ($1, 'existing-owner', 'Keep this issue', '{"type":"doc"}', 'todo', 'normal')`, [issue])
+      // The tracked schema must accept every current product code and still reject invalid input.
+      for (const status of ISSUE_STATUS_CODES) await app.query('update issues set status=$2 where id=$1', [issue, status])
+      for (const priority of ISSUE_PRIORITY_CODES) await app.query('update issues set priority=$2 where id=$1', [issue, priority])
+      await assert.rejects(app.query('update issues set status=$2 where id=$1', [issue, 'unsupported']), { code: '23514' })
+      await assert.rejects(app.query('update issues set priority=$2 where id=$1', [issue, 'none']), { code: '23514' })
       const userBefore = (await app.query('select * from "user"')).rows
       const issueBefore = (await app.query('select * from issues')).rows
       const before = [await snapshot(app), await snapshot(workspace)]

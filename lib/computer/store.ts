@@ -61,9 +61,19 @@ export class ComputerStore {
             AND r.status=ANY($2::text[])`, [workspaceId, ['queued', 'preparing', 'running', 'waiting_input', 'finishing']])
       }
       const sync = async () => {
-        if (!machine?.sandboxId || !machine.runtimeReady || !desktops.length) return
-        const sandbox = await this.runtime.connectComputer(machine.sandboxId)
-        for (const desktop of desktops) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
+        if (machine?.sandboxId && machine.runtimeReady && desktops.length) {
+          const sandbox = await this.runtime.connectComputer(machine.sandboxId)
+          for (const desktop of desktops) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
+        }
+        // Dedicated threads have their own driver lease. Updating only the
+        // Bot machine leaves an already issued thread grant on an old policy.
+        const threads = (await client.query(`SELECT t."sandboxId",t."botId",t."ownerId",t.epoch FROM thread_machines t
+          JOIN bots b ON b.id=t."botId" AND b."workspaceId"=t."workspaceId" AND b."ownerId"=t."ownerId"
+          WHERE t."workspaceId"=$1 AND t."sandboxId" IS NOT NULL AND t.state IN ('starting','running') ORDER BY t."runId"`, [workspaceId])).rows
+        for (const thread of threads) {
+          const sandbox = await this.runtime.connectComputer(thread.sandboxId)
+          await this.runtime.syncDesktopLease(sandbox, { botId: thread.botId, ownerId: thread.ownerId, display: 1, epoch: thread.epoch, controlledBy: null, controlUntil: 0, computerAllowed: permission !== 'deny', policyVersion: policy.version })
+        }
       }
       // Every transition increments the policy version. The display lock
       // fences old approvals even if the subsequent database commit fails.

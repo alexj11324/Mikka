@@ -15,6 +15,7 @@
     "./relay": "./src/relay.ts",
     "./relay-client": "./src/relay-client.ts",
     "./run-transcript": "./src/run-transcript.ts",
+    "./capture": "./src/capture.ts",
     "./run": "./src/run.ts",
     "./skill": "./src/skill.ts",
     "./skill-presets": "./src/skill-presets/index.ts",
@@ -44,7 +45,9 @@
     "./artifact-frame": "./src/artifact-frame.ts",
     "./coordinator": "./src/coordinator.ts",
     "./computer": "./src/computer.ts",
-    "./subscription": "./src/subscription.ts"
+    "./subscription": "./src/subscription.ts",
+    "./repository": "./src/repository.ts",
+    "./subagent": "./src/subagent.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",

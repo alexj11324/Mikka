@@ -38,6 +38,8 @@ export interface RunSource {
   steps: number
   createdAt: string
   finishedAt: string | null
+  /** Task outputs, already filtered through the viewer's task access. */
+  pullRequests?: import('@/lib/issue-metadata').IssuePullRequest[]
 }
 
 export type CitationSource = IssueSource | RunSource

@@ -502,3 +502,88 @@ func TestCleanupFailuresCannotStarveLaterArtifacts(t *testing.T) {
 		t.Fatal("four failed deletions starved the next artifact")
 	}
 }
+
+func usageAnswer(provider string, rejected func(string) bool) *http.Client {
+	return &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		secret := request.Header.Get("Authorization")
+		if rejected(secret) {
+			return &http.Response{StatusCode: 401, Body: io.NopCloser(strings.NewReader(`{"error":"` + secret + `"}`)), Header: make(http.Header)}, nil
+		}
+		body := map[string]any{"diagnostic": secret, "plan_type": "plus"}
+		if provider == "codex" {
+			body["rate_limit"] = map[string]any{"primary_window": map[string]any{"used_percent": 25, "limit_window_seconds": 18000, "reset_at": 1793000000}, "secondary_window": map[string]any{"used_percent": 60, "limit_window_seconds": 604800, "reset_at": 1793400000}}
+		} else {
+			body["five_hour"] = map[string]any{"utilization": 25, "resets_at": "2026-10-28T12:00:00Z"}
+			body["seven_day"] = map[string]any{"utilization": 60, "resets_at": "2026-11-02T08:00:00Z"}
+		}
+		raw, _ := json.Marshal(body)
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(raw)), Header: make(http.Header)}, nil
+	})}
+}
+
+func TestUsageReadsOwnConnectionWithoutBindingOrToken(t *testing.T) {
+	for _, provider := range []string{"codex", "claude"} {
+		t.Run(provider, func(t *testing.T) {
+			w, _, issuer := fixtureWorker(t, provider)
+			initial := mustAcquire(t, w)
+			w.QuotaClient = usageAnswer(provider, func(string) bool { return false })
+			ctx := context.Background()
+			bound := w.Use
+			if _, err := w.Usage(ctx, initial.Revision); err != ErrUnsupported {
+				t.Fatal("usage ran under a model binding")
+			}
+			w.Use = nil
+			result, err := w.Usage(ctx, initial.Revision)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, _ := json.Marshal(result)
+			if bytes.Contains(raw, []byte("Bearer")) || bytes.Contains(raw, []byte("fixture-"+provider)) || bytes.Contains(raw, []byte("diagnostic")) {
+				t.Fatal("usage exported a credential")
+			}
+			if result.Status != 200 || result.Account != "fixture@example.invalid" || !bytes.Contains(raw, []byte("60")) || issuer.refreshes.Load() != 0 {
+				t.Fatalf("usage lost its projection: %s", raw)
+			}
+			if _, err := w.Usage(ctx, initial.Revision+1); err == nil {
+				t.Fatal("usage read a stale revision")
+			}
+			w.ExecutionOnly = true
+			if _, err := w.Usage(ctx, initial.Revision); err != ErrUnsupported {
+				t.Fatal("execution role read usage")
+			}
+			w.ExecutionOnly, w.Use = false, bound
+		})
+	}
+}
+
+func TestPersistentUsage401NeverRefreshesOrStopsTheConnection(t *testing.T) {
+	for _, status := range []int{401, 403} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			w, _, issuer := fixtureWorker(t, "claude")
+			initial := mustAcquire(t, w)
+			w.Use = nil
+			ctx := context.Background()
+			w.QuotaClient = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(`{"error":"` + request.Header.Get("Authorization") + `"}`)), Header: make(http.Header)}, nil
+			})}
+			for i := 0; i < 3; i++ {
+				result, err := w.Usage(ctx, initial.Revision)
+				if err != nil || result.Status != status || result.Account != "fixture@example.invalid" || len(result.Body) != 0 {
+					t.Fatalf("refused read not reported for itself: %+v %v", result, err)
+				}
+			}
+			if issuer.refreshes.Load() != 0 {
+				t.Fatal("a Settings read spent the refresh token")
+			}
+			record, err := w.Repo.Lookup(ctx, w.Scope)
+			if err != nil || record.State != "connected" || record.Epoch != initial.Revision || record.Version != initial.CredentialVersion {
+				t.Fatalf("a Settings read changed the connection: %+v %v", record, err)
+			}
+			// The runtime path still works afterwards.
+			bindFixture(t, w, initial.Revision, "claude_cpa")
+			if _, err := w.Execute(ctx, initial.Revision, "fixture-model", nil); err != nil {
+				t.Fatal("bots stopped after a Settings 401:", err)
+			}
+		})
+	}
+}

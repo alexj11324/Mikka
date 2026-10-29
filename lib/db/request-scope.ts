@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { Pool } from 'pg'
-import { drizzle } from 'drizzle-orm/node-postgres'
+import { Pool, type PoolClient } from 'pg'
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as schema from './schema'
 import { mikkaDatabaseURL } from './config'
 
@@ -20,10 +20,12 @@ if (process.env.NODE_ENV !== 'production' && process.env.VERCEL_ENV !== 'preview
 const defaultDatabase = createDatabase(defaultPool)
 const requestDatabase = new AsyncLocalStorage<{ pool: Pool; db: typeof defaultDatabase }>()
 type Transaction = Parameters<Parameters<typeof defaultDatabase.transaction>[0]>[0]
-const transactionDatabase = new AsyncLocalStorage<Transaction>()
+const heldClient = new AsyncLocalStorage<PoolClient>()
+const transactionDatabase = new AsyncLocalStorage<Transaction | NodePgDatabase<typeof schema>>()
 
 export const pool = new Proxy(defaultPool, {
   get(target, property) {
+    if (property === 'query' && heldClient.getStore()) return heldClient.getStore()!.query.bind(heldClient.getStore()!)
     const current = requestDatabase.getStore()?.pool ?? target
     const value = Reflect.get(current, property, current)
     return typeof value === 'function' ? value.bind(current) : value
@@ -41,6 +43,11 @@ export const db = new Proxy(defaultDatabase, {
 /** Keep composed actions on the caller's transaction; nested actions use savepoints. */
 export function withDatabaseTransaction<T>(transaction: Transaction, callback: () => T): T {
   return transactionDatabase.run(transaction, callback)
+}
+
+/** Reuse an already-open SQL transaction without acquiring another pool connection. */
+export function withDatabaseClient<T>(client: PoolClient, callback: () => T): T {
+  return heldClient.run(client, () => transactionDatabase.run(drizzle(client, { schema }), callback))
 }
 
 export function createRequestDatabaseScope(connectionString: string) {

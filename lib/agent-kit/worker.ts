@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { Harness } from '@mikka/protocol/harness'
 import { digest, type DefinitionSnapshot } from './definition'
 import { snapshotMailboxTools, workerMailboxScope, type WorkerMailboxScope, type WorkerMailboxGrant } from '../personal-mailbox-capability'
+import type { RepositoryAdmission } from '../repository-admission'
 
 export interface WorkerDefinitionSnapshot {
   schemaVersion: 1
@@ -16,6 +17,8 @@ export interface WorkerDefinitionSnapshot {
   parent: { executionId: string; revisionId: string; revision: number; definitionDigest: string } | null
   /** Explicit parent-selected tools, frozen only for newly authorized runs. */
   mailbox?: WorkerMailboxGrant
+  /** Server-owned authority accepted with this local task, preserved by retries. */
+  repositoryAdmission?: RepositoryAdmission
 }
 
 /** Captured atomically with dispatch, not retroactively inferred from a renamed Agent. */

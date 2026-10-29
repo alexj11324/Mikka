@@ -21,7 +21,7 @@ import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
  * What the center column shows: the Coordinator, a bot's chat (both on the
  * Coordinator harness), or a read-only older chat (reachable from ⌘K only).
  */
-export type ChatTarget = { kind: 'coordinator' } | { kind: 'bot'; botId: string } | { kind: 'agent'; sessionId: string | null }
+export type ChatTarget = { kind: 'coordinator' } | { kind: 'bot'; botId: string } | { kind: 'agent'; sessionId: string | null } | { kind: 'group'; id: string; title: string; workspaceId: string }
 
 type ListProps = {
   bots: BotView[]

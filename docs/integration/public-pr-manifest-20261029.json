@@ -1,0 +1,297 @@
+{
+  "repository": "alexj11324/Mikka",
+  "snapshot_date": "2026-10-29",
+  "base_commit": "142e1304f5d647264ffa62fdce37b1fab2222003",
+  "pr_count": 36,
+  "policy": "One aggregate tree on current main. Preserve public deltas and current architecture; exclude enterprise quota/audit/export ancestry. Superseded work is recorded explicitly, not described as a byte-for-byte merge.",
+  "prs": [
+    {
+      "number": 13,
+      "head_sha": "2d8777b172565737aa7abf10176120164132a728",
+      "head_ref": "claude/project-thread-08rikk",
+      "title": "feat: agent roles and the Agent settings page",
+      "disposition": "covered-by-current-or-successor",
+      "reason": "Current main intentionally removes standalone Agent management. Trusted harness/permission execution is covered by #398 and automatic device execution by #359/#362; do not restore the obsolete HeroUI role/model-picker UI or blanket bypass defaults."
+    },
+    {
+      "number": 54,
+      "head_sha": "407ddbcde1339afd68b20dbb11eba05fb2a2c622",
+      "head_ref": "cursor/cloud-agent-env-9ada",
+      "title": "docs: note how Cloud Agents run the local Mikka stack",
+      "disposition": "integrated",
+      "reason": "Local/cloud acceptance documentation."
+    },
+    {
+      "number": 157,
+      "head_sha": "5d8a3d1c167e5202fd73208d22f236b4dfb95441",
+      "head_ref": "wabi/issue-148-remote-desktop",
+      "title": "Draft: remote computer transport and exact workspace approval boundary (#148)",
+      "disposition": "covered-by-current-or-successor",
+      "reason": "Current main cloud-computer runtime and #346 supersede the old standalone remote transport. Preserve dedicated device/workspace bindings and existing policy, without reviving the retired ask-everything transport."
+    },
+    {
+      "number": 166,
+      "head_sha": "1d84f4cf47ef659711713890f2e65e876687ec49",
+      "head_ref": "wabi/issue-108-group-turns",
+      "title": "feat(groups): serialized routing and correction persistence (#108/#126)",
+      "disposition": "integrated",
+      "reason": "Serialized group routing and durable correction state."
+    },
+    {
+      "number": 206,
+      "head_sha": "9e610781af271d8431e818a9e477109e2ddf2c4a",
+      "head_ref": "codex/byos-binding-0ac9e45",
+      "title": "Draft: owner-scoped BYOS custody and account email recovery",
+      "disposition": "covered-by-current-or-successor",
+      "reason": "Current main BYOS custody/email recovery and the #345/#377 account architecture supersede this earlier draft. Keep current owned bindings and cleanup paths."
+    },
+    {
+      "number": 240,
+      "head_sha": "39147229fb343f443c71e8246a8dc508c5d4d64b",
+      "head_ref": "feat/coordinator-submit-idempotency",
+      "title": "feat: send Coordinator messages with an idempotency key",
+      "disposition": "integrated",
+      "reason": "Idempotent Coordinator message submission."
+    },
+    {
+      "number": 265,
+      "head_sha": "50598846e592dbdb4b9419f96eb99b6cf5b9edbf",
+      "head_ref": "codex/215-tenant-quota-20261025",
+      "title": "Draft: enforce tenant budgets and quotas across backend execution (#215)",
+      "disposition": "excluded-enterprise",
+      "reason": "Tenant budget/quota enforcement (#215), explicitly excluded by the request."
+    },
+    {
+      "number": 287,
+      "head_sha": "fe0c9152baf5eb148d57b32e7fb3480ad6b6fce9",
+      "head_ref": "integrate/280-mailbox-workspace",
+      "title": "Integrate mailbox and scoped Agent exchange backends",
+      "disposition": "public-covered-enterprise-excluded",
+      "reason": "Public mailbox/scoped exchange behavior already exists in current main. Do not import inherited enterprise audit/export stack or the retired group executor. Keep this mixed PR open for its excluded enterprise residue."
+    },
+    {
+      "number": 300,
+      "head_sha": "e4e9014668055b1803a2af655fb425dd566068e2",
+      "head_ref": "codex/294-durable-telegram-replies",
+      "title": "Recover durable Telegram replies and compose current Bot round ceiling",
+      "disposition": "public-delta-integrated",
+      "reason": "Port durable Telegram reply receipts and recovery. Retain current 120-round behavior; exclude inherited organization policy, tenant quotas and audit stack."
+    },
+    {
+      "number": 301,
+      "head_sha": "1682ed092e1417c2dbf255b5760c22b3f8d57eb3",
+      "head_ref": "codex/184-personal-revert-20261026",
+      "title": "Draft: fence scope retirement, run completion and Linear re-publication (#184)",
+      "disposition": "covered-by-current-or-successor",
+      "reason": "Included through successor #365 (ancestor relationship verified)."
+    },
+    {
+      "number": 304,
+      "head_sha": "1001971b44d499a2d71bd7d0067e8aa0786c3ebd",
+      "head_ref": "codex/cleaner-current-main-diagnostics-20261026",
+      "title": "Integrate cleanup-only safe diagnostics with current main",
+      "disposition": "covered-by-current-or-successor",
+      "reason": "Safe diagnostics are byte-identical to the current main classifier; the earlier credential broker is superseded by #345."
+    },
+    {
+      "number": 308,
+      "head_sha": "42f0d5c4ccba01703f1a606c4472a333badc0145",
+      "head_ref": "codex/177-approved-write-actions",
+      "title": "Draft: approved Notion Slack and Calendar cancellation backend (#177)",
+      "disposition": "covered-by-current-or-successor",
+      "reason": "Current main approved writes, cancellation/replay protections, and #392 preserve and extend the public behavior."
+    },
+    {
+      "number": 313,
+      "head_sha": "77c9984a55afaa2e6e980f05aeed6ae6bc0a12dc",
+      "head_ref": "integration/auth-r0-main975ee",
+      "title": "Integrate retained R0 coverage with owner-only thread access",
+      "disposition": "public-covered-enterprise-excluded",
+      "reason": "Preserve current owner-only threads, automatic test accounts and mandatory DB inventory. Do not import inherited enterprise audit/export/disposal or obsolete R0 runner composition. Keep this mixed PR open for its excluded enterprise residue."
+    },
+    {
+      "number": 316,
+      "head_sha": "4c1255dbbb81b6247a3b68b7d946d22a6e8030be",
+      "head_ref": "codex/self-improvement-acceptance-20261026",
+      "title": "WIP: complete controlled Skill improvement and real acceptance (#237)",
+      "disposition": "covered-by-current-or-successor",
+      "reason": "Included through successor #395 (ancestor relationship verified)."
+    },
+    {
+      "number": 318,
+      "head_sha": "ae2cc7531b70cded25d7c7d1101abdb0fe913d7c",
+      "head_ref": "claude/keen-franklin-1354x6",
+      "title": "feat(search): wire ⌘K to site search, read-only group chat, personal-scope confirmation (#131, #184)",
+      "disposition": "integrated",
+      "reason": "Site search, read-only group history, and explicit personal scope."
+    },
+    {
+      "number": 338,
+      "head_sha": "ba0d6ca05ff6c229061382afbb3fbc383bda46ee",
+      "head_ref": "claude/issue-search-pickers",
+      "title": "feat: wire issue relation pickers to the server-side search API",
+      "disposition": "integrated",
+      "reason": "Server-backed issue relation lookup."
+    },
+    {
+      "number": 345,
+      "head_sha": "eedc0f0b8846a493d40dfac16d6d0eb10c2b79de",
+      "head_ref": "codex/180-account-credential-vault",
+      "title": "feat: account credential vault and isolated AWS KMS broker (#180)",
+      "disposition": "integrated",
+      "reason": "Personal account credential vault with isolated KMS broker."
+    },
+    {
+      "number": 346,
+      "head_sha": "a18dfd27dbb3ff9e62bfff4a98fe76e4108eba7c",
+      "head_ref": "codex/342-runtime",
+      "title": "feat: owner-scoped browser subagents and separate thread machines (#342)",
+      "disposition": "integrated",
+      "reason": "Owner-scoped browser subagents and separate Thread machines."
+    },
+    {
+      "number": 359,
+      "head_sha": "bdecd4e905f631ca81532e644a5ca6c91311e0d0",
+      "head_ref": "codex/mvp-local-runtime",
+      "title": "feat(daemon): provision local execution and clone repositories (#357 · 3/6)",
+      "disposition": "integrated",
+      "reason": "Local execution discovery and canonical repository cache."
+    },
+    {
+      "number": 360,
+      "head_sha": "7ecd963472ac0430115ae83c129b125f970ff424",
+      "head_ref": "codex/mvp-device-auth",
+      "title": "feat(daemon): ship JS package and browser device authorization",
+      "disposition": "integrated",
+      "reason": "JavaScript daemon package and browser device authorization."
+    },
+    {
+      "number": 361,
+      "head_sha": "3352981641321db43ffb0b94d46fd0427b261ddc",
+      "head_ref": "codex/mvp-results",
+      "title": "feat: close local thread results with approved pushes and GitHub PRs",
+      "disposition": "integrated",
+      "reason": "Approved repository publication and durable GitHub PR results."
+    },
+    {
+      "number": 362,
+      "head_sha": "61d231717826fcf943d647ff3a5a18e8be3664d5",
+      "head_ref": "codex/mvp-e2e",
+      "title": "test: use automatic pooled login for MVP daemon acceptance",
+      "disposition": "integrated",
+      "reason": "Automatic test-account MVP acceptance on the current local runtime."
+    },
+    {
+      "number": 363,
+      "head_sha": "661adbc8acc0e1f7b2627f18415513278a2bfe17",
+      "head_ref": "claude/run-captures",
+      "title": "feat: screenshots and screen recordings as run evidence",
+      "disposition": "integrated",
+      "reason": "Screenshots and recordings as owner-scoped run evidence."
+    },
+    {
+      "number": 365,
+      "head_sha": "c7e90be1cb67096b0d7abe4cbb4eb08875b79d79",
+      "head_ref": "codex/301-personal-scope-batch",
+      "title": "Keep tasks personal until an explicit team choice",
+      "disposition": "integrated",
+      "reason": "Explicit team choice, personal scope retirement and generation fences."
+    },
+    {
+      "number": 375,
+      "head_sha": "172ea15341cdc0aed7067f5982a8b403a12688c2",
+      "head_ref": "design/grey-secondary-buttons",
+      "title": "Make secondary buttons a grey fill with no border",
+      "disposition": "integrated",
+      "reason": "Secondary button styling."
+    },
+    {
+      "number": 377,
+      "head_sha": "564687642461809ecc68a18d86ac61bcbdc0beca",
+      "head_ref": "design/plugins-accounts",
+      "title": "feat(plugins): app icons, on/off switch, account detail with reconnect and disconnect",
+      "disposition": "integrated",
+      "reason": "Connected app icons, controls and account reconnect/disconnect."
+    },
+    {
+      "number": 378,
+      "head_sha": "00cd1f716ce8c4e8529db5eefdc4079d16f37f74",
+      "head_ref": "design/subscription-quota",
+      "title": "feat(settings): show remaining subscription quota per connected account",
+      "disposition": "integrated",
+      "reason": "Remaining connected-subscription quota display; personal account UI, not tenant budget enforcement."
+    },
+    {
+      "number": 385,
+      "head_sha": "283a64232fe444505a59fed15d8364214512f26a",
+      "head_ref": "codex/192-routing-main-20261028",
+      "title": "Persist owner-scoped Factory intake routing (#192)",
+      "disposition": "covered-by-current-or-successor",
+      "reason": "Included through successor #386 (ancestor relationship verified)."
+    },
+    {
+      "number": 386,
+      "head_sha": "b92633177829c31b584eaa5caa4dda4f705f10ae",
+      "head_ref": "codex/factory193-checks-20261028",
+      "title": "Wire Factory independent checks and receipt-bound model recovery (#193)",
+      "disposition": "integrated",
+      "reason": "Scoped Factory lifecycle, independent checks and model recovery."
+    },
+    {
+      "number": 388,
+      "head_sha": "0aceacba24fdf010aca1222ece05beed5576d6c7",
+      "head_ref": "codex/194-approval-main-20261028",
+      "title": "feat(factory): extract candidate-bound approval and publication consumers",
+      "disposition": "integrated",
+      "reason": "Candidate-bound approval, policy authority and publication consumers."
+    },
+    {
+      "number": 389,
+      "head_sha": "8561dfd4683d34d30867899fa538b6b633ba014b",
+      "head_ref": "codex/195-monitor-minimal-20261028",
+      "title": "feat(factory): validate monitor V2 observations and scoped issue proposals",
+      "disposition": "integrated",
+      "reason": "Scoped monitor observations and incident/issue proposals."
+    },
+    {
+      "number": 392,
+      "head_sha": "ba8177e1acba4327129fe2548e4dbb3f41e48d92",
+      "head_ref": "fix/374-policy-write",
+      "title": "fix: connect personal write policy and visual model execution",
+      "disposition": "integrated",
+      "reason": "Personal write policy and real-image model execution."
+    },
+    {
+      "number": 394,
+      "head_sha": "9e052675f92207ff68a93d56271bd59e9b5920f8",
+      "head_ref": "fix/coordinator-model-judgment-dd6",
+      "title": "fix(coordinator): bind model judgments to real images and durable retries",
+      "disposition": "integrated",
+      "reason": "Image-bound Decisions judgments and durable triage retries."
+    },
+    {
+      "number": 395,
+      "head_sha": "fef4ef272e456fe796bcb3127cd32a202137c602",
+      "head_ref": "codex/skill-semantic-316-integration-20261028",
+      "title": "Add controlled Skill comparison with trusted execution evidence",
+      "disposition": "integrated",
+      "reason": "Controlled Skill comparison and trusted execution evidence."
+    },
+    {
+      "number": 398,
+      "head_sha": "bfe9875777fa25f182c014975115fc2bdeec9694",
+      "head_ref": "codex/pr13-approval-bridge-dd6d8d4",
+      "title": "fix: enforce trusted CLI policy and persist network approval decisions",
+      "disposition": "integrated",
+      "reason": "Trusted CLI policy, tool approvals and durable network decisions."
+    },
+    {
+      "number": 400,
+      "head_sha": "0001db1baa011f77c448503a7188a265d3c983ce",
+      "head_ref": "docs/agents-allocated-test-accounts-20261029",
+      "title": "docs: use automatic test accounts for ordinary local acceptance",
+      "disposition": "integrated",
+      "reason": "Automatic leased accounts for ordinary local/cloud acceptance."
+    }
+  ]
+}

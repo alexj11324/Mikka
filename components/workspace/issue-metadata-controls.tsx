@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useTranslations } from 'next-intl'
 import { moveIssueToProject } from '@/app/actions/projects'
 import useSWR from 'swr'
-import { Box, Check, Circle, GitMerge, GitPullRequest, Link2, Tag, X } from 'lucide-react'
+import { Box, Check, Circle, GitPullRequest, Link2, Tag, X } from 'lucide-react'
 import { getIssuePropertyOptions, updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issue-metadata'
 import { LABEL_COLORS, type IssueLabel, type IssueMetadata, type IssuePullRequest } from '@/lib/issue-metadata'
 import { useActionError } from '@/lib/use-action-error'
@@ -20,6 +20,7 @@ import { IssuePropertyMenu } from './issue-property-menu'
 import { cn } from '@/lib/utils'
 import { ROW_VALUE } from './issue-property-row'
 import { IssuePullRequestLink } from './issue-pull-request-link'
+import { PULL_REQUEST_ICONS } from '@/lib/pull-request-appearance'
 
 export type MetadataSavedIssue = Extract<Awaited<ReturnType<typeof updateIssueMetadata>>, { issue: unknown }>['issue']
 type Target = 'project' | 'labels' | 'pullRequests' | 'invite'
@@ -43,11 +44,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   const tCommon = useTranslations('Common')
   const actionError = useActionError()
   const colorLabel = (value: IssueLabel['color']) => tColors.has(value as never) ? tColors(value as never) : value
-  const prStates = [
-    { value: 'open', label: tPrState('open'), icon: GitPullRequest },
-    { value: 'merged', label: tPrState('merged'), icon: GitMerge },
-    { value: 'closed', label: tPrState('closed'), icon: X },
-  ]
+  const prStates = (['open', 'draft', 'merged', 'closed'] as const).map(value => ({ value, label: tPrState(value), icon: PULL_REQUEST_ICONS[value] }))
   const titles: Record<Target, string> = { project: tProperty('setProject'), labels: tProperty('editLabels'), pullRequests: tProperty('managePullRequests'), invite: tProperty('invite') }
   const [target, setTarget] = useState<Target | null>(null)
   const [pending, setPending] = useState(false)

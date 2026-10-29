@@ -78,9 +78,9 @@ export const ELECTRON_CLIENT_ID = "mikka-desktop"
 /** OAuth client id the daemon sends to the device-authorization plugin. */
 export const DAEMON_CLIENT_ID = "mikka-daemon"
 /**
- * Deep-link host of the desktop screen that approves a daemon's device code:
- * `mikka[-dev]://device?user_code=ABCD-EFGH` (the device-authorization
- * plugin's verification_uri_complete).
+ * Legacy desktop host, retained for older desktop clients. Daemon approval
+ * opens the web page `<origin><basePath>/device?user_code=ABCD-EFGH`.
+ * The grant returns a device token, never a persistent browser session.
  */
 export const DEVICE_APPROVAL_DEEP_LINK_HOST = "device"
 

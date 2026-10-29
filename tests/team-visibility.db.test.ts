@@ -10,10 +10,11 @@ if (process.env.REQUIRE_DB === '1' && !authorized) throw new Error('Visibility d
 
 test('real API/core visibility: owner, teammate, outsider, scope flip and suspension', { skip: !authorized }, async () => {
   const { Pool } = await import('pg')
+  const { drizzle } = await import('drizzle-orm/node-postgres')
   const pool = new Pool({ connectionString: url, max: 2 })
   const { issueForUser } = await import('../lib/issue-access')
   const { issueVisibility } = await import('../lib/issue-visibility')
-  const { db } = await import('../lib/db')
+  const { db, pool: appPool, createRequestDatabaseScope } = await import('../lib/db')
   const { issues } = await import('../lib/db/schema')
   const { readRun, visibleRuns, addRunMessage, requestRunStop } = await import('../lib/agent-runs')
   const tools = await import('../lib/mcp/tools')
@@ -31,7 +32,7 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     for (const [w,u] of [[workspace,owner],[workspace,member],[otherWorkspace,foreign]]) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [w,u,`${u}@example.invalid`])
     for (const [id,w,u] of [[team,workspace,owner],[otherTeam,otherWorkspace,foreign]]) await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Visibility\',\'VIS\')', [id,w,u])
     for (const [id,u,scope,label] of [[shared,owner,'workspace','shared-label'],[personal,owner,'personal','secret-label'],[foreignIssue,foreign,'workspace','foreign-label'],[unlinked,owner,'workspace','invite-label']]) {
-      await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'doing\',\'none\',$5)', [id,u,id,doc(label),scope])
+      await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'doing\',\'normal\',$5)', [id,u,id,doc(label),scope])
       await pool.query('insert into issue_members ("issueId","userId","memberId") values ($1,$2,$3)', [id,u,member])
     }
     // Stale invitations cannot bypass a workspace link; personal scope wins
@@ -50,6 +51,25 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     assert.equal((await issueForUser(member,shared))?.id,shared)
     assert.equal(await issueForUser(member,foreignIssue),null)
     assert.equal(await issueForUser(member,unlinked),null)
+    // Exhaust the application pool as concurrent Factory transactions do.
+    const scope = createRequestDatabaseScope(url!)
+    await scope.run(async () => {
+      const clients = await Promise.all(Array.from({ length: 5 }, () => appPool.connect()))
+      await Promise.all(clients.map(client => client.query('BEGIN')))
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const reads = Promise.all(clients.map(client => issueForUser(member,shared,false,drizzle(client))))
+      try {
+        const result = await Promise.race([reads, new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('visibility requested another application connection')), 5000)
+        })])
+        assert.ok(result.every(issue => issue?.id === shared))
+      } finally {
+        clearTimeout(timer)
+        await Promise.all(clients.map(client => client.query('ROLLBACK')))
+        clients.forEach(client => client.release())
+        await reads.catch(() => undefined)
+      }
+    }).finally(() => scope.close())
     const list = await db.select({id:issues.id}).from(issues).where((await issueVisibility(member)).predicate)
     assert.deepEqual(list.map(x=>x.id).filter(id=>new Set<string>([shared,personal,foreignIssue,unlinked]).has(id)).sort(),[shared])
     for (const user of [member,foreign]) {
@@ -81,7 +101,7 @@ test('real API/core visibility: owner, teammate, outsider, scope flip and suspen
     await assert.rejects(requestRunStop(member,sharedRun), /runNotFound/)
     assert.equal((await pool.query('select "stopRequestedAt" from agent_runs where id=$1',[sharedRun])).rows[0].stopRequestedAt,null)
     const choices = await issuePropertyChoices(member)
-    assert.deepEqual(choices.agents.map(row=>row.id),[ownAgent])
+    assert.equal(Object.hasOwn(choices, 'agents'), false, 'task properties do not list execution identities, including your own')
     assert.deepEqual(choices.labels.map(row=>row.name).sort(),['shared-label'])
     assert.equal(await readRun(foreign,sharedRun),null)
     const citations = await citationSources(member,[`[[issue:${personal}]] [[run:${sharedRun}]]`])

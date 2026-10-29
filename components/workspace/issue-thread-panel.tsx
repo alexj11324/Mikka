@@ -8,13 +8,13 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
 import { runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import type { IssueThread } from '@/lib/issue-threads'
-import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { ThreadStatus, harnessLabel } from './issue-threads'
+import { ThreadStatusIcon } from './thread-status-icon'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
 import { listRunArtifacts } from '@/app/actions/artifacts'
@@ -24,6 +24,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 
 // Loaded on demand: the window itself shows this panel, bare, on its right.
 const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
+import { ThreadFeedback } from './self-improvement'
 
 const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm whitespace-pre-wrap break-words'
 
@@ -99,7 +100,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
         <Button variant="ghost" size="sm" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
         <span aria-hidden="true" className="text-muted-foreground">/</span>
       </>}
-      {detail && <BotAvatar color={colorFor(detail.agentName)} size="pill" still />}
+      {detail && data && <ThreadStatusIcon status={data.thread.status} />}
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{detail?.name ?? t('title')}</h2>
       {back && <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />}
       {!back && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
@@ -129,6 +130,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
                 </>)}
             </li>)}
           </ol>
+          {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
         </>}
     </div>
     {active && detail && <div className={cn('flex shrink-0 flex-col gap-1 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')}>

@@ -12,6 +12,12 @@ const dialect = new PgDialect(), owner = 'synthetic-owner', bot = 'synthetic-bot
 let events: Record<string, unknown>[] = [], messages: StoredMessage[] = [], woke: string[] = []
 let selectionConditions = 0
 const transport = {
+  async execute(query: SQL) {
+    const statement = dialect.sqlToQuery(query)
+    assert.match(statement.sql, /pg_advisory_xact_lock/)
+    assert.ok(statement.params.includes(`bot-chat:${owner}:${bot}`), 'chat lock must bind the owner and Bot')
+    return []
+  },
   select() {
     let table: unknown, condition: SQL
     const selection = {

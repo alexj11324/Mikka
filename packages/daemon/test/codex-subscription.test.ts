@@ -1,3 +1,4 @@
+import { ToolApprovalGate } from "../src/agents/tool-approval"
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { afterEach, expect, it, vi } from "vitest"
@@ -49,6 +50,7 @@ async function fixture(token?: CodexAdapterOptions["subscriptionAuth"]) {
   })
   const options = {
     runId: "external-run",
+    toolApproval: new ToolApprovalGate("external-run", { permission: () => "allow", ask: async () => "deny", isLive: () => true }),
     cwd: await makeRepo(),
     prompt: "REFRESH",
     env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }),

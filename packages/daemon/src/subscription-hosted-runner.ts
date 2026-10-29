@@ -26,6 +26,7 @@ import type { AgentSession, StartOptions } from "./adapters/types";
 import { runPaths, MCP_SERVER_SCRIPT } from "./agents/run-context";
 import type { spawnCli } from "./agents/child";
 import type { AgentSandbox } from "./agents/sandbox";
+import { requireRunToolApproval } from "./agents/tool-approval";
 import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
@@ -324,6 +325,7 @@ export async function createHostedBotRunner(host: {
       assignment: RunAssignment,
       options: StartOptions,
     ): Promise<AgentSession> {
+      const gate = requireRunToolApproval(options.runId, options.toolApproval);
       const selected = assignment.subscriptionBinding;
       const kind = assignment.harness;
       if (
@@ -337,356 +339,433 @@ export async function createHostedBotRunner(host: {
         options.continueSession
       )
         throw unavailable();
-      const context = () =>
-        host.link.nativeContext!(assignment.deviceId, assignment.runId);
-      const first = nativeBrokerContextSchema.parse(await context());
-      if (first.route !== selected.route || first.modelId !== options.model)
-        throw unavailable();
-      const revision = first.revision;
-      const check = async () => {
-        const current = await context();
-        if (
-          current.revision !== revision ||
-          current.accountId !== first.accountId ||
-          current.route !== first.route ||
-          current.modelId !== first.modelId
-        )
-          throw unavailable();
-        return current;
-      };
-      const paths = runPaths(host.stateDir, assignment.runId);
-      mkdirSync(paths.runDir, { recursive: true, mode: 0o700 });
-      const shadow = join(paths.runDir, "runtime-git");
-      const emptyHome = join(paths.runDir, "git-bootstrap-home");
-      mkdirSync(emptyHome, { recursive: true, mode: 0o700 });
-      if (!existsSync(shadow))
-        await exec(
-          "git",
-          [
-            "-c",
-            "core.hooksPath=/dev/null",
-            "-c",
-            "core.fsmonitor=false",
-            "clone",
-            "--no-hardlinks",
-            "--no-checkout",
-            "--",
-            realpathSync(options.cwd),
-            shadow,
-          ],
-          {
-            env: {
-              ...bareEnv,
-              HOME: emptyHome,
-              GIT_CONFIG_GLOBAL: "/dev/null",
-              GIT_CONFIG_SYSTEM: "/dev/null",
-              GIT_TERMINAL_PROMPT: "0",
-            },
-            timeout: 30000,
-            maxBuffer: 1024 * 1024,
-          },
-        );
-      if (
-        !lstatSync(shadow).isDirectory() ||
-        !lstatSync(join(shadow, ".git")).isDirectory() ||
-        !realpathSync(shadow).startsWith(realpathSync(paths.runDir) + "/")
-      )
-        throw unavailable();
-      const ledger = join(
-        host.stateDir,
-        "native-ledgers",
-        assignment.runId + ".json",
-      );
-      const scope = {
-        runId: assignment.runId,
-        bindingId: selected.bindingId,
-        ownerId: selected.ownerId,
-        workspaceId: selected.workspaceId,
-        consumerId: selected.consumerId,
-        route: selected.route,
-        revision,
-        accountId: first.accountId,
-        modelId: first.modelId,
-      };
-      const previous = readJson(ledger) as
-        { scope: typeof scope; sessionId: string } | undefined;
-      if (
-        existsSync(ledger) &&
-        (!previous ||
-          JSON.stringify(previous.scope) !== JSON.stringify(scope) ||
-          typeof previous.sessionId !== "string")
-      )
-        throw unavailable();
-      mkdirSync(dirname(ledger), { recursive: true, mode: 0o700 });
-      const record = async (sessionId: string) => {
-        writeJsonAtomic(ledger, { scope, sessionId });
-      };
-      const broker = await createNativeSubscriptionBroker({
-        root: join(host.stateDir, "native-brokers"),
-        revision,
-        check,
-        worker: {
-          nativeRequest: (_revision, payload, signal) =>
-            host.link.nativeRequest!(
-              assignment.deviceId,
-              assignment.runId,
-              payload,
-              signal,
-            ),
-        },
-      });
       const name = `mikka-native-${randomUUID()}`;
       const nonce = randomUUID();
       const resourceFile = join(resources, name + ".json");
       const resource: Resource = { name, nonce, state: "creating" };
+      const lifetime = new AbortController();
       let closed = false;
       let closing: Promise<void> | undefined;
       let computerGrant: ReturnType<ComputerBroker["spec"]>;
-      const close = () =>
-        (closing ??= (async () => {
-          closed = true;
-          if (computerGrant) host.computerBroker?.revoke(computerGrant.token);
+      type Broker = Awaited<ReturnType<typeof createNativeSubscriptionBroker>>;
+      let broker: Broker | undefined;
+      let brokerStarting: Promise<Broker> | undefined;
+      let creating: Promise<void> | undefined;
+      let timer: ReturnType<typeof setInterval> | undefined;
+      let offRevoke = () => {};
+      const assertOpen = () => {
+        if (closed || gate.revoked || lifetime.signal.aborted) throw unavailable();
+      };
+      const live = async () => {
+        assertOpen();
+        if (!await gate.checkLive()) {
+          gate.revoke();
+          throw unavailable();
+        }
+        assertOpen();
+      };
+      const close = () => {
+        if (closing) return closing;
+        // Fence new work before awaiting anything. A Docker create is not
+        // aborted: its outcome must settle before the nonce-verified removal,
+        // otherwise a late successful create could escape this run's cleanup.
+        closed = true;
+        clearInterval(timer);
+        // Publish the shared close promise before abort emits synchronous child
+        // callbacks; those callbacks can re-enter close through adapter teardown.
+        closing = Promise.resolve().then(async () => {
+          const brokerClosed = (async () => {
+            await brokerStarting?.catch(() => undefined);
+            await broker?.close();
+          })();
+          // Observe failures immediately even if Docker create is still pending;
+          // the finally below still propagates the broker cleanup failure.
+          void brokerClosed.catch(() => undefined);
           try {
-            if (existsSync(resourceFile))
-              await removeResource(resourceFile, resource);
+            await creating?.catch(() => undefined);
+            if (existsSync(resourceFile)) await removeResource(resourceFile, resource);
           } finally {
-            await broker.close();
+            try { await brokerClosed; }
+            finally { offRevoke(); }
           }
-        })());
-      const cwd = realpathSync(options.cwd);
-      const runDir = realpathSync(paths.runDir);
-      const protectedGit = lstatSync(join(cwd, ".git")).isFile()
-        ? join(cwd, ".git")
-        : join(shadow, ".git");
-      if (
-        !lstatSync(runDir).isDirectory() ||
-        !runDir.startsWith(realpathSync(host.stateDir) + "/runs/")
-      ) {
-        await close();
-        throw unavailable();
-      }
-      const computer = assignment.computer;
-      if (computer && (!host.computerBroker || computer.ownerId !== selected.ownerId)) {
-        await close();
-        throw unavailable();
-      }
-      computerGrant = computer ? host.computerBroker!.spec(assignment.runId, decide("computer_use", { policy: assignment.policy }), { display: computer.display }) : undefined;
-      if (computer && !computerGrant) { await close(); throw unavailable(); }
-      const computerMcp = computerGrant ? {
-        command: "node", args: ["/mikka-computer/proxy.mjs", "/run/mikka-computer.sock", computerGrant.token], env: {},
-      } : undefined;
-      const containerArgs = [
-        "create",
-        "--pull=never",
-        "--name",
-        name,
-        "--label",
-        `com.mikka.native.resource=${nonce}`,
-        "--init",
-        "--network",
-        "none",
-        "--read-only",
-        "--cap-drop",
-        "ALL",
-        "--security-opt",
-        "no-new-privileges",
-        "--user",
-        `${process.getuid!()}:${process.getgid!()}`,
-        "--memory=1g",
-        "--cpus=2",
-        "--pids-limit=128",
-        "--tmpfs",
-        "/tmp:rw,nosuid,nodev,noexec,size=128m",
-        "-i",
-        "-v",
-        `${binaries[kind]}:/usr/local/bin/native-cli:ro`,
-        "-v",
-        `${bootstrap}:/native-container.mjs:ro`,
-        "-v",
-        `${MCP_SERVER_SCRIPT}:${MCP_SERVER_SCRIPT}:ro`,
-        "-v",
-        `${broker.socket}:/run/mikka-native.sock:ro`,
-        ...(computerGrant ? [
-          "-v", `${computerGrant.socketPath}:/run/mikka-computer.sock:ro`,
-          "-v", `${fileURLToPath(new URL("./computer/proxy.mjs", import.meta.url))}:/mikka-computer/proxy.mjs:ro`,
-          "-v", `${fileURLToPath(new URL("./computer/driver.mjs", import.meta.url))}:/mikka-computer/driver.mjs:ro`,
-        ] : []),
-        "-v",
-        `${cwd}:${cwd}${options.policy?.readOnly ? ":ro" : ""}`,
-        "-v",
-        `${protectedGit}:${cwd}/.git:ro`,
-        "-v",
-        `${runDir}:${runDir}`,
-        "-w",
-        cwd,
-        image,
-        "node",
-        "/native-container.mjs",
-      ];
-      writeJsonAtomic(resourceFile, resource);
-      try {
-        const created = await exec("docker", containerArgs, {
-          env: bareEnv,
-          timeout: 30000,
         });
-        resource.id = created.stdout.trim();
-        if (!/^[a-f0-9]{64}$/.test(resource.id)) throw unavailable();
-        resource.state = "created";
-        writeJsonAtomic(resourceFile, resource);
-      } catch {
-        await close();
-        throw unavailable();
-      }
-      const spawnHosted = (config: SpawnOptions): SpawnedProcess => {
-        const home = join(runDir, "runtime-home");
-        mkdirSync(home, { recursive: true, mode: 0o700 });
-        // A run may not import its real host HOME or any platform environment.
-        const env = {
-          ...config.env,
-          HOME: kind === "claude_code" ? (config.env.HOME ?? home) : home,
-          PATH: "/usr/local/bin:/usr/bin:/bin",
-          GIT_DIR: join(shadow, ".git"),
-          GIT_WORK_TREE: cwd,
-          GIT_CONFIG_GLOBAL: "/dev/null",
-          GIT_CONFIG_SYSTEM: "/dev/null",
-          GIT_TERMINAL_PROMPT: "0",
-        } as Record<string, string>;
-        for (const [key, value] of Object.entries(env))
+        if (computerGrant) host.computerBroker?.revoke(computerGrant.token);
+        lifetime.abort();
+        return closing;
+      };
+      // Hosted adapters inject Docker spawns, so they do not install the
+      // official sandbox launcher's revocation hook. Own that hook here before
+      // the first context/broker/create await, including already-revoked gates.
+      offRevoke = gate.onRevoke(() => { void close().catch(() => undefined); });
+      try {
+        await live();
+        const context = () =>
+          host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal);
+        const first = nativeBrokerContextSchema.parse(await context());
+        await live();
+        if (first.route !== selected.route || first.modelId !== options.model)
+          throw unavailable();
+        const revision = first.revision;
+        const check = async () => {
+          await live();
+          const current = await context();
+          await live();
           if (
-            value !== undefined &&
-            (/INFISICAL|E2B_API_KEY|REFRESH_TOKEN|^AWS_|^GOOGLE_|^OPENAI_|^ANTHROPIC_.*(?:KEY|TOKEN)|SECRET|PASSWORD/.test(
-              key,
-            ) ||
-              (key === "CLAUDE_CODE_OAUTH_TOKEN" && value !== placeholder))
+            current.revision !== revision ||
+            current.accountId !== first.accountId ||
+            current.route !== first.route ||
+            current.modelId !== first.modelId
           )
             throw unavailable();
-        const child = spawn("docker", ["start", "-ai", name], {
-          env: bareEnv,
-          stdio: ["pipe", "pipe", "pipe"],
-          signal: config.signal,
-        });
-        child.stdin.write(
-          JSON.stringify({ kind, args: config.args, cwd, env }) + "\n",
+          return current;
+        };
+        const paths = runPaths(host.stateDir, assignment.runId);
+        mkdirSync(paths.runDir, { recursive: true, mode: 0o700 });
+        const shadow = join(paths.runDir, "runtime-git");
+        const emptyHome = join(paths.runDir, "git-bootstrap-home");
+        mkdirSync(emptyHome, { recursive: true, mode: 0o700 });
+        if (!existsSync(shadow))
+          await exec(
+            "git",
+            [
+              "-c",
+              "core.hooksPath=/dev/null",
+              "-c",
+              "core.fsmonitor=false",
+              "clone",
+              "--no-hardlinks",
+              "--no-checkout",
+              "--",
+              realpathSync(options.cwd),
+              shadow,
+            ],
+            {
+              env: {
+                ...bareEnv,
+                HOME: emptyHome,
+                GIT_CONFIG_GLOBAL: "/dev/null",
+                GIT_CONFIG_SYSTEM: "/dev/null",
+                GIT_TERMINAL_PROMPT: "0",
+              },
+              timeout: 30000,
+              signal: lifetime.signal,
+              maxBuffer: 1024 * 1024,
+            },
+          );
+        await live();
+        if (
+          !lstatSync(shadow).isDirectory() ||
+          !lstatSync(join(shadow, ".git")).isDirectory() ||
+          !realpathSync(shadow).startsWith(realpathSync(paths.runDir) + "/")
+        )
+          throw unavailable();
+        const ledger = join(
+          host.stateDir,
+          "native-ledgers",
+          assignment.runId + ".json",
         );
-        return child;
-      };
-      const codexSpawn: typeof spawnCli = async (_sandbox, argv, input) => {
-        const child = spawnHosted({
-          command: argv[0],
-          args: argv.slice(1),
-          cwd: input.cwd,
-          env: input.env,
-          signal: new AbortController().signal,
-        }) as ReturnType<typeof spawn>;
-        child.stderr?.resume();
-        const exited = new Promise<{
-          code: number | null;
-          signal: string | null;
-        }>((resolve) => {
-          child.once("exit", (code, signal) => resolve({ code, signal }));
-          child.once("error", () => resolve({ code: null, signal: null }));
+        const scope = {
+          runId: assignment.runId,
+          bindingId: selected.bindingId,
+          ownerId: selected.ownerId,
+          workspaceId: selected.workspaceId,
+          consumerId: selected.consumerId,
+          route: selected.route,
+          revision,
+          accountId: first.accountId,
+          modelId: first.modelId,
+        };
+        const previous = readJson(ledger) as
+          { scope: typeof scope; sessionId: string } | undefined;
+        if (
+          existsSync(ledger) &&
+          (!previous ||
+            JSON.stringify(previous.scope) !== JSON.stringify(scope) ||
+            typeof previous.sessionId !== "string")
+        )
+          throw unavailable();
+        mkdirSync(dirname(ledger), { recursive: true, mode: 0o700 });
+        const record = async (sessionId: string) => {
+          assertOpen();
+          writeJsonAtomic(ledger, { scope, sessionId });
+        };
+        brokerStarting = createNativeSubscriptionBroker({
+          root: join(host.stateDir, "native-brokers"),
+          revision,
+          check,
+          worker: {
+            nativeRequest: async (_revision, payload, signal) => {
+              await live();
+              const upstream = await host.link.nativeRequest!(
+                assignment.deviceId,
+                assignment.runId,
+                payload,
+                AbortSignal.any([lifetime.signal, ...(signal ? [signal] : [])]),
+              );
+              try { await live(); }
+              catch (error) {
+                await upstream.body.cancel().catch(() => undefined);
+                throw error;
+              }
+              return upstream;
+            },
+          },
+        }).then(created => {
+          broker = created;
+          return created;
         });
-        return {
-          process: child as Awaited<ReturnType<typeof spawnCli>>["process"],
-          exited,
-          stderrTail: () => "",
-          kill: async () => {
-            child.kill("SIGTERM");
-            await close().catch(() => undefined);
-          },
-        };
-      };
-      try {
-        const adapter =
-          kind === "codex"
-            ? new CodexAdapter({
-                stateDir: host.stateDir,
-                sandbox: blockedSandbox,
-                spawnCli: codexSpawn,
-                onHostedSession: record,
-                computerMcp,
-                subscriptionAuth: {
-                  accountId: first.accountId,
-                  verify: async () => {
-                    await check();
-                  },
-                  token: async () => {
-                    const current = await check();
-                    return {
-                      accessToken: placeholder,
-                      chatgptAccountId: current.accountId,
-                      chatgptPlanType: current.plan,
-                    };
-                  },
-                },
-              })
-            : new ClaudeAdapter({
-                stateDir: host.stateDir,
-                onHostedSession: record,
-                computerMcp,
-                spawnHosted: (config, token) => {
-                  if (token !== placeholder) throw unavailable();
-                  return spawnHosted(config);
-                },
-                subscriptionAuth: {
-                  brokered: true,
-                  accountId: first.accountId,
-                  verify: async () => {
-                    await check();
-                  },
-                  token: async () => {
-                    const current = await check();
-                    return {
-                      accessToken: placeholder,
-                      accountId: current.accountId,
-                      expiresAt: current.expiresAt,
-                    };
-                  },
-                },
-              });
-        const session = previous
-          ? await adapter.resume(previous.sessionId, options)
-          : await adapter.start(options);
-        let checking = false;
-        const timer = setInterval(() => {
-          if (checking || closed) return;
-          checking = true;
-          void check()
-            .catch(async () => {
-              await session.cancel();
-              await close();
-            })
-            .finally(() => {
-              checking = false;
-            })
-            .catch(() => undefined);
-        }, 1000);
-        timer.unref();
-        const finish = async () => {
-          clearInterval(timer);
+        const readyBroker = await brokerStarting;
+        await live();
+        const cwd = realpathSync(options.cwd);
+        const runDir = realpathSync(paths.runDir);
+        const protectedGit = lstatSync(join(cwd, ".git")).isFile()
+          ? join(cwd, ".git")
+          : join(shadow, ".git");
+        if (
+          !lstatSync(runDir).isDirectory() ||
+          !runDir.startsWith(realpathSync(host.stateDir) + "/runs/")
+        ) {
           await close();
+          throw unavailable();
+        }
+        const computer = assignment.computer;
+        if (computer && (!host.computerBroker || computer.ownerId !== selected.ownerId)) {
+          await close();
+          throw unavailable();
+        }
+        computerGrant = computer ? host.computerBroker!.spec(assignment.runId, decide("computer_use", { policy: assignment.policy }), { display: computer.display }) : undefined;
+        if (computer && !computerGrant) { await close(); throw unavailable(); }
+        const computerMcp = computerGrant ? {
+          command: "node", args: ["/mikka-computer/proxy.mjs", "/run/mikka-computer.sock", computerGrant.token, "--captures"], env: {},
+        } : undefined;
+        const containerArgs = [
+          "create",
+          "--pull=never",
+          "--name",
+          name,
+          "--label",
+          `com.mikka.native.resource=${nonce}`,
+          "--init",
+          "--network",
+          "none",
+          "--read-only",
+          "--cap-drop",
+          "ALL",
+          "--security-opt",
+          "no-new-privileges",
+          "--user",
+          `${process.getuid!()}:${process.getgid!()}`,
+          "--memory=1g",
+          "--cpus=2",
+          "--pids-limit=128",
+          "--tmpfs",
+          "/tmp:rw,nosuid,nodev,noexec,size=128m",
+          "-i",
+          "-v",
+          `${binaries[kind]}:/usr/local/bin/native-cli:ro`,
+          "-v",
+          `${bootstrap}:/native-container.mjs:ro`,
+          "-v",
+          `${MCP_SERVER_SCRIPT}:${MCP_SERVER_SCRIPT}:ro`,
+          "-v",
+          `${join(dirname(MCP_SERVER_SCRIPT), "capture-copy.mjs")}:${join(dirname(MCP_SERVER_SCRIPT), "capture-copy.mjs")}:ro`,
+          "-v",
+          `${readyBroker.socket}:/run/mikka-native.sock:ro`,
+          ...(computerGrant ? [
+            "-v", `${computerGrant.socketPath}:/run/mikka-computer.sock:ro`,
+            "-v", `${fileURLToPath(new URL("./computer/proxy.mjs", import.meta.url))}:/mikka-computer/proxy.mjs:ro`,
+            "-v", `${fileURLToPath(new URL("./computer/driver.mjs", import.meta.url))}:/mikka-computer/driver.mjs:ro`,
+          ] : []),
+          "-v",
+          `${cwd}:${cwd}${options.policy?.readOnly ? ":ro" : ""}`,
+          "-v",
+          `${protectedGit}:${cwd}/.git:ro`,
+          "-v",
+          `${runDir}:${runDir}`,
+          "-w",
+          cwd,
+          image,
+          "node",
+          "/native-container.mjs",
+        ];
+        await live();
+        writeJsonAtomic(resourceFile, resource);
+        try {
+          creating = exec("docker", containerArgs, {
+            env: bareEnv,
+            timeout: 30000,
+          }).then(created => {
+            resource.id = created.stdout.trim();
+            if (!/^[a-f0-9]{64}$/.test(resource.id)) throw unavailable();
+            resource.state = "created";
+            writeJsonAtomic(resourceFile, resource);
+          });
+          await creating;
+          await live();
+        } catch {
+          await close();
+          throw unavailable();
+        }
+        const spawnHosted = (config: SpawnOptions): SpawnedProcess => {
+          assertOpen();
+          const home = join(runDir, "runtime-home");
+          mkdirSync(home, { recursive: true, mode: 0o700 });
+          // A run may not import its real host HOME or any platform environment.
+          const env = {
+            ...config.env,
+            HOME: kind === "claude_code" ? (config.env.HOME ?? home) : home,
+            PATH: "/usr/local/bin:/usr/bin:/bin",
+            GIT_DIR: join(shadow, ".git"),
+            GIT_WORK_TREE: cwd,
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_CONFIG_SYSTEM: "/dev/null",
+            GIT_TERMINAL_PROMPT: "0",
+          } as Record<string, string>;
+          for (const [key, value] of Object.entries(env))
+            if (
+              value !== undefined &&
+              (/INFISICAL|E2B_API_KEY|REFRESH_TOKEN|^AWS_|^GOOGLE_|^OPENAI_|^ANTHROPIC_.*(?:KEY|TOKEN)|SECRET|PASSWORD/.test(
+                key,
+              ) ||
+                (key === "CLAUDE_CODE_OAUTH_TOKEN" && value !== placeholder))
+            )
+              throw unavailable();
+          const child = spawn("docker", ["start", "-ai", name], {
+            env: bareEnv,
+            stdio: ["pipe", "pipe", "pipe"],
+            signal: AbortSignal.any([lifetime.signal, ...(config.signal ? [config.signal] : [])]),
+          });
+          child.stdin.write(
+            JSON.stringify({ kind, args: config.args, cwd, env }) + "\n",
+          );
+          return child;
         };
-        return {
-          sessionId: session.sessionId,
-          async *events() {
-            try {
-              yield* session.events();
-            } finally {
-              await finish();
-            }
-          },
-          send: async (text) => {
-            await check();
-            await session.send(text);
-          },
-          cancel: async () => {
-            await session.cancel();
-            await finish();
-          },
+        const codexSpawn: typeof spawnCli = async (_sandbox, argv, input) => {
+          await check();
+          const child = spawnHosted({
+            command: argv[0],
+            args: argv.slice(1),
+            cwd: input.cwd,
+            env: input.env,
+            signal: new AbortController().signal,
+          }) as ReturnType<typeof spawn>;
+          child.stderr?.resume();
+          const exited = new Promise<{
+            code: number | null;
+            signal: string | null;
+          }>((resolve) => {
+            child.once("exit", (code, signal) => resolve({ code, signal }));
+            child.once("error", () => resolve({ code: null, signal: null }));
+          });
+          return {
+            process: child as Awaited<ReturnType<typeof spawnCli>>["process"],
+            exited,
+            stderrTail: () => "",
+            kill: async () => {
+              child.kill("SIGTERM");
+              await close().catch(() => undefined);
+            },
+          };
         };
-      } catch {
+        try {
+          const adapter =
+            kind === "codex"
+              ? new CodexAdapter({
+                  stateDir: host.stateDir,
+                  sandbox: blockedSandbox,
+                  spawnCli: codexSpawn,
+                  onHostedSession: record,
+                  computerMcp,
+                  subscriptionAuth: {
+                    accountId: first.accountId,
+                    verify: async () => {
+                      await check();
+                    },
+                    token: async () => {
+                      const current = await check();
+                      return {
+                        accessToken: placeholder,
+                        chatgptAccountId: current.accountId,
+                        chatgptPlanType: current.plan,
+                      };
+                    },
+                  },
+                })
+              : new ClaudeAdapter({
+                  stateDir: host.stateDir,
+                  onHostedSession: record,
+                  computerMcp,
+                  spawnHosted: (config, token) => {
+                    if (token !== placeholder) throw unavailable();
+                    return spawnHosted(config);
+                  },
+                  subscriptionAuth: {
+                    brokered: true,
+                    accountId: first.accountId,
+                    verify: async () => {
+                      await check();
+                    },
+                    token: async () => {
+                      const current = await check();
+                      return {
+                        accessToken: placeholder,
+                        accountId: current.accountId,
+                        expiresAt: current.expiresAt,
+                      };
+                    },
+                  },
+                });
+          const session = previous
+            ? await adapter.resume(previous.sessionId, options)
+            : await adapter.start(options);
+          // A quick, successful adapter may already have ended and revoked its
+          // gate here. Preserve its terminal events; sends/spawns/provider work
+          // remain fenced by close, and do not install a new monitor after it.
+          let checking = false;
+          if (!closed) timer = setInterval(() => {
+            if (checking || closed) return;
+            checking = true;
+            void check()
+              .catch(async () => {
+                try { await session.cancel(); }
+                finally { await close(); }
+              })
+              .finally(() => {
+                checking = false;
+              })
+              .catch(() => undefined);
+          }, 1000);
+          timer?.unref();
+          const finish = async () => {
+            clearInterval(timer);
+            await close();
+          };
+          return {
+            sessionId: session.sessionId,
+            async *events() {
+              try {
+                yield* session.events();
+              } finally {
+                await finish();
+              }
+            },
+            send: async (text) => {
+              await check();
+              assertOpen();
+              await session.send(text);
+            },
+            cancel: async () => {
+              try { await session.cancel(); }
+              finally { await finish(); }
+            },
+          };
+        } catch {
+          await close();
+          throw unavailable();
+        }
+      } catch (error) {
         await close();
-        throw unavailable();
+        throw error;
       }
     },
   };

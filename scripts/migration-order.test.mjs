@@ -37,3 +37,43 @@ test('Agent Kit migration alias requires its original exact SQL', () => {
   assert.equal(alreadyApplied(name,new Set(['20261027040500_agent_kit.sql']),sql),true)
   assert.throws(()=>alreadyApplied(name,new Set(['20261027040500_agent_kit.sql']),sql+'-- changed'),/content changed/)
 })
+
+test('local repository defaults only accepts the exact SQL under its historical name', () => {
+  const name = '20261029022353_local_repository_defaults.sql'
+  const old = '20261028020000_local_repository_defaults.sql'
+  const previous = '20261028143922_local_repository_defaults.sql'
+  const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
+  assert.equal(alreadyApplied(name, new Set(), sql), false)
+  assert.equal(alreadyApplied(name, new Set([old]), sql), true)
+  assert.equal(alreadyApplied(name, new Set([previous]), sql), true)
+  assert.equal(alreadyApplied(name, new Set([name]), sql), true)
+  assert.throws(() => alreadyApplied(name, new Set([old]), sql + '\n-- modified'), /content changed/)
+})
+
+test('device authorization recognizes its historical name only for identical SQL', () => {
+  const name = '20261029023121_device_authorization.sql'
+  const old = '20261028022909_device_authorization.sql'
+  const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
+  assert.equal(alreadyApplied(name, new Set(), sql), false)
+  assert.equal(alreadyApplied(name, new Set([old]), sql), true)
+  assert.equal(alreadyApplied(name, new Set([name]), sql), true)
+  assert.throws(() => alreadyApplied(name, new Set([old]), sql + '\n-- modified'), /content changed/)
+})
+
+test('publication migration keeps the exact historical SQL receipt', () => {
+  const name = '20261029024124_run_publications.sql'
+  const old = '20261028030036_run_publications.sql'
+  const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
+  assert.equal(alreadyApplied(name, new Set([old]), sql), true)
+  assert.equal(alreadyApplied(name, new Set(), sql), false)
+  assert.throws(() => alreadyApplied(name, new Set([old]), sql + ' '), /content changed/)
+})
+
+test('credential vault migration recognizes the exact previously applied Preview SQL', () => {
+  const name = '20261029012027_account_credential_vault.sql'
+  const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
+  assert.equal(alreadyApplied(name, new Set(['20261027221500_account_credential_vault.sql']), sql), true)
+  assert.equal(alreadyApplied(name, new Set(['20261028174823_account_credential_vault.sql']), sql), true)
+  assert.equal(alreadyApplied(name, new Set(), sql), false)
+  assert.throws(() => alreadyApplied(name, new Set(['20261027221500_account_credential_vault.sql']), sql + '-- changed'), /content changed/)
+})

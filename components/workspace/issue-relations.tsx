@@ -1,13 +1,14 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronRight, Circle, Flag, GitBranch, Link2, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { listIssueConnections, updateIssueRelation } from '@/app/actions/issue-operations'
-import { listIssues, moveIssue, type getIssue } from '@/app/actions/issues'
+import { moveIssue, type getIssue } from '@/app/actions/issues'
 import { useActionError } from '@/lib/use-action-error'
+import { useRelationSearch } from '@/lib/hooks/use-relation-search'
 import { Button } from '@/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -18,41 +19,19 @@ import { cn } from '@/lib/utils'
 
 type Issue = Awaited<ReturnType<typeof getIssue>>
 export type RelationKind = 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'
-// Picker-only cache key, keyed by the signed-in viewer like the board's ['issues', viewerId] (listIssues returns the viewer's visible issues); mutate it after any relation change.
-export const relationPickerKey = (userId: string) => ['issues', 'relation-picker', userId] as const
 const closed = (status: string) => ['done', 'canceled', 'duplicate'].includes(status)
 
-export function IssueRelationPicker({ viewerId, kind, task, open, onOpenChange, pending, onSelect, validationError }: { viewerId: string; kind: RelationKind; task: Issue; open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; onSelect: (id: string) => void; validationError?: string }) {
+export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, onSelect, validationError }: { kind: RelationKind; task: Issue; open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; onSelect: (id: string) => void; validationError?: string }) {
   const t = useTranslations('Metadata.relations')
   const relationTitle = (value: RelationKind) => t.has(`title.${value}` as never) ? t(`title.${value}` as never) : value
   const [query, setQuery] = useState('')
-  // Relations change between openings; never filter against a stale board snapshot.
-  const { data: connections, error, mutate } = useSWR(open ? ['issue-connections', task.id] : null, () => listIssueConnections(task.id))
-  const { data: latestBoard, isValidating, mutate: mutateBoard } = useSWR(open ? relationPickerKey(viewerId) : null, listIssues)
-  // While revalidating, the cached board may predate the last relation change; wait for fresh data instead of filtering against it.
-  // While a selection is saving, latestBoard may be the pre-save (stale) board: we intentionally keep showing it
-  // (items are disabled via `pending`) so the list the user chose from doesn't collapse back to loading; it refreshes once the save settles.
-  const board = isValidating && !pending ? undefined : latestBoard
-  const source = board ?? (isValidating && !pending ? undefined : connections)
-  const needle = query.trim().toLowerCase()
-  // A parent cannot be one of this task's descendants (the server rejects the cycle too).
-  // Index children by parentId once, then walk the subtree; memoized so typing in the search box doesn't recompute it.
-  const descendants = useMemo(() => {
-    const result = new Set<string>()
-    if (kind !== 'parent' || !source) return result
-    const childrenByParent = new Map<string, string[]>()
-    for (const row of source) { const parentId = row.metadata.parentId; if (!parentId) continue; const siblings = childrenByParent.get(parentId); if (siblings) siblings.push(row.id); else childrenByParent.set(parentId, [row.id]) }
-    const queue = [task.id]
-    while (queue.length) for (const id of childrenByParent.get(queue.pop()!) ?? []) if (!result.has(id)) { result.add(id); queue.push(id) }
-    return result
-  }, [kind, source, task.id])
-  const sameOwner = (source ?? []).filter(row => row.id !== task.id && !descendants.has(row.id) && row.ownerId === task.userId && (kind !== 'child' || row.metadata.parentId !== task.id))
-  const otherOwner = (board ?? []).some(row => row.id !== task.id && row.ownerId !== task.userId)
-  const rows = sameOwner.filter(row => !needle || `${issueIdentifier(row)} ${row.title}`.toLowerCase().includes(needle))
-  const loadFailed = Boolean(error && !board)
+  // The server excludes the task itself, a parent's descendants and a sub-issue's ancestors, and reports canRelate per row.
+  const { items, rows, failed, reload } = useRelationSearch({ open, issueId: task.id, kind, query })
+  const needle = query.trim()
+  const loadFailed = failed && !items
   // On load failure the error is an alert above the Command (cmdk hides CommandEmpty when an item exists); the list keeps only the reload item.
-  const empty = loadFailed ? '' : !source ? t('loading') : rows.length === 0 && !needle && otherOwner && sameOwner.length === 0 ? t('noTasksSameOwner') : rows.length === 0 ? t(needle ? 'noMatch' : 'noTasks') : ''
-  return <Dialog open={open} onOpenChange={value => { if (!pending) onOpenChange(value) }}><DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">{/* Our own container caps the height to the viewport so the header and close button stay visible on short screens; the list scrolls inside. */}<div className="flex max-h-[calc(100svh-2rem)] min-h-0 flex-col"><DialogHeader className="shrink-0 p-4 pr-10"><DialogTitle>{relationTitle(kind)}</DialogTitle><DialogDescription>{t('dialogDescription')}</DialogDescription></DialogHeader>{validationError && <p role="alert" className="shrink-0 px-4 pb-3 text-sm text-destructive">{validationError}</p>}{loadFailed && <p role="alert" className="shrink-0 px-4 pb-3 text-sm text-destructive">{t('loadFailed')}</p>}<Command shouldFilter={false} className="min-h-0 flex-1 [&_[cmdk-item]]:min-h-11 lg:[&_[cmdk-item]]:min-h-0"><CommandInput value={query} onValueChange={setQuery} placeholder={t('searchPlaceholder')} aria-label={t('searchAria')} disabled={pending} />{/* min-h keeps loading / empty / list states the same height so the dialog does not jump. */}<CommandList className="min-h-36">{empty ? <CommandEmpty>{!source ? <span className="text-muted-foreground">{empty}</span> : empty}</CommandEmpty> : null}{rows.length > 0 && <CommandGroup heading={t('group')}>{rows.map(row => { const Icon = ISSUE_STATUSES.find(status => status.value === row.status)?.icon ?? Circle; return <CommandItem key={row.id} value={`${row.id} ${issueIdentifier(row)} ${row.title}`} disabled={pending} onSelect={() => onSelect(row.id)}><Icon /><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row)}</span><span className="truncate">{row.title}</span></CommandItem> })}</CommandGroup>}{error && <CommandGroup><CommandItem value="reload" onSelect={() => { void Promise.all([mutate(), mutateBoard()]) }}>{t('reload')}</CommandItem></CommandGroup>}</CommandList></Command></div></DialogContent></Dialog>
+  const empty = loadFailed ? '' : !items ? t('loading') : rows.length === 0 && !needle && items.some(item => !item.canRelate) ? t('noTasksSameOwner') : rows.length === 0 ? t(needle ? 'noMatch' : 'noTasks') : ''
+  return <Dialog open={open} onOpenChange={value => { if (!pending) onOpenChange(value) }}><DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">{/* Our own container caps the height to the viewport so the header and close button stay visible on short screens; the list scrolls inside. */}<div className="flex max-h-[calc(100svh-2rem)] min-h-0 flex-col"><DialogHeader className="shrink-0 p-4 pr-10"><DialogTitle>{relationTitle(kind)}</DialogTitle><DialogDescription>{t('dialogDescription')}</DialogDescription></DialogHeader>{validationError && <p role="alert" className="shrink-0 px-4 pb-3 text-sm text-destructive">{validationError}</p>}{loadFailed && <p role="alert" className="shrink-0 px-4 pb-3 text-sm text-destructive">{t('loadFailed')}</p>}<Command shouldFilter={false} className="min-h-0 flex-1 [&_[cmdk-item]]:min-h-11 lg:[&_[cmdk-item]]:min-h-0"><CommandInput value={query} onValueChange={setQuery} placeholder={t('searchPlaceholder')} aria-label={t('searchAria')} disabled={pending} />{/* min-h keeps loading / empty / list states the same height so the dialog does not jump. */}<CommandList className="min-h-36">{empty ? <CommandEmpty>{!items ? <span className="text-muted-foreground">{empty}</span> : empty}</CommandEmpty> : null}{rows.length > 0 && <CommandGroup heading={t('group')}>{rows.map(row => { const Icon = ISSUE_STATUSES.find(status => status.value === row.status)?.icon ?? Circle; return <CommandItem key={row.id} value={`${row.id} ${issueIdentifier(row)} ${row.title}`} disabled={pending} onSelect={() => onSelect(row.id)}><Icon /><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row)}</span><span className="truncate">{row.title}</span></CommandItem> })}</CommandGroup>}{failed && <CommandGroup><CommandItem value="reload" onSelect={reload}>{t('reload')}</CommandItem></CommandGroup>}</CommandList></Command></div></DialogContent></Dialog>
 }
 
 export function IssueRelations({ viewerId, task, mode, onOpen, onCreate, onPick, getCurrent, onSaved, disabled }: { viewerId: string; task: Issue; mode: 'subissues' | 'sidebar'; onOpen: (id: string) => void; onCreate: () => void; onPick: (kind: RelationKind) => void; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; disabled: boolean }) {
@@ -77,7 +56,7 @@ export function IssueRelations({ viewerId, task, mode, onOpen, onCreate, onPick,
       if (!latest) return
       const result = await updateIssueRelation({ id: task.id, revision: latest.revision, kind, targetId, remove: true })
       if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
-      onSaved(result.issue); await Promise.all([mutate(), refresh(relationPickerKey(viewerId)), refresh(['issues', viewerId])]); toast.success(t('removed'))
+      onSaved(result.issue); await Promise.all([mutate(), refresh(['issues', viewerId])]); toast.success(t('removed'))
     } catch (error) { toast.error(error instanceof Error ? error.message : t('removeFailed')) }
     finally { busy.current = false; setPending(false) }
   }

@@ -1,10 +1,10 @@
 // i18n-ignore-file: The round notice is a model instruction, not UI copy.
 
 /**
- * Model rounds one message may cost, the way Comma bounds its agents: a round
- * is one model call, however many tools it asks for. A new message from the
- * person starts the count over; the agent's own tool results do not. Web
- * searches have no count of their own, they spend rounds like any tool.
+ * Model rounds one generate/inbox batch may cost: a round is one model call,
+ * however many tools it asks for. A new generate call starts the count over;
+ * tool results within that call do not. This is not a durable counter keyed
+ * by a human message. Web searches spend rounds like any tool.
  */
 export const AGENT_MAX_ROUNDS = 120
 

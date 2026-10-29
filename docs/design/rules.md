@@ -306,6 +306,19 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   the app-wide sweep is open in `decisions.md`. Exception: a comment card
   and the comment box (R-63) carry a 1px `--border` line, which must be a
   dark grey in dark mode, never white at low opacity.
+  Secondary buttons follow the same rule: a grey fill and no stroke, like
+  the 「Add folder…」 button in Claude desktop's settings (a light grey pill
+  on a white panel, no outline). `Button variant="outline"` (and the
+  `outline` Toggle, the motion `secondary`/`outline` buttons) use the
+  `--control` / `--control-hover` tokens, a translucent black (light) or
+  white (dark) overlay, so the button still reads on grey cards and
+  sidebars. Grouped buttons (`ButtonGroup`) keep a 2px gap so each one
+  stays distinct, and `ButtonGroupText` is the same grey with no border.
+  The top-bar search pill is grey too. Do not give a Button
+  `bg-background`/`bg-card` with a border, or turn an outline Button back
+  to white; ui-policy fails both as `style/secondary-button-fill`. Status
+  tones (`statusTones`, used by status and priority pickers and status
+  badges) are a tinted fill with no stroke; neutral uses `--control`.
 - **R-32** Font Geist, Chinese falls back to the system font. Only these text
   styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
   (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium

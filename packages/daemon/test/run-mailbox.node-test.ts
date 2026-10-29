@@ -1,5 +1,7 @@
+import { ToolApprovalGate } from "../src/agents/tool-approval"
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -18,10 +20,23 @@ import type { JournalEntry } from '../src/runs/journal'
 import type { StartOptions, AgentSession } from '../src/adapters/types'
 import { getEventListeners } from 'node:events'
 
-// Only synthetic process fixtures. No database, Docker, login or network fetch.
+// Synthetic process fixtures and retained local Git worktrees only.
+// No database, Docker, login or network fetch.
 // All files/empty IPC directories are retained; no cleanupTempDirs/rm/prune.
 const retained = mkdtempSync(join(tmpdir(), 'mikka-mailbox-cli-'))
+const supervisorRepository = join(retained, 'supervisor-repository')
+const supervisorWorktree = join(retained, 'supervisor-worktree')
+const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' }
+function fixtureGit(args: string[]) {
+  return execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgSign=false', ...args], { env: gitEnv, stdio: 'pipe' })
+}
+mkdirSync(supervisorRepository)
+fixtureGit(['init', '-q', supervisorRepository])
+fixtureGit(['-C', supervisorRepository, '-c', 'user.name=Mailbox fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-qm', 'Synthetic mailbox fixture'])
+fixtureGit(['-C', supervisorRepository, 'worktree', 'add', '--detach', supervisorWorktree, 'HEAD'])
 const endpoint = new URL('https://mikka.invalid/mikka/api/mcp')
+const syntheticApproval = (runId: string) => new ToolApprovalGate(runId, { permission: () => 'allow', ask: async () => 'deny', isLive: () => true })
+
 function fixture() {
   const token = 'mkw_' + randomBytes(32).toString('base64url')
   const assignment = { runId: randomUUID(), mcp: { url: endpoint.href, token, mailbox: true } } as RunAssignment
@@ -86,9 +101,13 @@ function supervisorFixture(f: ReturnType<typeof fixture>, failingClose = false, 
     opened(value)
     return { sessionId: 'synthetic', async *events() { entered(); await ending; yield { type: 'exit' as const, outcome: 'cancelled' as const } }, async send() {}, async cancel() { finish() } }
   }, async resume(): Promise<AgentSession> { throw Error('Unexpected resume') } }
-  const repo = { repoId: 'repo', name: 'synthetic', path: resolve('../..') }
+  const repo = { repoId: 'repo', name: 'synthetic', path: supervisorRepository }
+  const repositoryDeps = {
+    repository(assignment: RunAssignment) { assert.equal(assignment.repoId, repo.repoId); return repo },
+    async prepareRepository() {},
+  } satisfies Pick<SupervisorDeps, 'repository' | 'prepareRepository'>
   const supervisor = new RunSupervisor({ journal, outbox: { push(_id: string, record: { kind: string }) { records.push(record) }, async compact() {}, lastChunkSeq() { return 0 } },
-    worktrees: { pathFor: () => repo.path, async changedFiles() { return [] } }, adapters: new Map([['mock', adapter]]), repos: () => [repo], log: createLogger({ level: 'silent' }),
+    worktrees: { pathFor: () => supervisorWorktree, async changedFiles() { return [] } }, adapters: new Map([['mock', adapter]]), ...repositoryDeps, log: createLogger({ level: 'silent' }),
     prepareRunMailbox: async (assignment: RunAssignment, signal: AbortSignal, check: () => void) => {
       const mailbox = await createRunMailbox({ assignment, endpoint, signal, check, fetch: f.transport })
       if (controls.pause) { controls.pause.entered(); await controls.pause.wait }
@@ -96,12 +115,12 @@ function supervisorFixture(f: ReturnType<typeof fixture>, failingClose = false, 
     }, cancelGraceMs: 10,
   } as unknown as SupervisorDeps)
   const assignment = { ...f.assignment, repoId: 'repo', harness: 'mock', prompt: 'Synthetic', ...(controls.noLease ? {} : { leaseExpiresAt: new Date(Date.now() + 60000).toISOString() }) } as RunAssignment
-  journal.put({ assignment, state: 'queued', sessionId: null, worktree: repo.path, baseCommit: 'synthetic', lastSeq: 0, error: null, updatedAt: new Date().toISOString() })
+  journal.put({ assignment, state: 'queued', sessionId: null, worktree: supervisorWorktree, baseCommit: 'synthetic', lastSeq: 0, error: null, updatedAt: new Date().toISOString() })
   supervisor.resumeAll()
-  return { supervisor, records, options, running, finish, state }
+  return { supervisor, records, get options() { return Promise.race([options, supervisor.idle().then(() => { throw Error('Supervisor ended before starting the fixture adapter: ' + supervisor.list().map(run => run.error).join('; ')) })]) }, running, finish, state }
 }
 
-for (const mode of ['stop', 'lease-expiry', 'default-off', 'close-failure']) test(`actual Supervisor wires the callback and clears custody after ${mode}`, async () => {
+for (const mode of ['stop', 'lease-expiry', 'default-off', 'close-failure']) test(`actual Supervisor wires the callback and clears custody after ${mode}`, { timeout: 10_000 }, async () => {
   const f = fixture(); if (mode === 'default-off') delete f.assignment.mcp!.mailbox
   const h = supervisorFixture(f, mode === 'close-failure', { noLease: mode === 'default-off' })
   const options = await h.options; await h.running
@@ -120,7 +139,7 @@ for (const mode of ['stop', 'lease-expiry', 'default-off', 'close-failure']) tes
   }
 })
 
-for (const mode of ['stop', 'lease-expiry', 'shutdown']) test(`Supervisor handshake handoff ${mode} closes once without starting a CLI`, async () => {
+for (const mode of ['stop', 'lease-expiry', 'shutdown']) test(`Supervisor handshake handoff ${mode} closes once without starting a CLI`, { timeout: 10_000 }, async () => {
   const f = fixture(); let entered!: () => void, release!: () => void
   const ready = new Promise<void>(resolve => { entered = resolve }), wait = new Promise<void>(resolve => { release = resolve })
   const h = supervisorFixture(f, false, { pause: { entered, wait } })
@@ -178,7 +197,7 @@ for (const kind of ['claude_code', 'codex'] as const) test(`${kind} actual fake 
   const log = createLogger({ level: 'silent' })
   const adapter = kind === 'codex'
     ? new CodexAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-codex.mjs'), userHome: home })
-    : new ClaudeAdapter({ stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
+    : new ClaudeAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
   const args = { to: '00000000-0000-4000-8000-000000000001', key: randomUUID(), text: 'normal peer work' }
   const calls = [
     { name: '__mailbox_catalog' }, { name: 'mailbox_recipients', foreignNotice: true },
@@ -190,7 +209,7 @@ for (const kind of ['claude_code', 'codex'] as const) test(`${kind} actual fake 
     { name: 'mailbox_send', arguments: { ...args, key: randomUUID() } },
   ]
   try {
-    const session = await adapter.start({ runId: f.assignment.runId, cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'MAILBOX_TEST ' + JSON.stringify(calls) })
+    const session = await adapter.start({ runId: f.assignment.runId, toolApproval: syntheticApproval(f.assignment.runId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'MAILBOX_TEST ' + JSON.stringify(calls) })
     const chunks = []
     for await (const event of session.events()) chunks.push(event)
     const text = chunks.flatMap(event => event.type === 'chunk' && event.chunk.type === 'text-delta' ? [event.chunk.delta] : []).join('')
@@ -246,9 +265,9 @@ for (const kind of ['claude_code', 'codex'] as const) test(`${kind} actual fake 
   const log = createLogger({ level: 'silent' })
   const adapter = kind === 'codex'
     ? new CodexAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-codex.mjs'), userHome: home })
-    : new ClaudeAdapter({ stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
+    : new ClaudeAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
   try {
-    const session = await adapter.start({ runId: f.assignment.runId, cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox,
+    const session = await adapter.start({ runId: f.assignment.runId, toolApproval: syntheticApproval(f.assignment.runId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox,
       prompt: 'MAILBOX_TEST ' + JSON.stringify([{ name: '__mailbox_catalog' }, { name: 'mailbox_inbox' }, { name: 'mailbox_send', arguments: { to: randomUUID(), key: randomUUID(), text: 'Not granted' } }]) })
     let text = ''
     for await (const event of session.events()) if (event.type === 'chunk' && event.chunk.type === 'text-delta') text += event.chunk.delta
@@ -266,8 +285,9 @@ for (const kind of ['claude_code', 'codex'] as const) test(`${kind} fake CLI has
   const log = createLogger({ level: 'silent' })
   const adapter = kind === 'codex'
     ? new CodexAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-codex.mjs'), userHome: home })
-    : new ClaudeAdapter({ stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
-  const session = await adapter.start({ runId: randomUUID(), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, prompt: 'MAILBOX_TEST ' + JSON.stringify([{ name: '__mailbox_catalog' }, { name: 'mailbox_inbox' }]) })
+    : new ClaudeAdapter({ sandbox: new NoSandbox(), stateDir, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
+  const noMailboxRunId = randomUUID()
+  const session = await adapter.start({ runId: noMailboxRunId, toolApproval: syntheticApproval(noMailboxRunId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, prompt: 'MAILBOX_TEST ' + JSON.stringify([{ name: '__mailbox_catalog' }, { name: 'mailbox_inbox' }]) })
   const chunks = []
   for await (const event of session.events()) chunks.push(event)
   const text = chunks.flatMap(event => event.type === 'chunk' && event.chunk.type === 'text-delta' ? [event.chunk.delta] : []).join('')
@@ -319,9 +339,12 @@ test('Codex unaudited versions and mailbox-enabled history resume fail closed wi
       const binary = join(dir, 'codex-' + version + '.mjs')
       writeFileSync(binary, original.replace('codex_cli_rs/0.163.0', 'codex_cli_rs/' + version), { mode: 0o700 })
       const adapter = new CodexAdapter({ sandbox: new NoSandbox(), stateDir: join(dir, version), binary, userHome: home })
-      const options = { runId: randomUUID(), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'No provider invocation' }
+      const runId = randomUUID()
+      const options = { runId, toolApproval: syntheticApproval(runId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'No provider invocation' }
       await assert.rejects(adapter.start(options), /audited Codex0.163.0/)
-      await assert.rejects(adapter.resume('another-history', options), /fresh Codex thread/)
+      // The failed start has revoked its gate. Use a new host-owned lifetime
+      // to exercise the separate history guard instead of stopping at revoke.
+      await assert.rejects(adapter.resume('another-history', { ...options, toolApproval: syntheticApproval(runId) }), /fresh Codex thread/)
     }
     assert.equal(f.state.writes, 0)
   } finally { await mailbox.close() }

@@ -1,4 +1,5 @@
 import type { DecisionAnswer, DecisionQuestion } from '@/lib/coordinator/decision'
+import type { DecisionExecution } from './decide'
 
 // Who answers a message in a group chat, decided once before any agent wakes,
 // so agents never each judge for themselves whether to speak. An @mention
@@ -31,8 +32,12 @@ export interface GroupMessage { text: string; mentions: readonly string[]; recen
  */
 export type GroupRoute =
   | { by: 'mention'; responders: string[] }
-  | { by: 'model'; responders: string[]; confidence: number }
+  | { by: 'model'; responders: string[]; confidence?: number; execution?: DecisionExecution }
   | { by: 'lead'; responders: [string]; ask?: string }
+
+export class MissingGroupLeadError extends Error {
+  constructor() { super('group_lead_required: owner must PATCH /api/conversations/:id with an eligible leadAgentId') }
+}
 
 export class UnknownMentionError extends Error {
   constructor(readonly ids: string[]) {
@@ -85,11 +90,12 @@ export function routingQuestions(members: readonly RoutingMember[]): DecisionQue
 type Answers = ReadonlyMap<string, Exclude<DecisionAnswer, { type: 'refusal' }>>
 
 /** The route from the model's answers; no answers (no model, budget spent, failure) goes to the Lead. */
-export function routeFromAnswers(answers: Answers | null, members: readonly RoutingMember[], leadId: string): GroupRoute {
+export function routeFromAnswers(answers: Answers | null, members: readonly RoutingMember[], leadId: string | null): GroupRoute {
+  const lead = (): [string] => { if (!leadId || !members.some(m => m.id === leadId)) throw new MissingGroupLeadError(); return [leadId] }
   const responder = answers?.get('responder')
   const everyone = answers?.get('wantsEveryone')
   const ids = new Set(members.map(member => member.id))
-  if (responder?.type !== 'choice' || !ids.has(responder.choice)) return { by: 'lead', responders: [leadId] }
+  if (responder?.type !== 'choice' || !ids.has(responder.choice)) return { by: 'lead', responders: lead() }
   const confidence = responder.confidence ?? 0
   if (everyone?.type === 'predicate' && everyone.probability >= EVERYONE_THRESHOLD) {
     // The most relevant member first; the rest in the model's order.
@@ -98,7 +104,7 @@ export function routeFromAnswers(answers: Answers | null, members: readonly Rout
     return { by: 'model', responders: order, confidence }
   }
   if (confidence >= RESPONDER_CONFIDENCE) return { by: 'model', responders: [responder.choice], confidence }
-  return responder.choice === leadId ? { by: 'lead', responders: [leadId] } : { by: 'lead', responders: [leadId], ask: responder.choice }
+  return responder.choice === leadId ? { by: 'lead', responders: lead() } : { by: 'lead', responders: lead(), ask: responder.choice }
 }
 
 /** What a member replies when earlier answers already said everything. */

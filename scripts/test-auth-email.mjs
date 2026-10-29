@@ -5,6 +5,7 @@ import { Pool } from 'pg'
 import { checkSummary, parseSummary } from './run-db-tests.mjs'
 
 if (process.platform !== 'linux') throw new Error('Authentication acceptance requires cloud Linux')
+// Own isolated fixture rows may change; retain the container after acceptance.
 const suffix = randomUUID()
 const name = `mikka-auth-email-${suffix}`
 const password = `synthetic-${suffix}`
@@ -15,7 +16,7 @@ const run = (args, options = {}) => {
 }
 let pool
 try {
-  run(['docker', 'run', '-d', '--rm', '--name', name, '--memory=256m', '--cpus=1',
+  run(['docker', 'run', '-d', '--name', name, '--memory=256m', '--cpus=1',
     '-p', '127.0.0.1::5432', '-e', 'POSTGRES_USER=mikka_test', '-e', `POSTGRES_PASSWORD=${password}`,
     '-e', 'POSTGRES_DB=mikka_auth_email_e2e', 'postgres:17-alpine'])
   const port = run(['docker', 'port', name, '5432/tcp']).split(':').at(-1)
@@ -35,7 +36,6 @@ try {
   const error = checkSummary('auth-email', result.status, parseSummary(`${result.stdout}\n${result.stderr}`))
   if (result.error || error) throw new Error(error ?? `Authentication test subprocess failed: ${result.error.message}`)
 } finally {
-  try { await pool?.end() } finally {
-    spawnSync('docker', ['rm', '-f', name], { stdio: 'ignore', timeout: 10_000 })
-  }
+  await pool?.end()
+  console.error(`Preserved authentication test container: ${name}`)
 }

@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { createHmac, randomUUID } from 'node:crypto'
+import test, { mock } from 'node:test'
+import { cookies, draftMode } from 'next/headers'
 import { Pool } from 'pg'
+
+// This test removes a workspace member during its assertions; it remains on
+// hold until an independently reviewed no-deletion replacement exists.
 
 // Explicitly refuse business databases. This executes the real server action and real SQL.
 const target = new URL(process.env.E2E_DATABASE_URL ?? 'http://invalid')
@@ -10,6 +14,9 @@ const pool = new Pool({ connectionString: target.href, max: 1 })
 const owner = randomUUID(), viewer = randomUUID(), outsider = randomUUID(), removed = randomUUID()
 const issue = randomUUID(), other = randomUUID(), workspace = randomUUID(), team = randomUUID(), agent = randomUUID()
 const run = randomUUID(), removedRun = randomUUID(), otherRun = randomUUID()
+// Supply the Next request boundary only; authentication still reads a real DB session.
+let requestHeaders = new Headers()
+mock.module('next/headers', { namedExports: { cookies, draftMode, headers: async () => requestHeaders } })
 const bot = randomUUID()
 const excessRuns = Array.from({ length: 21 }, () => randomUUID())
 test('real actions keep thread content with its owner; current members see only whose threads exist and their status', async () => {
@@ -50,7 +57,15 @@ test('real actions keep thread content with its owner; current members see only 
     assert.ok(!/Route|Mikka Backend|Owned Bot|Routed|PRIVATE/.test(JSON.stringify(listed)))
     await assert.rejects(actAs(viewer, () => getIssueThread(issue, run)))
     await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' })))
-    // The owner still reads and talks in their own thread.
+    // An acting-user override cannot attest a browser's human/session provenance.
+    await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'No session' })), /authRequired/)
+    const { auth } = await import('../lib/auth')
+    const context = await auth.$context
+    const session = await context.internalAdapter.createSession(owner)
+    assert.ok(session)
+    const signature = createHmac('sha256', context.secret).update(session.token).digest('base64')
+    requestHeaders = new Headers({ cookie: `${context.authCookies.sessionToken.name}=${encodeURIComponent(`${session.token}.${signature}`)}` })
+    // The owner still reads and talks in their own thread through fresh cookie authentication.
     await actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' }))
     const after = await actAs(owner, () => getIssueThread(issue, run))
     assert.equal(after.chunks.length, 1)
@@ -79,18 +94,7 @@ test('real actions keep thread content with its owner; current members see only 
     assert.equal(bounded.length, 20)
     assert.ok(bounded.every(row => row.ownedByCurrentUser && row.id !== otherRun && row.id !== removedRun))
   } finally {
-    await pool.query('DELETE FROM run_messages WHERE "runId"=ANY($1::uuid[])',[[run,removedRun,otherRun]])
-    await pool.query('DELETE FROM run_chunks WHERE "runId"=ANY($1::uuid[])',[[run,removedRun,otherRun,...excessRuns]])
-    await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])',[[run,removedRun,otherRun,...excessRuns]])
-    await pool.query('DELETE FROM bots WHERE id=$1',[bot])
-    await pool.query('DELETE FROM agents WHERE id=$1',[agent])
-    await pool.query('DELETE FROM issue_members WHERE "issueId"=ANY($1::uuid[])',[[issue,other]])
-    await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1',[issue])
-    await pool.query('DELETE FROM mikka_teams WHERE id=$1',[team])
-    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1',[workspace])
-    await pool.query('DELETE FROM mikka_workspaces WHERE id=$1',[workspace])
-    await pool.query('DELETE FROM issues WHERE id=ANY($1::uuid[])',[[issue,other]])
-    await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])',[[owner,viewer,outsider,removed]])
+    console.error(`Retained thread fixture workspace=${workspace} issue=${issue} owner=${owner}`)
     await pool.end()
   }
 })

@@ -44,7 +44,11 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
   const pool = new Pool({ connectionString: dbURL, max: 16 })
   // Isolated schema inside the ephemeral CI database; no dependency on bootstrap #115.
   const schema = `group_test_${randomUUID().replaceAll('-', '')}`
+  const reverseSchema = `group_test_${randomUUID().replaceAll('-', '')}`
   await pool.query(`CREATE SCHEMA "${schema}"`)
+  console.log(`Retaining synthetic group test schema ${schema} at ${new Date().toISOString()}`)
+  await pool.query(`CREATE SCHEMA "${reverseSchema}"`)
+  console.log(`Retaining synthetic group test schema ${reverseSchema} at ${new Date().toISOString()}`)
   const scoped = new Pool({ connectionString: dbURL, max: 16, options: `-c search_path=${schema}` })
   try {
     const migration = await readFile(new URL('../drizzle/20261023213851_group_conversations.sql', import.meta.url), 'utf8')
@@ -52,9 +56,36 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     await scoped.query(migration) // production retry / coexistence with #69
     const reads = await readFile(new URL('../tests/fixtures/conversation-reads-69.sql', import.meta.url), 'utf8')
     await scoped.query(reads) // this migration first, then #69
-    await scoped.query('DROP TABLE conversation_reads')
-    await scoped.query(reads) // #69 first, then this migration
-    await scoped.query(migration)
+    // Exercise the reverse migration order in a second retained schema.
+    const reverse = new Pool({ connectionString: dbURL, max: 1, options: `-c search_path=${reverseSchema}` })
+    try {
+      await reverse.query(reads) // #69 first, then this migration
+      await reverse.query(migration)
+      // Compare both orders at the catalog level, including table columns,
+      // defaults, constraints and index keys. Each pool resolves its own schema.
+      const catalog = async (target: Pool) => {
+        const columns = await target.query(`SELECT table_name,column_name,ordinal_position,data_type,udt_name,is_nullable,column_default
+          FROM information_schema.columns WHERE table_schema=current_schema()
+          ORDER BY table_name,ordinal_position`)
+        const constraints = await target.query(`SELECT t.relname AS table_name,c.conname,c.contype,pg_get_constraintdef(c.oid) AS definition
+          FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace
+          WHERE n.nspname=current_schema() ORDER BY t.relname,c.conname`)
+        const indexes = await target.query(`SELECT t.relname AS table_name,idx.relname AS index_name,i.indisunique,i.indisprimary,
+          i.indnkeyatts,i.indnatts,i.indkey::text AS attributes,i.indoption::text AS options,
+          pg_get_expr(i.indexprs,i.indrelid) AS expressions,
+          ARRAY(SELECT pg_get_indexdef(i.indexrelid,k,true) FROM generate_series(1,i.indnkeyatts) AS k ORDER BY k) AS keys,
+          pg_get_expr(i.indpred,i.indrelid) AS predicate
+          FROM pg_index i JOIN pg_class t ON t.oid=i.indrelid JOIN pg_class idx ON idx.oid=i.indexrelid
+          JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname=current_schema()
+          ORDER BY t.relname,idx.relname`)
+        return {columns:columns.rows,constraints:constraints.rows,indexes:indexes.rows}
+      }
+      const forwardCatalog = await catalog(scoped)
+      const reverseCatalog = await catalog(reverse)
+      assert.deepEqual([...new Set(forwardCatalog.columns.map(row => row.table_name))],
+        ['conversation_links','conversation_members','conversation_messages','conversation_reads','conversations'])
+      assert.deepEqual(reverseCatalog, forwardCatalog, 'both migration orders must produce equivalent columns, constraints and indexes')
+    } finally { await reverse.end() }
     const run = (changes: Partial<GroupRequest>) => handleGroup(scoped, directory, { ...base, ...changes })
     for (const input of [undefined, '{', JSON.stringify({ workspaceId, title: '', members: [] }), JSON.stringify({ workspaceId: randomUUID(), title: 'foreign' }), JSON.stringify({ workspaceId, title: 'private', members: [{ memberType: 'agent', memberId: privateAgent }] })]) {
       assert.ok([404, 422].includes((await run({ method: 'POST', body: input })).status))
@@ -140,7 +171,6 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     assert.equal(((await run({})).body as typeof list).conversations[0].lastMessage.position, '9007199254740993')
   } finally {
     await scoped.end()
-    await pool.query(`DROP SCHEMA "${schema}" CASCADE`)
     await pool.end()
   }
 })

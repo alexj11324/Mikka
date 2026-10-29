@@ -1,5 +1,5 @@
 import 'server-only'
-import { inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/core'
 import { db } from '@/lib/db'
 import { issuePrefixes, linearIssueLinks, linearTeamSyncs, users } from '@/lib/db/schema'
@@ -54,5 +54,7 @@ export async function taskIdentifiers(tasks: TaskRef[], executor: Executor = db)
 export async function issueView<T extends { id: string; userId: string; scope: TaskScope; content: JSONContent }>(issue: T, executor: Executor = db) {
   const view = issueWithMetadata(issue)
   const identifiers = await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: view.metadata.number }], executor)
-  return { ...view, identifier: identifiers.get(issue.id) ?? null }
+  const [verified] = issue.scope === 'workspace' ? await executor.select({ id: linearIssueLinks.id }).from(linearIssueLinks)
+    .where(and(eq(linearIssueLinks.issueId, issue.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1) : []
+  return { ...view, identifier: identifiers.get(issue.id) ?? null, linearTargetVerified: Boolean(verified) }
 }

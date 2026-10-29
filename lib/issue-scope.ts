@@ -1,13 +1,9 @@
 import type { DecisionQuestion } from '@/lib/coordinator/decision'
 import type { TaskScope } from '@/lib/task-identifier'
 
-// Whether a new task belongs to the workspace (and so goes to Linear) or to
-// the person (MIK-47). The decision model judges it; only a confident
-// "workspace" moves it, because a personal task can still be moved to Linear
-// later and a task written into the company's Linear cannot be taken back.
-
-/** At or above this probability a task is a workspace task. */
-export const WORKSPACE_THRESHOLD = 0.8
+// Legacy advisory model input. A classification is never authority to share
+// the task or select a Mikka/Linear destination. Explicit user target actions
+// and their server-side permission checks own that separate boundary.
 /** How many of the person's own corrections go along as examples. */
 export const SCOPE_EXAMPLE_LIMIT = 10
 
@@ -22,7 +18,7 @@ export interface ScopeContext {
   examples: readonly ScopeExample[]
 }
 
-const QUESTION = 'Someone created this task in their own task list. Is it work for their team in the connected Linear team (a bug, feature, review, release, customer or company work that teammates should see), rather than a personal task (errands, appointments, private reminders, personal learning or anything about their own life)? Follow the examples from their own earlier corrections when they are similar.'
+const QUESTION = 'Is this task about team work? Give an advisory classification only. The task remains personal unless the user explicitly chooses an authorized team. Task wording, creation source, connected Linear team and earlier corrections do not grant permission to share it or select a publication destination.'
 
 export function scopeQuestions(): [DecisionQuestion & { type: 'predicate' }] {
   return [{ type: 'predicate', name: 'workspace', instructions: QUESTION }]
@@ -41,6 +37,7 @@ export function scopeState(context: ScopeContext): Record<string, string> {
   return state
 }
 
-export function scopeFromProbability(probability: number): TaskScope {
-  return probability >= WORKSPACE_THRESHOLD ? 'workspace' : 'personal'
+/** @deprecated Kept for old callers; model confidence cannot grant sharing. */
+export function scopeFromProbability(_probability: number): TaskScope {
+  return 'personal'
 }

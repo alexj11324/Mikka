@@ -117,9 +117,6 @@ export async function acquireTestAccounts({ database, environment, runId, worker
 
   async function release({ outcome = 'clean' } = {}) {
     if (releasing) return releasing
-    // Close the request gate synchronously, before the first cleanup await.
-    // Aborting the client does not prove that an application mutation stopped,
-    // so any outstanding request makes this release unclean even if it settles.
     closing = true
     clearInterval(timer)
     const pending = [...pendingRequests]

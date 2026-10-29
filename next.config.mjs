@@ -10,8 +10,12 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingIncludes: {
+    '/api/bots/*/subagents/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
+    '/api/threads/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
+    '/.well-known/workflow/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
     '/api/bots/*/computer/*': ['./scripts/e2b/start-desktop.sh', './scripts/e2b/viewer-gateway.py', './scripts/e2b/lease-driver.py', './scripts/e2b/start-container-runtime.sh'],
     '/api/workspaces/**': ['./scripts/e2b/lease-driver.py'],
+    '/v1/runs/*/screen': ['./scripts/e2b/screen-capture.sh'],
     '/api/subscriptions/**': ['./packages/subscription-worker/bin/mikka-subscription-worker', './packages/subscription-worker/bin/mikka-subscription-enrollment'],
     '/api/cron/subscriptions': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
     '/v1/devices/**/subscription': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
@@ -56,7 +60,7 @@ const nextConfig = {
       { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
       { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
     ] }, // next-intl can land the reset link on a locale-prefixed page; it carries the token too.
-      ...['/api/auth/verify-email', '/verify-email', '/:locale(en|zh-CN)/verify-email', '/api/auth/reset-password/:path*', '/reset-password/:path*', '/:locale(en|zh-CN)/reset-password/:path*'].map(source => ({
+      ...['/api/auth/verify-email', '/verify-email', '/:locale(en|zh-CN)/verify-email', '/api/auth/reset-password/:path*', '/reset-password/:path*', '/:locale(en|zh-CN)/reset-password/:path*', '/api/auth/device', '/api/auth/device/:path*', '/device', '/:locale(en|zh-CN)/device'].map(source => ({
       source,
       headers: [
         { key: 'Referrer-Policy', value: 'no-referrer' },

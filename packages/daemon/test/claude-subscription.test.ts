@@ -1,3 +1,4 @@
+import { ToolApprovalGate } from "../src/agents/tool-approval"
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { afterEach, expect, it, vi } from "vitest"
@@ -7,6 +8,7 @@ import {
 } from "../src/adapters/claude"
 import { buildChildEnv } from "../src/env"
 import { createLogger } from "../src/log"
+import { NoSandbox } from "../src/agents/sandbox"
 import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
 
 afterEach(cleanupTempDirs)
@@ -41,6 +43,7 @@ async function fixture(
     }))
   }
   const adapter = new ClaudeAdapter({
+    sandbox: new NoSandbox(),
     stateDir: tempDir(),
     binary,
     configDir: join(home, ".claude"),
@@ -48,6 +51,7 @@ async function fixture(
   })
   const options = {
     runId: "external-claude",
+    toolApproval: new ToolApprovalGate("external-claude", { permission: () => "allow", ask: async () => "deny", isLive: () => true }),
     cwd: await makeRepo(),
     prompt: "hello",
     env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }),

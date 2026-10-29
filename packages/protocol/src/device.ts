@@ -20,8 +20,9 @@ import { z } from "zod"
 import { modelNameSchema, runPolicySchema } from "./agent-policy"
 import { harnessInfoSchema, harnessSchema } from "./harness"
 import { quotaSnapshotSchema } from "./quota"
-import { runStopReason } from "./run"
+import { runStopReason, runBenchmarkContext } from "./run"
 import { MAX_SKILLS_PER_RUN, runSkillSchema } from "./skill"
+import { skillAssignmentReceiptSchema } from './skill-artifact'
 
 const id = z.string().min(1).max(64)
 const isoTime = z.iso.datetime({ offset: true })
@@ -37,7 +38,7 @@ export const RUN_LEASE_MS = 90_000
 
 export function isDeviceOnline(
   lastSeenAt: string | number | Date | null | undefined,
-  now = Date.now()
+  now = Date.now(),
 ): boolean {
   if (lastSeenAt === null || lastSeenAt === undefined) return false
   const seen =
@@ -52,7 +53,7 @@ export function isDeviceOnline(
 /** "设备 n/m 在线": how many of the user's devices are online. */
 export function devicesOnline(
   devices: readonly { lastSeenAt: string | number | Date | null }[],
-  now = Date.now()
+  now = Date.now(),
 ): { online: number; total: number } {
   return {
     online: devices.filter((d) => isDeviceOnline(d.lastSeenAt, now)).length,
@@ -88,7 +89,7 @@ export const devicePaths = {
   commands: (
     deviceId: string,
     waitSeconds: number,
-    skipRuns: readonly string[] = []
+    skipRuns: readonly string[] = [],
   ) =>
     `/v1/devices/${seg(deviceId)}/commands?wait=${waitSeconds}` +
     (skipRuns.length
@@ -195,7 +196,7 @@ export const runCheckpointSchema = z.object({
 })
 export type RunCheckpoint = z.infer<typeof runCheckpointSchema>
 
-// --- Allow-listed repos ---------------------------------------------------
+// --- Repository settings ---------------------------------------------------
 
 export const setupRecipeSchema = z.object({
   /** Paths relative to the main checkout copied into each new worktree. */
@@ -207,12 +208,15 @@ export const setupRecipeSchema = z.object({
 })
 export type SetupRecipe = z.infer<typeof setupRecipeSchema>
 
-/** One allow-listed repo on a device (`device_repo`). */
+export const REPO_ORIGIN_HEADER = "x-mikka-repo-origin-check"
+
+/** A repository record and its identity-scoped settings. */
 export const deviceRepoSchema = z.object({
   repoId: id,
   name: z.string().max(500),
-  /** Absolute path of the main checkout on the device. */
+  /** Logical repository key; only trusted cloud runtimes use an absolute path. */
   path: z.string().min(1).max(4_000),
+  remoteUrl: z.string().max(2_000).nullable().optional(),
   setup: setupRecipeSchema.optional(),
   /** Domains agents may reach in this repo, on top of the harness's own. */
   networkAllow: z.array(z.string().min(1).max(253)).max(200).optional(),
@@ -249,7 +253,11 @@ export const runAssignmentSchema = z.object({
   issueId: id,
   deviceId: id,
   repoId: id,
-  baseBranch: z.string().min(1).max(500),
+  /** Clone URL for local runs; hosted computer assignments keep their isolated workspace. */
+  remoteUrl: z.string().min(1).max(4_000).optional(),
+  /** Absent means origin/HEAD after fetch. */
+  baseBranch: z.string().min(1).max(500).optional(),
+  expectedRepoRemote: z.string().max(2_000).optional(),
   harness: harnessSchema,
   prompt: z.string().max(100_000),
   /**
@@ -297,6 +305,7 @@ export const runAssignmentSchema = z.object({
    * one, and the run goes ahead without it.
    */
   mcp: z.object({ url: z.url(), token: z.string().min(1).max(200), mailbox: z.literal(true).optional() }).optional(),
+  /** Question continuation must not silently open a different session. */
   /**
    * What the orchestrator dispatched this run for (ADR 0023). `plan` writes a
    * spec and proposes a split instead of changing code (ADR ORV-205).
@@ -320,6 +329,9 @@ export const runAssignmentSchema = z.object({
    * new session with `prompt`, which always carries the full brief.
    */
   resumeSessionId: z.string().max(500).optional(),
+  requireSessionResume: z.boolean().optional(),
+  preserveQuestionWorktree: z.boolean().optional(),
+  questionId: z.uuid().optional(),
   /**
    * What this run adds on top of the brief (a person's message, an answer,
    * a fix request). A resumed session gets only this as its next message;
@@ -331,6 +343,8 @@ export const runAssignmentSchema = z.object({
    * Absent from an older server: the daemon applies the ADR 0009 defaults.
    */
   policy: runPolicySchema.optional(),
+  /** Trusted server revision for the exact run policy; older servers omit it. */
+  policyRevision: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   /**
    * The skills mounted on this run's agent and still enabled, resolved at
    * claim time the way `policy` is. The daemon inlines them into the agent's
@@ -338,6 +352,10 @@ export const runAssignmentSchema = z.object({
    * server: the run simply has none.
    */
   skills: z.array(runSkillSchema).max(MAX_SKILLS_PER_RUN).optional(),
+  /** Server-minted assignment provenance; does not grant any policy permission. */
+  skillReceipt: skillAssignmentReceiptSchema.optional(),
+  /** Frozen by the server benchmark ledger; never extracted from model output. */
+  benchmark: runBenchmarkContext.optional(),
 })
 export type RunAssignment = z.infer<typeof runAssignmentSchema>
 

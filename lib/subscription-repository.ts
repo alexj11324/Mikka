@@ -4,7 +4,7 @@ import { quotaSnapshotSchema, type QuotaSnapshot } from '@mikka/protocol'
 import { subscriptionBindingSchema, type SubscriptionRoute, SubscriptionRefusal } from '@mikka/protocol/subscription'
 import type { CredentialScope } from '../packages/daemon/src/subscription-worker-client'
 
-export interface ConnectionRow { id: string; ownerId: string; workspaceId: string; provider: 'codex' | 'claude'; state: string; epoch: string; quota: unknown }
+export interface ConnectionRow { id: string; ownerId: string; workspaceId: string; provider: 'codex' | 'claude'; state: string; epoch: string; quota: unknown; accountLabel?: string | null }
 export class SubscriptionRepository {
   constructor(readonly pool: Pick<Pool, 'query'>) {}
   async create(ownerId: string, workspaceId: string, provider: 'codex' | 'claude') {
@@ -13,7 +13,7 @@ export class SubscriptionRepository {
     return id
   }
   async connection(ownerId: string, id: string): Promise<ConnectionRow> {
-    const { rows } = await this.pool.query<ConnectionRow>('select id,"ownerId","workspaceId",provider,state,epoch,quota from byos_connections where id=$1 and "ownerId"=$2', [id, ownerId])
+    const { rows } = await this.pool.query<ConnectionRow>('select id,"ownerId","workspaceId",provider,state,epoch,quota,"accountLabel" from byos_connections where id=$1 and "ownerId"=$2', [id, ownerId])
     if (!rows[0]) throw new SubscriptionRefusal('account_unavailable')
     return rows[0]
   }
@@ -33,6 +33,28 @@ export class SubscriptionRepository {
   }
   async saveQuota(row: ConnectionRow, quota: QuotaSnapshot) {
     await this.pool.query('update byos_connections set quota=$3 where id=$1 and "ownerId"=$2 and epoch=$4 and state=\'connected\'', [row.id, row.ownerId, JSON.stringify(quotaSnapshotSchema.parse(quota)), row.epoch])
+  }
+  /** The owner's own sign-in email, for Settings; fenced to the read's epoch. */
+  async saveAccountLabel(row: ConnectionRow, label: string) {
+    await this.pool.query('update byos_connections set "accountLabel"=$3 where id=$1 and "ownerId"=$2 and epoch=$4', [row.id, row.ownerId, label, row.epoch])
+  }
+  /** 移除: hide a disconnected connection from the owner's list. */
+  async remove(ownerId: string, id: string) {
+    const { rowCount } = await this.pool.query('update byos_connections set "removedAt"=now() where id=$1 and "ownerId"=$2 and state=\'disconnected\'', [id, ownerId])
+    if (!rowCount) throw new SubscriptionRefusal('account_unavailable')
+  }
+  /** Bots whose current binding uses each connection revision (Settings 「使用中」). */
+  async connectionBots(ownerId: string, workspaceId: string) {
+    const { rows } = await this.pool.query<{ connectionId: string; id: string; name: string; color: string; shape: string }>(`select u."connectionId",u.id,u.name,u.color,u.shape from (
+        select distinct on (b."consumerId",b.route) b."connectionId",b."connectionRevision",bot.id,bot.name,bot.color,bot.shape
+        from byos_bindings b
+        join bot_cloud_runtimes r on r."agentId"::text=b."consumerId" and r."ownerId"=b."ownerId" and r."workspaceId"::text=b."workspaceId"
+        join bots bot on bot.id=r."botId" and bot."ownerId"=b."ownerId"
+        where b."ownerId"=$1 and b."workspaceId"=$2
+        order by b."consumerId",b.route,b."createdAt" desc,b.id desc) u
+      join byos_connections c on c.id=u."connectionId" and c.epoch=u."connectionRevision" and c."ownerId"=$1
+      order by u.name limit 200`, [ownerId, workspaceId])
+    return rows
   }
   async defaultModelBinding(ownerId: string, consumerId: string): Promise<string | null> {
     const { rows } = await this.pool.query('select id from byos_bindings where "ownerId"=$1 and "consumerId"=$2 and route in (\'codex_cpa\',\'claude_cpa\') order by "createdAt" desc limit 1', [ownerId, consumerId])
