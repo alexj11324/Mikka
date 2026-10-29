@@ -1507,6 +1507,9 @@
       "teams": {
         "title": "团队",
         "description": "组织团队与共同负责的工作。"
+      },
+      "notifications": {
+        "title": "通知"
       }
     },
     "appearance": {
@@ -1704,6 +1707,19 @@
     },
     "preview": {
       "userName": "预览用户"
+    },
+    "notifications": {
+      "heading": "通知",
+      "proactive": "主动消息",
+      "pushDecide": "需要你决策",
+      "pushReview": "待审阅",
+      "pushFinished": "线程完成",
+      "pushBriefing": "每日简报",
+      "pushWhen": "推送时机",
+      "always": "立即",
+      "away": "电脑不在用时",
+      "loadError": "通知设置加载失败",
+      "saveFailed": "保存失败"
     }
   },
   "TelegramBot": {

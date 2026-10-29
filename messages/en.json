@@ -1507,6 +1507,9 @@
       "teams": {
         "title": "Teams",
         "description": "Organize teams and the work they own together."
+      },
+      "notifications": {
+        "title": "Notifications"
       }
     },
     "appearance": {
@@ -1704,6 +1707,19 @@
     },
     "preview": {
       "userName": "Preview user"
+    },
+    "notifications": {
+      "heading": "Notifications",
+      "proactive": "Proactive messages",
+      "pushDecide": "Needs your decision",
+      "pushReview": "Ready for review",
+      "pushFinished": "Thread finished",
+      "pushBriefing": "Daily briefing",
+      "pushWhen": "When to push",
+      "always": "Immediately",
+      "away": "When the computer is away",
+      "loadError": "Notification settings could not load",
+      "saveFailed": "Could not save"
     }
   },
   "TelegramBot": {

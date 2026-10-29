@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from './settings-link'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { ArrowLeft, Brain, Building2, KeyRound, Monitor, Plus, Plug, Search, SlidersHorizontal, SquareUserRound, UserRound, Users } from 'lucide-react'
+import { ArrowLeft, Bell, Brain, Building2, KeyRound, Monitor, Plus, Plug, Search, SlidersHorizontal, SquareUserRound, UserRound, Users } from 'lucide-react'
 import { listTeams } from '@/app/actions/teams'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
@@ -18,6 +18,7 @@ const navigation = [
     { title: 'Preferences', section: 'preferences', icon: SlidersHorizontal },
     { title: 'Profile', section: 'profile', icon: UserRound },
     { title: 'Memory', section: 'memory', icon: Brain },
+    { title: 'Notifications', section: 'notifications', icon: Bell },
     { title: 'Account', section: 'account', icon: KeyRound },
     { title: 'Integrations', section: 'integrations', icon: Plug },
     { title: 'Devices', section: 'devices', icon: Monitor },

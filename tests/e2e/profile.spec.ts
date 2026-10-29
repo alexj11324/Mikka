@@ -31,3 +31,21 @@ test('切换界面语言后进入英文界面', async ({ page }) => {
   await expect(page).toHaveURL(/\/en\//)
   await expect(page.getByRole('heading', { name: 'Preferences', exact: true })).toBeVisible()
 })
+
+// D16: the web Settings page now has the notification settings the phone has.
+test('通知设置可以关闭主动消息，刷新后保持', async ({ page }) => {
+  await register(page)
+  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '设置', exact: true }).click()
+  const sidebar = () => page.locator('[data-slot="sidebar-container"]')
+  await sidebar().getByRole('link', { name: '通知', exact: true }).click()
+
+  const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
+  await expect(proactive).toBeChecked()
+  await proactive.click()
+  await expect(proactive).not.toBeChecked()
+
+  await page.reload()
+  await sidebar().getByRole('link', { name: '通知', exact: true }).click()
+  await expect(page.getByRole('switch', { name: '主动消息', exact: true })).not.toBeChecked()
+})

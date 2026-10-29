@@ -29,6 +29,7 @@
 | A23 刷新后重复点击 | 刷新后从服务端读回状态，不重放决策 | 同上 |
 | D12 个人名称 | 个人资料名称为输入框，保存后刷新仍生效 | `tests/e2e/profile.spec.ts` |
 | D14 界面语言 | 切换后进入 `/en`，界面文案变英文 | 同上 |
+| D16 通知设置 | 设置页新增通知分区，开关保存后刷新仍生效 | 同上 |
 
 E2E 运行方式：独立 Postgres 库 `mikka_120_e2e`，`CI=true`，`BETTER_AUTH_URL=http://localhost:3100`，密钥走 `infisical run --env dev --path /vercel`。
 
@@ -213,7 +214,7 @@ Writing Style Guide、Shopify Polaris、Material 3 的公开规则。本轮收�
 | A05 / A06 / A20 群聊 | 无入口 | 创建群聊、退出群聊的 UI 不存在；Figma 有「群聊 · 运行时切换」但标记待批，未进 `decisions.md` |
 | A24 取消建议 | 有后端无 UI | `DELETE /api/suggestions/:id` 存在，建议卡片没有取消入口 |
 | A25 简报 | 未测 | 需要 Coordinator 08:00 消息与建议数据 |
-| A26 / D16 通知设置 | 无 UI | 偏好后端存在（`lib/preferences.ts`），设置页没有通知分区 |
+| A26 免打扰 | 部分 | 通知分区的「主动消息」开关即同一切换；手机推送未测 |
 | D19 / D20 推送失败 | 设计已补 | 需要 APNs 与真机，未跑 |
 | B / C 轨外部项 | 未执行 | 需要 Linear 工作区、GitHub App、Composio 连接、云电脑 |
 | 新增 artifact 状态 | 未覆盖 | 深色与窄屏版本、键盘与读屏操作 |
