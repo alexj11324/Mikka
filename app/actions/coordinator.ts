@@ -9,7 +9,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
-import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
+import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { botChats, chatView, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import { and, eq } from 'drizzle-orm'
 import { bots, devices } from '@/lib/db/schema'
@@ -17,8 +17,9 @@ import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destinat
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { coordinatorWelcome } from '@/lib/agent-welcome'
+import { claimSuggestion, readClaimedSuggestion } from '@/lib/suggestions/store'
+import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
-
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
@@ -104,5 +105,37 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot?.name), { botId: bot?.id ?? null }))
     after(() => wakeCoordinator(session.user.id))
     return { queued: true }
+  })
+}
+
+/**
+ * A tapped 建议 card goes to the Coordinator at once, with no composer step
+ * (R-21): the message is the card itself, which the chat draws as the same
+ * card and the Coordinator reads as the task. What came from the source app
+ * stays quoted inside the card (lib/suggestions/card.ts), never loose in the
+ * message. Sending and taking the card off 建议 commit together; with no
+ * Coordinator to read it, nothing is sent and the card stays.
+ */
+export async function sendSuggestion(suggestionId: string): Promise<ActionResult<{ queued: true }>> {
+  return runAction(async () => {
+    const userId = await getUserId()
+    const id = z.uuid().safeParse(suggestionId)
+    if (!id.success) throw new ActionFailureError('validationGeneric')
+    if (!coordinatorEnabled()) throw new ActionFailureError('coordinatorUnavailable')
+    try {
+      await db.transaction(async tx => {
+        const claimed = await claimSuggestion(userId, id.data, tx)
+        const item = claimed ?? await readClaimedSuggestion(userId, id.data, tx)
+        if (!item) throw new ActionFailureError('suggestionNotFound')
+        const text = suggestionMessage({ source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle, actor: item.actor, url: item.url })
+        if (claimed) await recordPersonalSubmission(tx, userId, text, { submissionId: item.id })
+        else if (!await personalSubmissionRecorded(tx, userId, text, item.id)) throw new ActionFailureError('suggestionNotFound')
+      })
+    } catch (error) {
+      if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
+      throw error
+    }
+    after(() => wakeCoordinator(userId))
+    return { queued: true as const }
   })
 }

@@ -169,7 +169,8 @@ export async function listAgents(userId: string) {
 }
 
 export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }) {
-  return attempt(async () => ({ ...(await queueRun(userId, input)), status: 'queued' }))
+  // Marked 'mcp' so the right column does not count it as the Coordinator's.
+  return attempt(async () => ({ ...(await queueRun(userId, input, null, undefined, 'mcp')), status: 'queued' }))
 }
 
 export async function sendToRun(userId: string, input: { runId: string; text: string }) {
