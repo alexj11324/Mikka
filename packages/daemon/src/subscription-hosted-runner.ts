@@ -31,7 +31,9 @@ import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
 import type { ComputerBroker } from "./computer/broker.mjs";
-import { decide } from "./permissions";
+import { decide, runDomains, runPolicy } from "./permissions";
+import { startPublicEgress, type PublicEgress } from "./agents/public-egress";
+import { matchesRunSandboxDomain } from "./agents/run-sandbox-launcher";
 
 const exec = promisify(execFile);
 const image = HOSTED_NATIVE_IMAGE;
@@ -350,6 +352,8 @@ export async function createHostedBotRunner(host: {
       type Broker = Awaited<ReturnType<typeof createNativeSubscriptionBroker>>;
       let broker: Broker | undefined;
       let brokerStarting: Promise<Broker> | undefined;
+      let egress: PublicEgress | undefined;
+      let egressStarting: Promise<PublicEgress> | undefined;
       let creating: Promise<void> | undefined;
       let timer: ReturnType<typeof setInterval> | undefined;
       let offRevoke = () => {};
@@ -377,6 +381,8 @@ export async function createHostedBotRunner(host: {
           const brokerClosed = (async () => {
             await brokerStarting?.catch(() => undefined);
             await broker?.close();
+            await egressStarting?.catch(() => undefined);
+            await egress?.close();
           })();
           // Observe failures immediately even if Docker create is still pending;
           // the finally below still propagates the broker cleanup failure.
@@ -516,6 +522,18 @@ export async function createHostedBotRunner(host: {
         });
         const readyBroker = await brokerStarting;
         await live();
+        // No Docker bridge or host networking: only a public-destination proxy
+        // is mounted, and each connection rechecks this run's current policy.
+        const egressMaximum = runDomains(runPolicy(options.policy), options.networkAllow ?? []);
+        if (egressMaximum.length) {
+          egressStarting = startPublicEgress({
+            signal: lifetime.signal,
+            authorize: async (destination, signal) => matchesRunSandboxDomain(destination, egressMaximum)
+              && await gate.preapprovedNetwork({runId: assignment.runId, harness: kind, requestId: 'hosted-egress', method: 'sandbox/network', input: destination}, signal),
+          }).then(created => { egress = created; return created; });
+          await egressStarting;
+          await live();
+        }
         const cwd = realpathSync(options.cwd);
         const runDir = realpathSync(paths.runDir);
         const protectedGit = lstatSync(join(cwd, ".git")).isFile()
@@ -565,6 +583,8 @@ export async function createHostedBotRunner(host: {
           `${binaries[kind]}:/usr/local/bin/native-cli:ro`,
           "-v",
           `${bootstrap}:/native-container.mjs:ro`,
+          "-v", `${fileURLToPath(new URL("./agents/native-egress.mjs", import.meta.url))}:/native-egress.mjs:ro`,
+          ...(egress ? ["-v", `${egress.socketPath}:/run/mikka-egress.sock:ro`] : []),
           "-v",
           `${MCP_SERVER_SCRIPT}:${MCP_SERVER_SCRIPT}:ro`,
           "-v",
@@ -636,7 +656,7 @@ export async function createHostedBotRunner(host: {
             signal: AbortSignal.any([lifetime.signal, ...(config.signal ? [config.signal] : [])]),
           });
           child.stdin.write(
-            JSON.stringify({ kind, args: config.args, cwd, env }) + "\n",
+            JSON.stringify({ kind, args: config.args, cwd, env, publicEgress: Boolean(egress) }) + "\n",
           );
           return child;
         };

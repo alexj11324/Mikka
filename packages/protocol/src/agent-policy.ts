@@ -6,9 +6,11 @@
 // Some actions are hard rules, never configurable: the run's worktree is the
 // agent's to read and write, project scripts run there, and a repo has to be
 // on the device's allow-list before anything starts. The rest default to
-// `ask` and a workspace owner or admin may change them, within the choices
+// their scoped defaults; a workspace owner or admin may change them within the choices
 // listed for each action.
 import { z } from "zod"
+import { networkDomainsWithin } from "./network-bounds"
+export { intersectNetworkDomains, networkDomainsWithin } from "./network-bounds"
 
 export const PERMISSION_ACTIONS = [
   "read_in_worktree",
@@ -57,7 +59,7 @@ export const PERMISSION_DEFAULTS: Readonly<
   Record<PermissionAction, PermissionDecision>
 > = {
   ...FIXED_PERMISSIONS,
-  install_dependency: "ask",
+  install_dependency: "allow",
   write_outside_repo: "ask",
   git_push: "ask",
   network: "ask",
@@ -178,6 +180,8 @@ export const runPolicySchema = z.object({
   }),
   /** The workspace layer of the domain allow-list (ADR 0009). */
   networkAllow: z.array(z.string().min(1).max(253)).max(MAX_NETWORK_DOMAINS),
+  /** Host-derived worker/workspace ceiling; even network=allow cannot widen it. */
+  networkCeiling: z.array(networkDomainSchema).max(MAX_NETWORK_DOMAINS).optional(),
   /**
    * The run only reads: the worktree is not writable and nothing is pushed
    * (ADR 0046). Absent from an older server means a normal, writable run.
@@ -310,6 +314,7 @@ export function applyApprovalMode(
  * spelled out so a test can hold every mode against it.
  */
 export function isNoLooserThan(base: RunPolicy, next: RunPolicy): boolean {
+  if (base.networkCeiling && (!next.networkCeiling || !networkDomainsWithin(next.networkCeiling, base.networkCeiling))) return false
   if (base.readOnly === true && next.readOnly !== true) return false
   return CONFIGURABLE_ACTIONS.every(
     (action) =>
@@ -349,7 +354,10 @@ export interface StoredAgentSettings {
 }
 
 /** Permissions with defaults; an invalid stored choice falls back. */
-export function resolvePermissions(stored: unknown): RunPermissions {
+/** Only the authenticated host selects the execution environment. */
+export type ExecutionEnvironment = 'local' | 'cloud'
+
+export function resolvePermissions(stored: unknown, environment: ExecutionEnvironment = 'local'): RunPermissions {
   const out = {} as Record<ConfigurableAction, PermissionDecision>
   const record =
     stored && typeof stored === "object"
@@ -360,7 +368,7 @@ export function resolvePermissions(stored: unknown): RunPermissions {
     out[action] =
       typeof value === "string" && permissionChoiceAllowed(action, value)
         ? value
-        : (PERMISSION_DEFAULTS[action] as PermissionDecision)
+        : (environment === 'cloud' && action === 'network' ? 'allow' : PERMISSION_DEFAULTS[action] as PermissionDecision)
   }
   return out
 }
@@ -386,15 +394,19 @@ export interface ResolvedAgentSettings {
  */
 export function resolveAgentSettings(
   workspace: StoredAgentSettings | null | undefined,
-  team?: StoredAgentSettings | null
+  team?: StoredAgentSettings | null,
+  environment: ExecutionEnvironment = 'local'
 ): ResolvedAgentSettings {
+  const permissions = resolvePermissions(workspace?.permissions, environment)
+  const explicit = storedPermissionsSchema.safeParse(workspace?.permissions ?? {})
+  if (environment === 'cloud' && workspace?.networkAllow != null && explicit.success && explicit.data.network === undefined) permissions.network = 'ask'
   const teamGuidance = team?.guidance
   const workspaceGuidance = workspace?.guidance ?? null
   const fromTeam = teamGuidance !== null && teamGuidance !== undefined
   const text = (fromTeam ? teamGuidance : workspaceGuidance)?.trim() ?? ""
   return {
     policy: {
-      permissions: resolvePermissions(workspace?.permissions),
+      permissions,
       networkAllow: resolveNetworkAllow(workspace?.networkAllow),
     },
     guidance: text ? text : null,

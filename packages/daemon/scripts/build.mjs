@@ -29,7 +29,7 @@ await build({
   external: Object.keys(dependencies).flatMap(name => [name, `${name}/*`]),
   logLevel: 'warning',
 })
-for (const path of ['agents/native-container.mjs', 'computer/proxy.mjs', 'computer/driver.mjs']) {
+for (const path of ['agents/native-container.mjs', 'agents/native-egress.mjs', 'computer/proxy.mjs', 'computer/driver.mjs']) {
   await mkdir(dirname(resolve(out, path)), { recursive: true })
   await copyFile(resolve(root, 'src', path), resolve(out, path))
 }

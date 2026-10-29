@@ -60,10 +60,34 @@ def safe_resume_snapshot(frames, document, evaluation):
         return any(unsafe(item) for item in value.values())
     return not unsafe(root) and isinstance(evaluation,dict) and 'exceptionDetails' not in evaluation and isinstance(evaluation.get('result'),dict) and evaluation['result'].get('value') is True
 
-def inspect_mutation_expression(mutation):
-    # Text and form metadata are hints, not a proof of a page's JS effects.
-    selector=json.dumps(str(mutation.get('selector',''))[:500])
-    return f"(() => {{ const e={('document.activeElement' if mutation.get('action')=='key' else 'document.querySelector('+selector+')')}; if (!e) return {{requiresApproval:true}}; const text=(e.innerText||e.getAttribute('aria-label')||'').slice(0,500); const risk=/pay|purchase|buy|delete|remove|cancel|unsubscribe|transfer|send|publish|submit|confirm|付款|支付|购买|删除|取消|转账|发送|发布|确认/i.test(text); return {{requiresApproval:risk || (e.type==='submit' && e.form?.method.toLowerCase()!=='get') || ({json.dumps(mutation.get('action')=='key' and mutation.get('key')=='Enter')} && e.form?.method.toLowerCase()!=='get')}}; }})()"
+def checked_point(data, viewport, prefix=''):
+    x=data.get('toX' if prefix else 'x');y=data.get('toY' if prefix else 'y')
+    if type(x) is not int or type(y) is not int or not 0<=x<viewport['clientWidth'] or not 0<=y<viewport['clientHeight']:raise web.HTTPBadRequest()
+    return x,y
+
+def action_receipt(path, action_id, payload):
+    # One host-generated operation ID survives lost HTTP responses and restarts.
+    # An in-progress/unknown mutation is NEVER automatically executed again.
+    if not isinstance(action_id,str) or len(action_id)!=36 or any(c not in '0123456789abcdef-' for c in action_id):raise web.HTTPBadRequest()
+    target=path/('action-'+action_id+'.json')
+    digest=hashlib.sha256(json.dumps(payload,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    if target.exists():
+        prior=json.loads(target.read_text())
+        if prior.get('digest')!=digest:raise web.HTTPConflict(text='action_changed')
+        if prior.get('state')=='done':return target,digest,prior['result']
+        raise web.HTTPConflict(text='action_outcome_unknown')
+    return target,digest,None
+
+def write_action_receipt(target, digest, state, result=None):
+    temporary=target.with_suffix('.tmp')
+    with temporary.open('w') as output:
+        os.fchmod(output.fileno(),0o600)
+        output.write(json.dumps({'digest':digest,'state':state,'result':result}))
+        output.flush();os.fsync(output.fileno())
+    temporary.replace(target)
+    directory=os.open(target.parent,os.O_RDONLY)
+    try:os.fsync(directory)
+    finally:os.close(directory)
 
 def browser_origin(value):
     try:
@@ -152,7 +176,7 @@ def authorize(request, role=None):
 class Browser:
     def __init__(self, grant):
         self.grant=grant;self.pending={};self.seq=0;self.frame=None;self.guard=None
-        self.session=None;self.target=None;self.lock=asyncio.Lock();self.viewer=set();self.stopped=False
+        self.observation=None;self.session=None;self.target=None;self.lock=asyncio.Lock();self.viewer=set();self.stopped=False
         self.path=ROOT/grant['subagentId']; self.path.mkdir(mode=0o700,exist_ok=True)
         # Restart never silently unlocks a credential-bearing page.
         self.guard_file=self.path/'guard'
@@ -251,7 +275,7 @@ async def begin(request):
     _,grant=authorize(request,'broker');b=browser(grant)
     async with b.lock:
         if b.guard:raise web.HTTPConflict()
-        b.guard=secrets.token_urlsafe(32);b.guard_file.write_text(b.guard);b.frame=None
+        b.guard=secrets.token_urlsafe(32);b.guard_file.write_text(b.guard);b.frame=None;b.observation=None
         display=b.grant.get('display')
         if display:
             state=Path('/run/mikka-viewer')
@@ -375,49 +399,88 @@ async def end(request):
             fcntl.flock(b.driver_lock,fcntl.LOCK_UN);b.driver_lock.close()
     return web.json_response({'resumed':True})
 
+async def visual_observation(b):
+    if b.guard:raise web.HTTPConflict()
+    before=(await b.rpc('Page.getFrameTree',session=b.session))['frameTree']['frame']
+    viewport=(await b.rpc('Page.getLayoutMetrics',session=b.session))['cssVisualViewport']
+    # The raw screenshot is never taken while credential insertion is guarded.
+    # Sensitive controls are additionally hidden before capturing the viewport.
+    expression="""(() => {
+      const style=document.createElement('style');style.id='mikka-visual-redaction';
+      style.textContent='input[type=password],input[autocomplete=one-time-code],input[autocomplete^=cc-]{visibility:hidden!important}';
+      (document.head||document.documentElement).appendChild(style);
+      const copy=document.body?.cloneNode(true);copy?.querySelectorAll('input,textarea,select,script,style,noscript').forEach(e=>e.remove());
+      return JSON.stringify({url:location.href,title:document.title.slice(0,1000),text:(copy?.innerText||copy?.textContent||'').slice(0,16000),elements:[],needsLogin:Array.from(document.querySelectorAll('input[type=password]')).some(e=>e.getClientRects().length>0)});
+    })()"""
+    try:
+        result=await b.rpc('Runtime.evaluate',{'expression':expression,'returnByValue':True},b.session)
+        picture=await b.rpc('Page.captureScreenshot',{'format':'jpeg','quality':75,'captureBeyondViewport':False},b.session)
+    finally:
+        await b.rpc('Runtime.evaluate',{'expression':"document.getElementById('mikka-visual-redaction')?.remove()"},b.session)
+    frame=(await b.rpc('Page.getFrameTree',session=b.session))['frameTree']['frame']
+    if b.guard or frame['loaderId']!=before['loaderId'] or frame['url']!=before['url']:raise web.HTTPConflict(text='observation_stale')
+    image=picture.get('data','')
+    if not image or len(image)>5_500_000:raise web.HTTPConflict(text='observation_unavailable')
+    parsed=urlsplit(frame['url']);origin=f'{parsed.scheme}://{parsed.netloc}' if parsed.scheme in ('http','https') else 'null'
+    observation={'observationId':secrets.token_hex(16),'loaderId':frame['loaderId'],'origin':origin,'observedAt':int(time.time()*1000),'width':int(viewport['clientWidth']),'height':int(viewport['clientHeight'])}
+    b.observation={**observation,'viewport':{k:viewport[k] for k in ('clientWidth','clientHeight','pageX','pageY')}}
+    return {**observation,'screenshot':'data:image/jpeg;base64,'+image,'observation':json.loads(result['result']['value'])}
+
 async def action(request):
     _,grant=authorize(request,'runtime');b=browser(grant);data=await request.json()
     async with b.lock:
         if b.guard:raise web.HTTPConflict()
         name=data.get('action')
-        if data.get('expectedLoaderId'):
-            from urllib.parse import urlsplit
-            tree=await b.rpc('Page.getFrameTree',session=b.session)
-            frame=tree['frameTree']['frame'];u=urlsplit(frame['url'])
-            if frame['loaderId']!=data['expectedLoaderId'] or f'{u.scheme}://{u.netloc}'!=data.get('expectedOrigin'):raise web.HTTPConflict()
-        if name=='inspectMutation':
-            from urllib.parse import urlsplit
-            mutation=data.get('mutation',{})
-            expression=inspect_mutation_expression(mutation)
-            check=await b.rpc('Runtime.evaluate',{'expression':expression,'returnByValue':True},b.session)
-            tree=await b.rpc('Page.getFrameTree',session=b.session);frame=tree['frameTree']['frame'];u=urlsplit(frame['url'])
-            return web.json_response({**check['result']['value'],'loaderId':frame['loaderId'],'origin':f'{u.scheme}://{u.netloc}'})
+        if name=='observe':return web.json_response(await visual_observation(b))
+        # Initial navigation comes from the explicit task URL, before any model
+        # turn. Every subsequent mutation requires an actual observation binding.
+        initial=name=='navigate' and not data.get('actionId') and await b.url()=='about:blank'
+        target=digest=None
+        if not initial:
+            target,digest,prior=action_receipt(b.path,data.get('actionId'),data)
+            if prior is not None:return web.json_response(prior)
+            observed=b.observation
+            if not observed or data.get('expectedObservationId')!=observed['observationId'] or time.time()*1000-observed['observedAt']>90_000:raise web.HTTPConflict(text='observation_stale')
+            frame=(await b.rpc('Page.getFrameTree',session=b.session))['frameTree']['frame'];parsed=urlsplit(frame['url'])
+            origin=f'{parsed.scheme}://{parsed.netloc}' if parsed.scheme in ('http','https') else 'null'
+            viewport=(await b.rpc('Page.getLayoutMetrics',session=b.session))['cssVisualViewport']
+            if frame['loaderId']!=observed['loaderId'] or origin!=observed['origin'] or any(viewport[k]!=v for k,v in observed['viewport'].items()):raise web.HTTPConflict(text='observation_stale')
+            if name in ('click','scroll','drag'):
+                x,y=checked_point(data,viewport)
+                if name=='drag':to_x,to_y=checked_point(data,viewport,True)
+            if name=='type':
+                text=data.get('text')
+                if not isinstance(text,str) or not 0<len(text)<=2000 or '\0' in text:raise web.HTTPBadRequest()
+                focused=await b.rpc('Runtime.evaluate',{'expression':f"(() => {{const e=document.activeElement;return Boolean(e && !{SENSITIVE_FIELD} && (['INPUT','TEXTAREA'].includes(e.tagName)||e.isContentEditable));}})()",'returnByValue':True},b.session)
+                if focused.get('result',{}).get('value') is not True:raise web.HTTPForbidden()
+            if name=='key':
+                key=data.get('key')
+                if key not in ('Enter','Tab','Escape','ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Backspace','Delete','Home','End','PageDown','PageUp'):raise web.HTTPBadRequest()
+                focused=await b.rpc('Runtime.evaluate',{'expression':f"(() => {{const e=document.activeElement;return Boolean(e && {SENSITIVE_FIELD});}})()",'returnByValue':True},b.session)
+                if focused.get('result',{}).get('value') is True and key not in ('Tab','Escape'):raise web.HTTPForbidden()
+            if name=='scroll' and any(type(data.get(k)) is not int or abs(data[k])>2000 for k in ('deltaX','deltaY')):raise web.HTTPBadRequest()
+            if name not in ('navigate','click','type','key','scroll','drag'):raise web.HTTPBadRequest()
         if name=='navigate':
-            from urllib.parse import urlparse
-            u=urlparse(data.get('url',''))
-            if u.scheme not in ('https','http') or not u.hostname or u.username or u.password:raise web.HTTPBadRequest()
-            await b.rpc('Page.navigate',{'url':data['url']},b.session)
-        elif name=='observe':
-            # Exclude all form values, cookies, storage and raw HTML.
-            text=await b.rpc('Runtime.evaluate',{'expression':'(() => { const copy=document.body.cloneNode(true); copy.querySelectorAll(\'input,textarea,select,script,style,noscript\').forEach(e=>e.remove()); const elements=Array.from(document.querySelectorAll(\'a,button,input,textarea,select\')).slice(0,150).map((e,i)=>{e.setAttribute(\'data-mikka-ref\',String(i));return {selector:\'[data-mikka-ref=\\"\'+i+\'\\"]\',tag:e.tagName,type:e.type||null,text:[\'INPUT\',\'TEXTAREA\',\'SELECT\'].includes(e.tagName)?null:e.innerText.slice(0,200),label:e.getAttribute(\'aria-label\')||e.getAttribute(\'placeholder\'),href:e.tagName===\'A\'?e.href:null}});return JSON.stringify({url:location.origin+location.pathname,title:document.title,text:(copy.innerText||copy.textContent||\'\').slice(0,16000),elements,needsLogin:Array.from(document.querySelectorAll(\'input[type=password]\')).some(e=>e.getClientRects().length>0)})})()','returnByValue':True},b.session)
-            return web.json_response({'observation':json.loads(text['result']['value'])})
-        elif name=='type':
-            selector=json.dumps(str(data.get('selector',''))[:500])
-            expression=f"(() => {{ const e=document.querySelector({selector}); if (!e || {SENSITIVE_FIELD} || !['INPUT','TEXTAREA'].includes(e.tagName)) return false; e.focus(); return true; }})()"
-            focused=await b.rpc('Runtime.evaluate',{'expression':expression,'returnByValue':True},b.session)
-            if focused.get('result',{}).get('value') is not True:raise web.HTTPForbidden()
-            await b.rpc('Input.insertText',{'text':str(data.get('text',''))[:2000]},b.session)
+            destination=data.get('url');u=urlsplit(destination) if isinstance(destination,str) else None
+            if not u or u.scheme not in ('https','http') or not u.hostname or u.username or u.password:raise web.HTTPBadRequest()
+        if target:write_action_receipt(target,digest,'invoking')
+        b.observation=None
+        if name=='navigate':await b.rpc('Page.navigate',{'url':destination},b.session)
+        elif name=='type':await b.rpc('Input.insertText',{'text':text},b.session)
         elif name=='key':
-            key=data.get('key')
-            if key not in ('Enter','Tab','Escape','ArrowDown','ArrowUp'):raise web.HTTPBadRequest()
             await b.rpc('Input.dispatchKeyEvent',{'type':'keyDown','key':key},b.session)
             await b.rpc('Input.dispatchKeyEvent',{'type':'keyUp','key':key},b.session)
         elif name=='click':
-            # The calling harness applies model and metadata-based approval checks.
-            selector=json.dumps(str(data.get('selector',''))[:500])
-            await b.rpc('Runtime.evaluate',{'expression':f'document.querySelector({selector})?.click()'},b.session)
-        else:raise web.HTTPBadRequest()
-        return web.json_response({'accepted':True})
+            await b.rpc('Input.dispatchMouseEvent',{'type':'mousePressed','x':x,'y':y,'button':'left','clickCount':1},b.session)
+            await b.rpc('Input.dispatchMouseEvent',{'type':'mouseReleased','x':x,'y':y,'button':'left','clickCount':1},b.session)
+        elif name=='scroll':await b.rpc('Input.dispatchMouseEvent',{'type':'mouseWheel','x':x,'y':y,'deltaX':data['deltaX'],'deltaY':data['deltaY']},b.session)
+        elif name=='drag':
+            await b.rpc('Input.dispatchMouseEvent',{'type':'mousePressed','x':x,'y':y,'button':'left','buttons':1,'clickCount':1},b.session)
+            for step in range(1,9):await b.rpc('Input.dispatchMouseEvent',{'type':'mouseMoved','x':x+(to_x-x)*step/8,'y':y+(to_y-y)*step/8,'button':'left','buttons':1},b.session)
+            await b.rpc('Input.dispatchMouseEvent',{'type':'mouseReleased','x':to_x,'y':to_y,'button':'left','clickCount':1},b.session)
+        result={'accepted':True,'actionId':data.get('actionId')}
+        if target:write_action_receipt(target,digest,'done',result)
+        return web.json_response(result)
 
 # No selector, expression, value, label or HTML is accepted from the caller.
 # Metadata comes from the current live top document; nested frames/shadow roots

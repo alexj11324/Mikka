@@ -3,6 +3,7 @@
 import { spawn } from "node:child_process";
 import { createServer, request as httpRequest } from "node:http";
 import { mkdirSync } from "node:fs";
+import { startNativeEgress } from "./native-egress.mjs";
 
 const PLACEHOLDER = "mikka-native-broker-placeholder";
 const fail = () => {
@@ -56,7 +57,18 @@ async function start(config, remainder) {
   delete config.env.CLAUDE_CODE_OAUTH_TOKEN;
   config.env.PATH = "/usr/local/bin:/usr/bin:/bin";
   mkdirSync(config.env.HOME, { recursive: true, mode: 0o700 });
-  // The only egress available to the container is its mounted task socket.
+  // Model credentials stay on the original task broker. Public downloads use
+  // a separate live, public-IP-only host proxy, never that credential endpoint.
+  const egress = config.publicEgress === true ? await startNativeEgress() : null;
+  if (egress) {
+    Object.assign(config.env, {
+      HTTP_PROXY: egress.url, HTTPS_PROXY: egress.url,
+      http_proxy: egress.url, https_proxy: egress.url,
+      NO_PROXY: 'localhost,127.0.0.1,::1', no_proxy: 'localhost,127.0.0.1,::1',
+      NODE_USE_ENV_PROXY: '1',
+    });
+  }
+  // The model transport remains bound to the mounted task broker socket.
   const proxy = createServer((request, response) => {
     if (request.method !== "POST") {
       response.writeHead(404).end();
@@ -133,6 +145,7 @@ async function start(config, remainder) {
       "GIT_CONFIG_SYSTEM",
       "GIT_TERMINAL_PROMPT",
       "HOME",
+      ...(egress ? ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NO_PROXY", "no_proxy", "NODE_USE_ENV_PROXY"] : []),
     ])
       args.push(
         "-c",
@@ -173,6 +186,6 @@ async function start(config, remainder) {
   child.on("exit", (code) => {
     clearTimeout(timer);
     proxy.closeAllConnections();
-    proxy.close(() => process.exit(code ?? 1));
+    void (egress?.close() ?? Promise.resolve()).finally(() => proxy.close(() => process.exit(code ?? 1)));
   });
 }

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import type { ComputerState } from '@mikka/protocol/computer'
 import * as provider from './e2b-provider'
+import { ensureCloudMachine } from './provision'
 
 export class ComputerError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -38,7 +39,7 @@ export class ComputerStore {
       await client.query('BEGIN')
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [key])
       const previous = (await client.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]?.permission ?? 'ask'
-      const machine = (await client.query<Machine>('SELECT * FROM cloud_machines WHERE "workspaceId"=$1 FOR UPDATE', [workspaceId])).rows[0]
+      const machines = (await client.query<Machine>('SELECT * FROM cloud_machines WHERE "workspaceId"=$1 ORDER BY "ownerId" FOR UPDATE', [workspaceId])).rows
       const desktops = (await client.query<Desktop>('SELECT * FROM bot_desktops WHERE "workspaceId"=$1 ORDER BY display FOR UPDATE', [workspaceId])).rows
       const policy = (await client.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version)
         VALUES ($1,$2,CASE WHEN $2='ask' THEN 0 ELSE 1 END)
@@ -61,9 +62,10 @@ export class ComputerStore {
             AND r.status=ANY($2::text[])`, [workspaceId, ['queued', 'preparing', 'running', 'waiting_input', 'finishing']])
       }
       const sync = async () => {
-        if (machine?.sandboxId && machine.runtimeReady && desktops.length) {
+        for (const machine of machines) {
+          if (!machine.sandboxId || !machine.runtimeReady) continue
           const sandbox = await this.runtime.connectComputer(machine.sandboxId)
-          for (const desktop of desktops) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
+          for (const desktop of desktops.filter(d => d.ownerId === machine.ownerId)) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
         }
         // Dedicated threads have their own driver lease. Updating only the
         // Bot machine leaves an already issued thread grant on an old policy.
@@ -94,7 +96,7 @@ export class ComputerStore {
   }
   async state(actor: Actor, botId: string): Promise<ComputerState> {
     await this.bot(actor, botId)
-    const { rows } = await this.pool.query('SELECT m.state AS machine,m."sandboxId",d.control,d."controlledBy",d."controlUntil",d."lastAction" FROM bot_desktops d JOIN cloud_machines m USING ("workspaceId") WHERE d."botId"=$1 AND d."ownerId"=$2', [botId, actor.userId])
+    const { rows } = await this.pool.query('SELECT m.state AS machine,m."sandboxId",d.control,d."controlledBy",d."controlUntil",d."lastAction" FROM bot_desktops d JOIN cloud_machines m ON m."workspaceId"=d."workspaceId" AND m."ownerId"=d."ownerId" WHERE d."botId"=$1 AND d."ownerId"=$2', [botId, actor.userId])
     const row = rows[0]
     if (!row) return { machine: 'sleeping', control: 'idle' }
     if (row.sandboxId && row.machine !== 'error') row.machine = await this.runtime.computerState(row.sandboxId)
@@ -123,34 +125,19 @@ export class ComputerStore {
   }
   async operate(actor: Actor, botId: string, action: 'wake' | 'viewer' | 'takeover' | 'handback', mode: 'view' | 'control' = 'view') {
     await this.bot(actor, botId)
-    // Persist the idempotency key before provisioning: a crashed request cannot
-    // provision an unbounded number of instances on retry.
-    await this.pool.query('INSERT INTO cloud_machines ("workspaceId","ownerId","operationId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [actor.workspaceId, actor.userId, randomUUID()])
+    const sandbox = await ensureCloudMachine(this.pool,actor,this.runtime)
+    if (!sandbox) throw new ComputerError(409,'Computer provisioning in progress')
     const client = await this.pool.connect()
     let persistProgress = false
     try {
       await client.query('BEGIN')
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
-      const machine = (await client.query<Machine>('SELECT * FROM cloud_machines WHERE "workspaceId"=$1 FOR UPDATE', [actor.workspaceId])).rows[0]
-      // A shared Unix account is not a multi-owner isolation boundary. Until
-      // separate OS/sandbox isolation ships, one workspace machine has one owner.
-      if (machine.ownerId !== actor.userId) throw new ComputerError(409, 'This workspace computer belongs to another account owner')
-      await this.bot(actor, botId, client)
-      let sandbox
-      if (machine.sandboxId) sandbox = await this.runtime.connectComputer(machine.sandboxId)
-      else {
-        sandbox = await this.runtime.createComputer(actor.workspaceId, machine.operationId)
-        await client.query('UPDATE cloud_machines SET "sandboxId"=$2,state=$3 WHERE "workspaceId"=$1', [actor.workspaceId, sandbox.sandboxId, 'waking'])
-        persistProgress = true
-      }
-      if (!machine.runtimeReady) {
-        await this.runtime.installComputerRuntime(sandbox)
-        await client.query('UPDATE cloud_machines SET "runtimeReady"=true WHERE "workspaceId"=$1', [actor.workspaceId])
-      }
-      await client.query('UPDATE cloud_machines SET "sandboxId"=$2,state=$3,"lastActiveAt"=now() WHERE "workspaceId"=$1', [actor.workspaceId, sandbox.sandboxId, 'running'])
+      const machine = (await client.query<Machine>('SELECT * FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2 FOR UPDATE', [actor.workspaceId,actor.userId])).rows[0]
+      if (!machine || machine.sandboxId !== sandbox.sandboxId) throw new ComputerError(409,'Computer allocation changed')
+      await this.bot(actor,botId,client)
       let desktop = (await client.query<Desktop>('SELECT * FROM bot_desktops WHERE "botId"=$1 FOR UPDATE', [botId])).rows[0]
       if (!desktop) {
-        const next = Number((await client.query('SELECT coalesce(max(display),0)+1 AS n FROM bot_desktops WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0].n)
+        const next = Number((await client.query('SELECT coalesce(max(display),0)+1 AS n FROM bot_desktops WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId,actor.userId])).rows[0].n)
         if (next > 999) throw new ComputerError(409, 'Desktop limit reached')
         desktop = (await client.query<Desktop>('INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,$4) RETURNING *', [botId, actor.workspaceId, actor.userId, next])).rows[0]
       }
@@ -184,7 +171,7 @@ export class ComputerStore {
         // Never roll back a generation already sent to the gateway: doing so
         // could revive an old control token on the next synchronization.
         // An expected authorization/conflict response is not a provider failure.
-        if (!(error instanceof ComputerError)) await client.query('UPDATE cloud_machines SET state=$2 WHERE "workspaceId"=$1', [actor.workspaceId, 'error'])
+        if (!(error instanceof ComputerError)) await client.query('UPDATE cloud_machines SET state=$2 WHERE "workspaceId"=$1 AND "ownerId"=$3', [actor.workspaceId, 'error',actor.userId])
         await client.query('COMMIT')
       } else await client.query('ROLLBACK')
       throw error

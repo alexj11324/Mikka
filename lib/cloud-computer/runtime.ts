@@ -51,6 +51,12 @@ export async function runtimeRequest(sandboxId: string, row: BrowserBinding, pat
   const sandbox = await connectComputer(sandboxId)
   const capability = await grant(sandbox, row, 'runtime')
   const response = await fetch(endpointPath(capability.endpoint, path), { method: body === undefined ? 'GET' : 'POST', redirect: 'error', cache: 'no-store', headers: { 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(25_000) })
-  if (!response.ok) throw new Error('Browser runtime unavailable')
+  if (!response.ok) {
+    if (response.status === 409) {
+      const reason = (await response.text()).slice(0,100)
+      if (reason === 'observation_stale' || reason === 'action_outcome_unknown') throw new Error(reason)
+    }
+    throw new Error('Browser runtime unavailable')
+  }
   return await response.json() as Record<string, unknown>
 }

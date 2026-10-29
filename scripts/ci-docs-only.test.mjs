@@ -177,7 +177,7 @@ test('all required gates reject failed classification and skipped full jobs', ()
     for (const [, block] of blocks) {
       const script = block.split('        run: |\n')[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
       const result = (changes, docs, full) => {
-        try { execFileSync('bash', ['-e', '-c', script], { env: { PATH: process.env.PATH, CHANGES_RESULT: changes, DOCS_ONLY: docs, FULL_RESULT: full }, stdio: 'ignore' }); return true } catch { return false }
+        try { execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { env: { PATH: process.env.PATH, CHANGES_RESULT: changes, DOCS_ONLY: docs, FULL_RESULT: full }, stdio: 'ignore' }); return true } catch { return false }
       }
       assert.equal(result('failure', 'true', 'skipped'), false)
       assert.equal(result('success', 'false', 'skipped'), false)
@@ -224,7 +224,7 @@ esac
     assert.ok(block, 'trusted classifier step must be present')
     const script = block[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
     const outputFile = join(dir, `${name}.output`)
-    const output = execFileSync('bash', ['-e', '-c', script], { cwd: dir, encoding: 'utf8', env: {
+    const output = execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { cwd: dir, encoding: 'utf8', env: {
       PATH: `${bin}:${process.env.PATH}`, FIXTURE_CLASSIFIER: resolve('scripts/ci-docs-only.mjs'),
       TMPDIR: dir,
       GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_OUTPUT: outputFile,
@@ -258,7 +258,7 @@ test('actual workflow classifier launches trusted ESM from its retained temporar
     git(['add', '.']); git(['commit', '-m', 'code change'])
     const head = git(['rev-parse', 'HEAD']), event = join(dir, 'event.json')
     writeFileSync(event, JSON.stringify({ pull_request: { base: { sha: base }, head: { sha: head } } }))
-    const output = execFileSync('bash', ['-e', '-c', script], { cwd: repo, env: { ...env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: event }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    const output = execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { cwd: repo, env: { ...env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: event }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
     writeFileSync(join(dir, 'result.txt'), output)
     assert.match(output, /docs_only=false/)
     assert.doesNotMatch(output, /classifier (?:differs|is not on main)/)
@@ -323,7 +323,7 @@ test('the actual workflow bootstrap executes its trusted temporary ESM module', 
       const event = join(dir, `${prefix}-event.json`), output = join(dir, `${prefix}-output`)
       writeFileSync(event, JSON.stringify({ before: base, after: head }), { flag: 'wx' })
       writeFileSync(output, '', { flag: 'wx' })
-      const stdout = execFileSync('bash', ['-e', '-c', script], {
+      const stdout = execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], {
         cwd: dir, encoding: 'utf8',
         env: { ...env, GITHUB_EVENT_NAME: 'push', GITHUB_SHA: head, GITHUB_EVENT_PATH: event, GITHUB_OUTPUT: output },
       })

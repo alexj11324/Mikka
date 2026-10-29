@@ -17,6 +17,7 @@ import {
 
 import {
   defaultRunPolicy,
+  intersectNetworkDomains,
   PACKAGE_REGISTRY_DOMAINS,
   PERMISSION_ACTIONS,
   PERMISSION_DEFAULTS,
@@ -60,11 +61,12 @@ export function runPolicy(sent: RunPolicy | undefined): RunPolicy {
   return sent ?? defaultRunPolicy()
 }
 
-/** A native shell has no typed install/push action boundary. Offer it only
- * when both effects are already authorized; otherwise retain file tools and
- * network approvals and report this specific capability as unavailable. */
+/** Project commands run inside the host-enforced sandbox. Publishing is a
+ * separate daemon capability, never a prerequisite for building or testing.
+ * An explicitly restricted installation profile retains file-only execution;
+ * unconfigured sandbox work allows project dependencies. */
 export function rawCliShellAvailable(policy: RunPolicy): boolean {
-  return !policy.readOnly && policy.permissions.install_dependency === 'allow' && policy.permissions.git_push === 'allow'
+  return !policy.readOnly && policy.permissions.install_dependency === 'allow'
 }
 
 /**
@@ -82,9 +84,10 @@ export function runDomains(
     policy.permissions.install_dependency === "allow"
       ? PACKAGE_REGISTRY_DOMAINS
       : []
-  if (policy.permissions.network === "allow") return ["*"]
   if (policy.permissions.network === "deny") return []
-  return [...new Set([...policy.networkAllow, ...repoAllow, ...registries])]
+  const destinations = policy.permissions.network === "allow" ? ["*"]
+    : [...new Set([...policy.networkAllow, ...repoAllow, ...registries])]
+  return policy.networkCeiling === undefined ? destinations : intersectNetworkDomains(destinations, policy.networkCeiling)
 }
 
 /**
@@ -224,13 +227,13 @@ export function policyInstructions(policy: RunPolicy): string[] {
     lines.push(
       "- This is a read-only check: you may read the worktree but not change it, and nothing is pushed. Report what you found through `submit`; do not fix anything yourself."
     )
-  if (!rawCliShellAvailable(policy)) lines.push('- Native shell execution is unavailable under the current install/push policy. Use the available file tools; report a blocked operation when a shell is required. A chat response does not grant execution authority.')
+  if (!rawCliShellAvailable(policy)) lines.push('- Native shell execution is unavailable under the current dependency-installation policy. Use the available file tools; report a blocked operation when a shell is required. A chat response does not grant execution authority.')
   lines.push(
     permissions.network === "allow"
       ? "- Network access is open for this workspace."
       : permissions.network === "deny"
         ? "- Network access is turned off (only your model API is reachable). Do not try to reach other hosts."
-        : "- Network access is limited to the workspace ceiling. Requests within that ceiling wait for a host approval; destinations outside it remain unavailable. Do not work around a blocked request."
+        : "- Network access is limited to the workspace ceiling. Destinations within that ceiling are pre-authorized; destinations outside it remain unavailable. Do not work around a blocked request."
   )
   lines.push(
     permissions.install_dependency === "allow"

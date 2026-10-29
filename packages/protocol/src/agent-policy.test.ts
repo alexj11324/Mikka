@@ -31,13 +31,13 @@ describe("agent policy table (ADR 0009)", () => {
     )
   })
 
-  it("keeps the ADR defaults", () => {
+  it("keeps unattended sandbox defaults while preserving publication and computer authority", () => {
     expect(PERMISSION_DEFAULTS).toEqual({
       read_in_worktree: "allow",
       write_in_worktree: "allow",
       run_project_script: "allow",
       run_setup_recipe: "allow",
-      install_dependency: "ask",
+      install_dependency: "allow",
       write_outside_repo: "ask",
       git_push: "ask",
       network: "ask",
@@ -62,7 +62,7 @@ describe("agent policy table (ADR 0009)", () => {
     expect(
       resolvePermissions({ write_outside_repo: "allow", git_push: "deny" })
     ).toEqual({
-      install_dependency: "ask",
+      install_dependency: "allow",
       write_outside_repo: "ask",
       git_push: "deny",
       network: "ask",
@@ -273,9 +273,26 @@ it("canonicalizes resolved execution policy independent of object key order", ()
   const policy = defaultRunPolicy()
   expect(runPolicyDigestInput()).toBe(runPolicyDigestInput(policy))
   const reordered = { networkAllow: policy.networkAllow, permissions: {
-    network: policy.permissions.network, git_push: policy.permissions.git_push,
+    network: policy.permissions.network, git_push: policy.permissions.git_push, computer_use: policy.permissions.computer_use,
     write_outside_repo: policy.permissions.write_outside_repo, install_dependency: policy.permissions.install_dependency,
   } }
   expect(runPolicyDigestInput(reordered)).toBe(runPolicyDigestInput(policy))
   expect(runPolicyDigestInput({ ...policy, readOnly: true })).not.toBe(runPolicyDigestInput(policy))
+})
+
+it('uses unattended cloud networking only for a trusted cloud environment and keeps explicit choices', () => {
+  expect(resolveAgentSettings(null, undefined, 'cloud').policy.permissions.network).toBe('allow')
+  expect(resolveAgentSettings(null).policy.permissions.network).toBe('ask')
+  for (const network of ['allow','ask','deny'] as const) {
+    expect(resolveAgentSettings({ permissions:{network} },undefined,'cloud').policy.permissions.network).toBe(network)
+  }
+  expect(resolveAgentSettings({permissions:{install_dependency:'deny',git_push:'deny'}},undefined,'cloud').policy.permissions).toMatchObject({install_dependency:'deny',git_push:'deny'})
+})
+
+it('cannot widen a worker/workspace egress ceiling with a frozen assignment', () => {
+  const base={...defaultRunPolicy(),networkCeiling:['*.github.com:443']}
+  expect(isNoLooserThan(base,{...base,networkCeiling:['api.github.com:443']})).toBe(true)
+  expect(isNoLooserThan(base,{...base,networkCeiling:['api.github.com']})).toBe(false)
+  expect(isNoLooserThan(base,defaultRunPolicy())).toBe(false)
+  expect(resolveAgentSettings({networkAllow:['registry.example.com']},undefined,'cloud').policy.permissions.network).toBe('ask')
 })

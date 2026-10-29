@@ -11,7 +11,7 @@ it('keeps decisions within the immutable maximum and the exact run', async () =>
   expect(await network({host:'other.invalid',port:443},signal)).toBe(false)
   expect(ask).not.toHaveBeenCalled()
   expect(await network({host:'example.invalid',port:443},signal)).toBe(true)
-  expect(ask).toHaveBeenCalledOnce()
+  expect(ask).not.toHaveBeenCalled()
   expect(() => runNetworkApproval('run-b','codex',gate,['*'])).toThrow('scope')
   gate.revoke()
   expect(await network({host:'example.invalid',port:443},signal)).toBe(false)
@@ -27,16 +27,18 @@ it('checks live authority even for provider destinations and never widens the ce
   expect(ask).not.toHaveBeenCalled()
 })
 
-it('fences cancellation during a pending exact destination decision', async () => {
-  let finish!: (value:'allow')=>void
-  const ask=vi.fn(()=>new Promise<'allow'>(resolve=>{finish=resolve}))
-  const gate = new ToolApprovalGate('run-a',{permission:()=> 'ask',ask,isLive:()=>true})
+it('fences cancellation while current policy is being checked', async () => {
+  let finish!: (value:'ask')=>void
+  const permission=vi.fn(()=>new Promise<'ask'>(resolve=>{finish=resolve}))
+  const ask=vi.fn(async()=> 'allow' as const)
+  const gate = new ToolApprovalGate('run-a',{permission,ask,isLive:()=>true})
   const controller = new AbortController()
   const pending = runNetworkApproval('run-a','codex',gate,['example.invalid'])({host:'example.invalid',port:443},controller.signal)
-  await vi.waitFor(()=>expect(ask).toHaveBeenCalledOnce())
+  await vi.waitFor(()=>expect(permission).toHaveBeenCalledOnce())
   controller.abort()
   expect(await pending).toBe(false)
-  finish('allow')
+  finish('ask')
+  expect(ask).not.toHaveBeenCalled()
 })
 
 it('routes only the trusted computer broker transport without a second approval', async () => {
@@ -53,4 +55,30 @@ it('routes only the trusted computer broker transport without a second approval'
   gate.revoke()
   expect(await network({host:'127.0.0.1',port:32123},signal)).toBe(false)
   for (const endpoint of ['example.invalid:443','127.0.0.1:0','127.0.0.1:65536']) expect(() => runNetworkApproval('run-a','codex',gate,['*'],endpoint)).toThrow()
+})
+
+it('does not consume mutation receipts or ask again for repeated pre-authorized sockets', async () => {
+  let live=true, decision:'allow'|'ask'|'deny'='ask'
+  const ask=vi.fn(async()=> 'allow' as const)
+  const gate=new ToolApprovalGate('run-a',{permission:()=>decision,ask,isLive:()=>live})
+  const network=runNetworkApproval('run-a','codex',gate,['example.invalid:443'])
+  const signal=new AbortController().signal
+  for(let i=0;i<2048;i++) expect(await network({host:'example.invalid',port:443},signal)).toBe(true)
+  expect(ask).not.toHaveBeenCalled()
+  decision='deny'
+  expect(await network({host:'example.invalid',port:443},signal)).toBe(false)
+  decision='allow';live=false
+  expect(await network({host:'example.invalid',port:443},signal)).toBe(false)
+  live=true
+  // Network checks cannot exhaust the ordinary action replay guard.
+  expect(await gate.request({runId:'run-a',harness:'codex',requestId:'first-action',method:'cli/Write',input:{}})).toBe('allow')
+})
+
+it('cannot use the pre-authorized transport for another run or a mutation', async () => {
+  const gate=new ToolApprovalGate('run-a',{permission:()=> 'allow',ask:async()=> 'allow',isLive:()=>true})
+  const base={runId:'run-a',harness:'codex' as const,requestId:'x',method:'sandbox/network',input:{host:'example.invalid',port:443}}
+  expect(await gate.preapprovedNetwork({...base,runId:'run-b'})).toBe(false)
+  expect(await gate.preapprovedNetwork({...base,method:'cli/Bash'})).toBe(false)
+  gate.revoke()
+  expect(await gate.preapprovedNetwork(base)).toBe(false)
 })

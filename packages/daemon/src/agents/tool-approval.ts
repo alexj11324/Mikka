@@ -48,6 +48,21 @@ export class ToolApprovalGate {
     catch { return false }
   }
 
+  /** A network ceiling is a host-issued destination grant, not a per-socket
+   * question. Only runNetworkApproval calls this AFTER checking that ceiling.
+   * Recheck live policy for each connection without consuming an action receipt
+   * or filling the mutation replay set during a large package installation. */
+  async preapprovedNetwork(request: ToolApprovalRequest, signal?: AbortSignal): Promise<boolean> {
+    if (request.runId !== this.runId || request.method !== 'sandbox/network' || this.revoked || signal?.aborted) return false
+    const lifetime = signal ? AbortSignal.any([signal, this.stop.signal]) : this.stop.signal
+    try {
+      if (!await abortable(Promise.resolve(this.host.isLive(this.runId)), lifetime)) return false
+      const decision = await abortable(Promise.resolve(this.host.permission(request)), lifetime)
+      if (decision !== 'allow' && decision !== 'ask') return false
+      return await abortable(Promise.resolve(this.host.isLive(this.runId)), lifetime) && !lifetime.aborted && !this.revoked
+    } catch { return false }
+  }
+
   async request(request: ToolApprovalRequest, signal?: AbortSignal): Promise<'allow' | 'deny'> {
     if (request.runId !== this.runId || !request.requestId || request.requestId.length > 219 || this.seen.has(request.requestId) || this.seen.size >= 1024 || this.stop.signal.aborted || signal?.aborted) return 'deny'
     let snapshot: ToolApprovalRequest
