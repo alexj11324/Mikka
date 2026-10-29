@@ -64,3 +64,22 @@ test('切换 Bot 时各自保留未发送的草稿', async ({ page }) => {
   await bots.getByRole('button', { name: '草稿 Bot', exact: true }).click()
   await expect(page.getByLabel('给 草稿 Bot 发消息', { exact: true })).toHaveValue('未发送的草稿')
 })
+
+// A09: pressing send twice on a slow network must not create two messages.
+test('连续按下发送只提交一次', async ({ page }) => {
+  await register(page)
+  await page.route('**/*', async route => {
+    const request = route.request()
+    if (request.method() === 'POST' && request.headers()['next-action']) {
+      await new Promise(resolve => setTimeout(resolve, 1200))
+    }
+    return route.fallback()
+  })
+  const composer = page.getByLabel('给 Coordinator 发消息', { exact: true })
+  await composer.fill('只提交一次')
+  await composer.press('Enter')
+  await composer.press('Enter')
+  await expect(page.getByText('只提交一次', { exact: true })).toHaveCount(1)
+  await page.waitForTimeout(1500)
+  await expect(page.getByText('只提交一次', { exact: true })).toHaveCount(1)
+})
