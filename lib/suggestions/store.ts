@@ -69,9 +69,23 @@ export async function listSuggestions(userId: string) {
   return db.select().from(suggestions).where(visible(userId, new Date(Date.now() - LIST_WINDOW_MS))).orderBy(desc(suggestions.occurredAt)).limit(LIST_LIMIT)
 }
 
+/** Atomically claim a visible suggestion for sending inside the caller's transaction. */
+export async function claimSuggestion(userId: string, id: string, executor: Pick<typeof db, 'update'>) {
+  const [row] = await executor.update(suggestions).set({ dismissedAt: new Date() })
+    .where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), eq(suggestions.shown, true), isNull(suggestions.dismissedAt)))
+    .returning()
+  return row ?? null
+}
+
+/** Read only an owned, shown suggestion, including one already dismissed. */
+export async function readClaimedSuggestion(userId: string, id: string, executor: Pick<typeof db, 'select'>) {
+  const [row] = await executor.select().from(suggestions).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), eq(suggestions.shown, true))).limit(1)
+  return row ?? null
+}
+
 /** Takes a suggestion off the person's list. False when it is not theirs. */
-export async function dismissSuggestion(userId: string, id: string) {
-  const rows = await db.update(suggestions).set({ dismissedAt: new Date() }).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), isNull(suggestions.dismissedAt))).returning({ id: suggestions.id })
+export async function dismissSuggestion(userId: string, id: string, executor: Pick<typeof db, 'update'> = db) {
+  const rows = await executor.update(suggestions).set({ dismissedAt: new Date() }).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId), isNull(suggestions.dismissedAt))).returning({ id: suggestions.id })
   return rows.length > 0
 }
 
