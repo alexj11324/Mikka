@@ -6,11 +6,12 @@ import { z } from 'zod'
 import { normalizeUserImages, userImageInputsSchema, MAX_PERSONAL_SUBMISSION_BYTES, type UserImageInput } from './coordinator/user-attachments'
 import { coordinatorEvents } from './db/schema'
 import type { db } from './db'
+import { MESSAGE_MAX } from './message-limits'
 import { taskDestinationSchema, type TaskDestination } from './task-destination'
 
 /** Personal Coordinator HTTP contract. Question/approval fields are not supported. */
 export const personalSubmissionInput = z.object({
-  text: z.string().trim().max(10_000).default(''),
+  text: z.string().trim().max(MESSAGE_MAX).default(''),
   images: userImageInputsSchema.optional(),
   submissionId: z.uuid().transform(value => value.toLowerCase()).optional(),
 }).strict().refine(value => Boolean(value.text || value.images?.length), {message:'messageRequired'})
