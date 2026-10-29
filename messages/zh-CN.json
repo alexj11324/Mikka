@@ -912,6 +912,7 @@
     "generic": "操作未成功，请稍后重试。",
     "authRequired": "请先登录。",
     "validationGeneric": "请检查填写内容。",
+    "issueToolsDisabled": "暂时无法创建任务。",
     "validationTitleRequired": "请填写任务标题。",
     "validationNameRequired": "请填写名称。",
     "teamIdentifierInvalid": "标识须为 2–12 位大写字母或数字，并以字母开头。",
@@ -2733,5 +2734,10 @@
   },
   "MobilePush": {
     "verificationCode": "收到一条验证码"
+  },
+  "MobileHandoff": {
+    "title": "登录 Mikka",
+    "confirm": "使用此账号继续",
+    "cancel": "取消"
   }
 }

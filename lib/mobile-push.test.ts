@@ -26,3 +26,8 @@ test('a verification code push comes from the messages, in the person\'s languag
   assert.equal(await codePushBody('zh-CN'), '收到一条验证码')
   assert.equal(await codePushBody('en'), 'A verification code arrived')
 })
+
+test('a card is pushed as its words, not as OpenUI', () => {
+  const card = 'root = Stack([TextContent("Stripe 10 月账单周五到期，没付会停服。"), BeFollowUps([{label:"现在付款", prompt:"帮我付款"}, {label:"晚点再说", prompt:"晚点提醒我"}])])'
+  assert.equal(pushBody(card), 'Stripe 10 月账单周五到期，没付会停服。 现在付款 晚点再说')
+})
