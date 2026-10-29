@@ -102,3 +102,28 @@ test('发送失败后草稿仍保留，恢复后可再发', async ({ page }) => 
   await composer.press('Enter')
   await expect(page.getByText('发送失败时保留', { exact: true })).toBeVisible()
 })
+
+// A28: the limit is visible near the edge, and over-long input is truncated
+// without throwing away what the person already typed.
+test('接近长度上限时显示计数，超长输入被截断但不清空', async ({ page }) => {
+  await register(page)
+  const composer = page.getByLabel('给 Coordinator 发消息', { exact: true })
+  await composer.fill('字'.repeat(9600))
+  await expect(page.getByText('9600 / 10000')).toBeVisible()
+  await composer.fill('字'.repeat(10500))
+  await expect(page.getByText('10000 / 10000')).toBeVisible()
+  expect((await composer.inputValue()).length).toBe(10000)
+})
+
+// Drafts must not outlive the session: a later account on this tab must not
+// find them.
+test('登出会清除本标签页里未发送的草稿', async ({ page }) => {
+  await register(page)
+  await page.getByLabel('给 Coordinator 发消息', { exact: true }).fill('登出前的草稿')
+  const stored = () => page.evaluate(() => Object.keys(sessionStorage).filter(key => key.startsWith('mikka:draft:')))
+  expect((await stored()).length).toBe(1)
+  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
+  await expect(page).toHaveURL(/sign-in/)
+  expect(await stored()).toEqual([])
+})

@@ -2109,7 +2109,8 @@
         "cancelled": "已取消"
       },
       "sources": "{count} 个来源"
-    }
+    },
+    "lengthCount": "{count} / {max}"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "先登录。",

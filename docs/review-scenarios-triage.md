@@ -19,6 +19,11 @@
 | A11 停止线程未确认 | 文案改为「停止未确认」，按钮改「重试停止」 | `tests/e2e/thread-stop.spec.ts` |
 | A13 窄屏重试点击区 | 320px 下重试按钮 88×44，桌面 88×32 | 同上 |
 | A02 切换 Bot 草稿 | 草稿按 Bot 存 `sessionStorage`，切换后不串线、不丢失 | `tests/e2e/bots.spec.ts` |
+| A08 发送失败 | 请求失败时草稿保留、显示错误、恢复后可再发 | 同上 |
+| A09 连续提交 | 慢网络下连按发送只产生一条消息 | 同上 |
+| A19 他人线程权限 | 可搜索的任务不授予同事线程内容、旧历史或私信权限 | `tests/e2e/site-search.spec.ts`（7/7） |
+| A27 找回旧消息 | 归档标题可定位 owner 历史，分页超过 100 条 | 同上 |
+| A28 超长输入 | 接近上限显示 `count / 10000`，超长截断但保留已输入内容 | `tests/e2e/bots.spec.ts` |
 
 E2E 运行方式：独立 Postgres 库 `mikka_120_e2e`，`CI=true`，`BETTER_AUTH_URL=http://localhost:3100`，密钥走 `infisical run --env dev --path /vercel`。
 

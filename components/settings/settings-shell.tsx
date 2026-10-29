@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { usePathname, useRouter } from '@/i18n/navigation'
 import { useSWRConfig } from 'swr'
-import { authClient } from '@/lib/auth-client'
+import { endSession } from '@/lib/auth-client'
 import { AppShell, SignOutBoundary } from '@/components/app-shell'
 import { SettingsView, type SettingsSection } from './settings-view'
 import { TeamDirectory } from '@/components/teams/team-directory'
@@ -27,7 +27,7 @@ export function SettingsShell({ user, defaultWorkspaceId, googleEnabled = false,
     if (signingOut) return
     setSigningOut(true); setError('')
     try {
-      const result = await authClient.signOut()
+      const result = await endSession()
       if (result.error) throw new Error('sign out failed')
       await mutate(() => true, undefined, { revalidate: false })
       router.replace('/sign-in?login=1'); router.refresh()

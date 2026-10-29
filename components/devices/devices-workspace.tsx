@@ -5,7 +5,7 @@ import useSWR from 'swr'
 import { useRouter } from '@/i18n/navigation'
 import { Laptop, RefreshCw, Sparkles, Terminal } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { authClient } from '@/lib/auth-client'
+import { endSession } from '@/lib/auth-client'
 import { SignOutBoundary } from '@/components/app-shell'
 import { listDevices, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
@@ -148,7 +148,7 @@ export function DevicesWorkspace({ user, localHostname, initialDevices }: {
     setSigningOut(true)
     setAccountError('')
     try {
-      const result = await authClient.signOut()
+      const result = await endSession()
       if (result.error) throw new Error('sign out failed')
       router.replace('/sign-in?login=1'); router.refresh()
     } catch { setAccountError(tAccount('signOutFailed')); setSigningOut(false) }

@@ -2109,7 +2109,8 @@
         "cancelled": "Cancelled"
       },
       "sources": "{count, plural, one {# source} other {# sources}}"
-    }
+    },
+    "lengthCount": "{count} / {max}"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "Sign in required",

@@ -68,9 +68,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const [draft, setDraft] = useState('')
   // A draft belongs to the bot it was typed for. Switching bots remounts this
   // component (the page keys it by bot), so keep the text per conversation.
-  const draftKey = `mikka:draft:${userId ?? 'anonymous'}:${botId ?? 'coordinator'}`
+  const draftKey = userId ? `mikka:draft:${userId}:${botId ?? 'coordinator'}` : null
   const draftLoaded = useRef(false)
   useEffect(() => {
+    if (!draftKey) return
     try {
       const saved = sessionStorage.getItem(draftKey)
       if (saved) setDraft(saved)
@@ -79,7 +80,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   }, [draftKey])
   function updateDraft(value: string) {
     setDraft(value)
-    if (!draftLoaded.current) return
+    if (!draftKey || !draftLoaded.current) return
     try {
       if (value) sessionStorage.setItem(draftKey, value)
       else sessionStorage.removeItem(draftKey)
@@ -138,7 +139,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     const text = draft.trim()
     if (!await post(text)) return
     setDraft(current => current.trim() === text ? '' : current)
-    if (draft.trim() === text) { try { sessionStorage.removeItem(draftKey) } catch { /* storage may be unavailable */ } }
+    if (draft.trim() === text && draftKey) { try { sessionStorage.removeItem(draftKey) } catch { /* storage may be unavailable */ } }
     const id = suggestion.current
     suggestion.current = null
     if (id) {

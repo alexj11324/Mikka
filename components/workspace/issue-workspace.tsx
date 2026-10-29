@@ -23,7 +23,6 @@ import { GlobalSearch, SearchPill } from '@/components/nav/global-search'
 import { ContextPanel } from '@/components/nav/context-panel'
 import type { CoordinatorPrefill } from '@/components/coordinator/coordinator-chat'
 import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
-import { clearChatDrafts } from '@/lib/chat-drafts'
 import { listThreads } from '@/app/actions/task-runs'
 import { listBots, type BotView } from '@/app/actions/bots'
 import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
@@ -31,7 +30,7 @@ import { sessionPreview } from '@/lib/agent-history'
 import { PanelRight } from 'lucide-react'
 import { ISSUE_STATUSES, issueIdentifier, type IssueStatus, type IssueView } from './issue-properties'
 import { listIssues } from '@/app/actions/issues'
-import { authClient } from '@/lib/auth-client'
+import { endSession } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ShortcutKeys } from '@/components/shortcut-keys'
@@ -278,9 +277,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     void leave(async () => {
       setSigningOut(true); setAccountError('')
       try {
-        const result = await authClient.signOut()
+        const result = await endSession()
         if (result.error) throw new Error('sign out failed')
-        clearChatDrafts()
         await clearCache(() => true, undefined, { revalidate: false }); router.replace('/sign-in?login=1'); router.refresh()
       } catch { setAccountError(i18nText("Workspace.signOutFailed")); setSigningOut(false) }
     })
