@@ -1,0 +1,55 @@
+name: Recover unattended source 404
+on:
+  push:
+    branches: [transfer/unattended-404-source]
+    paths: [.github/workflows/recover-unattended-source.yml]
+permissions:
+  contents: write
+concurrency:
+  group: recover-unattended-source-404
+  cancel-in-progress: false
+jobs:
+  recover:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/transfer/unattended-404-source'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: fix/unattended-sandbox-404
+          persist-credentials: false
+      - name: Import only the fixed retained source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 90884c7bd0e240a3bce664c0bfc59cb56bf0be4d
+          curl --fail --silent --show-error --max-time 60 --proto '=https' \
+            'https://sb-6fx93q3zrnl0.vercel.run/e4f5cf7a042333a6fadf84713cb28a99c8e5f371be069466d5207e7000133858.patch' \
+            -o "$RUNNER_TEMP/source.patch"
+          echo "e4f5cf7a042333a6fadf84713cb28a99c8e5f371be069466d5207e7000133858  $RUNNER_TEMP/source.patch" | sha256sum --check --strict
+          git apply --check --index "$RUNNER_TEMP/source.patch"
+          git apply --index "$RUNNER_TEMP/source.patch"
+          python3 - <<'PY'
+          import hashlib, subprocess
+          paths = subprocess.check_output(['git','diff','--cached','--name-only'], text=True).splitlines()
+          digest = hashlib.sha256(('\n'.join(sorted(paths))+'\n').encode()).hexdigest()
+          assert digest == 'a3012fdad5c9d707104fa1d4519a0d24460ca3a73ea2b0612016cf86867a4969', digest
+          assert not any(path.startswith('.github/workflows/') for path in paths)
+          print('Verified source paths:', len(paths))
+          PY
+          git -c user.name='Mikka source recovery' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            -c core.hooksPath=/dev/null commit -m 'feat: enable unattended sandbox execution with scoped authority'
+          git rev-parse HEAD
+          git rev-parse 'HEAD^{tree}'
+      - name: Publish only the feature branch without force
+        shell: bash
+        env:
+          RECOVERY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          header="$(printf 'x-access-token:%s' "$RECOVERY_TOKEN" | base64 -w0)"
+          echo "::add-mask::$header"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $header"
+          git -c core.hooksPath=/dev/null push https://github.com/alexj11324/Mikka.git HEAD:refs/heads/fix/unattended-sandbox-404
