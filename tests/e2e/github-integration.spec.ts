@@ -62,8 +62,10 @@ test('GitHub PR badge rechecks controlled response after focus and hides revoked
     await pool.query(`UPDATE issues SET content = jsonb_set(content::jsonb, '{attrs,mikka,pullRequests}', $2::jsonb) WHERE id=$1 AND "userId"=$3`, [issueId, JSON.stringify([{ url: prURL, state: 'open' }]), id])
   } finally { await pool.end() }
   let revoked = false
+  let revokedResponses = 0
   await page.route('**/api/github/pull-request-status', route => {
     expect(route.request().postDataJSON()).toEqual({ issueId, url: prURL })
+    if (revoked) revokedResponses++
     // A controlled error body deliberately uses 200 to avoid a browser console
     // resource error; provider HTTP rejection semantics have separate unit tests.
     return route.fulfill({ json: revoked ? { error: 'githubRepositoryForbidden' } : { viewerId: id, state: 'merged' } })
@@ -73,7 +75,12 @@ test('GitHub PR badge rechecks controlled response after focus and hides revoked
   await expect(link).toBeVisible()
   await testInfo.attach('github-pr-merged-controlled-response', { body: await page.screenshot(), contentType: 'image/png' })
   revoked = true
-  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  // SWR intentionally throttles focus revalidation for five seconds after mount.
+  // Exercise normal focus events until a fresh permission check actually occurs.
+  await expect.poll(async () => {
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    return revokedResponses
+  }).toBeGreaterThan(0)
   await expect(link).toHaveCount(0)
   await expect(page.getByRole('link', { name: /GitHub 状态不可用/ }).filter({ hasText: '#81' })).toBeVisible()
   await testInfo.attach('github-pr-revoked-controlled-response', { body: await page.screenshot(), contentType: 'image/png' })
