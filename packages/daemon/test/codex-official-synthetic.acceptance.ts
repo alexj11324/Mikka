@@ -72,6 +72,13 @@ function object(value: unknown): value is JsonObject {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
+function clippedContext(value: unknown, secrets: readonly string[]) {
+  return JSON.stringify(value, (key, item: unknown) => {
+    if (/token|authorization|cookie|password|secret|api.?key/i.test(key)) return '[redacted]'
+    return typeof item === 'string' ? secrets.reduce((text, secret) => secret ? text.replaceAll(secret, '[redacted]') : text, item) : item
+  }).slice(0, 6500)
+}
+
 function declaredTools(tools: unknown, namespace?: string): { name: string; namespace?: string }[] {
   if (!Array.isArray(tools)) return []
   return tools.flatMap((tool) => {
@@ -358,9 +365,11 @@ async function computerDiagnostic(binary: string) {
   const approvals: ToolApprovalRequest[] = [], asks: ToolApprovalRequest[] = []
   const decisions: { method: string; input: unknown; policy: string; effective: string }[] = []
   const events: AgentEvent[] = [], cleanupErrors: string[] = []
+  const redactions = [SYNTHETIC_KEY]
   let synthetic: Awaited<ReturnType<typeof provider>> | undefined
   let session: AgentSession | undefined, finished: Promise<void> | undefined
   let review: unknown, result: unknown, brokerEndpoint: string | undefined
+  const context = () => clippedContext({ toolResult: result, brokerCalls: executed, pending: broker.list(), approvals, asks, events: events.slice(-12), providerFailures: synthetic?.failures, providerCalls: synthetic?.requests.map((request, index) => ({ index, toolOutputs: Array.isArray(request.input) ? request.input.filter(item => object(item) && item.type === 'function_call_output') : [] })) }, redactions)
   const gate = new ToolApprovalGate(runId, {
     isLive: () => live,
     permission(request) {
@@ -379,9 +388,11 @@ async function computerDiagnostic(binary: string) {
     await broker.listen()
     const grant = broker.spec(runId, policy.permissions.computer_use)
     if (!grant) throw new Error('synthetic computer ask grant unavailable')
+    redactions.push(grant.token)
     brokerEndpoint = grant.socketPath
     const port = Number(new URL(brokerEndpoint).port)
     synthetic = await provider('', 'disabled', { name: 'get_desktop_state', namespace: 'mcp__mikka_computer', arguments: {}, callId: 'synthetic_computer_mcp_call' })
+    void synthetic.toolOutput.promise.then(output => { result = output })
     const adapter = new CodexAdapter({
       sandbox: new SandboxRuntime(), stateDir: dir, userHome,
       binary: wrapper(dir, binary, synthetic.url, 'disabled', join(dir, 'runs', runId, 'official-cli.stderr.log')),
@@ -403,9 +414,9 @@ async function computerDiagnostic(binary: string) {
     finished = (async () => { for await (const event of session!.events()) events.push(event) })()
     void finished.catch(() => undefined)
     const pending = await deadline(waitFor(() => {
-      if (synthetic!.failures.length) throw new Error(`official computer tool fixture failed: ${synthetic!.failures.join('; ')}`)
+      if (synthetic!.failures.length) throw new Error(`official computer tool fixture failed: ${context()}`)
       const terminal = events.at(-1)
-      if (terminal?.type === 'exit') throw new Error(`official Codex ended before the registered computer request: ${JSON.stringify(terminal)}`)
+      if (terminal?.type === 'exit') throw new Error(`official Codex ended before the registered computer request: ${context()}`)
       return broker.list()[0]
     }), 'official CLI registered computer MCP request')
     review = pending
@@ -423,7 +434,8 @@ async function computerDiagnostic(binary: string) {
     expect(broker.list()).toEqual([])
     expect(asks).toEqual([])
     expect(approvals.length).toBeGreaterThan(0)
-    expect(approvals.every(request => request.method === 'sandbox/network' && object(request.input) && request.input.host === '127.0.0.1' && request.input.port === synthetic!.port), 'only the synthetic provider should enter the ordinary network gate').toBe(true)
+    expect(approvals.filter(request => request.method === 'sandbox/network').every(request => object(request.input) && request.input.host === '127.0.0.1' && request.input.port === synthetic!.port), 'only the synthetic provider should enter the ordinary network gate').toBe(true)
+    expect(approvals.filter(request => request.method !== 'sandbox/network').map(request => request.method)).toEqual([`cli/${toolName}`])
     expect(events.some(event => event.type === 'chunk' && event.chunk.type === 'tool-input-available' && event.chunk.toolName === toolName)).toBe(true)
     expect(events.at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
   } finally {

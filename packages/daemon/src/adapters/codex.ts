@@ -389,6 +389,10 @@ export class CodexAdapter implements AgentAdapter {
     let cancelling = false
     let lastError: string | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
+    const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
+    const registeredMcpTool = (server: string, tool: string) =>
+      (server === MCP_SERVER_NAME && ['submit','ask_human','report_blocked'].includes(tool)) ||
+      (Boolean(computerMcp) && server === COMPUTER_MCP_SERVER_NAME && ['get_desktop_state','click','type_text','press_key','scroll'].includes(tool))
 
     /** The CLI and everything it started are gone before the exit is told. */
     let ended: Promise<void> | undefined
@@ -402,6 +406,7 @@ export class CodexAdapter implements AgentAdapter {
     }
     const close = async (event: Parameters<EventQueue["exit"]>[0] | null) => {
       ending = true
+      pendingMcp.clear()
       options.toolApproval?.revoke()
       if (pending.length > 0)
         log.warn(
@@ -416,6 +421,25 @@ export class CodexAdapter implements AgentAdapter {
     // Native requests retain their active turn identity and live run gate;
     // callbacks cannot widen the enclosing sandbox's capability ceiling.
     rpc.onRequest(async (method, params: unknown) => {
+      if (method === 'mcpServer/elicitation/request') {
+        if (pendingTurnStart) await pendingTurnStart
+        const call = params as {threadId?:unknown;turnId?:unknown;serverName?:unknown;mode?:unknown;_meta?:{codex_approval_kind?:unknown};requestedSchema?:{type?:unknown;properties?:unknown}} | null
+        const schema = call?.requestedSchema, properties = schema?.properties
+        // Codex's native transport approval is not the broker's action ask.
+        // Bind only an already observed fixed host tool to this live turn;
+        // human-readable elicitation messages never select authority.
+        if (!call || ending || !activeTurn || call.threadId !== sessionId || call.turnId !== activeTurn ||
+          call.mode !== 'form' || call._meta?.codex_approval_kind !== 'mcp_tool_call' ||
+          !schema || schema.type !== 'object' || Object.keys(schema).some(key => !['type','properties'].includes(key)) ||
+          !properties || typeof properties !== 'object' || Array.isArray(properties) || Object.keys(properties).length) return {action:'decline'}
+        const candidates = [...pendingMcp.entries()].filter(([,item]) => item.turnId === activeTurn && item.server === call.serverName && !item.attempted)
+        if (candidates.length !== 1) return {action:'decline'}
+        const [itemId,item] = candidates[0]
+        item.attempted = true // repeated native requests never mint another permit
+        const decision = await approval.request({runId:options.runId,harness:'codex',requestId:`${activeTurn}/${itemId}/mcp-transport`,method:`cli/mcp__${item.server}__${item.tool}`,input:{} })
+        return decision === 'allow' && !ending && !approval.revoked && call.turnId === activeTurn && pendingMcp.get(itemId) === item
+          ? {action:'accept',content:{}} : {action:'decline'}
+      }
       if (method === 'item/tool/call') {
         if (pendingTurnStart) await pendingTurnStart
         const call = params as { threadId?: unknown; turnId?: unknown; namespace?: unknown; tool?: unknown; arguments?: unknown }
@@ -487,7 +511,13 @@ export class CodexAdapter implements AgentAdapter {
         case "item/started":
         case "item/completed": {
           const phase = method === "item/started" ? "started" : "completed"
-          const { item } = params as ItemNotification
+          const { item, threadId: itemThread, turnId: itemTurn } = params as ItemNotification
+          if (item.type === 'mcpToolCall' && itemThread === sessionId && typeof itemTurn === 'string') {
+            const mcpItem = item as Extract<ThreadItem,{type:'mcpToolCall'}>
+            if (phase === 'completed') pendingMcp.delete(item.id)
+            else if (!pendingMcp.has(item.id) && pendingMcp.size < 1024 && registeredMcpTool(mcpItem.server,mcpItem.tool))
+              pendingMcp.set(item.id,{turnId:itemTurn,server:mcpItem.server,tool:mcpItem.tool,attempted:false})
+          }
           for (const chunk of codexItemChunks(
             phase,
             item,
@@ -535,6 +565,7 @@ export class CodexAdapter implements AgentAdapter {
     rpc.listen()
 
     const turnCompleted = async (turn: TurnNotification["turn"]) => {
+      for (const [id,item] of pendingMcp) if (item.turnId === turn.id) pendingMcp.delete(id)
       queue.chunk({
         type: "data-usage",
         data: {
