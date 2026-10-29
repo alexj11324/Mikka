@@ -44,7 +44,12 @@ export async function factoryRunAuthorityCases(
   const rejects = (fn: () => Promise<unknown>, code: string) =>
     assert.rejects(fn, (e) => e instanceof FactoryError && e.code === code);
   async function fixture(
-    options: { checkEvents?: boolean; sourceIssueNull?: boolean } = {},
+    options: {
+      checkEvents?: boolean;
+      sourceIssueNull?: boolean;
+      /** Warp-aligned default: no crypto issuer, review is advisory. */
+      advisory?: boolean;
+    } = {},
   ) {
     const x = await f.prepare(actor),
       runId = randomUUID(),
@@ -170,12 +175,16 @@ export async function factoryRunAuthorityCases(
       executionRunId: runId,
       tokenHash,
       decisionModelId: "synthetic-vision-capable-model",
-      reviewKey: (issuer, keyId) =>
-        state.keyAvailable &&
-        issuer === "synthetic-review-transport" &&
-        keyId === "ephemeral-test-key"
-          ? publicKey
-          : undefined,
+      ...(options.advisory
+        ? {}
+        : {
+            reviewKey: (issuer: string, keyId: string) =>
+              state.keyAvailable &&
+              issuer === "synthetic-review-transport" &&
+              keyId === "ephemeral-test-key"
+                ? publicKey
+                : undefined,
+          }),
       policy: async (tx, { run }) =>
         state.policyAvailable
           ? (
@@ -332,10 +341,13 @@ export async function factoryRunAuthorityCases(
     assert.ok(
       runEventBatchSchema.safeParse({ fromSeq: 1, chunks: [chunk] }).success,
     );
-    await pool.query(
-      'INSERT INTO run_chunks (id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,$3,clock_timestamp())',
-      [chunkId, runId, JSON.stringify(chunk)],
-    );
+    // Advisory mode installs no review record at all: the policy is the only
+    // authority, so nothing may depend on an envelope existing.
+    if (!options.advisory)
+      await pool.query(
+        'INSERT INTO run_chunks (id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,$3,clock_timestamp())',
+        [chunkId, runId, JSON.stringify(chunk)],
+      );
     const publication = async () => ({
       ...(await runtime.approvals.approve(actor, request)),
       eventId: randomUUID(),
@@ -982,6 +994,90 @@ export async function factoryRunAuthorityCases(
           await tx.query("ROLLBACK");
         } finally {
           tx.release();
+        }
+      },
+    );
+    await t.test(
+      "advisory mode publishes a preview from the registered policy and passed checks with no review key or envelope",
+      async () => {
+        const c = await fixture({ advisory: true }),
+          p = await c.publication();
+        const published = await c.runtime.approvals.publish(actor, p);
+        assert.ok(published);
+        assert.equal((await readdir(c.root)).length, 1);
+        const grant = (
+          await pool.query(
+            'SELECT "decisionEvidence" FROM factory_approvals WHERE id=$1',
+            [p.approvalId],
+          )
+        ).rows[0].decisionEvidence;
+        assert.equal(grant.verification.attestation, "advisory");
+        assert.equal(grant.verification.signatureDigest, undefined);
+        assert.equal(grant.verification.runBinding, undefined);
+        assert.equal(grant.issuer, "factory-host-policy");
+        assert.equal(grant.judgment, undefined);
+        assert.equal(grant.decision, "allow");
+      },
+    );
+    await t.test(
+      "advisory mode cannot be steered by an agent-written review envelope or a registered deny",
+      async () => {
+        const c = await fixture({ advisory: true });
+        await pool.query(
+          'INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,$3,clock_timestamp())',
+          [
+            randomUUID(),
+            c.runId,
+            JSON.stringify({
+              type: "data-factory-publication-review",
+              data: { ...c.envelope, signature: undefined },
+            }),
+          ],
+        );
+        await pool.query(
+          "UPDATE factory_policy_fixture SET decision='deny' WHERE \"runId\"=$1",
+          [c.runId],
+        );
+        await rejects(
+          () => c.runtime.approvals.approve(actor, c.request),
+          "factoryPolicyDenied",
+        );
+        await pool.query(
+          'UPDATE factory_policy_fixture SET "readOnly"=true,decision=\'allow\' WHERE "runId"=$1',
+          [c.runId],
+        );
+        await rejects(
+          () => c.runtime.approvals.approve(actor, c.request),
+          "factoryPolicyDenied",
+        );
+        assert.equal((await readdir(c.root)).length, 0);
+      },
+    );
+    await t.test(
+      "no mode authorizes a merge, and advisory mode requires an attestation for irreversible effects",
+      async () => {
+        for (const advisory of [true, false]) {
+          const c = await fixture({ advisory });
+          await rejects(
+            () =>
+              c.runtime.approvals.approve(actor, {
+                ...c.request,
+                action: "merge",
+              }),
+            "factoryPolicyDenied",
+          );
+          for (const action of ["deploy_production", "activate_skill"] as const)
+            await rejects(
+              () =>
+                c.runtime.approvals.approve(actor, {
+                  ...c.request,
+                  action,
+                }),
+              advisory
+                ? "factoryPolicyAttestationRequired"
+                : "factoryPolicyDecisionMismatch",
+            );
+          assert.equal((await readdir(c.root)).length, 0);
         }
       },
     );

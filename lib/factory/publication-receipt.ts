@@ -261,12 +261,13 @@ export async function readFactoryPublicationReceiptV2(
       d.data.ownerId !== userId ||
       digest(scope.data) !== digest(p.decisionScope) ||
       d.data.scopeDigest !== digest(scope.data) ||
-      d.data.judgment.scopeDigest !== d.data.scopeDigest ||
-      d.data.judgment.evidenceDigest !== scope.data.evidenceDigest ||
-      digest(d.data.judgment.imageDigests) !==
-        digest(scope.data.visualEvidenceDigests) ||
-      (d.data.judgment.visualInputRequired &&
-        !d.data.judgment.imageDigests.length) ||
+      (d.data.judgment !== undefined &&
+        (d.data.judgment.scopeDigest !== d.data.scopeDigest ||
+          d.data.judgment.evidenceDigest !== scope.data.evidenceDigest ||
+          digest(d.data.judgment.imageDigests) !==
+            digest(scope.data.visualEvidenceDigests) ||
+          (d.data.judgment.visualInputRequired &&
+            !d.data.judgment.imageDigests.length))) ||
       new Date(d.data.issuedAt).getTime() > p.createdAt.getTime() ||
       new Date(d.data.expiresAt).getTime() <
         new Date(approval.data.expiresAt).getTime()

@@ -70,6 +70,36 @@ secrets: []
 - `secrets` are **names only**. Values live in the managed secret store and are
   granted to specific agents; a definition can never carry a secret value.
 
+## Publication authorization in this repository
+
+`FactoryPublicationHost.reviewKey` is optional. A host that installs a trusted
+public key keeps the strict deployment: every publication must carry a signed
+review envelope, verified against that key.
+
+The default deployment installs no key and no signer, so the review cannot carry
+authority and nothing requires it:
+
+- Authorization comes from the registered policy (`host.policy()`), the
+  committed `passed` review/verify receipts, and the existing task, run, token,
+  device, lease and STOP fences.
+- The returned decision evidence records `verification.attestation: "advisory"`
+  with no signature digest, key fingerprint or model judgment. Advisory grants
+  use the host-owned issuer name `factory-host-policy` for ledger uniqueness;
+  the credential id is only an idempotency key.
+- Advisory mode may accompany `deploy_preview` only. `deploy_production` and
+  `activate_skill` fail with `factoryPolicyAttestationRequired` until a trusted
+  signer is installed.
+- `merge` is denied in both modes. The application opens pull requests; a person
+  merges, and repository protection is the enforced control.
+
+A chunk written by an agent can never change an advisory decision: the verifier
+does not read it, and a registered `deny` or `readOnly` policy still stops the
+publication.
+
+There is no production composition of this host yet. When one is added, it mints
+the approval's `decisionCredentialId` server-side; the field is an idempotency
+key, not a caller-supplied authority.
+
 ## Credentials
 
 Four boundaries remain separate, as in Warp Factories:
@@ -95,11 +125,11 @@ migration.
 
 ## Rollout
 
-1. **This change:** definition, strict validator, digest, CI check, tests.
-   No production behavior changes.
-2. Wire `FactoryPublicationHost` to the applied definition digest, make
-   `reviewKey` optional, and keep review as advisory evidence. Publication is
-   limited to opening a pull request; the application never merges.
+1. **Landed:** definition, strict validator, digest, CI check, tests. No
+   production behavior changes.
+2. **Landed:** `reviewKey` optional, advisory review, no merge, irreversible
+   actions behind the strict attestation. Wiring the definition digest into the
+   host follows when a production composition exists.
 3. Per-agent secret allowlists and `credentialStrategy` execution.
 4. Runner shapes, `workerHost` and hard budget caps for per-thread machines.
 
