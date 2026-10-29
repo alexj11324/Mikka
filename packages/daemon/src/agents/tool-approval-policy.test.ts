@@ -21,3 +21,13 @@ it('does not infer action authority from callback text or automatically ask', ()
     expect(toolApprovalDecision({ ...request, method:'unknown' }, policy)).toBe('unavailable')
   }
 })
+
+it('leaves registered computer actions to the existing broker without duplicating ask', () => {
+  const base = defaultRunPolicy()
+  const request: ToolApprovalRequest = {runId:'r',requestId:'i',harness:'claude_code',method:'cli/mcp__mikka_computer__click',input:{x:1,y:2}}
+  for (const computer_use of ['allow','ask'] as const) expect(toolApprovalDecision(request,{...base,permissions:{...base.permissions,computer_use}},'/worktree')).toBe('allow')
+  expect(toolApprovalDecision(request,{...base,permissions:{...base.permissions,computer_use:'deny'}},'/worktree')).toBe('deny')
+  expect(toolApprovalDecision(request,{...base,readOnly:true},'/worktree')).toBe('deny')
+  expect(toolApprovalDecision({...request,method:'cli/mcp__mikka_computer__arbitrary_tool'},base,'/worktree')).toBe('unavailable')
+  expect(toolApprovalDecision({...request,method:'cli/mcp__other__click'},base,'/worktree')).toBe('unavailable')
+})

@@ -15,6 +15,13 @@ export function toolApprovalDecision(request: Readonly<ToolApprovalRequest>, pol
   }
   if (request.method.startsWith('cli/') && policy && worktree) {
     const tool = request.method.slice(4)
+    // These fixed strict-MCP registrations delegate to the existing scoped
+    // server. A transport permit is never approval of a computer action:
+    // the run-bound broker still owns allow/ask/deny and current authority.
+    if (['get_desktop_state','click','type_text','press_key','scroll'].some(name => tool === `mcp__mikka_computer__${name}`)) {
+      return policy.readOnly || !policy.permissions.computer_use || policy.permissions.computer_use === 'deny' ? 'deny' : 'allow'
+    }
+    if (['submit','ask_human','report_blocked'].some(name => tool === `mcp__mikka__${name}`)) return 'allow'
     if (tool === 'Bash' || tool === 'PowerShell') return rawCliShellAvailable(policy) ? 'allow' : 'unavailable'
     const input = request.input as {file_path?: unknown; notebook_path?: unknown} | null
     if (['Write','Edit','MultiEdit','NotebookEdit'].includes(tool)) {

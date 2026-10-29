@@ -16,29 +16,37 @@ let missing=false
 const bindingById=mock.fn(async()=>{if(missing)throw Error('missing binding');return subscription})
 const latestBinding=mock.fn(async()=>subscription)
 const claimed=mock.fn(async()=> 'claimed')
-const cloudClaimed=mock.fn(async()=>({botId,ownerId:owner,display:':3',policyVersion:1}))
+let computerPermission: 'ask' | 'allow' = 'ask'
+const cloudClaimed=mock.fn(async()=>({botId,ownerId:owner,display:':3',policyVersion:1,permission:computerPermission}))
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
 let selectIndex=0
-const db={select:()=>({from:()=>({where:()=>({limit:async()=>[[{id:randomUUID(),userId:owner,agentId,deviceId,deviceRepoId:repoId,issueId,kind:'implement',prompt:'task',agentDefinition:definition}],[{id:agentId,userId:owner,harness:'claude_code'}],[{id:repoId,userId:owner,baseBranch:'main'}]][selectIndex++]})})})}
-let cloud=false
+const db={select:()=>({from:()=>({where:()=>({limit:async()=>[[{id:randomUUID(),userId:owner,agentId,deviceId,deviceRepoId:repoId,issueId,kind:'implement',prompt:'task',agentDefinition:definition}],[{id:agentId,userId:owner,harness:'claude_code'}],[{id:repoId,userId:owner,deviceId,baseBranch:'main'}]][selectIndex++]})})})}
+let cloud=false,localCapable=false
 stub('../db/index.ts',{db,pool:{}})
-stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,kind:cloud?'cloud':'local',harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
-stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:defaultRunPolicy(),revision:'a'.repeat(64)})})
+const cliPolicy: ReturnType<typeof defaultRunPolicy>={...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,network:'deny',install_dependency:'deny',git_push:'deny'},networkAllow:['cli-policy.invalid']}
+let cliReadOnly=false
+stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
+stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:{...cliPolicy,...(cliReadOnly?{readOnly:true}:{})},revision:'a'.repeat(64)})})
 stub('../mcp/worker.ts',{issueRunToken:async()=>({token:'synthetic-only'})})
 stub('../mcp/resource.ts',{mcpResourceURL:null})
 stub('../run-leases.ts',{latestCheckpoint:async()=>null})
+stub('../computer/local-authority.ts',{localComputerAuthority:async()=>({botId,ownerId:owner,workspaceId:workspace,policyVersion:3,permission:'allow'})})
 stub('../computer/claim.ts',{claimLocalRun:claimed,claimCloudRun:cloudClaimed})
 stub('../subscription-runtime.ts',{subscriptionRuntime:()=>({repository:{binding:bindingById,nativeBinding:latestBinding}})})
 let claim: typeof import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route').POST
 let queue: typeof import('../computer/queue-run').queueCloudRun
 before(async()=>{claim=(await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')).POST;queue=(await import('../computer/queue-run')).queueCloudRun})
-beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;selectIndex=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [bindingById,latestBinding,claimed,cloudClaimed])fn.mock.resetCalls()})
+beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;cliReadOnly=false;computerPermission='ask';selectIndex=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [bindingById,latestBinding,claimed,cloudClaimed])fn.mock.resetCalls()})
 const request=()=>claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+randomUUID()+'/claim',{method:'POST'}),{params:Promise.resolve({deviceId,runId:randomUUID()})})
+const assertCliPolicy=(body:{policy:ReturnType<typeof defaultRunPolicy>;policyRevision:string})=>{assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny');assert.equal(body.policy.permissions.git_push,'deny');assert.deepEqual(body.policy.networkAllow,['cli-policy.invalid']);assert.equal(body.policyRevision,'a'.repeat(64))}
 test('local claim uses frozen harness and exact subscription despite Agent edits',async()=>{
  const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.harness,'codex');assert.equal(body.model,'frozen-model');assert.deepEqual(bindingById.mock.calls[0].arguments,[owner,binding.id]);assert.equal(latestBinding.mock.callCount(),0);assert.equal(claimed.mock.callCount(),1)
 })
 test('cloud claim preserves main scoped claim and frozen subscription',async()=>{
- cloud=true;const response=await request();assert.equal(response.status,200);assert.equal(cloudClaimed.mock.callCount(),1);assert.equal(claimed.mock.callCount(),0);assert.equal((await response.json()).computer.botId,botId)
+ cloud=true;const response=await request();assert.equal(response.status,200);assert.equal(cloudClaimed.mock.callCount(),1);assert.equal(claimed.mock.callCount(),0);const body=await response.json();assert.equal(body.computer.botId,botId);assert.equal(body.computer.policyVersion,1);assert.equal(body.policy.permissions.computer_use,'ask')
+})
+test('cloud assignment takes computer allow from trusted claim, never a request field',async()=>{
+ cloud=true;computerPermission='allow';const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.policy.permissions.computer_use,'allow');assert.equal(body.computer.ownerId,owner);assert.equal(body.computer.policyVersion,1);assertCliPolicy(body)
 })
 test('missing, substituted or disabled pinned subscription refuses before claim without fallback',async()=>{
  for(const change of ['missing','model','consumer','disabled']){
@@ -73,4 +81,15 @@ test('cloud request replay cannot substitute another parent execution',async()=>
  const client={release(){},async query(sql:string){if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT r.'))return {rows:[{userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,runBotId:botId,botId,workspaceId:workspace,prompt:runPrompt('Review','','Review'),agentDefinition:{harness:'codex',parent:{executionId:randomUUID()}}}]};return {rows:[]}}}
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
  await assert.rejects(queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',execution:parent,idempotencyKey:'same-call'}),/Task request changed/)
+})
+
+test('local assignment receives only persisted server computer authority',async()=>{localCapable=true;const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.localComputer.workspaceId,workspace);assert.equal(body.localComputer.ownerId,owner);assert.equal(body.localComputer.policyVersion,3);assert.equal(body.policy.permissions.computer_use,'allow');assert.equal(body.computer,undefined);assertCliPolicy(body)})
+
+test('persisted computer grants retain the trusted CLI read-only restriction',async()=>{
+ cliReadOnly=true;computerPermission='allow'
+ for(const hosted of [true,false]){cloud=hosted;localCapable=!hosted;selectIndex=0;const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.policy.readOnly,true);assert.equal(body.policy.permissions.computer_use,'deny');assertCliPolicy(body)}
+})
+
+test('a scoped device credential cannot claim a different device even for the same owner',async()=>{
+ const otherDevice=randomUUID();const response=await claim(new Request('https://example.test/claim',{method:'POST'}),{params:Promise.resolve({deviceId:otherDevice,runId:randomUUID()})});assert.equal(response.status,404);assert.equal(selectIndex,0);assert.equal(claimed.mock.callCount(),0);assert.equal(cloudClaimed.mock.callCount(),0)
 })

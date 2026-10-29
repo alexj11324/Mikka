@@ -33,7 +33,7 @@ export type { PermissionAction, PermissionDecision, RunPolicy }
 export interface PermissionContext {
   /** Whether the user approved this repo's setup recipe. */
   setupRecipeApproved?: boolean
-  /** The workspace's choices; the ADR 0009 defaults when absent. */
+  /** Trusted host assignment only, never model-supplied. Defaults when absent. */
   policy?: RunPolicy
 }
 
@@ -41,7 +41,8 @@ export function decide(
   action: string,
   context: PermissionContext = {}
 ): PermissionDecision {
-  if (!Object.hasOwn(PERMISSION_DEFAULTS, action)) return "ask"
+  if (!Object.hasOwn(PERMISSION_DEFAULTS, action))
+    return context.policy?.readOnly ? "deny" : "ask"
   const typed = action as PermissionAction
   // A read-only run (ADR 0046) changes nothing, whatever the workspace chose:
   // the check reads the worktree, reports, and stops.

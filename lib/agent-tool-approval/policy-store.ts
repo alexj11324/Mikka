@@ -12,7 +12,9 @@ export const realCliMembershipGuard: CliMembershipGuard = async (workspaceId, us
   return acquireWorkspaceMembership(workspacePool, { workspaceId, userId }, signal)
 }
 
-export const cliPolicyLayerSchema = z.strictObject({ permissions: storedPermissionsSchema.optional(), networkAllow: networkAllowSchema.optional(), approvalMode: approvalModeSchema.optional() })
+// Computer authority has its existing persisted broker policy. Adding a
+// shared protocol action must not silently create a second writable source.
+export const cliPolicyLayerSchema = z.strictObject({ permissions: storedPermissionsSchema.omit({ computer_use: true }).optional(), networkAllow: networkAllowSchema.optional(), approvalMode: approvalModeSchema.optional() })
 const rank = { deny: 0, ask: 1, allow: 2 } as const
 /** Caller identity is authenticated by the host. Workspace membership is
  * separately pinned by cliAgentPolicyGuard through transaction commit. */
@@ -52,6 +54,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
   const policy = resolveTrustedRunPolicy({ workspace: { permissions: agent.permissions, networkAllow: agent.networkAllow }, personalApprovalMode: agent.approvalMode })
   for (const layer of [worker, workspace]) {
     for (const action of CONFIGURABLE_ACTIONS) {
+      if (action === 'computer_use') continue
       const override = layer.permissions?.[action]
       if (override && rank[override] < rank[policy.permissions[action]]) policy.permissions[action] = override
     }

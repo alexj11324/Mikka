@@ -136,6 +136,8 @@ jobs:
         run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
       - name: Existing mailbox CLI integration tests
         run: pnpm --filter @mikka/daemon test:mailbox-cli
+      - name: Local computer authority through actual daemon and adapter protocol
+        run: pnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts
       - name: Install sandbox runtime dependencies without changing host namespace policy
         if: ${{ !cancelled() }}
         run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
@@ -159,12 +161,17 @@ jobs:
             ${{ runner.temp }}/pr13-daemon-unit-results.json
             /tmp/mikka-official-codex-synthetic-*/evidence.json
             /tmp/mikka-official-codex-synthetic-*/runs/*/official-cli.stderr.log
+            /tmp/mikka-official-codex-computer-*/evidence.json
+            /tmp/mikka-official-codex-computer-*/runs/*/official-cli.stderr.log
             /tmp/mikka-official-claude-synthetic-*/evidence.json
             /tmp/mikka-official-claude-synthetic-*/adapters/runs/*/official-cli.stderr.log
+            /tmp/mikka-official-claude-computer-*/evidence.json
+            /tmp/mikka-official-claude-computer-*/adapters/runs/*/official-cli.stderr.log
             /tmp/mikka-hosted-approval-*/evidence.json
             /tmp/mikka-hosted-approval-*/docker.jsonl
             /tmp/mikka-hosted-approval-*/created-id
             /tmp/mikka-hosted-approval-*/adapters/native-resources/*.json
+            /tmp/mikka-launcher-computer-*/evidence.json
           if-no-files-found: warn
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/protocol typecheck

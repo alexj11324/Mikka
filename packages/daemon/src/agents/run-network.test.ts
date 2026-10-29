@@ -38,3 +38,19 @@ it('fences cancellation during a pending exact destination decision', async () =
   expect(await pending).toBe(false)
   finish('allow')
 })
+
+it('routes only the trusted computer broker transport without a second approval', async () => {
+  const live = vi.fn(() => true), ask = vi.fn(async () => 'allow' as const)
+  const gate = new ToolApprovalGate('run-a',{permission:()=> 'deny',ask,isLive:live})
+  const signal = new AbortController().signal
+  const network = runNetworkApproval('run-a','claude_code',gate,['127.0.0.1:32123'],'127.0.0.1:32123')
+  expect(await network({host:'127.0.0.1',port:32123},signal)).toBe(true)
+  expect(await network({host:'127.0.0.1',port:32124},signal)).toBe(false)
+  expect(await runNetworkApproval('run-a','claude_code',gate,[],'127.0.0.1:32123')({host:'127.0.0.1',port:32123},signal)).toBe(false)
+  expect(ask).not.toHaveBeenCalled()
+  live.mockReturnValue(false)
+  expect(await network({host:'127.0.0.1',port:32123},signal)).toBe(false)
+  gate.revoke()
+  expect(await network({host:'127.0.0.1',port:32123},signal)).toBe(false)
+  for (const endpoint of ['example.invalid:443','127.0.0.1:0','127.0.0.1:65536']) expect(() => runNetworkApproval('run-a','codex',gate,['*'],endpoint)).toThrow()
+})

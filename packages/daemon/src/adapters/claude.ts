@@ -1,23 +1,10 @@
 // Claude Code adapter (ADR 0003): the user's own signed-in Claude Code, run
 // through `@anthropic-ai/claude-agent-sdk`, one CLI process per session.
 //
-// The SDK starts the CLI itself — its own bundled build, not one from PATH —
-// so this adapter no longer hands a child to the daemon's `AgentSandbox`.
-// Instead the run's policy goes to Claude Code's own sandbox through the
-// `settings` option (the JSON `--settings` took before): the agent's commands
-// may write only where the run allows (the worktree, the run dir, the
-// harness's own state), may read everything but the credential stores, and
-// may reach only the run's domains. `allowUnsandboxedCommands: false` keeps
-// the agent from stepping outside it, and `failIfUnavailable` makes a sandbox
-// that cannot start an error rather than a silent fallback to no sandbox.
-//
-// What this does not cover: the sandbox confines the commands the agent runs,
-// not the CLI's own tools. Read/Write/Edit and WebFetch/WebSearch run inside
-// the CLI process, so neither the filesystem lists nor the network list bound
-// them the way the daemon's outer sandbox bounded everything the CLI did
-// (measured, not assumed). Permission deny rules do still bite in bypass mode
-// — `Read(<path>)`, `Edit(<path>)`, or a bare tool name — so the credential
-// stores can be closed again by generating rules from `policy.denyRead`.
+// The SDK's process hook places the entire local CLI inside its run-owned
+// official sandbox, including native tools and MCP children. Hosted runs use
+// their enclosing Docker boundary. Native permission callbacks additionally
+// use the live run gate; they cannot expand either outer boundary.
 //
 // Isolation (ADR 0009) without touching the login: Claude Code keeps its
 // OAuth token in the macOS Keychain under a name derived from its config
@@ -30,6 +17,7 @@
 // `resume` works after a daemon restart and for a follow-up run in the same
 // worktree (the store is keyed by the cwd).
 import { spawn } from "node:child_process"
+import { computerDomain, computerSandboxPolicy, sandboxComputerSpec } from '../computer/transport'
 import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { homedir } from "node:os"
@@ -60,6 +48,7 @@ import {
   RunContext,
   runPaths,
   type McpServerSpec,
+  type ComputerSpecProvider,
 } from "../agents/run-context"
 import type { AgentSandbox, SandboxPolicy } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
@@ -101,6 +90,7 @@ export interface ClaudeAdapterOptions {
   onHostedSession?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
+  computerProvider?: ComputerSpecProvider
   /** `~/.claude` of the user whose login the CLI uses. */
   configDir?: string
   /** Trusted owner-bound broker; the CLI receives no refresh grant. */
@@ -498,6 +488,8 @@ export class ClaudeAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (earlier) return endedSession(sessionId, earlier)
     ctx.clearHandoff()
+    const outerLocal = !this.options.spawnHosted && this.options.sandbox?.kind !== 'none'
+    const computerMcp = sandboxComputerSpec(this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy), outerLocal ? 'sandbox-runtime' : 'none')
 
     const queue = new EventQueue()
     const approvalTransport = new AbortController()
@@ -520,15 +512,14 @@ export class ClaudeAdapter implements AgentAdapter {
     if(externalAuth && this.options.onHostedSession) {
       try{await this.options.onHostedSession(sessionId)}catch{throw new Error(SUBSCRIPTION_ERROR)}
     }
-    const outerLocal = !this.options.spawnHosted && this.options.sandbox?.kind !== 'none'
     const spawnOuter = (config: SpawnOptions): SpawnedProcess => {
-      const policy = ctx.policy()
+      const policy = computerSandboxPolicy(ctx.policy(), computerMcp)
       const requested = this.options.networkCeiling
       const maximum = requested === undefined ? policy.allowDomains
         : policy.allowDomains.includes('*') ? [...requested]
         : requested.includes('*') ? policy.allowDomains
         : requested.filter(domain => policy.allowDomains.includes(domain))
-      const child = spawnRunSandbox({ command:this.options.binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,maximum), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
+      const child = spawnRunSandbox({ command:this.options.binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,maximum,computerDomain(computerMcp)), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
       const off = options.toolApproval!.onRevoke(() => { void child.revoke().catch(() => undefined) })
       void child.exited.finally(off)
       return child.process
@@ -561,7 +552,7 @@ export class ClaudeAdapter implements AgentAdapter {
         mcpServers: {
           ...(options.mailbox ? { mikka_mailbox: claudeMailboxServer(options.mailbox) } : {}),
           [MCP_SERVER_NAME]: { type: "stdio", ...ctx.mcpServer() },
-          ...(this.options.computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...this.options.computerMcp } } : {}),
+          ...(computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...computerMcp } } : {}),
         },
         strictMcpConfig: true,
         systemPrompt: {

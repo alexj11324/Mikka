@@ -8,7 +8,7 @@
   "scripts": {
     "test:mailbox-verification": "node --import tsx --test scripts/personal-mailbox-acceptance/r4-verification.test.mts",
     "test:credential-diagnostics": "TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./scripts/server-test.mjs --import tsx --test lib/infisical-workload.test.ts lib/infisical-auth-diagnostics.test.ts",
-    "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts",
+    "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts lib/computer/local-reviews.db.test.ts tests/device-computer-migration.test.mjs",
     "generate:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs",
     "check:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
     "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && pnpm lint && next build",
@@ -84,7 +84,7 @@
     "test:agent-kit": "node --import tsx --test lib/agent-kit/agent-kit.test.ts lib/agent-kit/evals.test.ts lib/agent-kit/http.test.ts",
     "test:agent-kit-db": "node --import tsx --test lib/agent-kit/store.db.test.ts",
     "check:agent-definitions": "tsx scripts/agent-kit.mts validate agents/default && tsx scripts/agent-kit.mts validate agents/research-example",
-    "test:agent-kit-compat": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-kit/main-compat.test.ts lib/agent-kit/registry-compat.test.ts && pnpm test:agent-kit-model",
+    "test:agent-kit-compat": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-kit/main-compat.test.ts lib/agent-kit/registry-compat.test.ts lib/agent-tool-approval/policy-layer.test.ts && pnpm test:agent-kit-model",
     "test:agent-kit-model": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/agent-execution-model.test.ts lib/subscription-model-snapshot.test.ts lib/subscription-workflow-model.test.ts lib/subscription-workflow-turn.test.ts lib/agent-kit/hosted-replay.test.ts lib/agent-kit/live-eval-disabled.test.ts lib/coordinator/summary-model-consumer.test.ts lib/agent-kit/core-entry.test.ts lib/agent-kit/disabled-entry.test.ts lib/agent-kit/message-safety-compat.test.ts lib/agent-kit/tool-defaults-compat.test.ts lib/agent-kit/defaults-consumers.test.ts",
     "test:migration-steps-db": "node --test tests/migration-steps.db.test.mjs",
     "test:coordinator-issue-tools": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/issue-tools.test.ts lib/mcp/issue-mutation.test.ts",

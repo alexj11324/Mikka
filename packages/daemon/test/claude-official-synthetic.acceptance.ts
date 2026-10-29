@@ -20,9 +20,10 @@ import type { AgentEvent, AgentSession } from "../src/adapters/types"
 import { SandboxRuntime, shellJoin, shellQuote } from "../src/agents/sandbox"
 import { ToolApprovalGate, type ToolApprovalRequest } from "../src/agents/tool-approval"
 import { toolApprovalDecision } from "../src/agents/tool-approval-policy"
+import { ComputerBroker } from "../src/computer/broker.mjs"
 import { createLogger } from "../src/log"
 import { runPolicy, type RunPolicy } from "../src/permissions"
-import { makeRepo } from "./helpers"
+import { makeRepo, waitFor } from "./helpers"
 
 const enabled = process.env.MIKKA_SANDBOX_ACCEPTANCE === "1"
 const SDK_VERSION = "0.3.305"
@@ -31,6 +32,8 @@ const MODEL = "claude-sonnet-4-6" // Schema selector for a local canned response
 const KEY = "synthetic-loopback-fixture-no-provider-credential"
 const CALL_ID = "toolu_synthetic_official_claude_probe"
 const CONTENT = "official-claude-write-completed\n"
+const COMPUTER_TOOL = "mcp__mikka_computer__get_desktop_state"
+const COMPUTER_RESULT = "synthetic-official-cli-computer-proxy-result"
 
 type JsonObject = Record<string, unknown>
 function object(value: unknown): value is JsonObject {
@@ -125,7 +128,7 @@ function resultBlock(input: JsonObject): JsonObject | undefined {
   }
 }
 
-async function provider(toolName: "Write" | "Bash", toolInput: JsonObject, unavailable: boolean) {
+async function provider(toolName: "Write" | "Bash" | typeof COMPUTER_TOOL, toolInput: JsonObject, unavailable: boolean) {
   const requests: { route: string; body: JsonObject }[] = []
   const failures: string[] = []
   const toolOutput = deferred<JsonObject>()
@@ -412,6 +415,150 @@ async function diagnostic(runtime: OfficialRuntime, scenario: Scenario) {
   if (cleanupErrors.length) throw new Error(`diagnostic cleanup failed: ${cleanupErrors.join("; ")}`)
 }
 
+// Observe actual socket admissions while preserving the broker's real grant,
+// pending-review, digest and execution checks. No driver process is started.
+class ObservedComputerBroker extends ComputerBroker {
+  readonly calls: unknown[] = []
+  override request(token: string, value: unknown, signal?: AbortSignal) {
+    this.calls.push(structuredClone(value))
+    return super.request(token, value, signal)
+  }
+}
+
+async function computerDiagnostic(runtime: OfficialRuntime) {
+  const dir = mkdtempSync(join(tmpdir(), "mikka-official-claude-computer-"))
+  const cwd = await makeRepo()
+  console.info(`Retained official Claude computer diagnostic: ${dir}; worktree: ${cwd}`)
+  const runId = "official-claude-computer-run"
+  const policy = runPolicy(undefined)
+  policy.networkAllow = []
+  policy.permissions.network = "ask"
+  policy.permissions.computer_use = "ask"
+  const approvals: ToolApprovalRequest[] = []
+  const asks: ToolApprovalRequest[] = []
+  const decisions: { requestId: string; decision: string }[] = []
+  const events: AgentEvent[] = []
+  const executions: unknown[] = []
+  const reviews: ReturnType<ComputerBroker["list"]> = []
+  const cleanupErrors: string[] = []
+  let live = true
+  const broker = new ObservedComputerBroker({
+    transport: "tcp", socketPath: join(dir, "unused-broker-path"),
+    driver: { installed: true, path: "/synthetic/no-computer-driver", version: "synthetic", fingerprint: "c".repeat(64) },
+    permitted: id => live && id === runId,
+    async execute(_driver, call, _display, id, context) {
+      context.assertLive()
+      expect(id).toBe(runId)
+      expect(call).toEqual({ name: "get_desktop_state", arguments: {} })
+      executions.push(structuredClone(call))
+      return { content: [{ type: "text", text: COMPUTER_RESULT }] }
+    },
+  })
+  let synthetic: Awaited<ReturnType<typeof provider>> | undefined
+  let gate: ToolApprovalGate | undefined
+  let session: AgentSession | undefined
+  let finished: Promise<void> | undefined
+  let networkCeiling: readonly string[] = []
+  let failure: string | undefined
+  try {
+    await broker.listen()
+    const grant = broker.spec(runId, policy.permissions.computer_use)
+    if (!grant) throw new Error("synthetic ask broker grant unavailable")
+    const brokerDomain = new URL(grant.socketPath).host
+    const brokerPort = Number(new URL(grant.socketPath).port)
+    synthetic = await provider(COMPUTER_TOOL, {}, false)
+    const providerPort = synthetic.port
+    networkCeiling = Object.freeze([`127.0.0.1:${providerPort}`, brokerDomain])
+    gate = new ToolApprovalGate(runId, {
+      isLive: id => live && id === runId,
+      permission(request) {
+        approvals.push(request)
+        // The provider's exact loopback port is the only fixture-specific
+        // exception. Broker transport must use the adapter's trusted endpoint
+        // capability, so an accidental second network approval fails closed.
+        const decision = request.method === "sandbox/network"
+          ? object(request.input) && request.input.host === "127.0.0.1" && request.input.port === providerPort ? "allow" : "deny"
+          : toolApprovalDecision(request, policy, cwd)
+        decisions.push({ requestId: request.requestId, decision })
+        return decision
+      },
+      async ask(request) { asks.push(request); return "deny" as const },
+    })
+    const runDir = join(dir, "adapters", "runs", runId)
+    const home = join(runDir, "native-home")
+    const configDir = join(home, ".claude")
+    mkdirSync(configDir, { recursive: true })
+    writeFileSync(join(home, ".claude.json"), JSON.stringify({ hasCompletedOnboarding: true }))
+    const adapter = new ClaudeAdapter({
+      sandbox: new SandboxRuntime(), stateDir: join(dir, "adapters"), configDir,
+      binary: wrapper(dir, runtime.binary, join(runDir, "official-cli.stderr.log")), networkCeiling,
+      computerMcp: {
+        command: process.execPath,
+        args: [realpathSync(join(import.meta.dirname, "../src/computer/proxy.mjs")), grant.socketPath, grant.token],
+        env: {},
+      },
+    })
+    session = await deadline(adapter.start({
+      runId, cwd, policy, toolApproval: gate, networkAllow: [...networkCeiling],
+      prompt: "Perform the single deterministic synthetic computer tool diagnostic.", model: MODEL,
+      env: {
+        PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: home, CLAUDE_CONFIG_DIR: configDir,
+        ANTHROPIC_BASE_URL: synthetic.url, ANTHROPIC_API_KEY: KEY,
+        // Advertise the fixed MCP schema directly to the canned provider.
+        ENABLE_TOOL_SEARCH: "false",
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1", DISABLE_AUTOUPDATER: "1",
+      },
+      log: createLogger(),
+    }), "official Claude computer session start")
+    finished = (async () => { for await (const event of session!.events()) events.push(event) })()
+    const pending = await deadline(waitFor(() => broker.list()[0], 30_000), "actual broker ask from official CLI MCP proxy")
+    expect(broker.calls).toEqual([{ name: "get_desktop_state", arguments: {} }])
+    expect(broker.list()).toHaveLength(1)
+    expect(pending).toMatchObject({ runId, call: { name: "get_desktop_state", arguments: {} } })
+    expect(executions).toEqual([])
+    expect(asks).toEqual([])
+    reviews.push(structuredClone(pending))
+    // Only this in-process trusted reviewer decides the broker's action ask.
+    // The CLI transport permit is never used as an action approval.
+    await deadline(broker.decide(pending.id, pending.digest, true), "synthetic broker review")
+    await deadline(finished, "official CLI computer session completion")
+    const output = await deadline(synthetic.toolOutput.promise, "real MCP result in subsequent Messages request")
+    expect(output.is_error).not.toBe(true)
+    expect(JSON.stringify(output.content)).toContain(COMPUTER_RESULT)
+    expect(synthetic.failures).toEqual([])
+    expect(broker.calls).toEqual([{ name: "get_desktop_state", arguments: {} }])
+    expect(executions).toEqual([{ name: "get_desktop_state", arguments: {} }])
+    expect(broker.list()).toEqual([])
+    const native = approvals.filter(request => request.method.startsWith("cli/"))
+    expect(native).toHaveLength(1)
+    expect(native[0]).toMatchObject({ runId, harness: "claude_code", method: `cli/${COMPUTER_TOOL}`, input: {} })
+    expect(decisions.find(decision => decision.requestId === native[0]?.requestId)?.decision).toBe("allow")
+    expect(approvals.some(request => request.method === "sandbox/network" && object(request.input) && request.input.port === providerPort)).toBe(true)
+    expect(approvals.filter(request => request.method === "sandbox/network" && object(request.input) && request.input.port === brokerPort)).toEqual([])
+    expect(asks).toEqual([])
+    expect(events.filter(event => event.type === "exit")).toEqual([expect.objectContaining({ type: "exit", outcome: "succeeded" })])
+  } catch (error) {
+    failure = String(error)
+    throw error
+  } finally {
+    live = false
+    gate?.revoke()
+    const cleanup = await Promise.allSettled([
+      deadline(session?.detach?.() ?? Promise.resolve(), "computer diagnostic process teardown"),
+      deadline(finished ?? Promise.resolve(), "computer diagnostic event teardown"),
+      synthetic?.close() ?? Promise.resolve(), broker.close(),
+    ])
+    cleanupErrors.push(...cleanup.flatMap(result => result.status === "rejected" ? [String(result.reason)] : []))
+    writeFileSync(join(dir, "evidence.json"), JSON.stringify({
+      classification: "official Claude SDK/CLI and real MCP proxy/SRT with synthetic Messages/broker execution; diagnostic only",
+      runtime, cwd, modelSchemaSelector: MODEL, scenario: "computer-proxy-ask", policy, networkCeiling,
+      approvals, asks, decisions, brokerCalls: broker.calls, brokerReviews: reviews, executions,
+      requests: synthetic?.requests ?? [], providerFailures: synthetic?.failures ?? [], cleanupErrors, failure, events,
+    }, null, 2))
+  }
+  if (cleanupErrors.length) throw new Error(`computer diagnostic cleanup failed: ${cleanupErrors.join("; ")}`)
+}
+
 describe.skipIf(!enabled)("official Claude SDK / synthetic Messages / real outer sandbox diagnostic", () => {
   let runtime: OfficialRuntime
   beforeAll(() => {
@@ -427,5 +574,9 @@ describe.skipIf(!enabled)("official Claude SDK / synthetic Messages / real outer
     "network-cancel", "network-outside-ceiling", "bash-restricted",
   ] as const)("observes actual native tool and host gate: %s", async (scenario) => {
     await diagnostic(runtime, scenario)
+  }, 90_000)
+
+  it("propagates the actual CLI MCP proxy environment to the broker under computer ask policy", async () => {
+    await computerDiagnostic(runtime)
   }, 90_000)
 })

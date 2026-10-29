@@ -2,9 +2,12 @@
 // Temp dirs and diagnostic output are retained for inspecting a failed CI run.
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { createServer, type Server } from "node:http"
-import type { Socket } from "node:net"
+import { createServer as createNetServer, type Socket } from "node:net"
+import { createInterface } from 'node:readline'
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
+import { ToolApprovalGate } from '../src/agents/tool-approval'
+import { runNetworkApproval } from '../src/agents/run-network'
 
 import { describe, expect, it } from "vitest"
 
@@ -147,14 +150,14 @@ function launch(
   dir: string,
   maxAllowDomains: readonly string[],
   onNetwork: (request: RunSandboxNetworkRequest, signal: AbortSignal) => Promise<boolean>,
-  extra: { args?: string[]; authToken?: string } = {}
+  extra: { args?: string[]; authToken?: string; env?: Record<string,string> } = {}
 ) {
   return spawnRunSandbox({
     command: process.execPath,
     args: extra.args ?? ["-e", HTTP_CLI],
     cwd: dir,
     // Synthetic CLI sees no ambient credentials/provider configuration.
-    env: { PATH: process.env.PATH, HOME: dir },
+    env: { PATH: process.env.PATH, HOME: dir, ...extra.env },
     policy: { allowWrite: [dir], denyRead: [], denyWrite: [], allowDomains: [...maxAllowDomains] },
     maxAllowDomains,
     onNetwork,
@@ -163,6 +166,52 @@ function launch(
 }
 
 describe.skipIf(process.env.MIKKA_SANDBOX_ACCEPTANCE !== "1")("official per-run launcher Linux acceptance", () => {
+  it('connects the actual computer MCP proxy only to its trusted run broker without a second approval', async () => {
+    const dir = mkdtempSync(join(tmpdir(),'mikka-launcher-computer-'))
+    console.info(`Retained synthetic computer transport evidence: ${dir}`)
+    const sockets = new Set<Socket>(), calls: unknown[] = []
+    const server = createNetServer(socket => {
+      sockets.add(socket); socket.once('close',() => sockets.delete(socket))
+      const lines = createInterface({input:socket})
+      lines.once('line',line => {
+        const frame = JSON.parse(line)
+        calls.push(frame)
+        socket.end(JSON.stringify(frame.token === 'synthetic-request-only' && frame.call.name === 'get_desktop_state'
+          ? {result:{content:[{type:'text',text:'synthetic-desktop-state'}]}}
+          : {error:'denied'})+'\n')
+      })
+    })
+    await new Promise<void>(done => server.listen(0,'127.0.0.1',done))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('missing broker port')
+    const endpoint = `127.0.0.1:${address.port}`, maximum = [endpoint]
+    let asks = 0
+    const gate = new ToolApprovalGate('computer-run',{permission:()=> 'deny',ask:async()=>{asks++;return 'deny'},isLive:()=>true})
+    const child = launch(dir,maximum,runNetworkApproval('computer-run','claude_code',gate,maximum,endpoint),{
+      args:[resolve('src/computer/proxy.mjs'),`tcp://${endpoint}`,'synthetic-request-only'],
+      env:{MIKKA_COMPUTER_SANDBOX_PROXY:'1'},
+    })
+    const off = gate.onRevoke(() => { void child.revoke() })
+    const answer = deferred<{result:{content:{type:string;text:string}[]}}>()
+    const lines = createInterface({input:child.process.stdout})
+    lines.on('line',line => { const frame=JSON.parse(line); if(frame.id===2)answer.resolve(frame) })
+    try {
+      child.process.stdin.write(JSON.stringify({jsonrpc:'2.0',id:1,method:'initialize'})+'\n')
+      child.process.stdin.write(JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'get_desktop_state',arguments:{}}})+'\n')
+      const reply = await deadline(answer.promise,'actual sandboxed computer MCP transport')
+      expect(reply.result.content).toContainEqual({type:'text',text:'synthetic-desktop-state'})
+      expect(calls).toHaveLength(1)
+      expect(asks).toBe(0)
+      writeFileSync(join(dir,'evidence.json'),JSON.stringify({actualProxy:true,actualSandbox:true,syntheticBroker:true,calls,reply}))
+      gate.revoke()
+      await deadline(child.exited,'revoked computer proxy exit')
+    } finally {
+      off(); gate.revoke(); await child.revoke(); lines.close()
+      for(const socket of sockets)socket.destroy()
+      await new Promise<void>(done=>server.close(()=>done()))
+    }
+  })
+
   it("isolates simultaneous approvals and ignores replayed proxy attribution", async () => {
     expect(process.platform).toBe("linux")
     const dir = mkdtempSync(join(tmpdir(), "mikka-launcher-isolation-"))

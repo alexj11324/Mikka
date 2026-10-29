@@ -3,17 +3,39 @@
 // Keeping tools/call pending returns the actual result to the same model turn
 // after the authenticated reviewer decides; text 'resume' cannot approve it.
 import { connect } from "node:net";
+import { request as httpRequest } from "node:http";
 import { createInterface } from "node:readline";
 import { TOOLS, normalizeCall } from "./driver.mjs";
 const [socketPath, token] = process.argv.slice(2);
 if (!socketPath || !token) process.exit(2);
-async function request(call) {
+async function openBroker() {
+  if (!socketPath.startsWith('tcp://')) return connect(socketPath);
+  const target = new URL(socketPath);
+  if (target.hostname !== '127.0.0.1' || !target.port || target.username || target.password || target.pathname || target.search || target.hash) throw new Error('Invalid broker');
+  if (process.env.MIKKA_COMPUTER_SANDBOX_PROXY !== '1') return connect({ host: target.hostname, port: Number(target.port) });
+  const proxy = new URL(process.env.HTTP_PROXY ?? process.env.http_proxy ?? '');
+  if (proxy.protocol !== 'http:' || !['127.0.0.1','localhost'].includes(proxy.hostname)) throw new Error('Sandbox proxy unavailable');
   return new Promise((resolve, reject) => {
-    const socket = connect(socketPath);
+    const headers = {};
+    if (proxy.username || proxy.password) headers['Proxy-Authorization'] = 'Basic ' + Buffer.from(decodeURIComponent(proxy.username) + ':' + decodeURIComponent(proxy.password)).toString('base64');
+    const req = httpRequest({ hostname: proxy.hostname, port: proxy.port || 80, method: 'CONNECT', path: target.host, headers });
+    req.once('error', reject);
+    req.setTimeout(10000, () => { req.destroy(); reject(new Error('Sandbox proxy unavailable')); });
+    req.once('connect', (response, socket, head) => {
+      if (response.statusCode !== 200) { socket.destroy(); reject(new Error('Sandbox proxy denied')); return; }
+      if (head.length) socket.unshift(head);
+      resolve(socket);
+    });
+    req.end();
+  });
+}
+async function request(call) {
+  const socket = await openBroker();
+  return new Promise((resolve, reject) => {
     let text = "";
-    socket.on("connect", () =>
-      socket.write(JSON.stringify({ token, call }) + "\n"),
-    );
+    const sendCall = () => socket.write(JSON.stringify({ token, call }) + "\n");
+    if (socket.connecting) socket.once("connect", sendCall);
+    else sendCall();
     socket.on("error", reject);
     socket.on("data", (data) => {
       text += data.toString();

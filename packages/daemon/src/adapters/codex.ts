@@ -1,3 +1,4 @@
+import { sandboxComputerSpec, computerSandboxPolicy, computerDomain } from '../computer/transport'
 // Codex adapter (ADR 0003): the user's own signed-in `codex app-server`,
 // one process per session, inside the run's sandbox, with an isolated
 // `CODEX_HOME` (see `agents/harness-home.ts`). Thread = session: `thread/start`
@@ -30,6 +31,7 @@ import {
   RunContext,
   runPaths,
   type McpServerSpec,
+  type ComputerSpecProvider,
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
@@ -72,6 +74,7 @@ export interface CodexAdapterOptions {
   onHostedSession?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
+  computerProvider?: ComputerSpecProvider
   /** The user's own `CODEX_HOME` (for the auth link); `~/.codex` by default. */
   userHome?: string
   /** Trusted, owner-bound broker only; never a task/model-supplied credential. */
@@ -321,6 +324,7 @@ export class CodexAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (threadId && earlier) return endedSession(threadId, earlier)
     ctx.clearHandoff()
+    const computerMcp = sandboxComputerSpec(this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy), this.options.sandbox.kind)
     const mcp = ctx.mcpServer()
     const argv = [
       this.options.binary ?? "codex",
@@ -334,10 +338,13 @@ export class CodexAdapter implements AgentAdapter {
         "-c",
         `mcp_servers.${MCP_SERVER_NAME}.env.${key}=${toml(value)}`,
       ]),
-      ...(this.options.computerMcp ? [
-        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.command=${toml(this.options.computerMcp.command)}`,
-        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.args=${toml(this.options.computerMcp.args)}`,
-        ...Object.entries(this.options.computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
+      ...(computerMcp ? [
+        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.command=${toml(computerMcp.command)}`,
+        "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.args=${toml(computerMcp.args)}`,
+        ...(computerMcp.env.MIKKA_COMPUTER_SANDBOX_PROXY === "1" ? [
+          "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env_vars=["HTTP_PROXY","http_proxy"]`,
+        ] : []),
+        ...Object.entries(computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
       ] : []),
       // Its shells get a filtered env; give them writable temp dirs.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
@@ -349,7 +356,7 @@ export class CodexAdapter implements AgentAdapter {
     const spawnOptions = {
       cwd: ctx.worktree,
       env: { ...options.env, ...ctx.tempEnv(), CODEX_HOME: codexHome.home },
-      policy: ctx.policy(),
+      policy: computerSandboxPolicy(ctx.policy(), computerMcp),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
     }
@@ -361,7 +368,7 @@ export class CodexAdapter implements AgentAdapter {
     let launcher: ReturnType<typeof spawnRunSandbox> | undefined
     const child = this.options.spawnCli || this.options.sandbox.kind === 'none'
       ? await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
-      : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum) }))
+      : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp)) }))
     if (launcher) {
       const ownedLauncher = launcher
       const off = options.toolApproval!.onRevoke(() => { void ownedLauncher.revoke().catch(() => undefined) })
@@ -406,7 +413,8 @@ export class CodexAdapter implements AgentAdapter {
       if (event) queue.exit(event)
     }
 
-    // Mikka's sandbox decides; inside it every action is allowed.
+    // Native requests retain their active turn identity and live run gate;
+    // callbacks cannot widen the enclosing sandbox's capability ceiling.
     rpc.onRequest(async (method, params: unknown) => {
       if (method === 'item/tool/call') {
         if (pendingTurnStart) await pendingTurnStart
