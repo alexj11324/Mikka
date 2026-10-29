@@ -133,6 +133,10 @@ export async function addRunMessage(
     .object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) })
     .safeParse(input)
   if (!parsed.success) throw new ActionFailureError('messageRequired')
+  // Ordinary user/peer traffic keeps main's single locked owner/state check.
+  // Only a host-attested browser session may enter ended Factory questions.
+  if (typeof source === 'string' || source.source === 'orchestrator')
+    return sendOwnedRunMessage(db,userId,parsed.data,typeof source === 'string' ? source : 'peer')
   const [run] = await db
     .select({ id: agentRuns.id, status: agentRuns.status })
     .from(agentRuns)
