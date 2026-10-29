@@ -66,6 +66,25 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     refreshInterval: latest => latest?.working ? 2000 : 10000,
   })
   const [draft, setDraft] = useState('')
+  // A draft belongs to the bot it was typed for. Switching bots remounts this
+  // component (the page keys it by bot), so keep the text per conversation.
+  const draftKey = `mikka:draft:${botId ?? 'coordinator'}`
+  const draftLoaded = useRef(false)
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(draftKey)
+      if (saved) setDraft(saved)
+    } catch { /* storage may be unavailable; the draft then lives in memory only */ }
+    draftLoaded.current = true
+  }, [draftKey])
+  function updateDraft(value: string) {
+    setDraft(value)
+    if (!draftLoaded.current) return
+    try {
+      if (value) sessionStorage.setItem(draftKey, value)
+      else sessionStorage.removeItem(draftKey)
+    } catch { /* storage may be unavailable */ }
+  }
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const { mutate: mutateAll } = useSWRConfig()
@@ -119,6 +138,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     const text = draft.trim()
     if (!await post(text)) return
     setDraft(current => current.trim() === text ? '' : current)
+    if (draft.trim() === text) { try { sessionStorage.removeItem(draftKey) } catch { /* storage may be unavailable */ } }
     const id = suggestion.current
     suggestion.current = null
     if (id) {
@@ -175,7 +195,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
       <PendingActions />
-      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={setDraft} sending={sending} onSubmit={() => { void send() }}
+      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }}
         quote={embedded?.quote ? <ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} /> : undefined} />
     </div>
     {!embedded && viewing && <ArtifactViewer artifactId={viewing} onArtifactChange={setViewing} onClose={() => setViewing(null)}

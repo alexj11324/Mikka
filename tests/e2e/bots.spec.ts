@@ -44,3 +44,23 @@ test('新建 Bot 进入左侧列表，打开它自己的对话，消息不进 Co
   await expect(page.getByText('帮我起草一份周报', { exact: true })).toHaveCount(0)
   await page.screenshot({ path: test.info().outputPath('coordinator-chat.png'), fullPage: false })
 })
+
+// A02: an unsent draft belongs to the bot it was typed for. Switching bots
+// must not move it into another composer or drop it.
+test('切换 Bot 时各自保留未发送的草稿', async ({ page }) => {
+  await register(page)
+  const bots = page.getByRole('list', { name: 'Bot', exact: true })
+  await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click()
+  const dialog = page.getByRole('dialog', { name: '新建 Bot' })
+  await dialog.getByLabel('名字', { exact: true }).fill('草稿 Bot')
+  await dialog.getByRole('button', { name: '爱心', exact: true }).click()
+  await dialog.getByRole('button', { name: '绿色', exact: true }).click()
+  await dialog.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(dialog).toBeHidden()
+
+  await page.getByLabel('给 草稿 Bot 发消息', { exact: true }).fill('未发送的草稿')
+  await bots.getByRole('button', { name: 'Coordinator', exact: true }).click()
+  await expect(page.getByLabel('给 Coordinator 发消息', { exact: true })).toHaveValue('')
+  await bots.getByRole('button', { name: '草稿 Bot', exact: true }).click()
+  await expect(page.getByLabel('给 草稿 Bot 发消息', { exact: true })).toHaveValue('未发送的草稿')
+})

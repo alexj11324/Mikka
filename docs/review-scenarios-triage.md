@@ -18,6 +18,7 @@
 | C19 停止分享请求抛错 | 显示「停止分享未确认 / 当前共享状态未知 / 重新检查 / 重试停止」，不显示已停止 | 同上 |
 | A11 停止线程未确认 | 文案改为「停止未确认」，按钮改「重试停止」 | `tests/e2e/thread-stop.spec.ts` |
 | A13 窄屏重试点击区 | 320px 下重试按钮 88×44，桌面 88×32 | 同上 |
+| A02 切换 Bot 草稿 | 草稿按 Bot 存 `sessionStorage`，切换后不串线、不丢失 | `tests/e2e/bots.spec.ts` |
 
 E2E 运行方式：独立 Postgres 库 `mikka_120_e2e`，`CI=true`，`BETTER_AUTH_URL=http://localhost:3100`，密钥走 `infisical run --env dev --path /vercel`。
 
