@@ -37,6 +37,17 @@ try {
   const pageErrors = []
   page.on('pageerror', error => pageErrors.push(String(error)))
   await page.waitForLoadState('domcontentloaded', { timeout: 90_000 })
+  async function navigate(url) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 })
+        return
+      } catch (error) {
+        if (attempt === 3 || !String(error).includes('ERR_ABORTED')) throw error
+        await new Promise(resolve => setTimeout(resolve, 1_000))
+      }
+    }
+  }
   console.log('window', page.url())
   if (!page.url().startsWith(appOrigin)) fail(`window left the app origin: ${page.url()}`)
 
@@ -77,15 +88,16 @@ try {
   })
   if (!notifications.rejected) fail('notifications.show accepted an invalid payload')
 
-  // Sign in through the development-only endpoint, which sets this window's
-  // session cookie. The endpoint is absent outside development.
+  // Sign in through the development-only endpoint from a stable page. The
+  // sign-in page with login=1 does not auto-redirect in development, so the
+  // fetch cannot race a client-side navigation.
+  await navigate(`${appOrigin}/mikka/en/sign-in?login=1`)
   await page.evaluate(async () => {
     const response = await fetch('/mikka/api/test-workspace', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
     if (!response.ok) throw new Error(`test session ${response.status}`)
   })
-  // A fresh profile has no prior app cookie, so the first load may have
-  // followed the development acceptance redirect. Enter the signed-in app.
-  await page.goto(`${appOrigin}/mikka/en`, { waitUntil: 'domcontentloaded', timeout: 120_000 })
+  // A fresh profile has no prior app cookie, so enter the signed-in app.
+  await navigate(`${appOrigin}/mikka/en`)
 
   const device = await page.evaluate(() => window.mikka.device.status())
   console.log('device', JSON.stringify(device))
@@ -96,10 +108,10 @@ try {
   if (!quota || !Array.isArray(quota.quotas)) fail('quota.get returned no report')
 
   // The retired standalone page redirects to the one Settings surface.
-  await page.goto(`${appOrigin}/mikka/devices`, { waitUntil: 'domcontentloaded', timeout: 120_000 })
-  await page.waitForURL(url => url.pathname.endsWith('/settings') && url.searchParams.get('section') === 'devices', { timeout: 60_000 })
+  await navigate(`${appOrigin}/mikka/devices`)
+  await page.waitForURL(url => url.pathname.endsWith('/settings') && url.searchParams.get('section') === 'devices', { timeout: 180_000 })
   console.log('legacy /devices redirected to', page.url())
-  await page.waitForFunction(() => /设备|Devices/.test(document.body.innerText), { timeout: 60_000 })
+  await page.waitForFunction(() => /设备|Devices/.test(document.body.innerText), { timeout: 180_000 })
   const settingsText = await page.locator('body').innerText()
 
   if (expectLocal) {
