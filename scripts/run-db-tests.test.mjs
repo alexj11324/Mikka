@@ -136,7 +136,7 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.match(workflow, /MIGRATION_BOOTSTRAP_CI: '1'/)
   assert.match(workflow, /REQUIRE_DB: '1'/)
   assert.match(browser, /pnpm test:performance --output=performance-results/)
-  assert.match(browser, /node scripts\/ci-browser-tests\.mjs > "\$log_file"/)
+  assert.ok(browser.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/4 > "$log_file"'), 'each isolated shard runs the selected layer')
   assert.deepEqual(browserArguments('full', '[]'), ['exec', 'playwright', 'test', '--grep-invert', '@performance'], 'integration retains every non-performance browser spec through the selected-layer runner')
   assert.match(browser, /^\s*pnpm test:e2e:mvp > "\$log_file" 2>&1 \|\| test_status=\$\?/m, 'the dedicated MVP browser gate remains required')
   assert.match(browser, /log_file=\.cache\/e2e\/playwright-mvp\.log[\s\S]*?audit-evidence --evidence "\$log_file"[\s\S]*?exit "\$test_status"/, 'MVP output is audited before display and the test result is preserved')

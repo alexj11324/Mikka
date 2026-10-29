@@ -4,7 +4,7 @@ import { constants, copyFileSync, existsSync, lstatSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { browserPlan, BROWSER_SMOKE, BROWSER_SCOPED_SPECS } from './ci-docs-only.mjs'
 
-export function browserArguments(tier, encodedSpecs) {
+export function browserArguments(tier, encodedSpecs, shard) {
   const specs = JSON.parse(encodedSpecs)
   if (!Array.isArray(specs) || specs.some(spec => typeof spec !== 'string') || new Set(specs).size !== specs.length) throw new Error('Invalid browser spec list')
   const allowed = new Set([...BROWSER_SMOKE, ...BROWSER_SCOPED_SPECS])
@@ -15,7 +15,14 @@ export function browserArguments(tier, encodedSpecs) {
     if (!BROWSER_SMOKE.every(spec => specs.includes(spec))) throw new Error('Critical browser flows cannot be omitted')
     if (tier === 'smoke' && specs.length !== BROWSER_SMOKE.length) throw new Error('Invalid smoke plan')
   } else throw new Error('Missing or invalid browser tier')
-  return ['exec', 'playwright', 'test', ...specs.map(spec => `tests/e2e/${spec}`), '--grep-invert', '@performance']
+  const args = ['exec', 'playwright', 'test', ...specs.map(spec => `tests/e2e/${spec}`), '--grep-invert', '@performance']
+  if (shard !== undefined) {
+    if (!/^[1-9]\d*\/[1-9]\d*$/.test(shard)) throw new Error('Invalid browser shard')
+    const [index, total] = shard.split('/').map(Number)
+    if (index > total) throw new Error('Invalid browser shard')
+    args.push(`--shard=${shard}`)
+  }
+  return args
 }
 
 // Policy changes must exercise actual subset execution as well as the full
@@ -28,11 +35,13 @@ export function selectionValidationPlans() {
 
 export function main() {
   const validating = process.argv[2] === '--verify-selection'
+  const shard = process.argv.find(argument => argument.startsWith('--shard='))?.slice('--shard='.length)
+  if (validating && shard) throw new Error('Selection validation must run unsharded')
   const plans = validating
     ? selectionValidationPlans()
     : [{ tier: process.env.BROWSER_TIER, specs: JSON.parse(process.env.BROWSER_SPECS) }]
   for (const plan of plans) {
-    const args = browserArguments(plan.tier, JSON.stringify(plan.specs))
+    const args = browserArguments(plan.tier, JSON.stringify(plan.specs), validating ? undefined : shard)
     console.log(`Browser acceptance layer: ${plan.tier}; ${args.join(' ')}`)
     // Keep each subset's reports separate from subsequent full regression.
     if (validating) args.push(`--output=selection-${plan.tier}-results`)

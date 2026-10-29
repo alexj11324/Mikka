@@ -31,8 +31,19 @@ const DOCS_ONLY = [
   /^\.github\/pull_request_template\.md$/,
 ]
 
+function isDocumentationFile(file) {
+  return (file === 'AGENTS.md' || !/(?:^|\/)AGENTS\.md$/.test(file)) && DOCS_ONLY.some(pattern => pattern.test(file))
+}
+
 export function isDocsOnly(files, unsafeModes = false) {
-  return !unsafeModes && files.length > 0 && files.every(file => (file === 'AGENTS.md' || !/(?:^|\/)AGENTS\.md$/.test(file)) && DOCS_ONLY.some(pattern => pattern.test(file)))
+  return !unsafeModes && files.length > 0 && files.every(isDocumentationFile)
+}
+
+/** Schema-only changes add migrations and documentation, never application code.
+ * Their migration/bootstrap tests still run; browser coverage drops to critical flows. */
+const SCHEMA_ONLY = /^drizzle\/[^/]+\.sql$/
+export function isSchemaOnly(files) {
+  return files.some(file => SCHEMA_ONLY.test(file)) && files.every(file => SCHEMA_ONLY.test(file) || isDocumentationFile(file))
 }
 
 // Whole existing specs, rather than title grep filters: assertions stay intact.
@@ -56,6 +67,9 @@ export function browserPlan(files, { unsafeModes = false, integration = false } 
   if (integration) return full(true)
   if (unsafeModes || !files.length) return full(files.some(path => PERFORMANCE_SPECS.includes(path)))
   if (isDocsOnly(files)) return { tier: 'docs', specs: [], performance: false }
+  // A migration without application code still runs the migration/bootstrap
+  // gates and the critical browser flows, not the whole regression suite.
+  if (isSchemaOnly(files)) return { tier: 'smoke', specs: [...BROWSER_SMOKE].sort(), performance: false }
   const specs = new Set(BROWSER_SMOKE)
   let targeted = false
   for (const file of files) {

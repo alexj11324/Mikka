@@ -49,7 +49,13 @@ cannot.
    | Documentation only | No browser runtime; the required gate confirms classification |
    | Source-only tests, CI workflows, CI policy and test-runner changes | Critical flows; selection-policy changes also validate both browser subsets |
    | Search, settings, Slack webhook paths | Critical flows plus complete relevant specs |
-   | Authentication, permissions, shared UI/runtime, dependencies, migrations, shared browser fixtures or unknown paths | Full functionality |
+   | Schema-only migrations (`drizzle/*.sql`, with documentation) | Migration bootstrap and database checks, then critical flows |
+   | Authentication, permissions, shared UI/runtime, dependencies, mixed schema and application changes, shared browser fixtures or unknown paths | Full functionality |
+
+   The full layer runs as four isolated shards. Each matrix job has its own
+   PostgreSQL service, test-account directory and artifact name, so no database,
+   lease or fixture is shared concurrently. Sharding changes wall-clock time, not
+   which assertions run.
 
    Critical flows cover anonymous redirects, registration/login, task creation,
    search/navigation, account isolation, and sign-out with server revocation.
