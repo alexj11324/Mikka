@@ -2366,7 +2366,8 @@
     "composer": "告诉 {agent} 下一步做什么…",
     "sendFailed": "没发出去，草稿还在",
     "stopping": "正在停止…",
-    "stopFailed": "没停下来，再试一次"
+    "stopFailed": "停止未确认",
+    "retryStop": "重试停止"
   },
   "Computer": {
     "status": {
@@ -2698,6 +2699,15 @@
     "sharingOn": "正在分享，之前发出的链接仍然有效。",
     "newLink": "复制新链接",
     "shareStopped": "已停止分享",
+    "createFailed": "创建失败",
+    "copyFailed": "复制失败",
+    "copyFailedHint": "选中链接后手动复制",
+    "selectLink": "选择链接",
+    "retryCopy": "重新复制",
+    "stopUnconfirmed": "停止分享未确认",
+    "shareStateUnknown": "当前共享状态未知",
+    "recheck": "重新检查",
+    "retryStop": "重试停止",
     "shareLink": "分享链接",
     "sharedNotFoundHint": "分享已停止，或者链接不完整。",
     "notFoundTitle": "这个链接已经失效了",

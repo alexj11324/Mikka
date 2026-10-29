@@ -2366,7 +2366,8 @@
     "composer": "Tell {agent} what to do next…",
     "sendFailed": "Not sent. Your draft is still here",
     "stopping": "Stopping…",
-    "stopFailed": "Couldn't stop it. Try again"
+    "stopFailed": "Stop not confirmed",
+    "retryStop": "Try stopping again"
   },
   "Computer": {
     "status": {
@@ -2698,6 +2699,15 @@
     "sharingOn": "Sharing is on. Links you sent still work.",
     "newLink": "Copy a new link",
     "shareStopped": "Sharing stopped",
+    "createFailed": "Could not create a link",
+    "copyFailed": "Could not copy",
+    "copyFailedHint": "Select the link to copy it yourself",
+    "selectLink": "Select link",
+    "retryCopy": "Try copying again",
+    "stopUnconfirmed": "Stop not confirmed",
+    "shareStateUnknown": "Sharing status unknown",
+    "recheck": "Check again",
+    "retryStop": "Try stopping again",
     "shareLink": "Share link",
     "sharedNotFoundHint": "Sharing was stopped, or the link is incomplete.",
     "notFoundTitle": "This link no longer works",
