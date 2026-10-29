@@ -602,7 +602,7 @@ jobs:
             echo "Changed files job did not succeed: $CHANGES_RESULT"
             exit 1
           fi
-          if [ "$EVENT_NAME" != "pull_request" ] && [ "$BROWSER_TIER:$BROWSER_PERFORMANCE" != "full:true" ]; then
+          if [ "$EVENT_NAME" != "pull_request" ] && [ "$DOCS_ONLY" != "true" ] && [ "$BROWSER_TIER:$BROWSER_PERFORMANCE" != "full:true" ]; then
             echo "Integration runs require full functionality and performance"
             exit 1
           fi

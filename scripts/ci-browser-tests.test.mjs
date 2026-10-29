@@ -226,7 +226,10 @@ test('protected browser gate requires build, runtime, selection and regression r
     assert(result({ event, tier: 'full', performance: 'true' }))
     assert(!result({ event, tier: 'full', performance: 'false' }))
     assert(!result({ event, tier: 'smoke', performance: 'false' }))
-    assert(!result({ event, tier: 'docs', docs: 'true', performance: 'false' }))
+    // A docs-only main push has no browser runtime to exercise; the classifier
+    // selects the docs tier and nightlies/manual runs still require full.
+    assert(result({ event, tier: 'docs', docs: 'true', performance: 'false' }))
+    assert(!result({ event, tier: 'docs', docs: 'false', performance: 'false' }))
   }
 })
 
