@@ -2755,5 +2755,10 @@
   },
   "MobilePush": {
     "verificationCode": "收到一条验证码"
+  },
+  "MobileHandoff": {
+    "title": "登录 Mikka",
+    "confirm": "使用此账号继续",
+    "cancel": "取消"
   }
 }

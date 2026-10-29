@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BotAvatar, SourceIcon } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { authClient } from '@/lib/auth'
+import { clearSessionExpired, sessionExpired } from '@/lib/session'
 import { colors, font } from '@/lib/theme'
 
 /**
@@ -16,12 +17,14 @@ export function SignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  // After the session was lost (lib/session.ts) the first thing shown says why the app signed out.
+  const [error, setError] = useState(() => sessionExpired() ? '登录已失效，请重新登录。' : '')
 
   const run = async (work: () => Promise<{ error?: unknown } | undefined | void>) => {
     if (busy) return
     setBusy(true)
     setError('')
+    clearSessionExpired()
     try {
       const result = await work()
       if (result && 'error' in result && result.error) setError('操作未成功，请检查填写的信息或稍后重试。')

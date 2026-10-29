@@ -2755,5 +2755,10 @@
   },
   "MobilePush": {
     "verificationCode": "A verification code arrived"
+  },
+  "MobileHandoff": {
+    "title": "Sign in to Mikka",
+    "confirm": "Continue with this account",
+    "cancel": "Cancel"
   }
 }

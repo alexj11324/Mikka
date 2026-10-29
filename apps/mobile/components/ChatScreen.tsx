@@ -1,19 +1,26 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Linking, ScrollView, StyleSheet, View, type ScrollViewInstance } from 'react-native'
+import { ScrollView, StyleSheet, View, type ScrollViewInstance } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ListChecks } from 'lucide-react-native'
 import { useDrawer } from '@/components/Drawer'
 import { BotAvatar, MenuIcon, Spinner, threadStatus } from '@/components/icons'
-import { BotBubble, EventLine, MyBubble, ThreadCard, TimedRow, useTimeReveal } from '@/components/chat'
+import { CardButton } from '@/components/cards'
+import { BotBubble, EventLine, MyBubble, OutgoingBubble, ThreadCard, TimedRow, useTimeReveal } from '@/components/chat'
 import { Markdown } from '@/components/Markdown'
+import { OfflineBanner } from '@/components/OfflineBanner'
+import { OpenUIReply } from '@/components/OpenUI'
+import { PendingActions } from '@/components/PendingActions'
 import { Text } from '@/components/Text'
 import { Composer, Header, RoundButton } from '@/components/ui'
 import { api } from '@/lib/api'
 import { clockTime } from '@/lib/clock'
-import { API_URL } from '@/lib/config'
-import { runTitle, type Chat, type CitationSource } from '@/lib/types'
+import { isOpenUI } from '@/lib/openui'
+import { delivered, inFlight, marked, outgoingKey, queued, type Outgoing } from '@/lib/outbox'
+import { askForPush, usePushState } from '@/lib/push-state'
+import { runTitle, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
+import { webChatPath } from '@/lib/web'
 import { colors, lift } from '@/lib/theme'
 
 const RUN_ENDED = /^\[Event\] Run ([0-9a-f-]{36}) ended with status (\w+)/i
@@ -27,15 +34,14 @@ function eventText(text: string, sources: Record<string, CitationSource>) {
   return text.replace(/^\[Event\]\s*/, '')
 }
 
-/** OpenUI cards (lib/coordinator/native-prompt.ts) are drawn by the web's renderer only. */
-const OPEN_UI = /^\s*root\s*=/
-
 /**
  * A chat with a bot; the Coordinator is one (R-06): the bot's name in a pill,
  * the threads behind the right button, the composer at the bottom. Polls while
- * a reply is coming.
+ * a reply is coming. Below the messages sit the proposals waiting for the
+ * person (approve or decline, as on the web); `focus` marks the one a push
+ * was about. OpenUI cards are drawn natively (components/OpenUI.tsx).
  */
-export function ChatScreen({ botId, name, color, shape, draft }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string }) {
+export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string }) {
   const drawer = useDrawer()
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -44,32 +50,65 @@ export function ChatScreen({ botId, name, color, shape, draft }: { botId: string
   const path = `/api/mobile/chat${botId ? `?bot=${botId}` : ''}`
   const [fast, setFast] = useState(false)
   const { data, error, reload } = useApi<Chat>(path, fast ? 2500 : 15000)
-  const [sending, setSending] = useState<string[]>([])
-  const [sendFailed, setSendFailed] = useState(false)
-  const working = Boolean(data?.working) || sending.length > 0
+  const pending = useApi<PendingAction[]>('/api/pending-actions', 10000)
+  const [outbox, setOutbox] = useState<Outgoing[]>([])
+  const [text, setText] = useState(draft ?? '')
+  const working = Boolean(data?.working) || inFlight(outbox)
+  const push = usePushState()
+  // Opened from a push about a proposal: its card is scrolled into view once, instead of the chat's end.
+  const pendingTop = useRef(0)
+  const [pinned, setPinned] = useState(false)
+  const showFocus = (y: number) => {
+    if (pinned) return
+    setPinned(true)
+    // After this frame's layout, so the list's own offset (measured after its children) is known.
+    setTimeout(() => scroll.current?.scrollTo({ y: Math.max(0, pendingTop.current + y - insets.top - 84), animated: true }), 0)
+  }
+  useEffect(() => { setPinned(false) }, [focus])
 
   useEffect(() => { setFast(working) }, [working])
+  useEffect(() => { if (draft) setText(draft) }, [draft])
+
+  const items = data?.items ?? []
+  const sources = data?.sources ?? {}
+  // A card is answered once the person has written after it (here or anywhere else).
+  const lastMine = items.reduce((last, item, index) => item.from === 'person' ? index : last, -1)
+  const proactive = items.some((item, index) => item.from === 'coordinator' && items[index - 1]?.from === 'event')
+
+  // iOS asks once; the moment is the first message the Coordinator sent on its own, not app launch.
+  useEffect(() => { if (proactive && push === 'undetermined') void askForPush() }, [proactive, push])
 
   const open = (source: CitationSource) => {
     if (source.kind === 'run') router.push(`/threads/${source.id}`)
     else router.push('/tasks')
   }
 
-  const send = async (text: string) => {
-    setSending(list => [...list, text])
-    setSendFailed(false)
+  const deliver = async (key: string, message: string) => {
     try {
-      await api(`/api/mobile/chat`, { method: 'POST', body: { text, botId } })
+      await api('/api/mobile/chat', { method: 'POST', body: { text: message, botId } })
       await reload()
+      setOutbox(list => delivered(list, key))
+      return true
     } catch {
-      setSendFailed(true)
-    } finally {
-      setSending(list => list.filter(item => item !== text))
+      setOutbox(list => marked(list, key, 'failed'))
+      return false
     }
   }
 
-  const items = data?.items ?? []
-  const sources = data?.sources ?? {}
+  const send = async (message: string) => {
+    setPinned(false)
+    const key = outgoingKey()
+    setOutbox(list => queued(list, key, message))
+    return deliver(key, message)
+  }
+
+  const retry = async (item: Outgoing) => {
+    setOutbox(list => marked(list, item.key, 'sending'))
+    // The composer still holds the words of a failed send; once they arrive it empties.
+    if (await deliver(item.key, item.text)) setText(current => current.trim() === item.text ? '' : current)
+  }
+
+  const answer = async (message: string) => send(message)
 
   return (
     <View style={styles.screen}>
@@ -84,9 +123,10 @@ export function ChatScreen({ botId, name, color, shape, draft }: { botId: string
         }
         right={<RoundButton label="线程" onPress={() => router.push('/threads')}><ListChecks size={21} color={colors.ink} strokeWidth={2} /></RoundButton>}
       />
+      <OfflineBanner top={insets.top + 66} />
       <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
-        <ScrollView ref={scroll} contentContainerStyle={[styles.list, { paddingTop: insets.top + 76 }]} onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
-          {items.map(item => {
+        <ScrollView ref={scroll} contentContainerStyle={[styles.list, { paddingTop: insets.top + 76 }]} onContentSizeChange={() => { if (!pinned) scroll.current?.scrollToEnd({ animated: false }) }}>
+          {items.map((item, index) => {
             const time = clockTime(item.createdAt)
             return (
               <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
@@ -94,11 +134,9 @@ export function ChatScreen({ botId, name, color, shape, draft }: { botId: string
                 {item.from === 'person' && item.text ? <TimedRow time={time} offset={offset} align="right"><MyBubble text={item.text} /></TimedRow> : null}
                 {item.from === 'coordinator' && item.text ? (
                   <TimedRow time={time} offset={offset}>
-                    <BotBubble>
-                      {OPEN_UI.test(item.text)
-                        ? <Text style={styles.webOnly} onPress={() => void Linking.openURL(API_URL)}>卡片 · 在网页上查看</Text>
-                        : <Markdown text={item.text} sources={sources} onOpen={open} />}
-                    </BotBubble>
+                    {isOpenUI(item.text)
+                      ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} webPath={webChatPath(botId)} sources={sources} onOpen={open} />
+                      : <BotBubble><Markdown text={item.text} sources={sources} onOpen={open} /></BotBubble>}
                   </TimedRow>
                 ) : null}
                 {item.threads.map(id => {
@@ -110,15 +148,24 @@ export function ChatScreen({ botId, name, color, shape, draft }: { botId: string
               </Fragment>
             )
           })}
-          {sending.map(text => <MyBubble key={`sending-${text}`} text={text} />)}
+          {outbox.map(item => <OutgoingBubble key={item.key} text={item.text} failed={item.state === 'failed'} onRetry={() => void retry(item)} />)}
           {working ? <View style={styles.working}><Spinner size={16} /></View> : null}
           {data && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
-          {error && !data ? <Text style={styles.error}>连不上 Mikka，稍后再试。</Text> : null}
+          {error && !data ? (
+            <View style={styles.failed}>
+              <Text style={styles.error}>连不上 Mikka。</Text>
+              <CardButton label="重试" onPress={() => void reload()} />
+            </View>
+          ) : null}
           {data?.error && !working ? <Text style={styles.error}>{data.error}</Text> : null}
-          {sendFailed ? <Text style={styles.error}>没发出去，再试一次。</Text> : null}
+          {pending.data ? (
+            <View onLayout={event => { pendingTop.current = event.nativeEvent.layout.y }}>
+              <PendingActions items={pending.data} focus={focus} reload={pending.reload} onFocusLayout={focus ? showFocus : undefined} />
+            </View>
+          ) : null}
         </ScrollView>
       </View>
-      <Composer key={draft ?? ''} initial={draft} placeholder={`给 ${name} 发消息`} onSend={send} />
+      <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} />
     </View>
   )
 }
@@ -132,7 +179,7 @@ const styles = StyleSheet.create({
   // Space above the composer (适度留白).
   list: { paddingBottom: 28, paddingHorizontal: 16, gap: 12 },
   working: { alignSelf: 'flex-start', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
-  webOnly: { fontSize: 15, color: colors.accent },
+  failed: { alignItems: 'center', gap: 10, marginTop: 24 },
   empty: { alignSelf: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
   error: { alignSelf: 'center', color: colors.danger, fontSize: 13, textAlign: 'center', marginHorizontal: 24 },
 })
