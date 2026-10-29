@@ -16,7 +16,7 @@ import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
 /** Existing rows and JSON only: admission, run and publication commit together. */
 export async function acceptLocalRun(input: {
   id: string; userId: string; issueId: string; agentId: string; deviceId: string; deviceRepoId: string
-  botId: string | null; prompt: string; definition: WorkerDefinitionSnapshot; requestEventId?: string
+  source?: 'mcp' | null; botId: string | null; prompt: string; definition: WorkerDefinitionSnapshot; requestEventId?: string
 }): Promise<{ runId: string }> {
   return db.transaction(async tx => withDatabaseTransaction(tx, async () => {
     const invalid = () => new ActionFailureError('runInvalid')
@@ -59,7 +59,7 @@ export async function acceptLocalRun(input: {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'repository-branch:' + repo.repoPath + ':' + branch}, 0))`)
     const [collision] = await tx.select({ runId: runPublications.runId }).from(runPublications).where(and(eq(runPublications.remoteKey, repo.repoPath), eq(runPublications.branch, branch), ne(runPublications.issueId, task.id))).limit(1)
     if (collision) throw invalid()
-    await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch, prompt: input.prompt, agentDefinition: { ...input.definition, repositoryAdmission: admission } })
+    await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, agentDefinition: { ...input.definition, repositoryAdmission: admission } })
     await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: repo.baseBranch, pushApproved: true })
     return { runId: input.id }
   }))

@@ -23,29 +23,34 @@ export class ComputerStore {
   async listBots(actor: Actor) {
     return (await this.pool.query<Bot>('SELECT id,name,"workspaceId","ownerId" FROM bots WHERE "workspaceId"=$1 AND "ownerId"=$2 ORDER BY "createdAt"', [actor.workspaceId, actor.userId])).rows
   }
-  async policy(workspaceId: string): Promise<'ask' | 'deny'> {
+  async policy(workspaceId: string): Promise<'allow' | 'ask' | 'deny'> {
     const row = (await this.pool.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]
-    return row?.permission === 'deny' ? 'deny' : 'ask'
+    if (!row) return 'ask'
+    if (!['allow', 'ask', 'deny'].includes(row.permission)) throw new Error('Computer policy unavailable')
+    return row.permission
   }
   /** Caller must authorize an active workspace admin. Serializes policy
    * transitions with display wake/control and each actual driver call. */
-  async setPolicy(workspaceId: string, permission: 'ask' | 'deny') {
+  async setPolicy(workspaceId: string, permission: 'allow' | 'ask' | 'deny') {
     const client = await this.pool.connect()
     const key = `computer-policy:${workspaceId}`
     try {
       await client.query('BEGIN')
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [key])
+      const previous = (await client.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]?.permission ?? 'ask'
       const machine = (await client.query<Machine>('SELECT * FROM cloud_machines WHERE "workspaceId"=$1 FOR UPDATE', [workspaceId])).rows[0]
       const desktops = (await client.query<Desktop>('SELECT * FROM bot_desktops WHERE "workspaceId"=$1 ORDER BY display FOR UPDATE', [workspaceId])).rows
       const policy = (await client.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version)
-        VALUES ($1,$2,CASE WHEN $2='deny' THEN 1 ELSE 0 END)
+        VALUES ($1,$2,CASE WHEN $2='ask' THEN 0 ELSE 1 END)
         ON CONFLICT ("workspaceId") DO UPDATE SET permission=$2,"updatedAt"=now(),
           version=CASE WHEN workspace_computer_policies.permission=$2 THEN workspace_computer_policies.version ELSE workspace_computer_policies.version+1 END
         RETURNING version`, [workspaceId, permission])).rows[0]
-      if (permission === 'deny') {
+      if (previous !== permission) {
         await client.query('UPDATE computer_run_bindings SET "approvedForRun"=false WHERE "workspaceId"=$1', [workspaceId])
         await client.query(`UPDATE local_computer_reviews v SET decision=false FROM computer_run_bindings b
           WHERE v."runId"=b."runId" AND b."workspaceId"=$1 AND v.decision IS NULL`, [workspaceId])
+      }
+      if (permission === 'deny') {
         // Previously delivered approvals cannot be rebound to a later policy
         // generation. Stop these threads so they cannot appear to resume with
         // stale authority after an administrator re-enables computer use.

@@ -6,6 +6,8 @@ import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema
 import { splitQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 import { PUBLICATION_ERRORS, type PublicationErrorCode } from '@/lib/run-publication-result'
 import { pullRequestSchema } from '@/lib/issue-metadata'
+import { splitBrowserNotes, type BrowserNote } from '@/lib/browser/note'
+import { splitSuggestion, type SuggestionCard } from '@/lib/suggestions/card'
 
 // What the Coordinator's model sees. Everything here depends only on the
 // stored conversation, never on time or on how long the person was away, so
@@ -223,6 +225,10 @@ export interface ChatItem {
   pending?: true
   /** What the person quoted from an artifact, shown above their text. */
   quote?: ArtifactQuote
+  /** Notes the person pinned on pages in the browser, shown as chips above their text. */
+  notes?: BrowserNote[]
+  /** The 建议 card the person tapped, drawn above their instruction (R-21). */
+  suggestion?: SuggestionCard
   /** Artifacts shown as cards under this entry, in order. */
   artifacts: string[]
 }
@@ -296,8 +302,10 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       // The triage line is for the Coordinator, not the person.
       if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') })
       else {
-        const { quote, text } = splitQuote(raw)
-        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}) })
+        const { quote, text: unquoted } = splitQuote(raw)
+        const { notes, text: rest } = splitBrowserNotes(unquoted)
+        const { suggestion, text } = splitSuggestion(rest)
+        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}) })
       }
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content

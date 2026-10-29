@@ -30,6 +30,9 @@ async function main() {
       'playwright-mvp-report', 'mvp-test-results',
       '.cache/e2e/http-acceptance-summary.json', '.cache/e2e/account-http-evidence.json',
       '.cache/e2e/playwright-performance.log', '.cache/e2e/playwright-browser.log', '.cache/e2e/playwright-mvp.log',
+      'playwright-selection-smoke-report', 'selection-smoke-results',
+      'playwright-selection-targeted-report', 'selection-targeted-results',
+      '.cache/e2e/playwright-selection.log',
     ]) {
       try { await stat(path); paths.push(path) } catch (error) { if (error.code !== 'ENOENT') throw error }
     }

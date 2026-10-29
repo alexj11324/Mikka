@@ -21,6 +21,10 @@ async function seedDispatch(email: string, title: string) {
     const runId = randomUUID()
     await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Mikka Frontend'])
     await pool.query('INSERT INTO agent_runs (id, "userId", "issueId", "agentId", status, prompt) VALUES ($1, $2, $3, $4, $5, $6)', [runId, user.id, issue.id, agentId, 'running', 'Speed up the home page\nMeasure first.'])
+    // What the thread handed over: one document, for the 「Artifact · 1」 entry in its header (F3).
+    const artifactId = randomUUID()
+    await pool.query('INSERT INTO artifacts (id, "userId", kind, title, "runId", "issueId") VALUES ($1, $2, $3, $4, $5, $6)', [artifactId, user.id, 'markdown', 'Home page timing', runId, issue.id])
+    await pool.query('INSERT INTO artifact_versions (id, "artifactId", version, "storageKey", "inlineContent", sha256, size, "authorName") VALUES ($1, $2, 1, $3, $4, $5, $6, $7)', [randomUUID(), artifactId, `e2e/${artifactId}.md`, '# Home page timing\n\n3.8s', 'e2e', 25, 'Mikka Frontend'])
     let seq = 0
     for (const chunk of [{ type: 'text-delta', id: 't1', delta: 'Home page loads in 3.8s.' }, { type: 'tool-input-available', toolCallId: 'a' }, { type: 'tool-input-available', toolCallId: 'b' }]) {
       await pool.query('INSERT INTO run_chunks (id, "runId", seq, chunk) VALUES ($1, $2, $3, $4)', [randomUUID(), runId, ++seq, JSON.stringify(chunk)])
@@ -94,6 +98,13 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await expect(thread.getByRole('textbox', { name: '告诉 Mikka Frontend 下一步做什么…' })).toBeVisible()
   await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息' })).toHaveCount(0)
   await testInfo.attach('thread-open', { body: await page.screenshot(), contentType: 'image/png' })
+
+  // 「Artifact · 1」 opens the Artifact window with this thread's conversation beside it (F3, F4).
+  await thread.getByRole('button', { name: 'Artifact · 1', exact: true }).click()
+  const artifactWindow = page.getByRole('dialog', { name: 'Home page timing', exact: true })
+  await expect(artifactWindow.getByRole('list', { name: '线程对话' })).toContainText('Home page loads in 3.8s.')
+  await artifactWindow.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(artifactWindow).toHaveCount(0)
 
   await thread.getByRole('button', { name: '返回 Coordinator', exact: true }).click()
   await expect(thread).toHaveCount(0)

@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { cn } from '@/lib/utils'
-import { sessionPreview } from '@/lib/agent-history'
+import { markdownLine, sessionPreview } from '@/lib/agent-history'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
 
@@ -79,7 +79,7 @@ function botMood(threads: Thread[], botId: string, chatting: boolean): BotMood {
 
 /** A Coordinator reply as one plain line: citations become their labels. */
 function coordinatorLine(text: string) {
-  return sessionPreview(text.replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, '').replace(/\[([^\]\n]+)\]\([^)]+\)/g, '$1'), null)
+  return sessionPreview(markdownLine(text), null)
 }
 
 /** Green while the bot is working, orange while it waits on you; otherwise no dot. */

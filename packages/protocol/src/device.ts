@@ -104,6 +104,7 @@ export const devicePaths = {
 // --- Registration ---------------------------------------------------------
 
 /** `POST /v1/devices/register` */
+export const deviceComputerCapability = z.object({ installed: z.boolean(), version: z.string().max(100).nullable() }).strict()
 export const deviceRegistration = z.object({
   name: z.string().trim().min(1).max(200),
   hostname: z.string().max(255).nullable().optional(),
@@ -112,6 +113,7 @@ export const deviceRegistration = z.object({
   daemonVersion: z.string().max(50),
   protocolVersion: z.number().int(),
   harnesses: z.array(harnessInfoSchema).max(20),
+  computerUse: deviceComputerCapability.optional(),
   /**
    * This machine's one device id, the same in every workspace (ADR ORV-284).
    * Registering with it in another workspace joins the same device there.
@@ -143,6 +145,7 @@ export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>
 /** `POST /v1/devices/:deviceId/heartbeat` */
 export const deviceHeartbeatSchema = z.object({
   harnesses: z.array(harnessInfoSchema).max(20),
+  computerUse: deviceComputerCapability.optional(),
   runs: z.array(heartbeatRunSchema).max(500),
   worktreeDiskBytes: z.number().int().nonnegative(),
   /**
@@ -263,6 +266,12 @@ export const runAssignmentSchema = z.object({
   subscriptionBinding: z.object({
     bindingId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
     consumerId: z.uuid(), route: z.enum(['codex_cli', 'claude_code_cli']),
+  }).strict().optional(),
+  /** Local host authority comes only from the server's owner-bound Bot run. */
+  localComputer: z.object({
+    botId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
+    policyVersion: z.number().int().nonnegative().max(2147483647),
+    permission: z.enum(['allow', 'ask']),
   }).strict().optional(),
   /** Trusted server assignment; the model cannot choose a Bot or display. */
   computer: z.object({
