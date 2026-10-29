@@ -2943,6 +2943,15 @@
     "confirm": "Continue with this account",
     "cancel": "Cancel"
   },
+  "DesktopHandoff": {
+    "returnTitle": "Return to Mikka",
+    "returnBody": "You are signed in. Opening Mikka…",
+    "openApp": "Open Mikka",
+    "finishTitle": "Returning to Mikka",
+    "finishBody": "Finishing sign-in…",
+    "finishFailed": "Sign-in did not finish. Return to Mikka and try again.",
+    "openSignIn": "Open sign-in"
+  },
   "DeviceAuthorization": {
     "title": "Connect this computer",
     "code": "Terminal verification code",

@@ -5,6 +5,8 @@ import { auth } from '@/lib/auth'
 import { safeAuthReturn } from '@/lib/auth-return'
 import { withBasePath } from '@/lib/base-path'
 import { desktopAuthState } from '@/lib/desktop-auth'
+import en from '@/messages/en.json'
+import zh from '@/messages/zh-CN.json'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,11 +48,9 @@ export async function GET(request: Request) {
     const { token } = await auth.api.generateOneTimeToken({ headers: requestHeaders })
     if (!token) return fail()
     const deepLink = `mikka-desktop://auth?${new URLSearchParams({ token, state, next })}`
-    const zh = request.headers.get('accept-language')?.startsWith('zh')
-    const copy = zh
-      ? { title: '返回 Mikka', body: '登录完成。正在打开 Mikka…', open: '打开 Mikka' }
-      : { title: 'Return to Mikka', body: 'You are signed in. Opening Mikka…', open: 'Open Mikka' }
-    const html = `<!doctype html><html lang="${zh ? 'zh-CN' : 'en'}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(copy.title)}</title><style>body{font:16px/1.5 -apple-system,BlinkMacSystemFont,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f5f4;color:#1c1917}main{max-width:28rem;padding:2rem;text-align:center}a{display:inline-block;margin-top:1rem;padding:.7rem 1.2rem;border-radius:.75rem;background:#1c1917;color:#fff;text-decoration:none}</style><main><h1>${escapeHtml(copy.title)}</h1><p>${escapeHtml(copy.body)}</p><a href="${escapeHtml(deepLink)}">${escapeHtml(copy.open)}</a></main><script>location.replace(${JSON.stringify(deepLink)})</script></html>`
+    const chinese = request.headers.get('accept-language')?.startsWith('zh')
+    const copy = (chinese ? zh : en).DesktopHandoff
+    const html = `<!doctype html><html lang="${chinese ? 'zh-CN' : 'en'}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(copy.returnTitle)}</title><style>body{font:16px/1.5 -apple-system,BlinkMacSystemFont,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f5f4;color:#1c1917}main{max-width:28rem;padding:2rem;text-align:center}a{display:inline-block;margin-top:1rem;padding:.7rem 1.2rem;border-radius:.75rem;background:#1c1917;color:#fff;text-decoration:none}</style><main><h1>${escapeHtml(copy.returnTitle)}</h1><p>${escapeHtml(copy.returnBody)}</p><a href="${escapeHtml(deepLink)}">${escapeHtml(copy.openApp)}</a></main><script>location.replace(${JSON.stringify(deepLink)})</script></html>`
     return new NextResponse(html, { headers: { ...safeHeaders, 'Content-Type': 'text/html; charset=utf-8' } })
   } catch {
     return fail()
