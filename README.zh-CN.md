@@ -31,7 +31,7 @@ Mikka 将你现有的 coding agent 组织为一个协同工作的团队。你只
   - Bot 与你对话，制定计划并分派任务，本身不直接执行工作。
   - 每项工作在独立的**线程**中运行。线程对应一次工作运行，拥有独立的名称，通常关联一个任务。一个 bot 可以同时管理多个线程。
   - 完整定义参见 [术语表](docs/design/glossary.md)。
-  - **Harness 是执行层，不是另一个 Bot。** Coordinator 通过 Mikka 的 AI SDK / Workflow harness 处理对话和工具；派发的编码线程由 daemon 选择 Claude Code、Codex 或 Cursor CLI harness 执行。旧的独立 Agent 聊天已退役，历史记录仅供查看。
+  - **Harness 是执行层，不是另一个 Bot。** Coordinator 通过 Mikka 的 AI SDK / Workflow harness 处理对话和工具；派发的编码线程由 daemon 选择 Claude Code、Codex 或 Cursor CLI harness 执行。旧的独立 Agent 聊天已退役，历史记录仅供查看。让 Coordinator 本身跑在 Claude Code 或 Codex 上（[#312](docs/architecture/native-coordinator.md)）是已废弃的方案：代码保留但保持关闭，不要启用。
 
 - **由 Coordinator 协调多个执行 harness。**
   - Coordinator 是常驻运行的 bot。当运行结束、任务状态变更或 worker 提出问题时，它会被唤醒并决定下一步操作，仅在需要你决策时发出通知。
@@ -166,7 +166,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check:ci` 为完整的 CI 检查，在 `check` 的基础上还包括生产构建、性能测试和 Playwright 测试。
+`pnpm check:ci` 运行 `check`、生产构建、性能测试和 Playwright 测试；CI 在 CI 与 Browser tests 两个 workflow 中运行这些检查以及数据库和 daemon 测试。
 
 建议首先阅读以下文档：
 
