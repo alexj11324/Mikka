@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -18,7 +19,8 @@ import type { JournalEntry } from '../src/runs/journal'
 import type { StartOptions, AgentSession } from '../src/adapters/types'
 import { getEventListeners } from 'node:events'
 
-// Only synthetic process fixtures. No database, Docker, login or network fetch.
+// Synthetic process fixtures and retained local Git worktrees only.
+// No database, Docker, login or network fetch.
 // All files/empty IPC directories are retained; no cleanupTempDirs/rm/prune.
 const retained = mkdtempSync(join(tmpdir(), 'mikka-mailbox-cli-'))
 const endpoint = new URL('https://mikka.invalid/mikka/api/mcp')
@@ -86,9 +88,16 @@ function supervisorFixture(f: ReturnType<typeof fixture>, failingClose = false, 
     opened(value)
     return { sessionId: 'synthetic', async *events() { entered(); await ending; yield { type: 'exit' as const, outcome: 'cancelled' as const } }, async send() {}, async cancel() { finish() } }
   }, async resume(): Promise<AgentSession> { throw Error('Unexpected resume') } }
-  const repo = { repoId: 'repo', name: 'synthetic', path: resolve('../..') }
+  const root = join(retained, f.assignment.runId), repoPath = join(root, 'repository'), worktree = join(root, 'worktree')
+  mkdirSync(repoPath, { recursive: true })
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: repoPath, stdio: 'pipe' })
+  git('init', '-b', 'main')
+  git('-c', 'user.name=Mikka Fixture', '-c', 'user.email=fixture@mikka.invalid', 'commit', '--allow-empty', '-m', 'fixture')
+  git('worktree', 'add', '-b', `mikka/run-${f.assignment.runId}`, worktree)
+  const repo = { repoId: 'repo', name: 'synthetic', path: repoPath }
   const supervisor = new RunSupervisor({ journal, outbox: { push(_id: string, record: { kind: string }) { records.push(record) }, async compact() {}, lastChunkSeq() { return 0 } },
-    worktrees: { pathFor: () => repo.path, async changedFiles() { return [] } }, adapters: new Map([['mock', adapter]]), repos: () => [repo], log: createLogger({ level: 'silent' }),
+    worktrees: { pathFor: () => worktree, async changedFiles() { return [] } }, adapters: new Map([['mock', adapter]]),
+    repository: () => repo, async prepareRepository() {}, async baseRef() { return 'main' }, log: createLogger({ level: 'silent' }),
     prepareRunMailbox: async (assignment: RunAssignment, signal: AbortSignal, check: () => void) => {
       const mailbox = await createRunMailbox({ assignment, endpoint, signal, check, fetch: f.transport })
       if (controls.pause) { controls.pause.entered(); await controls.pause.wait }
@@ -96,12 +105,12 @@ function supervisorFixture(f: ReturnType<typeof fixture>, failingClose = false, 
     }, cancelGraceMs: 10,
   } as unknown as SupervisorDeps)
   const assignment = { ...f.assignment, repoId: 'repo', harness: 'mock', prompt: 'Synthetic', ...(controls.noLease ? {} : { leaseExpiresAt: new Date(Date.now() + 60000).toISOString() }) } as RunAssignment
-  journal.put({ assignment, state: 'queued', sessionId: null, worktree: repo.path, baseCommit: 'synthetic', lastSeq: 0, error: null, updatedAt: new Date().toISOString() })
+  journal.put({ assignment, state: 'queued', sessionId: null, worktree, baseCommit: 'synthetic', lastSeq: 0, error: null, updatedAt: new Date().toISOString() })
   supervisor.resumeAll()
   return { supervisor, records, options, running, finish, state }
 }
 
-for (const mode of ['stop', 'lease-expiry', 'default-off', 'close-failure']) test(`actual Supervisor wires the callback and clears custody after ${mode}`, async () => {
+for (const mode of ['stop', 'lease-expiry', 'default-off', 'close-failure']) test(`actual Supervisor wires the callback and clears custody after ${mode}`, { timeout: 10000 }, async () => {
   const f = fixture(); if (mode === 'default-off') delete f.assignment.mcp!.mailbox
   const h = supervisorFixture(f, mode === 'close-failure', { noLease: mode === 'default-off' })
   const options = await h.options; await h.running
@@ -120,7 +129,7 @@ for (const mode of ['stop', 'lease-expiry', 'default-off', 'close-failure']) tes
   }
 })
 
-for (const mode of ['stop', 'lease-expiry', 'shutdown']) test(`Supervisor handshake handoff ${mode} closes once without starting a CLI`, async () => {
+for (const mode of ['stop', 'lease-expiry', 'shutdown']) test(`Supervisor handshake handoff ${mode} closes once without starting a CLI`, { timeout: 10000 }, async () => {
   const f = fixture(); let entered!: () => void, release!: () => void
   const ready = new Promise<void>(resolve => { entered = resolve }), wait = new Promise<void>(resolve => { release = resolve })
   const h = supervisorFixture(f, false, { pause: { entered, wait } })
