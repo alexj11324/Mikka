@@ -1,8 +1,8 @@
 name: Browser tests
 
 # PRs run critical flows plus scoped regressions; unknown/shared changes run
-# full functionality. Main, nightly and manual integration runs also measure
-# performance. See CONTRIBUTING.md for the required, fail-closed gate policy.
+# full functionality. Code-bearing main pushes, nightly and manual integration
+# runs also measure performance; docs-only main pushes keep lightweight gates. See CONTRIBUTING.md for the required, fail-closed gate policy.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
