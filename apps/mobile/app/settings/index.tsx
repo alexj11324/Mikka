@@ -3,7 +3,9 @@ import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Info, LogOut } from 'lucide-react-native'
+import { CardButton } from '@/components/cards'
 import { Spinner } from '@/components/icons'
+import { PushRow } from '@/components/PushRow'
 import { Avatar, Row } from '@/components/settings'
 import { Text } from '@/components/Text'
 import { CloseButton, Group } from '@/components/ui'
@@ -20,7 +22,7 @@ const icon = (Icon: typeof Bell, color: string = colors.ink) => <Icon size={21} 
 export default function SettingsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { data } = useSettings()
+  const { data, error, reload } = useSettings()
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
   const signOut = async () => {
     if (Platform.OS !== 'web') await (await import('@/lib/push')).unregisterPush()
@@ -32,8 +34,14 @@ export default function SettingsScreen() {
         <Text style={styles.title}>设置</Text>
         <CloseButton onPress={close} />
       </View>
-      {!data ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : (
+      {!data && error ? (
+        <View style={{ paddingTop: 40, alignItems: 'center', gap: 10 }}>
+          <Text style={{ color: colors.danger, fontSize: 13 }}>设置加载失败。</Text>
+          <CardButton label="重试" onPress={() => void reload()} />
+        </View>
+      ) : !data ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
+          <PushRow proactive={data.preferences.proactive} />
           <Group>
             <Row icon={<Avatar name={data.user.name || data.user.email} image={data.user.image} size={40} />} label={data.user.name || data.user.email} detail={data.user.email} onPress={() => router.push('/settings/profile')} />
             <Row icon={icon(BriefcaseBusiness)} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspace')} />
