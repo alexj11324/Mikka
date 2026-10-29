@@ -95,7 +95,7 @@ repurposed as a retry cursor; PG microseconds are compared at the driver's obser
 millisecond precision.
 
 The new schema-only prerequisite is
-`drizzle/20261028223600_coordinator_triage_attempt.sql`: nullable
+`drizzle/20261029011614_coordinator_triage_attempt.sql`: nullable
 `coordinator_events.lastTriageAttemptAt` and `triageDecision`, no cleanup or data
 backfill. This source has not executed that SQL. Schema must precede the code,
 including when optional features are off, because full-row Drizzle reads include
