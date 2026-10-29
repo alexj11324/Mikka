@@ -20,8 +20,8 @@ const payload = (requestId: string) => ({ runId, requestId, harness: 'codex' as 
 before(async () => {
   await pool.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid NOT NULL, status text NOT NULL, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz, "agentId" uuid NOT NULL, "agentDefinition" jsonb, "botId" uuid)`)
   await pool.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, harness text NOT NULL); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, enabled boolean NOT NULL); CREATE TABLE bots (id uuid PRIMARY KEY, "workspaceId" uuid, "ownerId" text NOT NULL); CREATE TABLE mikka_workspace_members ("workspaceId" uuid, "userId" text, status text, role text, PRIMARY KEY ("workspaceId", "userId")); CREATE TABLE agent_kit_heads (owner_id text, bot_key text, bot_id uuid, workspace_id uuid, PRIMARY KEY (owner_id, bot_key)); CREATE TABLE workspace_computer_policies ("workspaceId" uuid PRIMARY KEY, permission text NOT NULL DEFAULT 'ask')` )
-  await pool.query(await readFile('drizzle/20261028210100_agent_tool_approvals.sql', 'utf8'))
-  await pool.query(await readFile('drizzle/20261028214000_cli_run_policy.sql', 'utf8'))
+  await pool.query(await readFile('drizzle/20261029011700_agent_tool_approvals.sql', 'utf8'))
+  await pool.query(await readFile('drizzle/20261029011701_cli_run_policy.sql', 'utf8'))
   const agentId = randomUUID()
   await pool.query(`INSERT INTO agents (id,"userId",harness) VALUES ($1,$2,'codex')`, [agentId,actor.userId])
   await pool.query(`INSERT INTO devices VALUES ($1,$2,true)`, [deviceId,actor.userId])
