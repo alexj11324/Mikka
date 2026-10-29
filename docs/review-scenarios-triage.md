@@ -24,6 +24,9 @@
 | A19 他人线程权限 | 可搜索的任务不授予同事线程内容、旧历史或私信权限 | `tests/e2e/site-search.spec.ts`（7/7） |
 | A27 找回旧消息 | 归档标题可定位 owner 历史，分页超过 100 条 | 同上 |
 | A28 超长输入 | 接近上限显示 `count / 10000`，超长截断但保留已输入内容 | `tests/e2e/bots.spec.ts` |
+| A21 审批前核对 | 卡片显示收件人、主题、正文 | `tests/e2e/pending-actions.spec.ts` |
+| A22 拒绝高风险操作 | 拒绝后不出现「已发送」，数据库状态为 declined | 同上 |
+| A23 刷新后重复点击 | 刷新后从服务端读回状态，不重放决策 | 同上 |
 
 E2E 运行方式：独立 Postgres 库 `mikka_120_e2e`，`CI=true`，`BETTER_AUTH_URL=http://localhost:3100`，密钥走 `infisical run --env dev --path /vercel`。
 

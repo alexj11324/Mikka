@@ -55,4 +55,9 @@ test('审批卡片显示将要发送的邮件，拒绝后不报成功', async ({
   await expect(card).toHaveCount(0)
   await expect(page.getByText('邮件已发送', { exact: true })).toHaveCount(0)
   expect(await actionStatus(id)).toBe('declined')
+
+  // A23: after a reload the decision is read back from the server, not replayed.
+  await page.reload()
+  await expect(page.getByRole('list', { name: '等你确认', exact: true })).toHaveCount(0)
+  expect(await actionStatus(id)).toBe('declined')
 })
