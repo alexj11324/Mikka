@@ -2786,5 +2786,10 @@
     "production": "生产",
     "approve": "批准启用",
     "approved": "已记录批准"
+  },
+  "MobileHandoff": {
+    "title": "登录 Mikka",
+    "confirm": "使用此账号继续",
+    "cancel": "取消"
   }
 }

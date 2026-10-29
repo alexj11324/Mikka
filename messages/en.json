@@ -2786,5 +2786,10 @@
     "production": "Production",
     "approve": "Approve activation",
     "approved": "Approval recorded"
+  },
+  "MobileHandoff": {
+    "title": "Sign in to Mikka",
+    "confirm": "Continue with this account",
+    "cancel": "Cancel"
   }
 }

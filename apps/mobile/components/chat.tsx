@@ -1,5 +1,6 @@
 import { type ReactNode, useRef } from 'react'
 import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native'
+import { CircleAlert } from 'lucide-react-native'
 import { StatusIcon } from '@/components/icons'
 import { Text } from '@/components/Text'
 import type { ThreadStatus } from '@/lib/types'
@@ -16,6 +17,26 @@ export function MyBubble({ text }: { text: string }) {
     <View style={styles.myBubble}>
       <Text style={[styles.body, { color: '#fff' }]}>{text}</Text>
     </View>
+  )
+}
+
+/**
+ * A message the server has not taken yet: faded while it goes, and when it
+ * failed, 「未发送 · 重试」 under it; tapping either sends it again (iMessage).
+ */
+export function OutgoingBubble({ text, failed, onRetry }: { text: string; failed: boolean; onRetry: () => void }) {
+  return (
+    <Pressable accessibilityRole={failed ? 'button' : undefined} accessibilityHint={failed ? '重试' : undefined} disabled={!failed} onPress={onRetry} style={styles.outgoing}>
+      <View style={[styles.myBubble, { maxWidth: '100%' }, !failed && { opacity: 0.6 }]}>
+        <Text style={[styles.body, { color: '#fff' }]}>{text}</Text>
+      </View>
+      {failed ? (
+        <View style={styles.retryRow}>
+          <CircleAlert size={14} color={colors.danger} strokeWidth={2.2} />
+          <Text style={styles.retry}>未发送 · 重试</Text>
+        </View>
+      ) : null}
+    </Pressable>
   )
 }
 
@@ -64,6 +85,9 @@ const styles = StyleSheet.create({
   body: { fontSize: 16, lineHeight: 25 },
   botBubble: { alignSelf: 'flex-start', maxWidth: '86%', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11 },
   myBubble: { alignSelf: 'flex-end', maxWidth: '78%', backgroundColor: colors.accent, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
+  outgoing: { alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '78%', gap: 4 },
+  retryRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  retry: { fontSize: 12, color: colors.danger },
   threadCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.bubble, borderRadius: 18, paddingHorizontal: 16, height: 52 },
   threadTitle: { flex: 1, fontSize: 16, fontWeight: '500' },
   event: { alignSelf: 'center', textAlign: 'center', fontSize: 12, lineHeight: 17, color: colors.secondary, marginHorizontal: 24 },
