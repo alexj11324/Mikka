@@ -23,7 +23,7 @@ export function orderMigrations(names) {
 
 // Earlier branch and deployment names are aliases only for identical SQL.
 export const MIGRATION_EQUIVALENTS = {
-  '20261028143922_local_repository_defaults.sql': ['20261028020000_local_repository_defaults.sql'],
+  '20261029022353_local_repository_defaults.sql': ['20261028020000_local_repository_defaults.sql', '20261028143922_local_repository_defaults.sql'],
   '20261028143921_approved_write_binding.sql': ['20261028133236_approved_write_binding.sql', '20261027182632_approved_write_binding.sql'],
   '20261028143920_operation_ledger.sql': ['20261028133235_operation_ledger.sql', '20261027182631_operation_ledger.sql'],
 
@@ -46,7 +46,7 @@ export const MIGRATION_EQUIVALENTS = {
   '20261027164515_workspace_computer_policy.sql': ['20261027040514_workspace_computer_policy.sql', '20261027000700_workspace_computer_policy.sql'],
 }
 const EQUIVALENT_SQL_SHA256 = {
-  '20261028143922_local_repository_defaults.sql': '904b822ef1a281e1fb294ce1a25c3237e5493703ef61bb88c20628954093226a',
+  '20261029022353_local_repository_defaults.sql': '904b822ef1a281e1fb294ce1a25c3237e5493703ef61bb88c20628954093226a',
   '20261028143921_approved_write_binding.sql': '60fc01efb736fd5614d2a51f779f9a2fbe6f78f3f3ce0b4f99b8b8240ac48f90',
   '20261028143920_operation_ledger.sql': 'f5fbfacc61d5417aeacce88460244f185ec8a76a4784bddd151d006b48c627df',
 
