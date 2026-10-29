@@ -8,6 +8,7 @@ import { checkCredentialRequest, credentialBody, credentialFailure } from './htt
 import { Cdp, endCredentialGuardWhenSafe } from './browser'
 import { fillCredential } from './broker'
 import { CredentialStore } from './store'
+import { browserLoginContinuation } from '../cloud-computer/login-result'
 import { assertCredentialPageBinding, type CredentialPageBinding } from './page-binding'
 import { assertNoSecret, fingerprint } from './fingerprint'
 
@@ -373,4 +374,13 @@ test('guard continuation requires safe inputs and a matching origin', async () =
   validOrigin = true
   await endCredentialGuardWhenSafe(cdp, guard, target, 'fixture-token', owner.origin, owner.origin)
   assert.equal(ends, 1)
+})
+
+
+test('subagent resumes after broker session application but never after guarded insertion', () => {
+  assert.equal(browserLoginContinuation('session_applied'), 'running')
+  assert.equal(browserLoginContinuation('submitted'), 'running')
+  assert.equal(browserLoginContinuation('guarded'), 'guarded')
+  assert.equal(browserLoginContinuation('needs_login'), 'needs_login')
+  assert.equal(browserLoginContinuation('unexpected'), 'needs_login')
 })

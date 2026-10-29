@@ -11,7 +11,7 @@ import { db } from '@/lib/db'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { telegramReplyTargets, type TelegramReplyTarget } from '@/lib/coordinator-events'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
-import { eventsForInbox } from '@/lib/coordinator/triage'
+import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
 import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
@@ -31,7 +31,7 @@ const LEASE_MS = 10 * 60_000
 /** Inbox events moved into the conversation per take. */
 const INBOX_BATCH = 50
 
-type Executor = Pick<typeof db, 'select' | 'insert'>
+type Executor = Pick<typeof db, 'select' | 'insert' | 'execute'>
 
 // Every bot chats on this harness. `botId` picks the chat: null is the
 // person's Coordinator (the built-in bot), otherwise one of their own bots.
@@ -42,6 +42,7 @@ const messagesOf = (userId: string, botId: string | null) => and(eq(coordinatorM
 const eventsOf = (userId: string, botId: string | null) => and(eq(coordinatorEvents.userId, userId), ofBot(coordinatorEvents.botId, botId))
 
 async function nextPosition(executor: Executor, userId: string, botId: string | null): Promise<number> {
+  await executor.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bot-chat:${userId}:${botId ?? 'coordinator'}`},0))`)
   const [row] = await executor.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
   return Number(row?.last ?? 0) + 1
@@ -83,6 +84,7 @@ export interface InboxTake {
   pushReasons: PushReason[]
   /** A handed-over verification code: the push says only that one came, the code stays in the app chat. */
   pushHidesText: boolean
+  taskEventId?: string
 }
 
 const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushReasons: [], pushHidesText: false }
@@ -96,17 +98,20 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
       .where(and(sessionOf(userId, botId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
     if (!taken) return { held: false, ...NO_TAKE }
-    const due = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
+    const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+    const due = isolateTaskRequest(candidates)
     if (!due.length) return { held: true, ...NO_TAKE }
-    const backgroundLimit = INBOX_BATCH - due.length
+    const isolatedTask = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined
+    const backgroundLimit = isolatedTask ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), or(eq(coordinatorEvents.tier, 'background'), eq(coordinatorEvents.kind, 'issue_done'))))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
     if (!events.length) return { held: true, ...NO_TAKE }
+    const chatEvents = events.filter(event => !(event.kind === 'user_message' && event.payload.postedToChat === true))
     const first = await nextPosition(tx, userId, botId)
-    await tx.insert(coordinatorMessages).values(events.map((event, index) => ({
+    if (chatEvents.length) await tx.insert(coordinatorMessages).values(chatEvents.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
       message: sourcedEventMessage({ ...event, deliveredAt: now }, eventPrompt(event)),
     })))
@@ -114,6 +119,7 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     const handoffs = events.filter(event => isHandoff(event.kind))
     return {
       held: true, added: events.length,
+      ...(isolatedTask ? { taskEventId: due[0].id } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : telegramReplyTargets(events),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
@@ -158,6 +164,7 @@ export async function setEventTier(id: string, tier: CoordinatorEventTier): Prom
 export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null): Promise<void> {
   await assertCredentialSafeChat(userId, messages)
   await db.transaction(async tx => {
+    await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId" IS NOT DISTINCT FROM ${botId}::uuid FOR UPDATE`)
     if (messages.length) {
       const first = await nextPosition(tx, userId, botId)
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => ({

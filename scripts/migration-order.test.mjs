@@ -39,9 +39,10 @@ test('Agent Kit migration alias requires its original exact SQL', () => {
 })
 
 test('credential vault migration recognizes the exact previously applied Preview SQL', () => {
-  const name = '20261028174823_account_credential_vault.sql'
+  const name = '20261029012027_account_credential_vault.sql'
   const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
   assert.equal(alreadyApplied(name, new Set(['20261027221500_account_credential_vault.sql']), sql), true)
+  assert.equal(alreadyApplied(name, new Set(['20261028174823_account_credential_vault.sql']), sql), true)
   assert.equal(alreadyApplied(name, new Set(), sql), false)
   assert.throws(() => alreadyApplied(name, new Set(['20261027221500_account_credential_vault.sql']), sql + '-- changed'), /content changed/)
 })

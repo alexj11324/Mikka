@@ -6,7 +6,7 @@ import { runComposioAction } from '@/lib/composio'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { actionDecidedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { pendingActions } from '@/lib/db/schema'
 import { actionOutcome, PENDING_ACTION_TTL_MS } from '@/lib/pending-action-view'
 
@@ -20,18 +20,24 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     .set({ status: approve ? 'running' : 'declined', decidedAt: new Date() })
     .where(and(eq(pendingActions.id, id), eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
     .returning()
-  if (!row || !isApprovalAction(row.action)) throw new ActionFailureError('pendingActionUnavailable')
+  if (!row || (!isApprovalAction(row.action) && row.action !== 'browser_operation')) throw new ActionFailureError('pendingActionUnavailable')
 
+  if (row.action === 'browser_operation' && Date.now() - row.createdAt.getTime() > 5 * 60_000) {
+    await db.update(pendingActions).set({ status: 'failed', error: 'browserActionExpired' }).where(eq(pendingActions.id, row.id))
+    throw new ActionFailureError('pendingActionUnavailable')
+  }
   let status: 'done' | 'failed' | 'declined' = 'declined'
   let error: string | null = null
   let outcome: Record<string, string> = {}
-  if (approve) {
-    const result = await runComposioAction(userId, row.action, row.input)
+  if (approve || row.action === 'browser_operation') {
+    const result = row.action === 'browser_operation'
+      ? await (await import('@/lib/cloud-computer/action-reviews')).executeApprovedBrowserAction(pool, userId, row.input, approve)
+      : await runComposioAction(userId, row.action, row.input)
     if ('error' in result) {
       status = 'failed'
       error = result.error
     } else {
-      status = 'done'
+      status = approve ? 'done' : 'declined'
       outcome = actionOutcome(result.data)
     }
     await db.update(pendingActions).set({ status, error, result: outcome }).where(eq(pendingActions.id, row.id))

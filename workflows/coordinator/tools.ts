@@ -11,7 +11,7 @@ import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { personalMailboxTools } from '@/lib/mailbox-tools'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
 
-export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[] }
+export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; taskEventId?: string; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[] }
 
 export function createCoordinatorRegistry(userId: string, botId: string | null, scope?: NativeToolScope, options: CoordinatorToolOptions = {}) {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
@@ -43,7 +43,9 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
     ...(issueMutationsEnabled() ? { create_issue: tool({
       description: 'Create the task the person asked for, including requests from the new-task dialog. Write a short title and put details in body. The assignee can only be a person; dispatching a thread is a separate action. Defaults to todo and normal priority.',
       inputSchema: createIssueInput,
-      execute: (input, options) => steps.createIssue(userId, input, options.toolCallId, scope, botId),
+      execute: (input, toolOptions) => options.taskEventId
+        ? steps.createIssue(userId, input, toolOptions.toolCallId, scope, botId, options.taskEventId)
+        : steps.createIssue(userId, input, toolOptions.toolCallId, scope, botId),
     }),
     update_issue: tool({
       description: 'Update an existing task the person asked to change. Only supplied fields change; labels replaces the full label set. Read the task first. The assignee can only be a person.',
@@ -57,6 +59,11 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       execute: () => steps.listAgents(userId, scope),
     }),
     ...(computerEnabled ? {
+      start_web_subagent: tool({
+        description: 'Start web research as this Bot’s own browser sub-agent. It stays in the Bot chat, not the thread list. Pass suggestionId when starting from a suggestion. Never handle credentials; the browser asks through a login card.',
+        inputSchema: z.object({ botId: botInput, task: z.string().trim().min(1).max(2000), suggestionId: id.optional() }),
+        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.startWebSubagent(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
+      }),
       list_computer_workspaces: tool({
         description: 'List workspaces the person belongs to, so a requested new Bot is created in the right workspace.',
         inputSchema: z.object({}),
@@ -89,7 +96,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       }),
       dispatch_bot_computer: tool({
         description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Computer operations still require their approval.',
-        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional() }),
+        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional(), suggestionId: id.optional() }),
         execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerTask(userId, { ...input, botId: target }, options.toolCallId, scope, execution ?? undefined) : { error: 'botMismatch' } },
       }),
     } : {}),

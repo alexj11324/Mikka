@@ -27,7 +27,7 @@ export interface EvalReport {
   total: number
   errors: number
 }
-const cloudMutations = ['create_computer_bot','wake_bot_computer','bind_bot_subscription','dispatch_bot_computer'] as const
+const cloudMutations = ['create_computer_bot','wake_bot_computer','bind_bot_subscription','dispatch_bot_computer','start_web_subagent'] as const
 
 export const CORE_EVAL_CASES: readonly EvalCase[] = [
   { id: 'grounded-search', input: 'Search the public web for the release date of the fictional Acme Example 1.0 and report what the tool says. Do not change any account.', expectedOutcome: 'answered', requiredTools: ['web_search'], forbiddenTools: ['send_email', 'create_calendar_event', 'update_calendar_event', 'dispatch_run',...cloudMutations], mustMention: ['2026-01-15'] },

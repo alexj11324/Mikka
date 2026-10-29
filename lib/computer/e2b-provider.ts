@@ -59,9 +59,9 @@ export async function ensureHostedRunnerImage(sandbox: Sandbox) {
   await sandbox.commands.run(`docker --host=unix:///run/mikka-container/docker.sock image inspect ${image} >/dev/null 2>&1 || docker --host=unix:///run/mikka-container/docker.sock pull ${image} >/dev/null`, { user: 'root', timeoutMs: 300_000 })
 }
 
-export async function startDesktop(sandbox: Sandbox, display: number) {
+export async function startDesktop(sandbox: Sandbox, display: number, managedChrome = false) {
   if (!Number.isInteger(display) || display < 1 || display > 999) throw new Error('Invalid display')
-  await sandbox.commands.run(`bash /opt/mikka/computer/start-desktop.sh ${display}`, { user: 'user', background: true, timeoutMs: 0 })
+  await sandbox.commands.run(`bash /opt/mikka/computer/start-desktop.sh ${display}`, { user: 'user', background: true, timeoutMs: 0, ...(managedChrome ? { envs: { MIKKA_MANAGED_CHROME: '1' } } : {}) })
   await sandbox.commands.run(`for i in $(seq 1 60); do DISPLAY=:${display} xdpyinfo >/dev/null 2>&1 && test -S /home/user/.mikka/vnc/${display}-view.sock && test -S /home/user/.mikka/vnc/${display}-control.sock && exit 0; sleep .25; done; exit 1`, { user: 'user', timeoutMs: 20_000 })
 }
 

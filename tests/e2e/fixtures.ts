@@ -12,8 +12,8 @@ export function app(path: string) {
   return `${BASE_PATH}${path}`
 }
 
-/** Buttons on the left icon rail (主页 / 看板 / 插件). Phones have no rail. */
-export function rail(page: Page, name: '主页' | '看板' | '插件') {
+/** Buttons on the left icon rail (主页 / 建议 / 看板 / 插件 / Artifact). Phones have no rail. */
+export function rail(page: Page, name: '主页' | '建议' | '看板' | '插件' | 'Artifact') {
   return page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name, exact: true })
 }
 
@@ -64,6 +64,18 @@ export async function seedTask(page: Page, title: string, { status = 'todo', pri
   const content = { type: 'doc', content: [{ type: 'paragraph' }], attrs: { mikka: { number } } }
   await db.query('INSERT INTO issues (id, "userId", title, content, status, priority) VALUES ($1, $2, $3, $4, $5, $6)', [id, session.userId, title, content, status, priority])
   await db.query('INSERT INTO issue_versions (id, "issueId", "userId", revision, title, content, status, priority) VALUES ($1, $2, $3, 1, $4, $5, $6, $7)', [randomUUID(), id, session.userId, title, content, status, priority])
+  return id
+}
+
+/** A shown 建议 item for the signed-in person. */
+export async function seedSuggestion(page: Page, { source = 'gmail', action = 'reply', title, actionTitle = null }: { source?: string; action?: string; title: string; actionTitle?: string | null }) {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('seedSuggestion 需要已登录的页面。')
+  const db = database()
+  const { rows: [session] } = await db.query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  if (!session) throw new Error('找不到当前登录会话。')
+  const id = randomUUID()
+  await db.query('INSERT INTO suggestions (id, "userId", source, "externalId", action, title, shown, "decidedBy", "actionTitle", "occurredAt") VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, now())', [id, session.userId, source, `e2e-${id}`, action, title, 'rule', actionTitle])
   return id
 }
 
