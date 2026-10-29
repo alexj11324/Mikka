@@ -354,3 +354,35 @@ section 5 is settled.
   snapshot (lockfile change, schedule), and how long a cold start takes.
 - Sub-agent cap per workspace (proposal: 6) and how many headless contexts one
   bot machine size can hold.
+
+## 8. Enabling per-thread machines
+
+Off by default. The code path needs one flag and one provider key; nothing
+provisions a machine without both.
+
+Prerequisites:
+
+1. `E2B_API_KEY` is set for the worker deployment.
+2. `20261029011635_subagents_thread_machines.sql` and
+   `20261029080001_owner_cloud_machines.sql` are applied to the matching
+   database.
+3. A workspace cloud machine exists for the owner, because every thread machine
+   starts from its workspace snapshot.
+
+Enable with `MIKKA_CLOUD_THREAD_MACHINES=1`. Enqueue then writes one
+`thread_machines` row in `starting`, and `claimCloudRun` accepts the run only
+from that dedicated cloud device.
+
+Cost boundaries that exist today: one machine per cloud thread; idle pause after
+15 minutes, with the provider timeout refreshed only while the run is active; a
+hard end after 24 hours, a terminal run state, or an explicit `end`. A paused
+machine still bills for disk, so ending is the only way to stop it. There is no
+spend budget in code or schema: do not enable the flag on a workspace whose
+provider spend is not already approved.
+
+Disable by draining first. The flag is read at enqueue and at claim, so turning
+it off while a thread run is still queued sends that run down the Bot-machine
+claim path instead. Let queued thread runs finish or stop them, end their
+machines, then unset the flag. Machines left running keep billing until the
+lifecycle workflow ends them.
+
