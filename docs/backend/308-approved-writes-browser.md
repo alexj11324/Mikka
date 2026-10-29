@@ -25,6 +25,18 @@ Supported actions: append_notion_paragraph `{page_id:UUID,text:1..2000}`, send_s
 
 HTTP400invalid envelope/input,401session/Bearer rejection,403Origin,409domain/uncertain COMMIT,503unavailable/disabled.200is a typed result, not automatic provider success. View/list statuses pending/running/done/declined; running+operationUncertain remains unresolved. COMMIT errors retain explicit committed/unconfirmed state from the foundation; clients keep IDs and inspect the same result. No automatic transaction-body retry.
 
+## Product approval integration
+
+The client first reads public GET `/api/approved-writes`, which returns only `{enabled:boolean}` with status 200 and `no-store`, using the same server-owned gate without loading auth, database or provider services. Until it reports exactly `true`, the client does not POST list/view requests or render retained uncertain cards. Stable disabled deployments therefore produce no repeated 503s. Availability grants no authority: every POST still checks the current gate, session and operation policy, and a disabled POST retains its 503 contract. There is no second `NEXT_PUBLIC` flag.
+
+The existing approval area above the composer renders the new Notion, Slack and Calendar-delete proposals through `ApprovedWriteActions`. It uses only the authenticated `/api/approved-writes` list/view/decide path; the old mail/calendar-create/update list and decider remain separate. Cards retain the existing 14px approval-card layout (R-33), show frozen content, exact account and target, and expose explicit approve/decline controls. An expired proposal cannot be approved. Invalid bindings are attention-only and cannot be approved.
+
+Discovery accepts optional `unresolvedOnly:true`: it excludes terminal history and successful ledger outcomes before pagination, so old pending requests cannot be buried behind completed actions. Cursor binding includes this filter. The default discovery mode is unchanged. The HTTP list returns the authenticated `viewerId` so a stale session hook cannot put another account's response under an old browser cache key. No owner/account authority is accepted from request JSON.
+
+The new service being disabled yields no new cards and does not hide old approvals. Other load failures have a retry of the read only. A decision is sent once per explicit click. A lost/unconfirmed response keeps the exact action visible as `Result unconfirmed`, suppresses further approve/decline controls and polls the read-only view. If that authenticated view confirms the same action is still pending and unexpired, an explicit `Resume approval` control clears only the browser's uncertainty and refreshes reads. Approval or decline then requires another separate click. Running, unavailable and expired results cannot use this recovery path. A disappeared list row is not treated as proof that the action failed or succeeded.
+
+Source/component tests cover all three ask proposals, frozen content/account, independent old/new routing, disabled-service compatibility, pagination, expiry, switched-cookie response rejection and lost-response behavior. They use synthetic HTTP/auth leaves and do not establish provider acceptance. This addition changes no feature flag, permission, grant, credential or migration.
+
 ## Verification boundaries
 
 Focused tests use actual application functions/SQL generation with in-memory auth/PG/provider leaves; they are not real provider or PG concurrency evidence. The new legacy-schema DB test runs only through the authorized temporary Actions DB suite. Required current-head CI, production build and real-PG results must be recorded separately; older607/849 results are not transferred.

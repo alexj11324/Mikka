@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { withBasePath } from '@/lib/base-path'
 import type { PendingActionView } from '@/lib/pending-action-view'
 import { useActionError } from '@/lib/use-action-error'
+import { ApprovedWriteActions } from './approved-write-actions'
 
 /** "2026-10-27T10:00:00-07:00" → "2026-10-27 10:00 -07:00": exactly what will be sent, only easier to read. */
 function shownTime(value: unknown, timezone?: unknown) {
@@ -35,7 +36,7 @@ async function fetchPendingActions(): Promise<PendingActionView[]> {
 }
 
 /**
- * What the person's agents want to do in their mail and calendar, one card
+ * What the person's agents want to do in their accounts, one card
  * each, above the composer. Nothing runs until the person approves.
  */
 export function PendingActions() {
@@ -43,7 +44,6 @@ export function PendingActions() {
   const actionError = useActionError()
   const { data, mutate } = useSWR('pending-actions', fetchPendingActions, { refreshInterval: 10000 })
   const [busy, setBusy] = useState<string | null>(null)
-  if (!data?.length) return null
 
   async function decide(item: PendingActionView, approve: boolean) {
     setBusy(item.id)
@@ -56,8 +56,8 @@ export function PendingActions() {
     } catch { toast.error(actionError()) } finally { setBusy(null) }
   }
 
-  return <ul aria-label={t('label')} className="flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
-    {data.map(item => {
+  return <ul aria-label={t('label')} className="flex max-h-[50vh] flex-col gap-2 overflow-y-auto empty:hidden">
+    {data?.map(item => {
       const input = item.input
       const email = item.action === 'send_email'
       const repository = item.action === 'approve_repository_push'
@@ -90,5 +90,6 @@ export function PendingActions() {
         </div>
       </li>
     })}
+    <ApprovedWriteActions />
   </ul>
 }

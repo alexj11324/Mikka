@@ -31,7 +31,7 @@ export function approvedWriteHandler(auth: { api: { getSession: (args: { headers
       const body = parsed.data
       if (body.op === 'list') {
         if (!discovery) return json({ error: 'approvedWriteDiscoveryUnavailable' }, 503)
-        return json(await discovery.list({ userId: session.user.id, sessionId: session.session.id }, { cursor: body.cursor, limit: body.limit }, { signal: request.signal }))
+        return json({ ...await discovery.list({ userId: session.user.id, sessionId: session.session.id }, { cursor: body.cursor, limit: body.limit, unresolvedOnly: body.unresolvedOnly }, { signal: request.signal }), viewerId: session.user.id })
       }
       const input = body.op === 'propose' ? parseWriteInput(body.action, body.input) : null
       if (body.op === 'propose' && !input) return json({ error: 'invalidIntegrationInput' }, 400)

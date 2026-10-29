@@ -13,6 +13,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Centre chat title | `components/nav/conversation-pill.tsx` | Borderless, centred |
 | Right panel | `components/nav/context-panel.tsx` | No input box in the thread list or under a screen; an open thread ends in the composer, R-10 |
 | Composer | `ChatComposer` in `components/coordinator/chat-composer.tsx` (`InputGroup` + `InputGroupTextarea`) | Attachment button, no model picker. Reuse it for every chat |
+| Personal account approvals above the composer | `PendingActions` and `ApprovedWriteActions` in `components/coordinator/` | Existing card layout; ledger-backed Notion, Slack and Calendar deletion use `/api/approved-writes`, never the legacy decider. Unknown results have no effectful retry button; a verified pending result can explicitly restore approval controls without sending a decision |
 | Messages | `components/ui/message.tsx`, `components/ui/bubble.tsx`, `MessageScroller*` | R-13, R-14 |
 | Task, run and source chips in chat | OpenUI `TaskChip`, `RunChip`, `SourceChip` (`components/workspace/agent-ui-library.tsx`, data from `agent-citations.tsx`) | R-15 |
 | Thread card under a Coordinator reply | `components/coordinator/thread-card.tsx`; opens `IssueThreadPanel` in the centre | R-66 |
