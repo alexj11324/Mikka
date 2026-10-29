@@ -93,7 +93,7 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 | --- | --- | --- |
 | **设备接入与交付** | 连接设备，将编码工作交给 Claude Code 或 Codex，并按适用策略发布 GitHub PR。 | [#357](https://github.com/alexj11324/Mikka/issues/357) |
 | **云端电脑** | 上文的 bot 专属桌面处于早期体验阶段。下一步：每个云端线程拥有独立的机器，向所有人开放云端编码线程，以及替 bot 浏览网页的网页分身，每个分身使用独立的浏览器。 | [#172](https://github.com/alexj11324/Mikka/issues/172)、[#342](https://github.com/alexj11324/Mikka/issues/342) |
-| **本机 computer use** | Agent 在你自己的电脑上操作应用，按适用策略执行 allow / ask / deny。 | [#147](https://github.com/alexj11324/Mikka/issues/147) |
+| **本机 computer use** | Linux daemon 后端已接入，并通过真实 Xvfb 驱动与沙箱测试（[PR #161](https://github.com/alexj11324/Mikka/pull/161)）；CLI/模型使用合成 fixture。真实 macOS 使用和完整 agent 流程仍待验证，操作遵循 allow / ask / deny。 | [#147](https://github.com/alexj11324/Mikka/issues/147) |
 | **群聊** | 支持多个 bot 与多名成员在同一对话中协作，提供轮流发言、@ 提及以及「正在工作」状态栏。 | [#105](https://github.com/alexj11324/Mikka/issues/105) |
 | **Factory** | 完整的交付流程：同一任务同一时间仅执行一次、阶段状态持久化、独立的审查与验证线程，以及基于实际证据和适用策略的发布决策。 | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
 | **定时任务** | Bot 可在指定时间或按周期执行任务，并将结果返回至对话。目前按计划运行的只有每日简报。 | [#179](https://github.com/alexj11324/Mikka/issues/179) |
