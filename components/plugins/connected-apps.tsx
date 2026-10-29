@@ -98,6 +98,11 @@ export function useConnectedApps(enabled = true) {
   }, [t, enabled])
 
   useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => {
+    const onFocus = () => { void refresh() }
+    window.addEventListener('focus', onFocus)
+    return () => { window.removeEventListener('focus', onFocus) }
+  }, [refresh])
 
   useEffect(() => {
     if (!enabled) return
