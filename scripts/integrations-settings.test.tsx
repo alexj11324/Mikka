@@ -72,7 +72,7 @@ test('unconfirmed and signed-out sessions neither request nor display GitHub rep
 test('GitHub installation management is exposed as a link with the exact destination', async () => {
   await render()
   await respond(0, 'viewer-a', 'a/private')
-  const link = container.querySelector('a[role=\"link\"]')
+  const link = container.querySelector('a[role="link"]')
   assert.ok(link)
   assert.equal(link?.textContent, 'githubManage')
   assert.equal(link?.getAttribute('href'), 'https://github.com/apps/mikka-github/installations/new')
