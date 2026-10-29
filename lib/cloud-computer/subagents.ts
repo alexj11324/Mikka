@@ -36,6 +36,14 @@ export class SubagentStore {
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`subagents:${actor.workspaceId}:${actor.userId}`])
       row = await this.get(actor, botId, id, client)
       if (row.status !== 'queued') { await client.query('COMMIT'); return row }
+      const permission=(await client.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1',[actor.workspaceId])).rows[0]?.permission
+      if(permission && !['allow','ask','deny'].includes(permission)) throw new ComputerError(503,'Computer policy unavailable')
+      if(permission==='deny') {
+        const denied=(await client.query<Subagent>(`UPDATE bot_subagents SET status='failed',step='Computer use is denied',"endedAt"=now(),"startLeaseId"=NULL,"startLeaseUntil"=NULL WHERE id=$1 AND status='queued' RETURNING *`,[id])).rows[0]
+        if(denied) await this.publish(client,denied)
+        await client.query('COMMIT')
+        return denied ?? await this.get(actor,botId,id,client)
+      }
       const count = Number((await client.query(`SELECT count(*) AS n FROM bot_subagents WHERE "workspaceId"=$1 AND "ownerId"=$2 AND (status IN ('running','needs_you') OR (status='queued' AND "startLeaseUntil">now()))`, [actor.workspaceId,actor.userId])).rows[0].n)
       const older = await client.query(`SELECT 1 FROM bot_subagents WHERE "workspaceId"=$1 AND "ownerId"=$2 AND status='queued' AND ("startLeaseUntil" IS NULL OR "startLeaseUntil"<=now()) AND "createdAt"<(SELECT "createdAt" FROM bot_subagents WHERE id=$3) LIMIT 1`, [actor.workspaceId,actor.userId,id])
       if (count >= 6 || older.rowCount) { await client.query('COMMIT'); return row }
@@ -77,7 +85,7 @@ export class SubagentStore {
     try {
       await client.query('BEGIN')
       const row = (await client.query<Subagent>(`UPDATE bot_subagents SET status=$5,step=$6,needs=$7,"activeActionId"=CASE WHEN $5 IN ('running','done','failed','stopped') THEN NULL ELSE "activeActionId" END,"endedAt"=CASE WHEN $5 IN ('done','failed','stopped') THEN now() ELSE NULL END
-        WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 AND status IN ('running','needs_you') RETURNING *`, [id, actor.userId, actor.workspaceId, botId, status, step.slice(0, 500), needs ? JSON.stringify(needs) : null])).rows[0]
+        WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4 AND (status IN ('running','needs_you') OR (status='queued' AND $5 IN ('failed','stopped'))) RETURNING *`, [id, actor.userId, actor.workspaceId, botId, status, step.slice(0, 500), needs ? JSON.stringify(needs) : null])).rows[0]
       if (row) {
         await this.publish(client, row)
         if (['done', 'failed', 'stopped'].includes(status)) await client.query(`UPDATE suggestion_executions SET status=$2,"endedAt"=now() WHERE "subagentId"=$1`, [id, status])

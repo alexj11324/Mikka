@@ -156,3 +156,23 @@ test('two saved accounts require a concrete account choice instead of selecting 
   assert.equal(result.status,'needs_login');assert.equal(leaseCalls,0);assert.equal(submissions,0)
  } finally {await pool.query('UPDATE credentials SET revoked_at=now() WHERE id=$1',[second])}
 })
+
+test('a permanently failed queued start terminates durably without blocking later work',{skip:!enabled},async()=>{
+ const {SubagentStore}=await import('./subagents')
+ await pool.query(`UPDATE bot_subagents SET status='queued',"targetId"=NULL WHERE id=$1`,[subagentId])
+ const store=new SubagentStore(pool)
+ const result=await store.update(actor,botId,subagentId,'failed','Provisioning failed after bounded retries')
+ assert.equal(result.status,'failed')
+ const saved=(await pool.query('SELECT status,"endedAt" FROM bot_subagents WHERE id=$1',[subagentId])).rows[0]
+ assert.ok(saved.endedAt)
+ assert.equal((await pool.query(`SELECT count(*)::int AS n FROM bot_subagents WHERE "ownerId"=$1 AND status='queued'`,[actor.userId])).rows[0].n,0)
+ assert.equal((await store.update(actor,botId,subagentId,'running','Late callback')).status,'failed','a late start cannot revive the terminal task')
+})
+test('a denied queued web task ends before starting any browser runtime',{skip:!enabled},async()=>{
+ const {SubagentStore}=await import('./subagents')
+ await pool.query(`UPDATE bot_subagents SET status='queued',"targetId"=NULL WHERE id=$1`,[subagentId])
+ await pool.query(`UPDATE workspace_computer_policies SET permission='deny'`)
+ const row=await new SubagentStore(pool).start(actor,botId,subagentId)
+ assert.equal(row.status,'failed')
+ assert.equal(effects,0,'workspace denial cannot invoke a browser start')
+})
