@@ -233,7 +233,9 @@ async def main():
                     assert (await post('credentials/continue','credential-continuation',plan(observed,'submit')))[0]==409
                     status,body=await post('credentials/continue','credential-continuation',plan(observed));assert status==200 and json.loads(body)['resumed'] is True
                     screenshot=await browser.rpc('Page.captureScreenshot',{'format':'png'})
-                    (Path('/home/user/workspace')/'pr345-isolated-credential-clear.png').write_bytes(base64.b64decode(screenshot['data']))
+                    evidence = Path(os.environ.get('TEST_ARTIFACT_DIR', tempfile.gettempdir()))
+                    evidence.mkdir(parents=True, exist_ok=True)
+                    (evidence/'pr345-isolated-credential-clear.png').write_bytes(base64.b64decode(screenshot['data']))
                     # Restart's persisted guard never unlocks from old claims.
                     observed=await begin_fill();original=browser.guard;browser.guard='locked'
                     assert (await post('credentials/continue','credential-continuation',plan(observed)))[0]==409
