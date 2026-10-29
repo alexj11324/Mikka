@@ -7,6 +7,7 @@ import { decisionInput } from '@/lib/coordinator/decision'
 import { ruleTier, tierFromDecision, triageQuestions, triageState } from '@/lib/coordinator/triage'
 import type { CoordinatorEventTier } from '@/lib/db/schema'
 import { coordinatorTurn } from '@/workflows/coordinator/workflow'
+import { runTestFixture } from '@/lib/run-test-fixture'
 
 /**
  * Whether the Coordinator runs here: on Vercel (the AI Gateway signs in with
@@ -15,7 +16,7 @@ import { coordinatorTurn } from '@/workflows/coordinator/workflow'
  * (deprecated #312 runtime, keep unset) also enables it.
  */
 export function coordinatorEnabled(): boolean {
-  return process.env.MIKKA_NATIVE_COORDINATOR === '1' || process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY)
+  return process.env.MIKKA_NATIVE_COORDINATOR === '1' || process.env.VERCEL === '1' || Boolean(process.env.AI_GATEWAY_API_KEY) || runTestFixture('mock') !== undefined
 }
 
 /** Asks the decision model whether an event needs the person. When it does not answer, the event gets its quiet tier. */

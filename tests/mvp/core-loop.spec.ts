@@ -7,7 +7,9 @@ import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
 import type { Page, Route, TestInfo } from '@playwright/test'
-import { test, expect, register, openCreateIssue } from '../e2e/fixtures'
+import { app, openCreateIssue } from '../e2e/fixtures'
+import { test, expect } from './accounts'
+import type { AccountScope } from '../../scripts/test-accounts/session.mjs'
 import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 import { assertMvpEnvironment, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from './isolated-env.mjs'
 import { RepositoryCache } from '../../packages/daemon/src/repositories'
@@ -29,17 +31,18 @@ async function service<T>(path: string, input?: object): Promise<T> {
   return response.json() as Promise<T>
 }
 
-async function setup(page: Page, testInfo: TestInfo) {
+async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
   await page.route('https://github.com/favicon.ico', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="7" fill="#24292f"/></svg>' }))
   const startedAt = new Date().toISOString()
   const marker = `mvp-${randomUUID()}`
   const title = `MVP ${marker.slice(4, 12)}`
   // Personal task prefixes share the repository's branch namespace. Keep the
   // two disposable owners distinct so the real branch-collision guard stays on.
-  const prefix = testInfo.title.startsWith('Stopping') ? 'stpm' : 'loop'
-  const { email } = await register(page, '/', `${prefix}-${randomUUID()}@example.com`)
-  const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
-  expect(user?.id).toBeTruthy()
+  const prefix = testInfo.title.startsWith('Stopping') ? 'STPM' : 'LOOP'
+  await accounts.assertActive()
+  const user = { id: accounts.owner.userId }
+  await pool.query('INSERT INTO issue_prefixes ("userId",prefix) VALUES ($1,$2) ON CONFLICT ("userId") DO UPDATE SET prefix=EXCLUDED.prefix', [user.id, prefix])
+  await page.goto(app('/'))
   await indexMvpResource('owner-id', user.id)
   await indexMvpResource('scenario-id', marker)
   const githubAccountId = String(randomInt(1_000_000, 2_000_000_000))
@@ -101,7 +104,7 @@ async function setup(page: Page, testInfo: TestInfo) {
     const sha = (await execute('git', ['rev-parse', 'HEAD'])).stdout.trim()
     const runs = (await pool.query('SELECT id, "issueId", "deviceId", status, "stopReason" FROM agent_runs WHERE "userId" = $1', [user.id])).rows
     const publications = (await pool.query('SELECT "runId", status, "workflowRunId", "errorCode", "pullRequest" FROM run_publications WHERE "userId" = $1', [user.id])).rows
-    const evidence = { sha, githubSha: process.env.GITHUB_SHA ?? null, environment: 'disposable GitHub Actions Postgres / Next production build', startedAt, finishedAt: new Date().toISOString(), scenarioAssertions: assertionsCompleted ? 'completed' : 'incomplete or failed', overallResult: 'See the Playwright report; runtime guard and teardown run after this attachment', marker, deviceId: device?.id ?? null, runId: runId ?? null, checkpoints, runs, publications, requestIds: { browser: browserRequests, fixture: services.observations.flatMap(row => row.requestId ? [row.requestId] : []) }, services,
+    const evidence = { sha, githubSha: process.env.GITHUB_SHA ?? null, environment: 'disposable GitHub Actions Postgres / Next production build', authentication: { mode: 'automatic-account-pool', environmentId: accounts.lease.environmentId, leaseId: accounts.lease.id, generation: accounts.lease.generation, ownerId: user.id, oauthProviderVerified: false }, startedAt, finishedAt: new Date().toISOString(), scenarioAssertions: assertionsCompleted ? 'completed' : 'incomplete or failed', overallResult: 'See the Playwright report; runtime guard and teardown run after this attachment', marker, deviceId: device?.id ?? null, runId: runId ?? null, checkpoints, runs, publications, requestIds: { browser: browserRequests, fixture: services.observations.flatMap(row => row.requestId ? [row.requestId] : []) }, services,
       boundaries: ['Scripted AI SDK provider; real Mikka WorkflowAgent and durable tools', 'GitHub API stub; real daemon clone/worktree/verify/commit/push', 'Synthetic GitHub repository identity; daemon-only file:// transport rewrite', 'Synthetic proposal through real store and authenticated browser decision; GitHub identity is seeded', 'No production or Preview acceptance performed by this suite'] }
     await testInfo.attach('mvp-acceptance-evidence.json', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' })
     if (daemonOutput) await testInfo.attach('daemon-output', { body: daemonOutput, contentType: 'text/plain' })
@@ -126,7 +129,7 @@ async function setup(page: Page, testInfo: TestInfo) {
     await page.getByRole('option').filter({ hasText: device!.name }).click()
     await expect(machine).toContainText(device!.name)
     await dialog.getByLabel('任务描述', { exact: true }).fill(`创建任务「${title}」，在这台电脑修改 ${REPOSITORY}，添加 MIKKA_MOCK.md，完成后开 PR。${marker}`)
-    await testInfo.attach('01-local-device-selected', { body: await page.screenshot(), contentType: 'image/png' })
+    await testInfo.attach('01-local-device-selected', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
     await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
     await expect(dialog).not.toBeVisible()
     await expect.poll(async () => {
@@ -172,8 +175,8 @@ async function setup(page: Page, testInfo: TestInfo) {
   } catch (error) { await cleanup(); throw error }
 }
 
-test('Chat creates a task, the selected real daemon runs it, and the pushed PR returns to chat', async ({ page }, testInfo) => {
-  const loop = await setup(page, testInfo)
+test('Chat creates a task, the selected real daemon runs it, and the pushed PR returns to chat', async ({ page, testAccounts }, testInfo) => {
+  const loop = await setup(page, testInfo, testAccounts.scope)
   try {
     const reply = '请保留 README 的现有内容。'
     const composer = loop.thread.getByRole('textbox', { name: '告诉 Coordinator 下一步做什么…', exact: true })
@@ -182,7 +185,7 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     await expect(loop.thread.getByRole('list', { name: '线程对话' })).toContainText(`Noted: ${reply}`)
     await expect.poll(async () => (await pool.query('SELECT "deliveredAt" FROM run_messages WHERE "runId" = $1 AND text = $2', [loop.runId, reply])).rows[0]?.deliveredAt != null).toBe(true)
     loop.checkpoint('Thread reply reached the real daemon and was acknowledged')
-    await testInfo.attach('02-thread-progress-and-reply', { body: await page.screenshot(), contentType: 'image/png' })
+    await testInfo.attach('02-thread-progress-and-reply', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
     await expect.poll(async () => (await loop.run()).status, { timeout: 75_000 }).toBe('succeeded')
     const completed = await loop.run()
     expect(completed.stopReason).toBe('submitted')
@@ -215,13 +218,13 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     await expect(loop.chat).not.toContainText(loop.runId)
     await expect(loop.chat).not.toContainText('list_agents')
     loop.checkpoint('Coordinator reported the result in chat and R-66 card showed its PR without a progress line')
-    await testInfo.attach('03-completed-chat-and-pr-card', { body: await page.screenshot(), contentType: 'image/png' })
+    await testInfo.attach('03-completed-chat-and-pr-card', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
     loop.completeAssertions()
   } finally { await loop.cleanup() }
 })
 
-test('Stopping a thread reaches the real daemon and keeps the draft editable while stopping', async ({ page }, testInfo) => {
-  const loop = await setup(page, testInfo)
+test('Stopping a thread reaches the real daemon and keeps the draft editable while stopping', async ({ page, testAccounts }, testInfo) => {
+  const loop = await setup(page, testInfo, testAccounts.scope)
   try {
     const composer = loop.thread.getByRole('textbox', { name: '告诉 Coordinator 下一步做什么…', exact: true })
     // Hold only delivery of the real stop response while sampling optimistic UI.
@@ -250,7 +253,7 @@ test('Stopping a thread reaches the real daemon and keeps the draft editable whi
       await composer.fill('保留这个未发送的草稿')
       await expect(composer).toHaveValue('保留这个未发送的草稿')
       await expect.poll(() => held).toBe(true)
-      await testInfo.attach('04-stop-requested-draft-editable', { body: await page.screenshot(), contentType: 'image/png' })
+      await testInfo.attach('04-stop-requested-draft-editable', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
     } finally {
       releaseResponse()
       await page.unroute(matcher, holdStop)
@@ -262,7 +265,7 @@ test('Stopping a thread reaches the real daemon and keeps the draft editable whi
     expect((await service<ServiceEvidence>('/observations')).pullRequests).toEqual([])
     await expect(loop.thread.getByRole('textbox')).toHaveCount(0)
     loop.checkpoint('Stop request reached the real daemon; no PR was created')
-    await testInfo.attach('05-stopped-thread', { body: await page.screenshot(), contentType: 'image/png' })
+    await testInfo.attach('05-stopped-thread', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
     loop.completeAssertions()
   } finally { await loop.cleanup() }
 })
