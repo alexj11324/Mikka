@@ -8,7 +8,7 @@
   "scripts": {
     "test:mailbox-verification": "node --import tsx --test scripts/personal-mailbox-acceptance/r4-verification.test.mts",
     "test:credential-diagnostics": "TSX_DISABLE_CACHE=1 node --import ./scripts/credential-diagnostics-offline.mjs --import ./scripts/server-test.mjs --import tsx --test lib/infisical-workload.test.ts lib/infisical-auth-diagnostics.test.ts",
-    "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts",
+    "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts lib/computer/local-reviews.db.test.ts tests/device-computer-migration.test.mjs",
     "generate:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs",
     "check:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
     "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && pnpm lint && next build",

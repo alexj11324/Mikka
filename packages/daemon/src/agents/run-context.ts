@@ -74,6 +74,9 @@ export interface McpServerSpec {
   env: Record<string, string>
 }
 
+/** Trusted daemon callback, evaluated separately for each local run. */
+export type ComputerSpecProvider = (runId: string, policy?: RunPolicy) => McpServerSpec | undefined
+
 export interface RunContextOptions {
   /** Only the host may advertise this bound control-channel capability. */
   mailboxEnabled?: boolean
