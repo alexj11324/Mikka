@@ -18,7 +18,7 @@ test('电脑策略可以选择并重载允许，非管理员不能修改', async
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, permission, canEdit }) })
   })
   await register(page, '/settings?section=workspace')
-  const controls = page.getByRole('toolbar', { name: 'Bot 操作电脑', exact: true })
+  const controls = page.getByRole('group', { name: 'Bot 操作电脑', exact: true })
   const allow = controls.getByRole('button', { name: '允许', exact: true })
   const ask = controls.getByRole('button', { name: '操作前审批', exact: true })
   const deny = controls.getByRole('button', { name: '禁止', exact: true })
