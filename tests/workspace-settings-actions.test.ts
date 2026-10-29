@@ -16,13 +16,16 @@ const respond = <T>(name: string, value: T) => async (...args: unknown[]) => {
 
 let actions: typeof import('../app/actions/workspace-settings')
 let teamActions: typeof import('../app/actions/teams')
+let botActions: typeof import('../app/actions/bots')
+const inserted: Record<string, unknown>[] = []
+let defaults = { defaultModel: 'codex' as string | null, defaultRepository: 'acme/app' as string | null }
 
 before(async () => {
   mock.module('next/headers', { namedExports: {
     cookies: async () => ({ set: (name: string, value: string) => cookieJar.set(name, value), delete: (name: string) => cookieJar.delete(name), get: (name: string) => cookieJar.has(name) ? { value: cookieJar.get(name) } : undefined }),
     headers: async () => new Headers(),
   } })
-  mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError, requireWorkspace: async () => { throw new Error('unexpected') }, loadWorkspaceContext: async () => { throw new Error('unexpected') } } })
+  mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError, requireWorkspace: async () => { throw new Error('unexpected') }, loadWorkspaceContext: async () => ({ workspace: { id: actor.workspaceId } }) } })
   mock.module('@/lib/workspace-admin/current', { namedExports: { currentWorkspaceActor: async () => actor } })
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => ({ id: actor.userId, email: actor.email, name: actor.name }) } })
   mock.module('@/lib/workspace-admin/general', { namedExports: {
@@ -34,7 +37,16 @@ before(async () => {
     teamDeletionImpact: respond('teamDeletionImpact', { teamId: 't', name: 'Platform', tasks: 42, projects: 5 }),
     deleteTeamData: respond('deleteTeamData', { deleted: { tasks: 42, projects: 5 } }),
   } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor.userId, email: actor.email, name: actor.name } }) } } } })
+  mock.module('@/lib/db', { namedExports: { db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }) } } })
+  mock.module('@/lib/workspace-admin/bots', { namedExports: {
+    workspaceBotDefaults: async (workspaceId: string) => { calls.push(['workspaceBotDefaults', workspaceId]); return defaults },
+    botDefaultOptions: respond('botDefaultOptions', { defaultModel: 'codex', defaultRepository: null, models: ['mikka', 'codex', 'claude'], repositories: ['acme/app'] }),
+    saveBotDefaults: respond('saveBotDefaults', { defaultModel: 'claude', defaultRepository: null }),
+    workspaceBots: respond('workspaceBots', [{ id: 'b', name: 'Bot', status: 'running', runningThreads: 2 }]),
+  } })
   actions = await import('../app/actions/workspace-settings')
+  botActions = await import('../app/actions/bots')
   teamActions = await import('../app/actions/teams')
 })
 
@@ -88,4 +100,30 @@ test('getTeamDeletionImpact and deleteTeam', async () => {
   assert.deepEqual(calls, [['teamDeletionImpact', actor.userId, 't'], ['deleteTeamData', actor.userId, 't', 'Platform']])
   failure = new WorkspaceError('teamDeleteNameMismatch')
   assert.equal((await teamActions.deleteTeam('t', 'x')).error, 'teamDeleteNameMismatch')
+})
+
+test('createBot uses the workspace defaults only for omitted fields', async () => {
+  reset(); inserted.length = 0
+  await botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle' })
+  assert.equal(inserted[0].model, 'codex')
+  assert.equal(inserted[0].repository, 'acme/app')
+  assert.equal(inserted[0].workspaceId, actor.workspaceId)
+  await botActions.createBot({ name: 'Scout 2', color: 'encre', shape: 'cercle', model: 'mikka', repository: null })
+  assert.equal(inserted[1].model, 'mikka')
+  assert.equal(inserted[1].repository, null)
+  assert.equal(calls.filter(call => call[0] === 'workspaceBotDefaults').length, 1, 'explicit values skip the defaults read')
+  defaults = { defaultModel: null, defaultRepository: null }
+  await botActions.createBot({ name: 'Scout 3', color: 'encre', shape: 'cercle' })
+  assert.equal(inserted[2].model, null)
+  await assert.rejects(botActions.createBot({ name: 'Bad', color: 'encre', shape: 'cercle', model: 'gpt-x' }), /validationGeneric/)
+})
+
+test('bot defaults and workspace bot list actions', async () => {
+  reset()
+  assert.deepEqual((await botActions.getWorkspaceBotDefaults()).error, undefined)
+  assert.deepEqual(await botActions.updateWorkspaceBotDefaults({ defaultModel: 'claude' }), { defaultModel: 'claude', defaultRepository: null })
+  assert.deepEqual(await botActions.listWorkspaceBots(), { bots: [{ id: 'b', name: 'Bot', status: 'running', runningThreads: 2 }] })
+  assert.deepEqual(calls, [['botDefaultOptions', actor.workspaceId], ['saveBotDefaults', actor.userId, actor.workspaceId, { defaultModel: 'claude' }], ['workspaceBots', actor.workspaceId]])
+  failure = new WorkspaceError('botDefaultRepositoryUnavailable')
+  assert.equal((await botActions.updateWorkspaceBotDefaults({ defaultRepository: 'x/y' })).error, 'botDefaultRepositoryUnavailable')
 })
