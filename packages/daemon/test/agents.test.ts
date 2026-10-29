@@ -10,7 +10,7 @@ import { join } from "node:path"
 import { execa } from "execa"
 import { afterAll, afterEach, describe, expect, it } from "vitest"
 
-import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
+import { defaultRunPolicy, PACKAGE_REGISTRY_DOMAINS } from "@mikka/protocol/agent-policy"
 
 import { onLines } from "../src/agents/child"
 import { commitMessage, publishRun, snapshotTree } from "../src/agents/publish"
@@ -209,7 +209,7 @@ describe("run context", () => {
         "github.com",
         "*.github.com",
         "*.githubusercontent.com",
-        "registry.npmjs.org",
+        ...PACKAGE_REGISTRY_DOMAINS,
       ],
     })
     expect(policy.allowWrite).not.toContain(ctx.gitDir)

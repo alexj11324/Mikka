@@ -56,13 +56,13 @@ export class CredentialStore {
       return { status: 'saved' as const, origin }
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   }
-  async lease(caller: BrowserCaller, origin: string, target: BrowserTarget, username?: string, forcePassword = false) {
+  async lease(caller: BrowserCaller, origin: string, target: BrowserTarget, username?: string, forcePassword = false, expected?: { credentialId: string; revision: string }) {
     await this.authorize(caller)
     origin = canonicalOrigin(origin)
     if (canonicalOrigin(target.origin) !== origin || target.expiresAt < Date.now() + 5000) throw denied()
     const rows = (await this.pool.query(`SELECT c.id,s.nonce FROM credentials c JOIN credential_secrets s ON s.credential_id=c.id WHERE c.user_id=$1 AND c.origin=$2 AND ($3::text IS NULL OR c.username=$3) AND c.revoked_at IS NULL AND c.unattended_allowed=true ORDER BY c.last_used_at DESC NULLS LAST,c.created_at DESC LIMIT 2`, [caller.userId, origin, username ?? null])).rows
     // Never choose a different account silently when several logins exist.
-    if (rows.length !== 1) return { status: 'needs_login' as const, origin }
+    if (rows.length !== 1 || expected && (rows[0].id !== expected.credentialId || rows[0].nonce !== expected.revision)) return { status: 'needs_login' as const, origin }
     const value = nonce()
     await this.pool.query(`INSERT INTO credential_fill_leases(nonce_hash,credential_id,user_id,workspace_id,bot_id,subagent_id,run_id,origin,target,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '30 seconds')`, [hashNonce(value), rows[0].id, ...callerValues(caller), origin, { ...target, credentialRevision: rows[0].nonce, credentialMode: forcePassword ? 'password' : 'session-first' }])
     return { status: 'ready' as const, lease: value }

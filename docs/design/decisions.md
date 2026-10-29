@@ -178,3 +178,23 @@ through dedicated theme tokens, including draft gray and merged purple.
 | 2026-10-28 · 已确认 | Repository push approval belongs to the signed-in repository owner and is requested in that person's chat. Approval follows `(userId, remoteKey)` across devices; it is not a device setting or a model decision. | No automatic approval. The existing confirmation card shows the repository and permission; the authenticated backend records owner/time and claim sends the snapshot. Revocation prevents later claims and PR creation. Fixed-Preview acceptance remains outstanding. |
 | 2026-10-28 · 已确认 | A submitted thread without a configured repository verification command may commit and push after explicit repository approval, then open a **draft** PR for human review. It retains `verify: not_run`; only an approved, matching, actually pushed unverified result may be `succeeded`, meaning handed in for review, never verification passed. Without that push it remains stopped and unverified, with no automatic task review transition. An unverified continuation converts its own task-marked open PR to draft; a closed/merged PR is never reopened automatically. Failed verification cannot publish. | Coordinator explicitly reports “未配置验证，草稿 PR 待人工检查” when the server confirms a draft; otherwise it reports the blocked/unverified result without inventing a PR. No command such as `true` is inserted and no test pass is fabricated. |
 | 待 Alex 确认 | Server PR creation uses a live-verified GitHub identity linked to the same Mikka user, plus an installation of the Mikka GitHub App with repository access. A Google-only session needs that GitHub connection before the server can open its PR. | Existing login methods remain unchanged. Missing linked identity, installation or permission is reported as incomplete setup; no App credential is borrowed from another owner. |
+
+## 2026-10-29 — Unattended sandbox execution
+
+Alex authorized implementation and tested delivery of an unattended sandbox workflow.
+Isolated cloud coding tasks default to public web egress and project dependency
+installation; explicit denials, read-only checks and administrator ceilings remain
+binding. Local execution retains its bounded destination policy. Project shell
+execution is independent of Git publication authority; publication still happens
+through the host's existing authorized delivery path.
+
+Web sub-agents receive current screenshots and produce structured mouse/keyboard
+operations. DOM text is optional observation evidence, never a keyword-based
+business authorization system. Decisions supplies semantic judgments; host-owned
+allow/ask/deny policy remains authoritative. Ordinary browsing/drafting does not
+request a second per-click approval. Saved same-owner/site unattended-login grants
+cover a single guarded sign-in, without separate fill and submit prompts. Secrets
+stay behind the existing broker; unknown mutation outcomes are not blindly retried.
+
+Do not add proactive recommendations, habit/location triggers, background research,
+full onboarding, a new knowledge base, or local-browser-session import in this work.

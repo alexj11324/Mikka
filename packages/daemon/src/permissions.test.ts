@@ -30,7 +30,7 @@ describe("permission policy (ADR 0009)", () => {
     ["read_in_worktree", "allow"],
     ["write_in_worktree", "allow"],
     ["run_project_script", "allow"],
-    ["install_dependency", "ask"],
+    ["install_dependency", "allow"],
     ["write_outside_repo", "ask"],
     ["git_push", "ask"],
     ["network", "ask"],
@@ -118,6 +118,7 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(runDomains(policy({}), ["npmjs.org"])).toEqual([
       "github.com",
       "npmjs.org",
+      ...PACKAGE_REGISTRY_DOMAINS,
     ])
     expect(runDomains(policy({ network: "allow" }), ["npmjs.org"])).toEqual([
       "*",
@@ -198,8 +199,8 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(classifyCommand("xargs git push")).toBe("git_push")
   })
 
-  it("gives Claude Code ask or deny rules for installs and always denies git push", () => {
-    expect(claudePermissionRules(policy({}))).toMatchObject({
+  it("gives Claude Code ask or deny rules for explicit install restrictions and always denies git push", () => {
+    expect(claudePermissionRules(policy({install_dependency: "ask"}))).toMatchObject({
       ask: expect.arrayContaining(["Bash(npm install:*)"]),
       deny: ['Bash','PowerShell','Monitor',"Bash(git push:*)"],
     })
@@ -210,7 +211,7 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     )
     expect(
       claudePermissionRules(policy({ install_dependency: "allow" }))
-    ).toEqual({ allow: [], ask: [], deny: ['Bash','PowerShell','Monitor',"Bash(git push:*)"] })
+    ).toEqual({ allow: [], ask: [], deny: ["Bash(git push:*)"] })
     expect(claudePermissionRules(policy({install_dependency:'allow',git_push:'allow'}))).toEqual({allow:[],ask:[],deny:['Bash(git push:*)']})
     const settings = claudeSettings(
       {
@@ -265,7 +266,8 @@ describe("applying the workspace's policy (ADR 0028)", () => {
         : null
     }
     expect(chosen("touch NOTES.md")).toBe("yes")
-    expect(chosen("npm install zod")).toBe("no")
+    expect(chosen("npm install zod", policy({install_dependency: "deny"}))).toBe("no")
+    expect(chosen("npm install zod")).toBe("yes")
     expect(
       chosen("npm install zod", policy({ install_dependency: "allow" }))
     ).toBe("yes")
@@ -286,13 +288,13 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(strict).toContain("Writing outside it is not allowed")
     const defaults = runInstructions("/wt")
     expect(defaults).toContain("limited to the workspace ceiling")
-    expect(defaults).toContain("wait for a host approval")
-    expect(defaults).toContain("Native shell execution is unavailable")
+    expect(defaults).toContain("pre-authorized")
+    expect(defaults).not.toContain("Native shell execution is unavailable")
   })
-  it('does not expose a raw native shell when any untyped install/push action is restricted', () => {
+  it('keeps project shell execution independent of daemon publication permission', () => {
     for (const install of ['allow','ask','deny'] as const) for (const push of ['allow','ask','deny'] as const) {
       const value=policy({install_dependency:install,git_push:push})
-      expect(rawCliShellAvailable(value)).toBe(install==='allow' && push==='allow')
+      expect(rawCliShellAvailable(value)).toBe(install==='allow')
       expect(rawCliShellAvailable({...value,readOnly:true})).toBe(false)
     }
   })

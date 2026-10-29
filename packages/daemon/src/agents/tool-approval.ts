@@ -33,6 +33,7 @@ async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 export class ToolApprovalGate {
   private readonly epoch = randomUUID()
   private readonly seen = new Set<string>()
+  private readonly networkApprovals = new Map<string, Promise<'allow' | 'deny'>>()
   private readonly stop = new AbortController()
   constructor(readonly runId: string, private readonly host: ToolApprovalHost) {}
   revoke() { this.stop.abort() }
@@ -46,6 +47,32 @@ export class ToolApprovalGate {
     if (this.revoked) return false
     try { return await abortable(Promise.resolve(this.host.isLive(this.runId)), this.stop.signal) && !this.revoked }
     catch { return false }
+  }
+
+  /** A ceiling limits destinations; it is not itself user consent. Cloud allow
+   * needs no prompt. Explicit ask obtains one exact-destination grant and shares
+   * it across this run's sockets, while every connection rechecks live policy. */
+  async preapprovedNetwork(request: ToolApprovalRequest, signal?: AbortSignal): Promise<boolean> {
+    if (request.runId !== this.runId || request.method !== 'sandbox/network' || this.revoked || signal?.aborted) return false
+    const destination = request.input as { host?: unknown; port?: unknown } | null
+    if (!destination || typeof destination.host !== 'string' || !Number.isInteger(destination.port) || Number(destination.port) < 1 || Number(destination.port) > 65535) return false
+    const key = JSON.stringify([request.harness, destination.host, destination.port])
+    const lifetime = signal ? AbortSignal.any([signal, this.stop.signal]) : this.stop.signal
+    try {
+      if (!await abortable(Promise.resolve(this.host.isLive(this.runId)), lifetime)) return false
+      const decision = await abortable(Promise.resolve(this.host.permission(request)), lifetime)
+      if (decision !== 'allow' && decision !== 'ask') { this.networkApprovals.delete(key); return false }
+      if (decision === 'ask') {
+        let granted = this.networkApprovals.get(key)
+        if (!granted) {
+          if (this.networkApprovals.size >= 1024 || lifetime.aborted) return false
+          granted = this.request({ ...request, requestId: `network:${randomUUID()}` }, lifetime)
+          this.networkApprovals.set(key, granted)
+        }
+        if (await abortable(granted, lifetime) !== 'allow' || this.networkApprovals.get(key) !== granted) return false
+      }
+      return await abortable(Promise.resolve(this.host.isLive(this.runId)), lifetime) && !lifetime.aborted && !this.revoked
+    } catch { return false }
   }
 
   async request(request: ToolApprovalRequest, signal?: AbortSignal): Promise<'allow' | 'deny'> {

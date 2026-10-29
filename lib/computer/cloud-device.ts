@@ -20,7 +20,7 @@ export async function provisionCloudDevice(pool: Pool, actor: { userId: string; 
     } else {
       deviceId = randomUUID()
       await client.query('INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,$3,$4)', [deviceId, actor.userId, 'Cloud computer', 'cloud'])
-      await client.query('UPDATE cloud_machines SET "deviceId"=$2 WHERE "workspaceId"=$1', [actor.workspaceId, deviceId])
+      await client.query('UPDATE cloud_machines SET "deviceId"=$2 WHERE "workspaceId"=$1 AND "ownerId"=$3', [actor.workspaceId, deviceId,actor.userId])
     }
     await client.query('UPDATE device_tokens SET "revokedAt"=now() WHERE "boundDeviceId"=$1 AND "revokedAt" IS NULL', [deviceId])
     const token = `orv_${randomBytes(32).toString('base64url')}`

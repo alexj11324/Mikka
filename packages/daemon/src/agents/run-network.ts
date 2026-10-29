@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import type { Harness } from '@mikka/protocol'
 import { HARNESS_DOMAINS } from './run-context'
 import { matchesRunSandboxDomain } from './run-sandbox-launcher'
@@ -18,7 +17,9 @@ export function runNetworkApproval(runId: string, harness: Exclude<Harness, 'moc
     // A trusted run-bound computer broker has its own authenticated permission
     // gate. Its exact transport endpoint must not create a second network ask.
     if (matchesRunSandboxDomain(request, model) || localComputerEndpoint === `${request.host}:${request.port}`) return await gate.checkLive() && !signal.aborted && !gate.revoked
-    const decision = await gate.request({runId,harness,requestId:randomUUID(),method:'sandbox/network',input:{host:request.host,port:request.port}}, signal)
-    return decision === 'allow' && !signal.aborted && !gate.revoked
+    // The immutable ceiling limits reachability, not consent. The run gate
+    // reuses an approved exact destination without asking for each new socket.
+    return await gate.preapprovedNetwork({runId,harness,requestId:'network-destination',method:'sandbox/network',input:{host:request.host,port:request.port}}, signal)
+      && !signal.aborted && !gate.revoked
   }
 }
