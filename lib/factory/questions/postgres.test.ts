@@ -1202,6 +1202,12 @@ test(
             (await store.read(userId, f.task.id)).task.status,
             "blocked",
           );
+          const settled = await questions.read(userId, f.questionId);
+          const blocked = await store.read(userId, f.task.id);
+          await createFactoryReconciler(pool, store, questions)(userId);
+          assert.deepEqual(await questions.settle(userId, answer.continuationRunId), settled);
+          assert.deepEqual(await store.read(userId, f.task.id), blocked);
+          assert.equal((await pool.query('SELECT count(*)::int n FROM agent_runs WHERE "questionContinuation"->>\'questionId\'=$1', [f.questionId])).rows[0].n, 0);
         },
       );
       await t.test(

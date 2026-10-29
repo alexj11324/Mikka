@@ -11,8 +11,12 @@ import { ToolApprovalGate } from '../src/agents/tool-approval'
 import { makeRepo } from './helpers'
 import { createLogger } from '../src/log'
 import { defaultRunPolicy } from '@mikka/protocol'
+import { daemonTestMode } from '@mikka/protocol/repository'
 import { test } from 'node:test'
 test('actual daemon injects local authority and closes its own socket on stop', { timeout: 45000 }, async t => {
+// This entry uses node:test, so it does not inherit vitest's isolated file-origin
+// setting. The caller must opt in; production admission remains unchanged.
+assert.ok(daemonTestMode(process.env), 'Temporary repository fixture requires NODE_ENV=test and MIKKA_TEST_MODE=1 outside production')
 const root=mkdtempSync(join(tmpdir(),'pr161-host-')),bin=join(root,'cua-driver')
 writeFileSync(bin,'#!/bin/sh\necho cua-driver 0.38.0\n');chmodSync(bin,0o700)
 const oldPath=process.env.PATH
@@ -50,8 +54,11 @@ try {
  for(let i=0;i<200;i++){
    text=(server.streams.get(runId)??[]).filter((c:any)=>c.type==='text-delta').map((c:any)=>c.delta).join('')
    if(text.includes('computer'))break
+   const run=server.runs.get(runId)
+   assert.notEqual(run?.state,'failed',run?.completion?.report.summary ?? run?.patches.at(-1)?.error ?? 'Daemon failed before the adapter emitted its computer configuration')
    await new Promise(r=>setTimeout(r,25))
  }
+ assert.ok(text.includes('computer'),'Daemon did not emit the adapter computer configuration before the deadline')
  const computer=JSON.parse(text).computer
  endpoint=computer.args[1]
  assert.equal(computer.command,process.execPath)

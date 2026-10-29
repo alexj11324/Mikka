@@ -494,10 +494,18 @@ test('run result publication commits one owner-scoped result through retries and
       await writeRepositoryPushApproval(f.userId, f.remoteKey, false)
       assert.deepEqual(await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }), { status: 'denied' })
       await assert.rejects(sendOwnedRunMessage(db, f.userId, { runId, text: 'New authority after revocation' }), /runInvalid/)
-      const legacyRepo = randomUUID()
+      // A completed historical row is rejected before repository checks. Use
+      // a separate live legacy execution so this negative case exercises the
+      // real remote-key approval lookup without resurrecting f.runId or adding
+      // a second live execution to the admitted task.
+      const legacyRepo = randomUUID(), legacyIssue = randomUUID(), legacyRun = randomUUID()
       await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl") values ($1,$2,$3,$4,$5)', [legacyRepo, f.deviceId, f.userId, '/legacy-user-checkout', f.remoteUrl])
-      await pool.query('update agent_runs set "deviceRepoId"=$2 where id=$1', [f.runId, legacyRepo])
-      await assert.rejects(sendOwnedRunMessage(db, f.userId, { runId: f.runId, text: 'Legacy aliases cannot bypass revocation' }), /runInvalid/)
+      await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Live legacy execution\',$3,\'todo\',\'normal\',\'personal\')', [legacyIssue, f.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 3 } }, content: [] })])
+      await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,prompt) values ($1,$2,$3,$4,$5,$6,\'running\',\'implement\',\'Synthetic legacy execution\')', [legacyRun, f.userId, legacyIssue, f.agentId, f.deviceId, legacyRepo])
+      assert.deepEqual((await pool.query('select status,"agentDefinition" from agent_runs where id=$1', [legacyRun])).rows[0], { status: 'running', agentDefinition: null })
+      await assert.rejects(sendOwnedRunMessage(db, f.userId, { runId: legacyRun, text: 'Legacy aliases cannot bypass revocation' }), /runInvalid/)
+      assert.equal(Number((await pool.query('select count(*) as n from run_messages where "runId"=$1', [legacyRun])).rows[0].n), 0)
+      await assert.rejects(sendOwnedRunMessage(db, f.userId, { runId: f.runId, text: 'Finished runs cannot be reopened' }), /runNotFound/)
       assert.equal(Number((await pool.query('select count(*) as n from run_messages where "runId"=$1', [runId])).rows[0].n), 1)
       assert.deepEqual(await queueRun(f.userId, input, null, undefined, eventId), { runId }, 'old host replay preserves the already accepted execution')
       assert.equal((await prepareRunPublication(accepted, f.remoteUrl)).policy.permissions.git_push, 'allow', 'old admitted scope survives later revocation')
@@ -535,7 +543,7 @@ test('run result publication commits one owner-scoped result through retries and
         locker.release()
         await attempt?.catch(() => {})
       }
-      assert.equal(Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n), before + 1)
+      assert.equal(Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n), before + 2, 'only the admitted execution and the explicit legacy fixture were added')
     })
   } finally {
     // Fixture rows and audit history remain; credential invalidation is non-deleting.

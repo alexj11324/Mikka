@@ -15,6 +15,7 @@
 // submission and may be stored twice.
 
 import { withBasePath } from '@/lib/base-path'
+import { ACTION_ERROR_CODES, type ActionErrorCode } from '@/lib/action-result'
 
 export const MESSAGE_MAX_LENGTH = 10_000
 const REQUEST_TIMEOUT_MS = 20_000
@@ -30,12 +31,20 @@ export type SubmitOutcome =
   | { kind: 'authRequired' }
   // The server holds a different body under this id. Terminal: never resent, never given a new id.
   | { kind: 'conflict' }
-  | { kind: 'rejected'; error: 'messageRequired' | 'originRejected' | 'failed' }
+  | { kind: 'rejected'; error: ActionErrorCode | 'originRejected' | 'failed' }
   // Another submission of this composer is still in flight.
   | { kind: 'busy' }
 
 type Fetch = (input: string, init: RequestInit) => Promise<Response>
 type Unsettled = { submission: Submission; state: 'uncertain' | 'authRequired' | 'conflict' }
+
+/** The server-action transport keeps public errors without exposing exceptions. */
+export function readActionOutcome(result: { queued?: unknown; error?: unknown }): SubmitOutcome {
+  if (result.queued === true) return { kind: 'accepted', enabled: true, sourceEventId: null, replayed: false }
+  if (result.error === 'authRequired') return { kind: 'authRequired' }
+  if (result.error === 'submissionConflict') return { kind: 'conflict' }
+  return { kind: 'rejected', error: ACTION_ERROR_CODES.find(code => code === result.error) ?? 'generic' }
+}
 
 export async function readOutcome(response: Response): Promise<SubmitOutcome> {
   const body: Record<string, unknown> = await response.json().catch(() => ({}))

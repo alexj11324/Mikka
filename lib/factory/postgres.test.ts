@@ -395,11 +395,17 @@ test(
       );
       assert.equal(new Set(queued.map((r) => r.runId)).size, 1);
       assert.equal(queued.filter((r) => !r.replayed).length, 1);
-      await assert.rejects(
+      const beforeConflictingReplay = await store.read("owner", dispatchTask.task.id);
+      const dispatchRunCount = Number((await pool.query('SELECT count(*) FROM agent_runs WHERE "issueId"=$1', [issueId])).rows[0].count);
+      // The composed dispatcher rejects a changed request at its own receipt
+      // boundary, before it can reach the downstream queue's key check.
+      await rejects(
         () =>
           dispatcher("owner", { ...dispatchInput, note: "changed request" }),
-        /runDispatchKeyConflict/,
+        "factoryReplayMismatch",
       );
+      assert.deepEqual(await store.read("owner", dispatchTask.task.id), beforeConflictingReplay);
+      assert.equal(Number((await pool.query('SELECT count(*) FROM agent_runs WHERE "issueId"=$1', [issueId])).rows[0].count), dispatchRunCount);
       let dispatched = await store.read("owner", dispatchTask.task.id);
       await store.apply("owner", binding(dispatched.task), randomUUID(), {
         action: "cancel",

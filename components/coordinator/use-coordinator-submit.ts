@@ -4,7 +4,7 @@ import { useCallback, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { authClient } from '@/lib/auth-client'
 import { sendCoordinatorMessage } from '@/app/actions/coordinator'
-import { createCoordinatorSubmitter, type SubmitOutcome } from '@/lib/coordinator-client-submission'
+import { createCoordinatorSubmitter, readActionOutcome, type SubmitOutcome } from '@/lib/coordinator-client-submission'
 import type { ArtifactQuote } from '@/lib/artifacts/quote'
 import type { BrowserNote } from '@/lib/browser/note'
 import type { TaskDestination } from '@/lib/task-destination'
@@ -34,10 +34,7 @@ export function useCoordinatorSubmit() {
     submitter.current ??= createCoordinatorSubmitter({ currentOwner, transport: async submission => {
       const details = submission.context as CoordinatorMessageContext | undefined
       const result = await sendCoordinatorMessage(submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes)
-      if ('queued' in result && result.queued) return { kind: 'accepted', enabled: true, sourceEventId: null, replayed: false }
-      if (result.error === 'authRequired') return { kind: 'authRequired' }
-      if (result.error === 'submissionConflict') return { kind: 'conflict' }
-      return { kind: 'rejected', error: result.error === 'messageRequired' || result.error === 'messageTooLong' ? 'messageRequired' : 'failed' }
+      return readActionOutcome(result)
     } })
     return submitter.current.submit(text, undefined, context)
   }, [])
@@ -49,8 +46,7 @@ export function useCoordinatorSubmit() {
     if (outcome.kind === 'uncertain') return t('sendUncertain')
     if (outcome.kind === 'authRequired') return tErrors('authRequired')
     if (outcome.kind === 'conflict') return tErrors('submissionConflict')
-    if (outcome.error === 'messageRequired') return tErrors('messageRequired')
-    return tErrors('generic')
+    return tErrors(outcome.error === 'originRejected' || outcome.error === 'failed' ? 'generic' : outcome.error)
   }, [t, tErrors])
 
   return { submit, failureMessage }

@@ -530,8 +530,7 @@ test(
         } finally {
           tx.release();
         }
-        await complete(id);
-        const refs = [await evidence(state.task, id)];
+        const commandChunks: string[] = [];
         if (stage === "verify") {
           const input = randomUUID(),
             output = randomUUID(),
@@ -559,13 +558,18 @@ test(
               }),
             ],
           );
-          for (const chunk of [input, output])
-            refs.push({
-              ...(await evidence(state.task, id)),
-              artifact: `run-chunk:${chunk}`,
-              kind: "log",
-            });
+          commandChunks.push(input, output);
         }
+        // The existing verifier requires its command chunks to precede the
+        // terminal timestamp, as they do in an actual daemon execution.
+        await complete(id);
+        const refs = [await evidence(state.task, id)];
+        for (const chunk of commandChunks)
+          refs.push({
+            ...(await evidence(state.task, id)),
+            artifact: `run-chunk:${chunk}`,
+            kind: "log",
+          });
         state = await store.read(owner, state.task.id);
         const output = state.attempts.find(
           (a) => a.id === state.task.attemptId,

@@ -151,6 +151,9 @@ jobs:
         run: pnpm --filter @mikka/daemon test:mailbox-cli
       - name: Local computer authority through actual daemon and adapter protocol
         run: pnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts src/computer/proxy.test.mjs
+        env:
+          NODE_ENV: test
+          MIKKA_TEST_MODE: '1'
       - name: Install sandbox runtime dependencies without changing host namespace policy
         if: ${{ !cancelled() }}
         run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep

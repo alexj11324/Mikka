@@ -20,6 +20,7 @@ import {
   questionHandoffSchema,
   legacyQuestionId,
   orchestratorMayAnswer,
+  questionClosed,
   questionFingerprint,
   type QuestionHandoff,
   type QuestionKind,
@@ -745,10 +746,7 @@ export function createFactoryQuestions(
         );
         if (!identity) return null;
         const { task, q } = await owned(tx, userId, identity.id);
-        if (
-          ["resolved", "cancelled", "expired", "superseded"].includes(q.status)
-        )
-          return view(q);
+        if (questionClosed(q.status)) return view(q);
         const {
           rows: [run],
         } = await tx.query(
@@ -756,17 +754,17 @@ export function createFactoryQuestions(
           [runId, userId, q.issueId],
         );
         if (
-          !run ||
+          run &&
           !["succeeded", "failed", "stopped", "cancelled"].includes(run.status)
         )
           return view(q);
         const cancelled =
           stopped(task) ||
-          run.stopRequestedAt ||
-          run.status === "cancelled" ||
-          run.stopReason === "cancelled";
+          run?.stopRequestedAt ||
+          run?.status === "cancelled" ||
+          run?.stopReason === "cancelled";
         const resumed =
-          run.sessionId === q.originSessionId &&
+          run?.sessionId === q.originSessionId &&
           ["submitted", "asked_human", "blocked", "turn_ended"].includes(
             run.stopReason,
           );
@@ -779,7 +777,9 @@ export function createFactoryQuestions(
           ? "Continuation cancelled; no automatic resume"
           : resumed
             ? "Answer delivered through the original session"
-            : "Original session continuation failed; explicit recovery required";
+            : !run
+              ? "Original session continuation is unavailable; explicit recovery required"
+              : "Original session continuation failed; explicit recovery required";
         const {
           rows: [updated],
         } = await tx.query<FactoryQuestion>(

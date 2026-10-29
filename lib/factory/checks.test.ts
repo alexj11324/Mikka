@@ -217,16 +217,11 @@ test(
         };
         const sessionId =
           options.sessionId ?? `fixture-session-${randomUUID()}`;
+        // Command telemetry belongs inside the actual recorded run window.
+        // A receipt created after finishedAt must not count as verifier evidence.
         await pool.query(
-          `UPDATE agent_runs SET status=$2,"stopReason"=$3,"sessionId"=$4,report=$5,"startedAt"=CASE WHEN $6 THEN NULL ELSE coalesce("startedAt",now()) END,"finishedAt"=now() WHERE id=$1`,
-          [
-            runId,
-            options.failed || options.timeout ? "failed" : "succeeded",
-            options.timeout ? "timeout" : "submitted",
-            sessionId,
-            JSON.stringify(report),
-            options.noTimes ?? false,
-          ],
+          `UPDATE agent_runs SET "startedAt"=CASE WHEN $2 THEN NULL ELSE coalesce("startedAt",clock_timestamp()) END WHERE id=$1`,
+          [runId, options.noTimes ?? false],
         );
         if (run.kind === "acceptance" && !options.noRuntime) {
           const toolCallId = randomUUID();
@@ -253,6 +248,16 @@ test(
             ],
           );
         }
+        await pool.query(
+          `UPDATE agent_runs SET status=$2,"stopReason"=$3,"sessionId"=$4,report=$5,"finishedAt"=clock_timestamp() WHERE id=$1`,
+          [
+            runId,
+            options.failed || options.timeout ? "failed" : "succeeded",
+            options.timeout ? "timeout" : "submitted",
+            sessionId,
+            JSON.stringify(report),
+          ],
+        );
         return { report, sessionId };
       };
       const sha1 = "1".repeat(40),

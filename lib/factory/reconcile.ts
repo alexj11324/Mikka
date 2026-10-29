@@ -45,7 +45,20 @@ export function createFactoryReconciler(
           [task.attemptId, userId, task.issueId],
         );
         if (!run && task.status === "running") {
-          await store.apply(
+          // The run may have disappeared while its durable question and answer
+          // remain. Settle that continuation under the same task/issue lock so
+          // it cannot remain "resuming" after the task is blocked.
+          if (questions) {
+            const { rows: [attempt] } = await tx.query(
+              'SELECT "runId" FROM factory_attempts WHERE id=$1 AND "taskId"=$2',
+              [task.attemptId, task.id],
+            );
+            if (attempt?.runId) {
+              await questions.settle(userId, attempt.runId, tx);
+              task = await store.lockTask(tx, userId, task.id);
+            }
+          }
+          if (task.status === "running") await store.apply(
             userId,
             binding(task),
             factoryEventId("run-missing", task.attemptId),

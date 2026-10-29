@@ -61,16 +61,18 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const { retryLinearIssue } = await import('../app/actions/linear-sync')
   const { AfterContext } = await import('next/dist/server/after/after-context')
   const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
-  // Run the public actions and their actual Next after callbacks in request order.
-  async function action<T>(fn: () => Promise<T>, beforeClose?: () => Promise<void>) {
+  // Native HTTP has no Next request context. Run the same after callbacks that
+  // Next runs when a request closes, and fail if an asynchronous effect fails.
+  async function withRequestContext<T>(fn: () => Promise<T>, beforeClose?: () => Promise<void>) {
     const waits: Promise<unknown>[] = [], errors: unknown[] = []
     let close = () => {}
     const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: callback => { close = callback }, onTaskError: error => { errors.push(error) } })
     return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, async () => {
-      try { const result = await actAs(owner, fn); await beforeClose?.(); return result }
+      try { const result = await fn(); await beforeClose?.(); return result }
       finally { close(); await Promise.all(waits); assert.deepEqual(errors, []) }
     })
   }
+  const action = <T>(fn: () => Promise<T>, beforeClose?: () => Promise<void>) => withRequestContext(() => actAs(owner, fn), beforeClose)
   const { issueForUser } = await import('../lib/issue-access')
   const { readRun, queueRun, visibleRuns } = await import('../lib/agent-runs')
   const { issueRunToken, verifyRunToken } = await import('../lib/mcp/worker')
@@ -429,7 +431,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.equal((await pool.query('select count(*)::int n from issue_versions where "issueId"=$1',[id])).rows[0].n,2)
     } finally { await writer.query('rollback');writer.release();if(transition) await Promise.allSettled([transition]) }
   })
-  await scopeSubtest(t, 'HTTP completion paused after live read cannot write or dispatch after an unlinked task becomes personal', async () => {
+  await scopeSubtest(t, 'HTTP completion delayed before persistence cannot write or dispatch after an unlinked task becomes personal', async () => {
     const localOwner=`complete-owner-${randomUUID()}`,id=randomUUID(),run=randomUUID()
     fixtureIds.push(id)
     await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Complete owner\',$2,true,now(),now())',[localOwner,`${localOwner}@example.invalid`])
@@ -438,13 +440,14 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,localOwner])
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId",status) values ($1,$2,$3,$4,$5,\'running\')',[run,member,id,agent,device])
     const prepared=Promise.withResolvers<void>(),release=Promise.withResolvers<void>()
+    const handlerErrors:unknown[]=[]
     const server=createServer(async(incoming,outgoing)=>{
       const chunks:Buffer[]=[];for await(const chunk of incoming) chunks.push(Buffer.from(chunk))
       const body=Buffer.concat(chunks).toString()
       const request=new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{authorization:incoming.headers.authorization??''},body})
       request.json=async()=>{prepared.resolve();await release.promise;return JSON.parse(body)}
-      try {const response=await complete.POST(request,{params:Promise.resolve({runId:run})});outgoing.writeHead(response.status);outgoing.end(await response.text())}
-      catch {outgoing.writeHead(500);outgoing.end('Completion failed')}
+      try {const response=await withRequestContext(()=>complete.POST(request,{params:Promise.resolve({runId:run})}));outgoing.writeHead(response.status);outgoing.end(await response.text())}
+      catch(error) {handlerErrors.push(error);outgoing.writeHead(500);outgoing.end('Completion failed')}
     })
     await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve))
     let responsePromise:Promise<Response>|undefined
@@ -457,7 +460,9 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       assert.ok('issue' in changed)
       assert.deepEqual(await actAs(localOwner,()=>setIssueScope({id,revision:1,scope:'personal'})),{error:'issueStale'})
       release.resolve()
-      assert.equal((await responsePromise).status,204)
+      const response=await responsePromise
+      assert.deepEqual(handlerErrors,[],'the real completion handler and its after callbacks must succeed')
+      assert.equal(response.status,204)
       const row=(await pool.query('select status,scope from issues where id=$1',[id])).rows[0]
       assert.deepEqual(row,{status:'todo',scope:'personal'})
       assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'cancelled')

@@ -1,6 +1,54 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createCoordinatorSubmitter, readOutcome } from './coordinator-client-submission'
+import { createCoordinatorSubmitter, readActionOutcome, readOutcome } from './coordinator-client-submission'
+
+test('server-action rejections preserve public error codes and hide unknown errors', () => {
+  for (const error of ['issueToolsDisabled', 'deviceNotFound', 'messageRequired', 'messageTooLong', 'validationGeneric']) {
+    assert.deepEqual(readActionOutcome({ error }), { kind: 'rejected', error })
+  }
+  for (const error of ['Internal error: private database details', 'unknownErrorCode', { message: 'private details' }, null, undefined]) {
+    assert.deepEqual(readActionOutcome({ error }), { kind: 'rejected', error: 'generic' })
+  }
+})
+
+test('a refused task is not held as accepted or uncertain, and manual retry is a new submission', async () => {
+  const deliveries: string[] = []
+  const submitter = createCoordinatorSubmitter({ currentOwner: async () => 'owner', newId: ids(), transport: async submission => {
+    deliveries.push(submission.submissionId)
+    return readActionOutcome({ error: 'issueToolsDisabled' })
+  } })
+  const context = { taskDestination: { kind: 'cloud' } }
+  assert.deepEqual(await submitter.submit('create a task', undefined, context), { kind: 'rejected', error: 'issueToolsDisabled' })
+  assert.equal(submitter.held('owner', 'create a task', null, context), undefined)
+  assert.deepEqual(await submitter.submit('create a task', undefined, context), { kind: 'rejected', error: 'issueToolsDisabled' })
+  assert.equal(deliveries.length, 2)
+  assert.notEqual(deliveries[0], deliveries[1])
+})
+
+test('server-action sign-in retries retain the body and id, while conflicts stay terminal', async () => {
+  const deliveries: { submissionId: string; text: string; context: unknown }[] = []
+  let response: { queued?: boolean; error?: string } = { error: 'authRequired' }
+  const submitter = createCoordinatorSubmitter({ currentOwner: async () => 'owner', newId: ids(), transport: async submission => {
+    deliveries.push({ submissionId: submission.submissionId, text: submission.text, context: structuredClone(submission.context) })
+    return readActionOutcome(response)
+  } })
+  const context = { taskDestination: { kind: 'device', deviceId: 'device-a' } }
+  assert.deepEqual(await submitter.submit('create a task', undefined, context), { kind: 'authRequired' })
+  assert.equal(submitter.held('owner', 'create a task', null, context)?.state, 'authRequired')
+  response = { queued: true }
+  assert.deepEqual(await submitter.submit('create a task', undefined, context), { kind: 'accepted', enabled: true, sourceEventId: null, replayed: false })
+  assert.deepEqual(deliveries[1], deliveries[0])
+  assert.equal(submitter.held('owner', 'create a task', null, context), undefined)
+
+  response = { error: 'submissionConflict' }
+  assert.deepEqual(await submitter.submit('another task', undefined, context), { kind: 'conflict' })
+  const conflicted = submitter.held('owner', 'another task', null, context)
+  assert.equal(conflicted?.state, 'conflict')
+  response = { queued: true }
+  assert.deepEqual(await submitter.submit('another task', undefined, context), { kind: 'conflict' })
+  assert.equal(deliveries.length, 3)
+  assert.equal(submitter.held('owner', 'another task', null, context)?.submission.submissionId, conflicted?.submission.submissionId)
+})
 
 test('rich submissions freeze all context and keep independent uncertain bodies', async () => {
   const deliveries: { submissionId: string; context: unknown }[] = []
