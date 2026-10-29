@@ -12,8 +12,6 @@ const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
 const flavor = process.env.MIKKA_DESKTOP_FLAVOR === 'dev' ? 'dev' : 'prod'
 const appUrl = process.env.MIKKA_DESKTOP_APP_URL
   ?? (flavor === 'dev' ? 'http://localhost:3000/mikka' : 'https://app.aspectlylabs.com/mikka')
-const authOrigins = (process.env.MIKKA_DESKTOP_AUTH_ORIGINS ?? 'https://github.com,https://accounts.google.com')
-  .split(',').map(value => value.trim()).filter(Boolean)
 
 const parsed = new URL(appUrl)
 if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password) {
@@ -22,18 +20,11 @@ if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.
 if (flavor === 'prod' && parsed.protocol !== 'https:') {
   throw new Error('A production desktop build must load the app over HTTPS')
 }
-for (const origin of authOrigins) {
-  const url = new URL(origin)
-  if (!['https:', 'http:'].includes(url.protocol) || url.origin !== origin.replace(/\/$/, '')) {
-    throw new Error(`Invalid auth origin: ${origin}`)
-  }
-}
 
 const define = {
   __MIKKA_APP_URL__: JSON.stringify(appUrl),
   __MIKKA_APP_VERSION__: JSON.stringify(pkg.version),
   __MIKKA_FLAVOR__: JSON.stringify(flavor),
-  __MIKKA_AUTH_ORIGINS__: JSON.stringify(authOrigins),
 }
 
 await rm(outdir, { recursive: true, force: true })

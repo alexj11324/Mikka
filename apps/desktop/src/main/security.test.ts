@@ -1,10 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { externalUrl, isTrustedFrame, navigationDecision, originOf } from './security'
+import { appExternalUrl, desktopAuthFinishUrl, externalUrl, isTrustedFrame, navigationDecision, originOf } from './security'
 
 const APP = 'https://app.aspectlylabs.com/mikka'
-const AUTH = ['https://github.com', 'https://accounts.google.com']
 
 test('only the exact app origin is trusted', () => {
   assert.equal(isTrustedFrame('https://app.aspectlylabs.com/mikka/en', APP), true)
@@ -21,15 +20,15 @@ test('credentials and non-URLs have no origin', () => {
   assert.equal(originOf('not a url'), null)
 })
 
-test('navigation keeps the app and sign-in providers, opens HTTPS elsewhere', () => {
-  assert.equal(navigationDecision('https://app.aspectlylabs.com/mikka/issue/1', APP, AUTH), 'allow')
-  assert.equal(navigationDecision('https://github.com/login/oauth/authorize', APP, AUTH), 'allow')
-  assert.equal(navigationDecision('https://accounts.google.com/o/oauth2/auth', APP, AUTH), 'allow')
-  assert.equal(navigationDecision('https://docs.example/page', APP, AUTH), 'external')
-  assert.equal(navigationDecision('mailto:support@example.com', APP, AUTH), 'external')
-  assert.equal(navigationDecision('http://evil.example/mikka', APP, AUTH), 'deny')
-  assert.equal(navigationDecision('file:///etc/passwd', APP, AUTH), 'deny')
-  assert.equal(navigationDecision('javascript:alert(1)', APP, AUTH), 'deny')
+test('navigation keeps only the app, opens every other HTTPS URL externally', () => {
+  assert.equal(navigationDecision('https://app.aspectlylabs.com/mikka/issue/1', APP), 'allow')
+  assert.equal(navigationDecision('https://github.com/login/oauth/authorize', APP), 'external')
+  assert.equal(navigationDecision('https://accounts.google.com/o/oauth2/auth', APP), 'external')
+  assert.equal(navigationDecision('https://docs.example/page', APP), 'external')
+  assert.equal(navigationDecision('mailto:support@example.com', APP), 'external')
+  assert.equal(navigationDecision('http://evil.example/mikka', APP), 'deny')
+  assert.equal(navigationDecision('file:///etc/passwd', APP), 'deny')
+  assert.equal(navigationDecision('javascript:alert(1)', APP), 'deny')
 })
 
 test('external opens accept only HTTPS and mailto without credentials', () => {
@@ -40,4 +39,39 @@ test('external opens accept only HTTPS and mailto without credentials', () => {
   assert.equal(externalUrl('data:text/html,hi'), null)
   assert.equal(externalUrl('https://user:pass@example.com'), null)
   assert.equal(externalUrl(`https://example.com/${'a'.repeat(2_048)}`), null)
+})
+
+test('external app-origin opens stay on the app origin', () => {
+  assert.equal(appExternalUrl('https://app.aspectlylabs.com/mikka/sign-in?desktop=1', APP), 'https://app.aspectlylabs.com/mikka/sign-in?desktop=1')
+  assert.equal(appExternalUrl('http://localhost:3000/mikka/sign-in', 'http://localhost:3000/mikka'), 'http://localhost:3000/mikka/sign-in')
+  assert.equal(appExternalUrl('https://app.aspectlylabs.com.evil.example/mikka/sign-in', APP), null)
+  assert.equal(appExternalUrl('https://evil.example/mikka/sign-in', APP), null)
+  assert.equal(appExternalUrl('file:///etc/passwd', APP), null)
+  assert.equal(appExternalUrl('https://user:pass@app.aspectlylabs.com/mikka/sign-in', APP), null)
+})
+
+test('desktop auth deep links become the in-app token exchange page', () => {
+  const token = 'a'.repeat(32)
+  const state = 'b'.repeat(32)
+  const finish = desktopAuthFinishUrl(`mikka-desktop://auth?token=${token}&state=${state}&next=${encodeURIComponent('/settings?section=integrations')}`, APP)
+  assert.ok(finish)
+  const url = new URL(finish)
+  assert.equal(url.origin, 'https://app.aspectlylabs.com')
+  assert.equal(url.pathname, '/mikka/api/desktop/finish')
+  const hash = new URLSearchParams(url.hash.slice(1))
+  assert.equal(hash.get('token'), token)
+  assert.equal(hash.get('state'), state)
+  assert.equal(hash.get('next'), '/settings?section=integrations')
+})
+
+test('desktop auth deep links reject other schemes, hosts, tokens and paths', () => {
+  const token = 'a'.repeat(32)
+  const state = 'b'.repeat(32)
+  assert.equal(desktopAuthFinishUrl(`mikka://auth?token=${token}&state=${state}`, APP), null)
+  assert.equal(desktopAuthFinishUrl(`mikka-desktop://other?token=${token}&state=${state}`, APP), null)
+  assert.equal(desktopAuthFinishUrl(`mikka-desktop://auth?state=${state}`, APP), null)
+  assert.equal(desktopAuthFinishUrl(`mikka-desktop://auth?token=${token}`, APP), null)
+  assert.equal(desktopAuthFinishUrl(`mikka-desktop://auth?token=short&state=${state}`, APP), null)
+  assert.equal(desktopAuthFinishUrl(`mikka-desktop://auth?token=${token}&state=${state}&next=${encodeURIComponent('//evil.example')}`, APP), null)
+  assert.equal(desktopAuthFinishUrl(`mikka-desktop://auth?token=${token}&state=${state}&next=${encodeURIComponent('https://evil.example')}`, APP), null)
 })

@@ -7,6 +7,7 @@ import { getPathname } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
+import { openSettingsInBrowser } from '@/lib/platform/open-settings'
 import { Google } from '@/components/ui/svgs/google'
 
 // Signing in with Google: links a verified Google account to this Mikka
@@ -23,21 +24,25 @@ export function GoogleSignInSettings({ googleEnabled }: { googleEnabled: boolean
   useEffect(() => {
     if (!googleEnabled) { setGoogleLinked(false); return }
     let current = true
-    void authClient.listAccounts().then(({ data, error: resultError }) => {
-      if (!current) return
-      if (resultError) {
+    const load = () => {
+      void authClient.listAccounts().then(({ data, error: resultError }) => {
+        if (!current) return
+        if (resultError) {
+          setGoogleError(t('googleStatusFailed'))
+          setGoogleLinked(false)
+        } else {
+          setGoogleError('')
+          setGoogleLinked(data?.some(account => account.providerId === 'google') ?? false)
+        }
+      }).catch(() => {
+        if (!current) return
         setGoogleError(t('googleStatusFailed'))
         setGoogleLinked(false)
-      } else {
-        setGoogleError('')
-        setGoogleLinked(data?.some(account => account.providerId === 'google') ?? false)
-      }
-    }).catch(() => {
-      if (!current) return
-      setGoogleError(t('googleStatusFailed'))
-      setGoogleLinked(false)
-    })
-    return () => { current = false }
+      })
+    }
+    load()
+    window.addEventListener('focus', load)
+    return () => { current = false; window.removeEventListener('focus', load) }
   }, [googleEnabled, t])
 
   useEffect(() => {
@@ -57,6 +62,9 @@ export function GoogleSignInSettings({ googleEnabled }: { googleEnabled: boolean
   async function linkGoogle() {
     setGooglePending(true); setGoogleError(''); setGoogleSuccess('')
     try {
+      const handoff = await openSettingsInBrowser('account')
+      if (handoff === 'desktop') { setGoogleSuccess(t('linkInBrowser')); return }
+      if (handoff === 'unsupported') { setGoogleError(t('browserUpdateRequired')); return }
       const callbackURL = new URL(withBasePath('/api/integrations/google/callback'), window.location.origin)
       callbackURL.searchParams.set('locale', locale)
       const settingsURL = new URL(withBasePath(`${getPathname({ locale, href: '/' })}?settings=account&google=failed`), window.location.origin)
@@ -65,6 +73,7 @@ export function GoogleSignInSettings({ googleEnabled }: { googleEnabled: boolean
       if (result.data?.url) window.location.assign(result.data.url)
     } catch {
       setGoogleError(t('googleLinkFailed'))
+    } finally {
       setGooglePending(false)
     }
   }

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
+import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
 import { disconnectLinearAccount, disableLinearTeam, enableLinearTeam, getLinearIntegrationState, listLinearTeamOptions, retryLinearDelivery, retryLinearIssue, startLinearOAuth } from '@/app/actions/linear-sync'
 
 type IntegrationState = Awaited<ReturnType<typeof getLinearIntegrationState>>
@@ -73,9 +74,12 @@ export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | nu
   async function connect() {
     setBusy(true); setError('')
     try {
+      const handoff = await openCurrentPageInBrowser()
+      if (handoff === 'desktop') return
+      if (handoff === 'unsupported') { setError(t('browserUpdateRequired')); return }
       const result = await startLinearOAuth()
       window.location.assign(result.url)
-    } catch { setError(t('operationError')); setBusy(false) }
+    } catch { setError(t('operationError')) } finally { setBusy(false) }
   }
 
   async function enableTeam() {

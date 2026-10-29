@@ -1,6 +1,7 @@
 // IPC channel names shared by the preload script and Electron main.
 // Kept free of runtime dependencies so the sandboxed preload stays small.
 export const IPC = {
+  appOpenExternal: "mikka:app:open-external",
   settingsGetAll: "mikka:settings:get-all",
   settingsSet: "mikka:settings:set",
   quotaGet: "mikka:quota:get",
