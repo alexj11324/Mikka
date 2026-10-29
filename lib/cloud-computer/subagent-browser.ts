@@ -2,6 +2,8 @@ import 'server-only'
 import { pool } from '@/lib/db'
 import { connectComputer } from '@/lib/computer/e2b-provider'
 import { grant, runtimeRequest } from './runtime'
+import { z } from 'zod'
+const observationSchema = z.object({ targetId: z.string().min(1), origin: z.string().url(), loaderId: z.string().min(1), inputs: z.array(z.object({ backendNodeId: z.number().int().positive(), credentialRole: z.enum(['username', 'password']) }).strict()).min(1).max(2) }).strict()
 
 /** Broker contract. This binding is resolved exclusively from authenticated
  * owner/workspace/bot/subagent state; endpoints never enter model or UI data. */
@@ -16,8 +18,13 @@ export async function resolveSubagentBrowserTarget(input: { userId: string; work
   if (state.guarded || state.targetId !== row.targetId || typeof state.url !== 'string') throw new Error('Browser target unavailable')
   const parsed = new URL(state.url)
   if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('Browser target unavailable')
+  const observation = observationSchema.parse(await runtimeRequest(row.sandboxId, row, '/credentials/observe'))
+  if (observation.targetId !== row.targetId || observation.origin !== parsed.origin || new Set(observation.inputs.map(item => item.credentialRole)).size !== observation.inputs.length || !observation.inputs.some(item => item.credentialRole === 'password')) throw new Error('Credential target unavailable')
+  const policy = (await pool.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [input.workspaceId])).rows[0]
+  if (policy?.permission === 'deny') throw new Error('Credential target unavailable')
+  const observedInputs = observation.inputs.map(item => ({ ...item, loaderId: observation.loaderId, epoch: Number(row.epoch), permissionVersion: Number(policy?.version ?? 0) }))
   const capability = await grant(await connectComputer(row.sandboxId), row, 'broker')
-  return { targetId: row.targetId as string, origin: parsed.origin, ...capability }
+  return { targetId: row.targetId as string, origin: parsed.origin, observedInputs, ...capability }
 }
 
 export async function resolveThreadBrowserTarget(input: { userId: string; workspaceId: string; runId: string }) {

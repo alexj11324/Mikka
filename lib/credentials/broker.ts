@@ -28,7 +28,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     // Policy changes take the same lock in the computer host. The signed
     // gateway capability must additionally be issued by the trusted host
     // after its existing computer_use decision; this query is not approval.
-    if (!caller.subagentId || caller.runId || !target.observedInput) throw new CredentialError('credential_denied', 404)
+    if (!caller.subagentId || caller.runId || !(target.observedInputs?.length || target.observedInput)) throw new CredentialError('credential_denied', 404)
     // Global order: workspace policy before account/origin credentials. The
     // invoking host must not hold either lock across this service call.
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${caller.workspaceId}`])
@@ -39,8 +39,11 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
       WHERE s.id=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3 AND s."botId"=$4 AND s.status IN ('running','needs_you') FOR UPDATE OF s`,
     [caller.subagentId, caller.userId, caller.workspaceId, caller.botId])).rows[0]
     if (!bound || bound.permission === 'deny') throw new CredentialError('credential_denied', 404)
-    const observed = target.observedInput
-    if (!Number.isSafeInteger(observed.backendNodeId) || observed.backendNodeId < 1 || !['username','password'].includes(observed.credentialRole)) throw new CredentialError('credential_denied', 404)
+    const inputs = target.observedInputs ?? [target.observedInput!]
+    if (inputs.length < 1 || inputs.length > 2 || new Set(inputs.map(item => item.credentialRole)).size !== inputs.length) throw new CredentialError('credential_denied', 404)
+    const observed = inputs[0]
+    if (inputs.some(item => item.loaderId !== observed.loaderId || item.epoch !== observed.epoch || item.permissionVersion !== observed.permissionVersion)) throw new CredentialError('credential_denied', 404)
+    if (!inputs.some(item => item.credentialRole === 'password') || inputs.some(item => !Number.isSafeInteger(item.backendNodeId) || item.backendNodeId < 1 || !['username','password'].includes(item.credentialRole))) throw new CredentialError('credential_denied', 404)
     const common = { userId: caller.userId, workspaceId: caller.workspaceId, botId: caller.botId, subagentId: caller.subagentId, origin: context.origin, loaderId: observed.loaderId, permissionAction: 'computer_use' as const }
     assertCredentialPageBinding({ ...common, targetId: target.targetId, epoch: observed.epoch, permissionVersion: observed.permissionVersion, expiresAt: target.expiresAt }, { ...common, targetId: bound.targetId, epoch: bound.epoch, permissionVersion: bound.permissionVersion })
     if (target.origin !== context.origin) throw new CredentialError('credential_denied', 404)
@@ -86,7 +89,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
       let value = JSON.parse(plaintext.toString('utf8'))
       plaintext.fill(0); plaintext = undefined
       if (typeof value.username !== 'string' || typeof value.password !== 'string') throw new CredentialError()
-      await cdp.insertAtObservedInput(context.origin, observed.loaderId, observed.backendNodeId, observed.credentialRole, observed.credentialRole === 'password' ? value.password : value.username)
+      for (const input of inputs) await cdp.insertAtObservedInput(context.origin, input.loaderId, input.backendNodeId, input.credentialRole, input.credentialRole === 'password' ? value.password : value.username)
       value = null
       await client.query(`INSERT INTO credential_access_events(credential_id,user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,$6,$7)`, [context.credentialId, context.userId, caller.botId, caller.runId, caller.subagentId, context.origin, 'input_inserted_guarded'])
       await client.query('COMMIT'); completed = true

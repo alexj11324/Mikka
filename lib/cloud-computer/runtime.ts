@@ -34,10 +34,12 @@ export async function installSubagentRuntime(sandbox: Sandbox, ownerId: string) 
   await sandbox.commands.run('for i in $(seq 1 30); do curl -fsS --max-time 1 http://127.0.0.1:6082/version >/dev/null && exit 0; sleep .2; done; exit 1', { user: 'root', timeoutMs: 10_000 })
   await verifyGatewayVersion(sandbox)
 }
-export async function grant(sandbox: Sandbox, row: BrowserBinding, role: 'runtime' | 'view' | 'broker') {
+export type CredentialContinuation = { actionId: string; operation: 'submit' | 'clear'; targetId: string; origin: string; loaderId: string; inputs: { backendNodeId: number; credentialRole: 'username' | 'password' }[] }
+export async function grant(sandbox: Sandbox, row: BrowserBinding, role: 'runtime' | 'view' | 'broker' | 'credential-continuation', credentialAction?: CredentialContinuation) {
+  if ((role === 'credential-continuation') !== Boolean(credentialAction)) throw new Error('Invalid capability purpose')
   await verifyGatewayVersion(sandbox)
   const expiresAt = Date.now() + (role === 'broker' ? 90_000 : 120_000)
-  const payload = Buffer.from(JSON.stringify({ ownerId: row.ownerId, workspaceId: row.workspaceId, botId: row.botId, subagentId: row.id, epoch: row.epoch, role, ...(row.display ? { display: row.display } : {}), exp: Math.floor(expiresAt / 1000) })).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({ ownerId: row.ownerId, workspaceId: row.workspaceId, botId: row.botId, subagentId: row.id, epoch: row.epoch, role, ...(credentialAction ? { credentialAction } : {}), ...(row.display ? { display: row.display } : {}), exp: Math.floor(expiresAt / 1000) })).toString('base64url')
   const key = await sandbox.files.read('/run/mikka-subagents/key', { user: 'root', format: 'bytes' })
   const token = `${payload}.${createHmac('sha256', key).update(payload).digest('base64url')}`
   return { endpoint: `https://${sandbox.getHost(6082)}/agents/${row.id}?token=${token}`, expiresAt }

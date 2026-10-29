@@ -1,7 +1,7 @@
 name: Subagents and thread backend
 on:
   push:
-    branches: ['codex/342-runtime']
+    branches: ['codex/342-runtime', 'codex/180-account-credential-vault']
   workflow_dispatch:
 permissions:
   contents: read
@@ -31,6 +31,7 @@ jobs:
       - run: pnpm exec oxlint --deny-warnings lib/cloud-computer workflows/subagent app/api/computer/events scripts/e2b/subagent-cdp.mjs
       - run: python3 -m py_compile scripts/e2b/subagent-gateway.py scripts/e2b/subagent-live-acceptance.py
       - run: python3 scripts/e2b/subagent-guard.test.py
+      - run: node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/cloud-computer/credential-reviews.test.ts
       - name: Test credential broker protocol against isolated Chromium
         run: |
           python3 -m venv "$RUNNER_TEMP/pr346-gateway"

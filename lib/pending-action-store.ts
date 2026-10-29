@@ -36,7 +36,9 @@ export async function listPendingActions(userId: string): Promise<PendingActionV
   const rows = await db.select().from(pendingActions)
     .where(and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
     .orderBy(desc(pendingActions.createdAt)).limit(MAX_PENDING)
-  return rows.flatMap(row => isApprovalAction(row.action)
+  return rows.flatMap(row => (row.action === 'credential_operation' || row.action === 'browser_operation') && Date.now() - row.createdAt.getTime() <= 5 * 60_000
+    ? [{ id: row.id, action: row.action, input: { summary: row.input.summary, origin: row.input.origin, operation: row.input.operation, description: row.action === 'credential_operation' ? 'The page stays hidden until entered login fields are absent. This does not confirm authentication.' : undefined }, context: null, status: row.status, createdAt: row.createdAt.toISOString() } as PendingActionView]
+    : isApprovalAction(row.action)
     ? [{ id: row.id, action: row.action, input: row.input, context: row.context as PendingActionView['context'], status: row.status, createdAt: row.createdAt.toISOString() }]
     : [])
 }

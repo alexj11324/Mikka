@@ -30,6 +30,10 @@ export async function tick(actor: Actor, botId: string, id: string): Promise<'te
       const site = new URL(page.url).origin
       const { requestBrowserLogin } = await import('@/lib/cloud-computer/login-provider')
       const login = await requestBrowserLogin({ ...actor, botId, subagentId: id }, site)
+      if (login.status === 'needs_approval') {
+        await report(actor.userId, botId, id, `The saved login at ${site} needs approval in the pending action card. No input or submission has happened.`, 'credential-approval')
+        return 'waiting'
+      }
       const continuation = browserLoginContinuation(login.status)
       if (continuation === 'running') return 'running'
       await store.update(actor, botId, id, 'needs_you', 'needs_you', { kind: 'login', site })

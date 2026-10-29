@@ -6,7 +6,7 @@ import { fingerprint } from './fingerprint'
 
 /** Only the trusted host may attach these to an owner-bound broker grant. */
 export type ObservedCredentialInput = { loaderId: string; backendNodeId: number; credentialRole: 'username' | 'password'; epoch: number; permissionVersion: number }
-export type BrowserTarget = { targetId: string; origin: string; endpoint: string; expiresAt: number; observedInput?: ObservedCredentialInput }
+export type BrowserTarget = { targetId: string; origin: string; endpoint: string; expiresAt: number; observedInput?: ObservedCredentialInput; observedInputs?: ObservedCredentialInput[] }
 export const nonce = () => randomBytes(32).toString('base64url')
 export const hashNonce = (value: string) => createHash('sha256').update(value).digest('hex')
 const denied = () => new CredentialError('credential_denied', 404)

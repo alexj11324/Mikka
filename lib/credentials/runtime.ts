@@ -6,7 +6,7 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { resolveSubagentBrowserTarget, resolveThreadBrowserTarget } from '@/lib/cloud-computer/subagent-browser'
 import { canonicalOrigin, CredentialError, type BrowserCaller } from './contracts'
 import { awsKms } from './kms'
-import { CredentialStore } from './store'
+import { CredentialStore, type BrowserTarget } from './store'
 
 export const credentialStore = new CredentialStore(pool, awsKms('app'))
 export async function credentialActor(request: Request) {
@@ -21,10 +21,10 @@ export async function login(caller: BrowserCaller, site: string, submittedUserna
   if (process.env.CREDENTIAL_VAULT_ENABLED !== '1') throw new CredentialError()
   const origin = canonicalOrigin(site)
   await credentialStore.authorize(caller)
-  const target = await resolveCredentialBrowser(caller)
-  const lease = await credentialStore.lease(caller, origin, target, submittedUsername, options?.forcePassword)
-  if (lease.status === 'needs_login') return lease
-  return executeCredentialLease(lease.lease, origin)
+  const target: BrowserTarget = await resolveCredentialBrowser(caller)
+  if (!caller.subagentId || !target.observedInputs?.length || target.origin !== origin) throw new CredentialError()
+  const { proposeCredentialOperation } = await import('@/lib/cloud-computer/credential-reviews')
+  return proposeCredentialOperation(credentialStore.pool, caller, target, 'fill', { submittedUsername, forcePassword: options?.forcePassword })
 }
 
 export async function resolveCredentialBrowser(caller: BrowserCaller) {
