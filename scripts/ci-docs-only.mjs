@@ -14,7 +14,7 @@
 //   node scripts/ci-docs-only.mjs --base origin/main --head HEAD
 //
 // Also selects the browser layer. Unknown/shared paths run full functionality;
-// main, nightly and manual integration runs include performance. All outputs
+// code-bearing main pushes, nightly and manual integration runs include performance. All outputs
 // are computed by the trusted main copy, never by PR-supplied path patterns.
 
 import { execFileSync } from 'node:child_process'
@@ -160,10 +160,10 @@ export function main() {
         base = payload.before
         head = payload.after || process.env.GITHUB_SHA
       } else {
-      // Classify the whole branch against main, not just the pushed commits:
-      // a docs-only last push must not hide earlier code changes.
-      base = 'origin/main'
-      head = process.env.GITHUB_SHA
+        // Classify the whole branch against main, not just the pushed commits:
+        // a docs-only last push must not hide earlier code changes.
+        base = 'origin/main'
+        head = process.env.GITHUB_SHA
       }
     }
   }
