@@ -7,6 +7,7 @@ import { ClaudeAdapter } from '../src/adapters/claude'
 import { CodexAdapter } from '../src/adapters/codex'
 import { CursorAdapter } from '../src/adapters/cursor'
 import { NoSandbox } from '../src/agents/sandbox'
+import { ToolApprovalGate } from '../src/agents/tool-approval'
 import { buildChildEnv } from '../src/env'
 import { createLogger } from '../src/log'
 
@@ -20,17 +21,23 @@ for (const kind of ['claude_code', 'codex', 'cursor'] as const) test(`${kind} re
   const provider = (runId: string) => { calls.push(runId); return runId === 'allowed' ? expected : undefined }
   const common = { stateDir: join(root, 'state'), computerProvider: provider }
   const adapter = kind === 'claude_code'
-    ? new ClaudeAdapter({ ...common, binary: resolve('test/fakes/fake-claude.mjs'), configDir: join(home, '.claude') })
+    ? new ClaudeAdapter({ ...common, binary: resolve('test/fakes/fake-claude.mjs'), sandbox: new NoSandbox(), configDir: join(home, '.claude') })
     : kind === 'codex'
       ? new CodexAdapter({ ...common, binary: resolve('test/fakes/fake-codex.mjs'), sandbox: new NoSandbox(), userHome: home })
       : new CursorAdapter({ ...common, binary: resolve('test/fakes/fake-acp.mjs'), sandbox: new NoSandbox() })
   for (const runId of ['allowed', 'denied']) {
-    const session = await adapter.start({ runId, cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log: createLogger({ level: 'silent' }), prompt: 'COMPUTER_CONFIG_TEST' })
-    const chunks = []
-    for await (const event of session.events()) if (event.type === 'chunk' && event.chunk.type === 'text-delta') chunks.push(event.chunk.delta)
-    const found = JSON.parse(chunks.join('')).computer
-    if (runId === 'allowed') assert.deepEqual({ command: found.command, args: found.args, env: found.env }, expected)
-    else assert.equal(found, null)
+    // This fixture only inspects configuration; no tool operation is granted.
+    const toolApproval = new ToolApprovalGate(runId, {
+      permission: () => 'deny', ask: async () => 'deny', isLive: id => id === runId,
+    })
+    try {
+      const session = await adapter.start({ runId, toolApproval, cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log: createLogger({ level: 'silent' }), prompt: 'COMPUTER_CONFIG_TEST' })
+      const chunks = []
+      for await (const event of session.events()) if (event.type === 'chunk' && event.chunk.type === 'text-delta') chunks.push(event.chunk.delta)
+      const found = JSON.parse(chunks.join('')).computer
+      if (runId === 'allowed') assert.deepEqual({ command: found.command, args: found.args, env: found.env }, expected)
+      else assert.equal(found, null)
+    } finally { toolApproval.revoke() }
   }
   assert.deepEqual(calls, ['allowed', 'denied'])
 })

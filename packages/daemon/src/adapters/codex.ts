@@ -1,4 +1,4 @@
-import { sandboxComputerSpec, computerSandboxPolicy } from '../computer/transport'
+import { sandboxComputerSpec, computerSandboxPolicy, computerDomain } from '../computer/transport'
 // Codex adapter (ADR 0003): the user's own signed-in `codex app-server`,
 // one process per session, inside the run's sandbox, with an isolated
 // `CODEX_HOME` (see `agents/harness-home.ts`). Thread = session: `thread/start`
@@ -34,6 +34,10 @@ import {
   type ComputerSpecProvider,
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
+import { requireRunToolApproval } from "../agents/tool-approval"
+import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
+import { runNetworkApproval } from "../agents/run-network"
+import { rawCliShellAvailable, runPolicy } from "../permissions"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
@@ -59,6 +63,8 @@ import type {
 
 export interface CodexAdapterOptions {
   sandbox: AgentSandbox
+  /** Optional host-owned additional ceiling; conservative intersection only. */
+  networkCeiling?: readonly string[]
   /** The daemon's adapter state dir (per-run dirs and homes live under it). */
   stateDir: string
   binary?: string
@@ -260,6 +266,8 @@ export class CodexAdapter implements AgentAdapter {
     options: SessionOptions &
       Partial<Pick<StartOptions, "prompt" | "continueSession">>
   ): Promise<AgentSession> {
+    const approval = requireRunToolApproval(options.runId, options.toolApproval)
+    if (!await approval.checkLive()) { approval.revoke(); throw new Error('Run tool approval unavailable') }
     const log = options.log.child({ harness: "codex" })
     if (options.mailbox && mode !== 'new') throw new Error('Run mailbox requires a fresh Codex thread; resume capability is unverified')
     const paths = runPaths(this.options.stateDir, options.runId)
@@ -321,6 +329,7 @@ export class CodexAdapter implements AgentAdapter {
     const argv = [
       this.options.binary ?? "codex",
       "app-server",
+      "-c", `features.shell_tool=${rawCliShellAvailable(runPolicy(options.policy))}`,
       "-c",
       `mcp_servers.${MCP_SERVER_NAME}.command=${toml(mcp.command)}`,
       "-c",
@@ -344,13 +353,27 @@ export class CodexAdapter implements AgentAdapter {
       ]),
     ]
     const checkAuth = guardCodexAuth(codexHome.authFile, log)
-    const child = await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, {
+    const spawnOptions = {
       cwd: ctx.worktree,
       env: { ...options.env, ...ctx.tempEnv(), CODEX_HOME: codexHome.home },
       policy: computerSandboxPolicy(ctx.policy(), computerMcp),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
-    })
+    }
+    const requestedCeiling = this.options.networkCeiling
+    const maximum = requestedCeiling === undefined ? spawnOptions.policy.allowDomains
+      : spawnOptions.policy.allowDomains.includes('*') ? [...requestedCeiling]
+      : requestedCeiling.includes('*') ? spawnOptions.policy.allowDomains
+      : requestedCeiling.filter(domain => spawnOptions.policy.allowDomains.includes(domain))
+    let launcher: ReturnType<typeof spawnRunSandbox> | undefined
+    const child = this.options.spawnCli || this.options.sandbox.kind === 'none'
+      ? await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
+      : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp)) }))
+    if (launcher) {
+      const ownedLauncher = launcher
+      const off = options.toolApproval!.onRevoke(() => { void ownedLauncher.revoke().catch(() => undefined) })
+      void child.exited.finally(off)
+    }
     // After the whole group is gone (`exited` kills it first).
     void child.exited.then(checkAuth)
     const rpc: MessageConnection = jsonlConnection(
@@ -363,15 +386,28 @@ export class CodexAdapter implements AgentAdapter {
     let activeTurn: string | null = null
     let pendingTurnStart: Promise<void> | null = null
     let ending = false
+    let cancelling = false
     let lastError: string | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
+    const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
+    const registeredMcpTool = (server: string, tool: string) =>
+      (server === MCP_SERVER_NAME && ['submit','ask_human','report_blocked'].includes(tool)) ||
+      (Boolean(computerMcp) && server === COMPUTER_MCP_SERVER_NAME && ['get_desktop_state','click','type_text','press_key','scroll'].includes(tool))
 
     /** The CLI and everything it started are gone before the exit is told. */
     let ended: Promise<void> | undefined
-    const finish = (event: Parameters<EventQueue["exit"]>[0] | null) =>
-      (ended ??= close(event))
+    const finish = (event: Parameters<EventQueue["exit"]>[0] | null) => {
+      if (ended) return ended
+      ending = true
+      // Publish before close revokes the gate: an owner revocation listener
+      // can synchronously re-enter cancel(), which must join this outcome.
+      ended = Promise.resolve().then(() => close(event))
+      return ended
+    }
     const close = async (event: Parameters<EventQueue["exit"]>[0] | null) => {
       ending = true
+      pendingMcp.clear()
+      options.toolApproval?.revoke()
       if (pending.length > 0)
         log.warn(
           { dropped: pending.length },
@@ -382,8 +418,28 @@ export class CodexAdapter implements AgentAdapter {
       if (event) queue.exit(event)
     }
 
-    // Mikka's sandbox decides; inside it every action is allowed.
+    // Native requests retain their active turn identity and live run gate;
+    // callbacks cannot widen the enclosing sandbox's capability ceiling.
     rpc.onRequest(async (method, params: unknown) => {
+      if (method === 'mcpServer/elicitation/request') {
+        if (pendingTurnStart) await pendingTurnStart
+        const call = params as {threadId?:unknown;turnId?:unknown;serverName?:unknown;mode?:unknown;_meta?:{codex_approval_kind?:unknown};requestedSchema?:{type?:unknown;properties?:unknown}} | null
+        const schema = call?.requestedSchema, properties = schema?.properties
+        // Codex's native transport approval is not the broker's action ask.
+        // Bind only an already observed fixed host tool to this live turn;
+        // human-readable elicitation messages never select authority.
+        if (!call || ending || !activeTurn || call.threadId !== sessionId || call.turnId !== activeTurn ||
+          call.mode !== 'form' || call._meta?.codex_approval_kind !== 'mcp_tool_call' ||
+          !schema || schema.type !== 'object' || Object.keys(schema).some(key => !['type','properties'].includes(key)) ||
+          !properties || typeof properties !== 'object' || Array.isArray(properties) || Object.keys(properties).length) return {action:'decline'}
+        const candidates = [...pendingMcp.entries()].filter(([,item]) => item.turnId === activeTurn && item.server === call.serverName && !item.attempted)
+        if (candidates.length !== 1) return {action:'decline'}
+        const [itemId,item] = candidates[0]
+        item.attempted = true // repeated native requests never mint another permit
+        const decision = await approval.request({runId:options.runId,harness:'codex',requestId:`${activeTurn}/${itemId}/mcp-transport`,method:`cli/mcp__${item.server}__${item.tool}`,input:{} })
+        return decision === 'allow' && !ending && !approval.revoked && call.turnId === activeTurn && pendingMcp.get(itemId) === item
+          ? {action:'accept',content:{}} : {action:'decline'}
+      }
       if (method === 'item/tool/call') {
         if (pendingTurnStart) await pendingTurnStart
         const call = params as { threadId?: unknown; turnId?: unknown; namespace?: unknown; tool?: unknown; arguments?: unknown }
@@ -410,8 +466,22 @@ export class CodexAdapter implements AgentAdapter {
           throw new Error(SUBSCRIPTION_AUTH_ERROR)
         }
       }
-      if (method.endsWith("requestApproval") || method.endsWith("Approval"))
-        return { decision: "accept" }
+      if (method === "item/commandExecution/requestApproval" || method === "item/fileChange/requestApproval") {
+        if (!options.toolApproval) return { decision: "decline" }
+        if (pendingTurnStart) await pendingTurnStart
+        const call = params as { threadId?: unknown; turnId?: unknown; itemId?: unknown; approvalId?: unknown; grantRoot?: unknown; availableDecisions?: unknown } | null
+        if (!call || ending || call.threadId !== sessionId || call.turnId !== activeTurn || typeof call.itemId !== 'string' || !activeTurn) return { decision: "decline" }
+        // A grantRoot can widen writes for a session; this bridge grants only
+        // one exact operation. Never convert it into a session-wide grant.
+        if (method === 'item/fileChange/requestApproval' && call.grantRoot != null) return { decision: 'cancel' }
+        if (call.availableDecisions != null && (!Array.isArray(call.availableDecisions) || !call.availableDecisions.includes('accept'))) return { decision: 'cancel' }
+        if (call.approvalId != null && (typeof call.approvalId !== 'string' || !call.approvalId)) return { decision: 'decline' }
+        const callbackId = typeof call.approvalId === 'string' ? call.approvalId : call.itemId
+        const decision = await options.toolApproval.request({ runId: options.runId, harness: 'codex', requestId: `${activeTurn}/${call.itemId}/${callbackId}`, method, input: params })
+        // Do not grant a session or policy amendment in place of one action.
+        return { decision: decision === 'allow' && !options.toolApproval.revoked && !ending && call.turnId === activeTurn ? 'accept' : 'decline' }
+      }
+      if (method === "item/permissions/requestApproval") return { permissions: {}, scope: "turn" }
       log.warn({ method }, "unhandled codex request; declining")
       return { decision: "decline" }
     })
@@ -441,7 +511,13 @@ export class CodexAdapter implements AgentAdapter {
         case "item/started":
         case "item/completed": {
           const phase = method === "item/started" ? "started" : "completed"
-          const { item } = params as ItemNotification
+          const { item, threadId: itemThread, turnId: itemTurn } = params as ItemNotification
+          if (item.type === 'mcpToolCall' && itemThread === sessionId && typeof itemTurn === 'string') {
+            const mcpItem = item as Extract<ThreadItem,{type:'mcpToolCall'}>
+            if (phase === 'completed') pendingMcp.delete(item.id)
+            else if (!pendingMcp.has(item.id) && pendingMcp.size < 1024 && registeredMcpTool(mcpItem.server,mcpItem.tool))
+              pendingMcp.set(item.id,{turnId:itemTurn,server:mcpItem.server,tool:mcpItem.tool,attempted:false})
+          }
           for (const chunk of codexItemChunks(
             phase,
             item,
@@ -489,6 +565,7 @@ export class CodexAdapter implements AgentAdapter {
     rpc.listen()
 
     const turnCompleted = async (turn: TurnNotification["turn"]) => {
+      for (const [id,item] of pendingMcp) if (item.turnId === turn.id) pendingMcp.delete(id)
       queue.chunk({
         type: "data-usage",
         data: {
@@ -499,6 +576,7 @@ export class CodexAdapter implements AgentAdapter {
         },
       })
       if (ending) return
+      if (cancelling) return finish({ outcome: "cancelled" })
       const handoff = ctx.readHandoff(log)
       if (handoff) return finish(handoff)
       const next = pending.shift()
@@ -551,6 +629,7 @@ export class CodexAdapter implements AgentAdapter {
       if (ending) return
       ending = true
       rpc.dispose()
+      if (cancelling) return queue.exit({ outcome: "cancelled" })
       const handoff = ctx.readHandoff(log)
       if (handoff) return queue.exit(handoff)
       queue.exit({
@@ -577,7 +656,7 @@ export class CodexAdapter implements AgentAdapter {
       )
       // Public schemas omit the experimental dynamicTools field. Support only
       // the exact pinned CLI whose Rust protocol and response were audited.
-      if (options.mailbox && !/(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(initialized.userAgent ?? '')) throw new Error('Run mailbox requires the audited Codex0.163.0 dynamic-tools interface')
+      if ((options.mailbox || !rawCliShellAvailable(runPolicy(options.policy))) && !/(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(initialized.userAgent ?? '')) throw new Error('Run permissions require the audited Codex0.163.0 tool interface')
       await rpc.sendNotification("initialized")
       if (externalAuth) {
         try {
@@ -600,7 +679,7 @@ export class CodexAdapter implements AgentAdapter {
       }
       const thread: ThreadStartParams = {
         cwd: ctx.worktree,
-        approvalPolicy: "never",
+        approvalPolicy: "on-request",
         sandbox: "danger-full-access",
         developerInstructions: ctx.instructions(),
         ...(options.mailbox ? { dynamicTools: options.mailbox.tools.map(tool => ({ type: 'function' as const, ...tool })) } : {}),
@@ -667,6 +746,11 @@ export class CodexAdapter implements AgentAdapter {
         else await startTurn(message)
       },
       async cancel() {
+        // Revoking the gate tears down the owned proxy/CLI immediately. Mark
+        // intent first so that child exit or turn/completed cannot win the
+        // race and report a successful/failed run for this cancellation.
+        cancelling = true
+        options.toolApproval?.revoke()
         if (activeTurn && !ending) {
           await rpc
             .sendRequest("turn/interrupt", {
@@ -678,6 +762,7 @@ export class CodexAdapter implements AgentAdapter {
         await finish({ outcome: "cancelled" })
       },
       async detach() {
+        options.toolApproval?.revoke()
         await finish(null)
       },
     }

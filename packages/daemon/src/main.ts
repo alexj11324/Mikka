@@ -48,6 +48,7 @@ import { publishRun, snapshotTree } from "./agents/publish"
 import { runPaths } from "./agents/run-context"
 import { runVerify } from "./agents/verify"
 import { SandboxRuntime, type AgentSandbox } from "./agents/sandbox"
+import { SandboxManager } from '@anthropic-ai/sandbox-runtime'
 import { buildChildEnv } from "./env"
 import { browseFolder } from "./fs-browse"
 import {
@@ -370,6 +371,7 @@ export class Daemon {
       adapters,
       startSubscription: hosted?.start,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
+      prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
       bootstrap: hosted
         ? async (worktree, repo) => {
             if (
@@ -458,7 +460,19 @@ export class Daemon {
       ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
       : (this.options.harnesses ?? (await detectHarnesses()))
     if (this.stopped) throw new Error("daemon stopped during startup")
-    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({ ...info, coordinator: hosted ? false : coordinatorCapable(info) }))
+    // A callback alone is insufficient: the host must own the enforcement
+    // boundary and bind its lifetime to the run's authenticated gate.
+    const runApprovalTransport = typeof this.options.link.prepareRunToolApproval === 'function'
+    const localIsolation = this.ownedSandbox !== null && this.sandbox === this.ownedSandbox
+    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
+      ...info,
+      // Local enforcement requires the successful owned SRT probe. Hosted
+      // enforcement uses its existing network-none/read-only Docker boundary
+      // and gate-bound broker/container teardown; general egress stays outside
+      // that ceiling. Codex also verifies its pinned interface at initialize.
+      toolApproval: runApprovalTransport && (hosted || (localIsolation && (info.harness === 'claude_code' || (info.harness === 'codex' && /(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(info.version ?? ''))))) ? true as const : undefined,
+      coordinator: hosted ? false : coordinatorCapable(info),
+    }))
     // Runs survive restarts: pick up what the journal says was active.
     this.supervisor.resumeAll()
     if (!hosted && this.options.quotaSource !== null) {
@@ -662,6 +676,10 @@ export class Daemon {
       return false
     })
     try {
+      if (process.platform === 'linux') {
+        const dependencies = SandboxManager.checkDependencies()
+        if (dependencies.warnings.length) throw new Error(`Run sandbox isolation unavailable: ${dependencies.warnings.join('; ')}`)
+      }
       await sandbox.probe()
       this.ownedSandbox = sandbox
       return sandbox
@@ -704,9 +722,8 @@ export class Daemon {
   }
 
   /**
-   * Claude Code, Codex and Cursor. Claude Code is confined by the sandbox
-   * its own SDK turns on (the adapter's `settings`); the other two run
-   * inside the daemon's `AgentSandbox`.
+   * Claude Code and Codex enclose the whole CLI in a run-owned official
+   * sandbox. Cursor retains the existing daemon AgentSandbox boundary.
    */
   private realAdapters(): [Harness, AgentAdapter][] {
     const sandbox = this.agentSandbox()
@@ -721,7 +738,7 @@ export class Daemon {
         proxyPath: fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url)), nodeBinary: process.execPath })
     }
     return [
-      ["claude_code", new ClaudeAdapter({ stateDir, binary: bin.claude_code, computerProvider })],
+      ["claude_code", new ClaudeAdapter({ sandbox, stateDir, binary: bin.claude_code, computerProvider })],
       ["codex", new CodexAdapter({ sandbox, stateDir, binary: bin.codex, computerProvider })],
       ["cursor", new CursorAdapter({ sandbox, stateDir, binary: bin.cursor, computerProvider })],
     ]

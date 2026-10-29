@@ -44,9 +44,20 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
     await pool.query('insert into agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"agentDefinition") values($1,$2,$3,$4,$5,$6,\'queued\',$7)', [runId, owner, issueId, agentId, deviceId, repoId, JSON.stringify(definition)])
     await pool.query('insert into device_tokens(id,"userId",name,"tokenHash","lastUsedAt","expiresAt") values($1,$2,$3,$4,now(),now()+interval \'5 minutes\')', [deviceTokenId, owner, 'Mailbox default-off CI', tokenHash(deviceToken)])
     deviceTokenCreated = true
+    await t.test('a legacy CLI device without run approval transport cannot claim or receive a run token', async () => {
+      const response=await claim(request(`/v1/devices/${deviceId}/runs/${runId}/claim`,deviceToken),{params:Promise.resolve({deviceId,runId})})
+      assert.equal(response.status,409)
+      assert.deepEqual(await response.json(),{error:'Run approval capability unavailable.'})
+      assert.equal((await pool.query('select status from agent_runs where id=$1',[runId])).rows[0].status,'queued')
+      assert.equal((await pool.query('select count(*)::int as count from run_tokens where "runId"=$1',[runId])).rows[0].count,0)
+    })
+    // This is a newly created synthetic current-protocol device fixture, not
+    // evidence that the CI host has a usable sandbox. Runtime capability is
+    // verified separately by the real launcher acceptance gate.
+    await pool.query('update devices set harnesses=$2::jsonb where id=$1 and "ownerId"=$3',[deviceId,JSON.stringify([{harness:'codex',installed:true,version:'0.163.0',toolApproval:true}]),owner])
     await t.test('actual device-authenticated claim keeps ordinary MCP and omits mailbox capability', async () => {
       const response = await claim(request(`/v1/devices/${deviceId}/runs/${runId}/claim`, deviceToken), { params: Promise.resolve({ deviceId, runId }) })
-      assert.equal(response.status, 200)
+      assert.equal(response.status, 200, response.status===200 ? undefined : await response.text())
       const assignment = await response.json()
       assert.equal(assignment.runId, runId)
       assert.ok(assignment.mcp && typeof assignment.mcp.token === 'string')

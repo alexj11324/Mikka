@@ -95,7 +95,8 @@ jobs:
     name: UI policy (full)
     needs: changes
     if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
-    runs-on: ubuntu-latest
+    # Fixed standard Linux image; host namespace/security policy stays unchanged.
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
     env:
       BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
@@ -131,13 +132,47 @@ jobs:
       - run: pnpm test:coordinator-issue-tools
       - name: Prepare pinned hosted-runner test image
         run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
-      - run: pnpm --filter @mikka/daemon test
+      - name: Daemon unit and transport regression tests
+        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
+      - name: Existing mailbox CLI integration tests
+        run: pnpm --filter @mikka/daemon test:mailbox-cli
+      - name: Local computer authority through actual daemon and adapter protocol
+        run: pnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts src/computer/proxy.test.mjs
       - name: Install sandbox runtime dependencies without changing host namespace policy
+        if: ${{ !cancelled() }}
         run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
+      - name: Install pinned official CLI for offline protocol diagnostics
+        if: ${{ !cancelled() }}
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pr13-codex-contract" --no-audit --no-fund --ignore-scripts @openai/codex@0.163.0
+          echo "CODEX_CONTRACT_BIN=$RUNNER_TEMP/pr13-codex-contract/node_modules/.bin/codex" >> "$GITHUB_ENV"
       - name: Require real sandbox probe and daemon lifecycle acceptance (no skips)
-        run: pnpm --filter @mikka/daemon test
+        if: ${{ !cancelled() }}
+        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-sandbox-results.json"
         env:
           MIKKA_SANDBOX_ACCEPTANCE: '1'
+      - name: Preserve offline CLI diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr13-cli-diagnostics-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/pr13-sandbox-results.json
+            ${{ runner.temp }}/pr13-daemon-unit-results.json
+            /tmp/mikka-official-codex-synthetic-*/evidence.json
+            /tmp/mikka-official-codex-synthetic-*/runs/*/official-cli.stderr.log
+            /tmp/mikka-official-codex-computer-*/evidence.json
+            /tmp/mikka-official-codex-computer-*/runs/*/official-cli.stderr.log
+            /tmp/mikka-official-claude-synthetic-*/evidence.json
+            /tmp/mikka-official-claude-synthetic-*/adapters/runs/*/official-cli.stderr.log
+            /tmp/mikka-official-claude-computer-*/evidence.json
+            /tmp/mikka-official-claude-computer-*/adapters/runs/*/official-cli.stderr.log
+            /tmp/mikka-hosted-approval-*/evidence.json
+            /tmp/mikka-hosted-approval-*/docker.jsonl
+            /tmp/mikka-hosted-approval-*/created-id
+            /tmp/mikka-hosted-approval-*/adapters/native-resources/*.json
+            /tmp/mikka-launcher-computer-*/evidence.json
+          if-no-files-found: warn
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm --filter @mikka/mobile typecheck
@@ -226,7 +261,7 @@ jobs:
     name: Production build and browser interactions (full)
     needs: changes
     if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 25
     services:
       postgres:
@@ -263,6 +298,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install native dependencies for the CLI approval database roundtrip
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'
@@ -284,7 +321,17 @@ jobs:
         run: pnpm test:db
         env:
           REQUIRE_DB: '1'
-          DB_TEST_EXPECTED: test:active-agents,test:approved-writes-db,test:activity-actor-db,test:agent-kit-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:migration-steps-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db,test:suggestion-artifact-db
+          DB_TEST_EXPECTED: test:active-agents,test:approved-writes-db,test:activity-actor-db,test:agent-kit-db,test:agent-tool-approval-db,test:artifact-migration-db,test:bot-chats-db,test:computer-db,test:conversation-reads,test:coordinator-issue-tools-db,test:coordinator-native,test:groups,test:issue-search-db,test:migration-steps-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-migration-db,test:suggestion-artifact-db
+      - name: Preserve synthetic CLI approval database evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr13-http-cli-approval-${{ github.sha }}
+          path: |
+            /tmp/mikka-http-network-approval-*/evidence.json
+            /tmp/mikka-http-network-approval-*/*/repo/cli.stderr.log
+            ${{ runner.temp }}/pr13-personal-mailbox-results.xml
+          if-no-files-found: warn
       - run: pnpm build
 
   browser-tests:

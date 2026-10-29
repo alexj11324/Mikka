@@ -16,6 +16,8 @@ export const harnessInfoSchema = z.object({
   subscriptionBroker: z.literal(true).optional(),
   /** Set only by an E2B worker with the guarded Bot computer broker. */
   computerBroker: z.literal(true).optional(),
+  /** Run-scoped CLI approvals and policy-version checks are supported. */
+  toolApproval: z.literal(true).optional(),
   /** Version string reported by the CLI, null when not installed. */
   version: z.string().nullable(),
 })

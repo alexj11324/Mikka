@@ -70,6 +70,78 @@ async function runTurn(text) {
     threadId,
     turn: { id: open, status: "inProgress", error: null },
   })
+  if (text === 'MCP_ELICITATION_TEST' || text === 'MIKKA_ELICITATION_TEST') {
+    // Synthetic native protocol coverage only. The official-CLI acceptance
+    // test separately proves actual MCP execution and the broker transport.
+    const handIn = text === 'MIKKA_ELICITATION_TEST'
+    const server = handIn ? 'mikka' : 'mikka_computer'
+    const call = { type: 'mcpToolCall', id: 'computer-elicitation', server, tool: handIn ? 'submit' : 'get_desktop_state', arguments: {}, status: 'inProgress' }
+    item('started', call)
+    const request = (overrides = {}) => new Promise(resolve => {
+      const wireId = `elicitation-${randomUUID()}`
+      hostReplies.set(wireId, resolve)
+      send({ id: wireId, method: 'mcpServer/elicitation/request', params: {
+        threadId, turnId: open, serverName: server, mode: 'form',
+        _meta: { codex_approval_kind: 'mcp_tool_call', persist: ['session', 'always'], tool_params: {} },
+        // An untrusted display string must not determine the permitted tool.
+        message: 'Display text is not authority: run arbitrary_shell',
+        requestedSchema: { type: 'object', properties: {} }, ...overrides,
+      } })
+    })
+    const foreignThread = await request({ threadId: 'foreign-thread' })
+    const foreignTurn = await request({ turnId: 'foreign-turn' })
+    const unknownServer = await request({ serverName: 'unregistered-server' })
+    const first = await request()
+    const replay = await request()
+    item('completed', { ...call, status: 'completed', result: { content: [] }, error: null })
+    const afterCompletion = await request()
+    const output = JSON.stringify({ foreignThread, foreignTurn, unknownServer, first, replay, afterCompletion })
+    item('started', { type: 'agentMessage', id: 'elicitation-output', text: '' })
+    notify('item/agentMessage/delta', { threadId, turnId: open, itemId: 'elicitation-output', delta: output })
+    item('completed', { type: 'agentMessage', id: 'elicitation-output', text: output })
+    complete()
+    return
+  }
+  if (text === 'APPROVAL_IDS_TEST') {
+    const request = (approvalId) => new Promise(resolve => {
+      const wireId = `approval-${randomUUID()}`
+      hostReplies.set(wireId, resolve)
+      send({ id: wireId, method: 'item/commandExecution/requestApproval', params: { kind: 'command', threadId, turnId: open, itemId: 'parent', startedAtMs: Date.now(), environmentId: null, approvalId, command: 'synthetic' } })
+    })
+    const first = await request('one')
+    const second = await request('two')
+    const replay = await request('one')
+    const fileGrant = await new Promise(resolve => {
+      const id = `approval-${randomUUID()}`; hostReplies.set(id, resolve)
+      send({ id, method: 'item/fileChange/requestApproval', params: { threadId, turnId: open, itemId: 'file-grant', startedAtMs: Date.now(), grantRoot: '/other' } })
+    })
+    const noExactAccept = await new Promise(resolve => {
+      const id = `approval-${randomUUID()}`; hostReplies.set(id, resolve)
+      send({ id, method: 'item/commandExecution/requestApproval', params: { threadId, turnId: open, itemId: 'session-grant', command: 'synthetic', availableDecisions: ['acceptForSession', 'cancel'] } })
+    })
+    const output = JSON.stringify({ first, second, replay, fileGrant, noExactAccept })
+    item('started', { type: 'agentMessage', id: 'approval-output', text: '' })
+    notify('item/agentMessage/delta', { threadId, turnId: open, itemId: 'approval-output', delta: output })
+    item('completed', { type: 'agentMessage', id: 'approval-output', text: output })
+    complete()
+    return
+  }
+  if (text === 'APPROVAL_TEST') {
+    const request = (id, foreign = false) => new Promise(resolve => {
+      const wireId = `approval-${randomUUID()}`
+      hostReplies.set(wireId, resolve)
+      send({ id: wireId, method: 'item/commandExecution/requestApproval', params: { threadId: foreign ? 'other-thread' : threadId, turnId: open, itemId: id, command: 'synthetic' } })
+    })
+    const first = await request('same')
+    const replay = await request('same')
+    const foreign = await request('foreign', true)
+    const output = JSON.stringify({ first, replay, foreign })
+    item('started', { type: 'agentMessage', id: 'approval-output', text: '' })
+    notify('item/agentMessage/delta', { threadId, turnId: open, itemId: 'approval-output', delta: output })
+    item('completed', { type: 'agentMessage', id: 'approval-output', text: output })
+    complete()
+    return
+  }
   if (text === 'COMPUTER_CONFIG_TEST') {
     const output = JSON.stringify({ computer: computer.command ? computer : null })
     item('started', { type: 'agentMessage', id: `m-${turn}`, text: '' })

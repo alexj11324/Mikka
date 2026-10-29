@@ -13,7 +13,9 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // (`ServerUnreachableError`, the outbox keeps the item); 409 on a claim is
 // `RunNotPinnedHereError`; any other 4xx is a refusal (`DaemonError`) that
 // retrying cannot fix.
-import type { z } from "zod"
+import { z } from "zod"
+import { ToolApprovalGate } from "./agents/tool-approval"
+import { toolApprovalDecision } from "./agents/tool-approval-policy"
 import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
 
@@ -97,6 +99,55 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
+  async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string) {
+    if (!assignment.policy || !assignment.policyRevision) throw new Error('Run policy unavailable')
+    const policyRevision = assignment.policyRevision
+    const path = `/v1/runs/${seg(assignment.runId)}/tool-approval`
+    const proposal = z.object({ id: z.uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/), status: z.string() })
+    const response = z.object({ decision: z.enum(['pending', 'allow', 'deny']) })
+    const liveness = new AbortController()
+    const gate = new ToolApprovalGate(assignment.runId, {
+      permission: request => toolApprovalDecision(request, assignment.policy, worktree),
+      isLive: async () => { try { check(); const current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean() }), signal:liveness.signal, timeoutMs:5000 }); check(); return current.live } catch { return false } },
+      ask: async (request, signal) => {
+        const delay = () => new Promise<void>((resolve, reject) => {
+          const done = () => { signal.removeEventListener('abort', stop); resolve() }
+          const timer = setTimeout(done, 1000)
+          const stop = () => { clearTimeout(timer); reject(new Error('cancelled')) }
+          signal.addEventListener('abort', stop, { once: true })
+          if (signal.aborted) stop()
+        })
+        const retry = async <T>(operation: () => Promise<T>): Promise<T> => {
+          for (;;) {
+            try { return await operation() }
+            catch (error) { if (signal.aborted || !(error instanceof ServerUnreachableError)) throw error; await delay() }
+          }
+        }
+        const created = await retry(() => this.call('POST', path, { body: { operation: 'propose', deviceId: assignment.deviceId, policyRevision, requestId: request.requestId, harness: request.harness, method: request.method, input: request.input }, schema: proposal, signal }))
+        try {
+          for (;;) {
+            const result = await retry(() => this.call('POST', path, { body: { operation: 'take', deviceId: assignment.deviceId, id: created.id, digest: created.digest }, schema: response, signal }))
+            if (result.decision !== 'pending') return result.decision
+            await delay()
+          }
+        } finally {
+          void this.call('POST', path, { body: { operation: 'cancel', deviceId: assignment.deviceId, id: created.id, digest: created.digest } }).catch(() => undefined)
+        }
+      },
+    })
+    let checking = false
+    const monitor = setInterval(() => {
+      if (checking || gate.revoked) return
+      checking = true
+      void gate.checkLive().then(live => { if (!live) gate.revoke() }).finally(() => { checking = false })
+    },1000)
+    monitor.unref()
+    const abort = () => gate.revoke()
+    gate.onRevoke(() => { liveness.abort(); clearInterval(monitor); signal.removeEventListener('abort',abort) })
+    if (signal.aborted) gate.revoke()
+    else signal.addEventListener('abort', abort, { once: true })
+    return gate
+  }
   async prepareRunMailbox(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
     return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: this.fetchImpl,
       headers: { [CLIENT_VERSION_HEADER]: this.clientVersion, ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) } })

@@ -59,9 +59,10 @@ try {
     ]
     await pool.query(`CREATE TABLE IF NOT EXISTS ${identifier(config.name)} (${[...columns, ...constraints].join(', ')})`)
   }
-  // Computer infrastructure uses reviewed SQL migrations rather than Drizzle
-  // table definitions. Apply the same additive DDL in the isolated E2E DB.
-  for (const name of ['20261027164501_cloud_computers.sql', '20261027164502_computer_run_bindings.sql', '20261027164510_local_computer_reviews.sql', '20261027164511_cloud_device_scope.sql', '20261027164512_cloud_worker_leases.sql', '20261027164513_computer_run_approvals.sql', '20261027164514_bot_cloud_runtimes.sql', '20261027164515_workspace_computer_policy.sql', '20261029010447_workspace_computer_policy_allow.sql']) {
+  // Runtime infrastructure uses reviewed SQL migrations rather than Drizzle
+  // table definitions. Claim now reads its CLI policy, including legacy runs;
+  // apply those same additive dependencies in the isolated E2E DB.
+  for (const name of ['20261027164501_cloud_computers.sql', '20261027164502_computer_run_bindings.sql', '20261027164510_local_computer_reviews.sql', '20261027164511_cloud_device_scope.sql', '20261027164512_cloud_worker_leases.sql', '20261027164513_computer_run_approvals.sql', '20261027164514_bot_cloud_runtimes.sql', '20261027164515_workspace_computer_policy.sql', '20261027181000_agent_kit.sql', '20261029010446_device_computer_capability.sql', '20261029010447_workspace_computer_policy_allow.sql', '20261029011700_agent_tool_approvals.sql', '20261029011701_cli_run_policy.sql']) {
     await pool.query(await readFile(new URL(`../drizzle/${name}`, import.meta.url), 'utf8'))
   }
   for (const statement of postgresSchemaStatements) await pool.query(statement)

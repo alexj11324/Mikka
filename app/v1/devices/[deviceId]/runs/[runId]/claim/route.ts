@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { RUN_LEASE_MS } from '@mikka/protocol/device'
-import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
+import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
@@ -49,6 +49,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     return NextResponse.json({ error: 'Run is missing its agent, repository or issue.' }, { status: 409 })
   }
   const harness = run.agentDefinition?.harness ?? agent.harness
+  if ((harness === 'codex' || harness === 'claude_code') && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval === true)) return NextResponse.json({ error: 'Run approval capability unavailable.' }, { status: 409 })
   const pinned = run.agentDefinition?.subscription
   let subscription: Awaited<ReturnType<ReturnType<typeof subscriptionRuntime>['repository']['nativeBinding']>>
   try { subscription = process.env.MIKKA_BYOS_ENABLED === '1'
@@ -57,6 +58,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id || subscription.ownerId !== caller.userId)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
   if (subscription && (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId)) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
+  let cliPolicy: Awaited<ReturnType<typeof readCliRunPolicy>>
+  try { cliPolicy = await readCliRunPolicy(pool, runId, caller.userId) }
+  catch { return NextResponse.json({ error: 'Agent policy unavailable.' }, { status: 409 }) }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let computer: Awaited<ReturnType<typeof claimCloudRun>> = null
   let localComputer: Awaited<ReturnType<typeof localComputerAuthority>> = null
@@ -95,17 +99,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       ...(resumeFrom ? { resumeFrom } : {}),
     }
     : {}
+  const computerPermission = computer?.permission ?? localComputer?.permission
+  // Computer authority comes from its persisted claim; retain every trusted
+  // CLI restriction and its revision when attaching that independent grant.
+  const policy = computerPermission
+    ? { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, computer_use: cliPolicy.policy.readOnly ? 'deny' as const : computerPermission } }
+    : cliPolicy.policy
   return NextResponse.json({
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
     baseBranch: repo.baseBranch, harness, prompt: run.prompt,
-    kind: run.kind, leaseExpiresAt,
+    kind: run.kind, leaseExpiresAt, policy, policyRevision: cliPolicy.revision,
     ...(repo.verifyCommand ? { verifyCommand: repo.verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
     ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
-    ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion },
-      policy: { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: computer.permission } } } : {}),
-    ...(localComputer ? { localComputer,
-      policy: { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: localComputer.permission } } } : {}),
+    ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
+    ...(localComputer ? { localComputer } : {}),
     ...retry,
   })
 }

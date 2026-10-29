@@ -83,6 +83,24 @@ lines.on("line", async (line) => {
   const asked = JSON.parse(line)?.message?.content?.[0]?.text
   if (typeof asked !== "string") return
   const message = asked
+  if (['APPROVAL_TEST', 'COMPUTER_APPROVAL_TEST', 'UNKNOWN_COMPUTER_APPROVAL_TEST'].includes(message)) {
+    // Fixed callback fixtures only: these never invoke an MCP computer tool.
+    const toolName = message === 'APPROVAL_TEST' ? 'Bash'
+      : message === 'COMPUTER_APPROVAL_TEST' ? 'mcp__mikka_computer__click'
+      : 'mcp__mikka_computer__arbitrary_tool'
+    const input = message === 'APPROVAL_TEST' ? { command: 'synthetic' } : { x: 1, y: 2 }
+    const approval = (toolUseId) => new Promise(resolve => {
+      const request_id = `approval-${++sdkId}`
+      sdkReplies.set(request_id, resolve)
+      out({ type: 'control_request', request_id, request: { subtype: 'can_use_tool', tool_name: toolName, input, tool_use_id: toolUseId } })
+    })
+    const toolUseId = `synthetic-approval-${sessionId}`
+    const first = await approval(toolUseId)
+    const replay = await approval(toolUseId)
+    text(JSON.stringify({ first, replay }))
+    result()
+    return
+  }
   if (message === 'COMPUTER_CONFIG_TEST') {
     text(JSON.stringify({ computer: mcpServers.mikka_computer ?? null }))
     result()
