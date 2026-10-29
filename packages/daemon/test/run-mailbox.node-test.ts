@@ -18,7 +18,6 @@ import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
 import type { JournalEntry } from '../src/runs/journal'
 import type { StartOptions, AgentSession } from '../src/adapters/types'
 import { getEventListeners } from 'node:events'
-import { execFileSync } from 'node:child_process'
 
 // Synthetic process fixtures and retained local Git worktrees only.
 // No database, Docker, login or network fetch.
