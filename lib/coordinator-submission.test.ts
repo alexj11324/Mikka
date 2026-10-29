@@ -2,15 +2,17 @@ import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
-import { bots, coordinatorEvents } from './db/schema'
+import { bots, coordinatorEvents, devices } from './db/schema'
+import type { TaskDestination } from './task-destination'
 import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError } from './coordinator-submission'
 
 const submissionId = 'a4000000-0000-4000-8000-000000000001'
 const dialect = new PgDialect()
-type Stored = { id: string; userId: string; botId: string | null; kind: string; dedupeKey: string; issueId: null; runId: null; payload: { text: string } }
+type Stored = { id: string; userId: string; botId: string | null; kind: string; dedupeKey: string; issueId: null; runId: null; payload: { text: string; taskDestination?: TaskDestination } }
 function fixture() {
   const rows = new Map<string, Stored>()
   const botRows = new Map<string, { id: string; name: string; ownerId: string }>()
+  const deviceRows = new Map<string, { id: string; ownerId: string; kind: string; enabled: boolean }>()
   const trace: string[] = []
   const state: { insertError?: Error; selectError?: Error; arbitrate?: (event: Stored) => Promise<void>; missingRead?: boolean } = {}
   const executor = {
@@ -29,24 +31,26 @@ function fixture() {
       } } } }
     },
     select() { return { from(table: unknown) {
-      assert.ok(table === coordinatorEvents || table === bots)
+      assert.ok(table === coordinatorEvents || table === bots || table === devices)
       return { where(condition: SQL) {
         const query = dialect.sqlToQuery(condition)
         if (table === coordinatorEvents) assert.match(query.sql, /"coordinator_events"\."dedupeKey"/)
-        else { assert.match(query.sql, /"bots"\."id"/); assert.match(query.sql, /"bots"\."ownerId"/) }
+        else if (table === bots) { assert.match(query.sql, /"bots"\."id"/); assert.match(query.sql, /"bots"\."ownerId"/) }
+        else { assert.match(query.sql, /"devices"\."id"/); assert.match(query.sql, /"devices"\."ownerId"/); assert.match(query.sql, /"devices"\."kind"/); assert.match(query.sql, /"devices"\."enabled"/) }
         return { async limit(count: number) {
           assert.equal(count, 1)
           if (table === coordinatorEvents) trace.push('read')
           if (state.selectError) throw state.selectError
           if (state.missingRead) return []
           const row = table === coordinatorEvents ? rows.get(query.params[0] as string)
-            : [...botRows.values()].find(bot => query.params.includes(bot.id) && query.params.includes(bot.ownerId))
+            : table === bots ? [...botRows.values()].find(bot => query.params.includes(bot.id) && query.params.includes(bot.ownerId))
+              : [...deviceRows.values()].find(device => query.params.includes(device.id) && query.params.includes(device.ownerId) && query.params.includes(device.kind) && query.params.includes(device.enabled))
           return row ? [structuredClone(row)] : []
         } }
       } }
     } } },
   } as unknown as Parameters<typeof recordPersonalSubmission>[0]
-  return { rows, botRows, state, trace, executor }
+  return { rows, botRows, deviceRows, state, trace, executor }
 }
 
 function deferred<T>() {
@@ -67,6 +71,7 @@ test('concurrent identical submissions use the existing unique target and one im
   assert.equal(f.rows.size, 1)
   assert.equal(results.filter(result => !result.duplicate).length, 1)
   assert.equal(results.filter(result => result.duplicate).length, 9)
+  assert.deepEqual(new Set(results.map(result => result.eventId)), new Set([...f.rows.values()].map(row => row.id)))
   const before = structuredClone([...f.rows.values()])
   await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'different', { submissionId }), SubmissionConflictError)
   assert.deepEqual([...f.rows.values()], before)
@@ -88,7 +93,7 @@ test('an uncommitted winner blocks retry completion and reading until commit', a
     outcome.resolve()
     const result = await request
     if (changed) assert.ok(result.error instanceof SubmissionConflictError)
-    else { assert.equal(result.error, undefined); assert.deepEqual(result.value, { duplicate: true }) }
+    else { assert.equal(result.error, undefined); assert.deepEqual(result.value, { duplicate: true, eventId: 'committed-winner' }) }
     assert.deepEqual(f.trace, ['insert', 'read'])
     assert.equal([...f.rows.values()][0].payload.text, 'winner')
   }
@@ -102,7 +107,7 @@ test('a rolled-back winner allows the waiting insertion without a duplicate read
   await entered.promise
   assert.equal(settled, false); assert.deepEqual(f.trace, ['insert']); assert.equal(f.rows.size, 0)
   rollback.resolve()
-  assert.deepEqual(await request, { duplicate: false })
+  assert.deepEqual(await request, { duplicate: false, eventId: [...f.rows.values()][0].id })
   assert.deepEqual(f.trace, ['insert']); assert.equal(f.rows.size, 1)
 })
 
@@ -117,7 +122,9 @@ test('an unresolved conflict read never becomes an accepted retry', async () => 
 test('same submission UUID is isolated by authenticated owner and actual chat identity', async () => {
   const f = fixture(), botId = '24000000-0000-4000-8000-000000000002'
   for (const [owner, bot] of [['owner', null], ['foreign', null], ['owner', botId]] as const) {
-    assert.deepEqual(await recordPersonalSubmission(f.executor, owner, 'hello', { submissionId, botId: bot }), { duplicate: false })
+    const result = await recordPersonalSubmission(f.executor, owner, 'hello', { submissionId, botId: bot })
+    assert.equal(result.duplicate, false)
+    assert.ok(result.eventId)
   }
   assert.equal(f.rows.size, 3)
   assert.equal(new Set(f.rows.keys()).size, 3)
@@ -249,24 +256,24 @@ test('actual action freezes serialized quotes across retries and rejects quote c
 test('actual action puts validated browser notes after the quote and rejects bad ones', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'
   const note = { n: 1, kind: 'region' as const, url: 'https://example.org/pricing', label: 'example.org/pricing', note: 'Wrong price', rect: { x: 1, y: 2, width: 30, height: 40, viewportWidth: 560, viewportHeight: 800 } }
-  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, submissionId, [note]), { queued: true })
+  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, submissionId, undefined, [note]), { queued: true })
   const [row] = [...current.rows.values()]
   assert.match(row.payload.text, /^<browser-note n="1" kind="region" url="https:\/\/example.org\/pricing"[^>]*>Wrong price<\/browser-note>\nhello$/)
   current = fixture()
   for (const bad of [{ ...note, url: 'javascript:alert(1)' }, { ...note, note: ' ' }, { ...note, extra: true }, { ...note, text: 'page text is never sent' }]) {
-    assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, [bad as typeof note]), { error: 'messageRequired', params: undefined })
+    assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, undefined, [bad as typeof note]), { error: 'messageRequired', params: undefined })
   }
   for (const bad of [{}, 'not an array', [null]]) {
-    assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, bad as unknown as typeof note[]), { error: 'messageRequired', params: undefined })
+    assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, undefined, bad as unknown as typeof note[]), { error: 'messageRequired', params: undefined })
   }
   assert.equal(current.rows.size, 0)
-  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, [{ ...note, n: 102 }]), { queued: true })
+  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, undefined, [{ ...note, n: 102 }]), { queued: true })
   current = fixture()
-  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, [{ ...note, n: Number.MAX_SAFE_INTEGER + 1 }]), { error: 'messageRequired', params: undefined })
-  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, Array.from({ length: 21 }, (_, i) => ({ ...note, n: i + 1 }))), { error: 'messageRequired', params: undefined })
+  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, undefined, [{ ...note, n: Number.MAX_SAFE_INTEGER + 1 }]), { error: 'messageRequired', params: undefined })
+  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, undefined, undefined, Array.from({ length: 21 }, (_, i) => ({ ...note, n: i + 1 }))), { error: 'messageRequired', params: undefined })
   assert.equal(current.rows.size, 0)
   current = fixture()
-  assert.deepEqual(await sendCoordinatorMessage('x'.repeat(9_990), null, null, undefined, [note]), { error: 'messageTooLong', params: undefined })
+  assert.deepEqual(await sendCoordinatorMessage('x'.repeat(9_990), null, null, undefined, undefined, [note]), { error: 'messageTooLong', params: undefined })
   assert.equal(current.rows.size, 0)
 })
 
@@ -297,4 +304,54 @@ test('a failed dismissal fails the send, so the transaction rolls both back and 
   await assert.rejects(sendSuggestion(suggestionId), error => error === dismissError)
   assert.equal(callbacks.length, 0)
   dismissError = null
+})
+
+test('new-task machine choice is owner-checked, preserved separately from copy and frozen across retries', async () => {
+  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  const deviceId = 'b4000000-0000-4000-8000-000000000004'
+  const destination = { kind: 'device' as const, deviceId }
+  current.deviceRows.set(deviceId, { id: deviceId, ownerId: 'foreign', kind: 'local', enabled: true })
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { error: 'deviceNotFound', params: undefined })
+  assert.equal(current.rows.size, 0)
+  current.deviceRows.get(deviceId)!.ownerId = 'owner'
+  current.deviceRows.get(deviceId)!.enabled = false
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { error: 'deviceNotFound', params: undefined })
+  current.deviceRows.get(deviceId)!.enabled = true
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, undefined, destination), { error: 'validationGeneric', params: undefined })
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { queued: true })
+  assert.equal([...current.rows.values()][0].payload.text, 'do the task')
+  assert.deepEqual([...current.rows.values()][0].payload.taskDestination, destination)
+  ;[...current.rows.values()][0].issueId = 'c4000000-0000-4000-8000-000000000004' as never
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { queued: true })
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { error: 'submissionConflict', params: undefined })
+  current.deviceRows.get(deviceId)!.ownerId = 'foreign'
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { error: 'deviceNotFound', params: undefined })
+  assert.equal(current.rows.size, 1)
+  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+})
+
+test('new-task submission fails closed when issue tools are disabled', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { error: 'issueToolsDisabled', params: undefined })
+  assert.equal(current.rows.size, 0)
+  assert.equal(callbacks.length, 0)
+})
+
+
+test('browser notes and an authorized task destination persist together and remain frozen on retry', async () => {
+  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  const note = { n: 1, kind: 'element' as const, url: 'https://example.org/', label: 'Save', note: 'Keep this selection', selector: 'button' }
+  try {
+    assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }, [note]), { queued: true })
+    const [row] = [...current.rows.values()]
+    assert.deepEqual(row.payload.taskDestination, { kind: 'cloud' })
+    assert.match(row.payload.text, /^<browser-note /)
+    assert.ok(row.payload.text.endsWith('\ndo the task'))
+    assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }, [note]), { queued: true })
+    assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }, [{ ...note, note: 'Changed' }]), { error: 'submissionConflict', params: undefined })
+    assert.equal(current.rows.size, 1)
+  } finally { delete process.env.MIKKA_ISSUE_TOOLS_ENABLED }
 })

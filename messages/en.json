@@ -914,6 +914,7 @@
     "generic": "Something went wrong. Please try again.",
     "authRequired": "Please sign in first.",
     "validationGeneric": "Please check the information you entered.",
+    "issueToolsDisabled": "Task creation is unavailable.",
     "validationTitleRequired": "Please enter a task title.",
     "validationNameRequired": "Please enter a name.",
     "teamIdentifierInvalid": "Use 2–12 uppercase letters or digits, starting with a letter.",

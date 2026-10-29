@@ -12,13 +12,15 @@ import { userMessageEvent } from '@/lib/coordinator-events'
 import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { botChats, chatView, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import { and, eq } from 'drizzle-orm'
-import { bots } from '@/lib/db/schema'
+import { bots, devices } from '@/lib/db/schema'
+import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destination'
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 import { NOTE_MAX, NOTES_MAX, withBrowserNotes, type BrowserNote } from '@/lib/browser/note'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { coordinatorWelcome } from '@/lib/agent-welcome'
 import { dismissSuggestion, readSuggestion } from '@/lib/suggestions/store'
 import { suggestionMessage } from '@/lib/suggestions/card'
+import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -68,7 +70,7 @@ export async function botChatSummaries(): Promise<Record<string, BotChatSummary>
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, notes?: readonly BrowserNote[] | null): Promise<ActionResult<{ queued: true }>> {
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
     const userId = await getUserId()
     const bot = await ownBot(userId, botId)
@@ -80,7 +82,16 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     if (noted && !noted.success) throw new ActionFailureError('messageRequired')
     const withNotes = withBrowserNotes(parsed.data.text, noted?.data)
     if (withNotes === null) throw new ActionFailureError('messageTooLong')
-    try { await recordPersonalSubmission(db, userId, withQuote(withNotes, quoted?.data), { botId: bot?.id ?? null, submissionId: parsed.data.submissionId }) }
+    const destination = taskDestinationSchema.optional().safeParse(taskDestination)
+    if (!destination.success) throw new ActionFailureError('validationGeneric')
+    if (destination.data && !issueMutationsEnabled()) throw new ActionFailureError('issueToolsDisabled')
+    if (destination.data && !parsed.data.submissionId) throw new ActionFailureError('validationGeneric')
+    if (destination.data?.kind === 'device') {
+      const [device] = await db.select({ id: devices.id }).from(devices)
+        .where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true))).limit(1)
+      if (!device) throw new ActionFailureError('deviceNotFound')
+    }
+    try { await recordPersonalSubmission(db, userId, withQuote(withNotes, quoted?.data), { botId: bot?.id ?? null, submissionId: parsed.data.submissionId, taskDestination: destination.data }) }
     catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error

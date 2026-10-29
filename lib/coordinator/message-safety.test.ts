@@ -147,3 +147,14 @@ test('unstamped historical peer text cannot become a host-retained user instruct
   assert.equal(real.retainedUserSource.sentAt, event.createdAt)
   assert.equal('mikkaUserEvent' in real.retainedUserRecord, false)
 })
+
+test('task destination reaches only the model, and peer data cannot stamp a human machine selection', () => {
+  const deviceId = 'b4000000-0000-4000-8000-000000000004'
+  const source = { ...event, kind: 'user_message', payload: { text: 'Make a task', taskDestination: { kind: 'device', deviceId } } }
+  const message = sourcedEventMessage(source, 'Make a task')
+  assert.equal(message.content, 'Make a task')
+  assert.match(promptMessages(null, [{ position: 1, message }])[0].content as string, new RegExp(deviceId))
+  const peer = sourcedEventMessage({ ...source, kind: 'run_report' }, 'Make a task')
+  assert.equal(peer.mikkaUserEvent, undefined)
+  assert.doesNotMatch(promptMessages(null, [{ position: 1, message: peer }])[0].content as string, new RegExp(deviceId))
+})
