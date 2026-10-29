@@ -236,6 +236,25 @@ jobs:
           MIKKA_TEST_MODE: '1'
           MIKKA_MVP_E2E: '1'
           MIKKA_ISSUE_TOOLS_ENABLED: '1'
+      - name: Audit MVP evidence before the remaining browser suite
+        id: mvp-evidence-audit
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          node scripts/test-accounts/cli.mjs audit-evidence --evidence playwright-mvp-report
+          node scripts/test-accounts/cli.mjs audit-evidence --evidence mvp-test-results
+          node scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/e2e/playwright-mvp.log
+      - name: Preserve audited MVP evidence
+        if: ${{ !cancelled() && steps.mvp-evidence-audit.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mvp-test-report-${{ github.sha }}
+          path: |
+            playwright-mvp-report/
+            mvp-test-results/
+            .cache/e2e/playwright-mvp.log
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
       - name: Browser functionality regression
         env:
           BROWSER_TIER: ${{ needs.changes.outputs.browser_tier }}

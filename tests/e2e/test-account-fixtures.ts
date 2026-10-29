@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { test as base, expect, type APIRequestContext, type BrowserContext, type BrowserContextOptions, type Page } from '@playwright/test'
 import { acquireTestAccounts } from '../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../scripts/test-accounts/environment.mjs'
+import { browserConsoleDiagnostic, browserResponseDiagnostic, browserTestErrorDiagnostic } from '../../scripts/test-accounts/browser-diagnostics.mjs'
 import { app, browserClientHeaders } from './fixtures'
 import { installAccountOriginFence } from './test-account-network'
 
@@ -74,6 +75,9 @@ export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page 
     const origin = environment.origin
     const contexts: BrowserContext[] = []
     const runtimeFailures: string[] = []
+    const diagnostics: unknown[] = []
+    let diagnosticCount = 0
+    const diagnose = (value: unknown) => { diagnosticCount++; if (diagnostics.length < 20) diagnostics.push(value) }
     let blockedOrigins = 0
     let lost = false
     const unsubscribe = scope.onLeaseLost(() => {
@@ -81,6 +85,7 @@ export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page 
       void Promise.allSettled(contexts.map(context => context.close()))
     })
     let completed = false
+    let fixtureError: unknown
     try {
       const open = async (account: AccountScope['owner']) => {
         await scope.assertActive()
@@ -102,14 +107,19 @@ export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page 
         context.on('page', page => {
           // Never attach raw browser errors, responses or request URLs: those
           // may carry a credential in a query, response or diagnostic message.
-          page.on('pageerror', () => runtimeFailures.push('BROWSER_PAGE_ERROR'))
+          page.on('pageerror', error => {
+            runtimeFailures.push('BROWSER_PAGE_ERROR')
+            diagnose({ category: 'page-error', error: browserTestErrorDiagnostic(error) })
+          })
           page.on('console', message => {
             if (message.type() !== 'error') return
             if (blockedOrigins > 0 && message.text() === 'Failed to load resource: net::ERR_BLOCKED_BY_CLIENT') return
             runtimeFailures.push('BROWSER_CONSOLE_ERROR')
+            diagnose(browserConsoleDiagnostic(message.text(), message.location().url, origin))
           })
           page.on('response', response => {
             if (response.status() >= 500) runtimeFailures.push(`HTTP_${response.status()}`)
+            if (response.status() >= 400) diagnose(browserResponseDiagnostic(response.status(), response.url(), origin))
           })
         })
         const page = await context.newPage()
@@ -136,12 +146,29 @@ export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page 
       })
       await use({ scope, owner, peer, blockedOrigins: () => blockedOrigins })
       completed = testInfo.status === 'passed' && !lost && runtimeFailures.length === 0
+    } catch (error) {
+      fixtureError = error
+      throw error
     } finally {
+      // Capture the body's error before a teardown assertion can replace it in
+      // the list reporter. Only fixed categories and reviewed source locations
+      // enter stdout, which the CI wrapper still audits before displaying.
+      const errors = [...testInfo.errors, ...(fixtureError ? [fixtureError] : [])]
+      const bodyStatus = testInfo.status
+      const teardownErrors: unknown[] = []
       // Stop all browser traffic before revoking sessions/returning the pair.
       // If any context cannot close, the account stays quarantined.
       const closed = await Promise.allSettled(contexts.map(context => context.close()))
       unsubscribe()
-      await scope.release({ outcome: completed && closed.every(result => result.status === 'fulfilled') ? 'clean' : 'dirty' })
+      await scope.release({ outcome: completed && !lost && runtimeFailures.length === 0 && closed.every(result => result.status === 'fulfilled') ? 'clean' : 'dirty' }).catch(error => {
+        teardownErrors.push(error)
+        throw error
+      }).finally(() => {
+        if (errors.length || teardownErrors.length || runtimeFailures.length || lost) console.log('POOLED_BROWSER_DIAGNOSTICS', JSON.stringify({
+          bodyStatus, bodyErrors: errors.slice(0, 20).map(browserTestErrorDiagnostic), teardownErrors: teardownErrors.map(browserTestErrorDiagnostic),
+          runtimeFailures, diagnostics, omittedDiagnostics: diagnosticCount - diagnostics.length, lost,
+        }))
+      })
     }
     expect(lost, 'A lost lease must stop the browser and fail the test').toBe(false)
     expect(runtimeFailures, 'The pooled browser must not hide runtime failures').toEqual([])

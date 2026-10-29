@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { factoryCheckIndependent } from "./check-independence";
 import { recordMonitorIncidentState } from "./monitor-incidents";
+import { factoryScopeAllows, type FactoryIssueScope } from "./scope";
 import { lockSkillPublication } from "../self-improvement/activation";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
@@ -367,10 +368,37 @@ export function createFactoryMonitor(
       ]);
       let incidentId: string | null = null;
       if (failed) {
+        // The event consumer deduplicates failures onto their original issue.
+        // The receipt-bound ledger still rejects caller-selected issue changes.
+        // Read a hint first, then fence the original issue before taking the
+        // ledger's incident advisory/row locks (the same issue -> incident order).
+        const { rows: [original] } = await tx.query<{ id: string; issueId: string; taskId: string }>(
+          'SELECT id,"issueId","taskId" FROM factory_monitor_incidents WHERE "userId"=$1 AND "workspaceKey"=$2 AND fingerprint=$3',
+          [userId, scope, keys.fingerprint],
+        );
+        if (original) {
+          let current: FactoryIssueScope & { taskScopeVersion: number | null } | undefined;
+          try {
+            ({ rows: [current] } = await tx.query<FactoryIssueScope & { taskScopeVersion: number | null }>(
+              'SELECT i."userId",i.scope,i."scopeVersion",t."scopeVersion" AS "taskScopeVersion" FROM issues i JOIN factory_tasks t ON t."issueId"=i.id AND t.id=$2 AND t."userId"=$3 WHERE i.id=$1 FOR UPDATE OF i NOWAIT',
+              [original.issueId, original.taskId, userId],
+            ));
+          } catch (error) {
+            // Different actors can hold A -> B and B -> A. Do not wait for a
+            // second issue lock: both reconcilers roll back factoryStale and
+            // leave the durable input pending, without finishing its task.
+            if (error && typeof error === "object" && "code" in error && error.code === "55P03") fail("factoryStale");
+            throw error;
+          }
+          if (!current || !factoryScopeAllows({ userId, scopeVersion: current.taskScopeVersion }, current)
+            || !await authorize(userId, original.issueId, tx)
+            || await workspaceKey(userId, original.issueId, tx) !== scope) fail("factoryNotFound");
+        }
         const incident = await recordMonitorIncidentState(tx,{
           ownerId:userId,workspaceKey:scope,fingerprint:keys.fingerprint,checkKey:keys.checkKey,
-          issueId:task.issueId,taskId:task.id,candidateId:task.candidateId,outcome:"unhealthy",
+          issueId:original?.issueId ?? task.issueId,taskId:task.id,candidateId:task.candidateId,outcome:"unhealthy",
         });
+        if (original && incident.id !== original.id) throw Error("factoryMonitorIncidentConflict");
         if (!(await authorize(userId, incident.issueId, tx)))
           fail("factoryNotFound");
         incidentId = incident.id;

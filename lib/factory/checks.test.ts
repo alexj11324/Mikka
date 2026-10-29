@@ -508,6 +508,15 @@ test(
         action: "cancel",
         reason: "Withdrawn during claim",
       });
+      const withdrawn = await store.read("owner", cancelledCheck.task.id);
+      assert.equal(withdrawn.task.status, "cancelled");
+      const queuedBeforeClaim = (
+        await pool.query(`SELECT * FROM agent_runs WHERE id=$1`, [
+          cancelledCheck.runId,
+        ])
+      ).rows[0];
+      assert.equal(queuedBeforeClaim.status, "queued");
+      let claimCallbackRan = false;
       await rejects(
         () =>
           claim(
@@ -515,16 +524,24 @@ test(
             deviceId,
             cancelledCheck.runId,
             new Date(Date.now() + 90000).toISOString(),
+            async () => { claimCallbackRan = true; },
           ),
-        "factoryCheckBindingMismatch",
+        // The shared canonical claim rejects a cancelled task before the
+        // narrower check-assignment validation or claim side effects run.
+        "factoryClaimStale",
       );
-      assert.equal(
+      assert.equal(claimCallbackRan, false);
+      assert.deepEqual(
+        await store.read("owner", cancelledCheck.task.id),
+        withdrawn,
+      );
+      assert.deepEqual(
         (
-          await pool.query(`SELECT status FROM agent_runs WHERE id=$1`, [
+          await pool.query(`SELECT * FROM agent_runs WHERE id=$1`, [
             cancelledCheck.runId,
           ])
-        ).rows[0].status,
-        "queued",
+        ).rows[0],
+        queuedBeforeClaim,
       );
       await pool.query(`UPDATE agent_runs SET status='cancelled' WHERE id=$1`, [
         cancelledCheck.runId,

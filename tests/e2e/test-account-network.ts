@@ -23,6 +23,8 @@ export async function installAccountOriginFence(
   context: BrowserContext,
   scope: LeaseScope,
   origin: string,
+  // A refusal decision, not successful transport completion. Announce it
+  // before abort can emit a browser error; failed aborts still call onFailure.
   onBlocked: () => void,
   onFailure: () => void,
 ) {
@@ -76,7 +78,7 @@ export async function installAccountOriginFence(
               await session.send('Fetch.continueRequest', { requestId: event.requestId })
               return
             }
-            if (!sameOrigin(event.request.url, origin)) { await abort(session, event.requestId); onBlocked(); return }
+            if (!sameOrigin(event.request.url, origin)) { onBlocked(); await abort(session, event.requestId); return }
             await session.send('Fetch.continueRequest', { requestId: event.requestId })
           } catch {
             await abort(session, event.requestId).catch(() => {})
@@ -94,23 +96,23 @@ export async function installAccountOriginFence(
   const firstRequest = async (route: Route) => {
     try {
       await scope.assertActive()
-      if (!sameOrigin(route.request().url(), origin)) { await route.abort('blockedbyclient'); onBlocked(); return }
+      if (!sameOrigin(route.request().url(), origin)) { onBlocked(); await route.abort('blockedbyclient'); return }
       // An initial request needs an already installed Page request gate.
       // Initial popup navigation can precede Page creation. Waiting for 'page'
       // here deadlocks; allowing it would release an unprotected redirect.
       // This adapter deliberately refuses that unsupported navigation.
       let page: Page
       try { page = route.request().frame().page() } catch {
-        await route.abort('blockedbyclient')
         onBlocked()
+        await route.abort('blockedbyclient')
         return
       }
       // Fetch.enable cannot retroactively fence redirects of a request already
       // started. Ordinary newPage() returns only after protection is active;
       // any earlier navigation is rejected rather than lazily allowed.
       if (!sessions.get(page)?.active) {
-        await route.abort('blockedbyclient')
         onBlocked()
+        await route.abort('blockedbyclient')
         return
       }
       await scope.assertActive()

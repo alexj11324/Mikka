@@ -20,6 +20,7 @@ type Device = { id: string; name: string; protocolVersion: number }
 type Run = { id: string; issueId: string; deviceId: string; deviceRepoId: string; baseBranch: string | null; status: string; stopReason: string | null; report: { summary: string; verify: { status: string }; publish?: { pushed: boolean; commit: string; branch: string } } | null; worktreePath: string | null; stopRequestedAt: string | null }
 type Observation = { kind: string; toolName?: string; deviceId?: string; runId?: string; issueId?: string; url?: string; commit?: string; branch?: string; requestId?: string }
 type ServiceEvidence = { observations: Observation[]; errors: unknown[]; pullRequests: { number: number; url: string; branch: string; draft: boolean }[] }
+type MvpCheckpoint = 'accounts-active' | 'home-open' | 'fixture-ready' | 'push-proposal-created' | 'push-approved' | 'daemon-started' | 'daemon-registered' | 'task-submitted' | 'event-bound' | 'run-dispatched' | 'worktree-ready' | 'reply-delivered' | 'published' | 'chat-result-verified' | 'stop-completed'
 
 assertMvpEnvironment()
 const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 2 })
@@ -32,6 +33,13 @@ async function service<T>(path: string, input?: object): Promise<T> {
 }
 
 async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
+  const checkpoints: { at: string; code: MvpCheckpoint; step: string }[] = []
+  const checkpoint = (code: MvpCheckpoint, step: string) => {
+    checkpoints.push({ at: new Date().toISOString(), code, step })
+    // Only fixed phase codes enter the runner log. Detailed identifiers stay
+    // in the existing evidence attachment, and the log is audited before cat.
+    console.info(`MVP checkpoint: ${code}`)
+  }
   await page.route('https://github.com/favicon.ico', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="7" fill="#24292f"/></svg>' }))
   const startedAt = new Date().toISOString()
   const marker = `mvp-${randomUUID()}`
@@ -40,13 +48,16 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
   // two disposable owners distinct so the real branch-collision guard stays on.
   const prefix = testInfo.title.startsWith('Stopping') ? 'STPM' : 'LOOP'
   await accounts.assertActive()
+  checkpoint('accounts-active', 'Automatic account lease is active')
   const user = { id: accounts.owner.userId }
   await pool.query('INSERT INTO issue_prefixes ("userId",prefix) VALUES ($1,$2) ON CONFLICT ("userId") DO UPDATE SET prefix=EXCLUDED.prefix', [user.id, prefix])
   await page.goto(app('/'))
+  checkpoint('home-open', 'Authenticated home loaded')
   await indexMvpResource('owner-id', user.id)
   await indexMvpResource('scenario-id', marker)
   const githubAccountId = String(randomInt(1_000_000, 2_000_000_000))
   const scenario = await service<{ barePath: string; repo: string; baseBranch: string }>('/scenario', { marker, title, githubAccountId })
+  checkpoint('fixture-ready', 'Isolated repository and synthetic services are ready')
   const token = `orv_${randomBytes(32).toString('base64url')}`
   await recordAuthenticationSecrets([token])
   const tokenId = randomUUID()
@@ -64,6 +75,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
   expect(before.status).toBe('pending')
   expect(before.input).toMatchObject({ remoteKey: REPOSITORY_KEY, permission: 'push_to_origin' })
   expect((await pool.query('SELECT push FROM repository_settings WHERE "userId" = $1 AND "remoteKey" = $2', [user.id, REPOSITORY_KEY])).rows[0].push?.approved).not.toBe(true)
+  checkpoint('push-proposal-created', 'Real repository proposal is pending and has not granted push')
   const approvalCard = page.getByRole('list', { name: '等你确认' }).getByRole('listitem').filter({ hasText: REPOSITORY })
   await expect(approvalCard).toHaveCount(1, { timeout: 30_000 })
   await expect(approvalCard).toContainText('向此仓库的 origin 推送')
@@ -72,6 +84,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
   const push = (await pool.query('SELECT push FROM repository_settings WHERE "userId" = $1 AND "remoteKey" = $2', [user.id, REPOSITORY_KEY])).rows[0].push
   expect(push).toMatchObject({ approved: true, approvedByUserId: user.id, remote: 'origin' })
   await expect(approvalCard).toHaveCount(0)
+  checkpoint('push-approved', 'Authenticated browser approved the real repository proposal')
   const daemon = spawn(process.execPath, ['--import', 'tsx', 'tests/mvp/start-daemon.mts'], {
     cwd: resolve('.'), stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, MIKKA_E2E_DEVICE_TOKEN: token, MIKKA_E2E_DAEMON_DIR: dataDir,
@@ -82,6 +95,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
       GIT_CONFIG_KEY_0: `url.${pathToFileURL(scenario.barePath).href}.insteadOf`, GIT_CONFIG_VALUE_0: REPOSITORY,
       GIT_CONFIG_KEY_1: 'protocol.file.allow', GIT_CONFIG_VALUE_1: 'always', GIT_TERMINAL_PROMPT: '0' },
   })
+  checkpoint('daemon-started', 'Spawned the real CLI daemon process')
   let daemonOutput = ''
   const capture = (chunk: Buffer) => { daemonOutput = (daemonOutput + chunk.toString()).replaceAll(token, '[redacted]').slice(-20_000) }
   daemon.stdout?.on('data', capture); daemon.stderr?.on('data', capture)
@@ -94,8 +108,6 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
   let device: Device | undefined
   let runId: string | undefined
   let assertionsCompleted = false
-  const checkpoints: { at: string; step: string }[] = []
-  const checkpoint = (step: string) => { checkpoints.push({ at: new Date().toISOString(), step }) }
   const cleanup = async () => {
     await finishMvpResources({
       revoke: async () => { await pool.query('UPDATE device_tokens SET "revokedAt" = now() WHERE id = $1 AND "userId" = $2', [tokenId, user.id]) },
@@ -106,6 +118,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     const publications = (await pool.query('SELECT "runId", status, "workflowRunId", "errorCode", "pullRequest" FROM run_publications WHERE "userId" = $1', [user.id])).rows
     const evidence = { sha, githubSha: process.env.GITHUB_SHA ?? null, environment: 'disposable GitHub Actions Postgres / Next production build', authentication: { mode: 'automatic-account-pool', environmentId: accounts.lease.environmentId, leaseId: accounts.lease.id, generation: accounts.lease.generation, ownerId: user.id, oauthProviderVerified: false }, startedAt, finishedAt: new Date().toISOString(), scenarioAssertions: assertionsCompleted ? 'completed' : 'incomplete or failed', overallResult: 'See the Playwright report; runtime guard and teardown run after this attachment', marker, deviceId: device?.id ?? null, runId: runId ?? null, checkpoints, runs, publications, requestIds: { browser: browserRequests, fixture: services.observations.flatMap(row => row.requestId ? [row.requestId] : []) }, services,
       boundaries: ['Scripted AI SDK provider; real Mikka WorkflowAgent and durable tools', 'GitHub API stub; real daemon clone/worktree/verify/commit/push', 'Synthetic GitHub repository identity; daemon-only file:// transport rewrite', 'Synthetic proposal through real store and authenticated browser decision; GitHub identity is seeded', 'No production or Preview acceptance performed by this suite'] }
+    console.info(JSON.stringify({ mvpScenario: prefix === 'STPM' ? 'stop' : 'publish', assertionsCompleted, checkpoints: checkpoints.map(row => row.code), runCount: runs.length, publicationCount: publications.length, syntheticPullRequests: services.pullRequests.length, syntheticErrors: services.errors.length }))
     await testInfo.attach('mvp-acceptance-evidence.json', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' })
     if (daemonOutput) await testInfo.attach('daemon-output', { body: daemonOutput, contentType: 'text/plain' })
     // Credentials, daemon.secret, device.json and Workflow storage are never artifacts.
@@ -121,7 +134,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     await indexMvpResource('device-id', device!.id)
     await expect.poll(async () => (await pool.query('SELECT id FROM agents WHERE "userId" = $1 AND "deviceId" = $2 AND harness = $3', [user.id, device!.id, 'mock'])).rowCount).toBe(1)
     await service('/scenario/device', { deviceId: device!.id })
-    checkpoint('Real daemon logged in, registered and exposed its mock harness')
+    checkpoint('daemon-registered', 'Real daemon logged in, registered and exposed its mock harness')
     const dialog = await openCreateIssue(page)
     const machine = dialog.getByRole('combobox', { name: '运行的机器', exact: true })
     await expect(machine).toContainText('Mikka Cloud')
@@ -132,6 +145,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     await testInfo.attach('01-local-device-selected', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
     await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
     await expect(dialog).not.toBeVisible()
+    checkpoint('task-submitted', 'Browser submitted the task with the selected local device')
     await expect.poll(async () => {
       const { rows } = await pool.query<{ payload: { taskDestination?: unknown } }>('SELECT payload FROM coordinator_events WHERE "userId" = $1 AND kind = $2 AND payload->>\'text\' LIKE $3', [user.id, 'user_message', `%${marker}%`])
       return rows[0]?.payload.taskDestination
@@ -153,10 +167,10 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     expect(event.rows[0].deliveredAt).toBeTruthy()
     const receipt = await pool.query('SELECT operation, "issueId" FROM issue_tool_calls WHERE "userId" = $1 AND "toolCallId" = $2', [user.id, `${marker}-dispatch-create_issue`])
     expect(receipt.rows).toEqual([{ operation: 'create_issue', issueId: event.rows[0].issueId }])
-    checkpoint(`Delivered task event ${event.rows[0].id} bound to the same issue as the create tool receipt and run`)
+    checkpoint('event-bound', `Delivered task event ${event.rows[0].id} bound to the same issue as the create tool receipt and run`)
     const repo = (await pool.query<{ repoPath: string; remoteUrl: string; baseBranch: string | null }>('SELECT "repoPath", "remoteUrl", "baseBranch" FROM device_repos WHERE id = $1', [(await run()).deviceRepoId])).rows[0]
     expect(repo).toEqual({ repoPath: REPOSITORY_KEY, remoteUrl: REPOSITORY, baseBranch: null })
-    checkpoint('Coordinator created exactly one task and dispatched to the selected device')
+    checkpoint('run-dispatched', 'Coordinator created exactly one task and dispatched to the selected device')
     const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
     const threadTitle = `# ${title}`
     const card = chat.getByRole('button', { name: `打开线程 ${threadTitle}`, exact: true })
@@ -170,7 +184,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     expect(worktreePath).toBe(join(dataDir, 'worktrees', runId!))
     expect((await readFile(join(worktreePath!, '.git'), 'utf8')).trim()).toContain(`${cachePath}/.git/worktrees/`)
     expect((await execute('git', ['-C', cachePath, 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])).stdout.trim()).toBe('origin/trunk')
-    checkpoint('Daemon claimed assignment, cloned into its cache and resolved origin/trunk')
+    checkpoint('worktree-ready', 'Daemon claimed assignment, cloned into its cache and resolved origin/trunk')
     return { title, threadTitle, userId: user.id, dataDir, device: device!, runId: runId!, run, chat, card, thread, cleanup, checkpoint, completeAssertions: () => { assertionsCompleted = true } }
   } catch (error) { await cleanup(); throw error }
 }
@@ -184,7 +198,7 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     await composer.press('Enter')
     await expect(loop.thread.getByRole('list', { name: '线程对话' })).toContainText(`Noted: ${reply}`)
     await expect.poll(async () => (await pool.query('SELECT "deliveredAt" FROM run_messages WHERE "runId" = $1 AND text = $2', [loop.runId, reply])).rows[0]?.deliveredAt != null).toBe(true)
-    loop.checkpoint('Thread reply reached the real daemon and was acknowledged')
+    loop.checkpoint('reply-delivered', 'Thread reply reached the real daemon and was acknowledged')
     await testInfo.attach('02-thread-progress-and-reply', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
     await expect.poll(async () => (await loop.run()).status, { timeout: 75_000 }).toBe('succeeded')
     const completed = await loop.run()
@@ -202,7 +216,7 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     expect(evidence.observations.filter(item => item.kind === 'pull-request-created')).toEqual([expect.objectContaining({ runId: loop.runId, issueId: completed.issueId, commit: completed.report!.publish!.commit })])
     expect(evidence.observations.filter(item => item.kind === 'tool').map(item => item.toolName)).toEqual(expect.arrayContaining(['create_issue', 'list_agents', 'dispatch_run']))
     expect(Number((await pool.query('SELECT count(*) FROM pending_actions WHERE "userId" = $1 AND action = $2', [loop.userId, 'approve_repository_push'])).rows[0].count)).toBe(1)
-    loop.checkpoint('Real verification and push completed; GitHub stub confirmed the commit and stored PR on the task')
+    loop.checkpoint('published', 'Real verification and push completed; GitHub stub confirmed the commit and stored PR on the task')
     await loop.thread.getByRole('button', { name: '返回 Coordinator', exact: true }).click()
     await expect(loop.chat).toContainText('已完成：Added MIKKA_MOCK.md', { timeout: 60_000 })
     await expect(loop.chat.locator(`[data-agent-markdown] a[href="${pr}"]`)).toBeVisible()
@@ -217,7 +231,7 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     await expect(loop.chat).not.toContainText('Report the result in this chat')
     await expect(loop.chat).not.toContainText(loop.runId)
     await expect(loop.chat).not.toContainText('list_agents')
-    loop.checkpoint('Coordinator reported the result in chat and R-66 card showed its PR without a progress line')
+    loop.checkpoint('chat-result-verified', 'Coordinator reported the result in chat and R-66 card showed its PR without a progress line')
     await testInfo.attach('03-completed-chat-and-pr-card', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
     loop.completeAssertions()
   } finally { await loop.cleanup() }
@@ -264,7 +278,7 @@ test('Stopping a thread reaches the real daemon and keeps the draft editable whi
     expect((await loop.run()).report?.publish?.pushed ?? false).toBe(false)
     expect((await service<ServiceEvidence>('/observations')).pullRequests).toEqual([])
     await expect(loop.thread.getByRole('textbox')).toHaveCount(0)
-    loop.checkpoint('Stop request reached the real daemon; no PR was created')
+    loop.checkpoint('stop-completed', 'Stop request reached the real daemon; no PR was created')
     await testInfo.attach('05-stopped-thread', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
     loop.completeAssertions()
   } finally { await loop.cleanup() }

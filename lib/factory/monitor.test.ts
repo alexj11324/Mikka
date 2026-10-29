@@ -45,9 +45,11 @@ import {
 } from "./store";
 import {
   createFactoryMonitor,
+  createFactoryMonitorRunConsumer,
   monitorGate,
   type MonitorInput,
 } from "./monitor";
+import { createFactoryReconciler } from "./reconcile";
 import {
   monitorFingerprint,
   normalizeMonitorFailure,
@@ -166,6 +168,8 @@ test(
     const { appendMonitorEvidence } = await import("./monitor-evidence");
     const { loadIssueDocument, readIssueThreads } =
       await import("../linear-sync/document");
+    const { createAppIssueFromLinear } = await import("../linear-sync/issue-sync");
+    const { withDatabaseClient } = await import("../db");
     marker.deregister();
     const fixtureURL = await isolatedPostgresURL(target!);
     const schema = `monitor_195_${randomUUID().replaceAll("-", "")}`;
@@ -690,21 +694,30 @@ test(
         "INSERT INTO agents (id,\"userId\",name,harness) VALUES ($1,'owner','Fixture agent','codex')",
         [agentId],
       );
-      // This monitor case starts from an already imported workspace issue.
-      // A personal task cannot acquire team consent through a fixture UPDATE.
-      const issueId = await issue("owner", "workspace:a", "workspace");
+      // Import the synthetic remote snapshot through the actual server path.
+      // A workspace label or raw link alone is not verified Linear consent.
+      const issueId = randomUUID();
       const teamId = randomUUID();
       await pool.query(
         `INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture owner','owner@example.invalid',false,now(),now())`,
       );
-      await pool.query(
-        "INSERT INTO linear_team_syncs (id,\"ownerId\",\"linearTeamId\",\"linearTeamKey\",\"linearTeamName\") VALUES ($1,'owner','fixture-team','FIX','Fixture team')",
+      const { rows: [linearTeam] } = await pool.query<Parameters<typeof createAppIssueFromLinear>[0]>(
+        "INSERT INTO linear_team_syncs (id,\"ownerId\",\"linearTeamId\",\"linearTeamKey\",\"linearTeamName\") VALUES ($1,'owner','fixture-team','FIX','Fixture team') RETURNING *",
         [teamId],
       );
-      await pool.query(
-        'INSERT INTO linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") VALUES ($1,$2,\'owner\',$3,\'fixture-remote-issue\',\'FIX-195\')',
-        [randomUUID(), issueId, teamId],
-      );
+      const importClient = await pool.connect();
+      try {
+        const imported = await withDatabaseClient(importClient, () => createAppIssueFromLinear(linearTeam, {
+          id: issueId, identifier: "FIX-195", title: "Monitor layer fixture", description: "Synthetic remote issue for monitor evidence.",
+          dueDate: null, priority: 0, url: `https://linear.app/fixture/issue/FIX-195`, updatedAt: new Date().toISOString(),
+          state: { id: "fixture-state", name: "Todo", type: "unstarted" },
+          team: { id: "fixture-team", key: "FIX", name: "Fixture team" }, assignee: null, labels: [],
+        }));
+        assert.equal(imported?.id, issueId);
+      } finally { importClient.release(); }
+      scopes.set(issueId, "workspace:a");
+      assert.deepEqual((await pool.query('SELECT "externalTargetVerified","linearIssueId" FROM linear_issue_links WHERE "issueId"=$1', [issueId])).rows[0], { externalTargetVerified: true, linearIssueId: issueId });
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM linear_sync_outbox WHERE "issueId"=$1', [issueId])).rows[0].n, 0, "an incoming import must not enqueue itself");
       const first = await toMonitor("owner", issueId);
       await t.test(
         "ten concurrent replays retain one observation and one original logical issue",
@@ -763,7 +776,7 @@ test(
                 [issueId],
               )
             ).rows[0].linearIssueId,
-            "fixture-remote-issue",
+            issueId,
           );
           assert.equal(
             (await store.read("owner", first.task.id)).task.status,
@@ -1188,18 +1201,49 @@ test(
       await t.test(
         "reuse across issues preserves the original mapping and existing issue deletion cascade",
         async () => {
+          const monitorOwner = "monitor-reuse-owner";
           const originalIssue = await issue(
-            "owner",
+            monitorOwner,
             "workspace:deletion-fixture",
           );
           const anotherIssue = await issue(
-            "owner",
+            monitorOwner,
             "workspace:deletion-fixture",
           );
-          const original = await toMonitor("owner", originalIssue);
-          const another = await toMonitor("owner", anotherIssue);
-          const a = await monitor.consume("owner", original.input);
-          const b = await monitor.consume("owner", another.input);
+          const original = await toMonitor(monitorOwner, originalIssue);
+          const another = await toMonitor(monitorOwner, anotherIssue);
+          const a = await monitor.consume(monitorOwner, original.input);
+          denied.add(originalIssue);
+          try { await rejects(() => monitor.consume(monitorOwner, another.input), "factoryNotFound"); }
+          finally { denied.delete(originalIssue); }
+          scopes.set(originalIssue, "workspace:retired-partition");
+          try { await rejects(() => monitor.consume(monitorOwner, another.input), "factoryNotFound"); }
+          finally { scopes.set(originalIssue, "workspace:deletion-fixture"); }
+          const retained = async () => ({
+            task: (await store.read(monitorOwner, another.task.id)).task,
+            attempts: (await pool.query('SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY id', [another.task.id])).rows,
+            source: (await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [another.input.sourceEventId])).rows,
+            observations: (await pool.query('SELECT * FROM factory_monitor_observations WHERE "userId"=$1 ORDER BY id', [monitorOwner])).rows,
+            incidents: (await pool.query('SELECT * FROM factory_monitor_incidents WHERE "userId"=$1 ORDER BY id', [monitorOwner])).rows,
+            notices: (await pool.query('SELECT * FROM coordinator_events WHERE "userId"=$1 AND "dedupeKey" LIKE \'factory-monitor:%\' ORDER BY id', [monitorOwner])).rows,
+            documents: (await pool.query('SELECT * FROM issue_documents WHERE "issueId"=ANY($1::uuid[]) ORDER BY "issueId"', [[originalIssue, anotherIssue]])).rows,
+            outbox: (await pool.query('SELECT * FROM linear_sync_outbox WHERE "issueId"=ANY($1::uuid[]) ORDER BY id', [[originalIssue, anotherIssue]])).rows,
+          });
+          const unchanged = await retained();
+          assert.equal(unchanged.task.status, "running");
+          assert.equal(unchanged.observations.length, 1);
+          assert.equal(unchanged.incidents[0].occurrences, 1);
+          const locker = await pool.connect();
+          const reconcile = createFactoryReconciler(pool, store, undefined, { monitor: createFactoryMonitorRunConsumer(monitor) });
+          try {
+            await locker.query("BEGIN");
+            await locker.query('SELECT id FROM issues WHERE id=$1 FOR UPDATE', [originalIssue]);
+            assert.deepEqual(await reconcile(monitorOwner), { recovered: 0 });
+            assert.deepEqual(await retained(), unchanged, "lock contention cannot finish the task or consume its durable input");
+          } finally { await locker.query("ROLLBACK"); locker.release(); }
+          assert.deepEqual(await reconcile(monitorOwner), { recovered: 1 });
+          const b = await monitor.consume(monitorOwner, another.input);
+          assert.equal(b.replayed, true, "the same durable input succeeds after its original issue lock is released");
           assert.equal(a.incidentId, b.incidentId);
           assert.equal(b.issueId, originalIssue);
           assert.equal(
@@ -1222,7 +1266,7 @@ test(
             null,
           );
           assert.equal(
-            (await store.read("owner", another.task.id)).task.status,
+            (await store.read(monitorOwner, another.task.id)).task.status,
             "failed",
           );
         },

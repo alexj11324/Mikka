@@ -200,6 +200,10 @@ test('origin fence blocks a browser fetch redirect before it can carry cookies t
   await fixture(browser, async f => {
     const page = await f.context.newPage()
     await page.goto(`${f.origin}/final`)
+    const refusalsAtConsoleError: number[] = []
+    page.on('console', message => {
+      if (message.type() === 'error' && message.text() === 'Failed to load resource: net::ERR_BLOCKED_BY_CLIENT') refusalsAtConsoleError.push(f.blocked())
+    })
     try {
       const result = await page.evaluate(async () => {
         try { await fetch('/foreign-via'); return 'unexpected-success' } catch { return 'blocked' }
@@ -207,6 +211,8 @@ test('origin fence blocks a browser fetch redirect before it can carry cookies t
       expect(result).toBe('blocked')
     } finally { expect(f.foreignHits()).toBe(0) }
     await expect.poll(f.blocked).toBe(1)
+    await expect.poll(() => refusalsAtConsoleError.length).toBeGreaterThan(0)
+    expect(refusalsAtConsoleError.every(count => count === 1)).toBe(true)
   })
 })
 
@@ -217,7 +223,7 @@ test('origin fence closes the context and reports failure when the protocol cann
     finally { expect(f.foreignHits()).toBe(0) }
     await expect.poll(() => f.context.isClosed()).toBe(true)
     expect(f.failures).toEqual(['ORIGIN_FENCE_FAILED'])
-    expect(f.blocked()).toBe(0)
+    expect(f.blocked()).toBe(1)
   }, { failProtocolAbort: true })
 })
 
