@@ -157,3 +157,16 @@ test('all required gates reject failed classification and skipped full jobs', ()
     }
   }
 })
+
+test('trusted classifier executes as an ES module from a retained temporary artifact', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'docs-trusted-module-retained-'))
+  const artifact = join(dir, 'trusted.mjs'), output = join(dir, 'output.txt')
+  writeFileSync(artifact, readFileSync('scripts/ci-docs-only.mjs'))
+  const result = execFileSync(process.execPath, [artifact], { cwd: dir, encoding: 'utf8', env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_OUTPUT: output } })
+  assert.match(result, /docs_only=false/)
+  assert.match(readFileSync(output, 'utf8'), /docs_only=false/)
+  for (const workflow of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+    assert.ok(readFileSync(workflow, 'utf8').includes('trusted="$(mktemp --suffix=.mjs)"'))
+  }
+  console.log(`Retained trusted classifier artifact: ${dir}`)
+})

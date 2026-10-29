@@ -342,9 +342,31 @@ async def main():
                             assert begun.status==200
                             plan_guard=(await begun.json())['guardToken']
                         plan_url=str(client.make_url(f'/agents/case/credentials/cdp?guard={plan_guard}')).replace('http://','ws://',1)
-                        node=await asyncio.create_subprocess_exec('node','--import',str(Path(__file__).parents[1]/'server-test.mjs'),'--import','tsx',str(Path(__file__).parents[2]/'scripts/e2b/broker-service-real-client.test.mjs'),plan_url,target,origin,fresh['loaderId'],str(fresh['targets']['0']),str(fresh['targets']['1']),str(fresh['targets']['3']),stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
-                        stdout,stderr=await asyncio.wait_for(node.communicate(),45)
-                        if node.returncode:raise RuntimeError('Login submission regression failed: '+stderr.decode())
+                        node=await asyncio.create_subprocess_exec('node','--import',str(Path(__file__).parents[1]/'server-test.mjs'),'--import','tsx',str(Path(__file__).parents[2]/'scripts/e2b/broker-service-real-client.test.mjs'),plan_url,target,origin,fresh['loaderId'],str(fresh['targets']['0']),str(fresh['targets']['1']),str(fresh['targets']['3']),stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
+                        ready=await asyncio.wait_for(node.stdout.readline(),45)
+                        if ready.strip()!=b'READY: captured encrypted session':
+                            stdout,stderr=await asyncio.wait_for(node.communicate(),10)
+                            raise RuntimeError('Login submission regression failed: '+stderr.decode())
+                        assert browser.guard is None
+                        await browser.rpc('Network.clearBrowserCookies')
+                        await browser.rpc('Page.navigate',{'url':origin+'/login'})
+                        for _ in range(100):
+                            frame=(await browser.rpc('Page.getFrameTree'))['frameTree']['frame']
+                            state=await browser.rpc('Runtime.evaluate',{'expression':'document.readyState','returnByValue':True})
+                            if frame['url']==origin+'/login' and state['result']['value']=='complete':break
+                            await asyncio.sleep(.05)
+                        else:raise AssertionError('fresh synthetic login document did not load')
+                        async with client.post('/agents/case/action?token=synthetic',json={'action':'observe'}) as seen:
+                            assert seen.status==200
+                            fresh=await seen.json()
+                        grant.update({'backendNodeId':fresh['targets']['0'],'loaderId':fresh['loaderId'],'additionalInput':{'backendNodeId':fresh['targets']['1'],'role':'password'},'submitNodeId':fresh['targets']['3']})
+                        async with client.post('/agents/case/credentials/begin?token=synthetic') as begun:
+                            assert begun.status==200
+                            reuse_guard=(await begun.json())['guardToken']
+                        reuse_url=str(client.make_url(f'/agents/case/credentials/cdp?guard={reuse_guard}')).replace('http://','ws://',1)
+                        restore={'url':reuse_url,'loaderId':fresh['loaderId'],'node':fresh['targets']['0'],'passwordNode':fresh['targets']['1'],'submitNode':fresh['targets']['3']}
+                        stdout,stderr=await asyncio.wait_for(node.communicate(json.dumps(restore).encode()),45)
+                        if node.returncode:raise RuntimeError('Login session restore regression failed: '+stderr.decode())
                         assert stdout.decode().startswith('PASS: real PG and broker service filled')
                         assert browser.guard is None
                         print(stdout.decode().strip(),flush=True)

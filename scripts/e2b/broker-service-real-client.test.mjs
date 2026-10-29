@@ -8,7 +8,7 @@ import { fillCredential } from '../../lib/credentials/broker.ts'
 import { CredentialStore } from '../../lib/credentials/store.ts'
 import { seal } from '../../lib/credentials/kms.ts'
 import { recordCredentialAction } from '../../lib/cloud-computer/credential-action-ledger.ts'
-const [url, targetId, origin, loaderId, node, passwordNode, submitNode] = process.argv.slice(2)
+let [url, targetId, origin, loaderId, node, passwordNode, submitNode] = process.argv.slice(2)
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL
 assert(['127.0.0.1','localhost'].includes(new URL(databaseURL).hostname))
 assert.equal(new URL(origin).hostname, '127.0.0.1')
@@ -69,7 +69,20 @@ try {
     assert.equal(saved.length,1)
     assert(saved[0].ciphertext.length>0)
     await assert.rejects(fillCredential(pool,lease,{kms,guard}))
-    console.log(`PASS: real PG and broker service filled model-selected fields, submitted selected form, sealed session and released actual gateway; retained schema ${schema}; KMS synthetic`)
+    // Keep the synthetic KMS key in this process while the outer fixture
+    // clears its browser cookies and supplies a newly observed document.
+    console.log('READY: captured encrypted session')
+    let input = ''
+    for await (const chunk of process.stdin) input += chunk
+    const fresh = JSON.parse(input)
+    url = fresh.url; loaderId = fresh.loaderId; node = String(fresh.node)
+    Object.assign(binding, { loaderId, backendNodeId:Number(node), additionalInput:{backendNodeId:fresh.passwordNode,role:'password'}, submitNodeId:fresh.submitNode })
+    released = false
+    const reuse = await leaseFor()
+    assert.deepEqual(await fillCredential(pool,reuse,{kms,guard}),{status:'session_applied',origin})
+    assert.equal(released,true)
+    assert.equal(decrypts,3,'one password open, one session seal, one cached-session open')
+    console.log(`PASS: real PG and broker service filled model-selected fields, submitted selected form, sealed and restored the session after browser-cookie removal, and released actual gateway; retained schema ${schema}; KMS synthetic`)
   } else {
   assert.deepEqual(await fillCredential(pool,lease,{kms,guard}),{status:'guarded',origin})
   assert.equal(decrypts,1)
