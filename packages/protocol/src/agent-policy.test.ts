@@ -39,6 +39,7 @@ describe("agent policy table (ADR 0009)", () => {
       write_outside_repo: "ask",
       git_push: "ask",
       network: "ask",
+      computer_use: "ask",
     })
   })
 
@@ -63,7 +64,10 @@ describe("agent policy table (ADR 0009)", () => {
       write_outside_repo: "ask",
       git_push: "deny",
       network: "ask",
+      computer_use: "ask",
     })
+    expect(resolvePermissions({ computer_use: "unknown" }).computer_use).toBe("ask")
+    expect(storedPermissionsSchema.safeParse({ computer_use: "unknown" }).success).toBe(false)
   })
 
   it("normalizes the domain list and refuses a bare wildcard", () => {
@@ -116,6 +120,16 @@ describe("resolveAgentSettings", () => {
     })
     expect(parsed.policy?.permissions.network).toBe("deny")
   })
+
+  it("keeps computer permission in new assignments and accepts an older assignment without granting allow", () => {
+    const policy = resolveAgentSettings({ permissions: { computer_use: "allow" } }).policy
+    const assignment = { runId: "r1", issueId: "i1", deviceId: "d1", repoId: "p1", baseBranch: "main", harness: "mock", prompt: "x" }
+    expect(runAssignmentSchema.parse({ ...assignment, policy }).policy?.permissions.computer_use).toBe("allow")
+    const legacy = { ...policy, permissions: { ...policy.permissions } }
+    delete legacy.permissions.computer_use
+    expect(runAssignmentSchema.parse({ ...assignment, policy: legacy }).policy?.permissions.computer_use).toBeUndefined()
+    expect(resolveAgentSettings(null).policy.permissions.computer_use).toBe("ask")
+  })
 })
 
 describe("a person's approval mode (ADR 0060)", () => {
@@ -137,6 +151,7 @@ describe("a person's approval mode (ADR 0060)", () => {
       // Network stays as the workspace set it: a read-only run still has to
       // reach its model's API (ADR 0046).
       network: "allow",
+      computer_use: "deny",
     })
     expect(readOnly.readOnly).toBe(true)
     expect(readOnly.networkAllow).toEqual(["example.com"])

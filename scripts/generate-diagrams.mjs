@@ -33,40 +33,40 @@ const ARCH_BOXES = {
   worker: [C4, 70, 60, false],
   linear: [C4, 190, 48, false],
   monitor: [C4, 270, 60, true],
-  cloud: [C4, 380, 60, true],
+  cloud: [C4, 380, 60, false],
   agents: [C4, 520, 60, false],
   cu: [C4, 680, 60, true],
 }
 
 const ARCH_TEXT = {
   en: {
-    web: ['Web app'], tg: ['Telegram'], notify: ['GitHub, Gmail,', 'Notion, Slack'],
+    web: ['Web app'], tg: ['Telegram, Slack'], notify: ['GitHub, Gmail,', 'Calendar, Notion,', 'Slack'],
     sched: ['Scheduler', 'scheduled tasks'], mcpc: ['Claude Code, Codex', 'as MCP clients'],
     vault: ['Credential vault', 'controlled browser'],
     api: ['API and server actions', 'incl. device API /v1'], mcp: ['MCP server', 'OAuth 2.1'],
-    db: ['Postgres', 'Neon'], factory: ['Factory stages', 'review, verification,', 'release approval'],
+    db: ['Postgres', 'Neon'], factory: ['Factory stages', 'review, verification,', 'release decision'],
     coord: ['Coordinator', 'workflow, triage'], daemon: ['Mikka daemon', 'on your machine'],
     worker: ['Linear sync Worker', 'Cloudflare'], linear: ['Linear'],
     monitor: ['Monitoring', 'incidents to issues'], cloud: ['Cloud computer', 'E2B, a desktop per bot'],
     agents: ['Coding agent CLI', 'one worktree per run'], cu: ['Computer use', 'local cua-driver'],
     tWebhook: 'webhook', tNotify: 'webhooks, triggers', tMcp: 'MCP', tDb: 'reads, writes',
-    tEvents: 'events', tDispatch: 'runs, answers', tTools: 'report, ask, blocked', tLinear: 'webhooks, API',
-    pActions: 'actions after approval', pWake: 'wake', pSecure: 'secure input', pHandoff: 'handoff',
+    tEvents: 'events', tDispatch: 'runs', tTools: 'report, ask, blocked', tLinear: 'webhooks, API',
+    pActions: 'mail / calendar approval', pWake: 'wake', pSecure: 'secure input', tCloudRun: 'hosted run', tCloudWake: 'wake',
     title: 'Mikka architecture',
   },
   zh: {
-    web: ['Web 应用'], tg: ['Telegram'], notify: ['GitHub、Gmail、', 'Notion、Slack'],
+    web: ['Web 应用'], tg: ['Telegram、Slack'], notify: ['GitHub、Gmail、', '日历、Notion、', 'Slack'],
     sched: ['Scheduler', '定时任务'], mcpc: ['Claude Code、Codex', '作为 MCP 客户端'],
     vault: ['凭据保管库', '受控浏览器'],
     api: ['API 与 server actions', '含设备 API /v1'], mcp: ['MCP server', 'OAuth 2.1'],
-    db: ['Postgres', 'Neon'], factory: ['Factory 阶段', '审查、验证、', '人工发布审批'],
+    db: ['Postgres', 'Neon'], factory: ['Factory 阶段', '审查、验证、', '发布决策'],
     coord: ['Coordinator', 'workflow、分诊'], daemon: ['Mikka daemon', '运行在你的设备上'],
     worker: ['Linear 同步 Worker', 'Cloudflare'], linear: ['Linear'],
     monitor: ['监控', '故障回流为 issue'], cloud: ['云端电脑', 'E2B，每个 bot 一个桌面'],
     agents: ['Coding agent CLI', '每次运行独立 worktree'], cu: ['Computer use', '本机 cua-driver'],
     tWebhook: 'webhook', tNotify: 'webhook、触发器', tMcp: 'MCP', tDb: '读写',
-    tEvents: '事件', tDispatch: '派发运行、回答', tTools: '汇报、提问、阻塞', tLinear: 'webhook、API',
-    pActions: '审批后执行操作', pWake: '唤醒', pSecure: '安全输入', pHandoff: '接续',
+    tEvents: '事件', tDispatch: '派发运行', tTools: '汇报、提问、阻塞', tLinear: 'webhook、API',
+    pActions: '邮件 / 日历审批', pWake: '唤醒', pSecure: '安全输入', tCloudRun: '托管运行', tCloudWake: '唤醒',
     title: 'Mikka 架构',
   },
 }
@@ -78,7 +78,7 @@ function archFlows(t, p) {
     ...line([[C1[1], 320], [BUS1, 320], [BUS1, 240]], p), ...chevron(BUS1, 272, 'up', p),
     ...line([[C1[1], 240], [C2[0], 240]], p), ...chevron(388, 240, 'right', p),
     ...tag(285, 240, t.tWebhook, p), ...tag(285, 320, t.tNotify, p),
-    // Planned: connected-app actions go back out after approval.
+    // Mail and calendar approval is implemented; real external writes await acceptance.
     ...line([[420, 270], [420, 368], [110, 368], [110, 350]], p, true), ...chevron(110, 358, 'up', p),
     ...tag(290, 368, t.pActions, p, true),
     // External MCP clients.
@@ -102,14 +102,13 @@ function archFlows(t, p) {
     // Planned: Factory stages on top of the Coordinator, fed by monitoring.
     ...line([[830, 288], [830, 350]], p, true), ...chevron(830, 300, 'up', p), ...chevron(830, 340, 'down', p),
     ...line([[C4[0], 270], [C3[1], 270]], p, true), ...chevron(932, 270, 'left', p),
-    // Dispatch: your machine today, the cloud computer later. Answers to a
-    // run's questions travel the same way; the agent reads them on its next poll.
-    ...line([[C3[1], 380], [C4[0], 380]], p, true), ...chevron(988, 380, 'right', p),
+    // Coordinator wake of a bot's cloud computer was verified in production.
+    ...line([[C3[1], 380], [C4[0], 380]], p), ...chevron(988, 380, 'right', p), ...tag(960, 380, t.tCloudWake, p),
     ...line([[830, 410], [830, 490]], p), ...chevron(830, 482, 'down', p), ...tag(830, 446, t.tDispatch, p),
     ...line([[C3[1], 520], [C4[0], 520]], p), ...chevron(988, 520, 'right', p),
-    // Planned: runs hand off between machines.
+    // Hosted coding runs need real subscription-backed inference acceptance.
     ...line([[1100, 410], [1100, 490]], p, true), ...chevron(1100, 422, 'up', p), ...chevron(1100, 478, 'down', p),
-    ...tag(1100, 450, t.pHandoff, p, true),
+    ...tag(1100, 450, t.tCloudRun, p, true),
     // Planned: local computer use for the agent.
     ...line([[1150, 550], [1150, 650]], p, true), ...chevron(1150, 642, 'down', p),
     // Agents report, ask and say they are blocked through the MCP worker tools.
@@ -138,13 +137,13 @@ const RAIL = 1190
 
 // id: [x range, y center, height, planned]
 const FLOW_BOXES = {
-  request: [X1, 230, 48, false],
+  request: [X1, 230, 60, false],
   triage: [X2, 230, 48, false],
   dispatch: [X3, 230, 48, false],
   agent: [X4, 230, 60, false],
   asks: [X4, 70, 60, false],
   answer: [X3, 70, 60, false],
-  details: [[440, 620], 390, 48, false],
+  details: [[440, 620], 390, 48, true],
   review: [X4, 520, 60, true],
   approve: [[430, 610], 520, 60, true],
   ship: [X1, 520, 60, true],
@@ -152,22 +151,22 @@ const FLOW_BOXES = {
 
 const FLOW_TEXT = {
   en: {
-    request: ['New request', 'chat, Telegram, Linear'], triage: ['Coordinator triages'],
+    request: ['New request', 'chat, Telegram,', 'Slack, Linear'], triage: ['Coordinator triages'],
     dispatch: ['Dispatch run'], agent: ['Coding agent runs'],
     asks: ['Coordinator asks', 'for clarification'], answer: ['Human provides input'],
     details: ['Human adds details'], review: ['Review and verification', 'agents run'],
-    approve: ['Human approves', 'the release'], ship: ['Ship and monitor'],
+    approve: ['Policy decision', 'for release'], ship: ['Ship and monitor'],
     clear: ['Clear?'], passes: ['Ready', 'to ship?'],
     tClear: 'Clear', tUnclear: 'Needs clarification', tAsks: 'Asks, blocked', tAnswer: 'Answer to the run',
     pFinished: 'Finished', pFix: 'Needs a fix', pPasses: 'Ready', pIncident: 'New issue',
     title: 'How a task moves through Mikka',
   },
   zh: {
-    request: ['新请求', '对话、Telegram、Linear'], triage: ['Coordinator 分诊'],
+    request: ['新请求', '对话、Telegram、', 'Slack、Linear'], triage: ['Coordinator 分诊'],
     dispatch: ['派发运行'], agent: ['编码 agent 运行'],
     asks: ['Coordinator', '请求澄清'], answer: ['人工提供输入'],
     details: ['人工补充细节'], review: ['审查与验证', 'agent 运行'],
-    approve: ['人工批准发布'], ship: ['上线并监控'],
+    approve: ['按策略决定发布'], ship: ['上线并监控'],
     clear: ['是否清楚？'], passes: ['是否可以', '上线？'],
     tClear: '清楚', tUnclear: '需要澄清', tAsks: '提问、阻塞', tAnswer: '答案送回运行',
     pFinished: '完成', pFix: '需要修复', pPasses: '可以上线', pIncident: '新 issue',
@@ -183,14 +182,14 @@ function flowEdges(t, p) {
     ...line([[590, 230], [X3[0], 230]], p), ...chevron(672, 230, 'right', p), ...tag(628, 230, t.tClear, p),
     ...line([[X3[1], 230], [X4[0], 230]], p), ...chevron(922, 230, 'right', p),
     // Clarification before dispatch: an unclear request goes back to the person.
-    ...line([[530, 290], [530, 366]], p), ...chevron(530, 358, 'down', p), ...tag(530, 328, t.tUnclear, p),
-    ...line([[440, 390], [340, 390], [340, 254]], p), ...chevron(340, 264, 'up', p),
+    ...line([[530, 290], [530, 366]], p, true), ...chevron(530, 358, 'down', p), ...tag(530, 328, t.tUnclear, p, true),
+    ...line([[440, 390], [340, 390], [340, 254]], p, true), ...chevron(340, 264, 'up', p),
     // Clarification during a run: the agent asks, the person answers, the answer goes back.
     ...line([[1060, 200], [1060, 100]], p), ...chevron(1060, 110, 'up', p), ...tag(1060, 150, t.tAsks, p),
     ...line([[X4[0], 70], [X3[1], 70]], p), ...chevron(868, 70, 'left', p),
-    ...line([[770, 100], [770, 150], [970, 150], [970, 200]], p), ...chevron(970, 192, 'down', p),
-    ...tag(870, 150, t.tAnswer, p),
-    // Planned Factory loop: review, a fix when it fails, release approval, monitoring.
+    ...line([[770, 100], [770, 150], [970, 150], [970, 200]], p, true), ...chevron(970, 192, 'down', p),
+    ...tag(870, 150, t.tAnswer, p, true),
+    // Planned Factory loop: review, a fix when it fails, policy-based release decisions, monitoring.
     ...line([[X4[1], 230], [RAIL, 230], [RAIL, 520], [X4[1], 520]], p, true),
     ...chevron(RAIL, 300, 'down', p), ...chevron(1140, 520, 'left', p), ...tag(RAIL, 375, t.pFinished, p, true),
     ...line([[X4[0], 520], [826, 520]], p, true), ...chevron(834, 520, 'left', p),
