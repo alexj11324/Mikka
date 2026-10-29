@@ -60,6 +60,7 @@ export const factoryRunReview = z
     expiresAt: z.iso.datetime(),
     checks: z.array(checkReceipt).length(2),
     judgment: verifiedFactoryDecision.shape.judgment
+      .unwrap()
       .extend({
         choice: z.literal("publish_current"),
         requestDigest: hash,
@@ -135,9 +136,12 @@ export interface FactoryPublicationHost {
   tokenHash: string;
   /** Actual shared transport's selected vision-capable model, from host config. */
   decisionModelId: string;
-  /** Trusted host-review public keys. No live attestation producer or key is
-   * configured here; absence rejects. No production identity is installed. */
-  reviewKey(issuer: string, keyId: string): KeyObject | undefined;
+  /** Optional strict deployment: trusted host-review public keys. A host that
+   * installs one requires a signed review envelope for every publication. The
+   * default Warp-aligned deployment installs none; its review is advisory and
+   * the registered policy alone authorizes a preview. No production identity is
+   * installed here. */
+  reviewKey?(issuer: string, keyId: string): KeyObject | undefined;
   /** Resolve/lock the real current registered publication policy using these DB
    * rows, including workspace membership/version/revocation. A network, desktop
    * or unknown-action ask fallback is not a publication registration. Main has
@@ -291,13 +295,10 @@ export function createFactoryRunDecisionAuthority(
       )
         fail("factoryPolicyDecisionRevoked");
       const run = await lockFactoryPublicationExecutor(tx, host, task.issueId);
-      const {
-        rows: [source],
-      } = await tx.query<{ id: string; chunk: unknown; createdAt: Date }>(
-        `SELECT id,chunk,"createdAt" FROM run_chunks WHERE "runId"=$1 AND chunk->>'type'='data-factory-publication-review' AND chunk->'data'->'payload'->>'credentialId'=$2 ORDER BY seq,"createdAt",id LIMIT 1 FOR SHARE`,
-        [run.id, credentialId],
-      );
-      if (!source) fail("factoryPolicyDecisionUnavailable");
+      // This application opens pull requests; it never merges. Repository
+      // protection and repository permissions are the enforced merge control,
+      // so no credential may authorize a merge here.
+      if (expected.action === "merge") fail("factoryPolicyDenied");
       const identity = task as FactoryTask & {
         botId: string | null;
         sourceEventId: string;
@@ -326,77 +327,119 @@ export function createFactoryRunDecisionAuthority(
         new Date(run.leaseExpiresAt).getTime() <= now
       )
         fail("factoryPolicyDecisionRevoked");
-      const parsed = factoryRunReviewChunk.safeParse(source.chunk);
-      if (!parsed.success) fail("factoryPolicyDecisionInvalid");
-      const envelope = parsed.data.data,
+      // A host that installs a trusted review key runs the strict deployment:
+      // the signed review envelope is the decision credential. The default,
+      // Warp-aligned deployment installs no crypto issuer, so its review is
+      // advisory and the registered policy alone decides. Both paths enforce
+      // the same task/run/lease/check fences.
+      const signedKey = host.reviewKey?.bind(host);
+      const attestation: "signed" | "advisory" = signedKey
+        ? "signed"
+        : "advisory";
+      // Irreversible effects stay behind the strict deployment; opening a
+      // preview is the only effect an advisory review may accompany.
+      if (!signedKey && expected.action !== "deploy_preview")
+        fail("factoryPolicyAttestationRequired");
+      const scopeDigest = digest(expected);
+      let body: z.infer<typeof factoryRunReview> | undefined;
+      let envelope: z.infer<typeof factoryRunReviewEnvelope> | undefined;
+      let signature: Buffer | undefined;
+      let keyFingerprint: string | undefined;
+      let receiptId = credentialId;
+      // Advisory grants use one host-owned issuer name for ledger uniqueness;
+      // the credential id is only an idempotency key, never a signed nonce.
+      let issuer = "factory-host-policy";
+      if (signedKey) {
+        const {
+          rows: [source],
+        } = await tx.query<{ id: string; chunk: unknown; createdAt: Date }>(
+          `SELECT id,chunk,"createdAt" FROM run_chunks WHERE "runId"=$1 AND chunk->>'type'='data-factory-publication-review' AND chunk->'data'->'payload'->>'credentialId'=$2 ORDER BY seq,"createdAt",id LIMIT 1 FOR SHARE`,
+          [run.id, credentialId],
+        );
+        if (!source) fail("factoryPolicyDecisionUnavailable");
+        const parsed = factoryRunReviewChunk.safeParse(source.chunk);
+        if (!parsed.success) fail("factoryPolicyDecisionInvalid");
+        envelope = parsed.data.data;
         body = envelope.payload;
-      const key = host.reviewKey(envelope.issuer, envelope.keyId);
-      if (!key || key.type !== "public" || key.asymmetricKeyType !== "ed25519")
-        fail("factoryPolicyDecisionUnavailable");
-      const signature = Buffer.from(envelope.signature, "base64url");
-      if (
-        signature.length !== 64 ||
-        signature.toString("base64url") !== envelope.signature ||
-        !verify(
-          null,
-          factoryRunReviewSignatureInput(body, envelope),
-          key,
-          signature,
+        issuer = envelope.issuer;
+        const key = signedKey(envelope.issuer, envelope.keyId);
+        if (
+          !key ||
+          key.type !== "public" ||
+          key.asymmetricKeyType !== "ed25519"
         )
-      )
-        fail("factoryPolicyDecisionInvalid");
-      if (
-        body.credentialId !== credentialId ||
-        body.ownerId !== host.ownerId ||
-        body.executionRunId !== run.id ||
-        body.executionSessionId !== run.sessionId ||
-        body.assignmentDigest !== digest(run.agentDefinition) ||
-        body.instructionsDigest !==
-          digest(
-            await readFactoryPublicationRequirements(
-              tx,
-              task,
-              run.agentDefinition,
-            ),
-          ) ||
-        body.scopeDigest !== digest(expected) ||
-        body.permissionAction !== expected.action ||
-        !run.startedAt ||
-        new Date(body.issuedAt).getTime() < new Date(run.startedAt).getTime() ||
-        new Date(body.issuedAt).getTime() > source.createdAt.getTime() ||
-        new Date(body.issuedAt).getTime() > now ||
-        new Date(body.expiresAt).getTime() <= now ||
-        new Date(body.expiresAt).getTime() <
-          new Date(expected.expiresAt).getTime()
-      )
-        fail("factoryPolicyDecisionMismatch");
-      if (
-        body.judgment.receiptId !== body.judgment.execution.executionId ||
-        body.judgment.model !== body.judgment.execution.modelId ||
-        !factoryDecisionExecutionMatches(body.judgment.execution, {
-          modelId: host.decisionModelId,
-          requestDigest: body.judgment.requestDigest,
-          imageDigests: body.judgment.imageDigests,
-          requiresVisual: body.judgment.visualInputRequired,
-          scopeDigest: body.scopeDigest,
-          evidenceDigest: expected.evidenceDigest,
-          startedAfter: new Date(run.startedAt!).toISOString(),
-          observedAt: body.issuedAt,
-        })
-      )
-        fail("factoryPolicyModelEvidenceUnavailable");
+          fail("factoryPolicyDecisionUnavailable");
+        keyFingerprint = createHash("sha256")
+          .update(key.export({ format: "der", type: "spki" }))
+          .digest("hex");
+        signature = Buffer.from(envelope.signature, "base64url");
+        if (
+          signature.length !== 64 ||
+          signature.toString("base64url") !== envelope.signature ||
+          !verify(
+            null,
+            factoryRunReviewSignatureInput(body, envelope),
+            key,
+            signature,
+          )
+        )
+          fail("factoryPolicyDecisionInvalid");
+        if (
+          body.credentialId !== credentialId ||
+          body.ownerId !== host.ownerId ||
+          body.executionRunId !== run.id ||
+          body.executionSessionId !== run.sessionId ||
+          body.assignmentDigest !== digest(run.agentDefinition) ||
+          body.instructionsDigest !==
+            digest(
+              await readFactoryPublicationRequirements(
+                tx,
+                task,
+                run.agentDefinition,
+              ),
+            ) ||
+          body.scopeDigest !== scopeDigest ||
+          body.permissionAction !== expected.action ||
+          !run.startedAt ||
+          new Date(body.issuedAt).getTime() <
+            new Date(run.startedAt).getTime() ||
+          new Date(body.issuedAt).getTime() > source.createdAt.getTime() ||
+          new Date(body.issuedAt).getTime() > now ||
+          new Date(body.expiresAt).getTime() <= now ||
+          new Date(body.expiresAt).getTime() <
+            new Date(expected.expiresAt).getTime()
+        )
+          fail("factoryPolicyDecisionMismatch");
+        if (
+          body.judgment.receiptId !== body.judgment.execution.executionId ||
+          body.judgment.model !== body.judgment.execution.modelId ||
+          !factoryDecisionExecutionMatches(body.judgment.execution, {
+            modelId: host.decisionModelId,
+            requestDigest: body.judgment.requestDigest,
+            imageDigests: body.judgment.imageDigests,
+            requiresVisual: body.judgment.visualInputRequired,
+            scopeDigest: body.scopeDigest,
+            evidenceDigest: expected.evidenceDigest,
+            startedAfter: new Date(run.startedAt!).toISOString(),
+            observedAt: body.issuedAt,
+          })
+        )
+          fail("factoryPolicyModelEvidenceUnavailable");
+        receiptId = source.id;
+      }
+      const passed = await passedChecks(tx, task);
       const current = await approvalEvidence(tx, task);
       if (
         current.evidenceDigest !== expected.evidenceDigest ||
         digest(current.manifest.candidate) !== digest(expected.candidate) ||
-        digest(body.checks) !== digest(await passedChecks(tx, task))
+        (body !== undefined && digest(body.checks) !== digest(passed))
       )
         fail("factoryPolicyCheckReceiptRequired");
       const {
         rows: [grant],
       } = await tx.query(
         'SELECT * FROM factory_approvals WHERE "decisionCredentialId"=$1 AND "decisionEvidence"->>\'issuer\'=$2 FOR SHARE',
-        [credentialId, envelope.issuer],
+        [credentialId, issuer],
       );
       if (grant?.revokedAt) fail("factoryPolicyDecisionRevoked");
       if (
@@ -426,11 +469,12 @@ export function createFactoryRunDecisionAuthority(
       if (
         policy.ownerId !== host.ownerId ||
         policy.runId !== run.id ||
-        policy.assignmentDigest !== body.assignmentDigest ||
-        policy.scopeDigest !== digest(expected) ||
+        policy.assignmentDigest !== digest(run.agentDefinition) ||
+        policy.scopeDigest !== scopeDigest ||
         policy.permissionAction !== expected.action ||
-        policy.id !== body.policyId ||
-        policy.revision !== body.policyRevision
+        (body !== undefined &&
+          (policy.id !== body.policyId ||
+            policy.revision !== body.policyRevision))
       )
         fail("factoryPolicyDecisionRevoked");
       const decision = policy.readOnly ? "deny" : policy.decision;
@@ -438,38 +482,53 @@ export function createFactoryRunDecisionAuthority(
         decision === "ask"
           ? await host.confirmation?.(tx, {
               credentialId,
-              scopeDigest: body.scopeDigest,
+              scopeDigest,
               policy,
             })
           : undefined;
+      // Advisory evidence must stay deterministic: the verify result is stored
+      // with the grant and compared byte-for-byte at the publish boundary.
+      const issuedAt =
+        body?.issuedAt ??
+        (run.startedAt ? new Date(run.startedAt).toISOString() : undefined);
+      if (!issuedAt) fail("factoryPolicyDecisionUnavailable");
       return {
         version: 1,
         credentialId,
-        issuer: envelope.issuer,
+        issuer,
         policyId: policy.id,
         policyRevision: policy.revision,
         permissionAction: policy.permissionAction,
         ownerId: host.ownerId,
-        scopeDigest: body.scopeDigest,
+        scopeDigest,
         decision,
-        issuedAt: body.issuedAt,
-        expiresAt: body.expiresAt,
+        issuedAt,
+        expiresAt: body?.expiresAt ?? expected.expiresAt,
         verification: {
-          receiptId: source.id,
-          signatureDigest: createHash("sha256").update(signature).digest("hex"),
-          runBinding: {
-            runId: run.id,
-            sessionId: run.sessionId,
-            assignmentDigest: body.assignmentDigest,
-            checkReceiptsDigest: digest(body.checks),
-            reviewDigest: digest(envelope),
-            keyId: envelope.keyId,
-            keyFingerprint: createHash("sha256")
-              .update(key.export({ format: "der", type: "spki" }))
-              .digest("hex"),
-          },
+          receiptId,
+          attestation,
+          ...(signature
+            ? {
+                signatureDigest: createHash("sha256")
+                  .update(signature)
+                  .digest("hex"),
+              }
+            : {}),
+          ...(body && envelope && keyFingerprint
+            ? {
+                runBinding: {
+                  runId: run.id,
+                  sessionId: run.sessionId,
+                  assignmentDigest: body.assignmentDigest,
+                  checkReceiptsDigest: digest(body.checks),
+                  reviewDigest: digest(envelope),
+                  keyId: envelope.keyId,
+                  keyFingerprint,
+                },
+              }
+            : {}),
         },
-        judgment: body.judgment,
+        ...(body ? { judgment: body.judgment } : {}),
         ...(confirmation ? { confirmation } : {}),
       };
     },

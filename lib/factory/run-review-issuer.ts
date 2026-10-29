@@ -277,7 +277,7 @@ export function createFactoryRunReviewIssuer(
         ),
         keyId: factoryRunReviewChunk.shape.data.shape.keyId.parse(signer.keyId),
       };
-      const trustedKey = host.reviewKey(
+      const trustedKey = host.reviewKey?.(
         signingIdentity.issuer,
         signingIdentity.keyId,
       );
