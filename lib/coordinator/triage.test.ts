@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { chatItems, eventPrompt, promptMessages, type StoredMessage } from './context'
-import { ATTENTION_THRESHOLD, eventsForInbox, isolateTaskRequest, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
+import { eventsForInbox, isolateTaskRequest, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
 import { briefingEvent } from '@/lib/coordinator-events'
 
 const run = (payload: Record<string, unknown>) => ({ kind: 'run_finished' as const, payload: { stopReason: 'submitted', ...payload } })
@@ -14,28 +14,27 @@ test('machine-selected requests get separate turns in inbox order', () => {
   assert.deepEqual(isolateTaskRequest([first, second, normal]), [first])
   assert.deepEqual(isolateTaskRequest([second, normal]), [second])
   assert.deepEqual(isolateTaskRequest([normal]), [normal])
+  const approval = { kind: 'action_decided', payload: { action: 'approve_repository_push', status: 'done', requestEventId: 'one' } }
+  const otherApproval = { ...approval, payload: { ...approval.payload, requestEventId: 'two' } }
+  assert.deepEqual(isolateTaskRequest([normal, approval, otherApproval]), [normal])
+  assert.deepEqual(isolateTaskRequest([approval, otherApproval, second]), [approval], 'an approved task resumes in its own host turn')
 })
 
-test('clear cases follow the rules', () => {
-  assert.equal(ruleTier({ kind: 'user_message', payload: { text: 'hi' } }), 'attention')
-  assert.equal(ruleTier({ kind: 'issue_done', payload: { title: 'x' } }), 'background')
-  assert.equal(ruleTier({ kind: 'run_retried', payload: { retryRunId: 'r2', attempt: 2, maxAttempts: 3 } }), 'background')
-  assert.equal(ruleTier(run({ status: 'failed' })), 'attention')
-  assert.equal(ruleTier(run({ status: 'cancelled' })), 'background')
-  assert.equal(ruleTier(run({ status: 'stopped' })), 'background')
-  assert.equal(ruleTier(run({ status: 'succeeded', summary: null })), 'result')
-  assert.equal(ruleTier(run({ status: 'succeeded', summary: '  ' })), 'result')
-})
+test('only direct user delivery has a transport tier; every runtime event needs model judgment', () => {
+  assert.equal(ruleTier({ kind:'user_message',payload:{text:'hi'} }), 'attention')
+  for (const kind of ['issue_done','run_retried','run_finished','run_question','run_blocked','run_report','daily_briefing','matter_handoff','artifact_submitted','action_decided'] as const) {
+    for (const status of ['failed','cancelled','stopped','succeeded']) assert.equal(ruleTier({kind,payload:{status}}), null)
+  }
 
-test('a success with a summary goes to the decision model', () => {
-  assert.equal(ruleTier(run({ status: 'succeeded', summary: 'Fixed it, but could not run the tests' })), null)
-  assert.deepEqual(triageState(run({ status: 'succeeded', summary: 'Done' })), { status: 'succeeded', stopReason: 'submitted', agentSummary: 'Done' })
 })
-
-test('the model\'s probability picks attention or result', () => {
-  assert.equal(tierFromDecision(ATTENTION_THRESHOLD), 'attention')
-  assert.equal(tierFromDecision(0.9), 'attention')
-  assert.equal(tierFromDecision(0.2), 'result')
+test('triage projects observed state separately from untrusted claims and asks for a direct choice', () => {
+  const state=triageState(run({status:'succeeded',summary:'Done'}))
+  assert.equal(JSON.parse(state.untrustedEventPayload).summary,'Done')
+  assert.equal(JSON.parse(state.hostObservation).observedRun,null)
+  assert.equal(triageQuestions(run({}))[0].type,'choice')
+  assert.equal(tierFromDecision({type:'choice',name:'tier',choice:'result'}),'result')
+  assert.equal(tierFromDecision({type:'predicate',name:'tier',probability:0.99}),null)
+  assert.equal(tierFromDecision(undefined),null)
 })
 
 test('the tier reaches the Coordinator but not the chat', () => {
@@ -56,22 +55,14 @@ test('a waking message reaches a batch ahead of an older background backlog', ()
   assert.deepEqual(batch, [...batch].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()))
 })
 
-test('worker events: questions and blocks need the person, reports go to the model', () => {
-  assert.equal(ruleTier({ kind: 'run_question', payload: { question: 'Drop the old table?' } }), 'attention')
-  assert.equal(ruleTier({ kind: 'run_blocked', payload: { reason: 'No database access' } }), 'attention')
-  assert.equal(ruleTier({ kind: 'run_report', payload: { text: ' ' } }), 'background')
-  const report = { kind: 'run_report' as const, payload: { text: 'Migrated the users table' } }
-  assert.equal(ruleTier(report), null)
-  assert.deepEqual(triageState(report), { agentProgressNote: 'Migrated the users table' })
-  assert.match(triageQuestions(report)[0].instructions, /progress note/)
-  assert.equal(triageQuestions(report)[0].type, 'predicate')
-  assert.equal(tierFromDecision(0.9, 'run_report'), 'attention')
-  assert.equal(tierFromDecision(0.1, 'run_report'), 'background')
+test('worker questions and blockers are not automatically escalated to a person', () => {
+  for(const kind of ['run_question','run_blocked','run_report'] as const) assert.equal(ruleTier({kind,payload:{text:'',reason:'blocked'}}),null)
+  assert.match(triageQuestions(run({}))[0].instructions,/does not automatically need a person/)
 })
 
 test('a worker question tells the Coordinator to relay the answer', () => {
   const text = eventPrompt({ kind: 'run_question', issueId: null, runId: 'r2', payload: { question: 'Keep v1?', options: ['Yes', 'No'] }, tier: 'attention' })
-  assert.match(text, /asks the person: Keep v1\?\nOptions: Yes \/ No\n.*send_to_run/)
+  assert.match(text, /asks the person: Keep v1\?\nOptions: Yes \/ No[\s\S]*send_to_run/)
 })
 
 test('the morning briefing is pushed to the person once a day', () => {
@@ -81,8 +72,7 @@ test('the morning briefing is pushed to the person once a day', () => {
   ])
   assert.equal(event.dedupeKey, 'daily_briefing:u1:2026-10-27:daily')
   assert.notEqual(briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'first', total: 1, counts: {} }, []).dedupeKey, event.dedupeKey)
-  const tier = ruleTier(event)
-  assert.equal(tier, 'attention')
+  const tier = 'attention' as const // This projection fixture supplies a completed model decision.
   const prompt = eventPrompt({ ...event, tier })
   assert.match(prompt, /^\[Event\] It is 08:00 for the person: their morning briefing for 2026-10-27\. 4 item\(s\)/)
   assert.match(prompt, /gmail 3, linear 1/)

@@ -218,10 +218,11 @@ acceptance('prepare/acquire/real owner-peer HTTP/clean release safely reuses the
     fixturesClean = true
 
     const ids = [first.owner.userId, first.peer.userId]
+    const sessionRowsBeforeRelease = (await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[])', [ids])).rows[0].n
     const before = (await database.query('select count(*)::int as n from public."user"')).rows[0].n
     assert.equal((await release(first)).state, 'released')
     assert.equal((await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[]) and "expiresAt">clock_timestamp()', [ids])).rows[0].n, 0)
-    assert.ok((await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[])', [ids])).rows[0].n >= ids.length, 'released session evidence is retained')
+    assert.equal((await database.query('select count(*)::int as n from public.session where "userId"=any($1::text[])', [ids])).rows[0].n, sessionRowsBeforeRelease)
     assert.equal((await other.owner.request('/api/auth/get-session')).status, 200)
 
     const next = await acquire('lifecycle-next')

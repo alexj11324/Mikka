@@ -18,9 +18,6 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { issueTeamAccess } from '@/lib/issue-team-access'
 import { isIssueTeamAccessAllowed } from '@/lib/issue-team-access-policy'
-import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
-import { judgeIssueScope } from '@/lib/issue-scope-judge'
-import { after } from 'next/server'
 import { parseTelegramCommand } from './commands'
 import { isPostgresUniqueViolation } from './unique-violation'
 
@@ -309,8 +306,6 @@ async function handleTelegramMessage(input: {
       await input.post(t('coordinatorQueued'))
       return
     }
-    dispatchLinearIssueSync(result.issueId)
-    after(() => judgeIssueScope(result.issueId, 'Telegram'))
     await input.post(result.reply)
     return
   }

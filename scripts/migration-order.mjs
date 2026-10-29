@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { INTEGRATION_MIGRATION_EQUIVALENTS, integratedMigrationApplied } from './integration-migration-history.mjs'
+import { SCOPE_MIGRATION_EQUIVALENTS, scopeMigrationApplied } from './scope-migration-history.mjs'
 
 // This baseline fills tables that predate the tracked SQL history. Its timestamp
 // remains a normal migration ID, but it must run BEFORE 0001's issues FK.
@@ -23,6 +25,26 @@ export function orderMigrations(names) {
 
 // Earlier branch and deployment names are aliases only for identical SQL.
 export const MIGRATION_EQUIVALENTS = {
+  ...INTEGRATION_MIGRATION_EQUIVALENTS,
+  '20261029024124_run_publications.sql': ['20261028030036_run_publications.sql', '20261028224429_run_publications.sql'],
+  '20261029023121_device_authorization.sql': ['20261028022909_device_authorization.sql', '20261028202036_device_authorization.sql'],
+  '20261029022353_local_repository_defaults.sql': ['20261028020000_local_repository_defaults.sql', '20261028143922_local_repository_defaults.sql'],
+  '20261029012027_account_credential_vault.sql': ['20261028174823_account_credential_vault.sql', '20261027221500_account_credential_vault.sql'],
+  ...SCOPE_MIGRATION_EQUIVALENTS,
+  "20261029044002_run_dispatch_keys.sql": ["20261028231549_run_dispatch_keys.sql", "20261026190325_run_dispatch_keys.sql", "20261028213120_run_dispatch_keys.sql", "20261025051201_run_dispatch_keys.sql"],
+  "20261029044003_factory_192_stages.sql": ["20261028231550_factory_192_stages.sql", "20261026190326_factory_192_stages.sql", "20261028213121_factory_192_stages.sql", "20261025051202_factory_192_stages.sql"],
+  "20261029044004_factory_194_approvals.sql": ["20261028231551_factory_194_approvals.sql", "20261026190327_factory_194_approvals.sql", "20261028213122_factory_194_approvals.sql", "20261025051203_factory_194_approvals.sql"],
+  "20261029044005_factory_195_monitor.sql": ["20261028231552_factory_195_monitor.sql", "20261026190328_factory_195_monitor.sql", "20261028213123_factory_195_monitor.sql", "20261025051204_factory_195_monitor.sql"],
+  "20261029044006_factory_192_questions.sql": ["20261028231553_factory_192_questions.sql", "20261026190329_factory_192_questions.sql", "20261028213124_factory_192_questions.sql", "20261025051205_factory_192_questions.sql"],
+  "20261029044007_self_improvement.sql": ["20261028231554_self_improvement.sql", "20261026190330_self_improvement.sql", "20261028213125_self_improvement.sql", "20261025070600_self_improvement.sql"],
+  "20261029044008_improvement_skill_assignments.sql": ["20261028231555_improvement_skill_assignments.sql", "20261026190331_improvement_skill_assignments.sql", "20261028213126_improvement_skill_assignments.sql", "20261025083303_improvement_skill_assignments.sql"],
+  "20261029044009_skill_candidate_registry.sql": ["20261028231556_skill_candidate_registry.sql", "20261026200000_skill_candidate_registry.sql"],
+  "20261029044010_skill_mount_evidence.sql": ["20261028231557_skill_mount_evidence.sql", "20261026200500_skill_mount_evidence.sql"],
+  "20261029044011_feedback_candidate_generation.sql": ["20261028231558_feedback_candidate_generation.sql", "20261026201000_feedback_candidate_generation.sql"],
+  "20261029044012_skill_evaluations.sql": ["20261028231559_skill_evaluations.sql", "20261026201500_skill_evaluations.sql"],
+  "20261029044013_factory_skill_activation.sql": ["20261028231600_factory_skill_activation.sql", "20261026202000_factory_skill_activation.sql"],
+  "20261029044014_skill_lifecycle_operations.sql": ["20261028231601_skill_lifecycle_operations.sql", "20261026204000_skill_lifecycle_operations.sql"],
+  "20261029044015_issue_status_codes.sql": ["20261028231602_issue_status_codes.sql", "20261026211318_issue_status_codes.sql"],
   '20261028143921_approved_write_binding.sql': ['20261028133236_approved_write_binding.sql', '20261027182632_approved_write_binding.sql'],
   '20261028143920_operation_ledger.sql': ['20261028133235_operation_ledger.sql', '20261027182631_operation_ledger.sql'],
   '20261027181000_agent_kit.sql': ['20261027040500_agent_kit.sql'],
@@ -44,6 +66,24 @@ export const MIGRATION_EQUIVALENTS = {
   '20261027164515_workspace_computer_policy.sql': ['20261027040514_workspace_computer_policy.sql', '20261027000700_workspace_computer_policy.sql'],
 }
 const EQUIVALENT_SQL_SHA256 = {
+  '20261029024124_run_publications.sql': '2808e1fca5e5e0a7b6979bbdfe4a20b1e8abb15ffe0a9e1d76082e1ea0452a41',
+  '20261029023121_device_authorization.sql': 'b04be21d6641914e55113464452d2d4d4b83a767df4bf9b7a7b5b3471c52e414',
+  '20261029022353_local_repository_defaults.sql': '904b822ef1a281e1fb294ce1a25c3237e5493703ef61bb88c20628954093226a',
+  '20261029012027_account_credential_vault.sql': '68a735ed78ad3d6c5f9b0344f57931b8975fd84ce4331a757fa80610c4ff4233',
+  "20261029044002_run_dispatch_keys.sql": "ae4618bb7a9e9bfd9df1b52df5b36a6cead6b87edf5dd271eff4b4ca5b9ebf9d",
+  "20261029044003_factory_192_stages.sql": "675eb386f3ef611885c145051806e2c5d3a9c07a37bde1eed9b0285cf48ef5ea",
+  "20261029044004_factory_194_approvals.sql": "9e5b437d465a41b4bd86c7818c1a0bf5dbbf986d10199bde3a67eefcad2b7a96",
+  "20261029044005_factory_195_monitor.sql": "83c6454347229177133868a975054f5abc699bbfdc66ac0eee873f202cdb7acf",
+  "20261029044006_factory_192_questions.sql": "b29263653731169ae347c840f8d0a0ec5cfaa586c0016043e1de9ffc9d9fe40d",
+  "20261029044007_self_improvement.sql": "5e9bad53e922a3256d239c65c8ea287a267e10a4537ff1c40b0b447137b5c2d5",
+  "20261029044008_improvement_skill_assignments.sql": "8022d8244ffdbee4cda8e8080e245353a40691367edb977085e6f5acef153928",
+  "20261029044009_skill_candidate_registry.sql": "c2501a2b3c53e028809fb127af245a0b8bbdeda4f20fac5c1bfa8e837fbb0628",
+  "20261029044010_skill_mount_evidence.sql": "2744ed91ddedc8a29951d681869831096f642f2666a215d07490a37aa45f72b8",
+  "20261029044011_feedback_candidate_generation.sql": "36bdd0d1c6bea6ab89e06aac7d1bccff9cfbdde5b81b9c85fb22f3929dd8271c",
+  "20261029044012_skill_evaluations.sql": "aa6ed27d6c38ba3a33bfbc3de9b45991ddb92c2985e6c43a6bab980a171f697c",
+  "20261029044013_factory_skill_activation.sql": "598b2d8ed46e43eac3eed629072a21f981ca89454c1d45c88139049673c766f0",
+  "20261029044014_skill_lifecycle_operations.sql": "5889c46b59d118d04ecbd515da377045fbf3e0c5599cb1bc0c0ace6b219318fd",
+  "20261029044015_issue_status_codes.sql": "190e2afea98f319efb6d3605236441420e30fc39fb81eea0c44ab17d8b6819d1",
   '20261028143921_approved_write_binding.sql': '60fc01efb736fd5614d2a51f779f9a2fbe6f78f3f3ce0b4f99b8b8240ac48f90',
   '20261028143920_operation_ledger.sql': 'f5fbfacc61d5417aeacce88460244f185ec8a76a4784bddd151d006b48c627df',
   '20261027181000_agent_kit.sql': '365230faab874af93a8f696a1f83f1b3276a83bb6ea933b3939a6b654dea1be2',
@@ -65,6 +105,11 @@ const EQUIVALENT_SQL_SHA256 = {
   '20261027164515_workspace_computer_policy.sql': 'b776298be218ee6f741347df61c99ada1565d92d813aa7da396725a3a967c76e',
 }
 export function alreadyApplied(name, applied, sql) {
+  const integrated = integratedMigrationApplied(name, applied, sql)
+  if (integrated !== undefined) return integrated
+  const scope = scopeMigrationApplied(name, applied, sql)
+  if (scope !== undefined) return scope
+  if (["20261029044002_run_dispatch_keys.sql", "20261029044003_factory_192_stages.sql", "20261029044004_factory_194_approvals.sql", "20261029044005_factory_195_monitor.sql", "20261029044006_factory_192_questions.sql", "20261029044007_self_improvement.sql", "20261029044008_improvement_skill_assignments.sql", "20261029044009_skill_candidate_registry.sql", "20261029044010_skill_mount_evidence.sql", "20261029044011_feedback_candidate_generation.sql", "20261029044012_skill_evaluations.sql", "20261029044013_factory_skill_activation.sql", "20261029044014_skill_lifecycle_operations.sql", "20261029044015_issue_status_codes.sql"].includes(name) && (typeof sql !== 'string' || createHash('sha256').update(sql).digest('hex') !== EQUIVALENT_SQL_SHA256[name])) throw new Error(`migrate: equivalent migration content changed: ${name}`)
   if (applied.has(name)) return true
   if (!(MIGRATION_EQUIVALENTS[name] ?? []).some(alias => applied.has(alias))) return false
   // An alias is safe only for the exact SQL historically recorded under it.

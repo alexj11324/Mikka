@@ -76,7 +76,7 @@ const ACTIVE = new Set(['queued', 'preparing', 'running', 'finishing'])
 const OPEN_ISSUE = new Set(['backlog', 'todo', 'doing'])
 const CLOSED_ISSUE = new Set(['done', 'canceled', 'duplicate'])
 
-type PrLink = { url: string; state: 'open' | 'merged' | 'closed' }
+type PrLink = { url: string; state: 'open' | 'draft' | 'merged' | 'closed' }
 type GroupedThread = { id: string; status: string; issueId: string | null; createdAt: string; superseded: boolean }
 /** The task a thread works on, as far as grouping needs it. */
 export type GroupIssue = { status: string; metadata: { pullRequests: readonly PrLink[] } }
@@ -105,7 +105,7 @@ export function threadGroup(thread: GroupedThread, issue: GroupIssue | undefined
   if (thread.status === 'failed') return !thread.superseded && (!issue || newestOnIssue) ? 'waiting' : 'resolved'
   if (!issue) return thread.status === 'stopped' ? 'idle' : 'resolved'
   if (!newestOnIssue) return 'resolved'
-  if (issue.status === 'review' || issue.metadata.pullRequests.some(pr => pr.state === 'open')) return 'waiting'
+  if (issue.status === 'review' || issue.metadata.pullRequests.some(pr => pr.state === 'open' || pr.state === 'draft')) return 'waiting'
   if (issue.metadata.pullRequests.some(pr => pr.state === 'merged')) return 'resolved'
   return OPEN_ISSUE.has(issue.status) ? 'idle' : 'resolved'
 }

@@ -16,8 +16,11 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Messages | `components/ui/message.tsx`, `components/ui/bubble.tsx`, `MessageScroller*` | R-13, R-14 |
 | Task, run and source chips in chat | OpenUI `TaskChip`, `RunChip`, `SourceChip` (`components/workspace/agent-ui-library.tsx`, data from `agent-citations.tsx`) | R-15 |
 | Thread card under a Coordinator reply | `components/coordinator/thread-card.tsx`; opens `IssueThreadPanel` in the centre | R-66 |
+| GitHub PR state icons | `components/workspace/pull-request-icon.tsx` | Shared open/draft/merged/closed icons and Primer semantic colors; used in task properties, board and thread outputs |
+| Thread state icon | `components/workspace/thread-status-icon.tsx` | Shared by thread card, thread list and open-thread header; Bot avatars remain for actual Bot actors only (R-62/R-66) |
 | New task | `components/coordinator/new-task-dialog.tsx` | R-22, R-23 |
-| Search | reUI `CommandDialog` (⌘K), centred | |
+| Search | reUI `CommandDialog` (⌘K), centred | Local rows first, then `GET /api/search` hits per source (`hooks/use-site-search.ts`) |
+| Group chat (opened from search) | `components/workspace/group-chat-view.tsx` | Read-only until group sending opens: no composer (R-10). Runs per R-13; bot colour not available yet |
 | Board | reUI `Kanban` (`components/reui/kanban.tsx`) | R-25 |
 | Status | StatusBadge set; `components/nav/status-dot.tsx` for devices | R-24, R-34 |
 | People avatars | `components/nav/letter-avatar.tsx`, `components/user-avatar.tsx` | |
@@ -27,6 +30,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | App-wide browser (top bar 🌐, Figma `412:8066`) | `components/browser/`: `BrowserToggle` (icon only, in the window bar, `lg` and up), `BrowserPane` (replaces the right panel while open), `BrowserNotesProvider` / `BrowserNoteChip` / `BrowserNoteLine` | The person's own browser, not a bot's 电脑. Every page is framed with the same sandbox, never `allow-top-navigation*`. One 选择元素 button: on a page of the app's own origin it picks an element (reusing the artifact frame's picking script); on any other origin it becomes a dragged box, so a note there carries the URL and the box, nothing read from the page. A chip reads 「1 · 周会 · 删除 · 备注」 (the item the element sits in, its name, the note; no role words), and no page text is sent. Notes are chips in the chat composer on screen and ride at the head of the next message (`lib/browser/note.ts`) |
 | 建议 page (rail) | `components/suggestions/suggestion-feed.tsx`; cards from `components/suggestions/mobile-card.tsx` (`SuggestionCardBody`, `SourceMark`) | Figma F8 `420:5831`, R-21. A tapped card heads the person's message in the Coordinator chat (`lib/suggestions/card.ts`) |
 | Artifact page (rail) | `components/artifacts/artifact-library.tsx`, opening `ArtifactWindow` (the reader beside the thread or Coordinator chat) | Figma F2 `395:27790`, F4 `395:27525`. Rail icon `components/icons/artifact-icon.tsx`, never lucide Copy/Library |
+| Plugin (connected app) list, detail page and brand icons | `components/plugins/connected-apps.tsx`, `components/plugins/app-icons.tsx` | Codex Settings › 插件 precedent (R-70, R-71): brand tile, switch, ⋯ menu per account |
 | Agent outputs (documents, web pages) | `components/artifacts/`: `ArtifactCard` (in chat), `ArtifactChip` (chat beside the reader), `ArtifactViewer` (reader), `ArtifactQuoteChip` / `ArtifactQuoteLine` | Figma `178:11626`. Quoted text is marked by `remarkMarks`, never by touching the DOM |
 
 ## Do not use

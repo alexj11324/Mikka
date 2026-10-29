@@ -7,8 +7,8 @@ type MailboxPool = ConstructorParameters<typeof SessionMailbox>[0]
 // A controlled row-lock/interleaving model, not a PostgreSQL emulator or proof.
 // It invokes the real fence and SessionMailbox transaction, and stages writes
 // until COMMIT so late admission failures cannot appear to have persisted.
-function model(botId: string | null = 'bot') {
-  const state = { botOwner: 'owner', workspace: 'namespace', holder: 'holder', status: 'running', enabled: true, pending: true, tool: 'mailbox_inbox', deviceId: 'device', clock: 0, expires: 100 }
+function model(botId: string | null = 'bot', toolName?: string) {
+  const state = { botOwner: 'owner', workspace: 'namespace', holder: 'holder', status: 'running', enabled: true, pending: true, tool: toolName ?? 'mailbox_inbox', deviceId: 'device', clock: 0, expires: 100 }
   const locks = new Set<string>(), lockOrder: string[] = [], waiting: (() => void)[] = [], queries: string[] = []
   let staged = 0, delivered = 0
   const control = { enabled: true, beforeWrite: async () => {}, beforeDeviceLock: async () => {} }
@@ -44,7 +44,7 @@ function model(botId: string | null = 'bot') {
       throw new Error('Unexpected model SQL: ' + sql)
     },
   }
-  const fence = nativeMailboxFence({ userId: 'owner', botId, workspaceId: 'namespace', scope: { holder: 'holder', turnId: 'turn', callId: 'call' }, action: 'inbox' }, () => control.enabled)
+  const fence = nativeMailboxFence({ userId: 'owner', botId, workspaceId: 'namespace', scope: { holder: 'holder', turnId: 'turn', callId: 'call' }, action: 'inbox', toolName }, () => control.enabled)
   const store = new SessionMailbox({ connect: async () => client } as unknown as MailboxPool, 'namespace', fence)
   const read = () => store.inbox({ userId: 'owner', workspaceId: 'namespace', mailboxId: 'box' })
   return { state, control, queries, lockOrder, mutate, read, delivered: () => delivered }
@@ -130,4 +130,9 @@ test('built-in Coordinator null Bot scope uses its exact session without inventi
   assert.deepEqual(h.lockOrder, ['device', 'turn', 'session', 'tool'])
   assert.equal(h.queries.some(sql => sql.startsWith('SELECT id FROM bots')), false)
   assert.equal(h.delivered(), 1)
+})
+
+test('a host-selected external tool is fenced by its exact native call name', async () => {
+ const h = model('bot', 'send_slack_message'); await h.read(); assert.equal(h.delivered(), 1)
+ const changed = model('bot', 'send_slack_message'); changed.state.tool = 'other_tool'; await assert.rejects(changed.read(), /Native mailbox authority expired or revoked/); assert.equal(changed.delivered(), 0)
 })

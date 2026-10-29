@@ -5,9 +5,10 @@
 import { connect } from "node:net";
 import { request as httpRequest } from "node:http";
 import { createInterface } from "node:readline";
-import { TOOLS, normalizeCall } from "./driver.mjs";
-const [socketPath, token] = process.argv.slice(2);
+import { CAPTURE_TOOLS, TOOLS, isCaptureTool, normalizeCall, normalizeCaptureCall } from "./driver.mjs";
+const [socketPath, token, ...flags] = process.argv.slice(2);
 if (!socketPath || !token) process.exit(2);
+const captures = flags.includes("--captures");
 async function openBroker() {
   if (!socketPath.startsWith('tcp://')) return connect(socketPath);
   const target = new URL(socketPath);
@@ -29,11 +30,11 @@ async function openBroker() {
     req.end();
   });
 }
-async function request(call) {
+async function request(call, kind = "call") {
   const socket = await openBroker();
   return new Promise((resolve, reject) => {
     let text = "";
-    const sendCall = () => socket.write(JSON.stringify({ token, call }) + "\n");
+    const sendCall = () => socket.write(JSON.stringify({ token, [kind]: call }) + "\n");
     if (socket.connecting) socket.once("connect", sendCall);
     else sendCall();
     socket.on("error", reject);
@@ -47,7 +48,7 @@ async function request(call) {
     socket.on("end", () => {
       try {
         const body = JSON.parse(text);
-        body.error ? reject(new Error(body.error)) : resolve(body.result);
+        body.error ? reject(Object.assign(new Error(body.error), { detail: body.detail })) : resolve(body.result);
       } catch (error) {
         reject(error);
       }
@@ -74,9 +75,28 @@ lines.on("line", (line) => {
           capabilities: { tools: {} },
           serverInfo: { name: "mikka-approved-computer", version: "1" },
         });
-      if (msg.method === "tools/list") return send(msg.id, { tools: TOOLS });
+      if (msg.method === "tools/list") return send(msg.id, { tools: captures ? [...TOOLS, ...CAPTURE_TOOLS] : TOOLS });
       if (msg.method !== "tools/call") return send(msg.id, {});
-      const result = await request(normalizeCall(msg.params));
+      // MCP transport metadata (for example Claude's progressToken and
+      // toolUseId) is not part of the action or any authority decision.
+      // Validate the envelope separately; keep driver arguments strict.
+      const params = msg.params;
+      if (!params || typeof params !== 'object' || Array.isArray(params) ||
+        Object.keys(params).some(key => !['name', 'arguments', '_meta'].includes(key)) ||
+        ('_meta' in params && (!params._meta || typeof params._meta !== 'object' || Array.isArray(params._meta))))
+        throw new Error('Invalid MCP call envelope');
+      if (captures && isCaptureTool(params.name)) {
+        try {
+          // Checked here for a quick refusal; the broker checks the call again.
+          const capture = { name: params.name, arguments: params.arguments ?? {} };
+          normalizeCaptureCall(capture);
+          const result = await request(capture, "capture");
+          return send(msg.id, { content: [{ type: "text", text: JSON.stringify(result) }] });
+        } catch (error) {
+          return send(msg.id, { isError: true, content: [{ type: "text", text: typeof error?.detail === "string" ? error.detail : "Capture failed; no automatic retry." }] });
+        }
+      }
+      const result = await request(normalizeCall({ name: params.name, arguments: params.arguments }));
       send(msg.id, {
         ...result,
         content: [

@@ -5,9 +5,8 @@ type WriteAuth = Parameters<typeof approvedWriteHandler>[0]
 type WriteOperations = Parameters<typeof approvedWriteHandler>[1]
 type WriteDiscovery = Parameters<typeof approvedWriteHandler>[2]
 
-/** Release gate, not a browser parameter or a credential/configuration switch.
- * Native contracts and the separately coordinated approval view are not accepted
- * yet. A later reviewed release must explicitly change this value. */
+/** The trusted deployment gate is checked before loading runtime services.
+ * An admitted Preview still uses the same identity, permission and ledger path. */
 
 export function createPersonalWriteRoute(dependencies: {
   enabled: () => boolean

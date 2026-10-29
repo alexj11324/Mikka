@@ -7,8 +7,8 @@ import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 
 /** Resolve workspace membership in its own DB; never cross-join the two DBs.
  * No request/global cache: suspension/removal takes effect on the next read. */
-export async function issueVisibility(userId: string, includeDeleted = false, workspaceId?: string) {
-  const candidates = await db.select({ id: issues.id }).from(issues).where(or(
+export async function issueVisibility(userId: string, includeDeleted = false, workspaceId?: string, executor: Pick<typeof db, 'select'> = db) {
+  const candidates = await executor.select({ id: issues.id }).from(issues).where(or(
     eq(issues.userId, userId),
     sql`exists (select 1 from ${issueMembers} where ${issueMembers.issueId} = ${issues.id} and ${issueMembers.userId} = ${issues.userId} and ${issueMembers.memberId} = ${userId})`,
   ))

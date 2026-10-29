@@ -1,5 +1,6 @@
 // Required Linux CI mode: real isolation startup, with no agent CLI or credentials.
 import { existsSync } from "node:fs"
+import { execFileSync } from "node:child_process"
 import { connect } from "node:net"
 
 import { SandboxManager } from "@anthropic-ai/sandbox-runtime"
@@ -9,6 +10,7 @@ import { expect, it } from "vitest"
 import { SandboxRuntime } from "../src/agents/sandbox"
 import { Daemon } from "../src/main"
 import { MemoryServer } from "../src/server-link"
+import { HttpServerLink } from "../src/server-link-http"
 import { cleanupTempDirs, tempDir } from "./helpers"
 
 const HOST_DENIAL = /(?:^sandbox probe failed: bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted$|namespace.*(?:Operation not permitted|Permission denied)|(?:uid|gid) map.*(?:Operation not permitted|Permission denied|Read-only file system)|No permissions to create new namespace)/i
@@ -79,15 +81,24 @@ it("probes real Linux isolation, advertises only usable harnesses, and cleans up
     })
     const device = "device-sandbox-acceptance"
     const server = new MemoryServer(device)
+    const codexVersion = execFileSync(process.env.CODEX_CONTRACT_BIN!, ['--version'], {encoding:'utf8'}).trim()
+    expect(codexVersion).toMatch(/\b0\.163\.0\b/)
+    // Registration uses the production HTTP gate factory. The separate DB
+    // roundtrip exercises this factory against actual approval handlers.
+    const approvalLink = new HttpServerLink('http://127.0.0.1:1')
+    const link = Object.assign(server.link(), {
+      prepareRunToolApproval: approvalLink.prepareRunToolApproval.bind(approvalLink),
+    })
     daemon = new Daemon({
       dataDir: tempDir(),
       flavor: "dev",
-      link: server.link(),
+      link,
       credential: "synthetic-test-credential",
       harnesses: [
         { harness: "mock", installed: true, version: "test" },
-        { harness: "codex", installed: true, version: "test" },
+        { harness: "codex", installed: true, version: codexVersion },
       ],
+      harnessBinaries: {codex:process.env.CODEX_CONTRACT_BIN!},
       quotaSource: null,
       log,
     })
@@ -96,6 +107,10 @@ it("probes real Linux isolation, advertises only usable harnesses, and cleans up
     const advertised = hostError ? ["mock"] : ["mock", "codex"]
     expect(daemon.status().harnesses.map((info) => info.harness)).toEqual(advertised)
     expect(server.devices.get(device)?.info.harnesses.map((info) => info.harness)).toEqual(advertised)
+    if (!hostError) {
+      expect(daemon.status().harnesses.find(info=>info.harness==='codex')?.toolApproval).toBe(true)
+      expect(server.devices.get(device)?.info.harnesses.find(info=>info.harness==='codex')?.toolApproval).toBe(true)
+    }
     const unavailable = logs.filter((entry) => entry.msg === "agent sandbox unavailable")
     if (hostError) {
       expect(unavailable).toHaveLength(1)

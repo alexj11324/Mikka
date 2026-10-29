@@ -11,7 +11,7 @@ mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExpor
   useSession: () => ({ data: userId ? { user: { id: userId } } : null, isPending: pending }),
   linkSocial: async () => ({ error: true }),
 } } })
-mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
+mock.module('next-intl', { namedExports: { useTranslations: () => translate, useLocale: () => 'en', useFormatter: () => ({}) } })
 mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ render, children, disabled, onClick, role }: { render?: ReactElement; children?: React.ReactNode; disabled?: boolean; onClick?: () => void; role?: string }) => render ? cloneElement(render as ReactElement<{ role?: string }>, { role }, children) : <button disabled={disabled} onClick={onClick}>{children}</button> } })
 
 const browser = new Window({ url: 'https://mikka.example/en?settings=integrations' })

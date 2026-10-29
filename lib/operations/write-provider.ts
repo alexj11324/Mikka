@@ -4,6 +4,7 @@ import { OperationError } from './ledger'
 import type { WriteActionName, WriteProvider } from './write-contract'
 import { channelSnapshot, calendarSnapshot, snapshotDigest } from './write-target'
 import { createHash } from 'node:crypto'
+import { SLACK_CONVERSATION_READ_CONTRACT, type SlackConversationReader } from './slack-conversation-read'
 
 const definitions = {
   append_notion_paragraph: { toolkit: 'notion', write: 'NOTION_APPEND_BLOCK_CHILDREN', read: 'NOTION_RETRIEVE_PAGE' },
@@ -13,14 +14,14 @@ const definitions = {
 const record = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {}
 export function writeArguments(action: WriteActionName, p: Record<string, unknown>) {
   if (action === 'append_notion_paragraph') return { block_id: p.page_id, children: [{ object: 'block', type: 'paragraph', paragraph: { rich_text: [{ type: 'text', text: { content: p.text } }] } }] }
-  if (action === 'send_slack_message') return { channel: p.channel, text: String(p.text).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'), mrkdwn: false, parse: 'none', link_names: false, unfurl_links: false, unfurl_media: false }
+  if (action === 'send_slack_message') return { channel: p.channel, text: p.text }
   return { calendar_id: 'primary', event_id: p.event_id, send_updates: p.send_updates }
 }
 /** Native tool schemas/permissions must still be accepted against a specifically
  * authorized test connection before enabling this adapter in product tooling. */
-export type ConditionalCalendarDelete = (input: { ownerId: string; accountId: string; eventId: string; ifMatch: string; sendUpdates: 'none' | 'all'; signal: AbortSignal; beforeSend: () => Promise<void> }) => Promise<{ status: number }>
+export type ConditionalCalendarDelete = (input: { ownerId: string; accountId: string; eventId: string; ifMatch: string; sendUpdates: 'none' | 'all' | 'externalOnly'; signal: AbortSignal; beforeSend: () => Promise<void> }) => Promise<{ status: number }>
 export type SlackReadContract = { version: string; metadataDigest: string }
-export function composioWriteProvider(client: ComposioActionClient | null, action: WriteActionName, conditionalDelete?: ConditionalCalendarDelete, slackReadContract?: SlackReadContract): WriteProvider {
+export function composioWriteProvider(client: ComposioActionClient | null, action: WriteActionName, conditionalDelete?: ConditionalCalendarDelete, slackReadContract?: SlackReadContract, slackReader?: SlackConversationReader): WriteProvider {
   const d = definitions[action]
   async function account(owner: string) {
     if (!client) throw new OperationError('composioNotConfigured')
@@ -35,6 +36,10 @@ export function composioWriteProvider(client: ComposioActionClient | null, actio
     return tool.version
   }
   async function inspect(owner: string, accountId: string, payload: Record<string, unknown>) {
+      if (action === 'send_slack_message' && slackReader) {
+        const channel = await slackReader(owner, accountId, String(payload.channel))
+        return { ...channelSnapshot(channel, payload.channel), readContract: SLACK_CONVERSATION_READ_CONTRACT }
+      }
       if (action === 'send_slack_message') {
         // Catalog name alone is not a parameter contract. Default closed until a
         // reviewed, versioned raw metadata fixture is supplied by the host.
@@ -75,7 +80,7 @@ export function composioWriteProvider(client: ComposioActionClient | null, actio
         // Do not guess an if_match tool argument: only an explicitly supplied
         // transport that atomically honors Google's If-Match can cancel.
         if (!conditionalDelete) throw new OperationError('integrationConditionalWriteUnavailable')
-        const result = await conditionalDelete({ ownerId: p.ownerId, accountId: p.accountId, eventId: String(p.payload.event_id), ifMatch: String(p.approvalContext!.etag), sendUpdates: p.payload.send_updates as 'none' | 'all', signal: p.signal, beforeSend: recheck })
+        const result = await conditionalDelete({ ownerId: p.ownerId, accountId: p.accountId, eventId: String(p.payload.event_id), ifMatch: String(p.approvalContext!.etag), sendUpdates: p.payload.send_updates as 'none' | 'all' | 'externalOnly', signal: p.signal, beforeSend: recheck })
         if (result.status !== 204) throw new OperationError('operationUncertain')
         return { providerObjectId: String(p.payload.event_id), evidenceDigest: createHash('sha256').update(JSON.stringify([p.accountId, action, p.approvalContext])).digest('hex') }
       }

@@ -23,7 +23,7 @@ lines.on("line", async (line) => {
   if (id === undefined) return
   if (method === "initialize") {
     experimental = params.capabilities?.experimentalApi === true
-    return send({ id, result: { userAgent: "fixture" } })
+    return send({ id, result: { userAgent: process.env.FAKE_CODEX_USER_AGENT ?? "codex_cli_rs/0.163.0 synthetic-fixture" } })
   }
   if (method === "account/login/start") {
     if (

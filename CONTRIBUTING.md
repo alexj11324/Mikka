@@ -68,8 +68,9 @@ cannot.
    skipped/failed selected test job fails the required gate.
 4. **Integration** (CI): every code-bearing push to main, nightly on main, and manual
    Actions → Browser tests → Run workflow run full functionality **and** the
-   desktop/mobile performance suite. A PR changing a performance spec also
-   runs performance before merge. Other PRs defer performance to integration;
+   desktop/mobile performance suite. Consolidation PRs on `integrate/` branches
+   run both complete layers before merge as well. A PR changing a performance
+   spec also runs performance before merge. Other PRs defer performance to integration;
    thresholds, assertions, worker count and retry policy remain unchanged.
 
 A pull request that only changes documentation — non-executable Markdown in

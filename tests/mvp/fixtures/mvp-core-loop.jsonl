@@ -1,0 +1,17 @@
+{"t":0,"chunk":{"type":"start","messageId":"mvp-message"}}
+{"t":0,"chunk":{"type":"start-step"}}
+{"t":0,"chunk":{"type":"text-start","id":"mvp-progress"}}
+{"t":0,"chunk":{"type":"text-delta","id":"mvp-progress","delta":"正在检查仓库。"}}
+{"t":1,"chunk":{"type":"text-end","id":"mvp-progress"}}
+{"t":5000,"chunk":{"type":"tool-input-available","toolCallId":"mvp-read","toolName":"read","input":{"path":"README.md"}}}
+{"t":10000,"chunk":{"type":"tool-output-available","toolCallId":"mvp-read","output":{"ok":true}}}
+{"t":15000,"chunk":{"type":"text-start","id":"mvp-progress-2"}}
+{"t":20000,"chunk":{"type":"text-delta","id":"mvp-progress-2","delta":"准备添加说明文件。"}}
+{"t":25000,"chunk":{"type":"text-end","id":"mvp-progress-2"}}
+{"t":30000,"chunk":{"type":"tool-input-available","toolCallId":"mvp-write","toolName":"write","input":{"path":"MIKKA_MOCK.md"}}}
+{"t":35000,"write":{"path":"MIKKA_MOCK.md","content":"# MVP result\n\nWritten by the real Mikka mock harness.\n"},"chunk":{"type":"tool-output-available","toolCallId":"mvp-write","output":{"ok":true}}}
+{"t":35001,"chunk":{"type":"data-file-change","data":{"path":"MIKKA_MOCK.md","change":"added"}}}
+{"t":35002,"chunk":{"type":"finish-step"}}
+{"t":35003,"chunk":{"type":"finish","finishReason":"stop"}}
+{"t":35004,"submit":{"summary":"Added MIKKA_MOCK.md using the real daemon worktree.","nextStep":"Review the pull request."}}
+{"t":35005,"exit":{"outcome":"succeeded"}}

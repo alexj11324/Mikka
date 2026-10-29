@@ -3,11 +3,13 @@ import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { coordinatorEvents } from '@/lib/db/schema'
 import type { CoordinatorEventInput } from '@/lib/coordinator-events'
+import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 
 type Executor = Pick<typeof db, 'insert'>
 
 /** Writes the event once; a repeat with the same dedupe key is ignored. */
 export async function recordCoordinatorEvent(executor: Executor, event: CoordinatorEventInput) {
+  await assertCredentialSafeChat(event.userId, event.payload)
   await executor.insert(coordinatorEvents).values({ id: crypto.randomUUID(), ...event }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey })
 }
 

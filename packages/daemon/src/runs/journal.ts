@@ -6,6 +6,8 @@ import {
   type StopReason,
 } from "@mikka/protocol"
 
+import type { RunSkillMount, RunExecution, RunRuntime } from "@mikka/protocol/run"
+
 import { readJson, writeJsonAtomic } from "../fs-util"
 import type { RunAssignment } from "../server-link"
 
@@ -16,11 +18,19 @@ export interface JournalEntry {
   worktree: string | null
   /** The commit the worktree started from; checkpoints diff against it. */
   baseCommit?: string
+  /** Independent host reread, bound to the actual adapter session. */
+  skillMount?: RunSkillMount
+  execution?: RunExecution
+  runtime?: RunRuntime
   /** Last seq assigned to this run's events. */
   lastSeq: number
   error: string | null
   /** Set once the run reached a terminal state. */
   stopReason?: StopReason
+  /** Fail closed on a crash in the external session-message delivery window. */
+  questionResumeState?: "starting" | "accepted"
+  /** A durable help request still needs this worktree for its original session. */
+  waitingQuestionId?: string
   updatedAt: string
 }
 
@@ -28,8 +38,7 @@ export class RunJournal {
   private entries: Record<string, JournalEntry>
 
   constructor(private readonly file: string) {
-    const raw = readJson(file) as
-      | { runs?: Record<string, JournalEntry> }
+    const raw = readJson(file) as { runs?: Record<string, JournalEntry> }
       | undefined
     this.entries = raw?.runs ?? {}
   }

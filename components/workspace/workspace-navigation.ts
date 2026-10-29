@@ -1,10 +1,11 @@
-export type WorkspaceSection = 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts'
+export type WorkspaceSection = 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'group' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts'
 
 export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   inbox: 'Nav.inbox',
   'my-issues': 'Nav.myTasks',
   agent: 'Nav.agent',
   coordinator: 'Nav.coordinator',
+  group: 'GroupChat.untitled',
   projects: 'Nav.projects',
   views: 'Nav.views',
   'team-home': 'Nav.teamHome',

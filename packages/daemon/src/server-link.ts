@@ -12,6 +12,8 @@ import type { NativeCoordinatorJob, NativeCoordinatorCommand, NativeCoordinatorT
 // (`completeRun`: stop reason + handoff report) and the server decides the
 // issue's next step (the orchestrator, later; `MemoryServer.nextOwner` now).
 import { randomUUID } from "node:crypto"
+import { pathToFileURL } from "node:url"
+import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 
 import {
   isTerminalRunState,
@@ -32,7 +34,9 @@ import {
 } from "@mikka/protocol"
 
 import type { LocalComputerDecision, LocalComputerRequest } from "@mikka/protocol/computer"
+import type { CaptureUploadRequest, CaptureUploadResponse, CaptureView, ScreenCaptureRequest, ScreenCaptureResponse } from "@mikka/protocol/capture"
 import type { RunChunk } from "./chunks"
+import type { ToolApprovalGate } from "./agents/tool-approval"
 import type { RunMailbox } from './run-mailbox'
 import type { NativeBrokerContext, NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
@@ -61,6 +65,7 @@ export interface ChunkBatch {
  * the daemon keeps running and retries (offline tolerance, R13).
  */
 export interface ServerLink {
+  prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
   /** Optional host-only adapter for the claimed run; never model-supplied. */
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   claimCoordinator?(deviceId: string, signal: AbortSignal): Promise<NativeCoordinatorJob | null>
@@ -86,11 +91,23 @@ export interface ServerLink {
   /** Fails with `RunNotPinnedHereError` for runs pinned elsewhere. */
   claimRun(deviceId: string, runId: string): Promise<RunAssignment>
   localComputerAuthority?(deviceId: string, runId: string): Promise<NonNullable<RunAssignment['localComputer']>>
+  /** Receipted resumes require a current online source/access/lease fence. */
+  validateSkillReceipt?(runId:string,receiptId:string):Promise<SkillReceiptRevalidation>
   /** Owner-reviewed computer requests; responses carry decisions only. */
   syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]>
   /** Private hosted-run channel; these methods never return provider tokens. */
   nativeContext?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeBrokerContext>
   nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>
+  /**
+   * Screenshots and recordings a run keeps as evidence (`@mikka/protocol/capture`).
+   * Optional: links without them keep the files on this machine.
+   */
+  beginCapture?(runId: string, request: CaptureUploadRequest): Promise<CaptureUploadResponse>
+  resumeCapture?(runId: string, captureId: string): Promise<CaptureUploadResponse>
+  sendCapture?(runId: string, captureId: string, upload: CaptureUploadResponse["upload"], bytes: Uint8Array, contentType: string): Promise<void>
+  completeCapture?(runId: string, captureId: string): Promise<CaptureView>
+  /** The cloud computer's capture tools for a run on this cloud worker. */
+  screenCapture?(runId: string, request: ScreenCaptureRequest, signal?: AbortSignal): Promise<ScreenCaptureResponse>
   /** Appends to the run's event stream; returns the new tail offset. */
   appendRunChunks(runId: string, batch: ChunkBatch): Promise<{ offset: string }>
   updateRun(runId: string, patch: RunPatch): Promise<void>
@@ -258,8 +275,11 @@ export class MemoryServer {
 
   queueRun(deviceId: string, run: QueueRunInput): string {
     const runId = run.runId ?? randomUUID()
+    // Memory fixtures may identify an isolated source repo by path. The real
+    // HTTP server always supplies remoteUrl and never sends checkout paths.
+    const fixturePath = this.repos.get(deviceId)?.find(repo => repo.repoId === run.repoId)?.path
     this.runs.set(runId, {
-      assignment: { ...run, runId },
+      assignment: { ...run, runId, remoteUrl: run.remoteUrl ?? (fixturePath ? pathToFileURL(fixturePath).href : undefined) },
       deviceId,
       state: "queued",
       patches: [],

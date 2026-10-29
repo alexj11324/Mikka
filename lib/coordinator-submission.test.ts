@@ -8,7 +8,7 @@ import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictEr
 
 const submissionId = 'a4000000-0000-4000-8000-000000000001'
 const dialect = new PgDialect()
-type Stored = { id: string; userId: string; botId: string | null; kind: string; dedupeKey: string; issueId: null; runId: null; payload: { text: string; taskDestination?: TaskDestination } }
+type Stored = { id: string; userId: string; botId: string | null; kind: string; dedupeKey: string; issueId: null; runId: null; payload: { text: string; taskDestination?: TaskDestination; humanSessionId?: string } }
 function fixture() {
   const rows = new Map<string, Stored>()
   const botRows = new Map<string, { id: string; name: string; ownerId: string }>()
@@ -61,7 +61,7 @@ function deferred<T>() {
 
 test('personal input normalizes text and UUID and rejects question/authority fields', () => {
   assert.deepEqual(personalSubmissionInput.parse({ text: '  hello  ', submissionId: submissionId.toUpperCase() }), { text: 'hello', submissionId })
-  for (const extra of [{ questionId: submissionId }, { userId: 'foreign' }, { botId: submissionId }, { action: 'approve' }]) assert.equal(personalSubmissionInput.safeParse({ text: 'hello', submissionId, ...extra }).success, false)
+  for (const extra of [{ questionId: submissionId }, { userId: 'foreign' }, { botId: submissionId }, { action: 'approve' }, {humanSessionId:'forged'}]) assert.equal(personalSubmissionInput.safeParse({ text: 'hello', submissionId, ...extra }).success, false)
   for (const body of [{ text: '' }, { text: 'x', submissionId: 'invalid' }, { text: 'x', submissionId: null }]) assert.equal(personalSubmissionInput.safeParse(body).success, false)
 })
 
@@ -75,6 +75,18 @@ test('concurrent identical submissions use the existing unique target and one im
   const before = structuredClone([...f.rows.values()])
   await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'different', { submissionId }), SubmissionConflictError)
   assert.deepEqual([...f.rows.values()], before)
+})
+
+test('attachment bytes are part of the existing immutable submission identity', async () => {
+  const f = fixture()
+  const images = [{dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='}]
+  const inserted = await recordPersonalSubmission(f.executor,'owner','hello',{submissionId,images})
+  assert.equal(inserted.duplicate, false)
+  assert.ok(inserted.eventId)
+  const before = structuredClone([...f.rows.values()])
+  assert.deepEqual(await recordPersonalSubmission(f.executor,'owner','hello',{submissionId,images}),{duplicate:true,eventId:inserted.eventId})
+  await assert.rejects(recordPersonalSubmission(f.executor,'owner','hello',{submissionId,images:[]}),SubmissionConflictError)
+  assert.deepEqual([...f.rows.values()],before)
 })
 
 test('an uncommitted winner blocks retry completion and reading until commit', async () => {
@@ -157,6 +169,7 @@ test('unexpected stored scope and database failures are never accepted as a dupl
 // Invoke the real route/action with in-memory adapters; no server, DB or wake runs.
 let userId: string | null = 'owner'
 let current = fixture()
+let actionHeaders=new Headers()
 const callbacks: Array<() => unknown> = []
 let POST: (request: Request) => Promise<Response>
 let sendCoordinatorMessage: typeof import('../app/actions/coordinator').sendCoordinatorMessage
@@ -169,7 +182,7 @@ const dismissed: string[] = []
 let dismissError: Error | null = null
 let transactionTail: Promise<unknown> = Promise.resolve()
 before(async () => {
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => userId ? { user: { id: userId } } : null } } } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => userId ? { user: { id: userId }, session: { id: 'synthetic-browser-session' } } : null } } } })
   // A transaction runs on the same in-memory executor; the real one rolls back when the callback throws.
   mock.module('@/lib/db', { namedExports: { db: new Proxy({}, { get(_target, key) { return key === 'transaction' ? (run: (tx: unknown) => Promise<unknown>) => { const result = transactionTail.then(() => run(current.executor)); transactionTail = result.catch(() => {}); return result } : Reflect.get(current.executor, key) } }) } })
   mock.module('@/lib/suggestions/store', { namedExports: {
@@ -185,7 +198,7 @@ before(async () => {
   mock.module('@/lib/coordinator/store', { namedExports: { chatView: async () => ({}), botChats: async () => ({}) } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => enabled, wakeCoordinator: () => { throw new Error('test must not execute wake') } } })
   mock.module('next/server', { namedExports: { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) }, after: (callback: () => unknown) => callbacks.push(callback) } })
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
+  mock.module('next/headers', { namedExports: { headers: async () => actionHeaders, cookies: async () => ({ get: () => undefined }) } })
   ;({ POST } = await import('../app/api/coordinator/messages/route'))
   ;({ sendCoordinatorMessage, sendSuggestion } = await import('../app/actions/coordinator'))
 })
@@ -374,6 +387,20 @@ test('new-task submission fails closed when issue tools are disabled', async () 
   assert.equal(callbacks.length, 0)
 })
 
+// Regression for current-main integration: neither source can erase the other.
+test('image bytes and machine destination both participate in immutable submission identity', async () => {
+  const f = fixture()
+  const images = [{ dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==' }]
+  const taskDestination = { kind: 'cloud' } as const
+  const inserted = await recordPersonalSubmission(f.executor, 'owner', 'Inspect it', { submissionId, images, taskDestination })
+  assert.equal(inserted.duplicate, false)
+  const row = [...f.rows.values()][0]
+  assert.deepEqual(row.payload.taskDestination, taskDestination)
+  assert.equal((row.payload as { images?: unknown[] }).images?.length, 1)
+  assert.deepEqual(await recordPersonalSubmission(f.executor, 'owner', 'Inspect it', { submissionId, images, taskDestination }), { duplicate: true, eventId: inserted.eventId })
+  await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Inspect it', { submissionId, images }), SubmissionConflictError)
+  await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Inspect it', { submissionId, taskDestination }), SubmissionConflictError)
+})
 
 test('browser notes and an authorized task destination persist together and remain frozen on retry', async () => {
   process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
@@ -389,4 +416,44 @@ test('browser notes and an authorized task destination persist together and rema
     assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }, [{ ...note, note: 'Changed' }]), { error: 'submissionConflict', params: undefined })
     assert.equal(current.rows.size, 1)
   } finally { delete process.env.MIKKA_ISSUE_TOOLS_ENABLED }
+})
+
+test('host browser session provenance is immutable across replays and cannot upgrade a prior API message',async()=>{
+  const f=fixture()
+  await recordPersonalSubmission(f.executor,'owner','hello',{submissionId,humanSessionId:'synthetic-session-one'})
+  assert.equal([...f.rows.values()][0].payload.humanSessionId,'synthetic-session-one')
+  assert.equal((await recordPersonalSubmission(f.executor,'owner','hello',{submissionId,humanSessionId:'synthetic-session-two'})).duplicate,true)
+  assert.equal([...f.rows.values()][0].payload.humanSessionId,'synthetic-session-one')
+  const api=fixture()
+  await recordPersonalSubmission(api.executor,'owner','hello',{submissionId})
+  assert.equal((await recordPersonalSubmission(api.executor,'owner','hello',{submissionId,humanSessionId:'synthetic-session'})).duplicate,true)
+  assert.equal([...api.rows.values()][0].payload.humanSessionId,undefined)
+  await assert.rejects(recordPersonalSubmission(api.executor,'owner','changed',{submissionId,humanSessionId:'synthetic-session'}),SubmissionConflictError)
+})
+
+test('HTTP host provenance requires same-origin Cookie and no Authorization header',async()=>{
+  const variants:[Record<string,string>,boolean][]=[
+    [{cookie:'synthetic=1',origin:'https://synthetic.example'},true],
+    [{cookie:'synthetic=1',origin:'https://synthetic.example',authorization:'Bearer synthetic'},false],
+    [{cookie:'synthetic=1',origin:'https://foreign.example'},false],
+    [{cookie:'synthetic=1'},false],
+    [{origin:'https://synthetic.example'},false],
+  ]
+  for(const [headers,proof]of variants){
+    current=fixture();callbacks.length=0;userId='owner'
+    const request=new Request('https://synthetic.example/api/coordinator/messages',{method:'POST',headers,body:JSON.stringify({text:'hello',submissionId})})
+    assert.equal((await POST(request)).status,202)
+    assert.equal([...current.rows.values()][0].payload.humanSessionId,proof?'synthetic-browser-session':undefined)
+  }
+})
+test('actual server action stamps only its authenticated same-origin browser session',async()=>{
+  try{
+    current=fixture();userId='owner'
+    actionHeaders=new Headers({cookie:'synthetic=1',origin:'https://synthetic.example',host:'synthetic.example'})
+    assert.deepEqual(await sendCoordinatorMessage('hello',null,null,submissionId),{queued:true})
+    assert.equal([...current.rows.values()][0].payload.humanSessionId,'synthetic-browser-session')
+    current=fixture();actionHeaders.set('authorization','Bearer synthetic')
+    assert.deepEqual(await sendCoordinatorMessage('hello',null,null,submissionId),{queued:true})
+    assert.equal([...current.rows.values()][0].payload.humanSessionId,undefined)
+  }finally{actionHeaders=new Headers()}
 })

@@ -15,9 +15,9 @@ export function toneFor(name: string): AvatarTone {
  * list, 28px in search, 22px in pills and stacks, 16px on task rows, 72px
  * on a bot's 详情.
  */
-export function LetterAvatar({ name, tone = toneFor(name), size = 'list' }: { name: string; tone?: AvatarTone; size?: 'list' | 'search' | 'pill' | 'stack' | 'row' | 'profile' }) {
+export function LetterAvatar({ name, tone = toneFor(name), size = 'list' }: { name: string; tone?: AvatarTone; size?: 'list' | 'search' | 'pill' | 'stack' | 'row' | 'message' | 'profile' }) {
   const letter = Array.from(name.replace(/^mikka\s+/i, '').trim())[0]?.toUpperCase() ?? '·'
-  return <Avatar aria-hidden="true" className={cn('after:border-0', size === 'list' && 'size-8.5', size === 'search' && 'size-7', (size === 'pill' || size === 'stack') && 'size-5.5', size === 'stack' && 'ring-2 ring-background', size === 'row' && 'size-4', size === 'profile' && 'size-18')}>
+  return <Avatar aria-hidden="true" className={cn('after:border-0', size === 'list' && 'size-8.5', size === 'search' && 'size-7', (size === 'pill' || size === 'stack') && 'size-5.5', size === 'stack' && 'ring-2 ring-background', size === 'row' && 'size-4', size === 'message' && 'size-6', size === 'profile' && 'size-18')}>
     <AvatarFallback className={cn('text-xs leading-none font-semibold text-avatar-foreground', size === 'row' && 'scale-75', size === 'profile' && 'text-2xl',
       tone === 'coordinator' && 'bg-sidebar-primary text-sidebar-primary-foreground', tone === 1 && 'bg-avatar-1', tone === 2 && 'bg-avatar-2',
       tone === 3 && 'bg-avatar-3', tone === 4 && 'bg-avatar-4', tone === 5 && 'bg-avatar-5')}>{letter}</AvatarFallback>

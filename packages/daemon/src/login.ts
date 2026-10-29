@@ -2,12 +2,12 @@
 // the server's Better Auth device-authorization plugin, like `gh auth login`.
 //
 //   1. POST /api/auth/device/code   { client_id: "mikka-daemon" }
-//   2. show the user code and the verification link (the desktop app's
-//      approve screen, `mikka[-dev]://device?user_code=...`)
+//   2. show the user code and the web verification link (including base path)
 //   3. poll POST /api/auth/device/token every `interval` seconds until the
 //      user approved (or denied, or the code expired)
 //
-// The result is a session token the daemon sends as a Bearer header.
+// Mikka exchanges the temporary Better Auth session on the server. Only the
+// resulting device token is returned and persisted by the daemon.
 import {
   AUTH_BASE_PATH,
   CLIENT_VERSION_HEADER,
@@ -33,7 +33,7 @@ const deviceCodeResponse = z.object({
 })
 export type DeviceCode = z.infer<typeof deviceCodeResponse>
 
-const tokenResponse = z.object({ access_token: z.string().min(1) })
+const tokenResponse = z.object({ access_token: z.string().regex(/^orv_[A-Za-z0-9_-]{43}$/) })
 const errorResponse = z.object({ error: z.string() })
 
 export class LoginError extends DaemonError {
@@ -81,7 +81,7 @@ async function post(
   }
 }
 
-/** Runs the device flow; resolves to the session token. */
+/** Runs the device flow; resolves to a device token, never a web session. */
 export async function deviceLogin(
   options: DeviceLoginOptions
 ): Promise<string> {

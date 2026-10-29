@@ -5,6 +5,8 @@ import { randomUUID } from 'node:crypto'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { validateTarget } from '../scripts/run-db-tests.mjs'
 
+// The test body includes DELETE; block it until preservation review is complete.
+
 // Fail closed even when accidentally invoked locally, before importing/connecting pg.
 validateTarget(process.env)
 const { Client } = await import('pg')
@@ -17,8 +19,8 @@ test('PG17: nontransactional indexes, invalid retry, ledger and separate validat
   assert.ok(version >= 170000 && version < 180000, 'Requires PostgreSQL 17')
   const schema = `migration_steps_${randomUUID().replaceAll('-', '')}`
   t.after(async () => {
-    try { await client.query('reset search_path'); await client.query(`drop schema if exists ${schema} cascade`) }
-    finally { await client.end() }
+    console.log(`Retained migration steps schema: ${schema}`)
+    await client.end()
   })
   await client.query(`create schema ${schema}; set search_path to ${schema}`)
   await client.query('create table schema_migrations (name text primary key); create table t (a int); insert into t values (1), (1)')

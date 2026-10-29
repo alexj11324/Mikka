@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { browserArguments } from './ci-browser-tests.mjs'
-import { BOOTSTRAP, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
+import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
 
 const target = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
 const env = { CI: 'true', GITHUB_ACTIONS: 'true', E2E_DATABASE_URL: target, MIKKA_DATABASE_URL: target, DATABASE_URL: target }
@@ -46,6 +46,15 @@ test('discovers every present pg/DB suite and rejects unregistered or ambiguous 
   assert.throws(() => inventory(tree, full, ['test:not-present']), /Expected DB script not enrolled/)
   assert.throws(() => inventory(tree, { ...full, 'test:duplicate': `node --test ${extra}` }), /found 2/)
 })
+test('type-only pg imports do not enroll source-only tests as database suites', () => {
+  const tree = { ...files,
+    'lib/pure.test.ts': "import type { Pool, PoolClient } from 'pg'\nconst fakePool = {}",
+    'lib/multiline-pure.test.ts': 'import type {\n PoolClient,\n} from "pg";\nconst fakeClient = {}',
+  }
+  assert.deepEqual(inventory(tree, scripts).scripts, [sample.script])
+  assert.deepEqual(inventory(tree, scripts).files, [sample.file])
+  assert.throws(() => inventory({ ...tree, 'lib/runtime.test.ts': "import { Pool } from 'pg'" }, scripts), /needs one explicit/)
+})
 test('self-managed suites are excluded only with a reason and a live dedicated runner', () => {
   const own = { file: 'lib/own-db.test.ts', runner: 'scripts/test-own-db.mjs', reason: 'starts its own Postgres' }
   const tree = { ...files, [own.file]: "import { Pool } from 'pg'", [own.runner]: `spawn('node', ['--test', '${own.file}'])` }
@@ -59,6 +68,31 @@ test('self-managed suites are excluded only with a reason and a live dedicated r
   assert.throws(() => inventory({ ...tree, [own.runner]: sample.file }, scripts, [], REQUIRED_SUITES, [{ ...own, file: sample.file }]), /both required and self-managed/)
   for (const entry of SELF_MANAGED) assert.ok(entry.reason && entry.runner)
 })
+test('dedicated browser inventory requires its spec, config and script, without exempting adjacent DB tests', () => {
+  const suite = BROWSER_SUITES[0]
+  const tree = { ...files, [suite.file]: "import { Pool } from 'pg'", [suite.config]: 'export default {}' }
+  const commands = { ...scripts, [suite.script]: `playwright test --config=${suite.config}` }
+  const plan = inventory(tree, commands)
+  assert.deepEqual(plan.browser, [suite.file])
+  assert.deepEqual(plan.scripts, [sample.script], 'Playwright is not sent to the node:test summary checker')
+  assert.throws(() => inventory(tree, scripts), /Browser script .* missing/)
+  assert.throws(() => inventory(tree, { ...commands, [suite.script]: 'playwright test' }), /no longer runs/)
+  const noSpec = { ...tree }; delete noSpec[suite.file]
+  assert.throws(() => inventory(noSpec, commands), /Expected browser suite missing/)
+  const noConfig = { ...tree }; delete noConfig[suite.config]
+  assert.throws(() => inventory(noConfig, commands), /config .* missing/)
+  assert.throws(() => inventory({ ...tree, 'tests/mvp/new.db.test.ts': "import { Pool } from 'pg'" }, commands), /needs one explicit package test script/)
+  assert.throws(() => inventory({ ...tree, 'tests/mvp/new.spec.ts': "import { Pool } from 'pg'" }, commands), /needs one explicit package test script/)
+})
+test('real-driver offline exclusions require the actual source guard and the explicit pure script',()=>{
+  const entry={file:'scripts/offline.test.mjs',script:'test:offline',guard:'scripts/guard.mjs',reason:'reviewed zero-transport test'}
+  const tree={...files,[entry.file]:"import './guard.mjs'; import pg from 'pg'",[entry.guard]:'deny native transport'}
+  const commands={...scripts,[entry.script]:`node --import ./${entry.guard} --test ${entry.file}`}
+  assert.deepEqual(inventory(tree,commands,[],REQUIRED_SUITES,[],[entry]).offlineGuarded,[entry.file])
+  assert.throws(()=>inventory({...tree,[entry.file]:"import pg from 'pg'"},commands,[],REQUIRED_SUITES,[],[entry]),/source guard/)
+  assert.throws(()=>inventory(tree,{...commands,[entry.script]:`node --test ${entry.file}`},[],REQUIRED_SUITES,[],[entry]),/source guard/)
+  assert.throws(()=>inventory(tree,commands,[],REQUIRED_SUITES,[],[{...entry,reason:''}]),/source guard/)
+})
 test('this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')).scripts
   const tree = readTree()
@@ -66,13 +100,18 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   const plan = inventory(tree, pkg)
   assert.ok(plan.scripts.includes('test:groups'))
   assert.ok(plan.scripts.includes('test:workspace-migration-db'))
+  assert.ok(plan.scripts.includes('test:local-repository-migration-db'))
   assert.ok(plan.scripts.includes('test:relation-cycle'))
   assert.ok(plan.scripts.includes('test:coordinator-native'))
   assert.ok(plan.files.includes('lib/coordinator/native-relay.db.test.ts'))
   assert.ok(plan.selfManaged.includes('lib/auth-email.test.ts'))
+  assert.ok(plan.scripts.includes('test:factory'))
+  assert.ok(plan.files.includes('lib/self-improvement/wiring-postgres.test.ts'))
   const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
   const custodyWorkflow = readFileSync('.github/workflows/e2b-byos.yml', 'utf8')
   const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
+  assert.match(browser, /run: pnpm test:factory-http/ , 'Factory HTTP probes remain mandatory against the built app')
+  assert.ok(browser.indexOf('run: pnpm build') < browser.indexOf('run: pnpm test:factory-http'))
   for (const { runner } of SELF_MANAGED) {
     const dedicatedScript = Object.entries(pkg).find(([, command]) => command === `node ${runner}`)?.[0]
     assert.ok(workflow.includes(`run: node ${runner}`) || browser.includes(`run: node ${runner}`) || (dedicatedScript && custodyWorkflow.includes(`run: pnpm ${dedicatedScript}`)), `${runner} runs in CI`)
@@ -99,10 +138,59 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.match(browser, /pnpm test:performance --output=performance-results/)
   assert.match(browser, /node scripts\/ci-browser-tests\.mjs > "\$log_file"/)
   assert.deepEqual(browserArguments('full', '[]'), ['exec', 'playwright', 'test', '--grep-invert', '@performance'], 'integration retains every non-performance browser spec through the selected-layer runner')
+  assert.match(browser, /^\s*pnpm test:e2e:mvp > "\$log_file" 2>&1 \|\| test_status=\$\?/m, 'the dedicated MVP browser gate remains required')
+  assert.match(browser, /log_file=\.cache\/e2e\/playwright-mvp\.log[\s\S]*?audit-evidence --evidence "\$log_file"[\s\S]*?exit "\$test_status"/, 'MVP output is audited before display and the test result is preserved')
+  assert.equal(pkg['test:e2e:mvp'], 'playwright test --config=playwright.mvp.config.ts')
+  assert.deepEqual(plan.browser, ['tests/mvp/core-loop.spec.ts'])
+  const mvpConfig = readFileSync('playwright.mvp.config.ts', 'utf8')
+  assert.match(mvpConfig, /testDir:\s*['"]\.\/tests\/mvp['"]/)
+  assert.match(mvpConfig, /testMatch:\s*['"]\*\*\/\*\.spec\.ts['"]/)
+  assert.ok(tree['tests/mvp/core-loop.spec.ts']?.includes('@playwright/test'), 'the real-daemon browser spec remains present')
+  assert.match(browser, /MIKKA_TEST_MODE: '1'/)
+  assert.match(browser, /MIKKA_MVP_E2E: '1'/)
   assert.match(workflow, /image: postgres:17/)
   for (const name of ['test:agent', 'test:suggestions', 'test:integrations', 'test:issues', 'test:db-runner']) {
     assert.ok(workflow.includes(`pnpm ${name}`), `${name} strict gate retained`)
     assert.ok(pkg.check.includes(`pnpm ${name}`), `${name} in check`)
   }
   assert.ok(pkg['test:integrations'].includes('lib/issue-owner-scope.test.ts'))
+})
+
+test('self-improvement DB suite stays mandatory when its feature exists', () => {
+  const required = [{ marker: 'lib/self-improvement/store.ts', file: 'lib/self-improvement/postgres.test.ts', script: 'test:self-improvement-db' }]
+  const tree = { [required[0].marker]: '', [required[0].file]: "import { Pool } from 'pg'" }
+  const scripts = { 'test:self-improvement-db': 'node --import tsx --test lib/self-improvement/postgres.test.ts' }
+  assert.deepEqual(inventory(tree, scripts, [], required).scripts, ['test:self-improvement-db'])
+  assert.throws(() => inventory({ [required[0].marker]: '' }, scripts, [], required), /Expected DB suite missing/)
+  assert.throws(() => inventory(tree, {}, [], required), /Required script/)
+})
+
+test('isolated fixture databases reject application targets before I/O', async () => {
+  const { isolatedPostgresURL } = await import('../tests/helpers/isolated-postgres.mjs')
+  for (const target of ['postgresql://business.invalid/mikka_e2e', 'postgresql://localhost/mikka',
+    'https://localhost/mikka_e2e', 'postgresql://localhost/mikka_e2e?options=-c%20search_path=public',
+    'postgresql://localhost/mikka_e2e#fragment']) {
+    await assert.rejects(isolatedPostgresURL(target), /disposable test database/)
+  }
+})
+
+test('isolated fixture databases create distinct empty databases and close admin pools on success or failure', async t => {
+  const { Pool } = await import('pg')
+  const { isolatedPostgresURL } = await import('../tests/helpers/isolated-postgres.mjs')
+  const queries = []
+  let ended = 0
+  t.mock.method(Pool.prototype, 'query', async sql => { queries.push(sql) })
+  t.mock.method(Pool.prototype, 'end', async () => { ended++ })
+  const first = new URL(await isolatedPostgresURL(target))
+  const second = new URL(await isolatedPostgresURL(target))
+  assert.notEqual(first.pathname, second.pathname)
+  assert.match(first.pathname, /^\/mikka_fixture_[a-f0-9]{32}$/)
+  assert.equal(first.origin, new URL(target).origin)
+  assert.equal(first.username, new URL(target).username)
+  assert.equal(first.password, new URL(target).password)
+  assert.deepEqual(queries, [first, second].map(url => `CREATE DATABASE "${url.pathname.slice(1)}" TEMPLATE template0`))
+  assert.equal(ended, 2)
+  t.mock.method(Pool.prototype, 'query', async () => { throw new Error('no createdb permission') })
+  await assert.rejects(isolatedPostgresURL(target), /no createdb permission/)
+  assert.equal(ended, 3)
 })

@@ -22,3 +22,10 @@ test('团队、成员仅在路由设置页显示，搜索不改变该规则', ()
   const workspace = { groupTitle: 'Administration', groupLabel: zh.groups.administration, itemTitle: 'Workspace', label: zh.sections.workspace.title, section: 'workspace', query: '' }
   assert.equal(settingsItemVisible({ ...workspace, routed: false }), true)
 })
+
+test('模型订阅在集成页：额度、quota、ChatGPT、Claude、Codex、订阅都能搜到', () => {
+  const integrations = { groupTitle: 'Workspace', groupLabel: 'x', itemTitle: 'Integrations', label: zh.sections.integrations.title, keywords: zh.sections.integrations.keywords, section: 'integrations', routed: false }
+  for (const query of ['额度', 'quota', 'ChatGPT', 'chatgpt', 'Claude', 'Codex', '订阅', '模型订阅']) assert.equal(settingsItemVisible({ ...integrations, query }), true, query)
+  const other = { ...integrations, itemTitle: 'Workspace', label: zh.sections.workspace.title, keywords: '', section: 'workspace' }
+  for (const query of ['额度', 'quota', 'Claude']) assert.equal(settingsItemVisible({ ...other, query }), false, query)
+})

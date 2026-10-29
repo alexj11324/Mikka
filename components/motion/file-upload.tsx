@@ -582,7 +582,7 @@ export function FileUpload({
 
         <span
           className={cn(
-            "shrink-0 rounded-full border border-border text-xs font-medium text-foreground transition-colors duration-150 group-hover:bg-muted",
+            "shrink-0 rounded-full bg-control text-xs font-medium text-foreground transition-colors duration-150 group-hover:bg-control-hover",
             centered ? "mt-1 px-4 py-2" : "px-3.5 py-2",
           )}
         >

@@ -10,6 +10,9 @@ const issueId = '31300000-0000-4000-8000-000000000002'
 const botId = '31300000-0000-4000-8000-000000000003'
 const dialect = new PgDialect()
 let viewer: string | null = 'owner'
+let requestHeaders = new Headers({cookie: 'synthetic-session'})
+let sessionUser: string | null = null
+let freshSession = true
 function fixture() {
   const run = { id: runId, issueId, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', report: null, error: null, createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
   return { run, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined }
@@ -28,7 +31,11 @@ class Selection {
     const query = this.condition && dialect.sqlToQuery(this.condition)
     if (this.table === agentRuns) {
       assert.ok(query)
-      assert.ok(query.params.includes(issueId), 'actual action must bind the requested issue')
+      if (query.sql.includes('"agent_runs"."issueId"')) {
+        assert.ok(query.params.includes(issueId), 'readable thread must bind the requested issue')
+      } else {
+        assert.ok(query.sql.includes('"agent_runs"."userId"') && query.params.includes('owner') && query.params.includes(runId), 'message snapshot must bind owner and run')
+      }
       if (/"agent_runs"\."id"/.test(query.sql) && !query.params.includes(runId)) return []
       return [{ ...current.run }]
     }
@@ -71,9 +78,12 @@ const database = {
 }
 let actions: typeof import('../app/actions/agents')
 before(async () => {
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => viewer ? { user: { id: viewer } } : null } } } })
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
-  mock.module('@/lib/db', { namedExports: { db: database, pool: { query() { throw new Error('Unexpected SQL pool access outside thread control') } } } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async (input?: { query?: { disableCookieCache?: boolean } }) => {
+    if (input?.query?.disableCookieCache && !freshSession) return null
+    return viewer ? { user: { id: sessionUser ?? viewer }, session: { id: 'synthetic-session' } } : null
+  } } } } })
+  mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
+  mock.module('@/lib/db', { namedExports: { db: database, withDatabaseClient: () => { throw Error('Factory dispatch is outside thread-control fixture') }, pool: { query() { throw new Error('Unexpected SQL pool access outside thread control') } } } })
   mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) } } })
   mock.module('@/lib/issue-access', { namedExports: {
     requireIssueAccess: async (id: string) => {
@@ -85,7 +95,7 @@ before(async () => {
   } })
   mock.module('@/lib/issue-visibility', { namedExports: { issueVisibility: () => { throw new Error('listing runs outside test') } } })
   mock.module('@/lib/ssh', { namedExports: { listSshHosts: () => { throw new Error('SSH outside test') } } })
-  mock.module('@/lib/device-link', { namedExports: { DEVICE_ONLINE_WINDOW_MS: 0, hashDeviceToken: () => { throw new Error('device credentials outside test') }, newDeviceToken: () => { throw new Error('device credentials outside test') } } })
+  mock.module('@/lib/device-link', { namedExports: { DEVICE_ONLINE_WINDOW_MS: 0, hashDeviceToken: () => { throw new Error('device credentials outside test') }, newDeviceToken: () => { throw new Error('device credentials outside test') }, issueDeviceToken: () => { throw new Error('device credentials outside test') } } })
   mock.module('@/lib/coordinator/store', { namedExports: { citationSources: () => { throw new Error('citations outside test') } } })
   actions = await import('../app/actions/agents')
 })
@@ -155,4 +165,21 @@ test('actual actions preserve auth/validation and unknown database failures with
   await assert.rejects(actions.stopRun(runId), error => error === fault)
   await assert.rejects(actions.sendIssueThreadMessage({ issueId, runId, text: 'retry' }), error => error === fault)
   assert.equal(current.messages.length + current.updates, 0)
+})
+
+
+test('running UI messages require a fresh matching browser session without an API identity', async () => {
+  try {
+    for (const mode of ['no-cookie', 'authorization', 'expired', 'other-user']) {
+      current = fixture(); viewer = 'owner'
+      requestHeaders = new Headers(mode === 'no-cookie' ? {} : {cookie: 'synthetic-session'})
+      if (mode === 'authorization') requestHeaders.set('authorization', 'Bearer synthetic')
+      freshSession = mode !== 'expired'
+      sessionUser = mode === 'other-user' ? 'other' : null
+      await assert.rejects(actions.sendIssueThreadMessage({issueId, runId, text: 'Must remain unsent'}), rejected('authRequired'))
+      assert.equal(current.transactions, 0); assert.equal(current.messages.length, 0)
+    }
+  } finally {
+    requestHeaders = new Headers({cookie: 'synthetic-session'}); sessionUser = null; freshSession = true
+  }
 })

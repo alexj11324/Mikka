@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { runPatchSchema } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, devices } from '@/lib/db/schema'
@@ -38,6 +38,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ru
       ...(patch.error !== undefined ? { error: patch.error } : {}),
       updatedAt: new Date(),
     })
-    .where(eq(agentRuns.id, runId))
+    .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATES])))
   return new NextResponse(null, { status: 204 })
 }

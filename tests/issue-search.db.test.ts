@@ -13,6 +13,7 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
   const pool = new Pool({connectionString: url,max:2})
   const {db} = await import('../lib/db')
   const {parseSearchParams,searchIssues} = await import('../lib/issue-search')
+  const {promoteExistingIssueForUser} = await import('../lib/team-issue-promotion')
   const owner = `search-owner-${randomUUID()}`, viewer = `search-viewer-${randomUUID()}`
   const workspace = randomUUID(), otherWorkspace = randomUUID(), team = randomUUID()
   const root = randomUUID(), child = randomUUID(), hidden = randomUUID()
@@ -34,8 +35,8 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
     // >100 recent rows cannot hide an older keyword match. Large synthetic
     // dataset also makes the real planner choice observable without prod data.
     await pool.query(`insert into issues (id,"userId",title,content,status,priority,scope,"updatedAt")
-      select gen_random_uuid(),$1,'CI haystack '||g,jsonb_build_object('type','doc','attrs',jsonb_build_object('mikka',jsonb_build_object('number',g))),'todo','none','personal',now() from generate_series(1,12000) g`,[owner])
-    const add = async (id:string,title:string,scope='personal',meta:Record<string,unknown>={}) => pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"updatedAt") values ($1,$2,$3,$4,\'todo\',\'none\',$5,\'2020-01-01T00:00:00.123456Z\')',[id,owner,title,JSON.stringify({type:'doc',attrs:{mikka:{number:14000,...meta}},content:[]}),scope])
+      select gen_random_uuid(),$1,'CI haystack '||g,jsonb_build_object('type','doc','attrs',jsonb_build_object('mikka',jsonb_build_object('number',g))),'todo','normal','personal',now() from generate_series(1,12000) g`,[owner])
+    const add = async (id:string,title:string,scope='personal',meta:Record<string,unknown>={}) => pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"updatedAt") values ($1,$2,$3,$4,\'todo\',\'normal\',$5,\'2020-01-01T00:00:00.123456Z\')',[id,owner,title,JSON.stringify({type:'doc',attrs:{mikka:{number:14000,...meta}},content:[]}),scope])
     await add(root,'rare-needle 修复 50%_off')
     await add(child,'child rare-needle','personal',{parentId:root,number:14001})
     await add(hidden,'private rare-needle','personal',{parentId:root,number:14002})
@@ -59,7 +60,10 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
     assert.equal(closure.items.length,0)
     // One row is changed to a team-visible task, but never visible in another
     // workspace nor after suspension. Owner-only personal rows remain hidden.
-    await pool.query('update issues set scope=\'workspace\' where id=$1',[hidden])
+    const revision = (await pool.query('select revision from issues where id=$1',[hidden])).rows[0].revision
+    const promotion = await promoteExistingIssueForUser(owner,{requestId:randomUUID(),issueId:hidden,revision,teamId:team,expectedTeamId:team})
+    assert.ok('issue' in promotion && promotion.issue,JSON.stringify(promotion))
+    assert.equal(promotion.issue.scope,'workspace')
     assert.deepEqual((await search({q:'rare-needle'},viewer)).items.map(x=>x.id),[hidden])
     assert.equal((await search({q:'rare-needle'},viewer,otherWorkspace)).items.length,0)
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2',[workspace,viewer])
@@ -73,13 +77,13 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
     console.log('CI synthetic selective title EXPLAIN:',JSON.stringify(plan.rows[0]['QUERY PLAN']))
     assert.match(JSON.stringify(plan.rows[0]['QUERY PLAN']),/issues_title_search_trgm_idx/)
   } finally {
-    await pool.query('delete from issue_members where "userId"=$1',[owner])
-    await pool.query('delete from mikka_team_issues where "userId"=$1',[owner])
-    await pool.query('delete from issues where "userId"=$1',[owner])
-    await pool.query('delete from mikka_teams where id=$1',[team])
-    await pool.query('delete from mikka_workspace_members where "workspaceId"=any($1::uuid[])',[[workspace,otherWorkspace]])
-    await pool.query('delete from mikka_workspaces where id=any($1::uuid[])',[[workspace,otherWorkspace]])
-    await pool.query('delete from "user" where id=any($1::text[])',[[owner,viewer]])
+    // Retain synthetic fixtures on success and failure for audit and later inspection.
+    // Closing the client pool does not delete database rows, schemas or the server.
+    console.log('Issue-search fixture retention audit:', JSON.stringify({
+      recordedAt: new Date().toISOString(), database: 'mikka_e2e', retention: 'preserve',
+      note: 'Identifiers are allocated before setup; failed setup may leave only a subset present',
+      owner, viewer, workspace, otherWorkspace, team, root, child, hidden,
+    }))
     await pool.end()
   }
 })

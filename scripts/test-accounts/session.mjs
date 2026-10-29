@@ -117,9 +117,6 @@ export async function acquireTestAccounts({ database, environment, runId, worker
 
   async function release({ outcome = 'clean' } = {}) {
     if (releasing) return releasing
-    // Close the request gate synchronously, before the first cleanup await.
-    // Aborting the client does not prove that an application mutation stopped,
-    // so any outstanding request makes this release unclean even if it settles.
     closing = true
     clearInterval(timer)
     const pending = [...pendingRequests]
@@ -301,7 +298,9 @@ export async function auditEvidence(paths, { environment, stateDirectory } = {})
   environment ??= await loadEnvironment()
   const directory = resolve(stateDirectory ?? join('.cache/e2e/test-accounts', environment.instanceId))
   const secrets = new Set()
-  const root = await lstat(directory)
+  let root
+  try { root = await lstat(directory) }
+  catch (error) { fail(error.code === 'ENOENT' ? 'SECRET_AUDIT_MISSING' : 'SECRET_AUDIT_UNREADABLE') }
   if (!root.isDirectory() || root.isSymbolicLink() || (root.mode & 0o077) || (process.getuid && root.uid !== process.getuid())) fail('PRIVATE_DIRECTORY_UNSAFE')
   let credentialNames = []
   try {

@@ -26,9 +26,17 @@
 //
 // The handoff report's verify result is always the daemon's own: only the
 // agent's summary, open questions, next step and blocker are taken from the
-// agent. A submission is `succeeded` only when verify passed.
-import { randomUUID } from "node:crypto"
-import { resolve } from "node:path"
+// agent. An explicitly approved, pushed submission can finish unverified;
+// its report keeps `not_run`, and the server may open only a draft PR.
+import { fixedCheckSnapshot } from "./check"
+import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
+import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
+import { runPaths } from "../agents/run-context"
+import { SKILLS_DIR, SKILL_BODY_FILE, skillSlug } from "@mikka/protocol/skill"
+import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/protocol/run"
+import { runPolicyDigestInput } from "@mikka/protocol/agent-policy"
+import { createHash, randomUUID } from "node:crypto"
+import { join, resolve } from "node:path"
 
 import { execa } from "execa"
 
@@ -62,17 +70,18 @@ import type {
 } from "../adapters/types"
 import { runStateChunk, type RunChunk } from "../chunks"
 import { buildChildEnv } from "../env"
+import { worktreeGitWritePaths } from "../agents/publish"
 import {
   HarnessNotSupportedError,
   InvalidIdError,
-  RepoNotAllowedError,
+  InvalidRepositoryError,
   RunNotFoundError,
   type DaemonError,
 } from "../errors"
 import { isSafeId } from "../ids"
 import type { Logger } from "../log"
 import type { Outbox } from "../outbox"
-import { runPolicy } from "../permissions"
+import { pushDecision, runPolicy } from "../permissions"
 import {
   DEFAULT_LEASE_MS,
   type DeviceRepo,
@@ -80,20 +89,29 @@ import {
 } from "../server-link"
 import type { WorktreeManager } from "../worktrees"
 import type { JournalEntry, RunJournal } from "./journal"
+import type { ToolApprovalGate } from "../agents/tool-approval"
 import { assertMailboxRunAuthority, type RunMailbox } from '../run-mailbox'
 
 export interface SupervisorDeps {
   journal: RunJournal
+  /** Same adapter state root used by RunContext; never supplied by the model. */
+  adapterStateDir?: string
   outbox: Outbox
   worktrees: WorktreeManager
   adapters: ReadonlyMap<Harness, AgentAdapter>
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
+  prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
   bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
-  /** The device's current allow-list (`device_repo`). */
-  repos: () => DeviceRepo[]
+  /** Resolve only daemon-owned cache paths (or a trusted hosted workspace). */
+  repository: (assignment: RunAssignment) => DeviceRepo
+  prepareRepository: (assignment: RunAssignment, signal: AbortSignal) => Promise<void>
+  baseRef: (assignment: RunAssignment) => Promise<string>
   log: Logger
+  /** Uploads what the run's agent queued with `submit_capture` (`captures.ts`). */
+  captures?: { flush(runId: string): Promise<void> }
+  revalidateSkillAssignment?:(assignment:RunAssignment)=>Promise<SkillReceiptRevalidation>
   /** Watchdog: no progress for this long stops the run (`timeout`). */
   stallMs?: number
   /** How long `stop()` waits for runs to let go (default 3 s). */
@@ -155,6 +173,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface ActiveRun {
+  toolApproval?: ToolApprovalGate
   mailbox?: RunMailbox
   mailboxClosing?: Promise<void>
   session: AgentSession | null
@@ -192,6 +211,7 @@ export class RunSupervisor {
   private cutMessages = new Set<string>()
   /** Aborted by `stop()`: kills a running verify command. */
   private stopController = new AbortController()
+  private blockedSkillResumes = new Set<string>()
 
   constructor(private readonly deps: SupervisorDeps) {}
 
@@ -258,7 +278,7 @@ export class RunSupervisor {
    */
   async saveCheckpoints(
     save: (runId: string, checkpoint: RunCheckpoint) => Promise<void>,
-    now = Date.now()
+    now = Date.now(),
   ) {
     for (const [runId, run] of this.active) {
       const entry = this.deps.journal.get(runId)
@@ -318,13 +338,14 @@ export class RunSupervisor {
   /** Asks the session to stop; detaches it if it does not within the grace. */
   private requestCancel(run: ActiveRun): Promise<void> {
     run.cancelRequested = true
+    run.toolApproval?.revoke()
     // Fence new calls and abort outstanding transport immediately; do not
     // leave a mailbox usable during the CLI's cancellation grace period.
     void this.closeMailbox(run).catch(() => this.deps.log.warn('Run mailbox shutdown failed'))
     if (!run.cancelTimer) {
       run.cancelTimer = setTimeout(
         () => run.abort.abort(),
-        this.deps.cancelGraceMs ?? DEFAULT_CANCEL_GRACE_MS
+        this.deps.cancelGraceMs ?? DEFAULT_CANCEL_GRACE_MS,
       )
       run.cancelTimer.unref()
     }
@@ -352,7 +373,7 @@ export class RunSupervisor {
    */
   async discardIfEmpty(
     runId: string,
-    cancelledRunId?: string
+    cancelledRunId?: string,
   ): Promise<boolean> {
     const entry = this.deps.journal.get(runId)
     if (!entry) return false
@@ -363,20 +384,20 @@ export class RunSupervisor {
     const discardable = group.every((e) => {
       if (!isTerminalRunState(e.state)) return false
       if (e.assignment.runId === cancelledRunId) return true
+      if (e.waitingQuestionId) return false
       // A verified hand-in is under review; its work is published.
       if (e.state === "succeeded") return false
+      if (e.assignment.preserveQuestionWorktree && e.stopReason === "blocked") return false
       return !e.stopReason || !KEEP_WORKTREE.includes(e.stopReason)
     })
     if (!discardable) return false
-    const repo = this.deps
-      .repos()
-      .find((r) => r.repoId === entry.assignment.repoId)
-    if (!repo) return false
+    let repo: DeviceRepo
+    try { repo = this.deps.repository(entry.assignment) } catch { return false }
     return this.discard(
       group.map((e) => e.assignment.runId),
       worktree,
       repo.path,
-      runId
+      runId,
     )
   }
 
@@ -387,7 +408,7 @@ export class RunSupervisor {
   async discardOrphan(
     runId: string,
     worktree: string | null,
-    repoPath: string
+    repoPath: string,
   ): Promise<boolean> {
     if (this.deps.journal.get(runId)) return false
     return this.discard([runId], worktree, repoPath, runId)
@@ -397,18 +418,18 @@ export class RunSupervisor {
     runIds: string[],
     worktree: string | null,
     repoPath: string,
-    logRunId: string
+    logRunId: string,
   ): Promise<boolean> {
     try {
       const removed = await this.deps.worktrees.discardIfEmpty(
         runIds,
         worktree,
-        repoPath
+        repoPath,
       )
       if (removed)
         this.deps.log.info(
           { run_id: logRunId },
-          "removed the empty worktree and branches"
+          "removed the empty worktree and branches",
         )
       return removed
     } catch (err) {
@@ -429,8 +450,8 @@ export class RunSupervisor {
   }
 
   /**
-   * Starts a claimed run. The allow-list is checked before any worktree or
-   * process exists; a refused run is reported failed with the reason.
+   * Starts a claimed run. Its remote is validated before any worktree or
+   * process exists; repositories need no device registration.
    */
   start(assignment: RunAssignment): RunSummary {
     // The run id names the worktree, the branch and the outbox file; one
@@ -439,14 +460,15 @@ export class RunSupervisor {
     if (!isSafeId(assignment.runId)) {
       throw new InvalidIdError(
         `Refusing run id ${JSON.stringify(assignment.runId)}: only letters, digits, "_" and "-" (1-64 characters)`,
-        { runId: assignment.runId }
+        { runId: assignment.runId },
       )
     }
     const existing = this.deps.journal.get(assignment.runId)
     if (existing) return this.summary(existing)
-    const repo = this.deps.repos().find((r) => r.repoId === assignment.repoId)
-    if (!repo)
-      this.refuse(assignment, new RepoNotAllowedError(assignment.repoId))
+    let repo: DeviceRepo
+    try { repo = this.deps.repository(assignment) } catch (error) {
+      this.refuse(assignment, new InvalidRepositoryError(error instanceof Error ? error.message : undefined))
+    }
     if (!this.deps.adapters.has(assignment.harness)) {
       this.refuse(assignment, new HarnessNotSupportedError(assignment.harness))
     }
@@ -492,23 +514,52 @@ export class RunSupervisor {
   }
 
   /** Picks up every non-terminal run from the journal after a restart. */
-  resumeAll() {
-    for (const entry of this.deps.journal.active()) {
+  async resumeAll(receiptedOnly=false) {
+    const entries=this.deps.journal.active().sort((a,b)=>Number(Boolean(a.assignment.skillReceipt))-Number(Boolean(b.assignment.skillReceipt)))
+    for (const entry of entries) {
+      if (this.stopping) return
+      if (receiptedOnly && !this.blockedSkillResumes.has(entry.assignment.runId)) continue
       if (this.active.has(entry.assignment.runId)) continue
       // A crash between the outbox append and the journal write leaves the
       // outbox one chunk ahead; continue after it so seqs neither repeat nor gap.
       const outboxSeq = this.deps.outbox.lastChunkSeq(entry.assignment.runId)
       if (outboxSeq > entry.lastSeq)
         this.deps.journal.update(entry.assignment.runId, { lastSeq: outboxSeq })
-      const repo = this.deps
-        .repos()
-        .find((r) => r.repoId === entry.assignment.repoId)
-      if (!repo) {
-        this.finish(
-          entry.assignment.runId,
-          "error",
-          new RepoNotAllowedError(entry.assignment.repoId).message
-        )
+      let repo: DeviceRepo
+      try { repo = this.deps.repository(entry.assignment) } catch {
+        this.finish(entry.assignment.runId, 'error', 'Repository unavailable; dispatch a new thread with a repository URL.')
+        continue
+      }
+      if (entry.assignment.skillReceipt) {
+        // An interrupted finishing/publication window needs the existing
+        // explicit reconciliation path; online access is not permission to
+        // replay an uncertain external effect.
+        if (entry.state==='finishing') {
+          this.deps.journal.update(entry.assignment.runId,{error:'Skill resume blocked: interrupted finishing requires explicit reconciliation.'})
+          continue
+        }
+        try {
+          if (!this.deps.revalidateSkillAssignment) throw new Error('Current Skill source check unavailable')
+          const current=await this.deps.revalidateSkillAssignment(entry.assignment)
+          if (this.stopping) return
+          const latest=this.deps.journal.get(entry.assignment.runId)
+          if (!latest||isTerminalRunState(latest.state)||this.active.has(entry.assignment.runId)) {
+            this.blockedSkillResumes.delete(entry.assignment.runId)
+            continue
+          }
+          if (latest.state!==entry.state||latest.sessionId!==entry.sessionId||latest.worktree!==entry.worktree||latest.assignment.skillReceipt?.id!==entry.assignment.skillReceipt.id)
+            throw new Error('Local Skill resume fence changed')
+          this.leases.set(entry.assignment.runId,Date.parse(verifySkillResume(entry.assignment,current)))
+          this.deps.journal.update(entry.assignment.runId,{error:null})
+          this.blockedSkillResumes.delete(entry.assignment.runId)
+          this.launch(entry.assignment.runId,repo)
+        } catch {
+          const latest=this.deps.journal.get(entry.assignment.runId)
+          if (!latest||isTerminalRunState(latest.state)) {this.blockedSkillResumes.delete(entry.assignment.runId);continue}
+          this.leases.delete(entry.assignment.runId)
+          this.blockedSkillResumes.add(entry.assignment.runId)
+          this.deps.journal.update(entry.assignment.runId,{error:'Skill resume blocked: current online source, authorization and lease required.'})
+        }
         continue
       }
       // The old lease is stale; give the first heartbeat time to renew it.
@@ -524,7 +575,7 @@ export class RunSupervisor {
     if (!run?.session) throw new RunNotFoundError(runId)
     if (!adapter.capabilities.supportsInterject) {
       throw new Error(
-        `Harness "${adapter.harness}" cannot take messages mid-run`
+        `Harness "${adapter.harness}" cannot take messages mid-run`,
       )
     }
     // The agent's answer to this goes in a new message, after the person's.
@@ -554,6 +605,7 @@ export class RunSupervisor {
     this.stopController.abort()
     const runs = [...this.active.values()]
     for (const run of runs) {
+      run.toolApproval?.revoke()
       clearTimeout(run.cancelTimer)
       run.abort.abort()
     }
@@ -561,7 +613,7 @@ export class RunSupervisor {
     const grace = new Promise<void>((resolve) => {
       timer = setTimeout(
         resolve,
-        this.deps.stopGraceMs ?? DEFAULT_STOP_GRACE_MS
+        this.deps.stopGraceMs ?? DEFAULT_STOP_GRACE_MS,
       )
     })
     await Promise.race([Promise.all(runs.map((run) => run.done)), grace])
@@ -619,7 +671,7 @@ export class RunSupervisor {
   private emitPlanCards(
     runId: string,
     report: HandoffReport,
-    planning: boolean
+    planning: boolean,
   ) {
     const plan = planning ? report.plan : undefined
     if (!plan) return
@@ -671,26 +723,56 @@ export class RunSupervisor {
     runId: string,
     stopReason: StopReason,
     error?: string,
-    report: HandoffReport = baseReport(error)
+    report: HandoffReport = baseReport(error),
   ) {
+    this.active.get(runId)?.toolApproval?.revoke()
     // The kind the orchestrator dispatched, not what the agent said: an
     // agent must not be able to make a run read as a planning one (ADR ORV-205).
-    const planning = this.deps.journal.get(runId)?.assignment.kind === "plan"
+    const entry = this.deps.journal.get(runId)
+    const planning = entry?.assignment.kind === "plan"
+    // Never copy trusted evidence from an adapter/model report.
+    const { sourceCommit: _source, skillMount: _mount, execution: _execution, runtime: _runtime, ...content } = report
+    report = {
+      ...content,
+      ...(entry?.baseCommit && /^[a-f0-9]{40}$/.test(entry.baseCommit)
+        ? { sourceCommit: entry.baseCommit } : {}),
+      ...(entry?.skillMount && entry.skillMount.sessionId === entry.sessionId &&
+        entry.skillMount.receiptId === entry.assignment.skillReceipt?.id &&
+        entry.skillMount.versionId === entry.assignment.skillReceipt?.artifact.versionId &&
+        entry.skillMount.sha256 === entry.assignment.skillReceipt?.artifact.sha256
+        ? { skillMount: entry.skillMount,
+          ...(entry.runtime ? { runtime: { ...entry.runtime,
+            observedModel: this.active.get(runId)?.session?.runtimeModel ?? entry.runtime.observedModel,
+          } } : {}),
+          ...(entry.execution && entry.assignment.benchmark ? { execution: {
+            ...entry.execution,
+            observedModel: this.active.get(runId)?.session?.runtimeModel ?? entry.execution.observedModel,
+          } } : {}),
+        } : {}),
+    }
     // A planning hand-in leaves its two cards in the conversation (ADR ORV-205).
     this.emitPlanCards(runId, report, planning)
     this.endMessage(runId)
     this.openParts.delete(runId)
     if (stopReason === "submitted") this.setState(runId, "finishing")
-    // Only a submission whose verify passed is a success: a failed verify
-    // fails the run, an unverified one just stops.
+    // A trusted daemon push can hand unverified work in for a draft PR.
+    // Without that approved publication, the existing unverified stop stays.
     let state = runStateForStop(stopReason)
     if (stopReason === "submitted" && report.verify.status !== "passed") {
       const failed = report.verify.status === "failed"
-      if (!planning) state = failed ? "failed" : "stopped"
+      if (!planning) state = failed ? "failed" : report.publish?.pushed === true ? "succeeded" : "stopped"
       // A `plan` run writes no code, so a verify that did not run says
       // nothing about it.
       if (!failed && !planning)
         error ??= "Submitted, but no verify command ran; the work is unverified"
+    }
+    if (
+      (stopReason === "asked_human" || stopReason === "blocked") &&
+      report.question
+    ) {
+      this.deps.journal.update(runId, {
+        waitingQuestionId: report.question.questionId,
+      })
     }
     this.setState(runId, state, {
       stopReason,
@@ -716,7 +798,7 @@ export class RunSupervisor {
       worktree?: string
       error?: string
       stopReason?: StopReason
-    } = {}
+    } = {},
   ) {
     const entry = this.deps.journal.update(runId, {
       state,
@@ -740,6 +822,16 @@ export class RunSupervisor {
     })
   }
 
+  /** Waits for the run's capture uploads, but never longer than a minute. */
+  private async flushCaptures(runId: string): Promise<void> {
+    if (!this.deps.captures) return
+    let timer: NodeJS.Timeout | undefined
+    await Promise.race([
+      this.deps.captures.flush(runId),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, 60_000) }),
+    ]).finally(() => clearTimeout(timer))
+  }
+
   /**
    * The handoff report: the agent's own words (summary, questions, next
    * step, blocker) plus what only the daemon may state: changed files and,
@@ -754,24 +846,34 @@ export class RunSupervisor {
     assignment: RunAssignment,
     stopReason: StopReason,
     error: string | undefined,
-    agent: AgentReport | undefined
+    agent: AgentReport | undefined,
   ): Promise<{ report: HandoffReport; verifyError?: string; tree?: string }> {
-    const report = { ...baseReport(error), ...pickAgentReport(agent) }
+    let report: HandoffReport = {
+      ...baseReport(error),
+      ...pickAgentReport(agent),
+    }
     const filesChanged = (
       await this.deps.worktrees.changedFiles(worktree).catch(() => [])
     ).slice(0, MAX_REPORTED_FILES)
     const command = assignment.verifyCommand
     // A `plan` run writes no code: there is nothing for the issue's verify
     // command to check (ADR ORV-205).
-    if (stopReason !== "submitted" || !command || assignment.kind === "plan")
+    if (stopReason !== "submitted" || assignment.kind === "plan")
       return {
         report: { ...report, filesChanged, verify: { status: "not_run" } },
       }
+    if (!command) {
+      // No command was approved for this repository. Snapshot the submitted
+      // tree for an explicitly approved push, while retaining not_run.
+      const tree = await this.deps.publisher?.snapshot({ worktree, repo })
+      return { report: { ...report, filesChanged, verify: { status: "not_run" } }, tree }
+    }
+    let execution: Partial<HandoffReport["verify"]> = {}
     const failed = (output: string, verifyError: string) => ({
       report: {
         ...report,
         filesChanged,
-        verify: { status: "failed" as const, command, output },
+        verify: { status: "failed" as const, command, output, ...execution },
       },
       verifyError,
     })
@@ -780,7 +882,19 @@ export class RunSupervisor {
     const publisher = this.deps.publisher
     let before: string | undefined
     try {
-      before = await publisher?.snapshot({ worktree, repo })
+      if (fixedCandidateCheck(assignment)) {
+        if (runPolicy(assignment.policy).readOnly !== true)
+          throw new Error("Check assignment is missing its read-only policy")
+        const fixed = await fixedCheckSnapshot(
+          repo.path,
+          worktree,
+          assignment.baseBranch,
+        )
+        report = { ...report, check: { sha: fixed.sha, readOnly: true } }
+        before = fixed.tree
+      } else {
+        before = await publisher?.snapshot({ worktree, repo })
+      }
     } catch (snapshotError) {
       return failed("", `Could not read the worktree: ${String(snapshotError)}`)
     }
@@ -793,22 +907,31 @@ export class RunSupervisor {
       signal: this.stopController.signal,
       readOnly: runPolicy(assignment.policy).readOnly === true,
     })
+    execution = {
+      exitCode: result.exitCode,
+      signal: result.signal,
+      timedOut: result.timedOut,
+    }
     const output = result.output.slice(-4000)
     if (result.exitCode !== 0 || result.timedOut)
       return failed(output, verifyFailure(command, result))
-    const after = publisher
-      ? await publisher.snapshot({ worktree, repo }).catch(() => null)
-      : undefined
+    const after = fixedCandidateCheck(assignment)
+      ? await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
+          .then((fixed) => fixed.tree)
+          .catch(() => null)
+      : publisher
+        ? await publisher.snapshot({ worktree, repo }).catch(() => null)
+        : undefined
     if (after !== before)
       return failed(
         output,
-        `Submitted, but the verify command changed the worktree (\`${command}\`); the work is unverified`
+        `Submitted, but the verify command changed the worktree (\`${command}\`); the work is unverified`,
       )
     return {
       report: {
         ...report,
         filesChanged,
-        verify: { status: "passed", command, output },
+        verify: { status: "passed", command, output, ...execution },
       },
       tree: before,
     }
@@ -823,26 +946,35 @@ export class RunSupervisor {
   private async startPoint(
     runId: string,
     repo: DeviceRepo,
-    assignment: RunAssignment
+    assignment: RunAssignment,
   ): Promise<string> {
+    // Factory checks and benchmark replays use an immutable commit, never a
+    // remote branch named after that SHA or a later issue-branch head.
+    const fixed = fixedCandidateCheck(assignment) ? assignment.baseBranch : assignment.benchmark?.sourceCommit
+    if (fixed) {
+      if (!/^[a-f0-9]{40}$/.test(fixed) || !await hasCommit(repo.path, fixed))
+        throw new Error("Fixed execution commit is unavailable in the repository cache")
+      return fixed
+    }
     // Taking over a run from another machine: start where it started.
     const resume = assignment.resumeFrom?.baseCommit
     if (resume && (await hasCommit(repo.path, resume))) return resume
     const branch = assignment.pushBranch
-    if (!branch || repo.push?.approved !== true) return assignment.baseBranch
+    const base = await this.deps.baseRef(assignment)
+    if (!branch || !pushDecision(runPolicy(assignment.policy), repo.push?.approved === true).push) return base
     try {
       return await this.deps.worktrees.fetchBranch(
         repo.path,
-        repo.push.remote ?? "origin",
+        repo.push?.remote ?? "origin",
         branch,
-        runId
+        runId,
       )
     } catch (error) {
       this.deps.log.info(
         { run_id: runId, branch, err: error },
-        "issue branch not fetched; starting from the base branch"
+        "issue branch not fetched; starting from the base branch",
       )
-      return assignment.baseBranch
+      return base
     }
   }
 
@@ -856,7 +988,7 @@ export class RunSupervisor {
     repo: DeviceRepo,
     assignment: RunAssignment,
     report: HandoffReport,
-    tree: string
+    tree: string,
   ): Promise<RunPublish> {
     const publisher = this.deps.publisher as NonNullable<
       SupervisorDeps["publisher"]
@@ -902,15 +1034,16 @@ export class RunSupervisor {
         this.deps.log.error({ run_id: runId, err: error }, "run failed")
         if (this.stopping) return
         try {
-          this.finish(runId, "error", message)
+          this.finish(runId, run.cancelRequested ? run.forcedStop ?? "cancelled" : "error", run.cancelRequested ? undefined : message)
         } catch (finishError) {
           this.deps.log.error(
             { run_id: runId, err: finishError },
-            "could not record the run's end"
+            "could not record the run's end",
           )
         }
       })
       .finally(async () => {
+        run.toolApproval?.revoke()
         try { await this.closeMailbox(run) }
         catch { this.deps.log.warn('Run mailbox shutdown failed') }
         finally { clearTimeout(run.cancelTimer); this.active.delete(runId) }
@@ -921,11 +1054,37 @@ export class RunSupervisor {
     const log = this.deps.log.child({ run_id: runId })
     let entry = this.deps.journal.get(runId) as JournalEntry
     const { assignment } = entry
+    verifySkillAssignment(assignment)
+    if (assignment.skillReceipt && (this.leases.get(runId)??0)<=Date.now())
+      throw new Error('Receipted Skill assignment requires a current server lease')
     const adapter = this.adapterFor(runId)
+    if (
+      assignment.requireSessionResume &&
+      entry.questionResumeState === "starting"
+    )
+      throw new Error(
+        "Question continuation delivery is uncertain after interruption; explicit recovery is required",
+      )
+    if (
+      assignment.requireSessionResume &&
+      (!assignment.resumeSessionId ||
+        !assignment.continuesRunId ||
+        !adapter.capabilities.supportsResume ||
+        !["claude_code", "codex"].includes(adapter.harness))
+    )
+      throw new Error(
+        "Question continuation requires the original resumable session",
+      )
 
     if (entry.state === "queued") {
       this.setState(runId, "preparing")
       entry = this.deps.journal.get(runId) as JournalEntry
+    }
+
+    await this.deps.prepareRepository(assignment, AbortSignal.any([this.stopController.signal, run.abort.signal]))
+    if (this.stopping || run.cancelRequested) {
+      if (!this.stopping) this.finish(runId, run.forcedStop ?? "cancelled")
+      return
     }
 
     // A retry after a lost lease can arrive while the earlier attempt is
@@ -944,16 +1103,20 @@ export class RunSupervisor {
             repo.path,
             this.deps.journal.get(assignment.continuesRunId)?.worktree ??
               this.deps.worktrees.pathFor(assignment.continuesRunId),
-            runId
+            runId,
           )
         : null
+    if (assignment.requireSessionResume && !entry.worktree && !continued)
+      throw new Error(
+        "Original question worktree is unavailable; a fresh task cannot replace it",
+      )
     const worktree =
       entry.worktree ??
       continued ??
       (await this.deps.worktrees.create(
         runId,
         repo.path,
-        await this.startPoint(runId, repo, assignment)
+        await this.startPoint(runId, repo, assignment),
       ))
     if (!entry.worktree) {
       // A continued worktree was bootstrapped by the run that made it.
@@ -973,17 +1136,20 @@ export class RunSupervisor {
         })
         log.info(
           { files: assignment.resumeFrom.files, applied },
-          "checkpoint from the earlier attempt"
+          "checkpoint from the earlier attempt",
         )
       }
-      const setup = continued
-        ? "continued"
-        : this.deps.bootstrap ? await this.deps.bootstrap(worktree,repo) : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
+      const setup = runPolicy(assignment.policy).readOnly === true ? 'read-only' : continued ? 'continued' : this.deps.bootstrap ? await this.deps.bootstrap(worktree,repo) : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
       log.info({ worktree, setup }, "worktree ready")
       this.deps.journal.update(runId, { worktree, baseCommit })
     }
     if (this.stopping) return
 
+    if (fixedCandidateCheck(assignment)) {
+      if (runPolicy(assignment.policy).readOnly !== true)
+        throw new Error("Check assignment is missing its read-only policy")
+      await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
+    }
     const checkMailbox = () => {
       const lease = this.leases.get(runId)
       const current = this.deps.journal.get(runId)
@@ -996,8 +1162,19 @@ export class RunSupervisor {
     if (this.stopping) return
     if (run.cancelRequested) { this.finish(runId, run.forcedStop ?? 'cancelled'); return }
     if (mailbox) checkMailbox()
+    const toolApproval = await this.deps.prepareRunToolApproval?.(assignment, run.abort.signal, checkMailbox, worktree)
+    run.toolApproval = toolApproval
+    // Cancellation or lease loss may win while the gate is being prepared.
+    // Revoke it before refusing, and never launch a CLI with stale authority.
+    if (this.stopping) { toolApproval?.revoke(); return }
+    if (run.cancelRequested || run.abort.signal.aborted) { toolApproval?.revoke(); this.finish(runId, run.forcedStop ?? 'cancelled'); return }
+    if (toolApproval) {
+      try { checkMailbox() } catch (error) { toolApproval.revoke(); throw error }
+    }
     const options = {
+      toolApproval,
       runId,
+      requireSessionResume: assignment.requireSessionResume,
       kind: assignment.kind,
       cwd: worktree,
       env: buildChildEnv({
@@ -1006,8 +1183,19 @@ export class RunSupervisor {
       }),
       log,
       networkAllow: repo.networkAllow,
+      gitWritePaths: await worktreeGitWritePaths(repo.path, worktree, runId),
       policy: assignment.policy,
       skills: assignment.skills,
+      skillReceipt: assignment.skillReceipt,
+      onRuntimeModel: assignment.skillReceipt ? (sessionId: string, observedModel: string) => {
+        const current = this.deps.journal.get(runId)
+        if (!current?.runtime || isTerminalRunState(current.state) || current.sessionId !== sessionId ||
+          current.skillMount?.sessionId !== sessionId || current.skillMount.receiptId !== assignment.skillReceipt?.id) return
+        if (current.runtime.observedModel === observedModel && (!current.execution || current.execution.observedModel === observedModel)) return
+        this.deps.journal.update(runId, { runtime: { ...current.runtime, observedModel },
+          ...(current.execution ? { execution: { ...current.execution, observedModel } } : {}),
+        })
+      } : undefined,
       fixture: assignment.fixture,
       model: assignment.model,
       mailbox,
@@ -1035,17 +1223,93 @@ export class RunSupervisor {
             message: assignment.followUp ?? assignment.prompt,
           }
         : undefined
-    const session = assignment.subscriptionBinding
+    if (assignment.requireSessionResume &&
+        (assignment.subscriptionBinding || !assignment.resumeSessionId || !assignment.continuesRunId ||
+          !adapter.capabilities.supportsResume || (!resuming && !continueSession) ||
+          (resuming && entry.sessionId !== assignment.resumeSessionId)))
+      throw new Error("factory_question_session_resume_required")
+    const benchmark = assignment.benchmark
+    const policyDigest = assignment.skillReceipt ? createHash('sha256').update(runPolicyDigestInput(assignment.policy)).digest('hex') : undefined
+    if (benchmark && (!assignment.skillReceipt || assignment.harness === "mock" ||
+      !assignment.verifyCommand || benchmark.sourceCommit !== this.deps.journal.get(runId)?.baseCommit ||
+      policyDigest !== benchmark.policyDigest)) throw new Error("Frozen benchmark execution configuration mismatch")
+    let fixtureDigest: string | undefined
+    if (benchmark) {
+      if (runPolicy(assignment.policy).readOnly !== true) throw new Error("Benchmark fixture must be read-only")
+      const fixed = await fixedCheckSnapshot(repo.path, worktree, benchmark.sourceCommit)
+      fixtureDigest = createHash('sha256').update(fixed.sha).digest('hex')
+      if (fixtureDigest !== benchmark.fixtureDigest) throw new Error("Frozen benchmark fixture digest mismatch")
+    }
+    const previousMount = entry.skillMount
+    const previousExecution = entry.execution
+    const previousRuntime = entry.runtime
+    let session: AgentSession
+    try {
+      session = assignment.subscriptionBinding
       ? this.deps.startSubscription
         ? await this.deps.startSubscription(assignment,{...options,prompt:assignment.prompt})
         : (()=>{throw new Error('subscription_hosted_runtime_unavailable')})()
       : resuming
       ? await adapter.resume(entry.sessionId as string, options)
-      : await adapter.start({
-          ...options,
-          prompt: assignment.prompt,
-          continueSession,
+      : await (async () => {
+          if (assignment.requireSessionResume)
+            this.deps.journal.update(runId, {
+              questionResumeState: "starting",
+            })
+          return adapter.start({
+            ...options,
+            prompt: assignment.prompt,
+            continueSession,
+            requireSessionResume: assignment.requireSessionResume,
+          })
+        })()
+    } catch (error) {
+      if (assignment.skillReceipt) this.deps.journal.update(runId, { skillMount: undefined, execution: undefined, runtime: undefined })
+      throw error
+    }
+    if (assignment.skillReceipt) {
+      try {
+        const receipt = assignment.skillReceipt
+        if (!this.deps.adapterStateDir || assignment.harness === "mock" || !session.sessionId ||
+          (resuming && session.sessionId !== entry.sessionId) ||
+          (assignment.requireSessionResume && session.sessionId !== assignment.resumeSessionId))
+          throw new Error("Skill mount requires the actual original harness session")
+        verifySkillAssignment(assignment)
+        const file = join(runPaths(this.deps.adapterStateDir, runId).runDir,
+          SKILLS_DIR, skillSlug(assignment.skills![0].name), SKILL_BODY_FILE)
+        verifyMountedSkill(file, receipt)
+        const mount = runSkillMount.parse({ receiptId: receipt.id, versionId: receipt.artifact.versionId,
+          sha256: receipt.artifact.sha256, sessionId: session.sessionId, mountedAt: new Date().toISOString() })
+        if (previousMount && (previousMount.receiptId !== mount.receiptId || previousMount.versionId !== mount.versionId ||
+          previousMount.sha256 !== mount.sha256 || previousMount.sessionId !== mount.sessionId))
+          throw new Error("Skill mount receipt or session changed during resume")
+        const observedModel = session.runtimeModel ?? (resuming && session.replayedHandoff && previousMount
+          ? previousRuntime?.observedModel ?? previousExecution?.observedModel ?? null : null)
+        this.deps.journal.update(runId, { skillMount: previousMount ?? mount, sessionId: session.sessionId,
+          runtime: runRuntime.parse({ harness: assignment.harness, requestedModel: assignment.model ?? null,
+            observedModel, policyDigest, sourceCommit: this.deps.journal.get(runId)?.baseCommit }),
+          ...(benchmark ? { execution: runExecution.parse({ ...benchmark, harness: assignment.harness,
+            requestedModel: assignment.model ?? null, observedModel,
+            policyDigest, fixtureDigest, verifyCommand: assignment.verifyCommand }) } : {}),
         })
+      } catch (error) {
+        this.deps.journal.update(runId, { skillMount: undefined, execution: undefined, runtime: undefined })
+        await session.cancel()
+        throw error
+      }
+    }
+    if (assignment.requireSessionResume) {
+      if (session.sessionId !== assignment.resumeSessionId) {
+        await session.cancel()
+        throw new Error(
+          "Question continuation returned a different session; execution stopped",
+        )
+      }
+      this.deps.journal.update(runId, {
+        questionResumeState: "accepted",
+        sessionId: session.sessionId,
+      })
+    }
     run.session = session
     log.info(
       {
@@ -1055,7 +1319,7 @@ export class RunSupervisor {
           continueSession !== undefined &&
           session.sessionId === continueSession.sessionId,
       },
-      "session open"
+      "session open",
     )
     if (entry.state !== "running" || !resuming) {
       this.setState(runId, "running", {
@@ -1093,8 +1357,11 @@ export class RunSupervisor {
           if (
             event.chunk.type === "tool-output-available" ||
             event.chunk.type === "tool-output-error"
-          )
+          ) {
             run.checkpointDue = true
+            // A tool call ended, perhaps submit_capture: upload in the background.
+            void this.deps.captures?.flush(runId)
+          }
           this.emit(runId, event.chunk)
           continue
         }
@@ -1109,6 +1376,11 @@ export class RunSupervisor {
               : stopReason === "device_lost"
                 ? "Run lease expired; the server could not be reached"
                 : undefined)
+        if (assignment.benchmark) {
+          const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.benchmark.sourceCommit)
+          if (createHash('sha256').update(fixed.sha).digest('hex') !== assignment.benchmark.fixtureDigest)
+            throw new Error("Benchmark fixture changed during model execution")
+        }
         const outcome = await this.report(
           runId,
           worktree,
@@ -1116,18 +1388,22 @@ export class RunSupervisor {
           assignment,
           stopReason,
           error,
-          event.report
+          event.report,
         )
         if (this.stopping) return
         const { verifyError, tree } = outcome
         let report = outcome.report
+        const policy = runPolicy(assignment.policy)
         if (
           stopReason === "submitted" &&
-          report.verify.status === "passed" &&
+          report.verify.status !== "failed" &&
           tree &&
+          // The draft-PR exception requires an explicit repository push
+          // approval. It must not even create a local commit without it.
+          (report.verify.status === "passed" || pushDecision(policy, repo.push?.approved === true).push) &&
           // A read-only check (ADR 0046) never commits or pushes: it reports
           // on the commit the implementation run already pushed.
-          runPolicy(assignment.policy).readOnly !== true
+          policy.readOnly !== true
         ) {
           const publish = await this.publish(
             runId,
@@ -1135,14 +1411,16 @@ export class RunSupervisor {
             repo,
             assignment,
             report,
-            tree
+            tree,
           )
           report = { ...report, publish }
         }
+        // Captures go up before the run reports its end; a stopping daemon does not wait for them.
+        if (!this.stopping) await this.flushCaptures(runId)
         this.finish(runId, stopReason, error ?? verifyError, report)
         log.info(
           { outcome: event.outcome, stop_reason: stopReason },
-          "run ended"
+          "run ended",
         )
         // A stopped or failed run that changed nothing leaves no worktree or
         // branch behind. A finished chat turn keeps its worktree: the next
@@ -1219,6 +1497,8 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
   else if (agent.nextStep === null) picked.nextStep = null
   if (typeof agent.blockedOn === "string")
     picked.blockedOn = agent.blockedOn.slice(0, 500)
+  const question = runQuestion.safeParse(agent.question)
+  if (question.success) picked.question = question.data
   // The planning hand-in was already parsed and checked by the adapter's
   // `readHandoff`; it is copied whole or not at all (ADR ORV-205).
   if (agent.plan) picked.plan = agent.plan
@@ -1296,7 +1576,7 @@ async function unsandboxedVerify(run: {
 
 function verifyFailure(
   command: string,
-  result: Pick<VerifyResult, "exitCode" | "signal" | "timedOut">
+  result: Pick<VerifyResult, "exitCode" | "signal" | "timedOut">,
 ): string {
   const how = result.timedOut
     ? "timed out"
@@ -1310,4 +1590,14 @@ function verifyFailure(
 
 export function baseReport(summary = ""): HandoffReport {
   return emptyRunReport(summary.slice(0, 10_000))
+}
+
+/** Existing acceptance runs remain compatible; Factory checks are exact-SHA read-only runs. */
+function fixedCandidateCheck(assignment: RunAssignment): assignment is RunAssignment & { baseBranch: string } {
+  return (
+    assignment.kind === "acceptance" &&
+    runPolicy(assignment.policy).readOnly === true &&
+    typeof assignment.baseBranch === "string" &&
+    /^[a-f0-9]{40}$/.test(assignment.baseBranch)
+  )
 }

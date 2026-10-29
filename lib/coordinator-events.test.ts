@@ -47,6 +47,13 @@ test('a finished run is one event per run, with its summary', () => {
 
 const workerRun = { id: 'run-1', userId: 'user-1', issueId: 'issue-1' }
 
+test('a finished run includes server-verified PR output in the same deduplicated event', () => {
+  const publication = { pullRequest: { url: 'https://github.com/owner/repo/pull/7', state: 'draft' as const }, branch: 'mikka/mik-42' }
+  const event = runFinishedEvent({ id: 'run-1', userId: 'owner', issueId: 'issue-1', kind: 'implement', status: 'succeeded', stopReason: 'submitted', publication })
+  assert.equal(event.dedupeKey, 'run_finished:run-1')
+  assert.deepEqual(event.payload.publication, publication)
+})
+
 test('a retry after the device went offline is one event per lost run', () => {
   const event = runRetriedEvent(workerRun, { runId: 'run-2', attempt: 2, maxAttempts: 3 })
   assert.deepEqual(event, { userId: 'user-1', kind: 'run_retried', dedupeKey: 'run_retried:run-1', issueId: 'issue-1', runId: 'run-1', payload: { retryRunId: 'run-2', attempt: 2, maxAttempts: 3 } })

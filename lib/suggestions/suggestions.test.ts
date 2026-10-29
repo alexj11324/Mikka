@@ -184,3 +184,10 @@ test('search results keep the external id their trigger event has', () => {
   assert.equal(notionSearchNotification(me, { ...page, in_trash: true }), null)
   assert.equal(notionSearchNotification(me, { ...page, object: 'database' }), null)
 })
+
+
+test('verified Composio notifications retain their source account', () => {
+  const event = { userId: me, toolkitSlug: 'SLACK', payload: { channel: 'C1', ts: '1', text: 'hello' }, metadata: { connectedAccount: { id: 'ca_source' } } }
+  assert.equal(composioNotification(event)?.connectedAccountId, 'ca_source')
+  assert.equal(composioNotification({ ...event, metadata: undefined })?.connectedAccountId, undefined)
+})

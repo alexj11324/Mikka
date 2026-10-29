@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { describe, expect, it } from "vitest"
 
-import { browseFolder } from "../src/fs-browse"
+import { browseFolder, verifyExpectedOrigin } from "../src/fs-browse"
 
 describe("browseFolder", () => {
   const root = mkdtempSync(join(tmpdir(), "mikka-fs-"))
@@ -48,6 +48,15 @@ describe("browseFolder", () => {
       repo: { remoteUrl: "git@github.com:o/app.git" },
     })
     expect(result.ok && result.repo?.path).toMatch(/app$/)
+  })
+
+
+  it("checks the exact checkout and GitHub origin against the asserted remote", async () => {
+    expect(await verifyExpectedOrigin(repo, "https://github.com/o/app")).toBe(true)
+    expect(await verifyExpectedOrigin(repo, "https://github.com/o/other")).toBe(false)
+    expect(await verifyExpectedOrigin(join(repo, "src"), "https://github.com/o/app")).toBe(false)
+    expect(await verifyExpectedOrigin(repo, "https://user:secret@github.com/o/app")).toBe(false)
+    expect(await verifyExpectedOrigin(join(root, "plain"), "https://github.com/o/app")).toBe(false)
   })
 
   it("answers missing paths, files and relative paths", async () => {

@@ -385,3 +385,66 @@ test("concurrent approved runs execute on their own trusted display", async (t) 
   assert.deepEqual(executions.map(row => row.runId), ["run-a", "run-b"]);
   assert.throws(() => normalizeCall({ name: "click", arguments: { x: 1, y: 2, display: ":2" } }));
 });
+test("capture calls skip review but still need the run's grant", async (t) => {
+  const calls = [];
+  let allowed = true;
+  const b = await fixture(t, {
+    permitted: () => allowed,
+    capture: async (runId, call) => { calls.push({ runId, call }); return { action: call.action, capture: { id: "c1" } }; },
+  });
+  const { token } = b.spec("run-1", "ask", { display: ":2" });
+  assert.deepEqual(await b.captureRequest(token, { name: "capture_screenshot", arguments: { title: "  Login   page " } }), { result: { action: "screenshot", capture: { id: "c1" } } });
+  assert.deepEqual(calls, [{ runId: "run-1", call: { action: "screenshot", title: "Login page" } }]);
+  assert.equal(b.list().length, 0, "nothing waits for review");
+  assert.deepEqual(await b.captureRequest("forged", { name: "capture_screenshot", arguments: { title: "x" } }), { error: "Not permitted" });
+  allowed = false;
+  assert.deepEqual(await b.captureRequest(token, { name: "stop_screen_recording", arguments: {} }), { error: "Not permitted" });
+  assert.equal(calls.length, 1);
+});
+test("capture calls cannot choose the desktop, a path or a longer recording", async (t) => {
+  const { normalizeCaptureCall, CAPTURE_TOOLS } = await import("./driver.mjs");
+  assert.deepEqual(CAPTURE_TOOLS.map(tool => tool.name), ["capture_screenshot", "start_screen_recording", "stop_screen_recording"]);
+  for (const value of [
+    { name: "capture_screenshot", arguments: { title: "x", display: ":3" } },
+    { name: "capture_screenshot", arguments: { title: "x", path: "/etc/passwd" } },
+    { name: "capture_screenshot", arguments: {} },
+    { name: "start_screen_recording", arguments: { title: "x", maxSeconds: 3600 } },
+    { name: "start_screen_recording", arguments: { title: "x", maxSeconds: 2.5 } },
+    { name: "stop_screen_recording", arguments: { id: "other" } },
+    { name: "get_desktop_state", arguments: {} },
+    { name: "constructor", arguments: {} },
+  ]) assert.throws(() => normalizeCaptureCall(value));
+  assert.deepEqual(normalizeCaptureCall({ name: "start_screen_recording", arguments: { title: "Flow", maxSeconds: 60 } }), { action: "start_recording", title: "Flow", maxSeconds: 60 });
+  const b = await fixture(t);
+  const { token } = b.spec("run-1", "ask");
+  assert.deepEqual(await b.captureRequest(token, { name: "capture_screenshot", arguments: { title: "x" } }), { error: "Not permitted" }, "no capture relay, no capture");
+});
+test("a refused capture tells the model only the server's own reason", async (t) => {
+  const b = await fixture(t, { capture: async () => { throw Object.assign(new Error("https://e2b.internal/secret?key=1"), { safeMessage: "A recording is already going; stop it first." }); } });
+  const { token } = b.spec("run-1", "ask");
+  assert.deepEqual(await b.captureRequest(token, { name: "start_screen_recording", arguments: { title: "x" } }), { error: "Capture failed", detail: "A recording is already going; stop it first." });
+  const quiet = await fixture(t, { capture: async () => { throw new Error("https://e2b.internal/secret?key=1"); } });
+  const grant = quiet.spec("run-1", "ask");
+  assert.deepEqual(await quiet.captureRequest(grant.token, { name: "capture_screenshot", arguments: { title: "x" } }), { error: "Capture failed" });
+});
+test("the proxy lists capture tools only with --captures and relays them over the socket", async (t) => {
+  const b = await fixture(t, { capture: async (_runId, call) => ({ action: call.action, capture: { id: "c1", title: call.title } }) });
+  await b.listen();
+  const { token, socketPath } = b.spec("run-1", "ask");
+  const ask = async (flags, messages) => {
+    const child = spawn(process.execPath, [new URL("./proxy.mjs", import.meta.url).pathname, socketPath, token, ...flags]);
+    const lines = createInterface({ input: child.stdout });
+    const replies = new Map();
+    lines.on("line", line => { const msg = JSON.parse(line); replies.set(msg.id, msg.result); });
+    for (const message of messages) child.stdin.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + "\n");
+    for (let i = 0; i < 100 && replies.size < messages.length; i++) await new Promise(resolve => setTimeout(resolve, 20));
+    child.kill();
+    return replies;
+  };
+  const plain = await ask([], [{ id: 1, method: "tools/list" }]);
+  assert.ok(!plain.get(1).tools.some(tool => tool.name === "capture_screenshot"));
+  const cloud = await ask(["--captures"], [{ id: 1, method: "tools/list" }, { id: 2, method: "tools/call", params: { name: "capture_screenshot", arguments: { title: "Home" } } }]);
+  assert.ok(cloud.get(1).tools.some(tool => tool.name === "capture_screenshot"));
+  assert.deepEqual(JSON.parse(cloud.get(2).content[0].text), { action: "screenshot", capture: { id: "c1", title: "Home" } });
+  assert.equal(b.list().length, 0);
+});

@@ -45,9 +45,12 @@ export type LostRunOutcome =
   | { kind: 'failed'; error: string }
 
 /** What to do with a run whose lease ran out. */
-export function lostRunOutcome(run: { attempt: number; stopRequestedAt: Date | null; issueId: string | null; deviceRepoId: string | null }): LostRunOutcome {
+export function lostRunOutcome(run: { attempt: number; stopRequestedAt: Date | null; issueId: string | null; deviceRepoId: string | null; questionContinuation?: unknown }): LostRunOutcome {
   // The person already asked it to stop; losing the machine finished the job.
   if (run.stopRequestedAt) return { kind: 'stopped' }
+  // An answer may already have reached its original session. Generic device
+  // takeover cannot preserve that guarantee and must never replay the answer.
+  if (run.questionContinuation != null) return { kind: 'failed', error: 'The device went offline during an original-session question continuation; explicit recovery is required.' }
   if (!run.issueId || !run.deviceRepoId) return { kind: 'failed', error: 'The device went offline, and the run cannot be queued again without its issue and repository.' }
   if (run.attempt >= MAX_RUN_ATTEMPTS) return { kind: 'failed', error: `The device went offline ${run.attempt} times; automatic retries are used up.` }
   return { kind: 'retry', attempt: run.attempt + 1 }
@@ -56,33 +59,20 @@ export function lostRunOutcome(run: { attempt: number; stopRequestedAt: Date | n
 /** The error on a retry that waited too long for its device. */
 export const DEVICE_STAYED_OFFLINE = 'The device stayed offline, so the retry could not start.'
 
-/** A git remote as `host/owner/repo`, so https and ssh spellings of one repo match. */
-export function remoteKey(url: string): string {
-  return url.trim().toLowerCase()
-    .replace(/^[a-z+]+:\/\//, '')
-    .replace(/^[^@/]+@/, '')
-    .replace(/^([^/:]+):(?!\d+\/)/, '$1/')
-    .replace(/:\d+\//, '/')
-    .replace(/\/+$/, '')
-    .replace(/\.git$/, '')
-}
+export { remoteKey } from '@mikka/protocol/repository'
 
 export interface TakeoverCandidate {
   deviceId: string
-  deviceRepoId: string
-  remoteUrl: string | null
   harnesses: readonly { harness: string; installed: boolean }[]
 }
 
 /**
  * Another machine that can go on with a run whose device went offline: it
- * has the same repository (by remote) and the agent's harness installed.
+ * can clone the repository and has the execution harness installed.
  * Candidates come online, enabled and most recently seen first.
  */
 export function pickTakeover(candidates: readonly TakeoverCandidate[], run: { remoteUrl: string | null; harness: string; lostDeviceId: string | null }): TakeoverCandidate | null {
   if (!run.remoteUrl) return null
-  const remote = remoteKey(run.remoteUrl)
   return candidates.find(candidate => candidate.deviceId !== run.lostDeviceId
-    && candidate.remoteUrl !== null && remoteKey(candidate.remoteUrl) === remote
     && candidate.harnesses.some(info => info.harness === run.harness && info.installed)) ?? null
 }

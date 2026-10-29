@@ -8,6 +8,8 @@ import { createOperationLedger, lockOperation, OperationError, type OperationInt
 import { requireOperationSession, withOperationSession } from './session-authorization'
 import type { WriteProvider } from './write-contract'
 import { writeBindingSchema as bindingSchema, prepareWriteBinding } from './write-binding'
+import { lockWritePolicy } from './write-policy-store'
+import { withWritePolicy } from './policy-authorization'
 
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical)
@@ -32,7 +34,7 @@ export interface ApprovedWriteView {
 // scope avoids inventing a workspace DB relationship or using a browser cookie.
 const scope = (owner: string) => `personal:${owner}`
 const identity = (p: Proposal) => ({ operationId: p.id, ownerId: p.userId, workspaceId: scope(p.userId) })
-const intent = (p: Proposal): OperationIntent => ({ ...identity(p), provider: p.operationBinding.provider, accountId: p.operationBinding.accountId, action: p.action, target: writeTarget(p.action as WriteActionName, p.input), approvalId: p.id, proposalDigest: digest([p.action, p.operationBinding]), payloadDigest: p.operationBinding.payloadDigest })
+const intent = (p: Proposal): OperationIntent => ({ ...identity(p), provider: p.operationBinding.provider, accountId: p.operationBinding.accountId, action: p.action, target: writeTarget(p.action as WriteActionName, p.input), approvalId: p.id, proposalDigest: digest([p.action, p.operationBinding]), payloadDigest: p.operationBinding.payloadDigest, ...(p.operationBinding.run ? { executionRunId: p.operationBinding.run.runId, policyScope: { botId: p.operationBinding.run.botId, workspaceId: p.operationBinding.run.workspaceId, version: p.operationBinding.run.policyVersion } } : {}) })
 
 /** Pure projection only; callers must authenticate/authorize the read separately.
  * Shared by by-ID and discovery so status never depends on which endpoint is used. */
@@ -61,7 +63,7 @@ async function bounded<T>(call: (signal: AbortSignal) => Promise<T>, requestSign
 
 export function createApprovedWrites(pool: Pool, provider: WriteProvider, action: WriteActionName, context: WriteRequestContext = {}) {
   function transaction<T>(work: (tx: PoolClient) => Promise<T>, actor: WriteActor | undefined = context.actor) {
-    return writeTransaction(pool, work, { signal: context.signal, ...(actor ? { authorizeCommit: (tx: PoolClient) => requireOperationSession(tx, actor, actor.userId) } : {}) })
+    return writeTransaction(pool, work, { signal: context.signal, guard: context.guard, ...(actor ? { authorizeCommit: (tx: PoolClient) => requireOperationSession(tx, actor, actor.userId) } : {}) })
   }
   async function owned(tx: PoolClient, owner: string, id: string) {
     const { rows } = await tx.query<Proposal>('SELECT * FROM pending_actions WHERE id=$1 AND "userId"=$2 FOR UPDATE', [id, owner])
@@ -78,10 +80,8 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
   }
   async function current(tx: PoolClient, binding: OperationIntent, _run: string | null, phase: string) {
     const p = await owned(tx, binding.ownerId, binding.approvalId)
-    if (JSON.stringify(intent(p)) !== JSON.stringify(binding)) {
-      // Compare fields canonically; JSONB object key order is not application order.
-      for (const [key, value] of Object.entries(intent(p))) if (binding[key as keyof OperationIntent] !== value) throw new OperationError('operationBindingConflict')
-    }
+    if (digest(intent(p)) !== digest(binding)) throw new OperationError('operationBindingConflict')
+    if (binding.executionRunId && _run !== null && binding.executionRunId !== _run) throw new OperationError('operationRunMismatch')
     const valid = await tx.query(`SELECT id FROM pending_actions WHERE id=$1 AND status IN ('running','done') AND ($2=false OR "createdAt">clock_timestamp()-interval '7 days')`, [p.id, ['claim', 'invoke'].includes(phase)])
     if (!valid.rows.length || p.operationBinding.provider !== provider.name) throw new OperationError('pendingActionUnavailable')
   }
@@ -90,6 +90,36 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
     // or success: existing running stays pending reconciliation; ledger is authoritative.
     if (row.status === 'succeeded') await pool.query(`UPDATE pending_actions SET status='done',result=$2,error=NULL WHERE id=$1 AND status IN ('running','done')`, [row.operationId, { id: row.receipt!.providerObjectId }])
     return { status: row.status === 'succeeded' ? 'done' as const : 'running' as const, error: row.status === 'succeeded' ? null : 'operationUncertain' }
+  }
+  async function execute(p: Proposal, actor?: WriteActor) {
+      const run = p.operationBinding.run
+      const guard = actor && run && context.guardForRun ? context.guardForRun({ ownerId: p.userId, botId: run.botId, workspaceId: run.workspaceId, runId: run.runId }) : context.guard
+      if (run?.workspaceId && !guard) throw new OperationError('writePolicyUnavailable')
+      const authorize = run ? withWritePolicy(current, async (tx, binding, runId, phase) => { if (!actor) throw new OperationError('writeApprovalRequired'); await current(tx, binding, runId, phase) }, { allowCompleted: Boolean(actor) }) : current
+      if (!actor && !run) throw new OperationError('operationAuthorizationRequired')
+      const ledger = createOperationLedger(pool, actor ? withOperationSession(actor, authorize) : authorize, { ...context, guard })
+      const row = await ledger.reserve(intent(p))
+      if (row.status !== 'reserved') {
+        if (row.status === 'succeeded') return project(row)
+        // A concurrent approval is not proof the first caller crashed. Negative
+        // lookup must not invalidate its claim before invocation starts.
+        const evidence = await bounded(() => provider.lookup({ ownerId: p.userId, accountId: p.operationBinding.accountId, idempotencyKey: row.idempotencyKey }), context.signal)
+        if (!evidence) return project(row)
+        return project(await ledger.reconcile(identity(p), async () => evidence))
+      }
+      let claimed: OperationRecord
+      try { claimed = await ledger.claim(identity(p), run?.runId ?? randomUUID()) }
+      catch (error) {
+        if (error instanceof OperationError && error.message === 'operationAlreadyClaimed') return project(await ledger.read(identity(p)))
+        throw error
+      }
+      try {
+        const result = await ledger.invoke(identity(p), claimed.attemptToken!, (record, beforeSend, leaseSignal) => bounded(signal => provider.execute({ signal: AbortSignal.any([signal, leaseSignal]), beforeSend, ownerId: p.userId, ...p.operationBinding, payload: p.input, approvalContext: p.context, idempotencyKey: record.idempotencyKey }), context.signal))
+        return project(result)
+      } catch {
+        // The durable invoke gate survives provider/writeback failures. Never resend.
+        return { status: 'running' as const, error: 'operationUncertain' }
+      }
   }
   return {
     async view(actor: { userId: string; sessionId: string }, id: string): Promise<ApprovedWriteView> {
@@ -141,6 +171,52 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         return { status: 'awaiting_approval', actionId: id }
       })
     },
+    async proposeFromRun(raw: unknown, intentKey: string) {
+      const run = context.modelRun
+      if (!run || (run.workspaceId && !context.guard)) throw new OperationError('writePolicyUnavailable')
+      const key = z.uuid().parse(intentKey).toLowerCase()
+      const input = parseWriteInput(action, raw)
+      if (!input) throw new OperationError('invalidIntegrationInput')
+      const hash = digest(input)
+      const locked = <T>(work: (tx: PoolClient) => Promise<T>) => transaction(async tx => {
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['approved-write-intent', run.ownerId, key])])
+        return work(tx)
+      })
+      const prior = async (tx: PoolClient) => {
+        const rows = await tx.query<Proposal>('SELECT * FROM pending_actions WHERE "userId"=$1 AND lower("intentKey")=$2', [run.ownerId, key])
+        if (rows.rows.length > 1) throw new OperationError('operationIntentAmbiguous')
+        const p = rows.rows[0]
+        if (p && (p.action !== action || p.operationBinding?.payloadDigest !== hash || p.operationBinding?.run?.runId !== run.runId || p.operationBinding.run.botId !== run.botId || p.operationBinding.run.workspaceId !== run.workspaceId)) throw new OperationError('operationBindingConflict')
+        return p ?? null
+      }
+      let proposal = await locked(prior)
+      if (!proposal) {
+        // Check authorization before provider metadata and recheck under the insert lock.
+        const first = await transaction(tx => lockWritePolicy(tx, { ...run, action }))
+        if (first.decision === 'deny') throw new OperationError('writeDenied')
+        const selected = await bounded(() => provider.prepare(run.ownerId, input), context.signal)
+        proposal = await locked(async tx => {
+          const existing = await prior(tx)
+          if (existing) return existing
+          const policy = await lockWritePolicy(tx, { ...run, action })
+          if (policy.version !== first.version || policy.decision !== first.decision) throw new OperationError('writePolicyChanged')
+          if (policy.decision === 'deny') throw new OperationError('writeDenied')
+          if (policy.decision === 'ask') {
+            await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['approved-write-pending-owner', run.ownerId])])
+            const count = await tx.query(`SELECT count(*) FROM pending_actions WHERE "userId"=$1 AND status='pending' AND "createdAt">clock_timestamp()-interval '7 days'`, [run.ownerId])
+            if (Number(count.rows[0].count) >= 20) throw new OperationError('tooManyPendingActions')
+          }
+          const binding = bindingSchema.parse({ ...prepareWriteBinding(provider.name, selected, input), run: { runId:run.runId, botId:run.botId, workspaceId:run.workspaceId, policyVersion:policy.version, decision:policy.decision } })
+          const id = randomUUID(), status = policy.decision === 'allow' ? 'running' : 'pending'
+          const inserted = await tx.query<Proposal>('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding",context,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [id, run.ownerId, action, input, key, binding, selected.context ?? null, status])
+          return inserted.rows[0]
+        })
+      }
+      if (proposal.status === 'pending') return { status:'awaiting_approval' as const, actionId:proposal.id }
+      if (proposal.status === 'declined') return { status:'declined' as const, actionId:proposal.id }
+      if (proposal.operationBinding.run?.decision !== 'allow') return { status:proposal.status, actionId:proposal.id }
+      return { ...(await execute(proposal)), actionId:proposal.id }
+    },
     async decide(actor: { userId: string; sessionId: string }, id: string, approve: boolean) {
       z.uuid().parse(id)
       // All paths use ledger -> session -> proposal. Revocation waits for an
@@ -159,6 +235,12 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
           return null
         }
         const row = await owned(tx, actor.userId, id)
+        if (row.operationBinding.run) {
+          const r = row.operationBinding.run
+          const policy = await lockWritePolicy(tx, { ownerId:actor.userId, botId:r.botId, workspaceId:r.workspaceId, runId:r.runId, action }, { allowCompleted:true })
+          if (policy.decision === 'deny') throw new OperationError('writeDenied')
+          if (policy.version !== r.policyVersion || policy.decision !== r.decision) throw new OperationError('writePolicyChanged')
+        }
         await requireOperationSession(tx, actor, actor.userId)
         const valid = await tx.query(`SELECT id FROM pending_actions WHERE id=$1 AND (status IN ('running','done') OR "createdAt">clock_timestamp()-interval '7 days')`, [id])
         if (!valid.rows.length) throw new OperationError('pendingActionUnavailable')
@@ -167,29 +249,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         return row
       }, actor)
       if (!p) return { status: 'declined' as const, error: null }
-      const ledger = createOperationLedger(pool, withOperationSession(actor, current), context)
-      const row = await ledger.reserve(intent(p))
-      if (row.status !== 'reserved') {
-        if (row.status === 'succeeded') return project(row)
-        // A concurrent approval is not proof the first caller crashed. Negative
-        // lookup must not invalidate its claim before invocation starts.
-        const evidence = await bounded(() => provider.lookup({ ownerId: p.userId, accountId: p.operationBinding.accountId, idempotencyKey: row.idempotencyKey }), context.signal)
-        if (!evidence) return project(row)
-        return project(await ledger.reconcile(identity(p), async () => evidence))
-      }
-      let claimed: OperationRecord
-      try { claimed = await ledger.claim(identity(p), randomUUID()) }
-      catch (error) {
-        if (error instanceof OperationError && error.message === 'operationAlreadyClaimed') return project(await ledger.read(identity(p)))
-        throw error
-      }
-      try {
-        const result = await ledger.invoke(identity(p), claimed.attemptToken!, (record, beforeSend) => bounded(signal => provider.execute({ signal, beforeSend, ownerId: p.userId, ...p.operationBinding, payload: p.input, approvalContext: p.context, idempotencyKey: record.idempotencyKey }), context.signal))
-        return project(result)
-      } catch {
-        // The durable invoke gate survives provider/writeback failures. Never resend.
-        return { status: 'running' as const, error: 'operationUncertain' }
-      }
+      return execute(p, actor)
     },
   }
 }

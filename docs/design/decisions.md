@@ -8,11 +8,23 @@ rule id here.
 
 Newest first.
 
+## MVP decisions awaiting Alex
+
+| Date | Proposal | Status / behavior until confirmed |
+| --- | --- | --- |
+| 2026-10-28 | ~~Proposed public daemon name and release workflow.~~ See the approved decision below. | Superseded; no npm publication has been performed. |
+| 2026-10-28 | Replace the Vercel-incompatible SSH setup dialog with three online commands (install, browser login, start), using the current origin plus base path. Add a web code-review page that approves or denies only the initiating daemon's device grant. | **待 Alex 确认**. Existing accepted Figma frames do not cover these views; review frames are prepared before implementation and linked from `daemon-connection.md`. |
+
 ## Decided
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
 | 2026-10-29 | Connect Linear sync to one PostHog feature flag and leave it off (Alex: 「那你Linear同步接一下posthog」「关掉这个feature」). Pausing covers backend intake, cron, dispatch, claims and settings polling; preserve connections, queued work and existing data. Settings show only the paused state | `../linear-sync.md`, R-40 | Per-team pause as a substitute for global disablement |
+| 2026-10-28 | Alex approved a manual, main-only GitHub Actions release with npm trusted publishing and provenance, per-repository push approval in the owner's conversation, and a draft PR marked unverified when no verification command ran. The initial `@mikka/daemon` package name was superseded by the single-install direction below. Source: “上面的请求全部允许”. Trusted publisher configuration and fixed-Preview acceptance remain outstanding. | | MVP proposals above and run-publication proposals below |
+| 2026-10-28 | Alex requested one installation and one `mikka` command, with the daemon as a subcommand: “如果说可以一起的话，最好一起吧，懒得弄两次”. The release candidate is `@aspectlylabs/mikka`; npm organization ownership and trusted publishing must be verified before publication. | | Initial `@mikka/daemon` public-name decision |
+| 2026-10-27 | A thread's owner stops it from the shared composer; the draft stays editable. Stop status appears immediately in the thread and the task's thread list. After about 30 seconds without acknowledgement, show an error and retry. Source: Alex's MVP core-loop brief, item 1 (#357). Existing accepted panel frames are `220:5314` / `220:5199`; [light/dark/narrow stop and timeout review](https://www.figma.com/design/zPe5LKycb2XuT1ivCLRw07?node-id=372-4786) is prepared. These new states remain **待 Alex 确认**; real Preview screenshots are still pending. | R-10, R-62 | PR #336's disabled composer while stopping and unbounded acknowledgement wait |
+| 2026-10-28 | Status badges and status pickers have no stroke: a tinted fill only (`statusTones`), following the no-strokes request for secondary buttons. Covers `Badge tone=` (for example the PR state badges) and the `BadgeButton` status and priority pickers; neutral uses the grey control fill | R-31, R-34 | Tinted fill + tinted stroke |
+| 2026-10-28 | Secondary buttons are a grey fill with no border, app-wide, like the 「Add folder…」 button in Claude desktop's settings (light grey pill on a white panel, no outline). Applies everywhere, not only settings | R-31 | White-fill outline buttons with a border (shadcn `outline`) |
 | 2026-10-28 | UI v9 approved by Alex (brief and Figma frames F1–F10, page `395:15023`). Copy is Chinese-first; 「Artifact」 is never translated; 资料库 = library; the right panel's 任务 tab is renamed 线程. 浏览器 (local, app-wide, top-bar globe) is distinct from 电脑 (a bot's cloud computer, a panel tab) | R-43, R-57, R-72, glossary | 任务 as the panel's thread label |
 | 2026-10-28 | Icon rail, in order: 主页 (House), 建议 (Lightbulb), 看板 (Columns3), 插件 (unchanged), Artifact. Artifact uses Mikka's own icon (two tilted upright rounded cards, Figma `icon/artifact`), not lucide Copy or Library. The browser is an icon-only globe toggle at the right of the top bar, no 「浏览器」 text; when on it opens a right column, and an annotated element goes into the current composer as a 「1 · <element> · <action> · <note>」 chip | R-35, R-56, R-57, R-71 | 建议 as an inbox icon (2026-10-27) |
 | 2026-10-28 | Right panel: pills 概览 (default) / 全部线程 switch only the right column, the centre chat stays. 概览 = bot avatar and name, then 详情 / 线程 / PR / 电脑; the header does not show 「<Bot 名> 的屏幕」, and 电脑 keeps the existing `AgentComputer` view. 线程 lists only the threads this bot dispatched. 全部线程 lists every bot's threads with a 16px bot avatar and a relative time per row. The panel is read-only: no 让它安排, 新建 or 上传; besides navigation the only control is 展开; routines come from chat, files from the composer's 「+」 | R-01, R-02, R-17, R-50, R-51 | 详情 header with 「<Bot 名> 的屏幕」 (2026-10-24 21:13); 建议 + 任务 panel (2026-10-24 21:57); threads never shown with a bot avatar, for 全部线程 only (2026-10-27) |
@@ -127,9 +139,15 @@ Questions waiting on Alex. Move a row to "Decided" when he answers.
 
 | Since | Question | Default until answered |
 | --- | --- | --- |
+| 2026-10-28 | 待 Alex 确认：本机线程只接受可 clone 的远程仓库；没有 origin 的本地仓库不支持。来源：核心闭环 MVP 第 3 项。 | 按请求的 remote URL 在 daemon 缓存中 clone；不读取本地 checkout。 |
+| 2026-10-28 | 待 Alex 确认：线程看不到用户 checkout 里未提交的改动。来源：核心闭环 MVP 第 3 项。 | 每个线程从远程分支建立独立 worktree；用户先提交并推送需要带入的改动。 |
 | 2026-10-24 | Remove white hairlines app-wide (dialog and popover rings, column borders), not only inputs? | Inputs only |
 | 2026-10-24 | Token drift between Figma and code (`rules.md` § Tokens): which side moves? | Code value ships, Figma follows |
 | 2026-10-28 | How does a group chat lay out in the v9 right panel (概览 tabs, 全部线程)? | Keep the 2026-10-25 group 详情 (R-13) |
+| 2026-10-28 | 待 Alex 确认: a thread's screenshots and recordings are evidence kept with the thread, not artifacts: own table, no card in the chat, no Coordinator wake; the acceptance view (Figma waiting on approval) will show them | Built that way (`docs/mcp.md` § Run captures) |
+| 2026-10-28 | 待 Alex 确认: only the thread's owner sees its captures, as its content (R-62); share links work as artifact links | Owner only, links as artifacts |
+| 2026-10-28 | 待 Alex 确认: cloud computer captures need no per-call approval (the image never goes to the model), but are refused while the person holds the desktop or the workspace turned computers off. A recording already going keeps going if the person takes over | No approval; refused while held; a running recording continues |
+| 2026-10-28 | 待 Alex 确认: limits: images 10 MB, videos 100 MB; one recording per thread, 120 s by default and at most 300 s, 10 fps MP4; the run's end stops and keeps it | These limits |
 
 
 ## 2026-10-25: Retire standalone Agent generation
@@ -146,3 +164,17 @@ not a shell/layout redesign; source correction: Alex 2026-10-25 23:40 UTC.
 GitHub repository access is individual: each person authorizes their own GitHub
 account and App installation. A linked PR's displayed state follows GitHub; Mikka
 does not close or reopen it. Existing manually shared task links remain shared.
+## MVP result closure · 2026-10-28
+
+R-66 implementation review frame, **待 Alex 确认** (not accepted):
+[Thread result cards, light/dark/narrow](https://www.figma.com/design/zPe5LKycb2XuT1ivCLRw07?node-id=356-4750).
+Status icon, thread title and real PR output chips only; no avatar or progress
+line. Show at most two PRs and fold additional or non-fitting outputs into `+N`.
+Use the existing Lucide icons and GitHub [Primer color states](https://primer.style/product/primitives/color/)
+through dedicated theme tokens, including draft gray and merged purple.
+
+| Status | Proposed decision | Behavior until Alex confirms |
+| --- | --- | --- |
+| 2026-10-28 · 已确认 | Repository push approval belongs to the signed-in repository owner and is requested in that person's chat. Approval follows `(userId, remoteKey)` across devices; it is not a device setting or a model decision. | No automatic approval. The existing confirmation card shows the repository and permission; the authenticated backend records owner/time and claim sends the snapshot. Revocation prevents later claims and PR creation. Fixed-Preview acceptance remains outstanding. |
+| 2026-10-28 · 已确认 | A submitted thread without a configured repository verification command may commit and push after explicit repository approval, then open a **draft** PR for human review. It retains `verify: not_run`; only an approved, matching, actually pushed unverified result may be `succeeded`, meaning handed in for review, never verification passed. Without that push it remains stopped and unverified, with no automatic task review transition. An unverified continuation converts its own task-marked open PR to draft; a closed/merged PR is never reopened automatically. Failed verification cannot publish. | Coordinator explicitly reports “未配置验证，草稿 PR 待人工检查” when the server confirms a draft; otherwise it reports the blocked/unverified result without inventing a PR. No command such as `true` is inserted and no test pass is fabricated. |
+| 待 Alex 确认 | Server PR creation uses a live-verified GitHub identity linked to the same Mikka user, plus an installation of the Mikka GitHub App with repository access. A Google-only session needs that GitHub connection before the server can open its PR. | Existing login methods remain unchanged. Missing linked identity, installation or permission is reported as incomplete setup; no App credential is borrowed from another owner. |

@@ -63,7 +63,7 @@ const result = () =>
     usage: { input_tokens: 10, output_tokens: 5 },
   })
 
-out({ type: "system", subtype: "init", cwd: process.cwd() })
+out({ type: "system", subtype: "init", cwd: process.cwd(), ...(flag("--model") === "delayed-requested" ? {} : { model: "observed:root-model" }) })
 if (flag("--resume")) text(`resumed ${sessionId}`)
 
 let release = null
@@ -83,6 +83,30 @@ lines.on("line", async (line) => {
   const asked = JSON.parse(line)?.message?.content?.[0]?.text
   if (typeof asked !== "string") return
   const message = asked
+  const captureApprovals = {
+    CAPTURE_SCREENSHOT_APPROVAL_TEST: ['mcp__mikka_computer__capture_screenshot', { title: 'Synthetic evidence' }],
+    START_RECORDING_APPROVAL_TEST: ['mcp__mikka_computer__start_screen_recording', { title: 'Synthetic flow', maxSeconds: 5 }],
+    STOP_RECORDING_APPROVAL_TEST: ['mcp__mikka_computer__stop_screen_recording', {}],
+    SUBMIT_CAPTURE_APPROVAL_TEST: ['mcp__mikka__submit_capture', { title: 'Synthetic local evidence', path: 'evidence.png' }],
+  }
+  if (['APPROVAL_TEST', 'COMPUTER_APPROVAL_TEST', 'UNKNOWN_COMPUTER_APPROVAL_TEST'].includes(message) || Object.hasOwn(captureApprovals, message)) {
+    // Fixed callback fixtures only: these never invoke an MCP computer tool.
+    const toolName = captureApprovals[message]?.[0] ?? (message === 'APPROVAL_TEST' ? 'Bash'
+      : message === 'COMPUTER_APPROVAL_TEST' ? 'mcp__mikka_computer__click'
+      : 'mcp__mikka_computer__arbitrary_tool')
+    const input = captureApprovals[message]?.[1] ?? (message === 'APPROVAL_TEST' ? { command: 'synthetic' } : { x: 1, y: 2 })
+    const approval = (toolUseId) => new Promise(resolve => {
+      const request_id = `approval-${++sdkId}`
+      sdkReplies.set(request_id, resolve)
+      out({ type: 'control_request', request_id, request: { subtype: 'can_use_tool', tool_name: toolName, input, tool_use_id: toolUseId } })
+    })
+    const toolUseId = `synthetic-approval-${sessionId}`
+    const first = await approval(toolUseId)
+    const replay = await approval(toolUseId)
+    text(JSON.stringify({ first, replay }))
+    result()
+    return
+  }
   if (message === 'COMPUTER_CONFIG_TEST') {
     text(JSON.stringify({ computer: mcpServers.mikka_computer ?? null }))
     result()
@@ -157,7 +181,14 @@ lines.on("line", async (line) => {
     return
   }
   if (message.includes("MODEL")) {
+    if (message.includes("DELAYED")) {
+      await new Promise(resolve => setTimeout(resolve, 50))
+      out({ type: "assistant", parent_tool_use_id: null,
+        message: { id: "delayed-root", model: "observed:delayed-model", content: [{ type: "text", text: "root output" }] } })
+    }
     text(`model: ${flag("--model") ?? "none"}`)
+    if (message.includes("SUBAGENT")) out({ type: "assistant", parent_tool_use_id: "child-tool",
+      message: { id: "child-model", model: "observed:subagent-model", content: [{ type: "text", text: "child output" }] } })
     result()
     return
   }

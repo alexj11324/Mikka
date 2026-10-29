@@ -126,7 +126,7 @@ test.beforeAll(async () => {
   const boundaryTeam = randomUUID()
   await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",email,name,role,status) values ($1,$2,$3,$2,\'member\',\'active\')', [workspace, outsider, `${outsider}@example.invalid`])
   await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Search thread boundary\',\'STB\')', [boundaryTeam, workspace, owner])
-  await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'todo\',\'none\',\'workspace\')', [boundary.issue, owner, `${prefix}-thread-boundary`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 133 } } })])
+  await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'todo\',\'normal\',\'workspace\')', [boundary.issue, owner, `${prefix}-thread-boundary`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 133 } } })])
   await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [boundary.issue, boundaryTeam, workspace, owner])
   await pool.query('insert into agents (id,"userId",harness,name,instructions) values ($1,$2,\'codex\',\'BOUNDARY_PRIVATE_AGENT\',\'BOUNDARY_PRIVATE_INSTRUCTIONS\')', [boundary.agent, outsider])
   await pool.query('insert into agent_runs (id,"userId","issueId","agentId",status,prompt,report) values ($1,$2,$3,$4,\'running\',\'BOUNDARY_PRIVATE_PROMPT\',$5)', [boundary.run, outsider, boundary.issue, boundary.agent, JSON.stringify({ summary: 'BOUNDARY_PRIVATE_REPORT' })])
@@ -154,14 +154,14 @@ test.beforeAll(async () => {
   }
   const foreignTeam = randomUUID(), ownedLinkedTask = randomUUID()
   await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Synthetic foreign team\',\'S131\')', [foreignTeam, otherWorkspace, outsider])
-  await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'todo\',\'none\',\'workspace\')', [ownedLinkedTask, owner, `${prefix}-owner-policy`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 132 } } })])
+  await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'todo\',\'normal\',\'workspace\')', [ownedLinkedTask, owner, `${prefix}-owner-policy`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 132 } } })])
   await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [ownedLinkedTask, foreignTeam, otherWorkspace, owner])
   // Neither body nor prompt is a searchable source, even in an accessible container.
   await pool.query('insert into conversation_messages (id,"conversationId",position,"authorType","authorId",body) values ($1,$2,1,\'user\',$3,$4)', [randomUUID(), groupIds[0], owner, `${prefix}-body-secret`])
   const history = randomUUID()
   await pool.query('insert into agent_sessions (id,"userId",title) values ($1,$2,\'unrelated title\')', [history, owner])
   await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,$4,$4,\'complete\',$5)', [randomUUID(), history, owner, `${prefix}-body-secret`, randomUUID()])
-  for (const user of [owner, outsider]) await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'todo\',\'none\',\'personal\')', [randomUUID(), user, `${prefix}-task`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 131 } } })])
+  for (const user of [owner, outsider]) await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'todo\',\'normal\',\'personal\')', [randomUUID(), user, `${prefix}-task`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 131 } } })])
   if (process.env.SITE_SEARCH_REQUIRE_DUAL_PG === '1') {
     expect((await pool.query('select count(*)::int n from mikka_workspace_members where "userId"=$1', [owner])).rows[0].n).toBe(0)
     expect((await workspacePool.query('select count(*)::int n from agent_sessions where "userId"=$1', [owner])).rows[0].n).toBe(0)

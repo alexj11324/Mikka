@@ -2,6 +2,7 @@ export const COMPOSIO_AUTH_CALLBACK_PATH = '/api/integrations/composio/callback'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const internalOrigin = 'https://mikka.invalid'
+const PLUGIN_APPS: readonly string[] = ['gmail', 'googlecalendar', 'notion', 'slack']
 
 function hasOnlyQueryKeys(url: URL, allowed: readonly string[]) {
   const entries = [...url.searchParams.entries()]
@@ -20,11 +21,21 @@ export function safeAuthReturn(value?: string) {
   if (url.origin !== internalOrigin || url.hash) return '/'
   if (/^\/invite\/[a-f0-9]{64}$/.test(url.pathname) && !url.search) return url.pathname
   if (url.pathname === '/devices' && !url.search) return '/devices'
+  if (url.pathname === '/device') {
+    const code = url.searchParams.get('user_code')
+    return hasOnlyQueryKeys(url, ['user_code']) && (code === null || /^[A-Z0-9-]{4,32}$/.test(code))
+      ? `${url.pathname}${url.search}` : '/'
+  }
   if (/^\/w\/[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])$/.test(url.pathname) && !url.search) return url.pathname
   if (url.pathname === '/workspaces/new' && !url.search) return '/workspaces/new'
   if (url.pathname === COMPOSIO_AUTH_CALLBACK_PATH && !url.search) return COMPOSIO_AUTH_CALLBACK_PATH
 
   if (url.pathname === '/') {
+    // The plugins page and one app's page there (?section=plugins&app=gmail).
+    const app = url.searchParams.get('app')
+    if (url.searchParams.get('section') === 'plugins' && hasOnlyQueryKeys(url, ['section', 'app'])) {
+      return app === null ? '/?section=plugins' : PLUGIN_APPS.includes(app) ? `/?section=plugins&app=${app}` : '/'
+    }
     const issue = url.searchParams.get('issue')
     return hasOnlyQueryKeys(url, ['issue']) && issue && uuidPattern.test(issue) ? `/?issue=${issue}` : value === '/' ? '/' : '/'
   }

@@ -7,9 +7,12 @@ import { ArrowUpRight, Puzzle, Search } from 'lucide-react'
 
 import { Link } from '@/i18n/navigation'
 import { withBasePath } from '@/lib/base-path'
+import { cn } from '@/lib/utils'
+import type { ComposioAppId } from '@/lib/composio-accounts'
 import type { SkillsSearchResult } from '@/lib/skills-search'
-import { IntegrationsSettings } from '@/components/settings/integrations-settings'
+import { ConnectedAppDetail, ConnectedAppsList, ConnectedAppsStatus, isComposioAppId, useConnectedApps, usePluginHref } from '@/components/plugins/connected-apps'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
+import { IntegrationsSettings } from '@/components/settings/integrations-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { Frame, FramePanel } from '@/components/reui/frame'
 import { IconTile } from '@/components/reui/icon-tile'
@@ -32,6 +35,27 @@ async function fetchSkills([path, query]: readonly [string, string]): Promise<Sk
 export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean }) {
   const t = useTranslations('Plugins')
   const [tab, setTab] = useState<'plugins' | 'skills'>('plugins')
+  const tApps = useTranslations('Settings.integrations')
+  const apps = useConnectedApps()
+  const pluginHref = usePluginHref()
+  // The open app's page is in the URL (?section=plugins&app=gmail), so back,
+  // reload and shared links land on it.
+  const [app, setApp] = useState<ComposioAppId | null>(null)
+  useEffect(() => {
+    const read = () => { const value = new URL(window.location.href).searchParams.get('app'); setApp(isComposioAppId(value) ? value : null) }
+    read()
+    window.addEventListener('popstate', read)
+    return () => window.removeEventListener('popstate', read)
+  }, [])
+  function openApp(next: ComposioAppId | null) {
+    const url = new URL(window.location.href)
+    url.searchParams.set('section', 'plugins')
+    if (next) url.searchParams.set('app', next)
+    else url.searchParams.delete('app')
+    window.history.pushState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    setApp(next)
+    if (next) setTab('plugins')
+  }
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const trimmedQuery = query.trim()
@@ -56,20 +80,28 @@ export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean })
         <Tabs value={tab} onValueChange={value => {
           if (value === 'plugins' || value === 'skills') setTab(value)
         }}>
-          <TabsList variant="line">
+          <TabsList variant="line" className={cn(app && 'hidden')}>
             <TabsTrigger value="plugins">{t('pluginsTab')}</TabsTrigger>
             <TabsTrigger value="skills">{t('skillsTab')}</TabsTrigger>
           </TabsList>
           <TabsContent value="plugins" className="flex flex-col gap-6 pt-4">
-            <SettingsSection id="agent-runtime-heading" title={t('agentRuntime')}>
-              <SettingRow title={t('agentDevices')} description={t('agentRuntimeDescription')}>
-                <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/devices" />}>
-                  {t('manageDevices')}
-                </Button>
-              </SettingRow>
-            </SettingsSection>
-            <GoogleSignInSettings googleEnabled={googleEnabled} />
-            <IntegrationsSettings showWebhookDetails={false} />
+            {!app && <>
+              <SettingsSection id="agent-runtime-heading" title={t('agentRuntime')}>
+                <SettingRow title={t('agentDevices')} description={t('agentRuntimeDescription')}>
+                  <Button variant="secondary" size="sm" nativeButton={false} render={<Link href="/devices" />}>
+                    {t('manageDevices')}
+                  </Button>
+                </SettingRow>
+              </SettingsSection>
+              <GoogleSignInSettings googleEnabled={googleEnabled} />
+              <IntegrationsSettings showWebhookDetails={false} showConnectedApps={false} />
+            </>}
+            {app
+              ? <ConnectedAppDetail apps={apps} app={app} rootLabel={t('pluginsTab')} rootHref={pluginHref(null)} onBack={() => openApp(null)} />
+              : <ConnectedAppsList apps={apps} title={tApps('heading')} appHref={pluginHref} onOpen={openApp} action={
+                <Button variant="ghost" size="sm" nativeButton={false} role="link" render={<Link href="/settings?section=integrations" />}>{tApps('openInSettings')}</Button>
+              } />}
+            <ConnectedAppsStatus apps={apps} />
           </TabsContent>
           <TabsContent value="skills" className="flex flex-col gap-5 pt-4">
             <div className="flex flex-col gap-3">
@@ -96,7 +128,7 @@ export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean })
                   <EmptyDescription>{t('loadFailedDescription')}</EmptyDescription>
                 </EmptyHeader>
                 <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => void mutate()}>{t('retry')}</Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => void mutate()}>{t('retry')}</Button>
                 <Button variant="ghost" size="sm" nativeButton={false} render={<a href="https://skills.sh/" target="_blank" rel="noopener noreferrer" />}>
                     {t('browseSkills')}<ArrowUpRight data-icon="inline-end" />
                   </Button>

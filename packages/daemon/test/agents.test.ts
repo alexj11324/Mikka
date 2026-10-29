@@ -52,10 +52,10 @@ function mcpClient(handoff: string) {
     request(method: string, params?: unknown) {
       const current = ++id
       child.stdin.write(
-        `${JSON.stringify({ jsonrpc: "2.0", id: current, method, params })}\n`
+        `${JSON.stringify({ jsonrpc: "2.0", id: current, method, params })}\n`,
       )
       return new Promise<Record<string, unknown>>((resolve) =>
-        waiting.set(current, resolve as (value: unknown) => void)
+        waiting.set(current, resolve as (value: unknown) => void),
       )
     },
     close: () => child.kill(),
@@ -86,6 +86,7 @@ describe("mikka MCP server", () => {
       }
       expect(list.result.tools.map((t) => t.name)).toEqual([
         "submit",
+        "request_help",
         "ask_human",
         "report_blocked",
       ])
@@ -155,6 +156,22 @@ describe("mikka MCP server", () => {
         stopReason: "asked_human",
         report: { openQuestions: ["Which color?"] },
       })
+      const questionId = ctx.readHandoff()?.report?.question?.questionId
+      expect(questionId).toEqual(expect.any(String))
+      await client.request("tools/call", {
+        name: "ask_human",
+        arguments: { question: "Which color?" },
+      })
+      expect(ctx.readHandoff()?.report?.question?.questionId).toBe(questionId)
+      ctx.clearHandoff()
+      await client.request("tools/call", {
+        name: "request_help",
+        arguments: { question: "Which existing API should I use?" },
+      })
+      expect(ctx.readHandoff()?.report?.question).toMatchObject({
+        kind: "context",
+        question: "Which existing API should I use?",
+      })
       const unknown = await client.request("tools/call", { name: "rm_rf" })
       expect(unknown).toHaveProperty("error")
     } finally {
@@ -177,7 +194,12 @@ describe("run context", () => {
     const policy = ctx.policy()
     expect(policy).toMatchObject({
       allowWrite: [ctx.worktree, ctx.runDir, "/tmp/codex-auth.json"],
-      denyWrite: [join(ctx.worktree, ".git")],
+      denyWrite: [
+        join(ctx.worktree, ".git"),
+        join(ctx.gitDir, "commondir"),
+        join(ctx.gitDir, "gitdir"),
+        join(ctx.gitDir, "config.worktree"),
+      ],
       allowDomains: [
         "openai.com",
         "*.openai.com",
@@ -197,7 +219,7 @@ describe("run context", () => {
         join(home, ".ssh"),
         join(home, ".aws"),
         join(home, ".claude/.credentials.json"),
-      ])
+      ]),
     )
     // Codex still reads its own login; the others never see it.
     expect(policy.denyRead).not.toContain(join(home, ".codex/auth.json"))
@@ -218,7 +240,7 @@ describe("run context", () => {
     expect(policy.allowWrite).not.toContain(ctx.worktree)
     expect(policy.allowWrite).toEqual([ctx.runDir])
     expect(policy.denyWrite).toEqual(
-      expect.arrayContaining([ctx.worktree, join(ctx.worktree, ".git")])
+      expect.arrayContaining([ctx.worktree, join(ctx.worktree, ".git")]),
     )
     // Its instructions say so, so the agent does not try.
     expect(ctx.instructions()).toContain("read-only check")
@@ -233,7 +255,7 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
     command: string,
     allowWrite: string[],
     domains: string[] = [],
-    extra: Pick<SandboxPolicy, "denyWrite" | "denyRead"> = {}
+    extra: Pick<SandboxPolicy, "denyWrite" | "denyRead"> = {},
   ) {
     const wrapped = await sandbox.wrap(["/bin/sh", "-c", command], {
       allowWrite,
@@ -262,7 +284,7 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
     expect(readFileSync(join(inside, "a.txt"), "utf8")).toBe("hi\n")
     const denied = await run(
       `echo hi > ${shellQuote(join(outside, "b.txt"))}`,
-      [inside]
+      [inside],
     )
     expect(denied.exitCode).not.toBe(0)
     expect(existsSync(join(outside, "b.txt"))).toBe(false)
@@ -280,14 +302,14 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
       `echo 'gitdir: /evil' > ${shellQuote(join(inside, ".git"))}`,
       [inside],
       [],
-      policy
+      policy,
     )
     expect(write.exitCode).not.toBe(0)
     const remove = await run(
       `rm -f ${shellQuote(join(inside, ".git"))}`,
       [inside],
       [],
-      policy
+      policy,
     )
     expect(remove.exitCode).not.toBe(0)
     expect(readFileSync(join(inside, ".git"), "utf8")).toBe("gitdir: /real\n")
@@ -311,7 +333,7 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
       `echo nope > ${shellQuote(target)}`,
       policy.allowWrite,
       [],
-      { denyWrite: policy.denyWrite }
+      { denyWrite: policy.denyWrite },
     )
     expect(write.exitCode).not.toBe(0)
     expect(existsSync(target)).toBe(false)
@@ -320,7 +342,7 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
       `cat ${shellQuote(join(ctx.worktree, "README.md"))}`,
       policy.allowWrite,
       [],
-      { denyWrite: policy.denyWrite }
+      { denyWrite: policy.denyWrite },
     )
     expect(read.exitCode).toBe(0)
     // Its own handoff still lands: the run dir stays writable.
@@ -328,7 +350,7 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
       `echo ok > ${shellQuote(join(ctx.runDir, "probe.txt"))}`,
       policy.allowWrite,
       [],
-      { denyWrite: policy.denyWrite }
+      { denyWrite: policy.denyWrite },
     )
     expect(handoff.exitCode).toBe(0)
   })
@@ -353,11 +375,11 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
     expect(ok.output).toContain("checked")
     expect(existsSync(join(worktree, "built.txt"))).toBe(true)
     const escape = await verify(
-      `echo x > ${shellQuote(join(worktree, ".git"))}`
+      `echo x > ${shellQuote(join(worktree, ".git"))}`,
     )
     expect(escape.exitCode).not.toBe(0)
     const secret = await verify(
-      `cat ${shellQuote(join(privateDir, "daemon.secret"))}`
+      `cat ${shellQuote(join(privateDir, "daemon.secret"))}`,
     )
     expect(secret.exitCode).not.toBe(0)
     expect(secret.output).not.toContain("hunter2")
@@ -401,11 +423,11 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
     async () => {
       const nested = await run(
         `/usr/bin/sandbox-exec -p '(version 1)(allow default)' /bin/echo nested`,
-        [tempDir("orvs-")]
+        [tempDir("orvs-")],
       )
       expect(nested.exitCode).not.toBe(0)
       expect(nested.stderr).toMatch(/sandbox_apply/)
-    }
+    },
   )
 
   it.skipIf(!process.env.MIKKA_NETWORK_TESTS)(
@@ -415,7 +437,7 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
         run(
           `curl -sS -o /dev/null -w '%{http_code}' --max-time 15 ${url}`,
           [tempDir("orvs-")],
-          domains
+          domains,
         )
       const allowed = await curl("https://api.anthropic.com/", [
         "api.anthropic.com",
@@ -423,7 +445,7 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
       expect(allowed.stdout).toMatch(/^[2-4]\d\d$/)
       const blocked = await curl("https://example.com/", ["api.anthropic.com"])
       expect(blocked.stdout).not.toMatch(/^2\d\d$/)
-    }
+    },
   )
 })
 
@@ -463,7 +485,7 @@ describe("publish", () => {
     await execa(
       "git",
       ["worktree", "add", "-q", "-b", `mikka/run-${runId}`, worktree],
-      { cwd: repo }
+      { cwd: repo },
     )
     return worktree
   }
@@ -471,7 +493,7 @@ describe("publish", () => {
   async function snapshotAndPublish(
     repo: string,
     worktree: string,
-    options: { runId: string; summary: string; approved: boolean }
+    options: { runId: string; summary: string; approved: boolean },
   ) {
     const tree = await snapshotTree(repo, worktree)
     return publishRun({
@@ -548,11 +570,11 @@ describe("publish", () => {
     const branch = await execa(
       "git",
       ["rev-parse", "refs/heads/mikka/run-run-3"],
-      { cwd: repo }
+      { cwd: repo },
     )
     expect(branch.stdout).toBe(result.commit)
     expect(
-      (await execa("git", ["rev-parse", "HEAD"], { cwd: evil })).stdout
+      (await execa("git", ["rev-parse", "HEAD"], { cwd: evil })).stdout,
     ).toBe(evilHead)
     expect(existsSync(marker)).toBe(false)
   })
@@ -587,7 +609,7 @@ describe("publish", () => {
     const remote = await execa(
       "git",
       ["--git-dir", origin, "branch", "--list"],
-      { reject: false }
+      { reject: false },
     )
     expect(remote.stdout.trim()).toBe("")
   })
@@ -609,7 +631,7 @@ describe("publish", () => {
       worktree: string,
       runId: string,
       approved = true,
-      pushBranch = "mikka/orv-1"
+      pushBranch = "mikka/orv-1",
     ) {
       return publishRun({
         runId,
@@ -645,7 +667,7 @@ describe("publish", () => {
       // The local commit stays on the run's own branch, which is not pushed.
       expect(
         (await execa("git", ["rev-parse", "mikka/run-run-1"], { cwd: repo }))
-          .stdout
+          .stdout,
       ).toBe(first.commit)
       expect(await remoteRev(origin, "mikka/run-run-1")).toBeNull()
 
@@ -708,7 +730,7 @@ describe("publish", () => {
         ["push", "-q", origin, "main:refs/heads/mikka/orv-1"],
         {
           cwd: other,
-        }
+        },
       )
       const theirs = await remoteRev(origin, "mikka/orv-1")
       const worktree = await runWorktree(repo, "run-1")
@@ -739,7 +761,7 @@ describe("publish", () => {
 
   it("builds a commit message from the agent's summary", () => {
     expect(
-      commitMessage({ runId: "r", issueId: "i", summary: "  Fix bug  " })
+      commitMessage({ runId: "r", issueId: "i", summary: "  Fix bug  " }),
     ).toBe("mikka: Fix bug\n\nMikka-Run: r\nMikka-Issue: i")
   })
 })

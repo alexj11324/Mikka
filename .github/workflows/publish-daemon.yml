@@ -1,0 +1,43 @@
+name: Publish daemon (manual)
+
+# Manual main-only release. The npm trusted publisher must be configured
+# separately before this workflow can publish.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MIKKA_DAEMON_PACKAGE_NAME: '@aspectlylabs/mikka'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mikka/daemon typecheck
+      - name: Prepare pinned hosted-runner test image
+        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
+      - run: pnpm --filter @mikka/daemon test
+      - run: pnpm --filter @mikka/daemon build
+        id: daemon-package
+      - run: pnpm --filter @mikka/daemon test:package
+        env:
+          MIKKA_DAEMON_DIST_DIR: ${{ steps.daemon-package.outputs.package-directory }}
+      - name: Publish with npm trusted publishing and provenance
+        working-directory: ${{ steps.daemon-package.outputs.package-directory }}
+        run: npm publish --access public --provenance

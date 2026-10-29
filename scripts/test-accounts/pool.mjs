@@ -405,6 +405,7 @@ export class TestAccountPool {
     })
   }
 
+
   async release(lease, { outcome = 'clean' } = {}) {
     if (!['clean', 'dirty', 'cancelled'].includes(outcome)) fail('INVALID_REQUEST')
     return this.transaction(async client => {

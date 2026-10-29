@@ -22,10 +22,12 @@ async function createTask(page: Page, title: string, team?: string) {
   await teamSelect.click()
   await page.getByRole('option', { name: team, exact: true }).click()
   const save = page.getByRole('button', { name: '保存团队归属', exact: true })
-  // Moving a task between teams asks for confirmation first.
-  page.once('dialog', dialog => { void dialog.accept() })
+  // Saving an explicit local target does not ask for another approval.
+  const unexpectedDialog = (dialog: import('@playwright/test').Dialog) => { void dialog.dismiss(); throw new Error('Unexpected task-team confirmation') }
+  page.on('dialog', unexpectedDialog)
   await save.click()
   await expect(save).toHaveCount(0)
+  page.off('dialog', unexpectedDialog)
   await expect(teamSelect).toContainText(team)
   // Team assignment keeps personal scope; these collaboration fixtures explicitly publish.
   await page.getByRole('button', { name: '归属：个人', exact: true }).click()
@@ -244,19 +246,17 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
     await expect(children.getByRole('button', { name: '子任务 0 / 1', exact: true })).toBeVisible()
     await children.getByRole('button', { name: `移除子任务关系：${childTitle}`, exact: true }).click()
     await expect(children.getByRole('button', { name: '子任务 0 / 0', exact: true })).toBeVisible()
-    // Hold server actions: the picker (keyed by the viewer) must show loading or fresh data, never the stale snapshot.
+    // Hold the picker's search: it must show loading or fresh data, never results from before the unlink.
     let release!: () => void
     const held = new Promise<void>(resolve => { release = resolve })
     let heldActions = 0
-    await member.route('**/*', async route => {
-      if (route.request().method() === 'POST' && route.request().headers()['next-action']) { heldActions++; await held }
-      await route.fallback()
-    })
+    const search = /\/api\/issues\/search\?/
+    await member.route(search, async route => { heldActions++; await held; await route.fallback() })
     picker = await addExisting()
     await expect.poll(() => heldActions).toBeGreaterThan(0)
     await expect(picker.getByText('正在读取任务…', { exact: true }).or(picker.getByRole('option').filter({ hasText: childTitle }))).toBeVisible()
     release()
-    await member.unroute('**/*')
+    await member.unroute(search)
     await expect(picker.getByRole('option').filter({ hasText: childTitle })).toBeVisible()
     await picker.getByRole('button', { name: '关闭', exact: true }).click()
   } finally {
