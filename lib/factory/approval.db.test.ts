@@ -41,6 +41,54 @@ test(
       const { actor, pool, provider } = f;
       await factoryRunAuthorityCases(t, f);
       await t.test(
+        "a live browser session approves and publishes without any decision authority",
+        async () => {
+          const x = await f.prepare(),
+            human = { ...x.approval } as Record<string, unknown>,
+            service = f.service([f.adapter], null),
+            before = provider.posts();
+          delete human.decisionCredentialId;
+          const approved = await service.approve(actor, human);
+          const published = await service.publish(actor, {
+            ...approved,
+            eventId: randomUUID(),
+            action: x.approval.action,
+            target: x.approval.target,
+            targetEnvironment: x.approval.targetEnvironment,
+          });
+          assert.ok(published?.receipt);
+          assert.equal(provider.posts(), before + 1);
+          const grant = (
+            await pool.query(
+              'SELECT "humanSessionId","decisionCredentialId","decisionScope","decisionEvidence" FROM factory_approvals WHERE id=$1',
+              [approved.approvalId],
+            )
+          ).rows[0];
+          assert.equal(grant.humanSessionId, actor.sessionId);
+          assert.equal(grant.decisionCredentialId, null);
+          assert.equal(grant.decisionScope, null);
+          assert.equal(grant.decisionEvidence, null);
+          const next = await f.prepare(),
+            nextHuman = { ...next.approval } as Record<string, unknown>;
+          delete nextHuman.decisionCredentialId;
+          await pool.query(
+            `UPDATE "session" SET "expiresAt"=now()-interval '1 second' WHERE id=$1`,
+            [actor.sessionId],
+          );
+          try {
+            await rejects(
+              () => service.approve(actor, nextHuman),
+              "factoryHumanRequired",
+            );
+          } finally {
+            await pool.query(
+              `UPDATE "session" SET "expiresAt"=now()+interval '1 hour' WHERE id=$1`,
+              [actor.sessionId],
+            );
+          }
+        },
+      );
+      await t.test(
         "policy allow publishes for authenticated backend owner without any human session prerequisite",
         async () => {
           const backendActor = { userId: actor.userId },
@@ -743,7 +791,7 @@ test(
         },
       );
       await t.test(
-        "historical human-bound V2 remains readable but cannot execute through the removed human-only path",
+        "historical human-bound V2 remains readable and a live human session replays it without another provider call",
         async () => {
           const x = await f.prepare(),
             p = await x.publication(),
@@ -794,10 +842,9 @@ test(
             tx.release();
           }
           const before = provider.posts();
-          await rejects(
-            () => s.publish(actor, p),
-            "factoryPolicyDecisionUnavailable",
-          );
+          const replay = await s.publish(actor, p);
+          assert.ok(replay);
+          assert.equal(replay.publicationId, result.publicationId);
           assert.equal(provider.posts(), before);
         },
       );

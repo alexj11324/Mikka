@@ -69,17 +69,26 @@ identity, permissions, signatures, binding, expiry, revocation and data integrit
 The current artifact transport reads owned run reports/chunks; it cannot supply
 real screenshot/video bytes yet. Actual visual provenance remains a dependency.
 
-`allow` advances without a human/session prerequisite. Only an existing policy
-`ask` needs a verified confirmation bound to that exact credential, owner, scope
-and expiry. The existing authority supplies and verifies that confirmation; this
-consumer does not create a second question/approval flow. `deny` stops. Browser
-HTTP still authenticates its real cookie/session and same origin; that is
-transport identity, not a blanket human decision. Backend calls require a trusted
-authenticated owner and the same policy proof; JSON never chooses the actor.
+An approval has two sources. The default, Warp-aligned path is a person
+approving in the browser: `approve` re-checks the live session and its linked
+GitHub or Google account inside the task transaction, records the approval with
+`humanSessionId` and no policy fields, and `validApproval` re-checks the live
+session at the gate, pre-POST and reconciliation boundaries. No decision
+authority or credential is involved, and no model may approve its own work
+because the route accepts only a real browser session, never a worker token.
 
-The grant remains in the existing approval ledger. New grants require
-`decisionCredentialId`, frozen scope and verified decision evidence. A unique
-issuer/credential index permits one grant; event replay returns that grant.
+A deployment that installs a policy authority may instead send
+`decisionCredentialId`. `allow` advances; only an existing policy `ask` needs a
+verified confirmation bound to that exact credential, owner, scope and expiry;
+`deny` stops. Backend calls without a session still require that policy proof.
+Browser HTTP always requires the real cookie/session and same origin, and JSON
+never chooses the actor.
+
+The grant remains in the existing approval ledger. Human grants store
+`humanSessionId` with null `decisionCredentialId`, `decisionScope` and
+`decisionEvidence`; policy grants require all three. A unique
+issuer/credential index permits one policy grant; event replay returns that
+grant.
 Candidate/action/target publication uniqueness reserves one logical effect before
 POST. The authority is rechecked at grant, gate, pre-POST and reconciliation
 boundaries; a stale allow is not cached. Revocation during provider preflight

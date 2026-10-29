@@ -72,12 +72,20 @@ secrets: []
 
 ## Publication authorization in this repository
 
+The application's approval is a human one. A person approves in the browser and
+`factory_approvals` records the live, GitHub- or Google-linked session; the same
+session is re-checked at the gate, pre-POST and reconciliation boundaries. No
+decision credential, policy service or attestation issuer is required, and an
+agent cannot approve its own work because only a real browser session crosses
+that route. The optional policy host below is the stricter path for worker-side
+or unattended publication, not a prerequisite for the default model.
+
 `FactoryPublicationHost.reviewKey` is optional. A host that installs a trusted
 public key keeps the strict deployment: every publication must carry a signed
 review envelope, verified against that key.
 
-The default deployment installs no key and no signer, so the review cannot carry
-authority and nothing requires it:
+The policy host installs no key and no signer by default, so the review cannot
+carry authority and nothing requires it:
 
 - Authorization comes from the registered policy (`host.policy()`), the
   committed `passed` review/verify receipts, and the existing task, run, token,
