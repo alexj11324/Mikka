@@ -43,6 +43,7 @@ before(async () => {
     workspaceBotDefaults: async (workspaceId: string) => { calls.push(['workspaceBotDefaults', workspaceId]); return defaults },
     botDefaultOptions: respond('botDefaultOptions', { defaultModel: 'codex', defaultRepository: null, models: ['mikka', 'codex', 'claude'], repositories: ['acme/app'] }),
     saveBotDefaults: respond('saveBotDefaults', { defaultModel: 'claude', defaultRepository: null }),
+    repositoryAvailable: async (workspaceId: string, repository: string) => { calls.push(['repositoryAvailable', workspaceId, repository]); return repository === 'acme/app' },
     workspaceBots: respond('workspaceBots', [{ id: 'b', name: 'Bot', status: 'running', runningThreads: 2 }]),
   } })
   actions = await import('../app/actions/workspace-settings')
@@ -116,6 +117,15 @@ test('createBot uses the workspace defaults only for omitted fields', async () =
   await botActions.createBot({ name: 'Scout 3', color: 'encre', shape: 'cercle' })
   assert.equal(inserted[2].model, null)
   await assert.rejects(botActions.createBot({ name: 'Bad', color: 'encre', shape: 'cercle', model: 'gpt-x' }), /validationGeneric/)
+})
+
+test('createBot refuses a repository the workspace has not installed', async () => {
+  reset(); inserted.length = 0
+  await botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle', repository: 'acme/app' })
+  assert.equal(inserted[0].repository, 'acme/app')
+  await assert.rejects(botActions.createBot({ name: 'Elsewhere', color: 'encre', shape: 'cercle', repository: 'other/secret' }), /botDefaultRepositoryUnavailable/)
+  assert.equal(inserted.length, 1)
+  assert.deepEqual(calls.filter(call => call[0] === 'repositoryAvailable').map(call => call[2]), ['acme/app', 'other/secret'])
 })
 
 test('bot defaults and workspace bot list actions', async () => {
