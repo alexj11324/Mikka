@@ -4,9 +4,6 @@ import test, { mock } from 'node:test'
 import { cookies, draftMode } from 'next/headers'
 import { Pool } from 'pg'
 
-// This test removes a workspace member during its assertions; it remains on
-// hold until an independently reviewed no-deletion replacement exists.
-
 // Explicitly refuse business databases. This executes the real server action and real SQL.
 const target = new URL(process.env.E2E_DATABASE_URL ?? 'http://invalid')
 if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pathname.endsWith('_e2e') || process.env.MIKKA_DATABASE_URL !== target.href || process.env.DATABASE_URL !== target.href) throw new Error('Thread integration requires the same isolated loopback *_e2e database for both stores')
@@ -14,6 +11,7 @@ const pool = new Pool({ connectionString: target.href, max: 1 })
 const owner = randomUUID(), viewer = randomUUID(), outsider = randomUUID(), removed = randomUUID()
 const issue = randomUUID(), other = randomUUID(), workspace = randomUUID(), team = randomUUID(), agent = randomUUID()
 const run = randomUUID(), removedRun = randomUUID(), otherRun = randomUUID()
+const removedAgent = randomUUID()
 // Supply the Next request boundary only; authentication still reads a real DB session.
 let requestHeaders = new Headers()
 mock.module('next/headers', { namedExports: { cookies, draftMode, headers: async () => requestHeaders } })
@@ -23,12 +21,14 @@ test('real actions keep thread content with its owner; current members see only 
   const { listIssueThreads, getIssueThread, sendIssueThreadMessage } = await import('../app/actions/agents')
   const { actAs } = await import('../lib/acting-user')
   const { requestRunStop } = await import('../lib/agent-runs')
+  const { promoteIssueToTeam } = await import('../app/actions/issues')
   try {
     for (const id of [owner, viewer, outsider, removed]) await pool.query('INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES ($1,$2,$3,false,now(),now())', [id, id === viewer ? 'Lin' : 'Isolated run test', `${id}@example.com`])
     for (const id of [issue, other]) await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,$3,'{"type":"doc","content":[]}','todo','normal')`, [id, owner, 'Isolated thread'])
     await pool.query('INSERT INTO issue_members ("issueId","userId","memberId") VALUES ($1,$2,$3),($1,$2,$4)', [issue, owner, viewer, removed])
     await pool.query('INSERT INTO agents (id,"userId",harness,name,instructions) VALUES ($1,$2,$3,$4,$5)', [agent,owner,'codex','Mikka Backend','PRIVATE INSTRUCTIONS'])
-    for (const [id, userId, issueId, status] of [[run,owner,issue,'running'],[removedRun,removed,issue,'succeeded'],[otherRun,owner,other,'succeeded']]) await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt,report,error) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id,userId,issueId,agent,status,'Route group replies',JSON.stringify({summary:'Routed'}),null])
+    for (const [id, userId, issueId, status] of [[run,owner,issue,'running'],[otherRun,owner,other,'succeeded']]) await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt,report,error) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id,userId,issueId,agent,status,'Route group replies',JSON.stringify({summary:'Routed'}),null])
+    await assert.rejects(pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId",status) VALUES ($1,$2,$3,$4,\'succeeded\')', [removedRun,removed,issue,agent]), /Personal task is unavailable/, 'legacy membership cannot create a teammate run on a personal task')
     await pool.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)', [bot, workspace, owner, 'Owned Bot'])
     await pool.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [run, bot, workspace, owner])
     await pool.query('INSERT INTO run_chunks (id,"runId",seq,chunk) VALUES ($1,$2,1,$3)', [randomUUID(),run,JSON.stringify({type:'text-delta',id:'a',delta:'Reproduced it'})])
@@ -45,12 +45,27 @@ test('real actions keep thread content with its owner; current members see only 
     assert.equal(own.thread.detail?.agentName, 'Owned Bot', 'a computer thread displays its owning Bot, not the internal executor')
     await assert.rejects(actAs(owner, () => getIssueThread(other, run)))
 
-    // A workspace issue: current members read and join every collaborator's thread.
-    await pool.query('UPDATE issues SET scope=$2 WHERE id=$1', [issue, 'workspace'])
+    // Sharing follows the same authenticated human action and migration-owned
+    // scope fence as the application; direct SQL cannot imply team consent.
     await pool.query('INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$2,$3)',[workspace,owner,'Isolated run workspace'])
     await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,$4,$5)',[team,workspace,owner,'Run test','RUNTEST'])
     await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)',[issue,team,workspace,owner])
     for (const id of [owner,viewer,removed]) await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$3,$4,$5,$6)',[workspace,id,'Member',`${id}@example.com`,'member','active'])
+    const { auth } = await import('../lib/auth')
+    const context = await auth.$context
+    const session = await context.internalAdapter.createSession(owner)
+    assert.ok(session)
+    const signature = createHmac('sha256', context.secret).update(session.token).digest('base64')
+    const ownerHeaders = new Headers({ cookie: `${context.authCookies.sessionToken.name}=${encodeURIComponent(`${session.token}.${signature}`)}` })
+    requestHeaders = ownerHeaders
+    const revision = (await pool.query('SELECT revision FROM issues WHERE id=$1', [issue])).rows[0].revision
+    const promotion = await promoteIssueToTeam({ requestId: randomUUID(), issueId: issue, revision, teamId: team, expectedTeamId: team })
+    assert.ok('issue' in promotion && promotion.issue, JSON.stringify(promotion))
+    assert.equal(promotion.issue.scope, 'workspace')
+    assert.equal(promotion.issue.linearSyncBlocked, true)
+    requestHeaders = new Headers()
+    await pool.query('INSERT INTO agents (id,"userId",harness,name) VALUES ($1,$2,\'codex\',\'Owned collaborator executor\')', [removedAgent,removed])
+    await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt,report) VALUES ($1,$2,$3,$4,\'succeeded\',$5,$6)', [removedRun,removed,issue,removedAgent,'Private collaborator work',JSON.stringify({summary:'Private result'})])
     // A workspace issue: teammates see whose threads exist and their status, never their content.
     const listed = await actAs(viewer, () => listIssueThreads(issue))
     assert.deepEqual(listed.map(row => [row.detail, row.ownerName, row.ownedByCurrentUser]).sort(), [[null, 'Isolated run test', false], [null, 'Isolated run test', false]])
@@ -59,12 +74,7 @@ test('real actions keep thread content with its owner; current members see only 
     await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' })))
     // An acting-user override cannot attest a browser's human/session provenance.
     await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'No session' })), /authRequired/)
-    const { auth } = await import('../lib/auth')
-    const context = await auth.$context
-    const session = await context.internalAdapter.createSession(owner)
-    assert.ok(session)
-    const signature = createHmac('sha256', context.secret).update(session.token).digest('base64')
-    requestHeaders = new Headers({ cookie: `${context.authCookies.sessionToken.name}=${encodeURIComponent(`${session.token}.${signature}`)}` })
+    requestHeaders = ownerHeaders
     // The owner still reads and talks in their own thread through fresh cookie authentication.
     await actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' }))
     const after = await actAs(owner, () => getIssueThread(issue, run))

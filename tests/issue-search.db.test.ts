@@ -13,6 +13,7 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
   const pool = new Pool({connectionString: url,max:2})
   const {db} = await import('../lib/db')
   const {parseSearchParams,searchIssues} = await import('../lib/issue-search')
+  const {promoteExistingIssueForUser} = await import('../lib/team-issue-promotion')
   const owner = `search-owner-${randomUUID()}`, viewer = `search-viewer-${randomUUID()}`
   const workspace = randomUUID(), otherWorkspace = randomUUID(), team = randomUUID()
   const root = randomUUID(), child = randomUUID(), hidden = randomUUID()
@@ -59,7 +60,10 @@ test('indexed, owner-safe relation search beyond 101 tasks, paging and graph vis
     assert.equal(closure.items.length,0)
     // One row is changed to a team-visible task, but never visible in another
     // workspace nor after suspension. Owner-only personal rows remain hidden.
-    await pool.query('update issues set scope=\'workspace\' where id=$1',[hidden])
+    const revision = (await pool.query('select revision from issues where id=$1',[hidden])).rows[0].revision
+    const promotion = await promoteExistingIssueForUser(owner,{requestId:randomUUID(),issueId:hidden,revision,teamId:team,expectedTeamId:team})
+    assert.ok('issue' in promotion && promotion.issue,JSON.stringify(promotion))
+    assert.equal(promotion.issue.scope,'workspace')
     assert.deepEqual((await search({q:'rare-needle'},viewer)).items.map(x=>x.id),[hidden])
     assert.equal((await search({q:'rare-needle'},viewer,otherWorkspace)).items.length,0)
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2',[workspace,viewer])

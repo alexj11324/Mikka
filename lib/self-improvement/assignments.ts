@@ -96,7 +96,7 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
   async function lockQuestion(userId: string, issueId: string, runId: string, tx: PoolClient) {
     const {rows:[source]}=await tx.query(`SELECT repo."repoPath" FROM agent_runs r
       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
-      WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$3`,[runId,userId,issueId])
+      WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$3 FOR SHARE OF repo`,[runId,userId,issueId])
     if (!source) throw new ImprovementError('sourceMismatch')
     // Admission and continuations use the same repository -> issue order.
     // The host acquires CLI policy before any source run/worker lock.

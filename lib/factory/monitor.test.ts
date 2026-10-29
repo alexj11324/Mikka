@@ -299,11 +299,11 @@ test(
       );
       return id;
     };
-    const issue = async (owner = "owner", workspace = "workspace:a") => {
+    const issue = async (owner = "owner", workspace = "workspace:a", scope: "personal" | "workspace" = "personal") => {
       const id = randomUUID();
       await pool.query(
-        'INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,\'Monitor layer fixture\',\'{"type":"doc","content":[{"type":"paragraph"}]}\',\'todo\',\'normal\')',
-        [id, owner],
+        'INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Monitor layer fixture\',\'{"type":"doc","content":[{"type":"paragraph"}]}\',\'todo\',\'normal\',$3)',
+        [id, owner, scope],
       );
       scopes.set(id, workspace);
       return id;
@@ -686,7 +686,9 @@ test(
         "INSERT INTO agents (id,\"userId\",name,harness) VALUES ($1,'owner','Fixture agent','codex')",
         [agentId],
       );
-      const issueId = await issue();
+      // This monitor case starts from an already imported workspace issue.
+      // A personal task cannot acquire team consent through a fixture UPDATE.
+      const issueId = await issue("owner", "workspace:a", "workspace");
       const teamId = randomUUID();
       await pool.query(
         `INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture owner','owner@example.invalid',false,now(),now())`,
@@ -695,9 +697,6 @@ test(
         "INSERT INTO linear_team_syncs (id,\"ownerId\",\"linearTeamId\",\"linearTeamKey\",\"linearTeamName\") VALUES ($1,'owner','fixture-team','FIX','Fixture team')",
         [teamId],
       );
-      await pool.query("UPDATE issues SET scope='workspace' WHERE id=$1", [
-        issueId,
-      ]);
       await pool.query(
         'INSERT INTO linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") VALUES ($1,$2,\'owner\',$3,\'fixture-remote-issue\',\'FIX-195\')',
         [randomUUID(), issueId, teamId],

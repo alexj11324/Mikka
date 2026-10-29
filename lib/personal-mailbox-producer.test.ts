@@ -25,7 +25,7 @@ const database = {
   },
   insert(table: unknown) { assert.equal(table, agentRuns); return { async values(row: Record<string, unknown>) { inserted.push(row) } } },
 }
-mock.module(new URL('./db/index.ts', import.meta.url).href, { exports: { db: database, pool: {} } })
+mock.module(new URL('./db/index.ts', import.meta.url).href, { exports: { db: database, pool: {}, withDatabaseClient: () => { throw Error('Factory transactions are outside the mailbox snapshot producer fixture') } } })
 mock.module(new URL('./device-repositories.ts', import.meta.url).href, { exports: { ensureDeviceRepository: async (userId: string, deviceId: string, repo: string) => {
   assert.equal(userId, owner); assert.equal(deviceId, 'device'); assert.equal(repo, repoUrl)
   return { id: repoId, baseBranch: 'main' }

@@ -4,7 +4,9 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import test from "node:test";
 import { Pool, type PoolClient } from "pg";
+import { remoteKey } from "@mikka/protocol/repository";
 import { createFactoryStore } from "../lib/factory/store";
+import { factoryBinding } from "../lib/factory/dispatch";
 import {
   createFactoryQuestions,
   questionReference,
@@ -23,6 +25,8 @@ test(
       assert.equal(target.username, "e2e");
     } else assert.equal(target.username, "factoryquestions192");
     assert.equal(target.pathname, "/mikka_e2e");
+    assert.equal(process.env.MIKKA_DATABASE_URL, target.toString());
+    assert.equal(process.env.DATABASE_URL, target.toString());
     const events: unknown[] = [];
     function client() {
       const ip = `198.18.${randomBytes(1)[0]}.${1 + (randomBytes(1)[0] % 254)}`;
@@ -79,6 +83,10 @@ test(
     const deviceId = randomUUID(),
       repoId = randomUUID(),
       agentId = randomUUID();
+    const remoteUrl = `https://github.com/mikka-ci/question-${repoId}.git`;
+    const { dispatchFactoryRun } = await import("../lib/factory/server");
+    const { pool: runtimePool } = await import("../lib/db");
+    const { workspacePool } = await import("../lib/workspace-db");
     const authorize = async (u: string, i: string, tx: PoolClient) =>
       (
         await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [
@@ -101,52 +109,43 @@ test(
         [deviceId, userId],
       );
       await pool.query(
-        `INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,'/isolated','fixture/repo')`,
-        [repoId, deviceId, userId],
+        `INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)`,
+        [repoId, deviceId, userId, remoteKey(remoteUrl), remoteUrl],
       );
       await pool.query(
         `INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,$2,'HTTP agent','codex',$3)`,
         [agentId, userId, deviceId],
       );
+      await pool.query('INSERT INTO issue_prefixes ("userId",prefix) VALUES ($1,\'FQHT\')', [userId]);
+      await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [userId,remoteKey(remoteUrl),JSON.stringify({ approved:true,remote:'origin',approvedByUserId:userId,approvedAt:new Date().toISOString() })]);
+      let number = 0;
       const fixture = async (
         kind: "context" | "decision" | "permission" | "external" = "context",
         record = true,
       ) => {
         const issueId = randomUUID(),
           eventId = randomUUID(),
-          runId = randomUUID(),
           questionId = randomUUID();
         await pool.query(
-          `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,current_setting('factory.test_owner'),'Use existing HTTP API','{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Keep the existing public API"}]}]}','todo','normal')`,
-          [issueId],
+          `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,current_setting('factory.test_owner'),'Use existing HTTP API',$2,'todo','normal')`,
+          [issueId,JSON.stringify({type:'doc',attrs:{mikka:{number:++number}},content:[{type:'paragraph',content:[{type:'text',text:'Keep the existing public API'}]}]})],
         );
         await pool.query(
           `INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey","issueId",payload) VALUES ($1,current_setting('factory.test_owner'),'user_message',$2,$3,'{"text":"Keep the existing public API"}')`,
           [eventId, eventId, issueId],
         );
-        let state = await store.route(userId, {
+        const routed = await store.route(userId, {
           issueId,
           eventId: randomUUID(),
           sourceEventId: eventId,
           rationale: "Explicit fixture",
         });
+        // Persist the same admission, worker snapshot and publication as a
+        // real host dispatch. Only the stopped hand-in is synthetic here.
+        const state = await dispatchFactoryRun(userId,{binding:factoryBinding(routed.task),agentId,deviceRepoId:repoId});
+        const runId = state.runId;
         await pool.query(
-          `INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"sessionId") VALUES ($1,current_setting('factory.test_owner'),$2,$3,$4,$5,'running',$6)`,
-          [runId, issueId, agentId, deviceId, repoId, `session:${runId}`],
-        );
-        const b = {
-          taskId: state.task.id,
-          issueId,
-          attemptId: state.task.attemptId,
-          revision: state.task.revision,
-          candidateId: state.task.candidateId,
-        };
-        state = await store.apply(userId, b, randomUUID(), {
-          action: "bind_run",
-          runId,
-        });
-        await pool.query(
-          `UPDATE agent_runs SET status='stopped',"stopReason"=$2,report=$3,"finishedAt"=now() WHERE id=$1`,
+          `UPDATE agent_runs SET status='stopped',"stopReason"=$2,report=$3,"sessionId"=$4,"startedAt"=now(),"finishedAt"=now() WHERE id=$1`,
           [
             runId,
             kind === "external" ? "blocked" : "asked_human",
@@ -160,6 +159,7 @@ test(
                 options: [],
               },
             }),
+            `session:${runId}`,
           ],
         );
         const q = record ? await questions.record(userId, runId) : null;
@@ -303,11 +303,11 @@ test(
         assert.equal(
           (
             await pool.query(
-              'SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1 AND "dispatchKey" IS NOT NULL',
+              'SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',
               [waiting.issueId],
             )
           ).rows[0].n,
-          0,
+          1,
         );
       }
       assert.equal(
@@ -345,6 +345,8 @@ test(
           JSON.stringify(events, null, 2),
         );
       await pool.end();
+      await runtimePool.end();
+      await workspacePool.end();
     }
   },
 );

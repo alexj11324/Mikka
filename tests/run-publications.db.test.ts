@@ -442,6 +442,10 @@ test('run result publication commits one owner-scoped result through retries and
       const { coordinatorEnabled } = await import('../lib/coordinator/wake')
       assert.equal(coordinatorEnabled(), false, 'this DB suite cannot invoke a real model')
       const f = await fixture({ prefix: 'ADMI' })
+      // This fixture supplies historical publication/legacy-alias evidence.
+      // The admission under test creates the next run, subject to the real
+      // one-live-run gate; keep the original row without leaving it active.
+      await pool.query('update agent_runs set status=\'succeeded\',"finishedAt"=clock_timestamp(),"leaseExpiresAt"=NULL where id=$1', [f.runId])
       await pool.query('update devices set "protocolVersion"=3 where id=$1', [f.deviceId])
       const input = { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl }
       const eventId = randomUUID()
