@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SettingsLoading } from '@/components/settings/primitives'
 import { dayLabel, relativeTime } from '@/lib/relative-time'
+import { httpUrl } from '@/lib/safe-url'
 
 /** V08: what Bots did with my accounts and what the Coordinator told me. */
 export function ActivitySettings() {
@@ -82,7 +83,7 @@ export function ActivitySettings() {
                 {[relativeTime(item.at, locale), detail].filter(Boolean).join(' · ')}
               </span>
             </div>
-            {openHref(item) && <a className="text-sm text-primary underline-offset-4 hover:underline" href={openHref(item)!} target="_blank" rel="noreferrer">{t('view')}</a>}
+            {httpUrl(item.target.url) && <a className="text-sm text-primary underline-offset-4 hover:underline" href={httpUrl(item.target.url)!} target="_blank" rel="noreferrer">{t('view')}</a>}
           </div>
         </div>
       })}
@@ -96,9 +97,4 @@ export function ActivitySettings() {
 
 function withoutScheme(site: string): string {
   return site.replace(/^https?:\/\//, '')
-}
-
-/** A reminder may carry the matter's link; everything else links by id where the page knows one. */
-function openHref(item: ActivityItem): string | null {
-  return item.target.url ?? null
 }
