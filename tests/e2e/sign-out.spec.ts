@@ -67,7 +67,7 @@ for (const path of ['/', '/settings/members', '/en/devices', '/devices']) {
       await expect(page.locator('[data-slot="sidebar"][data-mobile="true"]')).not.toBeVisible()
     }
     if (!mobile) await expect(accountMenu).toBeVisible()
-    await expect(page.getByRole('alert').filter({ hasText: english ? 'Sign out failed.' : '退出失败。' })).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: english ? 'Sign out failed. Please try again.' : '退出失败，请稍后重试。' })).toBeVisible()
     expect((await (await page.request.get(app('/api/auth/get-session'))).json()).user).toBeTruthy()
     await page.unroute(routePattern)
 
@@ -117,7 +117,7 @@ test('sign-out waits for editor validation and preserves saved edits when revoca
   await expect(title).not.toBeVisible()
   release()
   await expect(title).toHaveValue(updated)
-  await expect(page.getByRole('alert').filter({ hasText: '退出失败。' })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: '退出失败，请稍后重试。' })).toBeVisible()
   await page.reload()
   await expect(title).toHaveValue(updated)
 })
@@ -156,5 +156,5 @@ test('failed sign-out preserves an invalid project draft and its validation erro
   await expect(name).toHaveText('')
   await expect(name).toHaveAttribute('aria-invalid', 'true')
   await expect(page.getByText('项目名称不能为空', { exact: true })).toBeVisible()
-  await expect(page.getByRole('alert').filter({ hasText: '退出失败。' })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: '退出失败，请稍后重试。' })).toBeVisible()
 })

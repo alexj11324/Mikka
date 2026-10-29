@@ -117,7 +117,7 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   }, { times: 1 })
   await page.goto(networkFailureGrant.verification_uri_complete)
   const authorization = page.getByRole('region', { name: '连接这台电脑', exact: true })
-  await expect(authorization.getByRole('alert')).toHaveText('连接失败，请重试')
+  await expect(authorization.getByRole('alert')).toHaveText('连接失败')
   const retry = authorization.getByRole('button', { name: '重试', exact: true })
   await expect(retry).toBeEnabled()
   await testInfo.attach('device-code-network-error-narrow', { body: await page.screenshot(), contentType: 'image/png' })
