@@ -36,7 +36,7 @@ function fixture(records: Row[]) {
       assert.ok(sql.includes('l."ownerId"=p."userId"') && sql.includes("l.\"workspaceId\"='personal:'||p.\"userId\""))
       assert.deepEqual(params[1], WRITE_ACTIONS)
       assert.ok(!sql.includes("status='pending'"), 'running/terminal must not disappear from discovery')
-      const selected = snap.filter(p => p.userId === params[0] && p.cursorCreatedAt <= String(params[2]) && (!params[3] || p.cursorCreatedAt < String(params[3]) || p.cursorCreatedAt === params[3] && p.id < String(params[4])))
+      const selected = snap.filter(p => p.userId === params[0] && (!params[6] || ['pending','running'].includes(p.status) && p.execution?.status !== 'succeeded' || p.execution?.invokedAt && p.execution.status !== 'succeeded') && p.cursorCreatedAt <= String(params[2]) && (!params[3] || p.cursorCreatedAt < String(params[3]) || p.cursorCreatedAt === params[3] && p.id < String(params[4])))
         .sort((a, b) => b.cursorCreatedAt.localeCompare(a.cursorCreatedAt) || b.id.localeCompare(a.id)).slice(0, Number(params[5]))
       return { rows: duplicate && selected[0] ? [selected[0], selected[0]] : selected }
     }
@@ -81,6 +81,24 @@ test('bad bindings and ambiguous intents become redacted attention items without
   assert.equal(page.items.find(p => p.id === id(2))?.error, 'operationIntentAmbiguous')
 })
 
+test('unresolved discovery reaches older pending actions without completed history and binds cursors to the filter', async () => {
+  const pending = row(1, '2026-10-27T11:00:00.000001Z'), uncertain = row(2, '2026-10-27T11:00:00.000002Z')
+  execute(uncertain, 'uncertain')
+  const history = Array.from({ length: 60 }, (_, index) => { const p = row(index + 3); execute(p, 'succeeded'); return p })
+  const declined = row(99); declined.status = 'declined'
+  const f = fixture([...history, pending, uncertain, declined])
+  const first = await f.discovery.list(actor, { unresolvedOnly: true, limit: 1 })
+  assert.deepEqual(first.items.map(p => [p.id, p.status]), [[uncertain.id, 'running']])
+  await assert.rejects(f.discovery.list(actor, { cursor: first.nextCursor! }), /invalidWriteCursor/)
+  const second = await f.discovery.list(actor, { unresolvedOnly: true, cursor: first.nextCursor!, limit: 1 })
+  assert.deepEqual(second.items.map(p => [p.id, p.status]), [[pending.id, 'pending']])
+  assert.equal(second.nextCursor, null)
+  assert.ok(f.statements.some(sql => sql.includes("p.status IN ('pending','running')") && sql.includes("l.status <> 'succeeded'")))
+  const wrongProjection = row(100); execute(wrongProjection, 'uncertain'); wrongProjection.status = 'declined'
+  const attention = await fixture([wrongProjection]).discovery.list(actor, { unresolvedOnly: true })
+  assert.equal(attention.items[0].status, 'attention', 'an invoked unknown effect cannot disappear behind a stale declined projection')
+})
+
 test('cursors cannot replace actor/session, escape shape limits or survive session expiry', async () => {
   const f = fixture([row(1), row(2)]), first = await f.discovery.list(actor, { limit: 1 })
   const statements = f.statements.length
@@ -107,7 +125,9 @@ test('registered HTTP list wiring authenticates, rejects authority fields and ne
   assert.equal((await handler(req({ op: 'list' }, { origin: 'https://other.invalid' }))).status, 403)
   const response = await handler(req({ op: 'list' }))
   assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store')
-  assert.equal((await response.json()).items[0].id, id(1))
+  const body = await response.json()
+  assert.equal(body.items[0].id, id(1))
+  assert.equal(body.viewerId, actor.userId)
   const missing = approvedWriteHandler(auth, operations)
   assert.equal((await missing(req({ op: 'list' }))).status, 503)
   const closed = createPersonalWriteRoute({ enabled: () => false, load: async () => { throw Error('must not load') } })

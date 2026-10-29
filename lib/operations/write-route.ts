@@ -6,7 +6,7 @@ type WriteOperations = Parameters<typeof approvedWriteHandler>[1]
 type WriteDiscovery = Parameters<typeof approvedWriteHandler>[2]
 
 /** The trusted deployment gate is checked before loading runtime services.
- * An admitted Preview still uses the same identity, permission and ledger path. */
+ * An admitted deployment still uses the same identity, permission and ledger path. */
 
 export function createPersonalWriteRoute(dependencies: {
   enabled: () => boolean

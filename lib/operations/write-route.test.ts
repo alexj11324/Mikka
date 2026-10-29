@@ -1,13 +1,30 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { POST } from '../../app/api/approved-writes/route'
+import { GET, POST } from '../../app/api/approved-writes/route'
 import { createPersonalWriteRoute, PERSONAL_WRITES_ENABLED } from './write-route'
+import { personalWritesEnabled } from './write-feature'
 
 const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 function request(body: unknown, headers: Record<string, string> = {}) {
   return new Request('https://candidate.invalid/api/approved-writes', { method: 'POST', headers: { cookie: 'synthetic=fixture', origin: 'https://candidate.invalid', ...headers }, body: JSON.stringify(body) })
 }
 const proposal = { op: 'propose', action: 'send_slack_message', intentId: id, input: { channel: 'C12345678', text: 'Fixture' } }
+
+test('public availability reports only the server gate as 200 no-store without runtime services', async () => {
+  const previous = process.env.MIKKA_PERSONAL_WRITES_ENABLED
+  try {
+    for (const [value, enabled] of [['0', false], ['1', true]] as const) {
+      process.env.MIKKA_PERSONAL_WRITES_ENABLED = value
+      const response = GET()
+      assert.equal(response.status, 200)
+      assert.equal(response.headers.get('cache-control'), 'no-store')
+      assert.deepEqual(await response.json(), { enabled })
+    }
+  } finally {
+    if (previous === undefined) delete process.env.MIKKA_PERSONAL_WRITES_ENABLED
+    else process.env.MIKKA_PERSONAL_WRITES_ENABLED = previous
+  }
+})
 
 test('actual product POST is registered but disabled without initializing runtime', async () => {
   assert.equal(PERSONAL_WRITES_ENABLED, false)
@@ -21,9 +38,9 @@ test('actual product POST is registered but disabled without initializing runtim
   assert.equal(loads, 0)
 })
 
-test('synthetic enabled route delegates browser authority and durable IDs to the existing HTTP service', async () => {
+test('production rollout delegates browser authority and durable IDs to the existing HTTP service', async () => {
   const calls: unknown[] = []
-  const handler = createPersonalWriteRoute({ enabled: () => true, load: async () => ({
+  const handler = createPersonalWriteRoute({ enabled: () => personalWritesEnabled({VERCEL_ENV:'production',MIKKA_PERSONAL_WRITES_ENABLED:'1'}), load: async () => ({
     auth: { api: { getSession: async ({ query }) => { assert.equal(query.disableCookieCache, true); return { user: { id: 'owner' }, session: { id: 'session' } } } } },
     operations: action => ({
       propose: async (ownerId, input, intentId) => { calls.push({ action, ownerId, input, intentId }); return { status: 'awaiting_approval', actionId: id } },
