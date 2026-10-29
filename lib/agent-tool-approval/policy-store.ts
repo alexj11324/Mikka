@@ -37,8 +37,17 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
   const agentRow = await tx.query<{ policy: unknown; version: string; generation: string; workspace: string | null }>(`SELECT cli_run_policy AS policy,cli_run_policy_version AS version,cli_run_policy_generation AS generation,workspace_id AS workspace FROM agent_kit_heads WHERE owner_id=$1 AND bot_key=$2 FOR SHARE`, [userId,key])
   if (!agentRow.rows[0] || agentRow.rows[0].workspace !== scope.workspaceId) throw new Error('agentPolicyUnavailable')
   const agent = cliPolicyLayerSchema.parse(agentRow.rows[0]?.policy ?? {})
-  const workerRow = await tx.query<{ policy: unknown; version: string; generation: string; deviceKind: string }>(`SELECT a.cli_run_policy AS policy,a.cli_run_policy_version AS version,a.cli_run_policy_generation AS generation,d.kind AS "deviceKind" FROM agents a JOIN devices d ON d.id=a."deviceId" AND d."ownerId"=a."userId" WHERE a.id=$1 AND a."userId"=$2 FOR SHARE OF a,d`, [scope.agentId,userId])
+  const workerRow = await tx.query<{ policy: unknown; version: string; generation: string; deviceId: string | null }>(`SELECT cli_run_policy AS policy,cli_run_policy_version AS version,cli_run_policy_generation AS generation,"deviceId" FROM agents WHERE id=$1 AND "userId"=$2 FOR SHARE`, [scope.agentId,userId])
   if (!workerRow.rows[0]) throw new Error('agentPolicyUnavailable')
+  // A new owned worker can be configured before its first device assignment.
+  // Absence gets the bounded local default, never cloud authority. A bound
+  // device must still belong to the same owner and remain locked through commit.
+  let deviceKind = 'local'
+  if (workerRow.rows[0].deviceId) {
+    const device = await tx.query<{kind:string}>(`SELECT kind FROM devices WHERE id=$1 AND "ownerId"=$2 FOR SHARE`,[workerRow.rows[0].deviceId,userId])
+    if (!device.rows[0]) throw new Error('agentPolicyUnavailable')
+    deviceKind = device.rows[0].kind
+  }
   const worker = cliPolicyLayerSchema.parse(workerRow.rows[0].policy)
   const workerVersion = String(workerRow.rows[0].version)
   const agentVersion = String(agentRow.rows[0]?.version ?? '0')
@@ -51,7 +60,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     workspaceGeneration = row.rows[0].generation
   }
   if (!/^\d+$/.test(agentVersion) || !/^\d+$/.test(workerVersion) || !/^\d+$/.test(workspaceVersion)) throw new Error('agentPolicyUnavailable')
-  const policy = resolveTrustedRunPolicy({ workspace: { permissions: agent.permissions, networkAllow: agent.networkAllow }, personalApprovalMode: agent.approvalMode, environment: workerRow.rows[0].deviceKind === 'cloud' ? 'cloud' : 'local' })
+  const policy = resolveTrustedRunPolicy({ workspace: { permissions: agent.permissions, networkAllow: agent.networkAllow }, personalApprovalMode: agent.approvalMode, environment: deviceKind === 'cloud' ? 'cloud' : 'local' })
   for (const layer of [worker, workspace]) {
     for (const action of CONFIGURABLE_ACTIONS) {
       if (action === 'computer_use') continue
@@ -69,7 +78,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     policy.permissions.write_outside_repo = 'deny'
     policy.permissions.git_push = 'deny'
   }
-  const revision = createHash('sha256').update(JSON.stringify(['sandbox-defaults-404-v1',workerRow.rows[0].deviceKind ?? 'local',userId,scope.botId,scope.workspaceId,scope.agentId,agentRow.rows[0].generation,agentVersion,workerRow.rows[0].generation,workerVersion,workspaceGeneration,workspaceVersion])).digest('hex')
+  const revision = createHash('sha256').update(JSON.stringify(['sandbox-defaults-404-v1',deviceKind,userId,scope.botId,scope.workspaceId,scope.agentId,agentRow.rows[0].generation,agentVersion,workerRow.rows[0].generation,workerVersion,workspaceGeneration,workspaceVersion])).digest('hex')
   return { policy, revision, workspaceId: scope.workspaceId, layers: { agent, worker, workspace } }
 }
 

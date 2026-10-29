@@ -266,6 +266,7 @@ async function diagnostic(runtime: OfficialRuntime, scenario: Scenario) {
   const write = scenario === "write-allow"
   const restricted = scenario === "bash-restricted"
   const policy: RunPolicy = runPolicy(undefined)
+  if (restricted) policy.permissions.install_dependency = 'ask'
   policy.networkAllow = []
   policy.permissions.network = scenario === "network-allow" ? "allow" : "ask"
   if (!write && !restricted) {

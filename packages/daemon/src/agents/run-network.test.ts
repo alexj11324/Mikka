@@ -11,7 +11,7 @@ it('keeps decisions within the immutable maximum and the exact run', async () =>
   expect(await network({host:'other.invalid',port:443},signal)).toBe(false)
   expect(ask).not.toHaveBeenCalled()
   expect(await network({host:'example.invalid',port:443},signal)).toBe(true)
-  expect(ask).not.toHaveBeenCalled()
+  expect(ask).toHaveBeenCalledOnce()
   expect(() => runNetworkApproval('run-b','codex',gate,['*'])).toThrow('scope')
   gate.revoke()
   expect(await network({host:'example.invalid',port:443},signal)).toBe(false)
@@ -57,14 +57,14 @@ it('routes only the trusted computer broker transport without a second approval'
   for (const endpoint of ['example.invalid:443','127.0.0.1:0','127.0.0.1:65536']) expect(() => runNetworkApproval('run-a','codex',gate,['*'],endpoint)).toThrow()
 })
 
-it('does not consume mutation receipts or ask again for repeated pre-authorized sockets', async () => {
+it('obtains one scoped grant and reuses it without exhausting mutation receipts', async () => {
   let live=true, decision:'allow'|'ask'|'deny'='ask'
   const ask=vi.fn(async()=> 'allow' as const)
   const gate=new ToolApprovalGate('run-a',{permission:()=>decision,ask,isLive:()=>live})
   const network=runNetworkApproval('run-a','codex',gate,['example.invalid:443'])
   const signal=new AbortController().signal
   for(let i=0;i<2048;i++) expect(await network({host:'example.invalid',port:443},signal)).toBe(true)
-  expect(ask).not.toHaveBeenCalled()
+  expect(ask).toHaveBeenCalledOnce()
   decision='deny'
   expect(await network({host:'example.invalid',port:443},signal)).toBe(false)
   decision='allow';live=false
@@ -81,4 +81,30 @@ it('cannot use the pre-authorized transport for another run or a mutation', asyn
   expect(await gate.preapprovedNetwork({...base,method:'cli/Bash'})).toBe(false)
   gate.revoke()
   expect(await gate.preapprovedNetwork(base)).toBe(false)
+})
+
+it('coalesces explicit ask and never grants a new destination or a later run from that consent', async () => {
+  let resolve!: (choice:'allow'|'deny')=>void
+  const ask=vi.fn(()=>new Promise<'allow'|'deny'>(done=>{resolve=done}))
+  const gate=new ToolApprovalGate('run-a',{permission:()=> 'ask',ask,isLive:()=>true})
+  const network=runNetworkApproval('run-a','codex',gate,['*']),signal=new AbortController().signal
+  const pending=Array.from({length:12},()=>network({host:'example.invalid',port:443},signal))
+  await vi.waitFor(()=>expect(ask).toHaveBeenCalledOnce())
+  resolve('allow');expect(await Promise.all(pending)).toEqual(Array.from({length:12},()=>true))
+  const other=network({host:'other.invalid',port:443},signal)
+  await vi.waitFor(()=>expect(ask).toHaveBeenCalledTimes(2));resolve('deny');expect(await other).toBe(false)
+  expect(await network({host:'other.invalid',port:443},signal)).toBe(false)
+  expect(ask).toHaveBeenCalledTimes(2)
+  const next=new ToolApprovalGate('run-b',{permission:()=> 'ask',ask,isLive:()=>true})
+  const fresh=runNetworkApproval('run-b','codex',next,['*'])({host:'example.invalid',port:443},signal)
+  await vi.waitFor(()=>expect(ask).toHaveBeenCalledTimes(3));next.revoke();expect(await fresh).toBe(false);resolve('allow')
+})
+it('cloud allow never creates an approval while explicit deny cannot be bypassed',async()=>{
+ let decision:'allow'|'deny'='allow'
+ const ask=vi.fn(async()=> 'allow' as const)
+ const gate=new ToolApprovalGate('run-a',{permission:()=>decision,ask,isLive:()=>true})
+ const network=runNetworkApproval('run-a','codex',gate,['*']),signal=new AbortController().signal
+ expect(await network({host:'example.invalid',port:443},signal)).toBe(true)
+ decision='deny';expect(await network({host:'example.invalid',port:443},signal)).toBe(false)
+ expect(ask).not.toHaveBeenCalled()
 })

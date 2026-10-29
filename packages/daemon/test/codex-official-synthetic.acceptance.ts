@@ -275,6 +275,7 @@ async function diagnostic(binary: string, decision: Decision, native: "enabled" 
       runId, cwd, prompt: "Execute only the supplied deterministic synthetic diagnostic.", model: MODEL,
       env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: dir, MIKKA_SYNTHETIC_PROVIDER_KEY: SYNTHETIC_KEY },
       networkAllow: [`127.0.0.1:${synthetic.port}`, ...(decision === "outside-ceiling" ? [] : [`127.0.0.1:${origin.port}`])],
+      ...(native === 'restricted' ? {policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,install_dependency:'ask' as const}}} : {}),
       toolApproval: gate, log: createLogger(),
     }), "official adapter start")
     finished = (async () => { for await (const event of session!.events()) events.push(event) })()
