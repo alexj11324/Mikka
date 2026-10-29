@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { pool, db } from '@/lib/db'
 import { issues, linearCommentLinks, linearConnections, linearIssueLinks, linearSyncInbox, linearSyncOutbox, linearTeamSyncs } from '@/lib/db/schema'
 import { LinearApiError, sanitizeLinearError } from './graphql'
@@ -7,6 +7,8 @@ import { applyLinearCommentToApp } from './comment-sync'
 import { createAppIssueFromLinear, applyLinearIssueToApp, LinearSyncConflictError, syncAppIssueToLinear } from './issue-sync'
 import { linearAccessToken } from './tokens'
 import { linearComment, linearIssue } from './client'
+import { linearSyncEnabled } from './flags'
+import { processLinearOAuthRevocation } from './oauth-revocation'
 
 type InboxRow = typeof linearSyncInbox.$inferSelect
 type OutboxJob = { id: string; issueId: string; attempts: number }
@@ -69,6 +71,9 @@ async function failOutbox(job: OutboxJob, issueId: string, error: unknown) {
 }
 
 async function processOutboxOne(issueId?: string) {
+  // A claimed job finishes at the existing job boundary. Check again
+  // before each claim so disabling never burns queued jobs or retry attempts.
+  if (!await linearSyncEnabled()) return false
   const job = await claimOutbox(issueId)
   if (!job) return false
   const [issue] = await db.select({ updatedAt: issues.updatedAt }).from(issues).where(eq(issues.id, job.issueId)).limit(1)
@@ -202,25 +207,8 @@ async function importLinearCommentChain(token: string, issue: typeof issues.$inf
 async function processWebhook(event: WebhookEvent) {
   if (event.type === 'Issue') return processIssueEvent(event)
   if (event.type === 'Comment') return processCommentEvent(event)
-  if (event.type === 'OAuthAuthorization') {
-    const linearUserId = stringField(event.data, 'userId')
-    if (event.organizationId && linearUserId && ['remove', 'revoke', 'revoked'].includes(event.action ?? '')) {
-      const [owner] = await db.select({ userId: linearConnections.userId }).from(linearConnections)
-        .where(and(eq(linearConnections.organizationId, event.organizationId), eq(linearConnections.linearUserId, linearUserId))).limit(1)
-      if (owner) {
-        await db.update(linearConnections).set({ revokedAt: new Date(), updatedAt: new Date() }).where(eq(linearConnections.userId, owner.userId))
-        await db.update(linearTeamSyncs).set({ active: false, updatedAt: new Date() }).where(and(eq(linearTeamSyncs.ownerId, owner.userId), eq(linearTeamSyncs.active, true)))
-      }
-    }
-  }
-  if (event.type === 'OAuthApp') {
-    if (['remove', 'revoke', 'revoked'].includes(event.action ?? '')) {
-      if (event.organizationId) {
-        const owners = await db.select({ userId: linearConnections.userId }).from(linearConnections).where(eq(linearConnections.organizationId, event.organizationId))
-        await db.update(linearConnections).set({ revokedAt: new Date(), updatedAt: new Date() }).where(eq(linearConnections.organizationId, event.organizationId))
-        if (owners.length) await db.update(linearTeamSyncs).set({ active: false, updatedAt: new Date() }).where(and(inArray(linearTeamSyncs.ownerId, owners.map(owner => owner.userId)), eq(linearTeamSyncs.active, true)))
-      }
-    }
+  if (event.type === 'OAuthAuthorization' || event.type === 'OAuthApp') {
+    await processLinearOAuthRevocation(event)
   }
 }
 
@@ -243,6 +231,7 @@ async function claimInbox(deliveryId?: string): Promise<InboxRow | null> {
 }
 
 async function processInboxOne(deliveryId?: string) {
+  if (!await linearSyncEnabled()) return false
   const row = await claimInbox(deliveryId)
   if (!row) return false
   try {
@@ -262,6 +251,7 @@ async function processInboxOne(deliveryId?: string) {
 }
 
 export async function processLinearSyncBatch(limit = 3) {
+  if (!await linearSyncEnabled()) return { inbox: 0, outbox: 0, disabled: true }
   let inbox = 0
   let outbox = 0
   for (let index = 0; index < limit; index++) {

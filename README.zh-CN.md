@@ -21,7 +21,7 @@
 
 </div>
 
-Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI agent 连接成一个协同工作的团队。向 Bot 描述需求，它会为已连接设备上的 Claude Code、Codex 和 Cursor 安排编码任务。每个 bot 专属的云端电脑处于早期体验阶段，需开启 flag 后使用。
+Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI agent 连接成一个协同工作的团队。向 Bot 描述需求，它会为已连接设备上的 Claude Code、Codex 和 Cursor 安排编码任务。云端桌面支持查看、接管和交还；真实订阅支持的托管编码任务仍待验收。
 
 在同一个地方跟进进展、回应问题并审阅结果。
 
@@ -38,15 +38,15 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
   - 你可以创建更多 bot，并为每个 bot 设定名称、形状和颜色。每个 bot 都运行在 Coordinator harness 上，拥有各自的对话、记忆和线程。这一 harness 与执行编码线程的 CLI harness 分开运行。
 
 - **先确认，再执行。**
-  - 需求不明确时，Coordinator 会在派发运行前，先在对话中向你确认缺少的信息。
-  - 运行过程中，agent 可以提出问题或报告阻塞。Coordinator 会连同可选项一起向你提问，不会代你作答，并将你的回答送回该运行。
+  - Coordinator 可以在对话中确认缺少的信息；按需求歧义程度系统分流仍在开发中。
+  - 运行过程中，agent 可以提出问题或报告阻塞。将人工回答持久化并送回等待中的运行仍待验证。
 
 - **运行在你自己的设备上。**
   - Mikka daemon 可连接你的 Mac、Linux 主机或服务器。
   - Daemon 通过你已安装并登录的 CLI harness 执行线程，因此沿用你现有的订阅与配置。
 
 - **故障后自动恢复。**
-  - 每次运行均持有租约，daemon 会在运行过程中为进行中的工作保存检查点。设备在运行中途离线时，你名下另一台拥有相同仓库和 harness 的设备会从最新检查点接手该运行；若没有可接手的设备，Mikka 会在原有的 worktree 和 agent session 中重试，无需从头开始。
+  - 运行使用租约和 checkpoint。交接到拥有同一仓库的在线设备已有实现与测试，真实双机交接仍待验证。
 
 - **融入现有工具。**
   - 任务与 Linear 双向同步；其他 agent 可通过 MCP 操作 Mikka；在 Telegram 中发消息或在 Slack 中 @ 提及，即可联系 Coordinator。
@@ -55,10 +55,10 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/task-flow-zh-dark.svg">
-  <img src="docs/assets/task-flow-zh-light.svg" alt="任务在 Mikka 中的流转：请求经过分诊，需求不明确时在对话中向你澄清后再派发；agent 执行过程中可以向你提问；规划中的 Factory 阶段增加审查、验证、发布审批和监控。">
+  <img src="docs/assets/task-flow-zh-light.svg" alt="任务在 Mikka 中的流转：请求经过分诊并派发；需求澄清路由、回答送回等待中的运行和 Factory 阶段仍待完成或验收。">
 </picture>
 
-实线路径已经上线，运行完成后会在对话中汇报结果。虚线部分是规划中的 Factory 流程：独立的审查与验证（[#193](https://github.com/alexj11324/Mikka/issues/193)）、检查未通过时派发修复运行、由人工批准发布（[#194](https://github.com/alexj11324/Mikka/issues/194)），以及将故障转为 issue 的监控（[#195](https://github.com/alexj11324/Mikka/issues/195)）。按需求歧义程度进行系统分流在 [#192](https://github.com/alexj11324/Mikka/issues/192) 中跟踪。
+实线表示已接入的路径；虚线包含规划中和仍待端到端验收的路径。人工回答送回等待中的运行仍待验证。Factory 虚线流程包括：独立的审查与验证（[#193](https://github.com/alexj11324/Mikka/issues/193)）、检查未通过时派发修复运行、按适用策略决定发布（[#194](https://github.com/alexj11324/Mikka/issues/194)），以及将故障转为 issue 的监控（[#195](https://github.com/alexj11324/Mikka/issues/195)）。按需求歧义程度进行系统分流在 [#192](https://github.com/alexj11324/Mikka/issues/192) 中跟踪。
 
 ## 当前功能
 
@@ -68,7 +68,7 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 - **线程内容仅自己可见。** 在工作区任务上，同事只能看到线程的归属人、状态和时间，看不到指令、对话记录或结果。
 - **注明信息来源。** 回复中引用的任务、运行记录和网页以可点击的标签形式展示。需要最新信息时，bot 可以搜索网页。
 - **交付「Artifact」。** Bot 可以将文档或 HTML 页面作为「Artifact」交付，支持版本记录和分享链接。
-- **经你批准后在已连接应用中操作。** Bot 可以读取 Gmail、Google 日历、Notion 和 Slack。发送邮件、创建或修改日历事件会作为待批准操作等待，经你批准后才会执行。
+- **在已连接应用中操作。** Coordinator 可以提出邮件和 Google 日历操作。审批执行路径已有实现，真实外部写入和按策略 allow / ask / deny 执行仍待端到端验收。
 - **统一管理任务。** 任务支持看板和列表两种视图，包含关联关系、活动记录和个人任务编号，并与 Linear 双向同步。⌘K 可搜索 bot、历史对话、任务和项目。
 - **判断哪些事需要你。** Mikka 按「置之不理的代价」为来自 GitHub、Linear、Notion 和 Gmail 的通知评级。紧急事项交给 Coordinator，它每天最多打扰你五次；其余事项留在「建议」中。每日简报会在你所在时区 08:00 之后发送到 Coordinator 对话中。
 - **插件与技能。** 在同一页面查看已连接的应用，并浏览公开的 agent 技能。
@@ -78,26 +78,28 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 
 以下功能处于早期体验阶段，需开启 flag 或开关后使用：
 
-- **云端电脑。** 每个 bot 拥有自己的云端桌面，支持实时查看、接管和交还控制权；空闲时自动休眠并保留磁盘数据。Bot 在桌面上的操作会在对话卡片中请求你的批准。
-- **使用自己的订阅。** 在设置中连接 ChatGPT（Codex）或 Claude 订阅，bot 和运行即可使用你自己的套餐。
+- **云端电脑。** 每个 bot 拥有自己的云端桌面，支持实时查看、接管和交还控制权；空闲时自动休眠并保留磁盘数据。桌面操作遵守适用的授权策略。
+- **使用自己的订阅。** 在设置中连接 ChatGPT（Codex）或 Claude 订阅，真实订阅支持的托管编码仍待验收。
 - **关于你的记忆。** Mikka 从已评级的通知中提取关于你的信息，每晚合并，并在「记忆」中展示，每一条都可以修改或删除。
 - **移动端应用。** [`apps/mobile`](apps/mobile) 中的 iOS 应用以 Coordinator 对话为核心，包含建议、线程、任务、设置和推送通知。
 
 ## 开发路线
 
+目标授权流程由具备视觉能力的模型判断业务语义与行动。已有 auto-review 或 MCP 策略为 allow 时直接执行，ask 时请求确认，deny 时停止；鉴权、凭据保护、幂等和机械检查继续生效。敏感删除、安全设置等仍遵守适用策略的确认要求。此流程仍需实现和验收。
+
 正在进行的工作在 [GitHub issues](https://github.com/alexj11324/Mikka/issues) 中跟踪，并与 Linear（`MIK-xx`）同步。
 
 | 方向 | 规划内容 | 跟踪 |
 | --- | --- | --- |
-| **设备接入与交付** | 连接设备，将编码工作交给 Claude Code 或 Codex，并经你批准后发布 GitHub PR。 | [#357](https://github.com/alexj11324/Mikka/issues/357) |
+| **设备接入与交付** | 连接设备，将编码工作交给 Claude Code 或 Codex，并按适用策略发布 GitHub PR。 | [#357](https://github.com/alexj11324/Mikka/issues/357) |
 | **云端电脑** | 上文的 bot 专属桌面处于早期体验阶段。下一步：每个云端线程拥有独立的机器，向所有人开放云端编码线程，以及替 bot 浏览网页的网页分身，每个分身使用独立的浏览器。 | [#172](https://github.com/alexj11324/Mikka/issues/172)、[#342](https://github.com/alexj11324/Mikka/issues/342) |
-| **本机 computer use** | Agent 在你自己的电脑上操作应用，并沿用云端电脑的对话内审批：允许一次、拒绝，或在本次运行内始终允许。 | [#147](https://github.com/alexj11324/Mikka/issues/147) |
+| **本机 computer use** | Linux daemon 后端已接入，并通过真实 Xvfb 驱动与沙箱测试（[PR #161](https://github.com/alexj11324/Mikka/pull/161)）；CLI/模型使用合成 fixture。真实 macOS 使用和完整 agent 流程仍待验证，操作遵循 allow / ask / deny。 | [#147](https://github.com/alexj11324/Mikka/issues/147) |
 | **群聊** | 支持多个 bot 与多名成员在同一对话中协作，提供轮流发言、@ 提及以及「正在工作」状态栏。 | [#105](https://github.com/alexj11324/Mikka/issues/105) |
-| **Factory** | 完整的交付流程：同一任务同一时间仅执行一次、阶段状态持久化、独立的审查与验证线程，以及基于实际证据的人工发布审批。 | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
+| **Factory** | 完整的交付流程：同一任务同一时间仅执行一次、阶段状态持久化、独立的审查与验证线程，以及基于实际证据和适用策略的发布决策。 | [#191](https://github.com/alexj11324/Mikka/issues/191)–[#195](https://github.com/alexj11324/Mikka/issues/195) |
 | **定时任务** | Bot 可在指定时间或按周期执行任务，并将结果返回至对话。目前按计划运行的只有每日简报。 | [#179](https://github.com/alexj11324/Mikka/issues/179) |
-| **Connected apps** | 更多经你批准后执行的操作，例如 Notion 和 Slack 中的操作。 | [#177](https://github.com/alexj11324/Mikka/issues/177) |
+| **Connected apps** | 更多操作，例如 Notion 和 Slack 中的操作，按策略执行 allow / ask / deny。 | [#177](https://github.com/alexj11324/Mikka/issues/177) |
 | **主动建议** | 每晚的后台调研，根据你的截止日期和兴趣每天生成少量建议卡片，点击即可开始任务。 | [#350](https://github.com/alexj11324/Mikka/issues/350) |
-| **安全凭据** | Agent 通过安全表单请求凭据。凭据由保管库存放，受控浏览器仅在获批操作中使用。 | [#180](https://github.com/alexj11324/Mikka/issues/180) |
+| **安全凭据** | Agent 通过安全表单请求凭据。凭据由保管库存放，受控浏览器仅在适用策略允许的操作中使用。 | [#180](https://github.com/alexj11324/Mikka/issues/180) |
 | **体验优化** | 新用户引导、更完整的 ⌘K 搜索，以及知识库。 | [#129](https://github.com/alexj11324/Mikka/issues/129)、[#131](https://github.com/alexj11324/Mikka/issues/131)、[#134](https://github.com/alexj11324/Mikka/issues/134) |
 
 ## 接入 agent
@@ -133,13 +135,13 @@ Claude Code 会打开浏览器完成登录。登录后，agent 可以读取和�
 
 Web 应用、iOS 应用、Telegram、Slack 和 MCP 客户端均接入部署在 Vercel 上的同一个 Next.js 应用。运行结束、worker 提问、已评级的通知等事件会发送给 Coordinator。Coordinator 是一个持久化 workflow，负责对每个事件进行分诊并决定下一步操作。所有 bot 都运行在同一个 workflow 上，各自拥有独立的对话、记忆和收件箱。
 
-运行在你的设备上执行。Daemon 注册设备后，通过设备 API 领取运行，并在独立的 git worktree 中启动对应的 agent CLI。运行过程中它会上传检查点，以便其他设备接手。Agent 通过 Mikka 的 MCP worker 工具汇报进度、提出问题或报告阻塞。
+运行在你的设备上执行。Daemon 注册设备后，通过设备 API 领取运行，并在独立的 git worktree 中启动对应的 agent CLI。基于检查点的交接已有实现和测试；真实双机交接仍待验收。Agent 通过 Mikka 的 MCP worker 工具汇报进度、提出问题或报告阻塞。
 
 在早期体验中，bot 的云端电脑是一个 E2B sandbox，运行同一个 daemon，并提供可通过 noVNC 查看的桌面。[`packages/subscription-worker`](packages/subscription-worker) 中的 Go 订阅 worker 保管你所连接订阅的登录凭据，密钥存放在 Infisical 中。
 
 Linear 同步运行在 Cloudflare Worker 上，通过持久化的 inbox 和 outbox 与 Postgres 交换变更。另一个 Worker 负责触发每日简报和每小时的通知对账。
 
-图中的虚线框和虚线表示绘制时尚在规划中的部分。其中两项已经上线：跨设备接续（[PR #201](https://github.com/alexj11324/Mikka/pull/201)），以及处于早期体验阶段的云端电脑（[#317](https://github.com/alexj11324/Mikka/pull/317)）；经审批的 Connected apps 操作（[#177](https://github.com/alexj11324/Mikka/issues/177)）已部分完成。仍在规划中的有：Scheduler（[#179](https://github.com/alexj11324/Mikka/issues/179)）、Factory 阶段（[#191](https://github.com/alexj11324/Mikka/issues/191)–[#194](https://github.com/alexj11324/Mikka/issues/194)）、监控（[#195](https://github.com/alexj11324/Mikka/issues/195)）、本机 computer use（[#147](https://github.com/alexj11324/Mikka/issues/147)）以及凭据保管库（[#180](https://github.com/alexj11324/Mikka/issues/180)）。
+虚线框和虚线表示规划中或仍待端到端验收的部分，包括托管编码、回答路由和获批邮件/日历写入。其他路线图项目：Scheduler（[#179](https://github.com/alexj11324/Mikka/issues/179)）、Factory 阶段（[#191](https://github.com/alexj11324/Mikka/issues/191)–[#194](https://github.com/alexj11324/Mikka/issues/194)）、监控（[#195](https://github.com/alexj11324/Mikka/issues/195)）、本机 computer use（[#147](https://github.com/alexj11324/Mikka/issues/147)）、邮件和日历之外的 Connected apps 工作流（[#177](https://github.com/alexj11324/Mikka/issues/177)）以及凭据保管库（[#180](https://github.com/alexj11324/Mikka/issues/180)）。
 
 ## 技术栈
 
@@ -148,7 +150,7 @@ Linear 同步运行在 Cloudflare Worker 上，通过持久化的 inbox 和 outb
 | 应用 | Next.js 16、React 19、Tailwind CSS 4、shadcn/ui、ReUI |
 | 移动端 | [`apps/mobile`](apps/mobile) 中的 Expo 与 Expo Router（React Native） |
 | Bot | Vercel AI SDK；包括 Coordinator 在内的所有 bot 都是运行在 [Vercel Workflow](workflows/coordinator) 上的持久化循环 |
-| 分诊 | 优先按规则处理，必要时通过 Vercel AI Gateway 调用模型，并设置每月费用上限 |
+| 分诊 | 由具备能力的模型判断业务语义，按策略执行 allow / ask / deny，并保留机械安全检查；现有规则优先路由仍待调整和验收 |
 | 数据 | Neon 托管的 Postgres，Drizzle 迁移位于 [`drizzle/`](drizzle) |
 | 认证 | Better Auth，支持邮箱、Google 和 GitHub 登录，并为 MCP 提供 OAuth 2.1 server |
 | 集成 | GitHub 与 Linear 使用 webhook；Gmail、Google 日历、Notion、Slack 通过 Composio 接入；Linear 同步和定时简报运行在 Cloudflare Worker 上；Telegram 和 Slack 基于 Vercel Chat SDK；网页搜索使用 Firecrawl |

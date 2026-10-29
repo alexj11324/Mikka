@@ -19,6 +19,7 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-29 | Connect Linear sync to one PostHog feature flag and leave it off (Alex: 「那你Linear同步接一下posthog」「关掉这个feature」). Pausing covers backend intake, cron, dispatch, claims and settings polling; preserve connections, queued work and existing data. Settings show only the paused state | `../linear-sync.md`, R-40 | Per-team pause as a substitute for global disablement |
 | 2026-10-28 | Alex approved a manual, main-only GitHub Actions release with npm trusted publishing and provenance, per-repository push approval in the owner's conversation, and a draft PR marked unverified when no verification command ran. The initial `@mikka/daemon` package name was superseded by the single-install direction below. Source: “上面的请求全部允许”. Trusted publisher configuration and fixed-Preview acceptance remain outstanding. | | MVP proposals above and run-publication proposals below |
 | 2026-10-28 | Alex requested one installation and one `mikka` command, with the daemon as a subcommand: “如果说可以一起的话，最好一起吧，懒得弄两次”. The release candidate is `@aspectlylabs/mikka`; npm organization ownership and trusted publishing must be verified before publication. | | Initial `@mikka/daemon` public-name decision |
 | 2026-10-27 | A thread's owner stops it from the shared composer; the draft stays editable. Stop status appears immediately in the thread and the task's thread list. After about 30 seconds without acknowledgement, show an error and retry. Source: Alex's MVP core-loop brief, item 1 (#357). Existing accepted panel frames are `220:5314` / `220:5199`; [light/dark/narrow stop and timeout review](https://www.figma.com/design/zPe5LKycb2XuT1ivCLRw07?node-id=372-4786) is prepared. These new states remain **待 Alex 确认**; real Preview screenshots are still pending. | R-10, R-62 | PR #336's disabled composer while stopping and unbounded acknowledgement wait |
@@ -152,6 +153,11 @@ and Claude Code/Codex/Cursor task execution harnesses. Harness names describe
 execution layers, not extra user-facing Bots. This is a behavioural retirement,
 not a shell/layout redesign; source correction: Alex 2026-10-25 23:40 UTC.
 
+## 2026-10-27: GitHub repository access and PR status
+
+GitHub repository access is individual: each person authorizes their own GitHub
+account and App installation. A linked PR's displayed state follows GitHub; Mikka
+does not close or reopen it. Existing manually shared task links remain shared.
 ## MVP result closure · 2026-10-28
 
 R-66 implementation review frame, **待 Alex 确认** (not accepted):

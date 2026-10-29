@@ -159,6 +159,7 @@ jobs:
         run: node scripts/test-auth-email.mjs
       - run: pnpm test:groups
       - run: pnpm test:integrations
+      - run: pnpm test:github
       - run: pnpm test:request-log
       - run: pnpm test:slack
       - run: pnpm test:telegram
