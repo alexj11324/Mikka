@@ -174,14 +174,34 @@ mobile drawer.
   the settings allow it: 需要你决策 for events that need the person (handed-over
   matters included), 线程完成 for finished runs, 每日简报 for the 08:00
   briefing (`lib/push-reasons.ts`, `lib/mobile-push.ts`). A verification code
-  stays in the app chat; its push only says one came. Registering needs the
-  EAS project id in `app.json` (`extra.eas.projectId`) and a real device.
+  stays in the app chat; its push only says one came. A card is pushed as its
+  words (`lib/openui-lang.ts`). Registering needs the EAS project id
+  (`extra.eas.projectId`, set from `EAS_PROJECT_ID` by `app.config.ts`) and a
+  real device. The app asks iOS after the Coordinator's first message of its
+  own or from 通知, never at launch; denied or failed shows 「推送无法送达」.
+  A tap opens the proposal's card (`pendingActionId`), the finished thread
+  (`runId`) or the chat (`botId`), also when it launched the app.
+- **Cards and proposals:** OpenUI replies are drawn natively
+  (`components/OpenUI.tsx`: text, choice and question cards, approval,
+  follow-ups, buttons); a card the app cannot draw shows its words and
+  「在网页上打开」, which opens the same chat on the web signed in
+  (`app/api/mobile/open`, a one-minute single-use token). The browser first
+  shows the target account and requires a same-origin, browser-bound confirmation;
+  following the link alone never changes its signed-in account. Proposals from
+  `/api/pending-actions` sit at the end of every chat with 不要 and
+  发送/保存到日历 (`POST /api/mobile/pending-actions/:id`).
+- **Lost session:** a 401 signs the app out locally and shows sign-in with
+  「登录已失效，请重新登录。」.
+- **Sending:** a message that fails stays as its bubble with
+  「未发送 · 重试」, and the composer keeps the words until the server takes
+  them. 「没有网络」 shows under the header while offline.
 - **Settings stored:** 主动消息 is lib/attention's switch
   (`attention_settings.enabled`); the push switches and 使用记忆 (off leaves
   the memory out of the prompt) are in `user_preferences`.
-- **Not on the server yet**, so the app leaves them out: proactive cards with
-  buttons, 待审阅 and 已归档 threads, pinned bots, 电脑不在用时 (needs the web
-  to report presence), photo upload, dark mode.
+- **Not on the server yet**, so the app leaves them out: 待审阅 and 已归档
+  threads, pinned bots, 电脑不在用时 (needs the web to report presence),
+  photo upload and dictation (so the composer has no 「+」 or mic yet), dark
+  mode.
 - **Updates:** EAS Update for JavaScript changes; store releases for native
   changes.
 
