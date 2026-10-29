@@ -1,18 +1,25 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Columns3, Copy, House, type LucideIcon } from 'lucide-react'
+import type { ComponentType } from 'react'
+import { Blocks, Columns3, House, Lightbulb } from 'lucide-react'
+import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { Button } from '@/components/ui/button'
 import { Sidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 
-export type RailDestination = 'chats' | 'board' | 'plugins'
+export type RailDestination = 'chats' | 'suggestions' | 'board' | 'plugins' | 'artifacts'
 
-// 主页 (the agent conversations), the board, plugins.
-export const RAIL_ITEMS: { id: RailDestination; icon: LucideIcon; label: 'Nav.home' | 'Nav.board' | 'Nav.plugins' }[] = [
+/** A lucide icon or one of ours drawn the same way (components/icons). */
+type RailIcon = ComponentType<{ className?: string; 'data-icon'?: string }>
+
+// 主页 (the bot chats), 建议, the board, plugins, Artifact.
+export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; label: 'Nav.home' | 'Nav.suggestions' | 'Nav.board' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
   { id: 'chats', icon: House, label: 'Nav.home' },
+  { id: 'suggestions', icon: Lightbulb, label: 'Nav.suggestions' },
   { id: 'board', icon: Columns3, label: 'Nav.board' },
-  { id: 'plugins', icon: Copy, label: 'Nav.plugins' },
+  { id: 'plugins', icon: Blocks, label: 'Nav.plugins' },
+  { id: 'artifacts', icon: ArtifactIcon, label: 'Nav.artifacts' },
 ]
 
 type RailProps = {

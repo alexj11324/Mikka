@@ -96,7 +96,7 @@ function issueResult(issue: { id: string; title: string; status: string; priorit
   }
 }
 
-export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }, actor?: ActivityActor, toolCallId?: string) {
+export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }, actor?: ActivityActor, toolCallId?: string, taskEvent?: { eventId: string; botId: string | null }) {
   return attempt(() => actAs(userId, async () => {
     if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
     // The legacy MCP contract has no human-assignee field. Do not introduce a
@@ -111,7 +111,7 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
     const parsed = createIssueInput.safeParse(input)
     if (!parsed.success) return { error: 'validationGeneric' }
     const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
-    try { return await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate) }
+    try { return await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate, taskEvent) }
     catch (error) { if (error instanceof IssueToolCallConflict) return { error: error.message }; throw error }
   }, actor))
 }
@@ -169,7 +169,8 @@ export async function listAgents(userId: string) {
 }
 
 export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; deviceRepoId: string; note?: string }) {
-  return attempt(async () => ({ ...(await queueRun(userId, input)), status: 'queued' }))
+  // Marked 'mcp' so the right column does not count it as the Coordinator's.
+  return attempt(async () => ({ ...(await queueRun(userId, input, null, undefined, 'mcp')), status: 'queued' }))
 }
 
 export async function sendToRun(userId: string, input: { runId: string; text: string }) {

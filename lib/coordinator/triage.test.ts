@@ -1,16 +1,27 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { chatItems, eventPrompt, promptMessages, type StoredMessage } from './context'
-import { eventsForInbox, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
+import { eventsForInbox, isolateTaskRequest, ruleTier, tierFromDecision, triageQuestions, triageState } from './triage'
 import { briefingEvent } from '@/lib/coordinator-events'
 
 const run = (payload: Record<string, unknown>) => ({ kind: 'run_finished' as const, payload: { stopReason: 'submitted', ...payload } })
+
+test('machine-selected requests get separate turns in inbox order', () => {
+  const normal = { kind: 'user_message', payload: { text: 'hello' } }
+  const first = { kind: 'user_message', payload: { taskDestination: { kind: 'cloud' } } }
+  const second = { kind: 'user_message', payload: { taskDestination: { kind: 'device', deviceId: 'device' } } }
+  assert.deepEqual(isolateTaskRequest([normal, first, second]), [normal])
+  assert.deepEqual(isolateTaskRequest([first, second, normal]), [first])
+  assert.deepEqual(isolateTaskRequest([second, normal]), [second])
+  assert.deepEqual(isolateTaskRequest([normal]), [normal])
+})
 
 test('only direct user delivery has a transport tier; every runtime event needs model judgment', () => {
   assert.equal(ruleTier({ kind:'user_message',payload:{text:'hi'} }), 'attention')
   for (const kind of ['issue_done','run_retried','run_finished','run_question','run_blocked','run_report','daily_briefing','matter_handoff','artifact_submitted','action_decided'] as const) {
     for (const status of ['failed','cancelled','stopped','succeeded']) assert.equal(ruleTier({kind,payload:{status}}), null)
   }
+
 })
 test('triage projects observed state separately from untrusted claims and asks for a direct choice', () => {
   const state=triageState(run({status:'succeeded',summary:'Done'}))

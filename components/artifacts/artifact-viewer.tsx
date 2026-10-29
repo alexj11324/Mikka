@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenu
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -40,7 +41,7 @@ const versionPath = (id: string, version: number, file: 'frame' | 'download') =>
  * reads and answers in one place. Versions open from the pill by the title;
  * an older version shows its changes against the newest.
  */
-export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quotes, chat }: {
+export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quotes, chat, canQuote = true }: {
   artifactId: string
   onArtifactChange: (id: string) => void
   onClose: () => void
@@ -49,6 +50,8 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
   /** Every quote sent from artifacts in this chat; this reader underlines its own. */
   quotes: readonly ArtifactQuote[]
   chat: (slot: ArtifactChatSlot) => ReactNode
+  /** False when the chat beside it cannot take a quote (a thread): no 选择元素, no quoting. */
+  canQuote?: boolean
 }) {
   const t = useTranslations('Artifact')
   const format = useFormatter()
@@ -111,7 +114,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
         {detail && <ArtifactShare artifactId={artifactId} shared={Boolean(detail.shared)} onChange={() => { void mutate() }} />}
         {detail?.kind === 'markdown' && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('download')} render={<a href={versionPath(artifactId, version, 'download')} download />} />}><Download data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('download')}</TooltipContent></Tooltip>}
         {detail?.kind === 'html' && <>
-          <Button variant="ghost" size="sm" aria-pressed={selecting} onClick={() => setSelecting(on => !on)} className={cn('hidden md:inline-flex', selecting && 'bg-sidebar-primary-soft text-sidebar-primary-soft-foreground hover:bg-sidebar-primary-soft hover:text-sidebar-primary-soft-foreground')}><SquareDashedMousePointer data-icon="inline-start" />{t('selectElement')}</Button>
+          {canQuote && <Button variant="ghost" size="sm" aria-pressed={selecting} onClick={() => setSelecting(on => !on)} className={cn('hidden md:inline-flex', selecting && 'bg-sidebar-primary-soft text-sidebar-primary-soft-foreground hover:bg-sidebar-primary-soft hover:text-sidebar-primary-soft-foreground')}><SquareDashedMousePointer data-icon="inline-start" />{t('selectElement')}</Button>}
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('openInBrowser')} render={<a href={versionPath(artifactId, version, 'frame')} target="_blank" rel="noopener noreferrer" />} />}><Globe data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('openInBrowser')}</TooltipContent></Tooltip>
         </>}
         <Button variant="ghost" size="icon-sm" className="md:hidden" aria-pressed={pane === 'chat'} aria-label={pane === 'chat' ? t('showContent') : t('showChat')} onClick={() => setPane(current => current === 'chat' ? 'content' : 'chat')}><MessageSquare data-icon="inline-start" /></Button>
@@ -134,7 +137,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
             : markdown ? <ArtifactDocument key={`${artifactId}:${version}`} title={detail.title} markdown={text ?? ''} compareWith={old && showDiff ? latestText ?? null : null}
                 author={info ?? { authorName: '', authorColor: null, authorShape: null }} meta={info ? t(old ? 'versionMeta' : 'updated', { author: info.authorName, time: when(info.createdAt) }) : ''}
                 quoted={mine.filter(item => item.kind === 'text').map(item => item.text)} quoting={quote?.kind === 'text' && quote.artifactId === artifactId && quote.version === version ? quote.text : null}
-                onQuote={quoteText} />
+                onQuote={canQuote ? quoteText : undefined} />
             : <ArtifactFrame src={versionPath(artifactId, version, 'frame')} title={t('frameTitle', { title: detail.title })} selecting={selecting}
                 marked={[...mine.flatMap(item => item.selector ? [item.selector] : []), ...(quote?.selector && quote.artifactId === artifactId && quote.version === version ? [quote.selector] : [])]}
                 onSelectOff={() => setSelecting(false)}
@@ -143,7 +146,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
         <aside aria-label={bot.name} className={cn('w-full flex-col bg-muted/50 md:flex md:w-[25rem] md:shrink-0', pane === 'chat' ? 'flex' : 'hidden')}>
           <div className="flex h-12 shrink-0 items-center gap-2 px-4">
             {bot.avatar}
-            <span className="truncate text-sm font-medium">{bot.name}</span>
+            {bot.name ? <span className="truncate text-sm font-medium">{bot.name}</span> : <Skeleton className="h-4 w-40" />}
           </div>
           {chat({ quote, clearQuote: () => setQuote(null), activeArtifactId: artifactId, openArtifact: switchArtifact })}
         </aside>

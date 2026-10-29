@@ -139,6 +139,21 @@ test('real git diffs retain all fixtures while testing rename, deletion and even
 })
 
 
+test('the workflow-extracted trusted classifier executes as an ES module', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'docs-gate-loader-retained-'))
+  console.log(`Retained docs gate loader evidence: ${dir}`)
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+    const workflow = readFileSync(file, 'utf8')
+    const allocation = workflow.match(/trusted="\$\((mktemp[^\n]*)\)"/)
+    assert.ok(allocation, file)
+    const env = { PATH: process.env.PATH, TMPDIR: dir }
+    const extracted = execFileSync('bash', ['-ceu', allocation[1]], { env, encoding: 'utf8' }).trim()
+    writeFileSync(extracted, readFileSync('scripts/ci-docs-only.mjs'))
+    const output = execFileSync(process.execPath, [extracted, '--base', 'missing-base', '--head', 'missing-head'], { env, encoding: 'utf8' })
+    assert.match(output, /docs_only=false/, file)
+  }
+})
+
 test('trusted workflow classifier executes as an ES module from its retained temporary file', () => {
   for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
     const workflow = readFileSync(file, 'utf8')

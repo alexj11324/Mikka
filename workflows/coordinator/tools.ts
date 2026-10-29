@@ -11,7 +11,7 @@ import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { personalMailboxTools } from '@/lib/mailbox-tools'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
 
-export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[] }
+export interface CoordinatorToolOptions { execution?: AgentExecution | null; computerEnabled?: boolean; taskEventId?: string; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[] }
 
 export function createCoordinatorRegistry(userId: string, botId: string | null, scope?: NativeToolScope, options: CoordinatorToolOptions = {}) {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
@@ -43,7 +43,9 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
     ...(issueMutationsEnabled() ? { create_issue: tool({
       description: 'Create the task the person asked for, including requests from the new-task dialog. Write a short title and put details in body. The assignee can only be a person; dispatching a thread is a separate action. Defaults to todo and normal priority.',
       inputSchema: createIssueInput,
-      execute: (input, options) => steps.createIssue(userId, input, options.toolCallId, scope, botId),
+      execute: (input, toolOptions) => options.taskEventId
+        ? steps.createIssue(userId, input, toolOptions.toolCallId, scope, botId, options.taskEventId)
+        : steps.createIssue(userId, input, toolOptions.toolCallId, scope, botId),
     }),
     update_issue: tool({
       description: 'Update an existing task the person asked to change. Only supplied fields change; labels replaces the full label set. Read the task first. The assignee can only be a person.',

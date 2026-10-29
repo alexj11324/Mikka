@@ -16,7 +16,6 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { DeviceIcon } from '@/components/devices/device-icon'
-import { useCloudComputer } from '@/hooks/use-feature-availability'
 import { useComputer } from '@/hooks/use-computer'
 
 const MAX_LENGTH = 8000
@@ -59,19 +58,21 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const submission = useRef<{ text: string; destination: string; id: string } | null>(null)
   const fileId = useId()
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
   const { data: bots = [] } = useSWR(open ? 'agents' : null, listAgents)
   // Mikka Cloud first and by default: there the Coordinator picks the bot, so no bot is named.
-  // Then 本机 (the user's own computers), then Remote control (servers such as a VPS), as in 设置 › 设备.
+  // Direct daemon devices are 本机, including Linux. OS is not evidence that
+  // a computer is an SSH target reached through another machine (R-23).
   const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true }
-  const own: Machine[] = devices.filter(item => (item as typeof item & { kind?: string }).kind !== 'cloud').map(item => ({ value: item.id, label: item.name, online: item.online, server: item.platform !== 'darwin' && item.platform !== 'win32' }))
+  const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, online: item.online, server: false }))
   const local = own.filter(item => !item.server)
   const remote = own.filter(item => item.server)
-  // Mikka Cloud is offered only once the cloud computer is live (the `cloud-computer` flag).
-  const cloudComputer = useCloudComputer()
-  const machines = cloudComputer ? [cloud, ...local, ...remote] : [...local, ...remote]
+  // R-23: the task keeps its chosen destination even when cloud execution is
+  // unavailable; the Coordinator can create it and report the missing setup.
+  const machines = [cloud, ...local, ...remote]
   const [picked, setPicked] = useState<string | null>(null)
   const device = machines.find(item => item.value === picked) ?? machines[0]
   useEffect(() => { if (open && initialText) setDraft(current => current || initialText) }, [open, initialText])
@@ -92,9 +93,13 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
     setSending(true)
     try {
       const context = [device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
-      const result = await sendCoordinatorMessage(context ? t('promptWithContext', { context, text }) : t('prompt', { text }))
+      const prompt = context ? t('promptWithContext', { context, text }) : t('prompt', { text })
+      if (submission.current?.text !== prompt || submission.current.destination !== device.value) submission.current = { text: prompt, destination: device.value, id: crypto.randomUUID() }
+      const result = await sendCoordinatorMessage(prompt, null, null, submission.current.id,
+        device.cloud ? { kind: 'cloud' } : { kind: 'device', deviceId: device.value })
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       setDraft('')
+      submission.current = null
       onOpenChange(false)
       onSent?.()
       void mutate('coordinator-chat')
