@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Platform, View } from 'react-native'
-import { Stack, useRouter } from 'expo-router'
+import { Stack, useRouter, type Href } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { DrawerHost } from '@/components/Drawer'
@@ -19,7 +19,7 @@ export default function RootLayout() {
   )
 }
 
-/** Signed out: the sign-in screen. Signed in: the app, and this phone registers for pushes. */
+/** Signed out: the sign-in screen. Signed in: the app, and this phone's pushes (PushSetup). */
 function SessionGate() {
   const { data, isPending } = authClient.useSession()
   if (isPending && !data) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.page }}><Spinner size={22} /></View>
@@ -36,16 +36,21 @@ function SessionGate() {
   )
 }
 
+/**
+ * Pushes, once signed in: a tap opens what it was about (also a tap that
+ * launched the app), and iOS's permission is read but not asked for here; the
+ * app asks after the Coordinator's first message of its own, or from 通知.
+ */
 function PushSetup() {
   const router = useRouter()
   useEffect(() => {
     if (Platform.OS === 'web') return
     let cleanup: (() => void) | undefined
+    let gone = false
     void import('@/lib/push').then(push => {
-      push.registerForPush().catch(() => undefined)
-      cleanup = push.onPushOpened(botId => router.push(botId ? `/bots/${botId}` : '/'))
+      if (!gone) cleanup = push.watchPushes(href => router.push(href as Href))
     })
-    return () => cleanup?.()
+    return () => { gone = true; cleanup?.() }
   }, [router])
   return null
 }

@@ -35,7 +35,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     `)
     for (const name of ['20261027164501_cloud_computers.sql', '20261027164502_computer_run_bindings.sql']) await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
     await pool.query('ALTER TABLE cloud_machines ADD COLUMN "deviceId" uuid')
-    const migration = await readFile(new URL('../../drizzle/20261028183208_subagents_thread_machines.sql', import.meta.url), 'utf8')
+    const migration = await readFile(new URL('../../drizzle/20261029011635_subagents_thread_machines.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
     await pool.query(`ALTER TABLE suggestions ADD COLUMN "userId" text, ADD COLUMN shown boolean DEFAULT true, ADD COLUMN "dismissedAt" timestamptz, ADD COLUMN source text, ADD COLUMN actor text, ADD COLUMN url text, ADD COLUMN title text, ADD COLUMN action text, ADD COLUMN "actionTitle" text;
       CREATE TABLE coordinator_messages(id uuid PRIMARY KEY,"userId" text,"botId" uuid,position integer,message jsonb,UNIQUE NULLS NOT DISTINCT("userId","botId",position));
