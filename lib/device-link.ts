@@ -53,7 +53,7 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
   if (row.expiresAt && row.expiresAt.getTime() <= Date.now()) return null
   if (row.boundDeviceId || row.boundWorkspaceId) {
     if (!row.boundDeviceId || !row.boundWorkspaceId || !row.expiresAt) return null
-    const machine = await pool.query('SELECT 1 FROM cloud_machines m JOIN devices d ON d.id=m."deviceId" WHERE m."deviceId"=$1 AND m."workspaceId"=$2 AND m."ownerId"=$3 AND d."ownerId"=$3 AND d.kind=$4', [row.boundDeviceId, row.boundWorkspaceId, row.userId, 'cloud'])
+    const machine = await pool.query(`SELECT 1 FROM (SELECT "deviceId","workspaceId","ownerId" FROM cloud_machines UNION ALL SELECT "deviceId","workspaceId","ownerId" FROM thread_machines WHERE state <> 'ended') m JOIN devices d ON d.id=m."deviceId" WHERE m."deviceId"=$1 AND m."workspaceId"=$2 AND m."ownerId"=$3 AND d."ownerId"=$3 AND d.kind=$4`, [row.boundDeviceId, row.boundWorkspaceId, row.userId, 'cloud'])
     if (!machine.rowCount) return null
     const allowed = await cloudDeviceScopeAllows(request, row.boundDeviceId, async (runId, deviceId) => {
       if (!z.uuid().safeParse(runId).success) return false

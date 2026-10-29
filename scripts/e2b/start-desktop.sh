@@ -22,5 +22,7 @@ chmod 700 "$socketdir"
 # inject the client's coordinates even when they match x11vnc's cached input.
 x11vnc -display "$DISPLAY" -rfbport 0 -rfbportv6 0 -no6 -unixsock "$socketdir/$display-control.sock" -forever -shared -nopw -always_inject > /tmp/vnc-$display.log 2>&1 &
 x11vnc -display "$DISPLAY" -rfbport 0 -rfbportv6 0 -no6 -unixsock "$socketdir/$display-view.sock" -forever -shared -nopw -viewonly > /tmp/vnc-view-$display.log 2>&1 &
+if [[ "${MIKKA_MANAGED_CHROME:-0}" != "1" ]]; then
 chromium --no-sandbox --disable-gpu --disable-software-rasterizer --disable-dev-shm-usage --no-first-run --no-default-browser-check --password-store=basic --user-data-dir="$profile" --window-size=1280,800 about:blank > /tmp/chrome-$display.log 2>&1 &
+fi
 wait

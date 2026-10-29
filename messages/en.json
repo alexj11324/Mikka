@@ -2087,7 +2087,11 @@
       "approveSave": "Save to calendar",
       "sent": "Email sent",
       "saved": "Calendar updated",
-      "failed": "Didn't go through: {error}"
+      "failed": "Didn't go through: {error}",
+      "site": "Site",
+      "approveClear": "Clear fields",
+      "approveSubmit": "Submit login",
+      "approveBrowser": "Approve operation"
     },
     "working": "Coordinator is working…",
     "loadError": "Could not load the conversation. Retrying.",

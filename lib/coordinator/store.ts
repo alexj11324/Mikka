@@ -1,5 +1,6 @@
 import { sourcedEventMessage } from './message-safety'
 import { visibleRuns } from '@/lib/agent-runs'
+import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { issueForUser } from '@/lib/issue-access'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
@@ -30,7 +31,7 @@ const LEASE_MS = 10 * 60_000
 /** Inbox events moved into the conversation per take. */
 const INBOX_BATCH = 50
 
-type Executor = Pick<typeof db, 'select' | 'insert'>
+type Executor = Pick<typeof db, 'select' | 'insert' | 'execute'>
 
 // Every bot chats on this harness. `botId` picks the chat: null is the
 // person's Coordinator (the built-in bot), otherwise one of their own bots.
@@ -41,6 +42,7 @@ const messagesOf = (userId: string, botId: string | null) => and(eq(coordinatorM
 const eventsOf = (userId: string, botId: string | null) => and(eq(coordinatorEvents.userId, userId), ofBot(coordinatorEvents.botId, botId))
 
 async function nextPosition(executor: Executor, userId: string, botId: string | null): Promise<number> {
+  await executor.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bot-chat:${userId}:${botId ?? 'coordinator'}`},0))`)
   const [row] = await executor.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
   return Number(row?.last ?? 0) + 1
@@ -107,8 +109,9 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
     if (!events.length) return { held: true, ...NO_TAKE }
+    const chatEvents = events.filter(event => !(event.kind === 'user_message' && event.payload.postedToChat === true))
     const first = await nextPosition(tx, userId, botId)
-    await tx.insert(coordinatorMessages).values(events.map((event, index) => ({
+    if (chatEvents.length) await tx.insert(coordinatorMessages).values(chatEvents.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
       message: sourcedEventMessage({ ...event, deliveredAt: now }, eventPrompt(event)),
     })))
@@ -159,7 +162,9 @@ export async function setEventTier(id: string, tier: CoordinatorEventTier): Prom
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
 export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null): Promise<void> {
+  await assertCredentialSafeChat(userId, messages)
   await db.transaction(async tx => {
+    await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId" IS NOT DISTINCT FROM ${botId}::uuid FOR UPDATE`)
     if (messages.length) {
       const first = await nextPosition(tx, userId, botId)
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => ({

@@ -2087,7 +2087,11 @@
       "approveSave": "保存到日历",
       "sent": "邮件已发送",
       "saved": "日历已更新",
-      "failed": "没做成：{error}"
+      "failed": "没做成：{error}",
+      "site": "网站",
+      "approveClear": "清空登录字段",
+      "approveSubmit": "提交登录",
+      "approveBrowser": "批准操作"
     },
     "working": "Coordinator 正在处理…",
     "loadError": "对话加载失败，正在重试。",

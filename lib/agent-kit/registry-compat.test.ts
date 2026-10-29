@@ -22,8 +22,9 @@ const context={toolCallId:'synthetic-call',messages:[]}
 const execution=():AgentExecution=>({id:randomUUID(),status:'running',snapshot:makeSnapshot(randomUUID(),1,{...DEFAULT_AGENT_DEFINITION,tools:['dispatch_bot_computer']},'HOST',{harness:'ai_sdk',model:'synthetic'})})
 test('feature-off catalog omits cloud tools; only named options can enable the computer',()=>{
  const off=registry.coordinatorTools(owner,botId)
- assert.equal(off.dispatch_bot_computer,undefined);assert.equal(off.load_skill,undefined);assert.ok(off.record_attention)
+ assert.equal(off.dispatch_bot_computer,undefined);assert.equal(off.start_web_subagent,undefined);assert.equal(off.load_skill,undefined);assert.ok(off.record_attention)
  assert.ok(registry.coordinatorTools(owner,botId,undefined,{computerEnabled:true}).dispatch_bot_computer)
+ assert.ok(registry.coordinatorTools(owner,botId,undefined,{computerEnabled:true}).start_web_subagent)
  assert.throws(()=>registry.coordinatorTools(owner,botId,undefined,true as unknown as NonNullable<Parameters<typeof registry.coordinatorTools>[3]>),/agentToolOptionsInvalid/)
  assert.throws(()=>registry.coordinatorTools(owner,botId,undefined,{execution:execution(),computerEnabled:false}),/agentToolUnavailable/)
 })

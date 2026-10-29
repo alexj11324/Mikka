@@ -10,6 +10,7 @@ import { issueRunToken } from '@/lib/mcp/worker'
 import { latestCheckpoint } from '@/lib/run-leases'
 import { retryNote } from '@/lib/run-retry'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
+import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 
@@ -47,7 +48,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const pinned = run.agentDefinition?.subscription
   let subscription: Awaited<ReturnType<ReturnType<typeof subscriptionRuntime>['repository']['nativeBinding']>>
   try { subscription = process.env.MIKKA_BYOS_ENABLED === '1'
-    ? pinned ? await subscriptionRuntime().repository.binding(caller.userId,pinned.bindingId) : run.agentDefinition ? null : await subscriptionRuntime().repository.nativeBinding(caller.userId, agent.id, harness) : null
+    ? run.agentDefinition && !pinned ? null : device.kind === 'cloud'
+      ? await nativeRunBinding(pool, caller.userId, agent.id, harness, caller.scopeWorkspaceId, pinned?.bindingId)
+      : pinned ? await subscriptionRuntime().repository.binding(caller.userId,pinned.bindingId) : await subscriptionRuntime().repository.nativeBinding(caller.userId, agent.id, harness) : null
   } catch { return NextResponse.json({ error:'Subscription unavailable.' },{ status:409 }) }
   if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id || subscription.ownerId !== caller.userId)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
   if (subscription && (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId)) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
