@@ -3014,17 +3014,46 @@
     "positive": "有帮助",
     "negative": "需要改进",
     "saved": "反馈已保存",
-    "error": "操作未完成，请重试。",
-    "candidates": "Skill 候选版本",
-    "review": "查看候选版本",
-    "candidate": "候选指令",
-    "evaluation": "评估",
-    "evidence": "审查和验证证据",
-    "environment": "启用环境",
-    "chooseEnvironment": "选择环境",
+    "error": "操作未完成，请重试。"
+  },
+  "FactoryAcceptance": {
+    "title": "Factory 验收",
+    "skillTitle": "技能验收",
+    "candidate": "候选版本",
+    "target": "作用域",
+    "evidence": "证据",
+    "publication": "发布",
+    "thread": "线程",
+    "close": "关闭",
+    "state": {
+      "pending": "待你确认",
+      "approved": "已批准",
+      "publishing": "发布中",
+      "checking": "发布待核对",
+      "live": "已上线",
+      "revoked": "已撤销",
+      "expired": "已失效",
+      "unavailable": "不可批准"
+    },
+    "stage": {
+      "execute": "执行",
+      "review": "审查",
+      "verify": "验证"
+    },
+    "approve": "批准发布",
+    "enable": "启用",
+    "publish": "发布",
+    "reconcile": "核对发布",
+    "revoke": "撤销批准",
     "preview": "预览",
     "production": "生产",
-    "approve": "批准启用",
-    "approved": "已记录批准"
+    "expires": "有效至 {time}",
+    "internalSkill": "内置技能",
+    "error": "操作未完成，请重试。",
+    "decisionUnavailable": "批准暂不可用：尚未配置发布决策。",
+    "publicationUnavailable": "发布暂不可用：尚未配置发布目标。",
+    "attestationRequired": "生产发布需要签名证明。",
+    "artifactError": "证据打开失败。",
+    "closeEvidence": "关闭证据"
   }
 }

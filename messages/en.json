@@ -3014,17 +3014,46 @@
     "positive": "Helpful",
     "negative": "Needs improvement",
     "saved": "Feedback saved",
-    "error": "Could not complete the request. Try again.",
-    "candidates": "Skill candidates",
-    "review": "Review candidate",
-    "candidate": "Candidate instructions",
-    "evaluation": "Evaluation",
-    "evidence": "Review and verification evidence",
-    "environment": "Activation environment",
-    "chooseEnvironment": "Choose an environment",
+    "error": "Could not complete the request. Try again."
+  },
+  "FactoryAcceptance": {
+    "title": "Factory acceptance",
+    "skillTitle": "Skill acceptance",
+    "candidate": "Candidate",
+    "target": "Scope",
+    "evidence": "Evidence",
+    "publication": "Publication",
+    "thread": "Thread",
+    "close": "Close",
+    "state": {
+      "pending": "Waiting for you",
+      "approved": "Approved",
+      "publishing": "Publishing",
+      "checking": "Needs a check",
+      "live": "Live",
+      "revoked": "Revoked",
+      "expired": "Expired",
+      "unavailable": "Cannot approve"
+    },
+    "stage": {
+      "execute": "Execute",
+      "review": "Review",
+      "verify": "Verify"
+    },
+    "approve": "Approve publication",
+    "enable": "Enable",
+    "publish": "Publish",
+    "reconcile": "Check publication",
+    "revoke": "Revoke approval",
     "preview": "Preview",
     "production": "Production",
-    "approve": "Approve activation",
-    "approved": "Approval recorded"
+    "expires": "Valid until {time}",
+    "internalSkill": "Built-in skill",
+    "error": "That did not finish. Try again.",
+    "decisionUnavailable": "Approval is unavailable: no publication decision is configured.",
+    "publicationUnavailable": "Publication is unavailable: no publication target is configured.",
+    "attestationRequired": "Production needs a signed attestation.",
+    "artifactError": "The evidence did not open.",
+    "closeEvidence": "Close evidence"
   }
 }

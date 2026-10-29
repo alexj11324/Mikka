@@ -32,7 +32,11 @@ export interface FactoryTask {
   candidateId: string | null;
   reason: string;
 }
-export type FactoryTaskSummary = Pick<FactoryTask, "id" | "issueId" | "stage" | "status" | "revision" | "attemptId" | "candidateId" | "reason"> & { isSkillCandidate: boolean };
+export type FactoryTaskSummary = Pick<FactoryTask, "id" | "issueId" | "stage" | "status" | "revision" | "attemptId" | "candidateId" | "reason"> & {
+  isSkillCandidate: boolean;
+  /** The run that produced the candidate, so acceptance can sit beside its thread. */
+  candidateRunId: string | null;
+};
 export interface FactoryAttempt {
   id: string;
   taskId: string;
@@ -312,15 +316,15 @@ export function createFactoryStore(
       return transaction(async (tx) => {
         const issue = await lockedIssue(tx, issueId);
         if (!issue || !(await authorize(userId, issueId, tx))) fail("factoryNotFound");
-        const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean }>(
-          'SELECT t.*, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
+        const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null }>(
+          'SELECT t.*, c."runId" AS "candidateRunId", EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
           [userId, issueId, botId],
         );
         const tasks: FactoryTaskSummary[] = [];
         for (const row of rows)
           if (factoryScopeAllows(row, issue) && await sourceAllowed(tx, userId, row.sourceEventId, issueId)) {
-            const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate } = row;
-            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason,isSkillCandidate});
+            const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId } = row;
+            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason,isSkillCandidate,candidateRunId});
           }
         return { contractVersion: 1 as const, issueId, tasks };
       });
