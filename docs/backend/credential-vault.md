@@ -124,6 +124,24 @@ The authenticated daily cleanup cron removes expired/consumed challenges,
 leases and session ciphertexts; failed deletes return failure and retry on the
 next invocation. Logical revocation/expiry is checked independently of cleanup.
 
+## Enablement
+
+Off by default. With the flag unset, `GET /api/credentials` answers
+`503 credential_unavailable` and no broker call is made.
+
+1. Apply the credential migration to the target database. It is already applied
+   in Production (2026-10-29); a fresh Preview database needs it before the flag.
+2. Confirm `prod:/aws` and `staging:/aws` have their five values and are synced
+   to both Vercel projects, as `aws-kms-credential-setup.md` records.
+3. Deploy `services/credential-broker` as the `mikka-credential-broker` project
+   so `CREDENTIAL_BROKER_URL` can point at a frozen origin.
+4. In Preview only, set `CREDENTIAL_VAULT_ENABLED=1` and
+   `CREDENTIAL_BROKER_URL`. Verify: signed out gets `401`, signed in gets
+   `200 {"logins":[]}`, and the protected `/api/credentials/oidc` probe reports
+   own-role and same-context KMS success with cross-role and wrong-owner denial.
+5. Repeat for Production only after the Preview result is recorded. Turning the
+   flag off restores the `503` path; saved ciphertext rows remain.
+
 ## Verification
 
 `test:credentials` exercises context/AAD isolation, tampering, exact origins,
