@@ -28,4 +28,3 @@ export function createLinearOAuthRevocationProcessor(store: RevocationStore) {
     return true
   }
 }
-
