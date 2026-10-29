@@ -112,6 +112,8 @@ export const ACTION_ERROR_CODES = [
   'workspaceMembershipSuspended',
   'inviteInvalidEmails',
   'workspaceReadFailed',
+  'savedLoginNotFound',
+  'deviceHasActiveRuns',
 ] as const
 
 export type ActionErrorCode = (typeof ACTION_ERROR_CODES)[number]

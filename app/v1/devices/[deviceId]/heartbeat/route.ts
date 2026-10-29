@@ -4,7 +4,7 @@ import { deviceHeartbeatSchema } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { ensureDeviceAgents } from '@/lib/device-agents'
 import { devices } from '@/lib/db/schema'
-import { authenticateDevice, ownedDevice } from '@/lib/device-link'
+import { authenticateDevice, linkDeviceToken } from '@/lib/device-link'
 import { reclaimLostRuns, renewRunLeases } from '@/lib/run-leases'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
 import { skillAssignments } from '@/lib/self-improvement/server'
@@ -23,7 +23,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
-  if (!await ownedDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
+  // Also records this credential as the device's, so removing it revokes the credential.
+  if (!await linkDeviceToken(caller, deviceId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
   await db.update(devices).set({ harnesses: parsed.data.harnesses, computerUse: parsed.data.computerUse ?? { installed: false, version: null }, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))

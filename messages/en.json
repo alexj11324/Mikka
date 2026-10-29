@@ -1049,7 +1049,9 @@
     "runAlreadyActive": "This task already has an active run.",
     "runDispatchKeyConflict": "This request key was already used for different run parameters.",
     "runNotActive": "This run has ended and has no answerable question.",
-    "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response."
+    "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
+    "savedLoginNotFound": "This login does not exist or was already deleted.",
+    "deviceHasActiveRuns": "Threads are running on this device. Stop them before removing it."
   },
   "Overview": {
     "sections": {
