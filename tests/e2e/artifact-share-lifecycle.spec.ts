@@ -78,7 +78,7 @@ test('a share link opens for a signed-out reader; stopping it ends that access',
     // cache in the way.
     const response = await anonymous.request.get(link)
     const body = await response.text()
-    expect(body).toContain('这个链接已经失效了')
+    expect(body).toContain('链接已失效')
     expect(body).not.toContain(marker)
     await anonymous.close()
   }

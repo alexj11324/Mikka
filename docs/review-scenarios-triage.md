@@ -21,6 +21,16 @@
 
 E2E 运行方式：独立 Postgres 库 `mikka_120_e2e`，`CI=true`，`BETTER_AUTH_URL=http://localhost:3100`，密钥走 `infisical run --env dev --path /vercel`。
 
+## 文案规范已落地
+
+新增 `docs/design/copy.md`（C-01…C-08），依据 Linear、Apple HIG、GitHub Primer、Microsoft
+Writing Style Guide、Shopify Polaris、Material 3 的公开规则。本轮收敛：
+
+- 中文：删除所有祈使句「请」（129 处）和句尾「请重试」（78 处）、13 处口语化表达。
+- 英文：删除 `Please try again`（40 处）、`Couldn't`（5 处）、`Please …`（16 处）。
+- 规则已接入 `docs/design/README.md` 的阅读顺序和 `rules.md` 的 R-40。
+
+
 ## 分诊口径
 
 | 列 | 含义 |

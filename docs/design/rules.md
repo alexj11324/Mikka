@@ -259,7 +259,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
 ## Copy
 
 - **R-40** No filler or explanatory copy in the UI (口水话; Alex repeated
-  this on 2026-10-23 and 2026-10-24). If a sentence only explains the screen
+  this on 2026-10-23 and 2026-10-24). How the remaining words must be written
+  — status lines, no colloquial phrasing, no apology, no 「请」 — is
+  [`copy.md`](copy.md) (C-01…C-08). If a sentence only explains the screen
   or narrates state, remove it. Examples that were removed: 「谁在工作 · 1 个
   agent 正在处理任务」 above the composer, 「和你的 Coordinator 聊聊」,
   「有值得看的会第一时间放到这里」, and on a login sheet the subtitle
