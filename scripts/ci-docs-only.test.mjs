@@ -10,6 +10,7 @@ import { hasUnsafeModes, isDocsOnly } from './ci-docs-only.mjs'
 test('approved documentation paths are documentation-only', () => {
   const files = [
     'README.md',
+    'AGENTS.md',
     'README.zh-CN.md',
     'docs/design/glossary.md',
     'tasks/lessons.md',
@@ -17,6 +18,10 @@ test('approved documentation paths are documentation-only', () => {
     '.github/pull_request_template.md',
   ]
   assert.equal(isDocsOnly(files), true)
+  assert.equal(isDocsOnly(['AGENTS.md']), true)
+  assert.equal(isDocsOnly(['AGENTS.md', 'docs/README.md']), true)
+  assert.equal(isDocsOnly(['AGENTS.md', 'scripts/ci-docs-only.mjs']), false)
+  assert.equal(isDocsOnly(['AGENTS.md'], true), false)
 })
 
 test('code, workflows, configuration, messages and public assets are not documentation-only', () => {
@@ -35,6 +40,7 @@ test('code, workflows, configuration, messages and public assets are not documen
     'docs/generated.js',
     'docs/assets/architecture-light.svg',
     'docs/AGENTS.md',
+    'tasks/AGENTS.md',
     'scripts/generate-diagrams.mjs',
     'scripts/diagram-svg.mjs',
   ]) {
