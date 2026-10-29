@@ -33,13 +33,26 @@ export function selectionValidationPlans() {
   ])]
 }
 
+/** One named subset, so the two policy plans run as independent parallel jobs. */
+export function selectionPlan(name) {
+  const [critical, scoped] = selectionValidationPlans()
+  if (name === 'smoke') return critical
+  if (name === 'targeted') return scoped
+  throw new Error('Invalid selection plan')
+}
+
 export function main() {
-  const validating = process.argv[2] === '--verify-selection'
+  const legacyValidation = process.argv.includes('--verify-selection')
+  const planName = process.argv.find(argument => argument.startsWith('--verify-selection-plan='))?.slice('--verify-selection-plan='.length)
+  const validating = legacyValidation || planName !== undefined
   const shard = process.argv.find(argument => argument.startsWith('--shard='))?.slice('--shard='.length)
   if (validating && shard) throw new Error('Selection validation must run unsharded')
-  const plans = validating
-    ? selectionValidationPlans()
-    : [{ tier: process.env.BROWSER_TIER, specs: JSON.parse(process.env.BROWSER_SPECS) }]
+  if (legacyValidation && planName !== undefined) throw new Error('Choose one selection validation mode')
+  const plans = planName !== undefined
+    ? [selectionPlan(planName)]
+    : validating
+      ? selectionValidationPlans()
+      : [{ tier: process.env.BROWSER_TIER, specs: JSON.parse(process.env.BROWSER_SPECS) }]
   for (const plan of plans) {
     const args = browserArguments(plan.tier, JSON.stringify(plan.specs), validating ? undefined : shard)
     console.log(`Browser acceptance layer: ${plan.tier}; ${args.join(' ')}`)

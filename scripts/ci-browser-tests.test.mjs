@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync } fro
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { browserPlan, BROWSER_SMOKE, BROWSER_SCOPED_SPECS, BROWSER_INFRA_FILES, needsSelectionValidation } from './ci-docs-only.mjs'
-import { browserArguments, selectionValidationPlans } from './ci-browser-tests.mjs'
+import { browserArguments, selectionPlan, selectionValidationPlans } from './ci-browser-tests.mjs'
 
 const smoke = [...BROWSER_SMOKE].sort()
 const full = { tier: 'full', specs: [], performance: false }
@@ -119,10 +119,27 @@ test('runner invokes pnpm without a shell and preserves actual command failure',
   }
 })
 
-test('selection validation cannot be sharded', () => {
-  const result = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs'), '--verify-selection', '--shard=1/4'], { encoding: 'utf8' })
-  assert.notEqual(result.status, 0)
-  assert.match(result.stderr, /must run unsharded/)
+test('each selection plan can run as an independent unsharded job', () => {
+  assert.equal(selectionPlan('smoke').tier, 'smoke')
+  assert.equal(selectionPlan('targeted').tier, 'targeted')
+  for (const spec of BROWSER_SMOKE) assert(selectionPlan('smoke').specs.includes(spec))
+  for (const spec of [...BROWSER_SMOKE, ...BROWSER_SCOPED_SPECS]) assert(selectionPlan('targeted').specs.includes(spec))
+  assert.throws(() => selectionPlan('full'))
+  assert.throws(() => selectionPlan(''))
+})
+
+test('selection validation cannot be sharded or use both modes', () => {
+  for (const args of [
+    ['--verify-selection', '--shard=1/4'],
+    ['--verify-selection-plan=smoke', '--shard=1/4'],
+  ]) {
+    const result = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs'), ...args], { encoding: 'utf8' })
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /must run unsharded/)
+  }
+  const both = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs'), '--verify-selection', '--verify-selection-plan=smoke'], { encoding: 'utf8' })
+  assert.notEqual(both.status, 0)
+  assert.match(both.stderr, /Choose one selection validation mode/)
 })
 
 test('trusted classifier writes actual GitHub outputs for event ranges and integration, failing closed on missing ranges', () => {
@@ -165,28 +182,51 @@ test('trusted classifier writes actual GitHub outputs for event ranges and integ
   }
 })
 
-test('protected browser gate rejects failed/cancelled/skipped jobs, malformed plans and reduced integration runs', () => {
+test('protected browser gate requires build, runtime, selection and regression results', () => {
   const source = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
   const block = source.split('      - name: Require the selected browser layer\n')[1]
   const script = block.split('        run: |\n')[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
-  const result = (tier, docs, performance, job, changes = 'success', event = 'pull_request', verify = 'false') => spawnSync('bash', ['-e', '-c', script], {
-    env: { PATH: process.env.PATH, CHANGES_RESULT: changes, DOCS_ONLY: docs, BROWSER_TIER: tier, BROWSER_PERFORMANCE: performance, FULL_RESULT: job, EVENT_NAME: event, VERIFY_SELECTION: verify },
+  const result = (options = {}) => spawnSync('bash', ['-e', '-c', script], {
+    env: {
+      PATH: process.env.PATH,
+      CHANGES_RESULT: options.changes ?? 'success',
+      BUILD_RESULT: options.build ?? 'success',
+      RUNTIME_RESULT: options.runtime ?? 'success',
+      SELECTION_RESULT: options.selection ?? (options.verify === 'true' ? 'success' : 'skipped'),
+      FULL_RESULT: options.full ?? 'success',
+      DOCS_ONLY: options.docs ?? 'false',
+      BROWSER_TIER: options.tier ?? 'full',
+      BROWSER_PERFORMANCE: options.performance ?? 'false',
+      EVENT_NAME: options.event ?? 'pull_request',
+      VERIFY_SELECTION: options.verify ?? 'false',
+    },
   }).status === 0
-  for (const tier of ['smoke', 'targeted', 'full']) {
-    assert(result(tier, 'false', 'false', 'success'))
-    for (const job of ['failure', 'cancelled', 'skipped', '']) assert(!result(tier, 'false', 'false', job))
-    assert(!result(tier, 'false', 'false', 'success', 'failure'))
+  assert(result())
+  for (const tier of ['smoke', 'targeted', 'full']) assert(result({ tier }))
+  assert(!result({ changes: 'failure' }))
+  for (const value of ['failure', 'cancelled', 'skipped', '']) {
+    assert(!result({ build: value }), `build ${value}`)
+    assert(!result({ runtime: value }), `runtime ${value}`)
+    assert(!result({ full: value }), `full ${value}`)
   }
-  assert(!result('smoke', 'false', 'false', 'success', 'success', 'pull_request', ''))
-  assert(result('smoke', 'false', 'false', 'success', 'success', 'pull_request', 'true'))
-  assert(result('docs', 'true', 'false', 'skipped'))
-  assert(!result('docs', 'true', 'false', 'skipped', 'failure'))
-  for (const [tier, docs, perf] of [['', 'false', 'false'], ['docs', 'false', 'false'], ['full', 'true', 'false'], ['smoke', 'false', 'true'], ['targeted', 'false', 'true']]) assert(!result(tier, docs, perf, 'success'))
+  assert(result({ docs: 'true', tier: 'docs', full: 'skipped', build: 'skipped', runtime: 'skipped', selection: 'skipped' }))
+  assert(!result({ docs: 'true', changes: 'failure', tier: 'docs', full: 'skipped' }))
+  // A selection-policy change runs both subsets and skips the regression layer.
+  assert(result({ verify: 'true', tier: 'smoke', selection: 'success', full: 'skipped' }))
+  assert(!result({ verify: 'true', tier: 'smoke', selection: 'failure', full: 'skipped' }))
+  assert(!result({ verify: 'true', tier: 'smoke', selection: 'success', full: 'success' }))
+  // A policy change mixed with application code still runs the full regression.
+  assert(result({ verify: 'true', tier: 'full', selection: 'success', full: 'success' }))
+  assert(!result({ verify: 'true', tier: 'full', selection: 'success', full: 'skipped' }))
+  assert(!result({ verify: 'false', selection: 'success' }))
+  for (const [tier, docs, performance, verify] of [['', 'false', 'false', 'false'], ['docs', 'false', 'false', 'false'], ['smoke', 'false', 'true', 'false'], ['targeted', 'false', 'true', 'false'], ['smoke', 'false', 'false', 'maybe']]) {
+    assert(!result({ tier, docs, performance, verify }), `${tier}:${docs}:${performance}:${verify}`)
+  }
   for (const event of ['push', 'schedule', 'workflow_dispatch']) {
-    assert(result('full', 'false', 'true', 'success', 'success', event))
-    assert(!result('full', 'false', 'false', 'success', 'success', event))
-    assert(!result('smoke', 'false', 'false', 'success', 'success', event))
-    assert(!result('docs', 'true', 'false', 'skipped', 'success', event))
+    assert(result({ event, tier: 'full', performance: 'true' }))
+    assert(!result({ event, tier: 'full', performance: 'false' }))
+    assert(!result({ event, tier: 'smoke', performance: 'false' }))
+    assert(!result({ event, tier: 'docs', docs: 'true', performance: 'false' }))
   }
 })
 
@@ -202,18 +242,18 @@ test('policy validation exercises both subsets and covers every scoped spec with
     assert(source.includes(path))
     assert(readFileSync('scripts/test-accounts/evidence.mjs', 'utf8').includes(path))
   }
-  assert(source.includes("needs.changes.outputs.verify_selection != 'true' || needs.changes.outputs.browser_tier == 'full'"))
-  assert(source.includes('node scripts/ci-browser-tests.mjs --verify-selection'))
+  assert(source.includes("needs.changes.outputs.verify_selection == 'true' && needs.changes.outputs.browser_tier != 'full'"))
+  assert(source.includes('node scripts/ci-browser-tests.mjs --verify-selection-plan=${{ matrix.plan }}'))
   assert(source.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/4'))
-  assert(source.includes('if: needs.changes.outputs.verify_selection == \'true\''))
-  // Independent shards: each matrix job keeps its own PostgreSQL service,
-  // account directory and artifact name, so no fixture is shared concurrently.
+  // Independent jobs: build, runtime, two selection plans and four regression
+  // shards each get their own PostgreSQL service and artifact name.
+  assert(source.includes('matrix:\n        plan: [smoke, targeted]'))
   assert(source.includes('matrix:\n        shard: [1, 2, 3, 4]'))
-  assert(source.includes('if: ${{ matrix.shard == 1 }}'))
+  assert(source.includes('name: browser-build-${{ github.sha }}'))
+  assert(source.includes('name: browser-test-report-runtime-${{ github.sha }}'))
+  assert(source.includes('name: browser-test-report-selection-${{ matrix.plan }}-${{ github.sha }}'))
   assert(source.includes('name: browser-test-report-shard-${{ matrix.shard }}-${{ github.sha }}'))
-  // Shards without browser output must not fail the evidence audit during a
-  // selection-policy run; shard 1 and every shard that ran the regression still audit.
-  assert(source.includes("matrix.shard == 1 || needs.changes.outputs.verify_selection != 'true' || needs.changes.outputs.browser_tier == 'full'"))
+  assert(source.includes('needs: [changes, browser-build, browser-runtime, browser-selection, browser-e2e-full]'))
 })
 
 
