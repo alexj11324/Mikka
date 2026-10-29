@@ -1,4 +1,11 @@
-# Native Coordinator runtimes (issue #312)
+# Native Coordinator runtimes (issue #312) — deprecated
+
+> **Deprecated (Alex, 2026-10-27).** The Coordinator and every bot run their
+> chats only on Mikka's own harness ([R-05](../design/rules.md)). Claude Code
+> and Codex only execute threads. The code stays; with
+> `MIKKA_NATIVE_COORDINATOR` unset the server refuses this runtime. Do not
+> enable it, build a runtime picker for it or extend it. Everything below is a
+> historical record. See [decisions](../design/decisions.md), 2026-10-27.
 
 ## Ownership and execution
 
@@ -42,6 +49,8 @@ The job payload is cleared when the Workflow closes it. Tool receipts stay in
 the application database with the existing conversation's data boundary.
 
 ## Permissions and rollout
+
+Historical record. Do not follow these steps; the runtime is deprecated (see top).
 
 Apply `20261026170000_native_coordinator.sql` to an approved non-production
 branch first. Set `MIKKA_NATIVE_COORDINATOR=1` only in the environment being
@@ -93,7 +102,7 @@ or incorrectly named databases. They need no account/model credentials.
 SDK subprocess and App Server protocol fixtures test real transport boundaries,
 not real model quality or authenticated provider behavior. Complete live Claude
 and Codex validation, current-model OpenUI quality and authenticated Preview
-acceptance before enabling this optional backend in production. The implementation
+acceptance if this deprecated backend were ever enabled. The implementation
 does not claim to add new email subscriptions, dinner schedules, push delivery,
 or a settings picker; it routes existing Coordinator events through the selected
 runtime. No production migration, deployment or runtime switch is part of this PR.

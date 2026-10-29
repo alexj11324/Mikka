@@ -1,6 +1,14 @@
 # Browser CI execution budget
 
-The full browser job has a 45-minute total budget. Its official Chromium/system
+The selected browser job has a 45-minute total budget. PRs run critical flows
+and known affected scenarios, escalating shared or unknown paths to full
+functionality. Main, nightly and manual runs add the full performance suite;
+PRs that change a performance spec also run it. Pure CI and classifier changes use dedicated policy checks, critical flows
+and actual subset execution, without full functionality or performance.
+Mixed application changes still escalate according to their risk.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md#how-changes-are-tested) for the gate policy.
+
+The original full browser job has a 45-minute total budget. Its official Chromium/system
 dependency installation step has a separate 15-minute limit. This reserves time
 for the build and complete regression suite when Ubuntu package downloads are slow.
 
@@ -23,7 +31,8 @@ The official `playwright install --with-deps chromium` command remains unchanged
 binary caching and notes that Linux OS dependencies are not cacheable; browser
 caching would not address the measured system-package download delay.
 
-Test selection, assertions, performance thresholds, per-test and expectation
-timeouts, worker count, and retry policy are unchanged. No alternative package
+PR scenario selection and performance timing now follow the layer policy above.
+Assertions, performance thresholds, per-test and expectation timeouts, worker
+count, and retry policy are unchanged. No alternative package
 mirror is introduced. The total budget includes installation, build, tests and
 artifact upload; it does not permit an individual test to run longer.

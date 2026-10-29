@@ -1,6 +1,6 @@
 # Cloud Preview development
 
-Develop and test on cloud Preview deployments. Vercel previews, v0 previews and Cloudflare-hosted previews use their own HTTPS origin and an isolated Preview database. Set `BETTER_AUTH_URL` to the current origin without `/mikka`; if omitted, Vercel Preview prefers its deployment URL, and v0/Cloudflare Pages use their supplied preview URL. Vercel Preview uses the Neon integration's branch-specific `DATABASE_URL` ahead of global `MIKKA_DATABASE_URL` or `ORVILO_DATABASE_URL` overrides. Other environments retain their existing database selection.
+Develop and test on cloud Preview deployments. Vercel previews, v0 previews and Cloudflare-hosted previews use their own HTTPS origin and an isolated Preview database. Set `BETTER_AUTH_URL` to the current origin without `/mikka`; if omitted, Vercel Preview prefers its deployment URL, and v0/Cloudflare Pages use their supplied preview URL. Vercel Preview uses the Neon integration's branch-specific `DATABASE_URL` ahead of the global `MIKKA_DATABASE_URL` override. Other environments retain their existing database selection.
 
 ## Google and GitHub login
 
@@ -25,7 +25,7 @@ Validate login from each deployed Preview: the provider authorization URL must n
 
 Runtime acceptance follows [acceptance.md](acceptance.md): use direct Google/GitHub OAuth, reuse authorized sessions, and do not repeatedly ask the user for a Mikka password.
 
-Google login requests only `openid`, `email`, and `profile`. Google branding verification requires a public Mikka homepage with a service description and links to privacy and terms pages on a verified domain; those pages are not in this repository yet. Existing email/password users can sign in with their password and link Google under Settings → Integrations; Mikka keeps Better Auth's verified-email account-linking check enabled.
+Google login requests only `openid`, `email`, and `profile`. Google branding verification requires a public Mikka homepage with a service description and links to privacy and terms pages on a verified domain; those pages are not in this repository yet. Existing email/password users can sign in with their password and link Google under Settings → Account; Mikka keeps Better Auth's verified-email account-linking check enabled.
 
 ## Composio
 
