@@ -189,16 +189,6 @@ test('all required gates reject failed classification and skipped full jobs', ()
 })
 
 
-test('the trusted classifier runs as a copied .mjs entry point', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'trusted-docs-entry-'))
-  const entry = join(dir, 'classifier.mjs')
-  writeFileSync(entry, readFileSync(new URL('./ci-docs-only.mjs', import.meta.url)))
-  const output = execFileSync(process.execPath, [entry, '--base', 'HEAD', '--head', 'HEAD'], {
-    cwd: resolve(import.meta.dirname, '..'), encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: '' },
-  })
-  assert.match(output, /docs_only=false/)
-})
-
 test('the exact trusted-classifier workflow step executes ESM from a retained temporary file', () => {
   const dir = mkdtempSync(join(tmpdir(), 'docs-gate-launch-retained-'))
   console.log(`Retained workflow launcher fixture: ${dir}`)
