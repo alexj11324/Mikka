@@ -1,5 +1,7 @@
 # Shared image and history read compatibility
 
+> Superseded: generation retirement landed (see `legacy-retirement-integration.md`); `app/api/agent/route.ts` is a GET alias only.
+
 This candidate is based on frozen main `470c5cd4873634ff2b992598349ab52cffe1ee62`. It changes only the image loader's canonical GET path and adds retained-read regression coverage. It does not retire or restore POST generation on this base; runtime retirement remains PR293/PR300 integration. No Coordinator hotfiles, provider implementation, UI layout, data schema or configuration changes.
 
 ## Keep at integration

@@ -666,7 +666,7 @@ export const pendingActions = pgTable('pending_actions', {
   decidedAt: timestamp('decidedAt', { withTimezone: true }),
 }, table => [index('pending_actions_user_status_idx').on(table.userId, table.status, table.createdAt)])
 
-// Optional native Coordinator bridge (#312). Existing users default to AI SDK.
+// Deprecated native Coordinator bridge (#312, decision 2026-10-27). Kept, switched off; see docs/architecture/native-coordinator.md.
 export const coordinatorRuntimeSettings = pgTable('coordinator_runtime_settings', {
   userId: text('userId').primaryKey(), runtime: jsonb('runtime').notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),

@@ -15,7 +15,7 @@ supplies content.
    hairline-separated list. Do not wrap it in `Card`, `Frame`, or a
    `rounded-xl border bg-muted/30` div.
 4. **Cards only at the "repeated subject" level.** When a category repeats a
-   subject — one agent, one device, one member — one card per subject is
+   subject — one device, one member — one card per subject is
    allowed. The card contains rows, not a grid of tinted boxes, and the card
    itself must not have a background colour.
 5. **Navigation and search stay in the sidebar.** Do not build a second list,
@@ -23,7 +23,7 @@ supplies content.
 
 ## Sections
 
-- **Personal:** Preferences, Profile, Account (账户), Integrations.
+- **Personal:** Preferences, Profile, Memory (记忆), Account (账户), Integrations, Devices (设备).
 - **Administration:** Workspace, Teams, Members.
 
 Account holds how the person signs in: linking Google to the Mikka account.
@@ -39,8 +39,8 @@ fields read as unrelated components.
 
 ## Enforcement
 
-`scripts/lint-ui.mjs` reports `settings/field-surface` when a settings or
-agents file pairs `bg-muted` / `bg-accent` / `bg-secondary` with a `rounded-*`
+`scripts/lint-ui.mjs` reports `settings/field-surface` when a file under
+`components/settings/`, `components/devices/` or `components/agents/` pairs `bg-muted` / `bg-accent` / `bg-secondary` with a `rounded-*`
 radius in the same `className`. The subject card itself is allowed as long as
 it has no background colour.
 
