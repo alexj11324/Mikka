@@ -1652,7 +1652,8 @@
       "retry": "Retry sync",
       "loadError": "Could not load Linear settings.",
       "operationError": "The Linear sync action failed. Try again.",
-      "teamAlreadyLinked": "This Linear team is already connected to another Mikka account."
+      "teamAlreadyLinked": "This Linear team is already connected to another Mikka account.",
+      "browserUpdateRequired": "Update Mikka before connecting Linear from the desktop app."
     },
     "subscriptions": {
       "heading": "Model subscriptions",
@@ -1786,7 +1787,9 @@
       "takeoverNone": "Bots can no longer use {name}",
       "turnedOff": "Turned off {name}",
       "madeDefault": "{account} is now the default",
-      "openInSettings": "Manage in Settings"
+      "openInSettings": "Manage in Settings",
+      "linkInBrowser": "Continue in the browser window to finish linking. Return here when you’re done.",
+      "browserUpdateRequired": "Update Mikka before linking accounts from the desktop app."
     },
     "telegram": {
       "heading": "Messaging",

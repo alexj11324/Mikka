@@ -20,6 +20,7 @@ import { Switch } from '@/components/ui/switch'
 import { routing } from '@/i18n/routing'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { COMPOSIO_APP_IDS, composioConnectRedirect, type ComposioAppId, type ConnectedAccountView } from '@/lib/composio-accounts'
+import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
 import { cn } from '@/lib/utils'
 
 type IntegrationState = { configured: boolean; callbackVerifierConfigured: boolean; webhookConfigured: boolean; accounts: ConnectedAccountView[] }
@@ -112,6 +113,9 @@ export function useConnectedApps(enabled = true) {
   async function startLink(key: string, body: { toolkit: ComposioAppId } | { accountId: string }) {
     setPending(key); setError('')
     try {
+      const handoff = await openCurrentPageInBrowser()
+      if (handoff === 'desktop') return
+      if (handoff === 'unsupported') { setError(t('browserUpdateRequired')); return }
       const response = await fetch(integrationPath, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, returnTo: currentReturnPath() }) })
       const result = await response.json() as { redirectUrl?: unknown }
       const redirect = response.ok ? composioConnectRedirect(result.redirectUrl) : null
@@ -119,6 +123,7 @@ export function useConnectedApps(enabled = true) {
       window.location.assign(redirect.href)
     } catch {
       setError(t('connectFailed'))
+    } finally {
       setPending('')
     }
   }
