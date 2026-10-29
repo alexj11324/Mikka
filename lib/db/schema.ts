@@ -950,3 +950,31 @@ export const userPreferences = pgTable('user_preferences', {
   suggestionSources: jsonb('suggestionSources').$type<Record<string, boolean>>().notNull().default({}),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/**
+ * A picture the person uploaded for their profile (lib/account/avatar.ts).
+ * `user.image` points at /api/avatars/<userId>/<sha256>; the bytes live in R2
+ * under `storageKey`, or in `inlineContent` where no bucket is configured.
+ */
+export const userAvatars = pgTable('user_avatars', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  sha256: text('sha256').notNull(),
+  contentType: text('contentType').$type<'image/png' | 'image/jpeg' | 'image/webp'>().notNull(),
+  size: integer('size').notNull(),
+  storageKey: text('storageKey'),
+  inlineContent: bytea('inlineContent'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * 「导出我的数据」: one emailed download link. Only the token's hash is kept;
+ * the file is built when its owner opens the link (lib/account/export.ts).
+ */
+export const accountDataExports = pgTable('account_data_exports', {
+  id: uuid('id').primaryKey(),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('tokenHash').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  downloadedAt: timestamp('downloadedAt', { withTimezone: true }),
+}, table => [uniqueIndex('account_data_exports_token_key').on(table.tokenHash), index('account_data_exports_user_created_idx').on(table.userId, table.createdAt)])

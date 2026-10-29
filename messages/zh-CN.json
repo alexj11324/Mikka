@@ -1053,7 +1053,21 @@
     "runAlreadyActive": "此任务已有正在执行的线程。",
     "runDispatchKeyConflict": "此请求标识已用于不同的运行参数。",
     "runNotActive": "此运行已结束，且没有可回答的问题。",
-    "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。"
+    "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。",
+    "avatarInvalidType": "头像只支持 PNG、JPEG 或 WebP 图片。",
+    "avatarTooLarge": "头像图片不能超过 200 KB。",
+    "passwordIncorrect": "当前密码不正确。",
+    "passwordTooShort": "新密码至少需要 8 个字符。",
+    "passwordTooLong": "新密码不能超过 128 个字符。",
+    "passwordNotSet": "此账户还没有密码，可以先设置密码。",
+    "passwordAlreadySet": "此账户已有密码，可以直接修改密码。",
+    "sessionNotFound": "这台设备已退出登录。",
+    "sessionIsCurrent": "当前设备需要通过「退出登录」退出。",
+    "emailUnavailable": "邮件服务暂不可用。",
+    "emailDeliveryFailed": "邮件没有发送成功。",
+    "dataExportRateLimited": "每小时只能导出一次，{minutes} 分钟后可再次导出。",
+    "accountEmailMismatch": "输入的邮箱与当前账户不一致。",
+    "accountSoleAdmin": "你是工作区「{workspaces}」唯一的管理员。先把管理员身份转给其他成员，再删除账户。"
   },
   "Overview": {
     "sections": {
@@ -3073,5 +3087,9 @@
     "production": "生产",
     "approve": "批准启用",
     "approved": "已记录批准"
+  },
+  "AccountEmail": {
+    "exportSubject": "你的 Mikka 数据导出",
+    "exportBody": "你的 Mikka 数据导出已生成。\n\n{url}\n\n以 {email} 登录 Mikka 后打开上面的链接即可下载，链接 {hours} 小时内有效。如果不是你本人操作，忽略此邮件即可。"
   }
 }
