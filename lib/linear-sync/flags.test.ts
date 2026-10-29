@@ -21,6 +21,7 @@ test('missing configuration, HTTP errors, invalid JSON, network and body timeout
   assert.equal(await createLinearSyncGate({ fetcher: async () => { throw new Error('must not fetch') } })(''), 'unavailable')
   for (const fetcher of [
     async () => new Response('', { status: 503 }),
+    async () => new Response('', { status: 302, headers: { location: 'https://other.example.test' } }),
     async () => new Response('broken'),
     async () => { throw new Error('offline') },
     () => new Promise<Response>(() => {}),
@@ -39,7 +40,7 @@ test('off/on/off changes propagate at the bounded cache expiry without stale tru
     calls++
     assert.equal(url, 'https://us.i.posthog.com/flags?v=2')
     assert.equal(init?.cache, 'no-store')
-    assert.equal(init?.redirect, 'error')
+    assert.equal(init?.redirect, 'manual')
     assert.deepEqual(JSON.parse(init?.body as string), { api_key: 'project', distinct_id: LINEAR_SYNC_DISTINCT_ID })
     if (outage) throw new Error('offline')
     return Response.json(answer(enabled))

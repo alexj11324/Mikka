@@ -29,7 +29,9 @@ export function createLinearSyncGate({
               method: 'POST',
               headers: { 'content-type': 'application/json', 'user-agent': 'posthog-node/mikka-linear-sync' },
               body: JSON.stringify({ api_key: token, distinct_id: LINEAR_SYNC_DISTINCT_ID }),
-              cache: 'no-store', redirect: 'error', signal: controller.signal,
+              // Workers supports manual/follow only. Reject 3xx via !ok below
+              // instead of following a redirect with the project token.
+              cache: 'no-store', redirect: 'manual', signal: controller.signal,
             })
             if (!response.ok) return 'unavailable'
             const result = await response.json() as {
