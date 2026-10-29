@@ -113,7 +113,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: node --test scripts/ci-docs-only.test.mjs
+      - run: node --test scripts/ci-docs-only.test.mjs scripts/ci-browser-tests.test.mjs
       - run: pnpm test:ui-policy
       - run: pnpm test:motion
       - run: pnpm test:i18n
