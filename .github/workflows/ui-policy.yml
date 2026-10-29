@@ -132,6 +132,7 @@ jobs:
       - run: pnpm test:factory-monitor
       - run: pnpm test:agent-kit
       - run: pnpm test:agent-kit-compat
+      - run: pnpm test:approved-writes
       - run: pnpm test:coordinator-events
       - run: pnpm test:mvp-fixtures
       - run: pnpm test:credentials
