@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, chmodSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -14,6 +14,7 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
       .replace("'pg'", "'./pg.mjs'")
       .replace("from './migration-order.mjs'", "from './order.mjs'")
     writeFileSync(join(dir, 'migrate.mjs'), source)
+    writeFileSync(join(dir, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url), 'utf8'))
     writeFileSync(join(dir, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
     writeFileSync(join(dir, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
     writeFileSync(join(dir, 'pg.mjs'), 'export class Pool { constructor() { throw new Error("DATABASE_ACCESS") } }')
@@ -40,7 +41,7 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
     assert.notEqual(missing.status, 0)
     assert.match(missing.stderr, /PREVIEW_DATABASE_URL_REQUIRED/)
     assert.doesNotMatch(missing.stderr, /DATABASE_ACCESS|ENOENT/)
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+  } finally { console.error(`Retained test fixture: ${dir}`) }
 })
 
 test('explicit Preview migration never connects to the global application target', () => {
@@ -52,6 +53,7 @@ test('explicit Preview migration never connects to the global application target
       .replace("'pg'", "'./pg.mjs'")
       .replace("from './migration-order.mjs'", "from './order.mjs'")
     writeFileSync(join(scripts, 'migrate.mjs'), source)
+    writeFileSync(join(scripts, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'order.mjs'), 'export const orderMigrations = x => x; export const alreadyApplied = () => false')
@@ -69,7 +71,7 @@ test('explicit Preview migration never connects to the global application target
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /0001_application.sql/)
     assert.match(result.stdout, /0002_workspace.sql/)
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+  } finally { console.error(`Retained test fixture: ${dir}`) }
 })
 
 
@@ -96,5 +98,32 @@ esac
     })
     assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'pnpm lint', 'next build'])
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+  } finally { console.error(`Retained test fixture: ${dir}`) }
+})
+
+test('all files preflight before a database connection, even if an earlier file is valid', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'migration-preflight-'))
+  try {
+    // A scripts sibling directory preserves the real entrypoint's ../drizzle resolution.
+    const scripts = join(dir, 'scripts')
+    const drizzle = join(dir, 'drizzle')
+    // Imported lazily to keep the original fixtures above unchanged.
+    const { mkdirSync } = process.getBuiltinModule('node:fs')
+    mkdirSync(scripts); mkdirSync(drizzle)
+    const source = readFileSync(new URL('./migrate.mjs', import.meta.url), 'utf8').replace("'pg'", "'./pg.mjs'")
+    writeFileSync(join(scripts, 'migrate.mjs'), source)
+    writeFileSync(join(scripts, 'migration-order.mjs'), 'export const orderMigrations = x => x.sort(); export const alreadyApplied = (name, applied) => applied.has(name)')
+    writeFileSync(join(scripts, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url), 'utf8'))
+    writeFileSync(join(scripts, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
+    writeFileSync(join(scripts, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
+    writeFileSync(join(scripts, 'pg.mjs'), 'export class Pool { constructor() { throw new Error("DATABASE_ACCESS") } }')
+    writeFileSync(join(drizzle, '20261028000001_valid.sql'), 'select 1;')
+    writeFileSync(join(drizzle, '20261028000002_invalid.sql'), '-- migrate: no-transaction\nselect 1; select 2;')
+    const result = spawnSync(process.execPath, [join(scripts, 'migrate.mjs')], {
+      env: { ...process.env, MIGRATE: '1', VERCEL_ENV: '' }, encoding: 'utf8',
+    })
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /20261028000002_invalid.sql.*exactly one statement/)
+    assert.doesNotMatch(result.stderr, /DATABASE_ACCESS/)
+  } finally { console.error(`Retained test fixture: ${dir}`) }
 })

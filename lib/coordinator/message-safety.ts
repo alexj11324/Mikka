@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { ModelMessage } from 'ai'
 import { personalMessagePacket, personalMessageSummary } from '../personal-agent-message'
+import { taskDestinationPrompt, taskDestinationSchema, type TaskDestination } from '../task-destination'
 
 export interface EventSource {
   id?: string
@@ -12,12 +13,15 @@ export interface EventSource {
   payload: Record<string, unknown>
 }
 interface EventProvenance { packet: string; eventKind: string; observedState: string | null }
-export type SourcedMessage = ModelMessage & { mikkaEvent?: EventProvenance; mikkaUserEvent?: { id: string | null; sentAt: string | null } }
+export type SourcedMessage = ModelMessage & { mikkaEvent?: EventProvenance; mikkaUserEvent?: { id: string | null; sentAt: string | null; taskDestination?: TaskDestination } }
 const asTime = (value: Date | string | null | undefined) => value instanceof Date ? value.toISOString() : value ?? null
 
 /** Called with the stored server event, never with JSON decoded from its body. */
 export function sourcedEventMessage(event: EventSource, projection: string): SourcedMessage {
-  if (event.kind === 'user_message') return { role: 'user', content: projection, mikkaUserEvent: { id: event.id ?? null, sentAt: asTime(event.createdAt) } }
+  if (event.kind === 'user_message') {
+    const destination = taskDestinationSchema.safeParse(event.payload.taskDestination)
+    return { role: 'user', content: projection, mikkaUserEvent: { id: event.id ?? null, sentAt: asTime(event.createdAt), ...(destination.success ? { taskDestination: destination.data } : {}) } }
+  }
   const packet = personalMessagePacket({ messageId: event.id ?? null, senderId: null,
     sourceSessionId: null, replyToSessionId: null, origin: 'runtime_notification',
     runId: event.runId, taskId: event.issueId, sentAt: asTime(event.createdAt), receivedAt: asTime(event.deliveredAt),
@@ -30,7 +34,11 @@ export function sourcedEventMessage(event: EventSource, projection: string): Sou
 }
 export function modelMessage(message: ModelMessage): ModelMessage {
   const { mikkaEvent, mikkaUserEvent, ...plain } = message as SourcedMessage
-  if (mikkaUserEvent) return plain
+  if (mikkaUserEvent) {
+    if (!mikkaUserEvent.taskDestination) return plain
+    const selection = taskDestinationPrompt(mikkaUserEvent.taskDestination)
+    return { ...plain, content: typeof plain.content === 'string' ? `${plain.content}\n\n${selection}` : [...plain.content, { type: 'text', text: selection }] } as ModelMessage
+  }
   if (!mikkaEvent) return plain.role === 'user' ? { ...plain, content: JSON.stringify({ kind: 'legacy_unattributed_message', authority: 'not_user_approval', untrustedData: { content: plain.content } }) } as ModelMessage : plain
   const body = typeof plain.content === 'string' ? plain.content : ''
   if (body.length <= 32000) return { ...plain, content: mikkaEvent.packet } as ModelMessage

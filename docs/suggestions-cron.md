@@ -1,6 +1,6 @@
 # Suggestions schedules
 
-Three schedules keep the 建议 panel and each person's profile current (R-21, R-73). Vercel Hobby runs crons at most once a day, so a Cloudflare Worker, `cloudflare/suggestions-cron`, fires them instead. The Worker only calls Mikka with a bearer secret; the logic stays in the Next.js app, so the schedules can move to `vercel.json` later without touching the endpoints.
+Three schedules keep the 建议 page and each person's profile current (R-21, R-73). Vercel Hobby runs crons at most once a day, so a Cloudflare Worker, `cloudflare/suggestions-cron`, fires them instead. The Worker only calls Mikka with a bearer secret; the logic stays in the Next.js app, so the schedules can move to `vercel.json` later without touching the endpoints.
 
 | Cron (UTC) | Endpoint | What it does |
 | --- | --- | --- |
