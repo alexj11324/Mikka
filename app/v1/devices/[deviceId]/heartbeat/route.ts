@@ -24,7 +24,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (!await ownedDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
-  await db.update(devices).set({ harnesses: parsed.data.harnesses, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
+  await db.update(devices).set({ harnesses: parsed.data.harnesses, computerUse: parsed.data.computerUse ?? { installed: false, version: null }, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
   await ensureDeviceAgents(pool, caller.userId, deviceId, parsed.data.harnesses)
   const result = await renewRunLeases(deviceId, parsed.data.runs.map(run => run.runId))
   const cloudCredential = caller.scopeDeviceId === deviceId && caller.scopeWorkspaceId

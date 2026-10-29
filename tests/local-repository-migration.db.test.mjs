@@ -9,7 +9,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 
 const old = '20261028020000_local_repository_defaults.sql'
-const current = '20261028143922_local_repository_defaults.sql'
+const current = '20261029022353_local_repository_defaults.sql'
 const baseline = '20261023221259_application_baseline.sql'
 const run = promisify(execFile)
 
@@ -38,7 +38,7 @@ test('migration runner handles historical and new names without replay and rejec
       await pool.query('CREATE TABLE device_repos ("baseBranch" text NOT NULL); CREATE TABLE agent_runs ("baseBranch" text NOT NULL); CREATE TABLE schema_migrations (name text PRIMARY KEY, "appliedAt" timestamptz NOT NULL DEFAULT now())')
       if (historical) {
         await pool.query(sql)
-        await pool.query('INSERT INTO schema_migrations(name) VALUES ($1)', [old])
+        await pool.query('INSERT INTO schema_migrations(name) VALUES ($1)', [historical])
         // If the renamed SQL runs again, this deliberately restored constraint disappears.
         await pool.query('ALTER TABLE device_repos ALTER COLUMN "baseBranch" SET NOT NULL')
       }
@@ -47,19 +47,21 @@ test('migration runner handles historical and new names without replay and rejec
     async function migrate(url) {
       return run(process.execPath, [join(root, 'scripts/migrate.mjs')], { env: { ...process.env, MIGRATE:'1', VERCEL_ENV:'', DATABASE_URL:url, MIKKA_DATABASE_URL:url } })
     }
-    const existing = await fixture(true)
-    try {
-      await migrate(existing.url); await migrate(existing.url)
-      assert.deepEqual((await existing.pool.query('SELECT name FROM schema_migrations ORDER BY name')).rows.map(r => r.name), [old, baseline].sort())
-      assert.equal((await existing.pool.query("SELECT is_nullable FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='device_repos' AND column_name='baseBranch'")).rows[0].is_nullable, 'NO')
-    } finally { await existing.pool.end() }
+    for (const historical of [old, '20261028143922_local_repository_defaults.sql']) {
+      const existing = await fixture(historical)
+      try {
+        await migrate(existing.url); await migrate(existing.url)
+        assert.deepEqual((await existing.pool.query('SELECT name FROM schema_migrations ORDER BY name')).rows.map(r => r.name), [historical, baseline].sort())
+        assert.equal((await existing.pool.query("SELECT is_nullable FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='device_repos' AND column_name='baseBranch'")).rows[0].is_nullable, 'NO')
+      } finally { await existing.pool.end() }
+    }
     const fresh = await fixture(false)
     try {
       await migrate(fresh.url); await migrate(fresh.url)
       assert.deepEqual((await fresh.pool.query('SELECT name FROM schema_migrations ORDER BY name')).rows.map(r => r.name), [baseline, current].sort())
       assert.equal((await fresh.pool.query("SELECT is_nullable FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='device_repos' AND column_name='baseBranch'")).rows[0].is_nullable, 'YES')
     } finally { await fresh.pool.end() }
-    const conflict = await fixture(true)
+    const conflict = await fixture(old)
     try {
       await writeFile(join(root, 'drizzle', current), sql + '\n-- unexpected change\n')
       await assert.rejects(migrate(conflict.url), /equivalent migration content changed/)

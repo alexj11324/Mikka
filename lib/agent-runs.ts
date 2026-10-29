@@ -58,7 +58,7 @@ export const runViewColumns = {
  * `note` is extra direction for this run only, after the issue.
  */
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
-export async function queueRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, botId: string | null = null, execution?: AgentExecution): Promise<{ runId: string }> {
+export async function queueRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, botId: string | null = null, execution?: AgentExecution, source: 'mcp' | null = null): Promise<{ runId: string }> {
   const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional() }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   const issue = await issueForUser(userId, parsed.data.issueId)
@@ -88,7 +88,7 @@ export async function queueRun(userId: string, input: { issueId: string; agentId
   await db.insert(agentRuns).values({
     id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
     deviceRepoId: repo.id, status: 'queued', kind: 'implement', baseBranch: repo.baseBranch,
-    prompt, agentDefinition,
+    prompt, agentDefinition, source,
   })
   return { runId }
 }

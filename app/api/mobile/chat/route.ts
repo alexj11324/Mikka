@@ -3,6 +3,7 @@ import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { getCoordinatorChat, sendCoordinatorMessage } from '@/app/actions/coordinator'
 import { ActionFailureError } from '@/lib/action-error'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
+import { MESSAGE_MAX } from '@/lib/message-limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +30,7 @@ async function handlePOST(request: Request) {
   noteLogUser(user?.id)
   if (!user) return unauthorized()
   if (!writeAllowed(request)) return forbiddenOrigin()
-  const parsed = z.object({ text: z.string().trim().min(1).max(10_000), botId: z.uuid().nullable().optional() }).safeParse(await request.json().catch(() => null))
+  const parsed = z.object({ text: z.string().trim().min(1).max(MESSAGE_MAX), botId: z.uuid().nullable().optional() }).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return json({ error: 'messageRequired' }, 400)
   const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null)
   return result.error ? json(result, 400) : json(result, 202)

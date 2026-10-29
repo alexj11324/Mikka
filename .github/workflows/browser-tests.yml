@@ -1,11 +1,8 @@
 name: Browser tests
 
-# The full Playwright suite, the slowest layer of CI (CONTRIBUTING.md, "How
-# changes are tested"). Its own workflow, so a branch push does not report it
-# at all: a skipped check would count as passed for the required check.
-# Runs on a pull request once it is ready for review (not a draft) against the
-# PR merged with the latest main, on main after merging, every night on main,
-# and by hand (Actions → Browser tests → Run workflow).
+# PRs run critical flows plus scoped regressions; unknown/shared changes run
+# full functionality. Main, nightly and manual integration runs also measure
+# performance. See CONTRIBUTING.md for the required, fail-closed gate policy.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -25,9 +22,76 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  browser-e2e:
-    name: Browser tests (before merge)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+  changes:
+    name: Changed files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      docs_only: ${{ steps.docs.outputs.docs_only }}
+      browser_tier: ${{ steps.docs.outputs.browser_tier }}
+      browser_specs: ${{ steps.docs.outputs.browser_specs }}
+      browser_performance: ${{ steps.docs.outputs.browser_performance }}
+      verify_selection: ${{ steps.docs.outputs.verify_selection }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: docs
+        # Run the classifier from main, never from this checkout: a pull
+        # request must not be able to rewrite the script that skips its own
+        # required checks.
+        run: |
+          git fetch origin main --no-tags
+          trusted="$(mktemp --suffix=.mjs)"
+          echo "Retained trusted classifier: $trusted"
+          if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
+            echo "docs_only=false (classifier is not on main yet)"
+            {
+              echo "docs_only=false"
+              echo "browser_tier=full"
+              echo 'browser_specs=[]'
+              echo "browser_performance=true"
+              echo "verify_selection=true"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git diff --quiet origin/main -- scripts/ci-docs-only.mjs; then
+            # Fixed CI-only allowlist + mode checks from trusted main. Never let
+            # a changed classifier turn its own check into documentation-only.
+            node --input-type=module - "$trusted" <<'BROWSER_BOOTSTRAP'
+          import { execFileSync } from 'node:child_process'
+          import { appendFileSync, readFileSync } from 'node:fs'
+          import { pathToFileURL } from 'node:url'
+          const { isDocsOnly, hasUnsafeModes } = await import(pathToFileURL(process.argv[2]).href)
+          const infra = new Set([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "AGENTS.md", "CONTRIBUTING.md"])
+          const critical = ["routes.spec.ts", "sign-out.spec.ts", "test-account-pool.spec.ts", "workspace.spec.ts"]
+          const integration = process.env.GITHUB_EVENT_NAME !== 'pull_request'
+          let ciOnly = false, performance = integration
+          try {
+            const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
+            const base = event.pull_request?.base?.sha, head = event.pull_request?.head?.sha
+            if (!base || !head || /^0+$/.test(base) || /^0+$/.test(head)) throw new Error('missing range')
+            const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+            const files = execFileSync('git', ['diff', '--no-renames', '-z', '--name-only', `${base}...${head}`], options).split('\0').filter(Boolean)
+            const raw = execFileSync('git', ['diff', '--no-renames', '-z', '--raw', '--no-abbrev', `${base}...${head}`], options)
+            ciOnly = !integration && files.length > 0 && !hasUnsafeModes(raw) && files.every(file => infra.has(file) || isDocsOnly([file]))
+            performance ||= files.some(file => ['tests/e2e/navigation-performance.spec.ts', 'tests/e2e/agent-performance.spec.ts'].includes(file))
+          } catch { /* Unknown ranges always run full functionality. */ }
+          const tier = ciOnly ? 'smoke' : 'full', specs = ciOnly ? critical : []
+          const outputs = `docs_only=false\nbrowser_tier=${tier}\nbrowser_specs=${JSON.stringify(specs)}\nbrowser_performance=${performance}\nverify_selection=true\n`
+          appendFileSync(process.env.GITHUB_OUTPUT, outputs)
+          console.log(`Trusted policy bootstrap: ${tier}; performance=${performance}; verify both subsets`)
+          BROWSER_BOOTSTRAP
+            exit 0
+          fi
+          node "$trusted"
+
+  browser-e2e-full:
+    name: Browser tests (selected layer)
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     # OS/browser setup took 9–10 minutes in runs 40320688470/40324658490.
     # Budget setup separately without weakening any Playwright test limits.
@@ -72,6 +136,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: node --test scripts/ci-docs-only.test.mjs scripts/ci-browser-tests.test.mjs
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'
@@ -96,7 +161,24 @@ jobs:
         id: build
       - name: Real HTTP authentication, account reuse and isolation
         run: node scripts/test-accounts/run-http.mjs
+      - name: Validate real subset execution when browser selection policy changes
+        if: needs.changes.outputs.verify_selection == 'true'
+        run: |
+          umask 077
+          mkdir -p .cache/e2e
+          log_file=.cache/e2e/playwright-selection.log
+          : > "$log_file"
+          chmod 600 "$log_file"
+          test_status=0
+          node scripts/ci-browser-tests.mjs --verify-selection > "$log_file" 2>&1 || test_status=$?
+          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
+            if [ "$test_status" -eq 0 ]; then test_status=1; fi
+            exit "$test_status"
+          fi
+          cat "$log_file"
+          exit "$test_status"
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
+        if: needs.changes.outputs.browser_performance == 'true'
         run: |
           umask 077
           mkdir -p .cache/e2e
@@ -114,7 +196,10 @@ jobs:
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
       - name: Browser functionality regression
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          BROWSER_TIER: ${{ needs.changes.outputs.browser_tier }}
+          BROWSER_SPECS: ${{ needs.changes.outputs.browser_specs }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && (needs.changes.outputs.verify_selection != 'true' || needs.changes.outputs.browser_tier == 'full') }}
         run: |
           umask 077
           mkdir -p .cache/e2e
@@ -122,7 +207,7 @@ jobs:
           : > "$log_file"
           chmod 600 "$log_file"
           test_status=0
-          pnpm test:e2e --grep-invert @performance > "$log_file" 2>&1 || test_status=$?
+          node scripts/ci-browser-tests.mjs > "$log_file" 2>&1 || test_status=$?
           if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
             if [ "$test_status" -eq 0 ]; then test_status=1; fi
             exit "$test_status"
@@ -143,11 +228,54 @@ jobs:
             test-results/
             playwright-performance-report/
             performance-results/
+            playwright-selection-smoke-report/
+            selection-smoke-results/
+            playwright-selection-targeted-report/
+            selection-targeted-results/
             .cache/e2e/http-acceptance-summary.json
             .cache/e2e/account-http-evidence.json
+            .cache/e2e/playwright-selection.log
             .cache/e2e/playwright-performance.log
             .cache/e2e/playwright-browser.log
           # Only the explicit scanned paths above; never the private account directory.
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7
+
+  browser-e2e:
+    # Preserve the protected check name. Classification errors or a missing
+    # selected test job fail; documentation is the only test-free tier.
+    name: Browser tests (before merge)
+    needs: [changes, browser-e2e-full]
+    if: always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the selected browser layer
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          FULL_RESULT: ${{ needs.browser-e2e-full.result }}
+          BROWSER_TIER: ${{ needs.changes.outputs.browser_tier }}
+          BROWSER_PERFORMANCE: ${{ needs.changes.outputs.browser_performance }}
+          EVENT_NAME: ${{ github.event_name }}
+          VERIFY_SELECTION: ${{ needs.changes.outputs.verify_selection }}
+        run: |
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "Changed files job did not succeed: $CHANGES_RESULT"
+            exit 1
+          fi
+          if [ "$EVENT_NAME" != "pull_request" ] && [ "$BROWSER_TIER:$BROWSER_PERFORMANCE" != "full:true" ]; then
+            echo "Integration runs require full functionality and performance"
+            exit 1
+          fi
+          case "$VERIFY_SELECTION" in true|false) ;; *) echo "Missing selection validation plan"; exit 1 ;; esac
+          case "$BROWSER_TIER:$DOCS_ONLY:$BROWSER_PERFORMANCE" in
+            docs:true:false) echo "Documentation-only change; no browser runtime changed."; exit 0 ;;
+            smoke:false:false|targeted:false:false|full:false:false|full:false:true) ;;
+            *) echo "Invalid browser test plan"; exit 1 ;;
+          esac
+          if [ "$FULL_RESULT" != "success" ]; then
+            echo "The selected browser layer did not succeed: $FULL_RESULT"
+            exit 1
+          fi
