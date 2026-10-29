@@ -20,7 +20,6 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, type IssueThread } from '@/lib/issue-threads'
-import { runIsActive } from '@/lib/issue-run-conversation'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
 async function getUserId(): Promise<string> {
@@ -119,13 +118,15 @@ export async function listLocalSshHosts(): Promise<SshHostView[]> {
   return listSshHosts()
 }
 
-export async function addDeviceRepo(input: { deviceId: string; repoPath: string; baseBranch: string; verifyCommand: string }): Promise<void> {
+export async function addDeviceRepo(input: { deviceId: string; repoPath: string; baseBranch: string; verifyCommand: string; remoteUrl?: string }): Promise<void> {
   const userId = await getUserId()
   const parsed = z.object({
     deviceId: z.uuid(),
     repoPath: z.string().trim().min(1).max(4000).startsWith('/'),
     baseBranch: z.string().trim().min(1).max(200),
     verifyCommand: z.string().trim().max(2000),
+    // Repository metadata only; controlled Skill registration verifies its source separately.
+    remoteUrl: z.string().trim().max(2000).optional(),
   }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('repoPathInvalid')
   const [device] = await db.select({ id: devices.id }).from(devices)
@@ -134,6 +135,7 @@ export async function addDeviceRepo(input: { deviceId: string; repoPath: string;
   await db.insert(deviceRepos).values({
     id: crypto.randomUUID(), deviceId: device.id, userId,
     repoPath: parsed.data.repoPath, baseBranch: parsed.data.baseBranch,
+    remoteUrl: parsed.data.remoteUrl || null,
     verifyCommand: parsed.data.verifyCommand || null,
   }).onConflictDoNothing()
 }
@@ -293,7 +295,6 @@ export async function sendIssueThreadMessage(input: { issueId: string; runId: st
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId)
-  if(runIsActive(row.status))return addRunMessage(user.id,{runId:row.id,text:text.data})
   const requestHeaders=await headers()
   if(requestHeaders.has('authorization')||!requestHeaders.get('cookie'))throw new ActionFailureError('authRequired')
   const session=await auth.api.getSession({headers:requestHeaders,query:{disableCookieCache:true}})

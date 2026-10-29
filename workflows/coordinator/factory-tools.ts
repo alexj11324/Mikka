@@ -5,7 +5,7 @@ import {factoryDispatchSchema} from '@/lib/factory/dispatch-schema'
 import {contextQuestionAnswerSchema,questionEscalationSchema,questionReferenceSchema} from '@/lib/factory/questions/schema'
 import {commandSchema,skillEvaluationCommandSchema} from '@/lib/self-improvement/schema'
 import type {NativeToolScope} from './tool-scope'
-import * as steps from './factory-steps'
+import * as steps from './steps'
 const coordinatorQuestionReferenceSchema = questionReferenceSchema.pick({ questionId: true, questionRevision: true })
 export function factoryCoordinatorTools(userId:string,scope?:NativeToolScope){const id=z.uuid();return {
 list_factory_requests: tool({
@@ -73,7 +73,7 @@ stop_factory_task: tool({
 dispatch_factory_run: tool({
       description: 'Queue and bind one Factory run atomically. Use the exact current pending binding from route_factory_task/get_factory_task. Waiting, cancelled, revoked or stale tasks cannot dispatch. Reuse the same binding after a lost response.',
       inputSchema: factoryDispatchSchema,
-      execute: ( input) => steps.dispatchRun(userId, input, scope),
+      execute: ( input) => steps.dispatchFactoryRunStep(userId, input, scope),
     }),
 select_baseline_skill: tool({
       description:'When the person requests a controlled Skill rehearsal, explicitly select the built-in baseline for an existing queued run before claim. This does not activate a candidate, grant permissions or prove execution.',

@@ -384,6 +384,10 @@ export async function getRun(userId: string, input: { runId: string }, scope?: N
   return {
     id: run.id, issueId: run.issueId, agent: run.agentName, harness: run.harness, status: run.status,
     stopReason: run.stopReason, error: run.error, summary: (run.report as { summary?: string } | null)?.summary ?? null,
+    sourceCommit: run.report?.sourceCommit ?? null,
+    skillMount: run.report?.skillMount ?? null,
+    runtime: run.report?.runtime ?? null,
+    verify: run.report?.verify ?? null,
     startedAt: run.startedAt?.toISOString() ?? null, finishedAt: run.finishedAt?.toISOString() ?? null,
     // The tail of the event stream, enough to see what the agent is doing.
     recentEvents: detail.chunks.slice(-5).map(chunk => JSON.stringify(chunk).slice(0, 1000)),
@@ -409,4 +413,4 @@ export async function webSearchStep(userId: string, input: { query: string; limi
   return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
 }
 
-export { selectBaselineSkill, selectActiveSkill, registerSkillCandidate, skillEvaluation, dispatchBaselineRehearsal, recordRunFeedback, proposeSkillImprovement, readRunImprovements, handoffSkillImprovement, getSkillImprovementFactory, listFactoryRequests, createIssueFromRequestStep, routeFactoryTask, getFactoryTask, listFactoryQuestions, getFactoryQuestion, answerFactoryContext, escalateFactoryQuestion, answerFactoryQuestionFromUser, resolveFactoryTask, stopFactoryTask } from './factory-steps'
+export { dispatchRun as dispatchFactoryRunStep, selectBaselineSkill, selectActiveSkill, registerSkillCandidate, skillEvaluation, dispatchBaselineRehearsal, recordRunFeedback, proposeSkillImprovement, readRunImprovements, handoffSkillImprovement, getSkillImprovementFactory, listFactoryRequests, createIssueFromRequestStep, routeFactoryTask, getFactoryTask, listFactoryQuestions, getFactoryQuestion, answerFactoryContext, escalateFactoryQuestion, answerFactoryQuestionFromUser, resolveFactoryTask, stopFactoryTask } from './factory-steps'

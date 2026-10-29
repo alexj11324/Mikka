@@ -1193,7 +1193,6 @@ export class RunSupervisor {
     const previousRuntime = entry.runtime
     let session: AgentSession
     try {
-      session = resuming
       session = assignment.subscriptionBinding
       ? this.deps.startSubscription
         ? await this.deps.startSubscription(assignment,{...options,prompt:assignment.prompt})

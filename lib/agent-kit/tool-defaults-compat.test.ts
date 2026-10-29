@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 import { asSchema, type ToolSet } from 'ai'
 import { DEFAULT_AGENT_DEFINITION, builtinAgentDefinition } from './builtin'
-import { COMPUTER_TOOL_IDS } from './registry'
+import { COMPUTER_TOOL_IDS, FACTORY_TOOL_IDS } from './registry'
 import { makeSnapshot, parseDefinition, exportDefinition, importDefinition, digest } from './definition'
 import { AgentKitStore, type AgentExecution } from './store'
 
@@ -12,7 +12,7 @@ const capture = (name: string) => async (...args: unknown[]) => { calls.push({na
 const forbidden = () => { throw Error('No DB, provider or device in catalogue tests') }
 stub('../db/index.ts', {db: {select: forbidden}, pool: {connect: forbidden}})
 stub('../workspace-db.ts', {workspaceDb: {select: forbidden}})
-stub('../../workflows/coordinator/steps.ts', {composioAction: capture('read'), proposeAccountAction: capture('propose'), wakeComputerBot: capture('wake')})
+stub('../../workflows/coordinator/steps.ts', {composioAction: capture('read'), proposeAccountAction: capture('propose'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch')})
 stub('../../workflows/coordinator/agent-kit-steps.ts', { beforeAgentTool: async () => {}, afterAgentTool: async () => {}, loadAgentSkill: async () => ({ error: 'notAssigned' }) })
 let registry: typeof import('../../workflows/coordinator/tools')
 let service: typeof import('./service')
@@ -127,4 +127,24 @@ test('new deployment defaults cannot rewrite a persisted builtin/custom head or 
     assert.equal(JSON.stringify(saved), before)
     assert.ok(!queries.some(sql => /^(update|insert into agent_kit_versions|insert into agent_kit_executions)/.test(sql)))
   }
+})
+
+
+test('Factory dispatch and ordinary dispatch keep separate host entry points and frozen capability selection', async () => {
+  calls.length = 0
+  const tools = registry.coordinatorTools(owner, null, scope, {execution: execution()})
+  const ordinary = {agentId: bot, deviceRepoId: bot, issueId: bot}
+  const factory = {agentId: bot, deviceRepoId: bot, binding: {taskId: bot, issueId: bot, attemptId: bot, revision: 1, candidateId: null}}
+  await invoke(tools, 'dispatch_run', ordinary)
+  await invoke(tools, 'dispatch_factory_run', factory)
+  assert.deepEqual(calls, [
+    {name: 'ordinary-dispatch', args: [owner, ordinary, scope, null, execution()]},
+    {name: 'factory-dispatch', args: [owner, factory, scope]},
+  ])
+  const saved = execution(parseDefinition({...DEFAULT_AGENT_DEFINITION, tools: DEFAULT_AGENT_DEFINITION.tools.filter(name => !(FACTORY_TOOL_IDS as readonly string[]).includes(name))}))
+  const snapshot = JSON.stringify(saved)
+  const replayed = registry.coordinatorTools(owner, null, scope, {execution: saved})
+  assert.ok(replayed.dispatch_run)
+  for (const name of FACTORY_TOOL_IDS) assert.equal(replayed[name], undefined)
+  assert.equal(JSON.stringify(saved), snapshot)
 })
