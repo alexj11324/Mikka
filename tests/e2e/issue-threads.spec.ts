@@ -150,11 +150,11 @@ test('The owner stops a live thread from its composer; it reads 正在停止… 
     await page.screenshot({ path: testInfo.outputPath('thread-stop-stopping.png') })
     // An offline daemon never acknowledges. The timeout unlocks retry, not the draft.
     await page.clock.fastForward(30_100)
-    await expect(panel.getByRole('alert')).toContainText('没停下来，再试一次')
+    await expect(panel.getByRole('alert')).toContainText('停止未确认')
     await expect(composer).toHaveValue('Keep this draft while stopping')
     await expect(composer).toBeEditable()
     await page.screenshot({ path: testInfo.outputPath('thread-stop-timeout.png') })
-    await panel.getByRole('button', { name: '重试', exact: true }).click()
+    await panel.getByRole('button', { name: '重试停止', exact: true }).click()
     await expect(panel.getByRole('alert')).toHaveCount(0)
     await expect(composer).toHaveValue('Keep this draft while stopping')
     await expect(panel.getByText('正在停止…', { exact: true })).toBeVisible()
