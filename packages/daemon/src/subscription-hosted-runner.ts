@@ -30,6 +30,7 @@ import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
 import type { ComputerBroker } from "./computer/broker.mjs";
+import { decide } from "./permissions";
 
 const exec = promisify(execFile);
 const image = HOSTED_NATIVE_IMAGE;
@@ -440,9 +441,11 @@ export async function createHostedBotRunner(host: {
       const resource: Resource = { name, nonce, state: "creating" };
       let closed = false;
       let closing: Promise<void> | undefined;
+      let computerGrant: ReturnType<ComputerBroker["spec"]>;
       const close = () =>
         (closing ??= (async () => {
           closed = true;
+          if (computerGrant) host.computerBroker?.revoke(computerGrant.token);
           try {
             if (existsSync(resourceFile))
               await removeResource(resourceFile, resource);
@@ -467,7 +470,7 @@ export async function createHostedBotRunner(host: {
         await close();
         throw unavailable();
       }
-      const computerGrant = computer ? host.computerBroker!.spec(assignment.runId, "ask", { display: computer.display }) : undefined;
+      computerGrant = computer ? host.computerBroker!.spec(assignment.runId, decide("computer_use", { policy: assignment.policy }), { display: computer.display }) : undefined;
       if (computer && !computerGrant) { await close(); throw unavailable(); }
       const computerMcp = computerGrant ? {
         command: "node", args: ["/mikka-computer/proxy.mjs", "/run/mikka-computer.sock", computerGrant.token], env: {},

@@ -14,6 +14,7 @@ import { callMcpTool } from "./mcp-call.mjs"
 
 // `-c mcp_servers.mikka.command="..."` / `.args=[...]` / `.env.K="..."`
 const mcp = { command: "", args: [], env: {} }
+const computer = { command: "", args: [], env: {} }
 const argv = process.argv.slice(2)
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] !== "-c") continue
@@ -23,6 +24,9 @@ for (let i = 0; i < argv.length; i++) {
   if (key === "mcp_servers.mikka.args") mcp.args = value
   if (key.startsWith("mcp_servers.mikka.env."))
     mcp.env[key.split(".").pop()] = value
+  if (key === "mcp_servers.mikka_computer.command") computer.command = value
+  if (key === "mcp_servers.mikka_computer.args") computer.args = value
+  if (key.startsWith("mcp_servers.mikka_computer.env.")) computer.env[key.split(".").pop()] = value
 }
 
 const send = (message) =>
@@ -66,6 +70,14 @@ async function runTurn(text) {
     threadId,
     turn: { id: open, status: "inProgress", error: null },
   })
+  if (text === 'COMPUTER_CONFIG_TEST') {
+    const output = JSON.stringify({ computer: computer.command ? computer : null })
+    item('started', { type: 'agentMessage', id: `m-${turn}`, text: '' })
+    notify('item/agentMessage/delta', { threadId, turnId: open, itemId: `m-${turn}`, delta: output })
+    item('completed', { type: 'agentMessage', id: `m-${turn}`, text: output })
+    complete()
+    return
+  }
   if (text.startsWith('MAILBOX_TEST ')) {
     const results = []
     for (const call of JSON.parse(text.slice('MAILBOX_TEST '.length))) {

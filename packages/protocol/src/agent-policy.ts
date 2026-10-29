@@ -19,6 +19,7 @@ export const PERMISSION_ACTIONS = [
   "write_outside_repo",
   "git_push",
   "network",
+  "computer_use",
 ] as const
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number]
 
@@ -33,6 +34,7 @@ export const CONFIGURABLE_PERMISSIONS = {
   write_outside_repo: ["ask", "deny"],
   git_push: ["allow", "ask", "deny"],
   network: ["allow", "ask", "deny"],
+  computer_use: ["allow", "ask", "deny"],
 } as const satisfies Partial<
   Record<PermissionAction, readonly PermissionDecision[]>
 >
@@ -59,6 +61,7 @@ export const PERMISSION_DEFAULTS: Readonly<
   write_outside_repo: "ask",
   git_push: "ask",
   network: "ask",
+  computer_use: "ask",
 }
 
 export function isConfigurableAction(
@@ -116,6 +119,7 @@ export const storedPermissionsSchema = z
     write_outside_repo: z.enum(CONFIGURABLE_PERMISSIONS.write_outside_repo),
     git_push: z.enum(CONFIGURABLE_PERMISSIONS.git_push),
     network: z.enum(CONFIGURABLE_PERMISSIONS.network),
+    computer_use: z.enum(CONFIGURABLE_PERMISSIONS.computer_use),
   })
   .partial()
 export type StoredPermissions = z.infer<typeof storedPermissionsSchema>
@@ -159,6 +163,7 @@ export const READ_ONLY_DENIED: readonly PermissionAction[] = [
   "run_setup_recipe",
   "install_dependency",
   "git_push",
+  "computer_use",
 ]
 
 /** What a run is sent (`RunAssignment.policy`): every choice filled in. */
@@ -168,6 +173,8 @@ export const runPolicySchema = z.object({
     write_outside_repo: z.enum(PERMISSION_DECISIONS),
     git_push: z.enum(PERMISSION_DECISIONS),
     network: z.enum(PERMISSION_DECISIONS),
+    // Older servers omit this field; the daemon treats that as ask, never allow.
+    computer_use: z.enum(PERMISSION_DECISIONS).optional(),
   }),
   /** The workspace layer of the domain allow-list (ADR 0009). */
   networkAllow: z.array(z.string().min(1).max(253)).max(MAX_NETWORK_DOMAINS),
@@ -306,8 +313,8 @@ export function isNoLooserThan(base: RunPolicy, next: RunPolicy): boolean {
   if (base.readOnly === true && next.readOnly !== true) return false
   return CONFIGURABLE_ACTIONS.every(
     (action) =>
-      DECISION_RANK[next.permissions[action]] <=
-      DECISION_RANK[base.permissions[action]]
+      DECISION_RANK[next.permissions[action] ?? "ask"] <=
+      DECISION_RANK[base.permissions[action] ?? "ask"]
   )
 }
 

@@ -258,6 +258,11 @@ export class HttpServerLink implements ServerLink {
     const result = await this.call("POST", computerSyncPath(checkId(deviceId)), { body: { requests }, schema: computerSyncResponse, signal })
     return result.decisions
   }
+  async localComputerAuthority(deviceId: string, runId: string) {
+    return this.call('GET', `${devicePaths.claim(checkId(deviceId), checkId(runId)).replace(/\/claim$/, '')}/computer-authority`, {
+      schema: runAssignmentSchema.shape.localComputer.unwrap(),
+    })
+  }
   async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
     return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
   }
