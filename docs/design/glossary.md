@@ -56,9 +56,6 @@ Decided by Alex, 2026-10-28.
 
 - "会话" / "session" / "conversation list" for the left column. The left
   column is the **bot list** and the right column is the **thread list**.
-  `agent_sessions` and
-  `components/nav/conversation-list.tsx` are today's implementation, which
-  still lists sessions; that is a known gap, not the model.
 - "会话" for a run (e.g. "打开会话" on a task's run). Say **线程**.
 - "任务" for the right panel's thread tab. Say **线程**.
 - A Chinese word for Artifact. Keep **Artifact**.

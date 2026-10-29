@@ -24,6 +24,8 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-05** Bots run only on Mikka's own AI SDK harness. The 新建 Bot dialog
   has a big live preview, a shape grid, colours and a name. It has no machine
   picker, no harness picker and no 说明 field (instructions are edited in chat).
+  The Coordinator has no runtime switch either: the #312 native Claude Code /
+  Codex runtime is deprecated and stays off (decision 2026-10-27).
 - **R-06** The Coordinator has no special UI; it is a normal bot (Alex
   2026-10-24). Its role is coordinating, not looking different: the same
   bloub avatar with no star or badge, the same row, the same chat, the

@@ -37,7 +37,7 @@ review the results.
   - Each piece of work runs in a **thread**: one work run with its own name,
     usually tied to a task. One bot can run many threads at once.
   - The full definitions are in the [glossary](docs/design/glossary.md).
-  - A **harness** is the execution layer, not another bot. The Coordinator uses Mikka's AI SDK / Workflow harness for chat and tools; dispatched coding work uses the daemon's Claude Code, Codex or Cursor CLI harness. The retired standalone Agent chat is available only as read-only history.
+  - A **harness** is the execution layer, not another bot. The Coordinator uses Mikka's AI SDK / Workflow harness for chat and tools; dispatched coding work uses the daemon's Claude Code, Codex or Cursor CLI harness. The retired standalone Agent chat is available only as read-only history. Running the Coordinator itself on Claude Code or Codex ([#312](docs/architecture/native-coordinator.md)) is a deprecated design: the code is kept switched off and must not be enabled.
 
 - **One Coordinator, multiple execution harnesses.**
   - The Coordinator is a long-running bot. It wakes when a run ends, a task
@@ -217,8 +217,9 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check:ci` is the full CI gate: `check`, plus the production build,
-performance tests and Playwright tests.
+`pnpm check:ci` runs `check`, the production build, and the performance and
+Playwright tests. CI runs these, plus database and daemon suites, in the CI
+and Browser tests workflows.
 
 Start with these documents:
 
