@@ -27,6 +27,8 @@
 | A21 审批前核对 | 卡片显示收件人、主题、正文 | `tests/e2e/pending-actions.spec.ts` |
 | A22 拒绝高风险操作 | 拒绝后不出现「已发送」，数据库状态为 declined | 同上 |
 | A23 刷新后重复点击 | 刷新后从服务端读回状态，不重放决策 | 同上 |
+| D12 个人名称 | 个人资料名称为输入框，保存后刷新仍生效 | `tests/e2e/profile.spec.ts` |
+| D14 界面语言 | 切换后进入 `/en`，界面文案变英文 | 同上 |
 
 E2E 运行方式：独立 Postgres 库 `mikka_120_e2e`，`CI=true`，`BETTER_AUTH_URL=http://localhost:3100`，密钥走 `infisical run --env dev --path /vercel`。
 
@@ -177,9 +179,9 @@ Writing Style Guide、Shopify Polaris、Material 3 的公开规则。本轮收�
 | D09 | 停用一位成员 | 多人/权限 | 待真实应用执行 | run-e2e | env |
 | D10 | 离开工作区 | 多人/权限 | 待真实应用执行 | run-e2e | env |
 | D11 | 切换工作区 | 多人/权限 + 设置 | 待真实应用执行 | run-e2e | env |
-| D12 | 修改个人名称 | 设置 | 静态源码缺口；未修改 | fix-code | local |
+| D12 | 修改个人名称 | 设置 | 已完成：输入框 + 保存 | done | local |
 | D13 | 更换个人头像 | 设置 | 待真实应用执行 | run-e2e | local |
-| D14 | 切换界面语言 | 设置 | 静态源码缺口；未修改 | fix-code | local |
+| D14 | 切换界面语言 | 设置 | 已完成：ToggleGroup + locale 路由 | done | local |
 | D15 | 切换浅色深色与系统主题 | 设置 | 待真实应用执行 | run-e2e | local |
 | D16 | 设置通知类型 | 手机/推送 + 审批 + 设置 | 静态源码缺口；未修改 | fix-code | env |
 | D17 | 设置电脑使用时不推手机 | 手机/推送 + daemon/电脑 + 设置 | 待真实应用执行 | run-e2e | env |
@@ -201,7 +203,7 @@ Writing Style Guide、Shopify Polaris、Material 3 的公开规则。本轮收�
 
 1. **A 轨 30 项**：外部依赖最少（9/30），且已有停止线程的 3 个设计画面。先跑通 A 轨验证方法论。
 2. **C 轨 Artifact 5 项**：代码缺口已复现（R02/R03/R04），设计已补 5 个状态，改完即可测。
-3. **D 轨设置 3 项**：D12/D14/D16 是静态源码缺口，改动集中。
+3. **D 轨设置**：D12/D14 已完成；D16 通知分区仍缺 UI。
 4. **B 轨**：外部依赖最多（16/30），需要 Linear 工作区、GitHub App、多人账号，放最后。
 
 ## 尚未完成
@@ -212,7 +214,6 @@ Writing Style Guide、Shopify Polaris、Material 3 的公开规则。本轮收�
 | A24 取消建议 | 有后端无 UI | `DELETE /api/suggestions/:id` 存在，建议卡片没有取消入口 |
 | A25 简报 | 未测 | 需要 Coordinator 08:00 消息与建议数据 |
 | A26 / D16 通知设置 | 无 UI | 偏好后端存在（`lib/preferences.ts`），设置页没有通知分区 |
-| D14 语言 | 只读 | `settings-view.tsx` 里语言仍是 `<span>`，没有切换动作 |
 | D19 / D20 推送失败 | 设计已补 | 需要 APNs 与真机，未跑 |
 | B / C 轨外部项 | 未执行 | 需要 Linear 工作区、GitHub App、Composio 连接、云电脑 |
 | 新增 artifact 状态 | 未覆盖 | 深色与窄屏版本、键盘与读屏操作 |

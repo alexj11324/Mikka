@@ -1520,7 +1520,9 @@
       "systemLabel": "Follow system",
       "language": "Language",
       "languageDescription": "The display language for this version.",
-      "languageName": "English"
+      "languageName": "English",
+      "languageZh": "Chinese (Simplified)",
+      "languageEn": "English"
     },
     "profile": {
       "heading": "Account",
