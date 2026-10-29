@@ -27,18 +27,19 @@ const DOCS_ONLY = [
   /^tasks\/.*\.md$/,
   /^README(?:\.[^/]+)?\.md$/,
   /^LICENSE$/,
+  /^AGENTS\.md$/,
   /^\.github\/pull_request_template\.md$/,
 ]
 
 export function isDocsOnly(files, unsafeModes = false) {
-  return !unsafeModes && files.length > 0 && files.every(file => !/(?:^|\/)AGENTS\.md$/.test(file) && DOCS_ONLY.some(pattern => pattern.test(file)))
+  return !unsafeModes && files.length > 0 && files.every(file => (file === 'AGENTS.md' || !/(?:^|\/)AGENTS\.md$/.test(file)) && DOCS_ONLY.some(pattern => pattern.test(file)))
 }
 
 // Whole existing specs, rather than title grep filters: assertions stay intact.
 export const BROWSER_SMOKE = Object.freeze([
   'routes.spec.ts', 'workspace.spec.ts', 'test-account-pool.spec.ts', 'sign-out.spec.ts',
 ])
-export const BROWSER_INFRA_FILES = Object.freeze([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "AGENTS.md", "CONTRIBUTING.md"])
+export const BROWSER_INFRA_FILES = Object.freeze([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "CONTRIBUTING.md"])
 const SELECTION_POLICY_FILES = new Set([".github/workflows/browser-tests.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/test-accounts/evidence.mjs"])
 export const needsSelectionValidation = files => files.some(file => SELECTION_POLICY_FILES.has(file))
 const SCOPED_BROWSER = [
@@ -138,6 +139,7 @@ function changedFiles(base, head) {
 export function main() {
   let base = arg('--base')
   let head = arg('--head')
+  let mainPush = false
 
   if (!base || !head) {
     const eventName = process.env.GITHUB_EVENT_NAME
@@ -151,30 +153,42 @@ export function main() {
     } else if (eventName === 'schedule' || eventName === 'workflow_dispatch') {
       return output(false, 'integration run', browserPlan([], { integration: true }))
     } else if (eventName === 'push') {
-      // A main push is postsubmit: always run the full suites.
-      if (process.env.GITHUB_REF === 'refs/heads/main') return output(false, 'push to main', browserPlan([], { integration: true }))
+      // A regular docs-only main push may skip heavy postsubmit checks;
+      // nightly and manual integration still run full functionality.
+      if (process.env.GITHUB_REF === 'refs/heads/main') {
+        mainPush = true
+        base = payload.before
+        head = payload.after || process.env.GITHUB_SHA
+      } else {
       // Classify the whole branch against main, not just the pushed commits:
       // a docs-only last push must not hide earlier code changes.
       base = 'origin/main'
       head = process.env.GITHUB_SHA
+      }
     }
   }
 
   const emptySha = /^0+$/
-  if (!base || !head || emptySha.test(base) || emptySha.test(head)) return output(false, 'no comparable range')
+  if (!base || !head || emptySha.test(base) || emptySha.test(head)) return output(false, 'no comparable range', browserPlan([], { integration: mainPush }))
 
   let result
   try {
+    // Do not trust a force-pushed or unrelated main history for postsubmit skips.
+    if (mainPush) execFileSync('git', ['merge-base', '--is-ancestor', base, head], { stdio: 'ignore' })
     result = changedFiles(base, head)
   } catch (error) {
-    // Fail open: an unknown base must run the full suites, never skip them.
-    return output(false, `git diff failed: ${error instanceof Error ? error.message : String(error)}`)
+    // Unknown histories and failed comparisons must run the full suites.
+    return output(false, `git diff failed: ${error instanceof Error ? error.message : String(error)}`, browserPlan([], { integration: mainPush }))
   }
 
   const reason = result.files.length
     ? `${result.files.length} changed file(s)`
     : 'no changed files'
-  output(isDocsOnly(result.files, result.unsafeModes), result.unsafeModes ? `${reason}; non-regular path or unmerged entry` : reason, browserPlan(result.files, { unsafeModes: result.unsafeModes }), needsSelectionValidation(result.files))
+  const docsOnly = isDocsOnly(result.files, result.unsafeModes)
+  const plan = mainPush && !docsOnly
+    ? browserPlan([], { integration: true })
+    : browserPlan(result.files, { unsafeModes: result.unsafeModes })
+  output(docsOnly, result.unsafeModes ? `${reason}; non-regular path or unmerged entry` : reason, plan, needsSelectionValidation(result.files))
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()
