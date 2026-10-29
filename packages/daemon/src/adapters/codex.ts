@@ -385,8 +385,14 @@ export class CodexAdapter implements AgentAdapter {
 
     /** The CLI and everything it started are gone before the exit is told. */
     let ended: Promise<void> | undefined
-    const finish = (event: Parameters<EventQueue["exit"]>[0] | null) =>
-      (ended ??= close(event))
+    const finish = (event: Parameters<EventQueue["exit"]>[0] | null) => {
+      if (ended) return ended
+      ending = true
+      // Publish before close revokes the gate: an owner revocation listener
+      // can synchronously re-enter cancel(), which must join this outcome.
+      ended = Promise.resolve().then(() => close(event))
+      return ended
+    }
     const close = async (event: Parameters<EventQueue["exit"]>[0] | null) => {
       ending = true
       options.toolApproval?.revoke()
