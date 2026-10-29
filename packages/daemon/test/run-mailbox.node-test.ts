@@ -326,7 +326,9 @@ test('Codex unaudited versions and mailbox-enabled history resume fail closed wi
       const runId = randomUUID()
       const options = { runId, toolApproval: syntheticApproval(runId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'No provider invocation' }
       await assert.rejects(adapter.start(options), /audited Codex0.163.0/)
-      await assert.rejects(adapter.resume('another-history', options), /fresh Codex thread/)
+      // The failed start has revoked its gate. Use a new host-owned lifetime
+      // to exercise the separate history guard instead of stopping at revoke.
+      await assert.rejects(adapter.resume('another-history', { ...options, toolApproval: syntheticApproval(runId) }), /fresh Codex thread/)
     }
     assert.equal(f.state.writes, 0)
   } finally { await mailbox.close() }
