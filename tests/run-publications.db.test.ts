@@ -388,7 +388,7 @@ test('run result publication commits one owner-scoped result through retries and
       const { writeRepositoryPushApproval } = await import('../lib/repository-approval-write')
       const { coordinatorEnabled } = await import('../lib/coordinator/wake')
       assert.equal(coordinatorEnabled(), false, 'this DB suite cannot invoke a real model')
-      const f = await fixture({ prefix: 'ADMIT' })
+      const f = await fixture({ prefix: 'ADMI' })
       await pool.query('update devices set "protocolVersion"=3 where id=$1', [f.deviceId])
       const input = { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl }
       const eventId = randomUUID()
