@@ -83,3 +83,22 @@ test('连续按下发送只提交一次', async ({ page }) => {
   await page.waitForTimeout(1500)
   await expect(page.getByText('只提交一次', { exact: true })).toHaveCount(1)
 })
+
+// A08: a send that fails must keep the draft and say it failed, then retry.
+test('发送失败后草稿仍保留，恢复后可再发', async ({ page }) => {
+  await register(page)
+  const composer = page.getByLabel('给 Coordinator 发消息', { exact: true })
+  await composer.fill('发送失败时保留')
+  const failPost = async (route: import('@playwright/test').Route) => {
+    const request = route.request()
+    if (request.method() === 'POST' && request.headers()['next-action']) return route.fulfill({ status: 200, contentType: 'text/x-component', body: '' })
+    return route.fallback()
+  }
+  await page.route('**/*', failPost)
+  await composer.press('Enter')
+  await expect(page.getByRole('alert')).toBeVisible()
+  await expect(composer).toHaveValue('发送失败时保留')
+  await page.unroute('**/*', failPost)
+  await composer.press('Enter')
+  await expect(page.getByText('发送失败时保留', { exact: true })).toBeVisible()
+})

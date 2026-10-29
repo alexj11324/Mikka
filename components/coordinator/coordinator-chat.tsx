@@ -53,7 +53,7 @@ function footerTools(item: Chat['items'][number]) {
  * `embedded`, with chips instead of cards and the quote from the artifact in
  * the composer.
  */
-export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView }) {
+export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string }) {
   const t = useTranslations('Coordinator')
   const tNav = useTranslations('Nav')
   const botId = bot?.id ?? null
@@ -68,7 +68,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const [draft, setDraft] = useState('')
   // A draft belongs to the bot it was typed for. Switching bots remounts this
   // component (the page keys it by bot), so keep the text per conversation.
-  const draftKey = `mikka:draft:${botId ?? 'coordinator'}`
+  const draftKey = `mikka:draft:${userId ?? 'anonymous'}:${botId ?? 'coordinator'}`
   const draftLoaded = useRef(false)
   useEffect(() => {
     try {
