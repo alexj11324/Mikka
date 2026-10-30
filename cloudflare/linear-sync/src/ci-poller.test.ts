@@ -10,6 +10,7 @@ test('multiple workflows and missing required checks create one final callback, 
   const outputs:CiPollResult[]=[]
   const adapter:CiPollAdapter = {
     async lease() { return [{id:'fixture',generation:'1',attempt:0,observation}] },
+    async authorize(){return {async check(){},async close(){}}},
     async read() { return {head,open:true,snapshot} },
     async pending(_lease,state) { observation=state },
     async close() { throw Error('not closed') },
@@ -32,7 +33,7 @@ test('multiple workflows and missing required checks create one final callback, 
 test('failed provider reads back off and do not emit a final result', async () => {
   let due=0
   const lease:CiPollLease={id:'fixture',generation:'1',attempt:2,observation:null}
-  const adapter:CiPollAdapter={async lease(){return [lease]},async read(){throw Error('offline')},async pending(){throw Error('unexpected')},async close(){throw Error('unexpected')},async complete(){throw Error('unexpected')},async retry(_lease,next){due=next}}
+  const adapter:CiPollAdapter={async lease(){return [lease]},async authorize(){return {async check(){},async close(){}}},async read(){throw Error('offline')},async pending(){throw Error('unexpected')},async close(){throw Error('unexpected')},async complete(){throw Error('unexpected')},async retry(_lease,next){due=next}}
   const result=await pollActiveCi(adapter,{now:()=>1000,random:()=>0,deadline:31000})
   assert.equal(result.failed,1); assert.equal(result.completed,0); assert.ok(due>1000)
 })

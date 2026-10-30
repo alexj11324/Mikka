@@ -7,12 +7,21 @@ export class CiReadError extends Error {
   constructor(readonly code: 'configuration' | 'permission' | 'unavailable' | 'invalid_response' | 'unsupported_required_workflow') { super(code) }
 }
 
+/** After a commit has already been delivered, only the PR head is needed to
+ * detect a new commit or closure; same-commit reruns do not wake again. */
+export async function readCiHead(binding: Binding,token:string,fetcher:typeof fetch=fetch,signal?:AbortSignal):Promise<{head:string;open:boolean}> {
+  const {path}=githubRepository(binding.remoteKey)
+  const response=await fetcher(`https://api.github.com${path}/pulls/${binding.prNumber}`,{redirect:'error',cache:'no-store',signal,headers:{accept:'application/vnd.github+json',authorization:`Bearer ${token}`,'x-github-api-version':'2022-11-28'}})
+  if(!response.ok)throw new CiReadError('unavailable')
+  const pr=await response.json() as {state?:unknown;head?:{sha?:unknown;ref?:unknown;repo?:{id?:unknown}};base?:{repo?:{id?:unknown}}}
+  if(!['open','closed'].includes(String(pr.state))||typeof pr.head?.sha!=='string'||!/^[a-f0-9]{40}$/i.test(pr.head.sha)||pr.head.ref!==binding.branch||pr.head.repo?.id!==binding.repositoryId||pr.base?.repo?.id!==binding.repositoryId)throw new CiReadError('invalid_response')
+  return {head:pr.head.sha.toLowerCase(),open:pr.state==='open'}
+}
+
 /** Read only, fixed origin, installation- and repository-scoped. No token is retained. */
-export async function readCi(binding: Binding, env: Record<string, string | undefined>, fetcher: typeof fetch = fetch, options: { deadline?: number } = {}): Promise<{ head: string; open: boolean; snapshot: Snapshot }> {
-  if (!env.GITHUB_APP_ID || !env.GITHUB_APP_PRIVATE_KEY || !Number.isSafeInteger(binding.installationId) || binding.installationId <= 0 || !Number.isSafeInteger(binding.repositoryId) || binding.repositoryId <= 0 || !Number.isSafeInteger(binding.prNumber) || binding.prNumber <= 0 || !binding.branch || binding.branch.length > 255) throw new CiReadError('configuration')
+export async function readCi(binding: Binding, env: Record<string, string | undefined>, fetcher: typeof fetch = fetch, options: { deadline?: number; scopedToken?:string } = {}): Promise<{ head: string; open: boolean; snapshot: Snapshot }> {
+  if ((!options.scopedToken && (!env.GITHUB_APP_ID || !env.GITHUB_APP_PRIVATE_KEY)) || !Number.isSafeInteger(binding.installationId) || binding.installationId <= 0 || !Number.isSafeInteger(binding.repositoryId) || binding.repositoryId <= 0 || !Number.isSafeInteger(binding.prNumber) || binding.prNumber <= 0 || !binding.branch || binding.branch.length > 255) throw new CiReadError('configuration')
   const { path } = githubRepository(binding.remoteKey)
-  let jwt: string
-  try { jwt = githubAppJwt(env.GITHUB_APP_ID, env.GITHUB_APP_PRIVATE_KEY) } catch { throw new CiReadError('configuration') }
   async function request(pathname: string, token: string, body?: unknown): Promise<unknown> {
     let response: Response
     const remaining = options.deadline === undefined ? 8_000 : Math.min(8_000, options.deadline - Date.now())
@@ -23,9 +32,14 @@ export async function readCi(binding: Binding, env: Record<string, string | unde
     if (!response.ok) throw new CiReadError('unavailable')
     try { return await response.json() } catch { throw new CiReadError('invalid_response') }
   }
-  const tokenResponse = await request(`/app/installations/${binding.installationId}/access_tokens`, jwt, { repository_ids: [binding.repositoryId], permissions: { metadata: 'read', pull_requests: 'read', checks: 'read', statuses: 'read', contents: 'read', actions: 'read' } }) as { token?: unknown }
-  if (typeof tokenResponse?.token !== 'string' || !tokenResponse.token) throw new CiReadError('invalid_response')
-  const token = tokenResponse.token
+  let token=options.scopedToken
+  if (!token) {
+    let jwt: string
+    try { jwt = githubAppJwt(env.GITHUB_APP_ID!, env.GITHUB_APP_PRIVATE_KEY!) } catch { throw new CiReadError('configuration') }
+    const tokenResponse = await request(`/app/installations/${binding.installationId}/access_tokens`, jwt, { repository_ids: [binding.repositoryId], permissions: { metadata: 'read', pull_requests: 'read', checks: 'read', statuses: 'read', contents: 'read', actions: 'read' } }) as { token?: unknown }
+    if (typeof tokenResponse?.token !== 'string' || !tokenResponse.token) throw new CiReadError('invalid_response')
+    token = tokenResponse.token
+  }
   const pr = await request(`${path}/pulls/${binding.prNumber}`, token) as { state?: unknown; head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } }; base?: { ref?: unknown; repo?: { id?: unknown } } }
   if (!['open', 'closed'].includes(String(pr?.state)) || typeof pr.head?.sha !== 'string' || !/^[a-f0-9]{40}$/i.test(pr.head.sha) || pr.base?.repo?.id !== binding.repositoryId || pr.head.ref !== binding.branch || pr.head.repo?.id !== binding.repositoryId || typeof pr.base?.ref !== 'string' || !pr.base.ref || pr.base.ref.length > 255) throw new CiReadError('invalid_response')
   if (pr.state === 'closed') return { head: pr.head.sha, open: false, snapshot: { checks: [], statuses: [] } }

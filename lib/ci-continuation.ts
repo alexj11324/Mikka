@@ -32,6 +32,12 @@ export async function queueCiContinuation(tx: PoolClient, userId: string, input:
   if (!binding || !binding.agentId || !binding.deviceId || !binding.deviceRepoId || binding.stopRequestedAt || !['succeeded', 'stopped'].includes(binding.runStatus) || binding.stopReason !== 'submitted' || !['open', 'draft'].includes(binding.pullRequest?.state)) unavailable()
   if (!binding.sessionId || typeof binding.sessionId !== 'string' || binding.sessionId.length > 500) throw new CiContinuationUnsupported('session_missing')
   if (!binding.agentDefinition?.definitionDigest) throw new CiContinuationUnsupported('definition_missing')
+  if (binding.agentDefinition?.subscription) {
+    // Missing, oversized or failed snapshots must produce a durable attention
+    // event rather than silently enqueueing an impossible hosted resume.
+    const snapshot = await tx.query('SELECT 1 FROM ci_native_sessions WHERE "runId"=$1', [input.originRunId])
+    if (!snapshot.rowCount) throw new CiContinuationUnsupported('session_missing')
+  }
   const key = `ci:${createHash('sha256').update(JSON.stringify([userId, input.issueId, input.remoteKey, input.prNumber, input.head, input.fingerprint, binding.watchId, String(binding.generation)])).digest('hex')}`
   // An unsupported skill or revoked mailbox may be reported to the user by
   // the caller. Roll back the child before turning it into a recoverable notice.

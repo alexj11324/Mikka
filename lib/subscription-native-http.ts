@@ -23,7 +23,7 @@ const input = z.discriminatedUnion("action", [
     .strict(),
 ]);
 export function subscriptionNativeHTTP(deps: {
-  authorize(request: Request, deviceId: string): Promise<string | null>;
+  authorize(request: Request, deviceId: string): Promise<{userId:string;workspaceId:string|null} | null>;
   service(): SubscriptionService;
 }) {
   return async (
@@ -38,8 +38,8 @@ export function subscriptionNativeHTTP(deps: {
         !z.uuid().safeParse(runId).success
       )
         return new Response(null, { status: 404, headers });
-      const owner = await deps.authorize(request, deviceId);
-      if (!owner) return new Response(null, { status: 401, headers });
+      const principal = await deps.authorize(request, deviceId);
+      if (!principal) return new Response(null, { status: 401, headers });
       if (!request.headers.get("content-type")?.startsWith("application/json"))
         return new Response(null, { status: 415, headers });
       const reader = request.body?.getReader();
@@ -68,7 +68,8 @@ export function subscriptionNativeHTTP(deps: {
       }
       const body = input.parse(JSON.parse(new TextDecoder().decode(bytes)));
       const service = deps.service();
-      const use = await service.nativeRun(owner, deviceId, runId);
+      const use = await service.nativeRun(principal.userId, deviceId, runId);
+      if (principal.workspaceId && principal.workspaceId !== use.workspaceId) throw new Error('request refused')
       if (body.action === "context")
         return Response.json(await service.nativeContext(use, request.signal), {
           headers,
@@ -79,7 +80,7 @@ export function subscriptionNativeHTTP(deps: {
           ? { kind: 'save' as const, sessionId: body.sessionId, data: Buffer.from(body.data, 'base64') }
           : { kind: 'restore' as const }
         if (body.action === 'save_session' && operation.kind === 'save' && operation.data.toString('base64') !== body.data) throw new Error('request refused')
-        const data = await nativeSessionSnapshot(pool, { ownerId: owner, deviceId, runId, accountId: current.accountId, revision: current.revision, route: current.route, modelId: current.modelId }, operation, process.env.BETTER_AUTH_SECRET ?? '')
+        const data = await nativeSessionSnapshot(pool, { ownerId: principal.userId, workspaceId:use.workspaceId, deviceId, runId, accountId: current.accountId, revision: current.revision, route: current.route, modelId: current.modelId }, operation, process.env.BETTER_AUTH_SECRET ?? '')
         return Response.json({ data: data?.toString('base64') ?? null }, { headers })
       }
       const upstream = await service.nativeRequest(

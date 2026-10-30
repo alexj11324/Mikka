@@ -21,6 +21,10 @@ export async function registerCiPublication(tx: { execute: (query: ReturnType<ty
   if (row.ciOriginRunId) {
     // A CI continuation may advance an existing watch, but cannot create one.
     await tx.execute(sql`UPDATE github_ci_observations SET "chainDepth"=CASE WHEN "originRunId"=${row.runId} THEN "chainDepth" ELSE "chainDepth"+1 END,
+      generation=generation+CASE WHEN "originRunId" IS DISTINCT FROM ${row.runId} OR "scopeVersion" IS DISTINCT FROM ${row.scopeVersion} THEN 1 ELSE 0 END,
+      "pollLeaseId"=CASE WHEN "originRunId" IS DISTINCT FROM ${row.runId} OR "scopeVersion" IS DISTINCT FROM ${row.scopeVersion} THEN NULL ELSE "pollLeaseId" END,
+      "pollLeaseUntil"=CASE WHEN "originRunId" IS DISTINCT FROM ${row.runId} OR "scopeVersion" IS DISTINCT FROM ${row.scopeVersion} THEN NULL ELSE "pollLeaseUntil" END,
+      "pollObservation"=CASE WHEN "originRunId" IS DISTINCT FROM ${row.runId} OR "scopeVersion" IS DISTINCT FROM ${row.scopeVersion} THEN NULL ELSE "pollObservation" END,
       "originRunId"=${row.runId}, "scopeVersion"=${row.scopeVersion}, "expiresAt"=greatest("expiresAt",now()+interval '48 hours'),
       "nextCheckAt"=least("nextCheckAt",now()), "updatedAt"=now()
       WHERE "userId"=${row.userId} AND "issueId"=${row.issueId} AND "remoteKey"=${row.remoteKey} AND "prNumber"=${number} AND "scopeVersion"=${row.scopeVersion} AND "originRunId" IN (${row.ciOriginRunId},${row.runId})`)
@@ -30,6 +34,10 @@ export async function registerCiPublication(tx: { execute: (query: ReturnType<ty
     VALUES (${row.userId},${row.issueId},${row.remoteKey},${number},${row.runId},${row.scopeVersion},now()+interval '48 hours')
     ON CONFLICT ("userId","issueId","remoteKey","prNumber") DO UPDATE SET
       "originRunId"=EXCLUDED."originRunId", "scopeVersion"=EXCLUDED."scopeVersion", "chainDepth"=CASE WHEN github_ci_observations."originRunId"=EXCLUDED."originRunId" THEN github_ci_observations."chainDepth" ELSE 0 END,
+      generation=github_ci_observations.generation+CASE WHEN github_ci_observations."originRunId" IS DISTINCT FROM EXCLUDED."originRunId" OR github_ci_observations."scopeVersion" IS DISTINCT FROM EXCLUDED."scopeVersion" THEN 1 ELSE 0 END,
+      "pollLeaseId"=CASE WHEN github_ci_observations."originRunId" IS DISTINCT FROM EXCLUDED."originRunId" OR github_ci_observations."scopeVersion" IS DISTINCT FROM EXCLUDED."scopeVersion" THEN NULL ELSE github_ci_observations."pollLeaseId" END,
+      "pollLeaseUntil"=CASE WHEN github_ci_observations."originRunId" IS DISTINCT FROM EXCLUDED."originRunId" OR github_ci_observations."scopeVersion" IS DISTINCT FROM EXCLUDED."scopeVersion" THEN NULL ELSE github_ci_observations."pollLeaseUntil" END,
+      "pollObservation"=CASE WHEN github_ci_observations."originRunId" IS DISTINCT FROM EXCLUDED."originRunId" OR github_ci_observations."scopeVersion" IS DISTINCT FROM EXCLUDED."scopeVersion" THEN NULL ELSE github_ci_observations."pollObservation" END,
       "expiresAt"=greatest(github_ci_observations."expiresAt",EXCLUDED."expiresAt"), "updatedAt"=now()
     WHERE (SELECT (r."createdAt",r.id) FROM agent_runs r WHERE r.id=EXCLUDED."originRunId") >=
           (SELECT (r."createdAt",r.id) FROM agent_runs r WHERE r.id=github_ci_observations."originRunId")`)

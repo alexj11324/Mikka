@@ -250,7 +250,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       const agentBinding=await post({action:'bind',connectionId,revision,consumerId:agentId,route:nativeRoute,modelId:'fixture-model'})
       assert.equal(agentBinding.status,200)
       assert.equal((await repository.nativeBinding('alice',agentId,provider==='codex'?'codex':'claude_code')).id,agentBinding.body.bindingId)
-      const nativeHTTP=subscriptionNativeHTTP({authorize:async request=>request.headers.get('authorization')==='Bearer fixture-device'?'alice':request.headers.get('authorization')==='Bearer fixture-other'?'bob':null,service:()=>service})
+      const nativeHTTP=subscriptionNativeHTTP({authorize:async request=>request.headers.get('authorization')==='Bearer fixture-device'?{userId:'alice',workspaceId:null}:request.headers.get('authorization')==='Bearer fixture-other'?{userId:'bob',workspaceId:null}:null,service:()=>service})
       const nativePost=(runId,body,token='fixture-device',targetDevice=deviceId)=>nativeHTTP(new Request('http://localhost/v1/native',{method:'POST',headers:{'content-type':'application/json',authorization:`Bearer ${token}`},body:JSON.stringify(body)}),{params:Promise.resolve({deviceId:targetDevice,runId})})
       const noLoginCreates=secretMethods.filter(method=>method==='POST').length
       for(let task=0;task<2;task++){

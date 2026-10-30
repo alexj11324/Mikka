@@ -4,6 +4,9 @@ import { execFile, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   existsSync,
+  constants,
+  openSync,
+  closeSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -31,7 +34,7 @@ import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
 import { hostedCiResumePermitted, matchesNativeContinuation } from "./subscription-continuation";
-import { captureNativeSession, restoreNativeSession } from './native-session-files';
+import { captureNativeSessionAt, restoreNativeSession } from './native-session-files';
 import type { ComputerBroker } from "./computer/broker.mjs";
 import { decide, runDomains, runPolicy } from "./permissions";
 import { startPublicEgress, type PublicEgress } from "./agents/public-egress";
@@ -363,6 +366,7 @@ export async function createHostedBotRunner(host: {
       let egressStarting: Promise<PublicEgress> | undefined;
       let creating: Promise<void> | undefined;
       let timer: ReturnType<typeof setInterval> | undefined;
+      let sessionRootFd: number | undefined;
       let offRevoke = () => {};
       const assertOpen = () => {
         if (closed || gate.revoked || lifetime.signal.aborted) throw unavailable();
@@ -399,7 +403,7 @@ export async function createHostedBotRunner(host: {
             if (!host.retainResources && existsSync(resourceFile)) await removeResource(resourceFile, resource);
           } finally {
             try { await brokerClosed; }
-            finally { offRevoke(); }
+            finally { offRevoke(); if(sessionRootFd!==undefined){closeSync(sessionRootFd);sessionRootFd=undefined} }
           }
         });
         if (computerGrant) host.computerBroker?.revoke(computerGrant.token);
@@ -434,6 +438,7 @@ export async function createHostedBotRunner(host: {
         };
         const paths = runPaths(host.stateDir, assignment.runId);
         mkdirSync(paths.runDir, { recursive: true, mode: 0o700 });
+        sessionRootFd=openSync(paths.runDir,constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
         const shadow = join(paths.runDir, "runtime-git");
         const emptyHome = join(paths.runDir, "git-bootstrap-home");
         mkdirSync(emptyHome, { recursive: true, mode: 0o700 });
@@ -529,8 +534,9 @@ export async function createHostedBotRunner(host: {
         const saveSession = async (sessionId: string) => {
           if (!host.link.nativeSaveSession) throw unavailable();
           await check();
-          const root = kind === 'codex' ? join(paths.runDir, 'codex-home', 'sessions') : join(paths.runDir, 'native-home', '.claude', 'projects', claudeProjectDirName(realpathSync(options.cwd)));
-          const snapshot = captureNativeSession(root,kind,sessionId);
+          if(sessionRootFd===undefined)throw unavailable();
+          const rootParts = kind === 'codex' ? ['codex-home','sessions'] : ['native-home','.claude','projects',claudeProjectDirName(realpathSync(options.cwd))];
+          const snapshot = captureNativeSessionAt(sessionRootFd,rootParts,kind,sessionId);
           await host.link.nativeSaveSession(assignment.deviceId, assignment.runId, sessionId, snapshot, lifetime.signal);
           await check();
         };

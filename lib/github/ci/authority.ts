@@ -1,10 +1,32 @@
 import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 
+/** Lock workspace and, for shared tasks, team membership in one transaction.
+ * A single connection avoids pool exhaustion when several runs authorize. */
+export async function acquireCiCombined(workspaceId:string,issueId:string,userId:string,issueOwner:string,shared:boolean,workspace?:Pick<Pool,'connect'>) {
+  const source=workspace ?? (await import('@/lib/workspace-db')).workspacePool
+  const client=await source.connect()
+  let closed=false, failed=false
+  const fail=()=>{failed=true}
+  client.on('error',fail); client.on('end',fail)
+  const close=async()=>{if(closed)return;closed=true;if(!failed)try{await client.query('ROLLBACK')}catch{failed=true};client.removeListener('error',fail);client.removeListener('end',fail);client.release(failed?new Error('CI workspace authority lost'):undefined)}
+  try {
+    await client.query('BEGIN')
+    await client.query("SET LOCAL lock_timeout = '1s'; SET LOCAL statement_timeout = '5s'; SET LOCAL idle_in_transaction_session_timeout = '30s'")
+    const workspaceMember=await client.query(`SELECT 1 FROM mikka_workspaces w JOIN mikka_workspace_members m ON m."workspaceId"=w.id WHERE w.id=$1 AND m."userId"=$2 AND m.status='active' FOR SHARE OF w,m`,[workspaceId,userId])
+    if(!workspaceMember.rowCount || failed)throw new Error('CI workspace authority unavailable')
+    if(shared || issueOwner!==userId) {
+      const teamMember=await client.query(`SELECT 1 FROM mikka_team_issues t JOIN mikka_teams team ON team.id=t."teamId" AND team."workspaceId"=t."workspaceId" JOIN mikka_workspace_members m ON m."workspaceId"=team."workspaceId" WHERE t."issueId"=$1 AND t."workspaceId"=$3 AND m."userId"=$2 AND m.status='active' FOR SHARE OF t,team,m`,[issueId,userId,workspaceId])
+      if(!teamMember.rowCount || failed)throw new Error('CI issue authority unavailable')
+    }
+    return {held:shared || issueOwner!==userId,async check(){if(failed||closed)throw new Error('CI workspace authority lost');await client.query('SELECT 1');if(failed)throw new Error('CI workspace authority lost')},close}
+  } catch(error){await close();throw error}
+}
+
 /** A membership lock must precede every app issue/observation lock. */
-export async function acquireCiMembership(issueId: string, userId: string, ownerHint: string, workspace?: Pick<Pool, 'connect'>) {
+export async function acquireCiMembership(issueId: string, userId: string, ownerHint: string, workspace?: Pick<Pool, 'connect'>, forceShared = false) {
   if (!ownerHint) throw new Error('CI issue authority unavailable')
-  if (ownerHint === userId) return { held: false, signal: undefined, async check() {}, async close() {} }
+  if (ownerHint === userId && !forceShared) return { held: false, signal: undefined, async check() {}, async close() {} }
   const source = workspace ?? (await import('@/lib/workspace-db')).workspacePool
   const client: PoolClient = await source.connect()
   let closed = false

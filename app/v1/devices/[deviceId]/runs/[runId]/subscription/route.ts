@@ -15,9 +15,9 @@ export const POST = subscriptionNativeHTTP({
     )
       return null;
     const device = await ownedDevice(deviceId, caller.userId);
-    if (!device?.enabled || !device.harnesses.some((h) => h.subscriptionBroker))
+    if (!device?.enabled || !device.harnesses.some((h) => h.subscriptionBroker) || (caller.scopeDeviceId && !caller.scopeWorkspaceId))
       return null;
-    return caller.userId;
+    return {userId:caller.userId,workspaceId:caller.scopeWorkspaceId ?? null};
   },
   service: () => subscriptionRuntime(true),
 });

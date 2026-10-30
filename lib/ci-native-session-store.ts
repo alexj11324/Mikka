@@ -1,20 +1,20 @@
 import 'server-only'
 import type { Pool } from 'pg'
 import { openCiSession, sealCiSession, type CiSessionScope } from './ci-session-envelope'
-import { acquireCiMembership, ciIssueAuthorized } from './github/ci/authority'
+import { acquireCiCombined, ciIssueAuthorized } from './github/ci/authority'
 import { readIssueMetadata } from './issue-metadata'
 import { lockSubscriptionBinding } from './subscription-binding-lock'
 
-type Context = { ownerId: string; deviceId: string; runId: string; accountId: string; revision: number; route: string; modelId: string }
+type Context = { ownerId: string; workspaceId:string; deviceId: string; runId: string; accountId: string; revision: number; route: string; modelId: string }
 const unavailable = (): never => { throw new Error('CI session snapshot unavailable') }
 
 /** A snapshot is written only by a live hosted run and read only by its
  * server-bound CI child. Both paths hold the connection row through commit so
  * disconnect/reconnect cannot race the release of session material. */
-export async function nativeSessionSnapshot(pool: Pool, context: Context, operation: { kind: 'save'; sessionId: string; data: Buffer } | { kind: 'restore' }, secret: string): Promise<Buffer | null> {
-  const {rows:[hint]} = await pool.query(`SELECT i.id,i."userId",r."agentId" FROM agent_runs r JOIN issues i ON i.id=r."issueId" WHERE r.id=$1 AND r."userId"=$2`,[context.runId,context.ownerId])
+export async function nativeSessionSnapshot(pool: Pool, context: Context, operation: { kind: 'save'; sessionId: string; data: Buffer } | { kind: 'restore' }, secret: string, workspacePool?:Pick<Pool,'connect'>): Promise<Buffer | null> {
+  const {rows:[hint]} = await pool.query(`SELECT i.id,i."userId",i.scope,r."agentId" FROM agent_runs r JOIN issues i ON i.id=r."issueId" WHERE r.id=$1 AND r."userId"=$2`,[context.runId,context.ownerId])
   if (!hint) unavailable()
-  const membership = await acquireCiMembership(hint.id, context.ownerId, hint.userId)
+  const membership=await acquireCiCombined(context.workspaceId,hint.id,context.ownerId,hint.userId,hint.scope==='workspace',workspacePool)
   const tx = await pool.connect().catch(async error => { await membership.close(); throw error })
   try {
     await tx.query('BEGIN')
@@ -27,7 +27,7 @@ export async function nativeSessionSnapshot(pool: Pool, context: Context, operat
       AND b."ownerId"=$2 AND b."consumerId"=r."agentId"::text AND c."ownerId"=b."ownerId" AND c."workspaceId"=b."workspaceId"
       AND b.id=(SELECT latest.id FROM byos_bindings latest WHERE latest."ownerId"=b."ownerId" AND latest."consumerId"=b."consumerId" AND latest.route=b.route ORDER BY latest."createdAt" DESC,latest.id DESC LIMIT 1)
       FOR UPDATE OF r FOR SHARE OF b,c`, [context.runId, context.ownerId, context.deviceId])
-    if (!r || r.state !== 'connected' || Number(r.epoch) !== context.revision || Number(r.connectionRevision) !== context.revision || r.route !== context.route || r.modelId !== context.modelId) unavailable()
+    if (!r || r.workspaceId !== context.workspaceId || r.state !== 'connected' || Number(r.epoch) !== context.revision || Number(r.connectionRevision) !== context.revision || r.route !== context.route || r.modelId !== context.modelId) unavailable()
     const scopeVersion = operation.kind === 'restore' ? r.ciContinuation?.scopeVersion : issue?.scopeVersion
     if (!ciIssueAuthorized(issue,context.ownerId,scopeVersion,membership.held,value => Boolean(readIssueMetadata(value as never).deletedAt))) unavailable()
     const current = { ownerId: r.ownerId, workspaceId: r.workspaceId, consumerId: r.consumerId, bindingId: r.bindingId, accountId: context.accountId, route: r.route, revision: context.revision, modelId: r.modelId }

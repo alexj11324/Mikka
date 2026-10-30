@@ -3,13 +3,13 @@ import type { Pool } from 'pg'
 
 /** A bounded delivery batch. A crash or non-2xx response leaves the same
  * durable result retryable; the app must deduplicate the watch/head pair. */
-export async function deliverCiOutbox(pool:Pool, send:(item:{watchId:string;head:string;fingerprint:string},signal:AbortSignal)=>Promise<boolean>, options:{limit:number;deadline:number;now?:()=>number;random?:()=>number}):Promise<{sent:number;failed:number}> {
+export async function deliverCiOutbox(pool:Pool, send:(item:{watchId:string;head:string;fingerprint:string},signal:AbortSignal)=>Promise<boolean>, options:{limit:number;deadline:number;now?:()=>number;random?:()=>number;authorize:(item:{userId:string;issueId:string;issueOwner:string;issueScope:string})=>Promise<{check():Promise<void>;close():Promise<void>}>}):Promise<{sent:number;failed:number}> {
   const now=options.now ?? Date.now, random=options.random ?? Math.random, limit=Math.max(1,Math.min(20,Math.floor(options.limit)))
   const tx=await pool.connect()
-  const leased:Array<{userId:string;issueId:string;remoteKey:string;prNumber:number;head:string;watchId:string;fingerprint:string;leaseId:string;attempts:number}>=[]
+  const leased:Array<{userId:string;issueId:string;issueOwner:string;issueScope:string;remoteKey:string;prNumber:number;head:string;watchId:string;fingerprint:string;leaseId:string;attempts:number}>=[]
   try {
     await tx.query('BEGIN')
-    const rows=await tx.query(`SELECT q."userId",q."issueId",q."remoteKey",q."prNumber",q.head,q.attempts,q.payload->>'fingerprint' AS fingerprint,o."watchId" FROM github_ci_poll_outbox q JOIN github_ci_observations o USING ("userId","issueId","remoteKey","prNumber") WHERE q."deliveredAt" IS NULL AND q."nextAttemptAt"<=now() AND (q."leaseUntil" IS NULL OR q."leaseUntil"<=now()) AND o."expiresAt">now() AND o."pollObservation"->>'head'=q.head AND o."pollObservation"->>'fingerprint'=q.payload->>'fingerprint' ORDER BY q."createdAt" FOR UPDATE OF q SKIP LOCKED LIMIT $1`,[limit])
+    const rows=await tx.query(`SELECT q."userId",q."issueId",q."remoteKey",q."prNumber",q.head,q.attempts,q.payload->>'fingerprint' AS fingerprint,o."watchId",i."userId" AS "issueOwner",i.scope AS "issueScope" FROM github_ci_poll_outbox q JOIN github_ci_observations o USING ("userId","issueId","remoteKey","prNumber") JOIN issues i ON i.id=q."issueId" AND i."scopeVersion"=q."scopeVersion" WHERE q."deliveredAt" IS NULL AND q."nextAttemptAt"<=now() AND (q."leaseUntil" IS NULL OR q."leaseUntil"<=now()) AND o."expiresAt">now() AND o."originRunId"=q."originRunId" AND o."scopeVersion"=q."scopeVersion" AND o.generation=q.generation AND (i."userId"=q."userId" OR i.scope='workspace') AND coalesce(i.content #>> '{attrs,mikka,deletedAt}',i.content #>> '{attrs,orvilo,deletedAt}','')='' AND o."pollObservation"->>'head'=q.head AND o."pollObservation"->>'fingerprint'=q.payload->>'fingerprint' ORDER BY q."createdAt" FOR UPDATE OF q SKIP LOCKED LIMIT $1`,[limit])
     for (const row of rows.rows) {
       const leaseId=randomUUID()
       await tx.query(`UPDATE github_ci_poll_outbox SET "leaseId"=$6,"leaseUntil"=now()+interval '2 minutes' WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4 AND head=$5`,[row.userId,row.issueId,row.remoteKey,row.prNumber,row.head,leaseId])
@@ -20,7 +20,8 @@ export async function deliverCiOutbox(pool:Pool, send:(item:{watchId:string;head
   const result={sent:0,failed:0}
   for (const item of leased) {
     let ok=false
-    try { const remaining=options.deadline-now(); if (remaining>0) ok=await send({watchId:item.watchId,head:item.head,fingerprint:item.fingerprint},AbortSignal.timeout(Math.min(remaining,30_000))) } catch { /* retry from durable queue */ }
+    let authority:Awaited<ReturnType<typeof options.authorize>>|undefined
+    try { authority=await options.authorize(item); await authority.check(); const remaining=options.deadline-now(); if (remaining>0) ok=await send({watchId:item.watchId,head:item.head,fingerprint:item.fingerprint},AbortSignal.timeout(Math.min(remaining,30_000))); await authority.check() } catch { ok=false } finally { await authority?.close() }
     const args=[item.userId,item.issueId,item.remoteKey,item.prNumber,item.head,item.leaseId]
     const sql=ok
       ? `UPDATE github_ci_poll_outbox SET "deliveredAt"=now(),"leaseId"=NULL,"leaseUntil"=NULL WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4 AND head=$5 AND "leaseId"=$6 AND "deliveredAt" IS NULL`

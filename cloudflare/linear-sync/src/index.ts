@@ -8,14 +8,13 @@ const STATUS_PATH = '/mikka/api/integrations/linear/status'
 export interface Env {
   NEXT_PUBLIC_POSTHOG_KEY?: string
   HYPERDRIVE?: { connectionString: string }
+  CI_WORKSPACE_HYPERDRIVE?: { connectionString: string }
   CRON_SECRET?: string
   LINEAR_CLIENT_ID?: string
   LINEAR_CLIENT_SECRET?: string
   LINEAR_TOKEN_ENCRYPTION_KEY?: string
   LINEAR_WEBHOOK_SECRET?: string
   CI_POLL_ENABLED?: string
-  GITHUB_APP_ID?: string
-  GITHUB_APP_PRIVATE_KEY?: string
   MIKKA_URL?: string
 }
 
