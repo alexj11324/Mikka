@@ -1,5 +1,5 @@
 // Settings › 密钥与环境 and BYO E2B key. Mirrors drizzle/20261030113900_workspace_secrets_env.sql (MIKKA_DATABASE_URL).
-import { bigserial, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { bigserial, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 export const WORKSPACE_SECRET_KINDS = ['secret', 'env'] as const
 export const WORKSPACE_SECRET_SCOPES = ['workspace', 'repository'] as const
@@ -53,13 +53,3 @@ export const workspaceE2bKeys = pgTable('workspace_e2b_keys', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
-
-/** #438 A: sealed hold-back text of a streamed part (drizzle/20261030114000_run_mask_buffers.sql). */
-export const runMaskBuffers = pgTable('run_mask_buffers', {
-  runId: uuid('runId').notNull(),
-  partKey: text('partKey').notNull(),
-  ciphertext: text('ciphertext').notNull(),
-  iv: text('iv').notNull(),
-  keyVersion: integer('keyVersion').notNull(),
-  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [primaryKey({ columns: [table.runId, table.partKey] })])
