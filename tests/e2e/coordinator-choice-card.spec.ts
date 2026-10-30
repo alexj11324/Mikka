@@ -104,6 +104,6 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     const card = page.getByRole('region', { name: 'Coordinator', exact: true }).getByRole('group', { name: /派不出去/ })
     await expect(card.getByRole('button', { name: /等它上线/ })).toHaveAttribute('aria-pressed', 'true')
     await expect(card.getByRole('link', { name: /去设置 E2B 密钥/ })).toHaveCount(0)
-    await expect(card.getByRole('button', { name: /去设置 E2B 密钥/ })).toBeDisabled()
+    await expect(card.getByText('去设置 E2B 密钥', { exact: true }).locator('xpath=ancestor::*[@data-slot="item"][1]')).toHaveAttribute('aria-disabled', 'true')
   })
 }

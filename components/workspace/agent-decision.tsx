@@ -143,8 +143,9 @@ function ChoiceCard({ title, options, task }: { title: string; options: { value:
         const selected = chosen === option.value
         const label = copy(option)
         const letter = String.fromCharCode(65 + index)
-        // No E2B key yet (and not answered): this row opens the settings where the key is set instead of answering.
-        if (option.action === 'cloudKeySettings' && !answered) return <Item key={option.value} size="sm" variant="muted" render={<Link href={CLOUD_KEY_SETTINGS} />}>
+        // No E2B key yet: this row opens the settings where the key is set instead of answering. It stays an Item
+        // once answered (dimmed, not a link) so the row never swaps component and jumps.
+        if (option.action === 'cloudKeySettings') return <Item key={option.value} size="sm" variant="muted" aria-disabled={answered || undefined} className={cn(answered && 'pointer-events-none opacity-50')} render={answered ? <div /> : <Link href={CLOUD_KEY_SETTINGS} />}>
           <ItemMedia><Kbd>{letter}</Kbd></ItemMedia>
           <ItemContent><ItemTitle>{label}</ItemTitle></ItemContent>
           <ItemActions><ChevronRight aria-hidden="true" /></ItemActions>
