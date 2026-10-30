@@ -10,6 +10,7 @@ import { IPC } from '@mikka/protocol/ipc'
 
 import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
+import { offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { NotificationCenter } from './notification-center'
 import { appExternalUrl, desktopAuthState, externalUrl, navigationDecision } from './security'
@@ -160,12 +161,28 @@ function openWindow(url: string): void {
   }
 }
 
-function retryLater(): void {
-  if (retrying) return
-  retrying = setTimeout(() => {
-    retrying = null
-    if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(APP_URL)
-  }, 5_000)
+let offlineAttempt = 0
+
+function loadApp(): void {
+  if (retrying) { clearTimeout(retrying); retrying = null }
+  if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(APP_URL)
+}
+
+function showOffline(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  const delay = offlineRetryDelay(offlineAttempt++)
+  if (!mainWindow.webContents.getURL().startsWith('file:')) {
+    void mainWindow.loadFile(join(__dirname, 'offline.html'), { query: { app: APP_URL } })
+  }
+  if (retrying) clearTimeout(retrying)
+  retrying = setTimeout(() => { retrying = null; loadApp() }, delay)
+}
+
+/** Reload goes back to the app, never to the offline file it is showing. */
+function reloadApp(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.webContents.getURL().startsWith('file:')) loadApp()
+  else mainWindow.webContents.reload()
 }
 
 function createMainWindow(): void {
@@ -206,12 +223,21 @@ function createMainWindow(): void {
   mainWindow.webContents.on('will-redirect', (event, url) => handleNavigation(event, url))
   mainWindow.webContents.on('did-finish-load', () => {
     const loaded = mainWindow?.webContents.getURL() ?? ''
-    if (retrying && loaded.startsWith(APP_ORIGIN)) { clearTimeout(retrying); retrying = null }
+    if (loaded.startsWith(APP_ORIGIN)) {
+      offlineAttempt = 0
+      if (retrying) { clearTimeout(retrying); retrying = null }
+    }
+  })
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !mainWindow?.webContents.getURL().startsWith('file:')) return
+    const reload = input.key === 'F5' || ((input.control || input.meta) && input.key.toLowerCase() === 'r')
+    if (!reload) return
+    event.preventDefault()
+    loadApp()
   })
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, _description, validatedURL, isMainFrame) => {
     if (!isMainFrame || errorCode === -3 || !validatedURL.startsWith(APP_ORIGIN)) return
-    void mainWindow?.loadFile(join(__dirname, 'offline.html'))
-    retryLater()
+    showOffline()
   })
   void mainWindow.loadURL(APP_URL)
 }
@@ -289,12 +315,25 @@ async function checkForUpdates(interactive: boolean): Promise<void> {
   await autoUpdater.checkForUpdates().catch(reportUpdateError)
 }
 
+/**
+ * Ctrl/Cmd+= zooms in without Shift (Electron's default is Plus, which needs
+ * Shift on US layouts); a hidden Plus item keeps Ctrl/Cmd+Shift+= and keypad +.
+ */
+const ZOOM_ITEMS: Electron.MenuItemConstructorOptions[] = [
+  { role: 'resetZoom' },
+  { role: 'zoomIn', accelerator: 'CommandOrControl+=' },
+  { role: 'zoomIn', accelerator: 'CommandOrControl+Plus', visible: false },
+  { role: 'zoomIn', accelerator: 'CommandOrControl+numadd', visible: false },
+  { role: 'zoomOut' },
+  { role: 'zoomOut', accelerator: 'CommandOrControl+numsub', visible: false },
+]
+
 function installMenu(): void {
   if (process.platform !== 'darwin') {
     // Windows and Linux show no menu bar; the menu stays only to keep its shortcuts.
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
-      { label: 'View', submenu: [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, ...(app.isPackaged ? [] : [{ role: 'reload' as const }, { role: 'forceReload' as const }, { role: 'toggleDevTools' as const }])] },
+      { label: 'View', submenu: [{ label: 'Reload', accelerator: 'CommandOrControl+R', click: reloadApp }, ...ZOOM_ITEMS, ...(app.isPackaged ? [] : [{ role: 'forceReload' as const }, { role: 'toggleDevTools' as const }])] },
     ]))
     return
   }
@@ -324,10 +363,10 @@ function installMenu(): void {
     {
       label: 'View',
       submenu: [
-        { role: 'reload' }, { role: 'forceReload' },
+        { label: 'Reload', accelerator: 'CommandOrControl+R', click: reloadApp }, { role: 'forceReload' },
         ...(app.isPackaged ? [] : [{ role: 'toggleDevTools' as const }]),
         { type: 'separator' },
-        { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' },
+        ...ZOOM_ITEMS,
         { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
