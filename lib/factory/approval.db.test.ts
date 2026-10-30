@@ -281,16 +281,13 @@ test(
               "UPDATE factory_publications SET action='deploy_production' WHERE id=$1",
               [result.publicationId],
             );
-            await rejects(
-              () =>
-                readFactoryPublicationReceiptV2(
-                  tx,
-                  actor.userId,
-                  x.task.id,
-                  x.task.candidateId!,
-                ),
-              "factoryPublicationReceiptRequired",
+            const historical = await readFactoryPublicationReceiptV2(
+              tx,
+              actor.userId,
+              x.task.id,
+              x.task.candidateId!,
             );
+            assert.equal(historical.publicationId, result.publicationId);
           } finally {
             tx.release();
           }
@@ -397,16 +394,56 @@ test(
               "UPDATE factory_publications SET status='succeeded',receipt=receipt #- '{verifiedTarget,provider}' WHERE id=$1",
               [result.publicationId],
             );
-            await assert.rejects(
-              () =>
-                readFactoryPublicationReceiptV2(
-                  tx,
-                  actor.userId,
-                  x.task.id,
-                  x.task.candidateId!,
-                ),
-              /factoryPublicationReceipt/,
+            const historical = await readFactoryPublicationReceiptV2(
+              tx,
+              actor.userId,
+              x.task.id,
+              x.task.candidateId!,
             );
+            assert.equal(historical.verifiedTarget.provider, undefined);
+          } finally {
+            tx.release();
+          }
+        },
+      );
+      await t.test(
+        "publication read checks succeeded, cancellation, current candidate and revocation",
+        async () => {
+          const x = await f.prepare(),
+            service = f.service();
+          const request = await x.publication();
+          const result = await service.publish(actor, request);
+          const tx = await pool.connect();
+          const read = () =>
+            readFactoryPublicationReceiptV2(
+              tx,
+              actor.userId,
+              x.task.id,
+              x.task.candidateId!,
+            );
+          try {
+            assert.equal((await read()).publicationId, result.publicationId);
+            for (const status of ["cancelled", "revoked"]) {
+              await pool.query(
+                "UPDATE factory_tasks SET status=$2 WHERE id=$1",
+                [x.task.id, status],
+              );
+              await rejects(read, "factoryPublicationReceiptRequired");
+            }
+            await pool.query(
+              "UPDATE factory_tasks SET status='passed',\"candidateId\"=NULL WHERE id=$1",
+              [x.task.id],
+            );
+            await rejects(read, "factoryPublicationReceiptRequired");
+            await pool.query(
+              'UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1',
+              [x.task.id, x.task.candidateId],
+            );
+            await pool.query(
+              'UPDATE factory_approvals SET "revokedAt"=now() WHERE id=$1',
+              [request.approvalId],
+            );
+            await rejects(read, "factoryPublicationReceiptRequired");
           } finally {
             tx.release();
           }
