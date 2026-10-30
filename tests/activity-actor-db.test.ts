@@ -201,3 +201,40 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     await pool.end()
   }
 })
+
+test('actor constraint validation runs separately while a writer holds its table lock', { skip: !enabled }, async () => {
+  const pool = new Pool({ connectionString: connection, max: 2 })
+  const writer = await pool.connect()
+  const validator = await pool.connect()
+  const schema = `actor_validate_${randomUUID().replaceAll('-', '')}`
+  try {
+    assert.equal((await writer.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+    await writer.query(`create schema "${schema}"`)
+    await writer.query(`set search_path to "${schema}"`)
+    await validator.query(`set search_path to "${schema}"`)
+    await validator.query("set lock_timeout = '2s'")
+    await writer.query('create table issue_versions(id text primary key)')
+    await writer.query("insert into issue_versions(id) values ('legacy')")
+    await writer.query(readFileSync('drizzle/20261025200000_activity_version_actor.sql', 'utf8'))
+    await writer.query("insert into issue_versions values ('person','user','member')")
+    const names = ['issue_versions_actor_type_check', 'issue_versions_actor_id_needs_type_check']
+    const files = ['20261030180500_validate_activity_actor_type.sql', '20261030180501_validate_activity_actor_id.sql']
+    assert.deepEqual((await writer.query('select convalidated from pg_constraint where conrelid = $1::regclass and conname = any($2) order by conname', ['issue_versions', names])).rows.map(r => r.convalidated), [false, false])
+    await writer.query('begin')
+    await writer.query("update issue_versions set actor_id = actor_id where id = 'person'")
+    // This uncommitted update holds ROW EXCLUSIVE. The validations must complete
+    // while it is held, proving they do not need ACCESS EXCLUSIVE.
+    for (const file of files) await validator.query(readFileSync(`drizzle/${file}`, 'utf8'))
+    await writer.query('commit')
+    for (const file of files) await validator.query(readFileSync(`drizzle/${file}`, 'utf8'))
+    assert.deepEqual((await writer.query('select convalidated from pg_constraint where conrelid = $1::regclass and conname = any($2) order by conname', ['issue_versions', names])).rows.map(r => r.convalidated), [true, true])
+    assert.deepEqual((await writer.query("select actor_type, actor_id from issue_versions where id='legacy'")).rows, [{ actor_type: null, actor_id: null }])
+    assert.deepEqual((await writer.query("select actor_type, actor_id from issue_versions where id='person'")).rows, [{ actor_type: 'user', actor_id: 'member' }])
+  } finally {
+    await writer.query('rollback')
+    console.log(`Retained actor validation schema: ${schema}`)
+    writer.release()
+    validator.release()
+    await pool.end()
+  }
+})
