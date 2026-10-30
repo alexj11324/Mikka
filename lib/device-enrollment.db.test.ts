@@ -20,7 +20,7 @@ before(async () => {
   await admin.query(`CREATE SCHEMA ${schema}`)
   await run(async () => {
     const { pool } = await import('./db')
-    await pool.query(`CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text NOT NULL,kind text DEFAULT 'local'); CREATE TABLE device_tokens (id uuid PRIMARY KEY,"userId" text NOT NULL,"tokenHash" text NOT NULL,name text)`)
+    await pool.query(`CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text NOT NULL,kind text DEFAULT 'local',"removedAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY,"userId" text NOT NULL,"tokenHash" text NOT NULL,name text)`)
     await pool.query(await readFile(new URL('../drizzle/20261030193000_device_enrollment_management.sql', import.meta.url), 'utf8'))
   })
 })
@@ -47,6 +47,8 @@ test('management queue is owner-scoped, serial and acknowledges only its device'
   await pool.query(`INSERT INTO devices (id,"ownerId",kind) VALUES ($1,'owner-a','local'),($2,'owner-b','local'),($3,'owner-a','cloud')`, [a, b, cloud])
   assert.equal(await enqueueDeviceCommand('owner-b', a, 'restart'), undefined)
   assert.equal(await enqueueDeviceCommand('owner-a', cloud, 'restart'), undefined)
+  await pool.query(`UPDATE devices SET "removedAt"=now() WHERE id=$1`, [b])
+  assert.equal(await enqueueDeviceCommand('owner-b', b, 'restart'), undefined)
   const first = await enqueueDeviceCommand('owner-a', a, 'redetect')
   const second = await enqueueDeviceCommand('owner-a', a, 'restart')
   const third = await enqueueDeviceCommand('owner-a', a, 'update')

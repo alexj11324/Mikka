@@ -5,7 +5,7 @@ import { pool } from '@/lib/db'
 export type DeviceCommandKind = 'redetect' | 'restart' | 'update'
 export async function enqueueDeviceCommand(userId: string, deviceId: string, kind: DeviceCommandKind) {
   const result = await pool.query(`INSERT INTO device_management_commands (id,"deviceId",kind)
-    SELECT $1,id,$4 FROM devices WHERE id=$2 AND "ownerId"=$3 AND kind='local' RETURNING id`, [randomUUID(), deviceId, userId, kind])
+    SELECT $1,id,$4 FROM devices WHERE id=$2 AND "ownerId"=$3 AND kind='local' AND "removedAt" IS NULL RETURNING id`, [randomUUID(), deviceId, userId, kind])
   return result.rows[0]?.id as string | undefined
 }
 export async function pendingDeviceCommands(deviceId: string, completed: string[], failed: { id: string; error: string }[] = []) {
