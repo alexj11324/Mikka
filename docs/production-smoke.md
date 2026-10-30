@@ -19,9 +19,10 @@ signs in and reads.
 
 The `+mikka-smoke` tag ([`lib/smoke-account.ts`](../lib/smoke-account.ts)) grants
 nothing. Its only effect is that the account's PostHog events carry
-`test_account: true`; filter it out in PostHog's internal and test user
-settings. The account loads feature flags like any other user, so it sees what
-real users see.
+`test_account: true`. The PostHog project's internal and test user filter drops
+any event where `test_account` is set (configured 2026-10-30, next to the
+existing cohort rule). The account loads feature flags like any other user, so
+it sees what real users see.
 
 A new smoke account is made the same way: sign up with a `+mikka-smoke-<role>`
 address on an inbox you can read, open the verification link, sign in once so
