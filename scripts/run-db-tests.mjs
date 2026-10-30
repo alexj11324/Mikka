@@ -48,6 +48,7 @@ export const REQUIRED_SUITES = [
   { marker: 'drizzle/20261027164500_artifact_legacy_compat.sql', file: 'tests/artifact-legacy-migration.test.mjs', script: 'test:artifact-migration-db' },
   { marker: 'lib/workspace-admin/general.ts', file: 'tests/workspace-admin.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
+  { marker: 'lib/audit/record.ts', file: 'tests/audit-record.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/account/delete.ts', file: 'lib/account/store.db.test.ts', script: 'test:account-db' },
 ]
 // Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
