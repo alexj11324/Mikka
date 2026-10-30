@@ -21,7 +21,7 @@ mock.module('swr', { defaultExport: (key: string | null) => {
 mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 const Pass = ({ children }: { children?: ReactNode }) => <div>{children}</div>
-mock.module(new URL('../components/ui/dialog.tsx', import.meta.url).href, { namedExports: { Dialog: Pass, DialogContent: Pass, DialogTitle: Pass } })
+mock.module(new URL('../components/ui/dialog.tsx', import.meta.url).href, { namedExports: { Dialog: Pass, DialogContent: Pass, DialogHeader: Pass, DialogTitle: Pass } })
 
 const browser = new Window({ url: 'https://mikka.example/zh-CN' })
 let container: HTMLDivElement
@@ -33,7 +33,7 @@ before(async () => {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
   Object.defineProperty(globalThis, 'document', { configurable: true, value: browser.document })
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: browser.navigator })
-  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, HTMLElement: browser.HTMLElement })
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, HTMLElement: browser.HTMLElement, Element: browser.Element })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ FactoryAcceptance } = await import('../components/workspace/factory-acceptance'))
 })

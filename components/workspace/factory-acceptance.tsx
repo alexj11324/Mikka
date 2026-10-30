@@ -200,7 +200,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
 
   return <Dialog open onOpenChange={value => { if (!value) onClose() }}>
     <DialogContent showCloseButton={false} aria-describedby={undefined}
-      className="flex h-[min(53.75rem,calc(100dvh-2rem))] w-[min(80rem,calc(100vw-2rem))] max-w-none flex-col overflow-hidden sm:max-w-none">
+      className="flex max-h-[85svh] flex-col sm:max-w-5xl">
       <header className="flex shrink-0 items-center gap-2">
         <ClipboardCheck aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
         <DialogTitle>{t(task.isSkillCandidate ? 'skillTitle' : 'title')}</DialogTitle>
@@ -269,7 +269,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
 function ArtifactPreview({ name, content, onClose }: { name: string; content: string; onClose: () => void }) {
   const t = useTranslations('FactoryAcceptance')
   return <Dialog open onOpenChange={value => { if (!value) onClose() }}>
-    <DialogContent aria-describedby={undefined} closeLabel={t('closeEvidence')} className="flex max-h-[85svh] w-[min(64rem,calc(100vw-3rem))] max-w-none flex-col overflow-hidden sm:max-w-none">
+    <DialogContent aria-describedby={undefined} closeLabel={t('closeEvidence')} className="flex max-h-[85svh] flex-col sm:max-w-5xl">
       <DialogHeader>
         <DialogTitle><code>{name}</code></DialogTitle>
       </DialogHeader>
