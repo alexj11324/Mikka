@@ -18,7 +18,6 @@ import {
   approvalRequest,
 } from "../../lib/factory/approval-contract";
 import type { z } from "zod";
-import { digest } from "../../lib/factory/evidence";
 import {
   createVercelPublicationAdapter,
   MIKKA_VERCEL,
@@ -121,7 +120,7 @@ export async function factory194Fixture(connectionString: string) {
           'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
           [b.taskId, userId],
         );
-        if (!task || digest(binding(task)) !== digest(b))
+        if (!task || task.revision !== b.revision)
           throw new FactoryError("factoryStale");
         await tx.query(
           'INSERT INTO factory_events ("taskId","eventId") VALUES ($1,$2)',

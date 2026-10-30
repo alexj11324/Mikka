@@ -142,7 +142,7 @@ test(
         () =>
           store.apply(
             "owner",
-            { ...initial, issueId: otherIssueId },
+            { ...initial, taskId: randomUUID() },
             randomUUID(),
             { action: "cancel", reason: "foreign" },
           ),

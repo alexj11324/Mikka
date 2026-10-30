@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { FactoryError, type FactoryBinding } from "./approval-contract";
+import { revisionBindingSchema } from './contract';
 import { maskFactoryNote } from "./note-mask";
 import { checkFactoryRepairBudget } from "./check-recovery-evidence";
 import {
@@ -36,6 +37,10 @@ import {
 
 const principalId = (actor: FactoryActor) =>
   actor.sessionId ? `session:${actor.sessionId}` : `owner:${actor.userId}`;
+const requestDigest = (request: any) => digest({
+  ...request,
+  binding: revisionBindingSchema.parse(request.binding),
+});
 
 function providerInput(
   task: FactoryTask,
@@ -51,7 +56,7 @@ function providerInput(
       ownerId: task.userId,
       humanSessionId: a.humanSessionId,
       expiresAt: a.request.expiresAt,
-      binding: req.binding,
+      binding: bindingOf(task),
       eventId: req.eventId,
       action: req.action,
       target: req.target,
@@ -362,8 +367,9 @@ export function createFactoryApprovals(
     await browserSession(tx, actor);
     return task;
   }
-  function fence(task: FactoryTask, binding: FactoryBinding) {
-    if (digest(bindingOf(task)) !== digest(binding)) fail("factoryStale");
+  function fence(task: FactoryTask, binding: Pick<FactoryBinding, 'taskId' | 'revision'>) {
+    if (task.id !== binding.taskId || task.revision !== binding.revision)
+      fail("factoryStale");
   }
   async function defer(error: unknown, publicationId: string): Promise<never> {
     return deferPublication(pool, publicationId, error);
@@ -482,7 +488,6 @@ export function createFactoryApprovals(
       const req = parsed.data;
       return transaction(async (tx) => {
         const task = await owned(tx, actor, req.binding.taskId);
-        if (task.issueId !== req.binding.issueId) fail("factoryNotFound");
         const {
           rows: [prior],
         } = await tx.query(
@@ -491,7 +496,7 @@ export function createFactoryApprovals(
         );
         if (prior) {
           if (
-            digest(prior.request) !== digest(req) ||
+            requestDigest(prior.request) !== requestDigest(req) ||
             prior.principalId !== principalId(actor)
           )
             fail("factoryReplayMismatch");
@@ -591,7 +596,7 @@ export function createFactoryApprovals(
         );
         if (prior) {
           if (
-            digest(prior.request) !== digest(req) ||
+            requestDigest(prior.request) !== requestDigest(req) ||
             prior.principalId !== principalId(actor)
           )
             fail("factoryReplayMismatch");
@@ -695,7 +700,7 @@ export function createFactoryApprovals(
         );
         if (prior) {
           if (
-            digest(prior.request) !== digest(req) ||
+            requestDigest(prior.request) !== requestDigest(req) ||
             prior.principalId !== principalId(actor)
           )
             fail("factoryReplayMismatch");
@@ -741,7 +746,7 @@ export function createFactoryApprovals(
           [task.id, req.eventId],
         );
         if (replay) {
-          if (digest(replay.request) !== digest(req))
+          if (requestDigest(replay.request) !== requestDigest(req))
             fail("factoryReplayMismatch");
           if (replay.status !== "succeeded" || !replay.result)
             fail("factoryPublicationAlreadyClaimed");
@@ -851,7 +856,7 @@ export function createFactoryApprovals(
             [publicationId, task.id, req.approvalId],
           );
           if (!p) fail("factoryPublicationReceiptRequired");
-          if (digest(p.request) !== digest(req)) fail("factoryReplayMismatch");
+          if (requestDigest(p.request) !== requestDigest(req)) fail("factoryReplayMismatch");
           // Terminal: a confirmed provider failure is not asked again (B2).
           if (p.status === "failed")
             throw new PublicationDeferred(p.id, "failed", p.receipt);

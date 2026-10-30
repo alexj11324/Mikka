@@ -38,6 +38,18 @@ test(
     const f = await factory194Fixture(db!);
     try {
       const { actor, pool, provider } = f;
+      await t.test('approval accepts taskId and revision without redundant client context', async () => {
+        const x = await f.prepare();
+        const service = f.service([f.adapter]);
+        const minimal = { taskId: x.approval.binding.taskId, revision: x.approval.binding.revision };
+        const approval = await service.approve(actor, { ...x.approval, binding: minimal });
+        await pool.query('UPDATE factory_approvals SET request=jsonb_set(request,\'{binding}\',$2::jsonb) WHERE id=$1', [approval.approvalId, JSON.stringify({ ...minimal, issueId: randomUUID(), attemptId: randomUUID(), candidateId: randomUUID() })]);
+        const replay = await service.approve(actor, { ...x.approval, binding: { ...minimal, issueId: randomUUID(), attemptId: randomUUID(), candidateId: randomUUID() } });
+        assert.equal(replay.approvalId, approval.approvalId);
+        const request = { binding: { taskId: approval.binding.taskId, revision: approval.binding.revision }, eventId: randomUUID(), approvalId: approval.approvalId, action: x.approval.action, target: x.approval.target, targetEnvironment: x.approval.targetEnvironment };
+        const published = await service.publish(actor, request);
+        assert.ok(published?.publicationId);
+      });
       await t.test(
         "a live browser session approves and publishes without any decision authority",
         async () => {

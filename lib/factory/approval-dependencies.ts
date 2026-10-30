@@ -5,6 +5,7 @@ import type {
   candidateSchema,
   evidenceSchema,
 } from "./approval-contract";
+import type { FactoryRevisionBinding } from './contract';
 
 /** Consumer views only; no stage/state implementation. #192's lifecycle store
  * supplies this port. Its third argument is botId; lifecycle is the fourth.
@@ -41,7 +42,7 @@ export interface FactoryApprovalStore {
   ): Promise<FactoryTask>;
   apply(
     userId: string,
-    binding: z.infer<typeof bindingSchema>,
+    binding: FactoryRevisionBinding,
     eventId: string,
     change:
       | {
