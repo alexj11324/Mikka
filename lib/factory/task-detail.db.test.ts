@@ -86,12 +86,29 @@ test('task detail GET exposes criteria, independence and the B11 header without 
     assert.equal((await store.read('owner', taskId)).delivery?.previewUrl, null, 'latest preview is http: null, no fallback');
     assert.equal((await store.read('owner', taskId)).delivery?.deploymentEnvironment, null, 'receipt without Vercel target: null');
     // deploymentEnvironment comes only from the receipt's Vercel target; unknown values map to null.
-    for (const [i, name, target, status, want] of [[4, 'vercel', 'production', 'succeeded', 'production'], [5, 'vercel', 'staging', 'succeeded', null], [6, 'netlify', 'production', 'succeeded', null], [7, 'vercel', 'production', 'uncertain', null]] as const) {
+    // previewUrl and deploymentEnvironment come from the same row: the newest succeeded publication of the current candidate.
+    const P = 'https://mikka-git-p.vercel.app', Q = 'https://mikka-prod.vercel.app';
+    for (const [i, name, target, status, ref, want, wantUrl] of [
+      [4, 'vercel', 'production', 'succeeded', Q, 'production', Q],
+      [5, 'vercel', 'staging', 'succeeded', Q, null, Q],
+      [6, 'netlify', 'production', 'succeeded', Q, null, Q],
+      [7, 'vercel', 'production', 'uncertain', 'https://unconfirmed.vercel.app', null, Q],
+      [8, 'vercel', 'preview', 'succeeded', P, 'preview', P],
+      [9, 'vercel', 'production', 'succeeded', Q, 'production', Q],
+    ] as const) {
       const a = randomUUID();
       await pool.query(`INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,'owner','session:s','s',$5,'{}','{}','deploy_preview',$6,'d','[]',1,$4,1,now()+interval '1 hour')`, [a, taskId, candidateId, verifyAttempt, randomUUID(), `env-${i}`]);
-      await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,'deploy_preview',$5,$6,'{}',$9,$7,now()+make_interval(mins => $8))`, [randomUUID(), a, taskId, candidateId, `env-${i}`, randomUUID(), JSON.stringify({ verifiedTarget: { environment: 'preview', reference: 'https://main-branch-production.vercel.app', provider: { name, environment: target } } }), i, status]);
-      assert.equal((await store.read('owner', taskId)).delivery?.deploymentEnvironment, want, `${status} ${name} target ${target}`);
+      await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,'deploy_preview',$5,$6,'{}',$9,$7,now()+make_interval(mins => $8))`, [randomUUID(), a, taskId, candidateId, `env-${i}`, randomUUID(), JSON.stringify({ verifiedTarget: { environment: 'preview', reference: ref, provider: { name, environment: target } } }), i, status]);
+      const { delivery } = await store.read('owner', taskId);
+      assert.deepEqual([delivery?.previewUrl, delivery?.deploymentEnvironment], [wantUrl, want], `${status} ${name} target ${target}: same row, no stale preview link`);
     }
+    // An older candidate's succeeded preview never leaks into the current candidate.
+    const newer = randomUUID();
+    await pool.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,$3,'o/r','device:x','repo',$4)`, [newer, taskId, 'c'.repeat(40), implRun]);
+    await pool.query(`UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1`, [taskId, newer]);
+    { const { delivery } = await store.read('owner', taskId);
+      assert.deepEqual([delivery?.previewUrl, delivery?.deploymentEnvironment], [null, null], 'current candidate has no publication'); }
+    await pool.query(`UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1`, [taskId, candidateId]);
 
     // Closed status unions: a verify.status outside VERIFY_STATUSES drops verify; an attempt status outside
     // FACTORY_STATUSES drops the row (the CHECK constraint is lifted in this throwaway DB to simulate drift).

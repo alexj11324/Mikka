@@ -35,16 +35,16 @@ export interface FactoryDelivery {
   /** factory_candidates.environment: where the candidate was built (e.g. "device:<id>"), not a deploy target. */
   environment: string | null;
   /**
-   * Source of truth: receipt.verifiedTarget.reference (provider-confirmed) of the newest succeeded
-   * preview publication of the current candidate. previewUrl is exactly that value, kept only when it
-   * is https; an http latest reference yields null (no fallback to an older https one).
+   * Same row as deploymentEnvironment: the newest succeeded publication of the current candidate.
+   * previewUrl is that row's receipt.verifiedTarget.reference (provider-confirmed), kept only when it
+   * is https; otherwise null (no fallback to an older row).
    */
   previewUrl: string | null;
   /** Neon branch of the run. Mikka does not record one anywhere yet, so this is always null. */
   databaseBranch: { name: string; url: string } | null;
   /**
    * Vercel's deployment target as recorded in receipt.verifiedTarget.provider.environment (provider
-   * name "vercel") of the newest succeeded publication of the current candidate. Any other value, a
+   * name "vercel") of the same row as previewUrl: the newest succeeded publication of the current candidate. Any other value, a
    * receipt without a Vercel provider, or no receipt gives null. Never inferred from branch names.
    */
   deploymentEnvironment: "preview" | "production" | null;
@@ -111,15 +111,14 @@ export async function factoryTaskDetail(
   const { rows: [d] } = await tx.query<{ sha: string | null; repository: string | null; environment: string | null; pullRequest: FactoryDelivery["pullRequest"]; previewUrl: string | null; deploymentEnvironment: string | null }>(
     `SELECT c.sha,c.repository,c.environment,
        (SELECT p."pullRequest" FROM run_publications p WHERE p."runId"=c."runId" AND p."userId"=$3) AS "pullRequest",
-       (SELECT f.receipt->'verifiedTarget'->>'reference' FROM factory_publications f
-         WHERE f."taskId"=$1 AND f."candidateId"=c.id AND f.status='succeeded' AND f.receipt->'verifiedTarget'->>'environment'='preview'
-         ORDER BY f."finishedAt" DESC NULLS LAST, f.id DESC LIMIT 1) AS "previewUrl",
-       (SELECT CASE WHEN f.receipt->'verifiedTarget'->'provider'->>'name'='vercel'
-                    THEN f.receipt->'verifiedTarget'->'provider'->>'environment' END
-          FROM factory_publications f
+       f.receipt->'verifiedTarget'->>'reference' AS "previewUrl",
+       CASE WHEN f.receipt->'verifiedTarget'->'provider'->>'name'='vercel'
+            THEN f.receipt->'verifiedTarget'->'provider'->>'environment' END AS "deploymentEnvironment"
+     FROM factory_candidates c
+     LEFT JOIN LATERAL (SELECT receipt FROM factory_publications f
          WHERE f."taskId"=$1 AND f."candidateId"=c.id AND f.status='succeeded'
-         ORDER BY f."finishedAt" DESC NULLS LAST, f.id DESC LIMIT 1) AS "deploymentEnvironment"
-     FROM factory_candidates c WHERE c.id=$2 AND c."taskId"=$1`,
+         ORDER BY f."finishedAt" DESC NULLS LAST, f.id DESC LIMIT 1) f ON true
+     WHERE c.id=$2 AND c."taskId"=$1`,
     [task.id, task.candidateId, task.userId],
   );
   const url = d?.previewUrl && d.previewUrl.startsWith("https://") ? d.previewUrl : null;
