@@ -23,7 +23,7 @@ import { ArtifactKindIcon } from '@/components/artifacts/artifact-card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AcceptanceStateBadge, useThreadAcceptance } from './factory-acceptance'
-import { FactoryAcceptancePane } from './factory-acceptance-pane'
+import { CandidateMachine, FactoryAcceptancePane } from './factory-acceptance-pane'
 
 // Loaded on demand: the window itself shows this panel, bare, on its right.
 const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
@@ -122,6 +122,8 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
       <h2 className={cn('min-w-0 truncate text-sm font-semibold', !acceptance && 'flex-1')}>{detail?.name ?? t('title')}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
       {back && <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />}
+      {/* Frame 06 draws the machine in the wide centre-column header; the side panel has no room for it. */}
+      {acceptance && back && <CandidateMachine taskId={acceptance.id} />}
       {acceptance && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
         <TabsList className="max-sm:w-full"><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger></TabsList>
       </Tabs>}

@@ -30,6 +30,7 @@ let root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
 let FactoryAcceptance: typeof import('../components/workspace/factory-acceptance')['FactoryAcceptance']
 let FactoryAcceptancePane: typeof import('../components/workspace/factory-acceptance-pane')['FactoryAcceptancePane']
+let CandidateMachine: typeof import('../components/workspace/factory-acceptance-pane')['CandidateMachine']
 
 before(async () => {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
@@ -38,7 +39,7 @@ before(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, HTMLElement: browser.HTMLElement, Element: browser.Element })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ FactoryAcceptance } = await import('../components/workspace/factory-acceptance'))
-  ;({ FactoryAcceptancePane } = await import('../components/workspace/factory-acceptance-pane'))
+  ;({ FactoryAcceptancePane, CandidateMachine } = await import('../components/workspace/factory-acceptance-pane'))
 })
 beforeEach(() => {
   ledger = { binding: {}, approvals: [], publications: [] }; evidence = undefined
@@ -115,4 +116,35 @@ test('a failed publication shows 发布失败，批准仍保留 with 撤销批�
   assert.match(document.body.textContent ?? '', /发布失败，批准仍保留/)
   assert.ok(button('撤销批准'))
   assert.ok(button('发布'))
+})
+
+// #541 fixture: the task detail fields the backend adds for frame 06.
+const delivery = { candidateSha: 'a3f9c2e'.padEnd(40, 'b'), pullRequest: { url: 'https://github.com/alexj11324/Mikka/pull/418', state: 'open', title: 'perf(home): 首屏图片懒加载与字体子集' }, repository: 'alexj11324/Mikka', previewUrl: null, previewDatabaseBranch: 'preview/mik-48', machine: { name: 'Alex 的 MacBook', kind: 'device' } }
+
+test('the candidate card shows the PR title and the preview database branch (#541)', async () => {
+  list = { data: { checks: [], delivery }, isLoading: false, mutate: async () => undefined }
+  evidence = { binding: {}, manifest: { candidate: { sha: delivery.candidateSha, repository: 'alexj11324/Mikka', environment: 'preview', scope: '' }, artifacts: [] } }
+  await pane()
+  const card = document.querySelector('section[aria-label="候选版本"]')
+  assert.ok(card?.textContent?.includes('#418perf(home): 首屏图片懒加载与字体子集'))
+  assert.ok(card?.textContent?.includes('Preview · Neon preview/mik-48'))
+  assert.ok(!card?.textContent?.includes('alexj11324/Mikka'), 'the title replaces the repository')
+})
+
+test('without the #541 fields the card falls back to the repository and the bare environment', async () => {
+  list = { data: { checks: [], delivery: { ...delivery, pullRequest: { url: delivery.pullRequest.url, state: 'open' }, previewDatabaseBranch: undefined, machine: undefined } }, isLoading: false, mutate: async () => undefined }
+  evidence = { binding: {}, manifest: { candidate: { sha: delivery.candidateSha, repository: 'alexj11324/Mikka', environment: 'preview', scope: '' }, artifacts: [] } }
+  await pane()
+  const card = document.querySelector('section[aria-label="候选版本"]')
+  assert.ok(card?.textContent?.includes('alexj11324/Mikka'))
+  assert.ok(!card?.textContent?.includes('Neon'))
+})
+
+test('the header names the machine that produced the candidate, and nothing when unknown', async () => {
+  list = { data: { checks: [], delivery }, isLoading: false, mutate: async () => undefined }
+  await act(async () => root.render(<CandidateMachine taskId="t1" />))
+  assert.equal(container.textContent, 'Alex 的 MacBook')
+  list = { data: { checks: [], delivery: { ...delivery, machine: null } }, isLoading: false, mutate: async () => undefined }
+  await act(async () => root.render(<CandidateMachine taskId="t1" />))
+  assert.equal(container.textContent, '')
 })

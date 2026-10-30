@@ -3,7 +3,7 @@
 import { useCallback, useReducer, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { CircleCheck, CircleDashed, CircleX, ExternalLink, GitCommitHorizontal, Server } from 'lucide-react'
+import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, GitCommitHorizontal, Laptop, Server } from 'lucide-react'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -77,7 +77,7 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
     {pr && <div className="flex min-w-0 items-center gap-2 text-sm">
       <span className="flex size-4 shrink-0 [&_svg]:size-4"><PullRequestIcon state={pr.state} /></span>
       <a href={pr.url} target="_blank" rel="noopener noreferrer" className="shrink-0 font-medium hover:underline">{number ? `#${number}` : t('pullRequest')}</a>
-      {repository && <span className="min-w-0 truncate text-muted-foreground">{repository}</span>}
+      {pr.title ? <span className="min-w-0 truncate">{pr.title}</span> : repository && <span className="min-w-0 truncate text-muted-foreground">{repository}</span>}
     </div>}
     {sha && <div className="flex min-w-0 items-center gap-2">
       <Label>{t('commitLabel')}</Label>
@@ -94,13 +94,24 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
     <div className="flex min-w-0 items-center gap-2">
       <Label>{t('environmentLabel')}</Label>
       <Server aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-      <span className="truncate text-sm">{isSkill ? t('internalSkill') : environment ?? t('state.unavailable')}</span>
+      <span className="truncate text-sm">{isSkill ? t('internalSkill') : environment ?? t('state.unavailable')}{!isSkill && delivery?.previewDatabaseBranch && ` · Neon ${delivery.previewDatabaseBranch}`}</span>
     </div>
     {isSkill && <div className="flex min-w-0 items-center gap-2">
       <Label>{t('target')}</Label>
       <code className="truncate text-xs">mikka-builtin:run-report</code>
     </div>}
   </section>
+}
+
+/** Frame 06 header: the machine that produced the candidate. Reads the same task detail as the pane. */
+export function CandidateMachine({ taskId }: { taskId: string }) {
+  const { data } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${taskId}`, request)
+  const machine = data?.delivery?.machine
+  if (!machine?.name) return null
+  const Icon = machine.kind === 'cloud' ? Cloud : Laptop
+  return <span className="flex min-w-0 shrink items-center gap-1.5 text-xs text-muted-foreground max-sm:hidden">
+    <Icon aria-hidden="true" className="size-3.5 shrink-0" /><span className="truncate">{machine.name}</span>
+  </span>
 }
 
 function Verdict({ passed }: { passed: boolean | null }) {

@@ -12,15 +12,26 @@ export interface AcceptanceCheck {
   candidateId: string | null
   candidateSha: string | null
   runId: string | null
-  criteria: { criterionId: string | null; text: string | null; passed: boolean; evidence: string | null }[]
+  /** `command` and `exitCode` (#541): what checked this criterion, when the verify agent reported it. */
+  criteria: { criterionId: string | null; text: string | null; passed: boolean; evidence: string | null; command?: string | null; exitCode?: number | null }[]
   verify: { status: string; command: string | null; exitCode: number | null } | null
 }
+/**
+ * The task detail's delivery header. `pullRequest.title`, `previewDatabaseBranch`
+ * and `machine` come with #541 and stay optional, so the card works before and
+ * after the backend sends them.
+ */
 export interface AcceptanceDelivery {
   candidateSha: string | null
-  pullRequest: { url: string; state: 'open' | 'draft' | 'merged' | 'closed' } | null
+  pullRequest: { url: string; state: 'open' | 'draft' | 'merged' | 'closed'; title?: string | null } | null
   repository: string | null
   previewUrl: string | null
+  /** The Neon preview branch the run used, such as `preview/mik-48`. */
+  previewDatabaseBranch?: string | null
+  /** The device or cloud machine that produced the candidate. */
+  machine?: CandidateMachine | null
 }
+export interface CandidateMachine { name: string; kind: 'device' | 'cloud' }
 export interface AcceptanceDetail { checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery }
 
 /** One piece of evidence plus, for text from a verify run, the command it ran. */
@@ -46,19 +57,21 @@ function names(criterion: AcceptanceCheck['criteria'][number], entry: EvidenceEn
  * 验收标准: one group per criterion of the latest verify check, each with the
  * evidence its report names. Evidence no criterion names stays in a last group
  * without a title, so nothing the reviewer was given disappears. Text from the
- * verify run carries its command and exit code (`pnpm e2e · exit 0`).
+ * verify run carries its command and exit code (`pnpm e2e · exit 0`): the one
+ * that checked its criterion when the report names it, else the run's.
  */
 export function criterionGroups(entries: readonly EvidenceEntry[], checks: readonly AcceptanceCheck[], candidateId: string | null): CriterionGroup[] {
   const verify = latestCheck(checks, 'verify', candidateId)
-  const command = verify?.verify?.command ? { text: verify.verify.command, exitCode: verify.verify.exitCode } : null
-  const item = (entry: EvidenceEntry): AcceptanceItem => ({ entry, command: !isMedia(entry) && command && entry.runId === verify?.runId ? command : null })
+  const runCommand = verify?.verify?.command ? { text: verify.verify.command, exitCode: verify.verify.exitCode } : null
+  const item = (entry: EvidenceEntry, command = runCommand): AcceptanceItem => ({ entry, command: !isMedia(entry) && command && entry.runId === verify?.runId ? command : null })
   const used = new Set<number>()
   const groups: CriterionGroup[] = (verify?.criteria ?? []).map((criterion, position) => {
+    const own = criterion.command ? { text: criterion.command, exitCode: criterion.exitCode ?? null } : runCommand
     const items: AcceptanceItem[] = []
-    entries.forEach((entry, index) => { if (names(criterion, entry)) { used.add(index); items.push(item(entry)) } })
+    entries.forEach((entry, index) => { if (names(criterion, entry)) { used.add(index); items.push(item(entry, own)) } })
     return { key: criterion.criterionId ?? `criterion-${position}`, title: criterion.text, passed: criterion.passed, items }
   })
-  const rest = entries.filter((_, index) => !used.has(index)).map(item)
+  const rest = entries.filter((_, index) => !used.has(index)).map(entry => item(entry))
   if (rest.length) groups.push({ key: 'other', title: null, passed: null, items: rest })
   return groups
 }
