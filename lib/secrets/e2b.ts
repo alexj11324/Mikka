@@ -19,7 +19,8 @@ export class E2BKeyError extends Error {
 /** Runtime flag. Off (default) = platform E2B_API_KEY exactly as today. On = workspace key only, no fallback. Enabling needs Alex's approval. */
 export const byoE2BKeyEnabled = (env: Record<string, string | undefined> = process.env) => env.MIKKA_BYO_E2B_KEY === '1'
 
-export interface E2BKeyStatus { configured: boolean; masked: string | null; verifiedAt: string | null; lastErrorCode: string | null; lastErrorAt: string | null; updatedAt: string | null }
+/** Design update (#436): no last4, verifiedAt or updatedAt in responses (still stored). */
+export interface E2BKeyStatus { configured: boolean; lastErrorCode: string | null; lastErrorAt: string | null }
 
 export type E2BVerifyResult = { ok: true } | { ok: false; code: (typeof E2B_KEY_ERROR_CODES)[number] }
 
@@ -51,7 +52,6 @@ export async function takeVerifyAttempt(workspaceId: string, now = new Date()): 
   }))
 }
 
-const masked = (last4: string) => `e2b_••••${last4}`
 const sealKey = (apiKey: string, workspaceId: string) => {
   try { return sealSecret(apiKey, e2bKeyAad(workspaceId)) } catch (error) {
     if (error instanceof SecretsKeyMissingError) throw new WorkspaceError('secretsUnavailable')
@@ -60,11 +60,11 @@ const sealKey = (apiKey: string, workspaceId: string) => {
 }
 
 export async function getE2BKeyStatus(userId: string, workspaceId: string): Promise<E2BKeyStatus> {
-  // Members see the masked card (last4 / verifiedAt only); see SECRET_POLICY.memberMayViewE2BStatus.
+  // Members see whether a key is configured and its last error only; see SECRET_POLICY.memberMayViewE2BStatus.
   await requireSecretPermission(userId, workspaceId, 'e2b.status')
   const [row] = await guardSecretsDb(() => db.select().from(workspaceE2bKeys).where(eq(workspaceE2bKeys.workspaceId, workspaceId)))
-  if (!row) return { configured: false, masked: null, verifiedAt: null, lastErrorCode: null, lastErrorAt: null, updatedAt: null }
-  return { configured: true, masked: masked(row.last4), verifiedAt: row.verifiedAt?.toISOString() ?? null, lastErrorCode: row.lastErrorCode, lastErrorAt: row.lastErrorAt?.toISOString() ?? null, updatedAt: row.updatedAt.toISOString() }
+  if (!row) return { configured: false, lastErrorCode: null, lastErrorAt: null }
+  return { configured: true, lastErrorCode: row.lastErrorCode, lastErrorAt: row.lastErrorAt?.toISOString() ?? null }
 }
 
 /**

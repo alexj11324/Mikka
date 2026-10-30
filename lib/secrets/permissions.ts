@@ -19,7 +19,7 @@ export const SECRET_POLICY = {
   memberMayReplaceOthers: true,
   /** Deletes stay admin only (decided). */
   memberMayDelete: false,
-  /** Members see the E2B card status (masked: last4 / verifiedAt only). */
+  /** Members see the E2B card status (configured + last error only). */
   memberMayViewE2BStatus: true,
   /** Egress policy is admin only, read and write. */
   memberMayReadNetwork: false,

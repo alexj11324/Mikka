@@ -1,7 +1,6 @@
 import 'server-only'
 // 设置 › 密钥与环境: storage for workspace secrets / env vars and the outbound network policy.
-// Rules: secret values never leave this module (list/replace/delete return metadata only);
-// env values are returned because Bots read them verbatim (plan A3). Every write runs in one
+// Rules: no value (secret or env) ever leaves this module; list/create/replace/delete return metadata only. Every write runs in one
 // MIKKA-DB transaction and calls the audit hook inside it, so #432's recordAudit(tx, …) slots in
 // and an audit failure rolls the write back. targetLabel is always the NAME, never the value.
 import { and, asc, eq, sql } from 'drizzle-orm'
@@ -9,12 +8,12 @@ import { db } from '@/lib/db'
 import { workspaceNetworkPolicy, workspaceSecrets } from '@/lib/db/secrets-schema'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
-import { openSecret, sealSecret, secretAad, SecretsKeyMissingError } from './crypto'
+import { sealSecret, secretAad, SecretsKeyMissingError } from './crypto'
 import { secretActionAllowed, type SecretAction, type SecretTarget, type WorkspaceRole } from './permissions'
-import { checkEgressDomains, createSecretInput, deleteSecretInput, replaceSecretInput, scopeColumns, updateEgressInput, EGRESS_DOMAINS_MAX, WORKSPACE_SECRETS_LIMIT } from './format'
+import { isReservedEnvName, checkEgressDomains, createSecretInput, deleteSecretInput, replaceSecretInput, scopeColumns, updateEgressInput, EGRESS_DOMAINS_MAX, WORKSPACE_SECRETS_LIMIT } from './format'
 
 export type SecretsTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
-export type SecretAuditAction = 'secret.created' | 'secret.replaced' | 'secret.deleted' | 'env.created' | 'env.updated' | 'env.deleted' | 'network.updated'
+export type SecretAuditAction = 'secret.created' | 'secret.replaced' | 'secret.deleted' | 'env.created' | 'env.updated' | 'env.deleted' | 'network.updated' | 'secret.replace_denied'
 export interface SecretAuditEvent {
   workspaceId: string
   actorId: string
@@ -31,29 +30,23 @@ export type SecretAuditHook = (tx: SecretsTx, event: SecretAuditEvent) => Promis
 // MIKKA-DB secret/env/egress writes must use recordAudit inside this transaction, never recordAuditSafe.
 export const noAudit: SecretAuditHook = async () => {}
 
+/**
+ * Design update (#436): responses carry metadata only. No value (secret or env), no last4, no timestamps;
+ * those are still stored. `id` is kept as the handle for replace/delete.
+ */
 export interface WorkspaceSecretView {
   id: string
   name: string
   kind: 'secret' | 'env'
-  scope: { type: 'workspace' } | { type: 'repository'; repository: string }
+  scopeType: 'workspace' | 'repository'
+  /** '' for workspace scope, owner/repo (lowercase) for repository scope. */
+  scopeRef: string
   environment: 'all' | 'production' | 'preview' | 'development'
-  /** Only for kind='env'. Always null for kind='secret', and null when the row cannot be decrypted. */
-  value: string | null
-  /** True when the stored ciphertext no longer opens (moved row, wrong key). The rest of the list still works. */
-  unavailable: boolean
-  createdAt: string
-  updatedAt: string
 }
 export interface NetworkPolicyView { mode: 'open' | 'allowlist' | 'none'; allowedDomains: string[]; updatedAt: string | null }
 
 type Row = typeof workspaceSecrets.$inferSelect
 
-function unseal(row: Row) {
-  try { return openSecret(row, secretAad(row)) } catch (error) {
-    if (error instanceof SecretsKeyMissingError) throw new WorkspaceError('secretsUnavailable')
-    throw error
-  }
-}
 function seal(value: string, row: Parameters<typeof secretAad>[0]) {
   try { return sealSecret(value, secretAad(row)) } catch (error) {
     if (error instanceof SecretsKeyMissingError) throw new WorkspaceError('secretsUnavailable')
@@ -63,22 +56,7 @@ function seal(value: string, row: Parameters<typeof secretAad>[0]) {
 /** One line, id and code only: never the value, ciphertext, iv or the crypto error text. */
 export const logSecretFailure = (code: string, id: string) => console.error(`[secrets] ${code} id=${id}`)
 
-/** A missing key still fails the whole call (secretsUnavailable); a single row that won't open is marked unavailable. */
-function unsealForView(row: Row): { value: string | null; unavailable: boolean } {
-  try { return { value: unseal(row), unavailable: false } } catch (error) {
-    if (error instanceof WorkspaceError) throw error
-    logSecretFailure('secretDecryptFailed', row.id)
-    return { value: null, unavailable: true }
-  }
-}
-const view = (row: Row): WorkspaceSecretView => ({
-  id: row.id, name: row.name, kind: row.kind,
-  scope: row.scopeType === 'workspace' ? { type: 'workspace' } : { type: 'repository', repository: row.scopeRef },
-  environment: row.environment,
-  ...(row.kind === 'env' ? unsealForView(row) : { value: null, unavailable: false }),
-  createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
-})
-const meta = (row: Row): WorkspaceSecretView => ({ ...view({ ...row, kind: 'secret' }), kind: row.kind })
+const view = (row: Row): WorkspaceSecretView => ({ id: row.id, name: row.name, kind: row.kind, scopeType: row.scopeType, scopeRef: row.scopeRef, environment: row.environment })
 /** SQLSTATE (5 chars) on the error or its cause chain; app error codes like 'secretNotFound' are ignored. */
 const pgCode = (error: unknown): string | undefined => {
   if (!error || typeof error !== 'object') return undefined
@@ -128,7 +106,7 @@ export async function requireSecretPermission(userId: string, workspaceId: strin
   return role
 }
 
-/** Any member. Secrets come back with value=null; env vars with their value. */
+/** Any member. Metadata only: no value is ever read back (secret or env). */
 export async function listWorkspaceSecrets(userId: string, workspaceId: string): Promise<WorkspaceSecretView[]> {
   await requireSecretPermission(userId, workspaceId, 'secret.list')
   const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(eq(workspaceSecrets.workspaceId, workspaceId))
@@ -147,6 +125,7 @@ const withWarning = (row: WorkspaceSecretView, value: string): SavedSecretView =
 export async function createWorkspaceSecret(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit): Promise<SavedSecretView> {
   const role = await requireSecretPermission(userId, workspaceId, 'secret.create')
   const { name, kind, value, scope, environment } = createSecretInput.parse(input)
+  if (isReservedEnvName(name)) throw new WorkspaceError('secretNameReserved')
   const columns = { workspaceId, kind, name, ...scopeColumns(scope), environment }
   assertSecretPermission(role, 'secret.create', [columns])
   // TODO(audit): member writes are audited through the same hook as admin writes (recordAudit after #432).
@@ -160,7 +139,7 @@ export async function createWorkspaceSecret(userId: string, workspaceId: string,
       await audit(tx, { workspaceId, actorId: userId, action: kind === 'secret' ? 'secret.created' : 'env.created', target: { type: kind, id, label: name }, metadata: { scope: saved.scopeType, environment: saved.environment, role, ...(saved.scopeRef ? { repository: saved.scopeRef } : {}) } })
       return saved
     }), () => new WorkspaceError('secretNameTaken'))
-  return withWarning(kind === 'env' ? view(row) : meta(row), value)
+  return withWarning(view(row), value)
 }
 
 /**
@@ -173,7 +152,13 @@ export async function replaceWorkspaceSecret(userId: string, workspaceId: string
   const { id, value, scope, environment } = replaceSecretInput.parse(input)
   const row = await guardSecretsDb(() => db.transaction(async tx => {
     const [current] = await tx.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.id, id), eq(workspaceSecrets.workspaceId, workspaceId))).for('update')
-    if (!current) throw new WorkspaceError('secretNotFound')
+    // A missing id, an id in another workspace and an entry the caller may not edit are indistinguishable:
+    // same queries (this select + one denied audit row), same secretNotFound. The audit keeps the real reason.
+    const reason = !current ? 'notFound' : secretActionAllowed(role, 'secret.replace', [current], current.createdBy === userId) ? null : 'permission'
+    if (!current || reason) {
+      await audit(tx, { workspaceId, actorId: userId, action: 'secret.replace_denied', target: { type: current?.kind ?? 'secret', id, label: current?.name ?? '' }, metadata: { role, reason: reason ?? 'notFound' } })
+      return null
+    }
     const next = { ...current, ...(scope ? scopeColumns(scope) : {}), environment: environment ?? current.environment }
     assertSecretPermission(role, 'secret.replace', [current, next], current.createdBy === userId)
     // TODO(audit): member writes are audited through the same hook as admin writes (recordAudit after #432).
@@ -183,7 +168,8 @@ export async function replaceWorkspaceSecret(userId: string, workspaceId: string
       metadata: { role, environment: next.environment, ...(moved ? { from: [current.scopeType, current.scopeRef, current.environment], to: [next.scopeType, next.scopeRef, next.environment] } : {}) } })
     return saved
   }), () => new WorkspaceError('secretNameTaken'))
-  return withWarning(row.kind === 'env' ? view(row) : meta(row), value)
+  if (!row) throw new WorkspaceError('secretNotFound')
+  return withWarning(view(row), value)
 }
 
 /** Delete (no UI frame yet; kept for the API). Audit action secret.deleted / env.deleted. */
