@@ -699,7 +699,7 @@ export function createFactoryStore(
             fail("factoryTransition");
           if (
             change.action === "repair" &&
-            !["review", "verify", "monitor"].includes(task.stage)
+            !["review", "verify", "approval", "monitor"].includes(task.stage)
           )
             fail("factoryTransition");
           // A live old run must stop before another attempt can bind work.

@@ -6,6 +6,7 @@ import {
   approvalRequest,
   approvalControl,
   publicationRequest,
+  rejectRequest,
   type FactoryActor,
 } from "./approval-contract";
 import {
@@ -414,7 +415,21 @@ export function createFactoryApprovals(
           'SELECT id,"approvalId","candidateId",action,target,request,request->>\'targetEnvironment\' AS "targetEnvironment",status,receipt,"createdAt","finishedAt" FROM factory_publications WHERE "taskId"=$1 ORDER BY "createdAt"',
           [task.id],
         );
-        return { binding: bindingOf(task), approvals, publications };
+        const { rows: rejections } = await tx.query(
+          `SELECT c."eventId" AS id,c.request->>'candidateId' AS "candidateId",c.request->>'note' AS note,
+                  json_build_object('userId',c."userId",'name',u.name) AS actor,
+                  coalesce(jsonb_array_length(c.request->'failedEvidence'),0)::int AS "failedEvidenceCount",
+                  c."createdAt"
+             FROM factory_approval_controls c LEFT JOIN "user" u ON u.id=c."userId"
+            WHERE c."taskId"=$1 AND c.request->>'operation'='reject' ORDER BY c."createdAt"`,
+          [task.id],
+        );
+        return {
+          binding: bindingOf(task),
+          approvals,
+          publications,
+          rejections,
+        };
       });
     },
     async artifact(actor: FactoryActor, taskId: string, artifact: string) {
@@ -594,6 +609,88 @@ export function createFactoryApprovals(
           [approvalId, result.task.attemptId, result.task.revision],
         );
         return { approvalId, binding: bindingOf(result.task) };
+      });
+    },
+    /** Human "request changes" on the candidate awaiting approval. Revokes any
+     * open grant for that candidate and sends the task back to execute. */
+    async reject(actor: FactoryActor, input: unknown) {
+      const parsed = rejectRequest.safeParse(input);
+      if (!parsed.success) fail("factoryInvalid");
+      const req = { operation: "reject" as const, ...parsed.data };
+      return transaction(async (tx) => {
+        const task = await owned(tx, actor, req.binding.taskId);
+        const {
+          rows: [prior],
+        } = await tx.query(
+          'SELECT request,result,"principalId" FROM factory_approval_controls WHERE "taskId"=$1 AND "eventId"=$2',
+          [task.id, req.eventId],
+        );
+        if (prior) {
+          if (
+            digest(prior.request) !== digest(req) ||
+            prior.principalId !== principalId(actor)
+          )
+            fail("factoryReplayMismatch");
+          return prior.result as {
+            rejectionId: string;
+            binding: FactoryBinding;
+          };
+        }
+        await unusedEvent(tx, task.id, req.eventId);
+        fence(task, req.binding);
+        if (
+          task.stage !== "approval" ||
+          !["pending", "waiting"].includes(task.status) ||
+          task.candidateId !== req.candidateId
+        )
+          fail("factoryTransition");
+        await humanApproval(tx, actor);
+        if (req.failedEvidence?.length) {
+          const current = await approvalEvidence(tx, task);
+          const known = new Set(current.manifest.artifacts.map((a) => a.artifact));
+          if (
+            new Set(req.failedEvidence).size !== req.failedEvidence.length ||
+            req.failedEvidence.some((a) => !known.has(a))
+          )
+            fail("factoryEvidenceMismatch");
+        }
+        await tx.query(
+          'UPDATE factory_approvals SET "revokedAt"=clock_timestamp() WHERE "taskId"=$1 AND "candidateId"=$2 AND "revokedAt" IS NULL',
+          [task.id, task.candidateId],
+        );
+        const reason = req.note
+          ? `Person requested changes: ${req.note}`
+          : "Person requested changes";
+        let result = await store.apply(
+          actor.userId,
+          bindingOf(task),
+          randomUUID(),
+          { action: "finish", status: "failed", reason, evidence: [], output: {} },
+          tx,
+        );
+        result = await store.apply(
+          actor.userId,
+          bindingOf(result.task),
+          randomUUID(),
+          { action: "repair", reason },
+          tx,
+        );
+        const response = {
+          rejectionId: req.eventId,
+          binding: bindingOf(result.task),
+        };
+        await tx.query(
+          'INSERT INTO factory_approval_controls ("taskId","eventId","userId","principalId",request,result) VALUES ($1,$2,$3,$4,$5,$6)',
+          [
+            task.id,
+            req.eventId,
+            actor.userId,
+            principalId(actor),
+            JSON.stringify(req),
+            JSON.stringify(response),
+          ],
+        );
+        return response;
       });
     },
     async revoke(actor: FactoryActor, input: unknown) {
