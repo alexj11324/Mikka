@@ -2,7 +2,7 @@ import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 import { AgentToolApprovalStore } from './store'
 import { readCliRunPolicy, readCliAgentPolicy } from './policy-store'
 import { acquireWorkspaceMembership } from '../workspace-membership-guard'
@@ -153,6 +153,38 @@ test('unbound workers configure safely and only owned cloud devices receive open
  await assert.rejects(readCliAgentPolicy(pool,user,worker,null,guard),/agentPolicyUnavailable/)
 })
 
+
+test('policy changes and live tool checks share run-before-policy lock order', { timeout: 10000 }, async () => {
+  const current = await readCliRunPolicy(pool,runId,actor.userId)
+  let checkLocked!: () => void, settingsLockingRun!: () => void
+  const held = new Promise<void>(resolve => { checkLocked=resolve })
+  const setting = new Promise<void>(resolve => { settingsLockingRun=resolve })
+  const instrument = (query: (client:PoolClient,args:unknown[]) => Promise<unknown>) => ({ connect: async () => {
+    const client = await pool.connect()
+    return new Proxy(client, { get(target,key) {
+      if (key === 'query') return (...args:unknown[]) => query(target,args)
+      const value = Reflect.get(target,key,target)
+      return typeof value === 'function' ? value.bind(target) : value
+    } })
+  } })
+  const checks = instrument(async (client,args) => {
+    const result = await Reflect.apply(client.query,client,args)
+    if (String(args[0]).startsWith('SELECT id FROM agent_runs') && String(args[0]).includes('FOR UPDATE')) {
+      checkLocked()
+      await setting
+    }
+    return result
+  })
+  const settings = instrument(async (client,args) => {
+    if (/FROM agent_runs WHERE id=\$1 AND "userId"=\$2 FOR (SHARE|UPDATE)/.test(String(args[0]))) settingsLockingRun()
+    return Reflect.apply(client.query,client,args)
+  })
+  const checking = new AgentToolApprovalStore({...checks,query:pool.query.bind(pool)}).checkState(actor,runId,current.revision)
+  await held
+  const changing = setCliPolicy(settings,actor.userId,runId,'worker',current.revision,current.layers.worker)
+  const results = await Promise.allSettled([checking,changing])
+  assert.deepEqual(results.map(result => result.status === 'fulfilled' ? 'ok' : (result.reason as {code?:string}).code),['ok','ok'])
+})
 
 test('human control preserves pending approval and existing lease, then expires through the existing liveness poll', async () => {
   await pool.query(`ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "resumeStatus" text, ADD COLUMN "updatedAt" timestamptz`)
