@@ -11,8 +11,9 @@ import { db } from '@/lib/db'
 import { bots, WORKSPACE_BOT_MODELS } from '@/lib/db/schema'
 import { BOT_COLORS, BOT_SHAPES } from '@/lib/bot-shapes'
 import { workspaceAction } from '@/lib/workspace-admin/action'
+import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
-import { botDefaultOptions, repositoryAvailable, saveBotDefaults, workspaceBotDefaults, workspaceBots, type BotDefaultOptions, type BotDefaults, type WorkspaceBotView } from '@/lib/workspace-admin/bots'
+import { botDefaultOptions, listBotThreadsFor, repositoryAvailable, saveBotDefaults, workspaceBotDefaults, workspaceBots, type BotDefaultOptions, type BotDefaults, type BotThreadPage, type WorkspaceBotView } from '@/lib/workspace-admin/bots'
 
 /** A bot in the left column. Its instructions grow inside its chat, so they are not here. */
 export interface BotView {
@@ -79,4 +80,15 @@ export async function updateWorkspaceBotDefaults(input: { defaultModel?: string 
 /** Every bot in the current workspace: owner, 空闲 or 运行中 · N 个线程. Any member may read. */
 export async function listWorkspaceBots(): Promise<ActionResult<{ bots: WorkspaceBotView[] }>> {
   return workspaceAction(async () => ({ bots: await workspaceBots((await currentWorkspaceActor()).workspaceId) }))
+}
+
+/**
+ * WS-07 线程列表 for one bot in the current workspace, newest first. Any member may read;
+ * titles of tasks the viewer cannot see, and chat threads someone else started, come back null.
+ */
+export async function listBotThreads(input: { botId: string; limit?: number; cursor?: string | null }): Promise<SettingsActionResult<BotThreadPage>> {
+  return settingsWorkspaceAction(async () => {
+    const actor = await currentWorkspaceActor()
+    return listBotThreadsFor(actor.userId, actor.workspaceId, input)
+  })
 }

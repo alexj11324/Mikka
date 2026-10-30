@@ -463,6 +463,18 @@ export function createFactoryApprovals(
         };
       });
     },
+    /** A current evidence capture, behind the same ownership and source fences as every acceptance read. */
+    async capture(actor: FactoryActor, taskId: string, captureId: string) {
+      if (!z.uuid().safeParse(taskId).success || !z.uuid().safeParse(captureId).success)
+        fail("factoryNotFound");
+      return transaction(async (tx) => {
+        const task = await owned(tx, actor, taskId, true);
+        const current = await approvalEvidence(tx, task);
+        if (!current.captures.some((a) => a.captureId === captureId))
+          fail("factoryArtifactMissing");
+        return { ownerId: task.userId, captureId };
+      });
+    },
     async evidence(actor: FactoryActor, taskId: string) {
       if (!z.uuid().safeParse(taskId).success) fail("factoryInvalid");
       return transaction(async (tx) => {
@@ -473,7 +485,8 @@ export function createFactoryApprovals(
         )
           fail("factoryTransition");
         const current = await approvalEvidence(tx, task);
-        return { binding: bindingOf(task), ...current };
+        const { view, captures: _captures, ...bound } = current;
+        return { binding: bindingOf(task), ...bound, manifest: view };
       });
     },
     async approve(actor: FactoryActor, input: unknown) {
@@ -611,7 +624,7 @@ export function createFactoryApprovals(
         if (req.failedEvidence?.length) {
           const current = await approvalEvidence(tx, task);
           const known = new Set(
-            current.manifest.artifacts.map((a) => a.artifact),
+            current.view.artifacts.map((a) => a.artifact),
           );
           if (
             new Set(req.failedEvidence).size !== req.failedEvidence.length ||

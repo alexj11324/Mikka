@@ -12,6 +12,7 @@ import { workspaceMembers, workspaceInvitations, workspaces } from '@/lib/db/wor
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { slugIsReserved } from '@/lib/workspace-admin/general'
 import { transferOnSuspend } from '@/lib/workspace-admin/members'
+import { auditRequestContext, recordAuditSafe } from '@/lib/audit/record'
 
 const roleSchema = z.enum(['admin', 'member'])
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/)
@@ -105,6 +106,11 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; em
         links.push({ email, path: `/invite/${token}` })
       }
       return links
+    }).then(async links => {
+      // Workspace rows live in DATABASE_URL: the audit rows follow the commit (lib/audit/record.ts).
+      const request = auditRequestContext(await headers())
+      for (const link of links) await recordAuditSafe({ workspaceId: input.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.invited', target: { type: 'invitation', label: link.email }, metadata: { role }, ...request })
+      return links
     })
   })
 }
@@ -130,6 +136,12 @@ export async function updateWorkspaceMember(input: { workspaceId: string; userId
       }
       if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo)
       await tx.update(workspaceMembers).set({ role, status }).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId)))
+      return target
+    }).then(async target => {
+      const request = auditRequestContext(await headers())
+      const base = { workspaceId: input.workspaceId, actor: { type: 'user' as const, id: user.id, name: user.name }, target: { type: 'member', id: target.userId, label: target.name || target.email }, ...request }
+      if (target.role !== role) await recordAuditSafe({ ...base, action: 'member.role_changed', metadata: { oldRole: target.role, newRole: role } })
+      if (target.status !== status) await recordAuditSafe({ ...base, action: status === 'suspended' ? 'member.suspended' : 'member.reactivated' })
     })
   })
 }

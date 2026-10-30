@@ -52,7 +52,7 @@ export function createWritePolicySettings(pool: Pool, membershipGuard: (scope: A
         return { permissions,version }
       }, true, async (tx,value) => {
         const result=await tx.query<{permissions:unknown;version:string}>(`insert into workspace_computer_policies ("workspaceId",permission,external_write_permissions,external_write_policy_version)
-          values ($1,'ask',$2,case when $2::jsonb='{}'::jsonb then 0 else 1 end)
+          values ($1,'allow',$2,case when $2::jsonb='{}'::jsonb then 0 else 1 end)
           on conflict ("workspaceId") do update set external_write_permissions=$2
           returning external_write_permissions as permissions,external_write_policy_version as version`,[scope.workspaceId,value.permissions])
         return {permissions:writePolicySettingsSchema.parse(result.rows[0].permissions),version:versionSchema.parse(String(result.rows[0].version))}

@@ -156,11 +156,11 @@ export type ActionErrorCode = (typeof ACTION_ERROR_CODES)[number]
 
 export type ActionErrorParams = Record<string, string | number>
 
-export interface ActionFailure {
-  error: ActionErrorCode
+export interface ActionFailure<E extends string = ActionErrorCode> {
+  error: E
   params?: ActionErrorParams
   /** Stable operation ID for retrying a team action, including unknown outcomes. */
   requestId?: string
 }
 
-export type ActionResult<T> = (T & { error?: undefined }) | ActionFailure
+export type ActionResult<T, E extends string = ActionErrorCode> = (T & { error?: undefined }) | ActionFailure<E>

@@ -3,7 +3,7 @@ import { randomUUID,createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { before,after,beforeEach,mock,test } from 'node:test'
 import { Pool } from 'pg'
-import type { VisualObservation } from './visual-contract'
+import { browserEffects, type BrowserEffect, type VisualObservation } from './visual-contract'
 import type { judgeVisualBrowserAction } from './visual-model'
 
 const database=process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
@@ -18,11 +18,12 @@ let provision:typeof import('../computer/provision').ensureCloudMachine
 let proposeLogin:typeof import('./credential-reviews').proposeCredentialOperation
 const actor={userId:'alice',workspaceId:randomUUID()},botId=randomUUID(),subagentId=randomUUID(),credentialId=randomUUID()
 let effects=0,mode:'success'|'stale'|'unknown'='success',receipt=new Map<string,unknown>()
+let executableInputs=new Map<string,Record<string,any>>()
 let loginMode:'session_applied'|'guarded'='session_applied',leaseCalls=0,submissions=0
 const target={targetId:'chromium-target',origin:'https://example.com',endpoint:'https://broker.invalid',expiresAt:Date.now()+60000,observedInputs:[{backendNodeId:12,credentialRole:'password' as const,loaderId:'document',epoch:1,permissionVersion:0}]}
 const bytes=Buffer.from([0xff,0xd8,0xff,...Array.from({length:40},()=>0),0xff,0xd9]),imageDigest=createHash('sha256').update(bytes).digest('hex')
 const observation=():VisualObservation=>({observationId:'a'.repeat(32),loaderId:'document',origin:target.origin,observedAt:Date.now(),screenshot:'data:image/jpeg;base64,'+bytes.toString('base64'),width:1280,height:800,observation:{url:target.origin,title:'Fixture',text:'Fixture',elements:[],needsLogin:false}})
-function judgment(effect:'browse'|'write_external'|'payment'='browse'):Awaited<ReturnType<typeof judgeVisualBrowserAction>> {
+function judgment(effect:BrowserEffect='browse'):Awaited<ReturnType<typeof judgeVisualBrowserAction>> {
  return {scope:'within_task',effect,execution:{executionId:randomUUID(),modelId:'openai/gpt-6-luna-decisions',providerGenerationId:'synthetic-provider',startedAt:new Date().toISOString(),completedAt:new Date().toISOString(),requestDigest:'b'.repeat(64),imageDigests:[imageDigest],vision:'image-input-submitted'}}
 }
 const realFetch=globalThis.fetch
@@ -32,14 +33,14 @@ before(async()=>{
  pool=new Pool({connectionString:database,options:`-c search_path=${schema}`,max:6})
  await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY);INSERT INTO "user" VALUES('alice'),('bob');CREATE TABLE agent_runs(id uuid PRIMARY KEY);CREATE TABLE devices(id uuid PRIMARY KEY);CREATE TABLE suggestions(id uuid PRIMARY KEY);CREATE TABLE device_repos(id uuid PRIMARY KEY)`)
  for(const file of ['20261027164501_cloud_computers.sql','20261029011635_subagents_thread_machines.sql','20261029080000_unattended_browser_runtime.sql','20261029080001_owner_cloud_machines.sql']) await pool.query(await readFile(new URL('../../drizzle/'+file,import.meta.url),'utf8'))
- await pool.query(`CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text,version bigint DEFAULT 0,external_write_permissions jsonb DEFAULT '{}',external_write_policy_version bigint DEFAULT 0);
+ await pool.query(`CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text DEFAULT 'allow',version bigint DEFAULT 0,external_write_permissions jsonb DEFAULT '{}',external_write_policy_version bigint DEFAULT 0);
  CREATE TABLE agent_kit_heads(owner_id text,bot_id uuid,workspace_id uuid,external_write_permissions jsonb DEFAULT '{}',external_write_policy_version bigint DEFAULT 0);
  CREATE TABLE pending_actions(id uuid PRIMARY KEY,"userId" text NOT NULL,action text NOT NULL,input jsonb NOT NULL,status text DEFAULT 'pending',"createdAt" timestamptz DEFAULT now(),"decidedAt" timestamptz,result jsonb,error text);
  CREATE TABLE credentials(id uuid PRIMARY KEY,user_id text,origin text,username text,unattended_allowed boolean,revoked_at timestamptz);
  CREATE TABLE credential_secrets(credential_id uuid PRIMARY KEY,nonce text);`)
  await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4)',[botId,actor.userId,actor.workspaceId,'Fixture'])
  await pool.query('INSERT INTO agent_kit_heads(owner_id,bot_id,workspace_id) VALUES($1,$2,$3)',[actor.userId,botId,actor.workspaceId])
- await pool.query('INSERT INTO workspace_computer_policies("workspaceId",permission) VALUES($1,$2)',[actor.workspaceId,'ask'])
+ await pool.query('INSERT INTO workspace_computer_policies("workspaceId") VALUES($1)',[actor.workspaceId])
  await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","sandboxId",state,"runtimeReady") VALUES($1,$2,$3,$4,$5,true)',[actor.workspaceId,actor.userId,randomUUID(),'isolated-test-machine','running'])
  await pool.query(`INSERT INTO bot_subagents(id,"ownerId","workspaceId","botId",task,status,epoch,"targetId") VALUES($1,$2,$3,$4,'Open details','running',1,'chromium-target')`,[subagentId,actor.userId,actor.workspaceId,botId])
  await pool.query('INSERT INTO credentials VALUES($1,$2,$3,$4,true,NULL)',[credentialId,actor.userId,target.origin,'saved-user'])
@@ -47,6 +48,12 @@ before(async()=>{
  mock.module('@/lib/subscription-runtime',{namedExports:{authorizeSubscriptionWorkspace:async(owner:string,workspace:string)=>{if(owner!==actor.userId || workspace!==actor.workspaceId)throw Error('not authorized')}}})
  mock.module('./runtime',{namedExports:{
   runtimeRequest:async(_sandbox:string,_row:unknown,_path:string,body:any)=>{
+   if(_path==='/action') {
+    const action=await stored(body.actionId)
+    assert.equal(action.status,'running')
+    assert.ok(action.input.mutation,'the private executor retains its mutation until completion')
+    executableInputs.set(body.actionId,action.input)
+   }
    if(mode==='stale')throw Error('observation_stale')
    if(mode==='unknown')throw Error('action_outcome_unknown')
    if(!receipt.has(body.actionId)){effects++;receipt.set(body.actionId,{accepted:true,actionId:body.actionId})}
@@ -65,36 +72,90 @@ before(async()=>{
 })
 beforeEach(async()=>{
  if(!enabled)return
- effects=0;mode='success';receipt=new Map();leaseCalls=0;submissions=0;loginMode='session_applied'
- await pool.query(`UPDATE bot_subagents SET status='running',needs=NULL,"activeActionId"=NULL,epoch=1,"targetId"='chromium-target';UPDATE pending_actions SET status='declined' WHERE status IN ('running','pending');UPDATE agent_kit_heads SET external_write_permissions='{}',external_write_policy_version=0;UPDATE workspace_computer_policies SET permission='ask',version=0,external_write_permissions='{}',external_write_policy_version=0;UPDATE credentials SET unattended_allowed=true,revoked_at=NULL;UPDATE credential_secrets SET nonce='secret-version-1'`)
+ effects=0;mode='success';receipt=new Map();executableInputs=new Map();leaseCalls=0;submissions=0;loginMode='session_applied'
+ await pool.query(`UPDATE bot_subagents SET status='running',needs=NULL,"activeActionId"=NULL,epoch=1,"targetId"='chromium-target';UPDATE pending_actions SET status='declined' WHERE status IN ('running','pending');UPDATE agent_kit_heads SET external_write_permissions='{}',external_write_policy_version=0;UPDATE workspace_computer_policies SET permission='allow',version=0,external_write_permissions='{}',external_write_policy_version=0;UPDATE credentials SET unattended_allowed=true,revoked_at=NULL;UPDATE credential_secrets SET nonce='secret-version-1'`)
 })
 after(async()=>{if(enabled){console.log(`Retained unattended DB schema: ${schema}`);globalThis.fetch=realFetch;await pool.end();await admin.end()}})
-async function propose(effect:'browse'|'write_external'|'payment'='browse') {return browserAction(pool,actor,botId,subagentId,{action:'click',x:20,y:40},'Open the requested control',observation(),judgment(effect))}
+async function propose(effect:BrowserEffect='browse') {return browserAction(pool,actor,botId,subagentId,{action:'click',x:20,y:40},'Open the requested control',observation(),judgment(effect))}
 async function stored(id:string){return (await pool.query('SELECT * FROM pending_actions WHERE id=$1',[id])).rows[0]}
 
 test('authorized browsing runs without a human decision and exact replay returns the stored receipt',{skip:!enabled},async()=>{
  const result=await propose();assert.equal(result.state,'running');assert.equal(effects,1)
  const record=await stored(result.actionId);assert.equal(record.status,'done');assert.equal(record.decidedAt,null)
- assert.deepEqual(await execute(pool,actor.userId,record.input,true),{data:{subagentId,accepted:true,replayed:true}});assert.equal(effects,1)
+ assert.equal(record.input.mutation,undefined,'done: executable mutation scrubbed');assert.equal(record.input.mutationScrubbed,true)
+ assert.deepEqual(await execute(pool,actor.userId,executableInputs.get(result.actionId),true),{data:{subagentId,accepted:true,replayed:true}})
+ assert.ok('error' in await execute(pool,actor.userId,record.input,true),'a scrubbed row can never execute again');assert.equal(effects,1)
 })
-test('ask waits, concurrent replay produces one effect, and unrelated targets cannot borrow that approval',{skip:!enabled},async()=>{
- const result=await propose('write_external');assert.equal(result.state,'needs_you');assert.equal(effects,0)
- const record=await stored(result.actionId)
- assert.ok('error' in await execute(pool,actor.userId,record.input,true));assert.equal((await stored(result.actionId)).status,'pending')
- await pool.query(`UPDATE pending_actions SET status='running',"decidedAt"=now() WHERE id=$1`,[result.actionId])
- const outcomes=await Promise.all(Array.from({length:10},()=>execute(pool,actor.userId,record.input,true)))
+test('#438 mutation lifecycle: kept only while executable; scrubbed on done, declined, failed and expired; never returned',{skip:!enabled},async()=>{
+ const asked=await propose('write_external');assert.equal(asked.state,'running');assert.ok(!('mutation' in asked),'proposer gets no mutation')
+ const original=executableInputs.get(asked.actionId)!
+ assert.deepEqual(original.mutation,{action:'click',x:20,y:40},'running: kept for the private executor')
+ const done=await stored(asked.actionId);assert.equal(done.status,'done');assert.equal(done.input.mutation,undefined)
+ // Replay uses the original private payload, never the scrubbed database row.
+ assert.deepEqual(await execute(pool,actor.userId,original,true),{data:{subagentId,accepted:true,replayed:true}});assert.equal(effects,1)
+ // Historical pending rows may still exist after deploy. Seed the old state
+ // explicitly; the current automatic path must never manufacture an approval.
+ const legacyPending=async()=>{
+  const next={version:original.version,actionId:randomUUID(),workspaceId:original.workspaceId,botId:original.botId,subagentId:original.subagentId,epoch:original.epoch,loaderId:original.loaderId,origin:original.origin,observationId:original.observationId,observedAt:Date.now(),mutation:{action:'click',x:20,y:40},summary:original.summary,effect:original.effect,policyRevision:original.policyRevision,judgment:{executionId:original.judgment.executionId,requestDigest:original.judgment.requestDigest,imageDigest:original.judgment.imageDigest}}
+  const input={...next,digest:createHash('sha256').update(JSON.stringify([actor.userId,next])).digest('hex')}
+  await pool.query(`INSERT INTO pending_actions(id,"userId",action,input,status) VALUES($1,$2,'browser_operation',$3,'pending')`,[input.actionId,actor.userId,input])
+  await pool.query(`UPDATE bot_subagents SET status='needs_you',needs=$1,"activeActionId"=$2 WHERE id=$3`,[{kind:'approval',actionId:input.actionId},input.actionId,subagentId])
+  return input
+ }
+ const dRaw=await legacyPending()
+ await pool.query(`UPDATE pending_actions SET status='declined',"decidedAt"=now() WHERE id=$1`,[dRaw.actionId])
+ assert.deepEqual(await execute(pool,actor.userId,dRaw,false),{data:{declined:true}})
+ const declined=await stored(dRaw.actionId);assert.equal(declined.input.mutation,undefined);assert.equal(declined.input.summary,'Open the requested control');assert.equal(declined.input.digest,dRaw.digest)
+ // failed (stale)
+ mode='stale';await assert.rejects(propose(),/browserActionExpired/);mode='success'
+ const failed=(await pool.query(`SELECT input,status FROM pending_actions WHERE status='failed' ORDER BY "createdAt" DESC LIMIT 1`)).rows[0]
+ assert.equal(failed.input.mutation,undefined)
+ // expired: an undecided action older than 5 minutes is failed and scrubbed by the next proposal's sweep
+ const e=await legacyPending();await pool.query(`UPDATE pending_actions SET "createdAt"=now()-interval '6 minutes' WHERE id=$1`,[e.actionId])
+ await pool.query(`UPDATE bot_subagents SET status='running',needs=NULL,"activeActionId"=NULL`)
+ await propose()
+ const expired=await stored(e.actionId);assert.equal(expired.status,'failed');assert.equal(expired.error,'browserActionExpired');assert.equal(expired.input.mutation,undefined)
+ const left=await pool.query(`SELECT id FROM pending_actions WHERE input ? 'mutation' AND status IN ('done','declined','failed')`)
+ assert.equal(left.rowCount,0,'no terminal row keeps a mutation')
+ // list endpoint and audit event expose summary-level fields only; errors are fixed codes
+ const src=await readFile(new URL('../pending-actions.ts',import.meta.url),'utf8'),list=await readFile(new URL('../pending-action-store.ts',import.meta.url),'utf8')
+ assert.match(src,/row\.action === 'credential_operation' \|\| row\.action === 'browser_operation' \? \{ summary/)
+ assert.match(list,/input: \{ summary: row\.input\.summary, origin: row\.input\.origin, operation: row\.input\.operation/)
+})
+test('default allow: with no workspace policy row every effect, payment and sending included, runs with no human approval',{skip:!enabled},async()=>{
+ await pool.query('DELETE FROM workspace_computer_policies')
+ try {
+  for(const effect of browserEffects) {
+   const result=await propose(effect)
+   assert.equal(result.state,'running',effect)
+   const record=await stored(result.actionId)
+   assert.equal(record.status,'done',effect);assert.equal(record.decidedAt,null,effect)
+   const row=(await pool.query('SELECT status,needs,"activeActionId" FROM bot_subagents WHERE id=$1',[subagentId])).rows[0]
+   assert.deepEqual(row,{status:'running',needs:null,activeActionId:null},effect)
+  }
+  assert.equal(effects,browserEffects.length)
+  assert.equal((await pool.query(`SELECT 1 FROM pending_actions WHERE action='browser_operation' AND status='pending'`)).rowCount,0)
+ } finally {await pool.query('INSERT INTO workspace_computer_policies("workspaceId") VALUES($1)',[actor.workspaceId])}
+})
+test('a legacy stored ask is not a human gate; concurrent replay produces one effect and other owners or payloads cannot reuse it',{skip:!enabled},async()=>{
+ await pool.query(`UPDATE workspace_computer_policies SET permission='ask'`)
+ const result=await propose('write_external');assert.equal(result.state,'running');assert.equal(effects,1)
+ const record=await stored(result.actionId);assert.equal(record.decidedAt,null);assert.equal(record.input.mutation,undefined)
+ const original=executableInputs.get(result.actionId)!
+ const outcomes=await Promise.all(Array.from({length:10},()=>execute(pool,actor.userId,original,true)))
  assert.ok(outcomes.every(result=>'data' in result));assert.equal(effects,1)
- assert.ok('error' in await execute(pool,'bob',record.input,true));assert.equal(effects,1)
- assert.ok('error' in await execute(pool,actor.userId,{...record.input,mutation:{action:'click',x:999,y:999}},true));assert.equal(effects,1)
+ assert.ok('error' in await execute(pool,'bob',original,true));assert.equal(effects,1)
+ assert.ok('error' in await execute(pool,actor.userId,{...original,mutation:{action:'click',x:999,y:999}},true));assert.equal(effects,1)
 })
-test('deny wins over agent allow, including revocation after a pending decision',{skip:!enabled},async()=>{
+test('deny blocks: an explicit effect deny wins over agent allow, and a workspace computer deny blocks every effect',{skip:!enabled},async()=>{
  await pool.query(`UPDATE agent_kit_heads SET external_write_permissions='{"browser_payment":"allow"}'`)
  await pool.query(`UPDATE workspace_computer_policies SET external_write_permissions='{"browser_payment":"deny"}'`)
- await assert.rejects(propose('payment'));assert.equal(effects,0)
- const result=await propose('write_external'),record=await stored(result.actionId)
- await pool.query(`UPDATE pending_actions SET status='running',"decidedAt"=now() WHERE id=$1`,[result.actionId])
- await pool.query(`UPDATE workspace_computer_policies SET permission='deny',version=version+1`)
- assert.ok('error' in await execute(pool,actor.userId,record.input,true));assert.equal(effects,0)
+ await assert.rejects(propose('payment'),/Browser action denied/);assert.equal(effects,0)
+ assert.equal((await propose('write_external')).state,'running');assert.equal(effects,1)
+ await pool.query(`UPDATE workspace_computer_policies SET permission='deny',version=version+1,external_write_permissions='{}'`)
+ for(const effect of browserEffects) await assert.rejects(propose(effect),/Browser action denied/)
+ assert.equal(effects,1)
+ assert.equal((await pool.query(`SELECT 1 FROM pending_actions WHERE status='pending'`)).rowCount,0)
 })
 test('stale observations resume observation, unknown outcomes are not silently retried',{skip:!enabled},async()=>{
  mode='stale';await assert.rejects(propose(),/browserActionExpired/)

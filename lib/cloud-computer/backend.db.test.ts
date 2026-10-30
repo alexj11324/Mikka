@@ -155,7 +155,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     // a denied workspace or another owner never reaches the provider.
     const desktopCalls: string[] = []
     const desktopRuntime = {
-      async connectComputer(id: string) { desktopCalls.push(`connect ${id}`); return { sandboxId: id } },
+      async connectComputer(_workspaceId: string, id: string) { desktopCalls.push(`connect ${id}`); return { sandboxId: id } },
       async startDesktop(_sandbox: unknown, display: number) { assert.equal(display, 1); desktopCalls.push('start') },
       async syncDesktopLease(_sandbox: unknown, lease: { botId: string; ownerId: string; policyVersion: number; computerAllowed: boolean }) {
         assert.equal(lease.botId, botA); assert.equal(lease.ownerId, alice.userId)
@@ -165,7 +165,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
       async runtimeRequest() { return { targetId: 'thread-page' } },
       async viewerGrant() { desktopCalls.push('viewer'); return { url: 'wss://synthetic.invalid', expiresAt: new Date(Date.now() + 1000).toISOString() } },
     } as unknown as Parameters<typeof openThreadDesktop>[3]
-    await pool.query(`INSERT INTO workspace_computer_policies VALUES ($1,'ask',17)`, [alice.workspaceId])
+    await pool.query(`INSERT INTO workspace_computer_policies VALUES ($1,'allow',17)`, [alice.workspaceId])
     assert.equal((await openThreadDesktop(pool, alice, runA, desktopRuntime)).runId, runA)
     assert.deepEqual(desktopCalls, [`connect sandbox-${runA}`, 'start', 'lease', 'gateway', 'viewer'])
     assert.equal((await pool.query('SELECT "targetId" FROM thread_machines WHERE "runId"=$1', [runA])).rows[0].targetId, 'thread-page')

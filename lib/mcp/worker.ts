@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import { agentRuns, runTokens } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runBlockedEvent, runQuestionEvent, runReportEvent, type CoordinatorEventInput } from '@/lib/coordinator-events'
+import { maskForRun } from '@/lib/secrets/runtime'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 
 // The worker side of the MCP server: the agent inside a run reports progress,
@@ -75,17 +76,18 @@ async function deliver(event: CoordinatorEventInput): Promise<void> {
   after(() => wakeCoordinator(event.userId))
 }
 
+// 4e2 item 4: report/ask/blocked text is agent output persisted as coordinator events; masked with the run's secret set.
 export async function report(run: ReturnType<typeof workerRun>, text: string) {
-  await deliver(runReportEvent(run, text))
+  await deliver(runReportEvent(run, await maskForRun(run.id, text)))
   return 'Reported.'
 }
 
 export async function ask(run: ReturnType<typeof workerRun>, question: { question: string; options?: string[]; context?: string }) {
-  await deliver(runQuestionEvent(run, question))
+  await deliver(runQuestionEvent(run, await maskForRun(run.id, question)))
   return 'Asked. The answer will come as a follow-up instruction.'
 }
 
 export async function blocked(run: ReturnType<typeof workerRun>, reason: string) {
-  await deliver(runBlockedEvent(run, reason))
+  await deliver(runBlockedEvent(run, await maskForRun(run.id, reason)))
   return 'Noted. The Coordinator will tell the person.'
 }
