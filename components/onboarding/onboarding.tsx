@@ -279,8 +279,9 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
     onDone(bot)
   }
 
-  const avatarScale = stage === 'chat' ? 1 : 2
-  const avatarY = stage === 'chat' ? 0 : '24vh'
+  // The Bot is 144px on the intro and welcome pages and 96px in the conversation.
+  const avatarPx = stage === 'chat' ? 96 : 144
+  const travel = { duration: reduce ? 0 : PACE.travel / 1000, ease: EASE_OUT }
   return <div role="dialog" aria-modal="true" aria-label={t('title')} className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background">
     {/* The light deepens a step at a time as the guide goes on. */}
     <motion.div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-radial from-muted via-background to-background"
@@ -288,32 +289,32 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
     <div className="relative flex justify-end p-4">
       {card !== 'welcome' && <Button variant="ghost" size="sm" disabled={busy && closing.current} onClick={() => { void close() }}>{t('skip')}</Button>}
     </div>
-    <div className="relative mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-6 px-4 pb-6">
-      <motion.div className="flex shrink-0 flex-col items-center gap-2" initial={false} animate={{ y: avatarY }} transition={{ duration: reduce ? 0 : PACE.travel / 1000, ease: EASE_OUT }}>
-        <motion.div className="origin-top" initial={{ opacity: 0, scale: avatarScale * 0.6 }} animate={{ opacity: 1, scale: avatarScale }} transition={{ duration: reduce ? 0 : PACE.travel / 1000, ease: EASE_OUT }}>
-          <div ref={body}><BotAvatar color={color} shape={shape} size="profile" mood={mood} brisk label={bot?.name ?? t('botLabel')} /></div>
+    {/* The Bot, the conversation and the current card sit together in the middle; a long conversation pushes the Bot up and then scrolls. */}
+    <div className="relative mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col justify-center gap-8 px-4 pb-16">
+      <motion.div layout={reduce ? false : 'position'} transition={travel} className="flex shrink-0 flex-col items-center gap-2">
+        <motion.div className="flex items-center justify-center" initial={false} animate={{ height: avatarPx }} transition={travel}>
+          <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: avatarPx / 144 }} transition={travel}>
+            <div ref={body}><BotAvatar color={color} shape={shape} size="hero" mood={mood} brisk label={bot?.name ?? t('botLabel')} /></div>
+          </motion.div>
         </motion.div>
         <AnimatePresence>
           {stage === 'chat' && bot && <motion.p key="name" className="text-sm font-medium" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduce ? 0 : 0.25 }}>{bot.name}</motion.p>}
         </AnimatePresence>
       </motion.div>
 
-      {/* The conversation sits at the bottom and grows upwards, like a chat. */}
-      <motion.div ref={thread} aria-live="polite" className="flex min-h-0 flex-1 flex-col overflow-y-auto" animate={{ opacity: stage === 'welcome' ? 0 : 1 }} transition={{ duration: reduce ? 0 : 0.44 }}>
-        <div className="mt-auto flex flex-col gap-4">
-          <AnimatePresence initial={false}>
-            {stage !== 'welcome' && lines.map(line => line.from === 'bot'
-              ? <motion.p key={line.id} className="text-base" initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduce ? 0 : PACE.rise / 1000, ease: EASE_OUT }}>{line.text}</motion.p>
-              : <motion.div key={line.id} className="flex justify-end" initial={{ opacity: 0, y: reduce ? 0 : 40, scale: reduce ? 1 : 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={reduce ? { duration: 0 } : BUBBLE_SPRING}>
-                <Bubble variant="secondary" align="end" className="max-w-[80%] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground"><BubbleContent className="rounded-2xl px-4 py-3">{line.text}</BubbleContent></Bubble>
-              </motion.div>)}
-          </AnimatePresence>
-        </div>
-      </motion.div>
+      {stage !== 'welcome' && lines.length > 0 && <div ref={thread} aria-live="polite" className="flex min-h-0 flex-col gap-4 overflow-y-auto">
+        <AnimatePresence initial={false}>
+          {lines.map(line => line.from === 'bot'
+            ? <motion.p key={line.id} className="text-base" initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduce ? 0 : PACE.rise / 1000, ease: EASE_OUT }}>{line.text}</motion.p>
+            : <motion.div key={line.id} className="flex justify-end" initial={{ opacity: 0, y: reduce ? 0 : 40, scale: reduce ? 1 : 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={reduce ? { duration: 0 } : BUBBLE_SPRING}>
+              <Bubble variant="secondary" align="end" className="max-w-[80%] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground"><BubbleContent className="rounded-2xl px-4 py-3">{line.text}</BubbleContent></Bubble>
+            </motion.div>)}
+        </AnimatePresence>
+      </div>}
 
       <AnimatePresence mode="wait">
-        {card && <motion.div key={card} className="shrink-0" initial={{ opacity: 0, y: reduce ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.15 } }} transition={{ duration: reduce ? 0 : 0.25, ease: EASE_OUT }}>
-          {card === 'intro' && <div className="flex flex-col items-center gap-6 pb-40">
+        {card && <motion.div key={card} layout={reduce ? false : 'position'} className="shrink-0" initial={{ opacity: 0, y: reduce ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.15 } }} transition={{ duration: reduce ? 0 : 0.25, ease: EASE_OUT }}>
+          {card === 'intro' && <div className="flex flex-col items-center gap-6">
             <h1 className="text-xl font-semibold">{t('title')}</h1>
             <Button size="lg" autoFocus onClick={() => { void begin() }}>{t('start')}</Button>
           </div>}
@@ -370,7 +371,7 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
             </div>
           </div>}
 
-          {card === 'welcome' && <div className="flex flex-col items-center gap-6 pb-40 text-center">
+          {card === 'welcome' && <div className="flex flex-col items-center gap-6 text-center">
             <div className="flex flex-col gap-1">
               <h1 className="text-xl font-semibold">{bot?.name ?? t('title')}</h1>
               {bot && <p className="text-sm text-muted-foreground">{t('welcome')}</p>}
