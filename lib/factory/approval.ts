@@ -886,6 +886,13 @@ export function createFactoryApprovals(
             },
           };
         }
+        // complete() records this eventId in factory_events only after the provider effect.
+        // An eventId that row already holds would fail there, after a deployment was made.
+        const { rowCount: used } = await tx.query(
+          'SELECT 1 FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',
+          [task.id, req.eventId],
+        );
+        if (used) fail("factoryReplayMismatch");
         fence(task, req.binding);
         if (task.stage !== "publish" || task.status !== "pending")
           fail("factoryTransition");
