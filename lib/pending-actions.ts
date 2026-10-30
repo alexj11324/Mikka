@@ -68,6 +68,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
 
   if ((row.action === 'browser_operation' || row.action === 'credential_operation') && Date.now() - row.createdAt.getTime() > 5 * 60_000) {
     await db.update(pendingActions).set({ status: 'failed', error: 'browserActionExpired' }).where(eq(pendingActions.id, row.id))
+    if (row.action === 'browser_operation') await (await import('@/lib/cloud-computer/action-reviews')).scrubBrowserMutation(pool, row.id)
     throw new ActionFailureError('pendingActionUnavailable')
   }
   let status: 'done' | 'failed' | 'declined' = 'declined'
@@ -90,7 +91,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     }
     await db.update(pendingActions).set({ status, error, result: outcome }).where(eq(pendingActions.id, row.id))
   }
-  await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }))
+  await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' || row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }))
   await wakeCoordinator(userId)
   return { status, error }
 }

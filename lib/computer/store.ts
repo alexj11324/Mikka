@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from 'pg'
 import type { ComputerState } from '@mikka/protocol/computer'
 import * as provider from './e2b-provider'
 import { ensureCloudMachine } from './provision'
+import { computerPermission, type ComputerPermission } from './permission'
 
 export class ComputerError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -24,25 +25,25 @@ export class ComputerStore {
   async listBots(actor: Actor) {
     return (await this.pool.query<Bot>('SELECT id,name,"workspaceId","ownerId" FROM bots WHERE "workspaceId"=$1 AND "ownerId"=$2 ORDER BY "createdAt"', [actor.workspaceId, actor.userId])).rows
   }
-  async policy(workspaceId: string): Promise<'allow' | 'ask' | 'deny'> {
+  async policy(workspaceId: string): Promise<ComputerPermission> {
     const row = (await this.pool.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]
-    if (!row) return 'ask'
-    if (!['allow', 'ask', 'deny'].includes(row.permission)) throw new Error('Computer policy unavailable')
-    return row.permission
+    const permission = computerPermission(row?.permission)
+    if (!permission) throw new Error('Computer policy unavailable')
+    return permission
   }
   /** Caller must authorize an active workspace admin. Serializes policy
    * transitions with display wake/control and each actual driver call. */
-  async setPolicy(workspaceId: string, permission: 'allow' | 'ask' | 'deny') {
+  async setPolicy(workspaceId: string, permission: ComputerPermission) {
     const client = await this.pool.connect()
     const key = `computer-policy:${workspaceId}`
     try {
       await client.query('BEGIN')
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [key])
-      const previous = (await client.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]?.permission ?? 'ask'
+      const previous = computerPermission((await client.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]?.permission)
       const machines = (await client.query<Machine>('SELECT * FROM cloud_machines WHERE "workspaceId"=$1 ORDER BY "ownerId" FOR UPDATE', [workspaceId])).rows
       const desktops = (await client.query<Desktop>('SELECT * FROM bot_desktops WHERE "workspaceId"=$1 ORDER BY display FOR UPDATE', [workspaceId])).rows
       const policy = (await client.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version)
-        VALUES ($1,$2,CASE WHEN $2='ask' THEN 0 ELSE 1 END)
+        VALUES ($1,$2,CASE WHEN $2='allow' THEN 0 ELSE 1 END)
         ON CONFLICT ("workspaceId") DO UPDATE SET permission=$2,"updatedAt"=now(),
           version=CASE WHEN workspace_computer_policies.permission=$2 THEN workspace_computer_policies.version ELSE workspace_computer_policies.version+1 END
         RETURNING version`, [workspaceId, permission])).rows[0]
@@ -64,7 +65,7 @@ export class ComputerStore {
       const sync = async () => {
         for (const machine of machines) {
           if (!machine.sandboxId || !machine.runtimeReady) continue
-          const sandbox = await this.runtime.connectComputer(machine.sandboxId)
+          const sandbox = await this.runtime.connectComputer(workspaceId, machine.sandboxId)
           for (const desktop of desktops.filter(d => d.ownerId === machine.ownerId)) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
         }
         // Dedicated threads have their own driver lease. Updating only the
@@ -73,7 +74,7 @@ export class ComputerStore {
           JOIN bots b ON b.id=t."botId" AND b."workspaceId"=t."workspaceId" AND b."ownerId"=t."ownerId"
           WHERE t."workspaceId"=$1 AND t."sandboxId" IS NOT NULL AND t.state IN ('starting','running') ORDER BY t."runId"`, [workspaceId])).rows
         for (const thread of threads) {
-          const sandbox = await this.runtime.connectComputer(thread.sandboxId)
+          const sandbox = await this.runtime.connectComputer(workspaceId, thread.sandboxId)
           await this.runtime.syncDesktopLease(sandbox, { botId: thread.botId, ownerId: thread.ownerId, display: 1, epoch: thread.epoch, controlledBy: null, controlUntil: 0, computerAllowed: permission !== 'deny', policyVersion: policy.version })
         }
       }
@@ -99,7 +100,7 @@ export class ComputerStore {
     const { rows } = await this.pool.query('SELECT m.state AS machine,m."sandboxId",d.control,d."controlledBy",d."controlUntil",d."lastAction" FROM bot_desktops d JOIN cloud_machines m ON m."workspaceId"=d."workspaceId" AND m."ownerId"=d."ownerId" WHERE d."botId"=$1 AND d."ownerId"=$2', [botId, actor.userId])
     const row = rows[0]
     if (!row) return { machine: 'sleeping', control: 'idle' }
-    if (row.sandboxId && row.machine !== 'error') row.machine = await this.runtime.computerState(row.sandboxId)
+    if (row.sandboxId && row.machine !== 'error') row.machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId)
     const held = row.control === 'user' && new Date(row.controlUntil).getTime() > Date.now()
     const review = (await this.pool.query(`SELECT v.id,v.digest,v."runId",v.call,v."expiresAt"
       FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" AND r."userId"=v."userId" AND r."deviceId"=v."deviceId"

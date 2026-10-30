@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import type { ComputerStore } from './store'
+import { computerPermissions } from './permission'
 
 const headers = { 'cache-control': 'private, no-store' }
-const input = z.object({ permission: z.enum(['allow', 'ask', 'deny']) }).strict()
+const input = z.object({ permission: z.enum(computerPermissions) }).strict()
 
 export function createComputerPolicyHandler(deps: {
   enabled(): boolean

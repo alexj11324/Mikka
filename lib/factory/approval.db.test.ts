@@ -4,6 +4,7 @@ import test from "node:test";
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { factory194Target } from "../../tests/helpers/factory194-target";
 import { FactoryError } from "./approval-contract";
+import type { FactoryCaptureEvidence } from "./evidence";
 import { handleFactoryApproval } from "./approval-http";
 import {
   PublicationDeferred,
@@ -38,6 +39,50 @@ test(
     const f = await factory194Fixture(db!);
     try {
       const { actor, pool, provider } = f;
+      await t.test("run captures are display-only evidence behind the existing owner, issue and source fences", async () => {
+        const x = await f.prepare(actor, { capture: true }), service = f.service([f.adapter]);
+        const captureId = x.captureId!;
+        const read = await service.evidence(actor, x.task.id);
+        const entry = read.manifest.artifacts.find(a => "captureId" in a && a.captureId === captureId) as (FactoryCaptureEvidence & { artifact: string; kind: string; stage: string }) | undefined;
+        assert.ok(entry && "captureId" in entry);
+        assert.equal(entry.artifact, `run-capture:${captureId}`);
+        assert.equal(entry.kind, "screenshot");
+        assert.equal(entry.stage, "verify");
+        assert.equal(entry.contentType, "image/png");
+        assert.equal(entry.title, "Home");
+        assert.equal(entry.size, 3);
+        assert.equal(entry.durationMs, null);
+        assert.deepEqual(await service.capture(actor, x.task.id, captureId), { ownerId: actor.userId, captureId });
+        const rejectsCapture = (id = captureId) => rejects(() => service.capture(actor, x.task.id, id), "factoryArtifactMissing");
+        await rejectsCapture(randomUUID());
+        await rejects(() => service.capture({ userId: "someone-else", sessionId: actor.sessionId }, x.task.id, captureId), "factoryNotFound");
+        f.permission.allowed = false;
+        try { await rejects(() => service.capture(actor, x.task.id, captureId), "factoryNotFound"); }
+        finally { f.permission.allowed = true; }
+        f.source.allowed = false;
+        try { await rejects(() => service.capture(actor, x.task.id, captureId), "factoryNotFound"); }
+        finally { f.source.allowed = true; }
+        const captures = await pool.query('SELECT "runId" FROM run_captures WHERE id=$1', [captureId]);
+        await pool.query('UPDATE run_captures SET "userId"=$2 WHERE id=$1', [captureId, "someone-else"]);
+        await rejectsCapture();
+        await pool.query(`UPDATE run_captures SET "userId"=$2,kind='video' WHERE id=$1`, [captureId, actor.userId]);
+        await rejects(() => service.capture(actor, x.task.id, captureId), "factoryEvidenceMismatch");
+        await pool.query(`UPDATE run_captures SET kind='image',status='failed' WHERE id=$1`, [captureId]);
+        await rejectsCapture();
+        await pool.query(`UPDATE run_captures SET status='ready',"runId"=$2 WHERE id=$1`, [captureId, randomUUID()]);
+        await rejectsCapture();
+        await pool.query('UPDATE run_captures SET "runId"=$2,sha256=$3 WHERE id=$1', [captureId, captures.rows[0].runId, "f".repeat(64)]);
+        const changed = await service.evidence(actor, x.task.id);
+        assert.equal(changed.evidenceDigest, read.evidenceDigest);
+        assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_evidence_reads')).rows[0].n, 0);
+        const approved = await service.approve(actor, x.approval);
+        assert.ok(approved.approvalId);
+        assert.equal((await pool.query('SELECT "evidenceDigest" FROM factory_approvals WHERE id=$1', [approved.approvalId])).rows[0].evidenceDigest, null);
+        const sentBack = await f.prepare(actor, { capture: true });
+        const rejected = await service.reject(actor, { binding: sentBack.approval.binding, eventId: randomUUID(), candidateId: sentBack.approval.binding.candidateId!, failedEvidence: [`run-capture:${sentBack.captureId}`] });
+        assert.ok(rejected.rejectionId);
+        assert.equal((await service.ledger(actor, sentBack.task.id)).rejections[0].failedEvidenceCount, 1);
+      });
       await t.test(
         "a live browser session approves and publishes without any decision authority",
         async () => {

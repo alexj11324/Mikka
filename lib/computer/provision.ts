@@ -22,7 +22,7 @@ export async function ensureCloudMachine(pool:Pool,actor:Actor,runtime:Runtime=p
   } catch(error) {await client.query('ROLLBACK');throw error} finally {client.release()}
   if(!machine) throw new Error('Owned cloud machine unavailable')
   try {
-    const sandbox=machine.sandboxId?await runtime.connectComputer(machine.sandboxId):await runtime.createComputer(actor.workspaceId,machine.operationId)
+    const sandbox=machine.sandboxId?await runtime.connectComputer(actor.workspaceId,machine.sandboxId):await runtime.createComputer(actor.workspaceId,machine.operationId)
     // Record even an older attempt's idempotent allocation, but never replace a
     // different machine. A failed later step cannot erase an allocated resource.
     const recorded=await pool.query(`UPDATE cloud_machines SET "sandboxId"=$3 WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "operationId"=$4 AND ("sandboxId" IS NULL OR "sandboxId"=$3) RETURNING "provisionLeaseId"`,[actor.workspaceId,actor.userId,sandbox.sandboxId,machine.operationId])

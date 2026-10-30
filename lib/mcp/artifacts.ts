@@ -6,6 +6,7 @@ import { agentRuns, agents, oauthClients, type ArtifactKind } from '@/lib/db/sch
 import { submitArtifact, type ArtifactSubmitter } from '@/lib/artifacts/store'
 import { withBasePath } from '@/lib/base-path'
 import { runBotName } from '@/lib/run-bot-name'
+import { maskForRun } from '@/lib/secrets/runtime'
 
 // submit_artifact, the one way any harness hands a document or web page to
 // Mikka. From a run it is the run's artifact, by the run's agent; from an
@@ -27,7 +28,8 @@ export async function oauthSubmitter(userId: string, authInfo: AuthInfo | undefi
 }
 
 export async function submit(submitter: ArtifactSubmitter, input: SubmitInput) {
-  const result = await submitArtifact(submitter, input)
+  // 4e2 item 4: run artifacts (title + content) are masked with the run's secret set.
+  const result = await submitArtifact(submitter, submitter.runId ? { ...input, ...await maskForRun(submitter.runId, { title: input.title, content: input.content }) } : input)
   if ('error' in result) return result
   return { ...result, note: 'Handed over. The person sees it as a card in their chat. To change it, call submit_artifact again with this artifactId; that makes the next version.', path: withBasePath(`/api/artifacts/${result.artifactId}/versions/${result.version}/download`) }
 }

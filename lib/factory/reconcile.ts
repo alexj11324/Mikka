@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from "pg";
-import { FactoryError, type FactoryBinding } from "./contract";
+import { FactoryError, type FactoryBinding, type FactoryEvidence } from "./contract";
+import { runCaptureEvidence } from "./evidence";
 import { factoryEventId } from "./event-id";
 import type { FactoryTask, createFactoryStore } from "./store";
 import { MAX_RUN_ATTEMPTS } from "../run-retry";
@@ -288,6 +289,16 @@ export function createFactoryReconciler(
               );
               current = next.task;
             }
+            const report: FactoryEvidence = {
+              artifact: `run-report:${run.id}`,
+              kind: "report",
+              runId: run.id,
+              sessionId: run.sessionId,
+              candidateId: current.candidateId,
+              sha: task.stage === "execute" ? sha : null,
+              environment: `device:${run.deviceId}`,
+              recordedAt: (run.finishedAt ?? new Date()).toISOString(),
+            };
             const next = await store.apply(
               userId,
               binding(current),
@@ -296,18 +307,8 @@ export function createFactoryReconciler(
                 action: "finish",
                 status: "passed",
                 reason: "Persisted completed Harness run and artifact matched",
-                evidence: [
-                  {
-                    artifact: `run-report:${run.id}`,
-                    kind: "report",
-                    runId: run.id,
-                    sessionId: run.sessionId,
-                    candidateId: current.candidateId,
-                    sha: task.stage === "execute" ? sha : null,
-                    environment: `device:${run.deviceId}`,
-                    recordedAt: (run.finishedAt ?? new Date()).toISOString(),
-                  },
-                ],
+                // The report, then the screenshots and recordings the run took.
+                evidence: [report, ...(await runCaptureEvidence(tx, { id: run.id, userId }, report))],
                 output: { runId: run.id },
               },
               tx,

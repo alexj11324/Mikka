@@ -714,15 +714,26 @@ test(
         async () => {
           const r = await pendingReview(),
             review = await start(r.task);
+          const shot = randomUUID(), clip = randomUUID();
+          const capture = (id: string, runId: string, kind: "image" | "video") => db.query(
+            `INSERT INTO run_captures (id,"userId","runId",kind,"contentType",source,status,title,size,sha256,"storageKey") VALUES ($1,'owner',$2,$3,$4,'local','ready','Independent check capture',3,$5,$6)`,
+            [id, runId, kind, kind === "image" ? "image/png" : "video/mp4", "c".repeat(64), `owner/captures/${id}`],
+          );
           await terminal(review.runId, `review-${r.task.id}`);
+          await capture(shot, review.runId, "image");
           await reconcile("owner");
           const verify = await start((await state(r.task.id)).task);
           await terminal(verify.runId, `verify-${r.task.id}`);
+          await capture(clip, verify.runId, "video");
           await toolChunks(verify.runId);
           await reconcile("owner");
           const done = await state(r.task.id);
           assert.equal(done.task.stage, "approval");
           assert.equal(done.task.status, "pending");
+          for (const [stage, captureId, kind] of [["review", shot, "screenshot"], ["verify", clip, "video"]]) {
+            const refs = done.attempts.find(a => a.stage === stage)!.evidence as { artifact: string; kind: string }[];
+            assert.deepEqual(refs.filter(e => e.artifact.startsWith("run-capture:")).map(e => [e.artifact, e.kind]), [[`run-capture:${captureId}`, kind]]);
+          }
           const evidence = done.attempts.find((a) => a.stage === "verify")!
             .evidence as any[];
           assert.equal(
