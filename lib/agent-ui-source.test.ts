@@ -61,3 +61,17 @@ test('leading whitespace before a component call is fine', () => {
 test('root = may follow leading lines, as before', () => {
   assert.equal(detectAgentUISource('\n\nroot = Stack([])').isOpenUI, true)
 })
+
+test('root = in code fences or prose is not OpenUI', () => {
+  for (const source of [
+    'Here is the fix:\n\n```python\nroot = Path(__file__).parent\n```\n',
+    'Try:\n```js\nconst x = 1\nroot = document.getElementById("app")\n```',
+    'Set the variable like this:\nroot = /var/www',
+    '~~~\nroot = Stack([])\n~~~',
+  ]) assert.equal(detectAgentUISource(source).isOpenUI, false, source)
+})
+
+test('root = Component(…) after a fence is still OpenUI', () => {
+  assert.equal(detectAgentUISource('```\nx\n```\nroot = Stack([TextContent("hi")])').isOpenUI, true)
+  assert.equal(detectAgentUISource('root =Stack([])').isOpenUI, true)
+})

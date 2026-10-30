@@ -6,8 +6,17 @@ const TOP_LEVEL_COMPONENTS = [
   'ShadcnProgress', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame',
 ]
 
-/** `root = …`, where the prompt asks the model to put it (it may follow leading lines). */
-const ROOT_ASSIGNMENT = /(?:^|\n)\s*root\s*=/
+/**
+ * `root = Component(…)`, where the prompt asks the model to put it (it may
+ * follow leading lines). It must assign a known component call, so code such
+ * as `root = Path(__file__)` or prose like `root = /var/www` stays Markdown.
+ */
+const ROOT_ASSIGNMENT = new RegExp(`(?:^|\\n)[ \\t]*root[ \\t]*=[ \\t]*(?:${TOP_LEVEL_COMPONENTS.join('|')})[ \\t]*\\(`)
+
+/** Drops fenced code blocks so a `root =` inside them is not read as OpenUI. */
+function withoutFences(source: string): string {
+  return source.replace(/(^|\n)[ \t]*(```|~~~)[^\n]*\n[\s\S]*?(?:\n[ \t]*\2[^\n]*(?=\n|$)|$)/g, '$1')
+}
 
 /**
  * A call at the very start, e.g. `Stack([…])`: a known component name, then
@@ -24,7 +33,7 @@ const TOP_LEVEL_CALL = new RegExp(`^\\s*(?:${TOP_LEVEL_COMPONENTS.join('|')})\\s
  * normaliser, and prose that only names a component stays Markdown.
  */
 export function detectAgentUISource(source: string): { isOpenUI: boolean; source: string } {
-  if (ROOT_ASSIGNMENT.test(source)) return { isOpenUI: true, source: normalizeAgentUISource(source) }
+  if (ROOT_ASSIGNMENT.test(withoutFences(source))) return { isOpenUI: true, source: normalizeAgentUISource(source) }
   if (TOP_LEVEL_CALL.test(source)) return { isOpenUI: true, source: normalizeAgentUISource(`root = ${source.trimStart()}`) }
   return { isOpenUI: false, source }
 }
