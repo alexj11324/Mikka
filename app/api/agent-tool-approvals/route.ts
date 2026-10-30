@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { AgentToolApprovalStore } from '@/lib/agent-tool-approval/store'
 

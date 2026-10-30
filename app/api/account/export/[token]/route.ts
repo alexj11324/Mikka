@@ -1,4 +1,4 @@
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { buildAccountExport, claimExport } from '@/lib/account/export'
 
 export const dynamic = 'force-dynamic'

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { listPendingActions } from '@/lib/pending-action-store'
 
 // A plain GET, not a server action: the card list polls, and polling through

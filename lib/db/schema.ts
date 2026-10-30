@@ -377,7 +377,7 @@ export const runPublications = pgTable('run_publications', {
   status: text('status').$type<'assigned' | 'pending' | 'processing' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
   workflowRunId: text('workflowRunId'), leaseToken: uuid('leaseToken'), leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   attempts: integer('attempts').notNull().default(0),
-  pullRequest: jsonb('pullRequest').$type<{ url: string; state: 'open' | 'draft' | 'merged' | 'closed' } | null>(),
+  pullRequest: jsonb('pullRequest').$type<{ url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed' } | null>(),
   errorCode: text('errorCode'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
@@ -924,6 +924,7 @@ export const factoryTasks = pgTable('factory_tasks', {
 }, table => [unique('factory_tasks_source_key').on(table.userId, table.issueId, table.sourceEventId), index('factory_tasks_owner_issue_idx').on(table.userId, table.issueId, table.updatedAt)])
 
 export const factoryCandidates = pgTable('factory_candidates', {
+  previewDatabaseBranch: text('previewDatabaseBranch'), machineName: text('machineName'),
   id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
   sha: text('sha').notNull(), repository: text('repository').notNull(), environment: text('environment').notNull(), scope: text('scope').notNull(),
   runId: uuid('runId').notNull(),

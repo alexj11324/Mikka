@@ -13,3 +13,8 @@ export async function onboardingDone(userId: string) {
 export async function finishOnboarding(userId: string) {
   await db.insert(userOnboarding).values({ userId }).onConflictDoNothing()
 }
+
+/** Replays only this person's guide. */
+export async function resetOnboardingForUser(userId: string) {
+  await db.delete(userOnboarding).where(eq(userOnboarding.userId, userId))
+}

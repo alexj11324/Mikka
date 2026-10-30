@@ -70,7 +70,7 @@ export async function configureFactoryCheck(
     task.stage === "review"
       ? "Review the fixed candidate for correctness and regressions. Record each material finding as a failed criterion; explicitly pass a criterion only with concrete evidence."
       : "Independently exercise the acceptance criteria against this fixed candidate using real commands and observations. Record every criterion with its evidence. Code inspection alone is not verification.",
-    `Do not change files or git state. For verification, execute the frozen command exactly: ${row.verifyCommand}. Include its real observations in your criteria; inspection alone cannot pass. Submit your criteria and evidence. The daemon separately executes the frozen verify command; your self-report cannot replace it.`,
+    `Do not change files or git state. For verification, execute the frozen command exactly: ${row.verifyCommand}. Include its real observations in your criteria; inspection alone cannot pass. Submit your criteria and evidence, including the exact command and observed exitCode for each criterion you checked. The daemon separately executes the frozen verify command; your self-report cannot replace it.`,
     "\nOriginal issue and standing instructions:\n",
   ].join("\n");
   await tx.query(

@@ -43,7 +43,7 @@ export async function boundedJSON(request: Request): Promise<unknown> {
 export function createAgentDefinitionHandler(deps: {
   enabled:() => boolean
   authenticate:(request:Request) => Promise<string | null>
-  scope:(ownerId:string,botId:string | null) => Promise<AgentScope>
+  scope:(ownerId:string,botId:string | null,request:Request) => Promise<AgentScope>
   store:AgentKitStore
   writePolicy?: { enabled: () => boolean; settings: ReturnType<typeof createWritePolicySettings> }
   defaults:AgentDefinition
@@ -58,7 +58,7 @@ export function createAgentDefinitionHandler(deps: {
       if (!ownerId) return response({ error:'authRequired' },401)
       const parsedId=scopeId.safeParse(botId)
       if (!parsedId.success) return response({ error:'agentScopeNotFound' },404)
-      const scope=await deps.scope(ownerId,botId==='coordinator' ? null : botId)
+      const scope=await deps.scope(ownerId,botId==='coordinator' ? null : botId,request)
       if (request.method==='GET') {
         const url=new URL(request.url)
         const view=url.searchParams.get('view') ?? 'active'

@@ -141,6 +141,8 @@ export const runReport = z.object({
     sha: z.string().regex(/^[a-f0-9]{40}$/),
     readOnly: z.literal(true),
   }).optional(),
+  /** Preview branch created or used by the producing run; descriptive metadata only. */
+  previewDatabaseBranch: z.string().trim().min(1).max(500).optional(),
   /** Acceptance criteria the agent checked, with evidence. */
   criteria: z
     .array(
@@ -149,6 +151,9 @@ export const runReport = z.object({
         text: z.string().max(2_000).optional(),
         passed: z.boolean(),
         evidence: z.string().max(10_000).optional(),
+        /** Agent-reported criterion check; the daemon-owned verify remains authoritative. */
+        command: z.string().trim().min(1).max(2_000).optional(),
+        exitCode: z.number().int().nullable().optional(),
       }),
     )
     .max(200)
