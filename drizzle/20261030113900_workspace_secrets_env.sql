@@ -3,7 +3,7 @@
 -- (plan 1.3.1). Values are AES-256-GCM ciphertext under WORKSPACE_SECRETS_KEY;
 -- plaintext is never stored. "workspaceId" has no FK: workspaces live in the
 -- workspace database (DATABASE_URL). Mirrors lib/db/secrets-schema.ts.
--- Rollback: drop table workspace_e2b_verify_attempts, workspace_e2b_keys, workspace_network_policy, workspace_secrets;
+-- Rollback: drop table workspace_e2b_verify_attempts, workspace_e2b_keys, workspace_secrets;
 --           delete from schema_migrations where name = '20261030113900_workspace_secrets_env.sql';
 
 create table workspace_secrets (
@@ -28,15 +28,6 @@ create table workspace_secrets (
         and "scopeRef" !~ '(^|/)\.{1,2}(/|$)'))
 );
 create unique index workspace_secrets_name_key on workspace_secrets ("workspaceId", "scopeType", "scopeRef", name);
-
--- Outbound network (SEC-18/19): exactly one of open | allowlist | none.
-create table workspace_network_policy (
-  "workspaceId" uuid primary key,
-  mode text not null default 'open' check (mode in ('open', 'allowlist', 'none')),
-  "allowedDomains" text[] not null default '{}' check (cardinality("allowedDomains") <= 200),
-  "updatedBy" text not null,
-  "updatedAt" timestamptz not null default now()
-);
 
 -- One E2B API key per workspace. Write-only: only last4 / verifiedAt are ever shown.
 create table workspace_e2b_keys (

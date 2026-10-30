@@ -8,7 +8,7 @@ export type WorkspaceRole = 'admin' | 'member'
 export interface SecretTarget { scopeType: SecretScopeType }
 export type SecretAction =
   | 'secret.list' | 'secret.create' | 'secret.replace' | 'secret.delete'
-  | 'e2b.status' | 'e2b.write' | 'network.read' | 'network.write'
+  | 'e2b.status' | 'e2b.write'
 
 export const SECRET_POLICY = {
   /** Default 1+2 (7.12): "workspace-shared" means scopeType 'workspace', for secret and env alike; members can't write it. */
@@ -19,8 +19,6 @@ export const SECRET_POLICY = {
   memberMayDelete: false,
   /** Members see the E2B card status (configured + last error only). */
   memberMayViewE2BStatus: true,
-  /** Egress policy is admin only, read and write. */
-  memberMayReadNetwork: false,
 } as const
 
 /** Can a member write a row with this scope? (No environment dimension: a value reaches every run of its scope.) */
@@ -40,7 +38,5 @@ export function secretActionAllowed(role: WorkspaceRole, action: SecretAction, t
     case 'secret.delete': return SECRET_POLICY.memberMayDelete
     case 'e2b.status': return SECRET_POLICY.memberMayViewE2BStatus
     case 'e2b.write': return false
-    case 'network.read': return SECRET_POLICY.memberMayReadNetwork
-    case 'network.write': return false
   }
 }

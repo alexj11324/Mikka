@@ -3,7 +3,6 @@ import { bigserial, index, integer, pgTable, text, timestamp, uniqueIndex, uuid 
 
 export const WORKSPACE_SECRET_KINDS = ['secret', 'env'] as const
 export const WORKSPACE_SECRET_SCOPES = ['workspace', 'repository'] as const
-export const EGRESS_MODES = ['open', 'allowlist', 'none'] as const
 export const E2B_KEY_ERROR_CODES = ['invalid', 'rate_limited', 'template_unavailable', 'unavailable'] as const
 
 export const workspaceSecrets = pgTable('workspace_secrets', {
@@ -22,14 +21,6 @@ export const workspaceSecrets = pgTable('workspace_secrets', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('workspace_secrets_name_key').on(table.workspaceId, table.scopeType, table.scopeRef, table.name)])
-
-export const workspaceNetworkPolicy = pgTable('workspace_network_policy', {
-  workspaceId: uuid('workspaceId').primaryKey(),
-  mode: text('mode').$type<(typeof EGRESS_MODES)[number]>().notNull().default('open'),
-  allowedDomains: text('allowedDomains').array().notNull().default([]),
-  updatedBy: text('updatedBy').notNull(),
-  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-})
 
 /** One row per BYO key verify attempt; see takeVerifyAttempt. */
 export const workspaceE2bVerifyAttempts = pgTable('workspace_e2b_verify_attempts', {

@@ -1,24 +1,24 @@
 import 'server-only'
-// 设置 › 密钥与环境: storage for workspace secrets / env vars and the outbound network policy.
+// 设置 › 密钥与环境: storage for workspace secrets / env vars.
 // Rules: no value (secret or env) ever leaves this module; list/create/replace/delete return metadata only. Every write runs in one
 // MIKKA-DB transaction and calls the audit hook inside it, so #432's recordAudit(tx, …) slots in
 // and an audit failure rolls the write back. targetLabel is always the NAME, never the value.
 import { and, asc, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { workspaceNetworkPolicy, workspaceSecrets } from '@/lib/db/secrets-schema'
+import { workspaceSecrets } from '@/lib/db/secrets-schema'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { sealSecret, secretAad, SecretsKeyMissingError } from './crypto'
 import { secretActionAllowed, type SecretAction, type SecretTarget, type WorkspaceRole } from './permissions'
-import { isReservedEnvName, checkEgressDomains, createSecretInput, deleteSecretInput, replaceSecretInput, scopeColumns, updateEgressInput, EGRESS_DOMAINS_MAX, WORKSPACE_SECRETS_LIMIT } from './format'
+import { isReservedEnvName, createSecretInput, deleteSecretInput, replaceSecretInput, scopeColumns, WORKSPACE_SECRETS_LIMIT } from './format'
 
 export type SecretsTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
-export type SecretAuditAction = 'secret.created' | 'secret.replaced' | 'secret.deleted' | 'env.created' | 'env.updated' | 'env.deleted' | 'network.updated' | 'secret.replace_denied' | 'secret.injection_skipped'
+export type SecretAuditAction = 'secret.created' | 'secret.replaced' | 'secret.deleted' | 'env.created' | 'env.updated' | 'env.deleted' | 'secret.replace_denied' | 'secret.injection_skipped'
 export interface SecretAuditEvent {
   workspaceId: string
   actorId: string
   action: SecretAuditAction
-  target: { type: 'secret' | 'env' | 'network_policy' | 'e2b_key'; id: string; label: string }
+  target: { type: 'secret' | 'env' | 'e2b_key'; id: string; label: string }
   metadata?: Record<string, string | number | boolean | string[]>
 }
 /** Called inside the write transaction. Throwing rolls the write back. */
@@ -27,7 +27,7 @@ export type SecretAuditHook = (tx: SecretsTx, event: SecretAuditEvent) => Promis
 // TODO(audit): once PR #432 lands, replace this with
 //   (tx, e) => recordAudit(tx, { workspaceId: e.workspaceId, actor: { type: 'user', id: e.actorId, name }, action: e.action,
 //     category: 'secret', target: e.target, metadata: e.metadata, ...auditRequestContext(headers) })
-// MIKKA-DB secret/env/egress writes must use recordAudit inside this transaction, never recordAuditSafe.
+// MIKKA-DB secret/env writes must use recordAudit inside this transaction, never recordAuditSafe.
 export const noAudit: SecretAuditHook = async () => {}
 
 /**
@@ -42,7 +42,6 @@ export interface WorkspaceSecretView {
   /** '' for workspace scope, owner/repo (lowercase) for repository scope. */
   scopeRef: string
 }
-export interface NetworkPolicyView { mode: 'open' | 'allowlist' | 'none'; allowedDomains: string[]; updatedAt: string | null }
 
 type Row = typeof workspaceSecrets.$inferSelect
 
@@ -182,46 +181,4 @@ export async function deleteWorkspaceSecret(userId: string, workspaceId: string,
     await audit(tx, { workspaceId, actorId: userId, action: gone.kind === 'secret' ? 'secret.deleted' : 'env.deleted', target: { type: gone.kind, id, label: gone.name } })
     return { id }
   }))
-}
-
-/** Outbound network policy. Workspaces without a row are 'open' (today's behaviour). */
-export async function getNetworkPolicy(userId: string, workspaceId: string): Promise<NetworkPolicyView> {
-  await requireSecretPermission(userId, workspaceId, 'network.read')
-  const [row] = await guardSecretsDb(() => db.select().from(workspaceNetworkPolicy).where(eq(workspaceNetworkPolicy.workspaceId, workspaceId)))
-  return row ? { mode: row.mode, allowedDomains: row.allowedDomains, updatedAt: row.updatedAt.toISOString() } : { mode: 'open', allowedDomains: [], updatedAt: null }
-}
-
-export class EgressDomainError extends WorkspaceError {
-  /** 1-based line numbers. */
-  constructor(readonly lines: number[]) { super('egressDomainInvalid') }
-}
-export class EgressTooManyDomainsError extends WorkspaceError {
-  /** Distinct non-empty lines submitted (empty lines dropped, then deduped, then counted). */
-  constructor(readonly count: number) { super('egressTooManyDomains') }
-}
-
-/**
- * SEC-18/19. Permission check (admin only) runs first, so non-admins learn nothing about validation.
- * Errors: workspaceAccessDenied, secretPermissionDenied, validationGeneric, egressTooManyDomains {count}, egressDomainInvalid {lines, 1-based}.
- * open / none deliberately keep the stored allowlist untouched (and ignore allowedDomains), so
- * switching back to allowlist restores the admin's previous list instead of an empty one.
- */
-export async function updateNetworkPolicy(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit, now = new Date()): Promise<NetworkPolicyView> {
-  await requireSecretPermission(userId, workspaceId, 'network.write')
-  const { mode, allowedDomains } = updateEgressInput.parse(input)
-  let domains: string[] | null = null
-  if (mode === 'allowlist') {
-    const checked = checkEgressDomains(allowedDomains)
-    if (checked.count > EGRESS_DOMAINS_MAX) throw new EgressTooManyDomainsError(checked.count)
-    if (checked.invalid.length) throw new EgressDomainError(checked.invalid)
-    domains = checked.domains
-  }
-  const row = await guardSecretsDb(() => db.transaction(async tx => {
-    const set = domains ? { mode, allowedDomains: domains, updatedBy: userId, updatedAt: now } : { mode, updatedBy: userId, updatedAt: now }
-    const [saved] = await tx.insert(workspaceNetworkPolicy).values({ workspaceId, mode, allowedDomains: domains ?? [], updatedBy: userId, updatedAt: now })
-      .onConflictDoUpdate({ target: workspaceNetworkPolicy.workspaceId, set }).returning()
-    await audit(tx, { workspaceId, actorId: userId, action: 'network.updated', target: { type: 'network_policy', id: workspaceId, label: mode }, metadata: { mode, domains: saved.allowedDomains.length } })
-    return saved
-  }))
-  return { mode: row.mode, allowedDomains: row.allowedDomains, updatedAt: row.updatedAt.toISOString() }
 }

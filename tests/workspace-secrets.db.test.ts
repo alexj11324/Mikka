@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
-test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
+test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   const previousKey = process.env.WORKSPACE_SECRETS_KEY
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   const { Pool } = await import('pg')
@@ -58,7 +58,6 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     await rejects(store.listWorkspaceSecrets(outsider, ws.id), 'workspaceAccessDenied')
     await rejects(store.createWorkspaceSecret(outsider, ws.id, { name: 'X', kind: 'env', value: 'v', scope: { type: 'repository', repository: 'o/r' } }), 'workspaceAccessDenied')
     await rejects(e2b.getE2BKeyStatus(outsider, ws.id), 'workspaceAccessDenied')
-    await rejects(store.getNetworkPolicy(outsider, ws.id), 'workspaceAccessDenied')
     const [mine] = await store.listWorkspaceSecrets(admin, ws.id)
     await rejects(store.replaceWorkspaceSecret(admin, other.id, { id: mine.id, value: 'v' }), 'secretNotFound')
     await rejects(store.deleteWorkspaceSecret(admin, other.id, { id: mine.id }), 'secretNotFound')
@@ -96,17 +95,6 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     } finally { process.env.WORKSPACE_SECRETS_KEY = key }
     const { rows } = await pool.query(`select 1 from workspace_secrets where name='NOPE'`)
     assert.equal(rows.length, 0)
-  })
-
-  await t.test('egress: open by default, three modes only, domains validated per line', async () => {
-    assert.deepEqual(await store.getNetworkPolicy(admin, ws.id), { mode: 'open', allowedDomains: [], updatedAt: null })
-    const saved = await store.updateNetworkPolicy(admin, ws.id, { mode: 'allowlist', allowedDomains: ['github.com', '*.mikka.app', ''] })
-    assert.deepEqual([saved.mode, saved.allowedDomains], ['allowlist', ['github.com', '*.mikka.app']])
-    await assert.rejects(store.updateNetworkPolicy(admin, ws.id, { mode: 'allowlist', allowedDomains: ['ok.com', 'bad domain'] }), (error: unknown) => error instanceof store.EgressDomainError && error.lines.join() === '2')
-    await assert.rejects(store.updateNetworkPolicy(admin, ws.id, { mode: 'deny', allowedDomains: [] }))
-    for (const mode of ['deny', 'all', '', 'OPEN'])
-      await assert.rejects(pool.query(`update workspace_network_policy set mode=$1 where "workspaceId"=$2`, [mode, ws.id]), (error: { code?: string }) => error.code === '23514', mode)
-    assert.equal((await store.updateNetworkPolicy(admin, ws.id, { mode: 'none', allowedDomains: [] })).mode, 'none')
   })
 
   await t.test('E2B key: verified before save, write-only, audited as secret.* with label "E2B API Key"', async () => {
@@ -395,24 +383,6 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     await pool.query('delete from workspace_e2b_verify_attempts where "workspaceId"=$1', [w.id])
   })
 
-  await t.test('egress: admin check before validation, 200-domain limit with real count, 1-based lines, no IPs, open/none keep the allowlist', async () => {
-    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
-    await rejects(store.updateNetworkPolicy(member, w.id, { mode: 'bogus', allowedDomains: ['bad domain'] }), 'secretPermissionDenied')
-    await rejects(store.updateNetworkPolicy(member, w.id, { mode: 'allowlist', allowedDomains: Array.from({ length: 300 }, (_, i) => `d${i}.com`) }), 'secretPermissionDenied')
-    const many = (n: number) => Array.from({ length: n }, (_, i) => `d${i}.com`)
-    assert.equal((await store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: [...many(200), '', 'D0.COM', 'd1.com.'] })).allowedDomains.length, 200)
-    await assert.rejects(store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: [...many(205), '', 'd0.com'] }), (error: unknown) => error instanceof store.EgressTooManyDomainsError && error.code === 'egressTooManyDomains' && error.count === 205)
-    await assert.rejects(store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: ['ok.com', '1.2.3.4', 'x.com', '::1'] }), (error: unknown) => error instanceof store.EgressDomainError && error.lines.join() === '2,4')
-    const list = ['github.com', '*.mikka.app']
-    await store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: list })
-    for (const mode of ['open', 'none'] as const) {
-      const saved = await store.updateNetworkPolicy(admin, w.id, { mode, allowedDomains: ['ignored.com'] })
-      assert.deepEqual([saved.mode, saved.allowedDomains], [mode, list], `${mode} keeps the stored allowlist`)
-    }
-    const fresh = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
-    assert.deepEqual((await store.updateNetworkPolicy(admin, fresh.id, { mode: 'none' })).allowedDomains, [])
-  })
-
   await t.test('repository scope: . and .. rejected; owner/repo stored and compared lowercase', async () => {
     const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
     for (const repository of ['../x', 'o/..', './.', 'o/.']) await assert.rejects(store.createWorkspaceSecret(admin, w.id, { name: 'R', kind: 'env', value: 'repo-value', scope: { type: 'repository', repository } }), repository)
@@ -464,9 +434,6 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     assert.ok((await store.listWorkspaceSecrets(member, w.id)).every(r => !('value' in r)), 'no values for anyone (design update)')
     const status = await e2b.getE2BKeyStatus(member, w.id)
     assert.ok(!('apiKey' in status), 'member E2B view is masked')
-    await rejects(store.getNetworkPolicy(member, w.id), 'secretPermissionDenied')
-    await rejects(store.updateNetworkPolicy(member, w.id, { mode: 'none' }), 'secretPermissionDenied')
-    assert.equal((await store.getNetworkPolicy(admin, w.id)).mode, 'open')
     let verifyCalls = 0
     await rejects(e2b.setE2BKey(member, w.id, { apiKey: 'e2b_' + randomBytes(16).toString('hex') }, { verify: async () => { verifyCalls++; return { ok: true } } }), 'secretPermissionDenied')
     await rejects(e2b.removeE2BKey(member, w.id), 'secretPermissionDenied')

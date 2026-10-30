@@ -31,7 +31,6 @@ export const AUDIT_ACTIONS = {
   'env.updated': 'secret',
   'env.deleted': 'secret',
   // 安全
-  'network_policy.updated': 'security',
   'token.created': 'security',
   'token.revoked': 'security',
   'auth.signed_in': 'security',
@@ -75,7 +74,6 @@ export const AUDIT_METADATA = {
   'env.created': z.object({ scope }).partial().strict(),
   'env.updated': z.object({ scope }).partial().strict(),
   'env.deleted': z.object({ scope }).partial().strict(),
-  'network_policy.updated': z.object({ mode: z.enum(['open', 'allowlist', 'blocked']), addedHosts: z.number().int().min(0).max(1000), removedHosts: z.number().int().min(0).max(1000) }).partial().strict(),
   'token.created': z.object({ tokenName: label, expiresAt: z.string().datetime({ offset: true }).nullable() }).partial().strict(),
   'token.revoked': none,
   'auth.signed_in': z.object({ newDevice: z.boolean(), method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']) }).strict(),

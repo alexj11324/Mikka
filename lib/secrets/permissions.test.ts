@@ -7,7 +7,7 @@ const scopes: SecretScopeType[] = ['workspace', 'repository']
 const expectedMemberWrite = (scopeType: SecretScopeType) => scopeType === 'repository'
 
 test('matrix: admin may do everything', () => {
-  const actions: SecretAction[] = ['secret.list', 'secret.create', 'secret.replace', 'secret.delete', 'e2b.status', 'e2b.write', 'network.read', 'network.write']
+  const actions: SecretAction[] = ['secret.list', 'secret.create', 'secret.replace', 'secret.delete', 'e2b.status', 'e2b.write']
   for (const action of actions) for (const scopeType of scopes)
     assert.equal(secretActionAllowed('admin', action, [{ scopeType }], false), true, `${action} ${scopeType}`)
 })
@@ -24,8 +24,6 @@ test('matrix: member cells (defaults from plan 1.3 / 7.12)', () => {
   }
   assert.equal(secretActionAllowed('member', 'e2b.status'), true)
   assert.equal(secretActionAllowed('member', 'e2b.write'), false)
-  assert.equal(secretActionAllowed('member', 'network.read'), false)
-  assert.equal(secretActionAllowed('member', 'network.write'), false)
   assert.equal(secretActionAllowed('member', 'secret.create', []), false, 'no target, no write')
 })
 

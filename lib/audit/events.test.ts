@@ -117,12 +117,6 @@ test('per-action exemption: token.created may carry tokenName, nothing else may'
   assert.throws(() => toAuditRow({ ...token, metadata: { tokenName: 'gh~p_abcdefghijklmnopqrstuvwxyz0123456789'.replace('~', '') } }), /secret-bearing value/)
 })
 
-test('network_policy host counts are bounded ints', () => {
-  const np = { ...base, action: 'network_policy.updated' as const }
-  assert.doesNotThrow(() => toAuditRow({ ...np, metadata: { addedHosts: 0, removedHosts: 1000 } }))
-  for (const bad of [-1, 1001, 1.5]) assert.throws(() => toAuditRow({ ...np, metadata: { addedHosts: bad } }), /allowlist/, String(bad))
-})
-
 // One sample per credential pattern (Tech Lead's examples included). Fake, non-working values.
 // '~' keeps push-protection scanners off these fake samples; it is removed before use.
 const SECRET_VALUES = [
