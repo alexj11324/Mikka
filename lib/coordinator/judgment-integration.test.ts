@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {createHash} from 'node:crypto'
 import { before, beforeEach, after, mock, test } from 'node:test'
 import { DECISION_MODEL, decisionRequestInput, validatedAnswers } from './decision'
+import { deliverWake } from './wake-recovery'
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='
 const priorVercel=process.env.VERCEL
 const priorKey=process.env.DECISION_GATEWAY_API_KEY, priorFetch=globalThis.fetch, priorConsole=console.error
@@ -18,6 +19,16 @@ stub('./store.ts',{
  wakingChats:async()=>[null],hasWakingEvents:async()=>events.some(e=>e.tier!==null&&e.tier!=='background'),
 })
 stub('../attention/store.ts',{releaseAttention:async()=>{}})
+// Model integration uses synthetic inbox IO above. Keep its new durable claim
+// IO synthetic too; the production delivery orchestration still runs here.
+// Real claim/backoff/restart behavior is covered by wake-recovery.db.test.ts.
+stub('./wake-recovery.ts',{
+ deliverWake,
+ createWakeRecovery:()=>({
+  claim:async(scope:{userId:string;botId:string|null})=>{assert.deepEqual(scope,{userId:'synthetic',botId:null});return events.length?{...scope,ids:events.map(event=>event.id),attempt:1,leaseUntil:new Date(Date.now()+120_000)}:null},
+  failed:async()=>{},due:async()=>[],exhausted:async()=>0,replay:async()=>false,
+ }),
+})
 stub('../../workflows/coordinator/workflow.ts',{coordinatorTurn:()=>{}})
 mock.module('workflow/api',{namedExports:{start:async()=>{starts++}}})
 let wake:typeof import('./wake'),group:typeof import('./route-group'),transport:typeof import('./decide')
