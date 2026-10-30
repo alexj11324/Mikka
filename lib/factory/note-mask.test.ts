@@ -29,3 +29,17 @@ test("note masker hides uppercase hex and lowercase %xx spellings", () => {
   // Regex metacharacters in the value are matched literally.
   assert.equal(maskFactoryNote("a e2bXsynth+value=123 b", secrets), "a e2bXsynth+value=123 b");
 });
+
+test("control endpoint masks the human reason before the store sees it", async () => {
+  const { handleFactory } = await import("./http");
+  const seen: unknown[] = [];
+  const store = { apply: async (_u: string, _b: unknown, _e: string, change: unknown) => (seen.push(change), { ok: true }) };
+  const taskId = "00000000-0000-4000-8000-000000000001";
+  const binding = { taskId, issueId: "00000000-0000-4000-8000-000000000002", attemptId: "00000000-0000-4000-8000-000000000003", revision: 1, candidateId: null };
+  const res = await handleFactory(store as never, {
+    userId: "owner", taskId, method: "POST", origin: "https://m.example", url: "https://m.example/api/factory/tasks/x",
+    body: { binding, eventId: "00000000-0000-4000-8000-000000000004", action: "retry", reason: "retry with GITHUB_TOKEN=ghp_abcdefghijklmnop1234" },
+  });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.deepEqual(seen, [{ action: "retry", reason: "retry with GITHUB_TOKEN=[REDACTED]" }]);
+});

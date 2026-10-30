@@ -35,6 +35,17 @@ export const approvalControl = z
     approvalId: z.uuid(),
   })
   .strict();
+/** Human "request changes": sends the exact candidate back to execute. */
+export const rejectRequest = z
+  .object({
+    binding: bindingSchema,
+    eventId: z.uuid(),
+    candidateId: z.uuid(),
+    note: z.string().trim().max(2000).optional(),
+    // Artifact refs from the current evidence manifest the person marked as failing.
+    failedEvidence: z.array(z.string().min(1).max(2000)).max(100).optional(),
+  })
+  .strict();
 export const publicationRequest = approvalControl
   .extend({
     action: publicationAction,
