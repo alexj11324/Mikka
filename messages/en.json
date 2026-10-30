@@ -1084,6 +1084,7 @@
   },
   "IssueDetail": {
     "breadcrumbBoard": "Board",
+    "breadcrumbMore": "More locations",
     "connecting": "Connecting…",
     "deletedTitle": "This task was deleted",
     "unavailableTitle": "Task unavailable",
