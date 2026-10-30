@@ -167,5 +167,7 @@ test('a result for the old credential API is dropped once the prefix changes', a
   await page.evaluate(() => window.history.pushState(null, '', '?run=00000000-0000-4000-8000-000000000073'))
   await page.waitForTimeout(1500)
   await expect(page.getByTestId('credential-login-done')).toHaveCount(0)
+  // Not stuck pending: the form takes a new password for the new thread.
+  await page.getByLabel('密码', { exact: true }).fill(SECRET)
   await expect(page.getByRole('button', { name: '登录', exact: true })).toBeEnabled()
 })
