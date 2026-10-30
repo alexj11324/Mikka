@@ -3057,6 +3057,9 @@
     "attestationRequired": "生产发布需要签名证明。",
     "artifactError": "证据打开失败。",
     "superseded": "{sha} · 已失效",
+    "copySha": "复制完整 sha {sha}",
+    "shaCopied": "已复制完整 sha",
+    "shaCopyFailed": "复制失败，请允许浏览器访问剪贴板。",
     "loadError": "验收内容加载失败",
     "closeEvidence": "关闭证据",
     "skillState": {

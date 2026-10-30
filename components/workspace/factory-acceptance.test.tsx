@@ -136,8 +136,19 @@ test('revoke is secondary and busy actions swap the icon for the spinner (fixed 
 })
 
 test('a voided approval shows only the 「<sha> · 已失效」 badge next to the enable action', () => {
-  const html = renderToStaticMarkup(<ApprovalBar state="pending" isSkill details={[]} superseded="ccccccc" />)
+  const html = renderToStaticMarkup(<ApprovalBar state="pending" isSkill details={[]} superseded={'c'.repeat(40)} />)
   assert.match(html, />ccccccc · 已失效</)
+  assert.doesNotMatch(html, />c{8,}/)
   assert.match(html, />启用</)
   assert.doesNotMatch(html, /<p[\s>]/)
+})
+
+test('every sha shows 7 characters; the full sha is the copy target and the hover label', () => {
+  const full = '3f9c2ab' + 'e'.repeat(33)
+  const html = renderToStaticMarkup(<ApprovalBar state="approved" isSkill={false} details={['Preview']} sha={full} superseded={'d'.repeat(40)} />)
+  assert.match(html, />3f9c2ab</)
+  assert.doesNotMatch(html, />3f9c2abe/)
+  assert.match(html, new RegExp(`<button[^>]*data-sha="${full}"`))
+  assert.match(html, new RegExp(`aria-label="复制完整 sha ${full}"`))
+  assert.match(html, />ddddddd · 已失效</)
 })

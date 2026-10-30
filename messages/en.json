@@ -3057,6 +3057,9 @@
     "attestationRequired": "Production needs a signed attestation.",
     "artifactError": "The evidence did not open.",
     "superseded": "{sha} · Invalidated",
+    "copySha": "Copy full sha {sha}",
+    "shaCopied": "Full sha copied",
+    "shaCopyFailed": "Copy failed. Allow clipboard access in your browser.",
     "loadError": "Could not load the acceptance",
     "closeEvidence": "Close evidence",
     "skillState": {
