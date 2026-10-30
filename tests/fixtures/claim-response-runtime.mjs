@@ -1,6 +1,7 @@
 // In-memory claim boundary tests. No sockets, providers or database connections.
 import { registerHooks } from 'node:module'
-const dbSource = `
+const dbSource = `import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
+
 function query(columns){
   let table
   const q={from(value){table=value[Object.getOwnPropertySymbols(value).find(s=>s.description==='drizzle:Name')];return q},innerJoin(){return q},where(){return q},
@@ -10,10 +11,15 @@ function query(columns){
 }
 function update(value){
   const table=value[Object.getOwnPropertySymbols(value).find(s=>s.description==='drizzle:Name')]
-  return {set(values){return {async where(){
+  return {set(values){return {async where(condition){
     const p=globalThis.claimResponseProbe;(p.updates??=[]).push({table,values:{...values}})
-    // Mirror the route's WHERE: a failure write needs a queued run, an environment write needs the claimed (preparing) run.
-    if(table==='agent_runs'&&p.run.status===(values.status==='failed'?'queued':'preparing'))Object.assign(p.run,values)
+    await p.beforeUpdate?.(table,values)
+    // Evaluate the route's real WHERE (column = value conjuncts) against the in-memory run.
+    const rendered=new PgDialect().sqlToQuery(condition)
+    const terms=[...rendered.sql.matchAll(/"agent_runs"\\."(\\w+)" = \\$(\\d+)/g)]
+    if(rendered.sql.replace(/"agent_runs"\\."\\w+" = \\$\\d+|[() ]|and/g,'')!=='')throw new Error('unsupported claim WHERE: '+rendered.sql)
+    const same=(a,b)=>a instanceof Date||b instanceof Date?a!=null&&b!=null&&new Date(a).getTime()===new Date(b).getTime():a===b
+    if(table==='agent_runs'&&terms.every(([,column,index])=>same(p.run[column],rendered.params[Number(index)-1])))Object.assign(p.run,values)
   }}}}
 }
 export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}

@@ -77,7 +77,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (resolveRunSecretsEnvironment({ deviceKind: device.kind === 'cloud' ? 'cloud' : 'local', runBaseBranch: run.baseBranch, trustedDefaultBranch: null, override: run.secretsEnvironmentOverride }).rejected) {
     await db.update(agentRuns)
       .set({ status: 'failed', stopReason: 'error', error: 'Secret environment overrides are not supported.', finishedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'queued')))
     return NextResponse.json({ error: 'Secret environment overrides are not supported.', code: 'secretEnvironmentOverrideUnsupported' }, { status: 403 })
   }
   try { await skillAssignments.preflight(caller.userId, runId, supportsSkillArtifacts) } catch (error) {

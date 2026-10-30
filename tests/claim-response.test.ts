@@ -162,3 +162,28 @@ test('4e3: a cloud claim reads and records preview, even on the repo default bra
     }
   } finally { for(const key of ['MIKKA_CLOUD_COMPUTER_TASKS','MIKKA_BYOS_ENABLED','MIKKA_BYO_E2B_KEY'])if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key] }
 })
+
+test('4e3: the override failure write only fails a still-queued run of the caller (concurrent status change or foreign owner)',async()=>{
+  for(const change of ['status','owner'] as const){
+    const probe=fixture()
+    Object.assign(probe.run,{secretsEnvironmentOverride:'production',baseBranch:'main'})
+    ;(probe as {beforeUpdate?:()=>void}).beforeUpdate=()=>{if(change==='status')probe.run.status='cancelled';else probe.run.userId='someone-else'}
+    const response=await claim(probe,[])
+    assert.equal(response.status,403,change)
+    assert.equal(probe.run.status,change==='status'?'cancelled':'queued',`${change}: the write must not touch the run`)
+    assert.equal(probe.run.stopReason,null,change)
+  }
+})
+
+test('4e3: the local development write only lands on the run still claimed under this lease',async()=>{
+  for(const change of ['status','lease'] as const){
+    const probe=fixture()
+    ;(probe as {beforeUpdate?:(table:string,values:Record<string,unknown>)=>void}).beforeUpdate=(_table,values)=>{
+      if(!('secretsEnvironment' in values))return
+      if(change==='status')probe.run.status='cancelled';else probe.run.leaseExpiresAt=new Date(Date.now()+900_000)
+    }
+    const response=await claim(probe)
+    assert.equal((probe.run as {secretsEnvironment?:string}).secretsEnvironment,undefined,`${change}: a changed run keeps no environment`)
+    assert.ok(response.status>=200,change)
+  }
+})
