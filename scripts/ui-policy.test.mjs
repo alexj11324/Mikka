@@ -93,6 +93,11 @@ test('component composition + business data/event wiring + layout are allowed', 
   assert.deepEqual(rules(source), [])
 })
 
+test('icon-only buttons need no data-icon, text buttons still do', () => {
+  assert.deepEqual(rules(`import { X } from "lucide-react"; const ui = <Button size="icon-sm" aria-label="x"><X /></Button>`), [])
+  assert.ok(rules(`import { X } from "lucide-react"; const ui = <Button size="sm"><X />Close</Button>`).includes('icons/data-icon'))
+})
+
 test('shared settings fields retain form grouping checks without accepting lookalike wrappers', () => {
   const imports = `import { SettingsGroup as Group, SettingsRow as Row } from '@/components/ui/settings-layout'; import { Input } from '@/components/ui/input';`
   assert.deepEqual(rules(`${imports} const ui = <form><Group><Row title="Name" htmlFor="name"><Input id="name" /></Row></Group></form>`), [])

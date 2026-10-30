@@ -11,7 +11,8 @@ function Cloudflare(props: SVGProps<SVGSVGElement>) {
   </svg>
 }
 
-export function SiteIcon({ origin, ...props }: { origin: string; 'data-icon'?: 'inline-start' }) {
+/** No size of its own: inside a Button the Button sizes it; elsewhere the caller passes className. */
+export function SiteIcon({ origin, ...props }: { origin: string; className?: string; 'data-icon'?: 'inline-start' }) {
   const host = new URL(origin).hostname
-  return host === 'cloudflare.com' || host.endsWith('.cloudflare.com') ? <Cloudflare className="size-5" {...props} /> : <GlobeIcon className="size-5" {...props} />
+  return host === 'cloudflare.com' || host.endsWith('.cloudflare.com') ? <Cloudflare {...props} /> : <GlobeIcon {...props} />
 }

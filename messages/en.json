@@ -3065,12 +3065,30 @@
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "submit": "Sign in",
-    "code": "Verification code",
     "verify": "Verify",
     "securedBy": "Secured by",
-    "wrongPassword": "Wrong password",
-    "wrongCode": "Wrong code",
-    "failed": "Couldn’t sign in. Try again.",
-    "signedIn": "Signed in to {site}"
+    "signedIn": "Signed in to {site}",
+    "recheck": "Check again",
+    "outcome": {
+      "invalidCredentials": "Wrong email or password",
+      "twoFactorInvalid": "Wrong code",
+      "rateLimited": "Too many attempts. Try again later.",
+      "rateLimitedFor": "Too many attempts. Try again in {seconds}s.",
+      "accountLocked": "Account locked",
+      "rejected": "Sign-in was declined",
+      "code": "Verification code",
+      "codeTotp": "Code from your authenticator app",
+      "codeSms": "Code sent by text",
+      "codeEmail": "Code sent by email",
+      "captchaRequired": "This site needs you to finish a check yourself",
+      "needsUser": "This site needs you to finish signing in yourself",
+      "outcomeUnknown": "Couldn’t confirm whether you’re signed in",
+      "waiting": "Submitted. Waiting for the site…",
+      "submissionInvalid": "Couldn’t send that. Try again.",
+      "denied": "Sign-in isn’t allowed here",
+      "loginPending": "Another sign-in is still running",
+      "unavailable": "Sign-in is unavailable right now",
+      "failed": "Couldn’t sign in. Try again."
+    }
   }
 }
