@@ -133,7 +133,7 @@ export function EvidenceViewer({ taskId, entries, index, sha, environment, readT
           {environment && <Badge variant="outline" tone="neutral">{environment}</Badge>}
           {entry.recordedAt && <Badge variant="outline" tone="neutral">{format.dateTime(new Date(entry.recordedAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</Badge>}
         </div>
-        {download && <Button variant="ghost" size="icon-sm" aria-label={t('download')} nativeButton={false} render={<a href={download} download={media ? nameOf(entry) : `${entry.artifact.replace(/[^\w.-]+/g, '-')}.txt`} />}><Download data-icon="inline-start" /></Button>}
+        {download && <Button variant="ghost" size="icon-sm" aria-label={t('download')} nativeButton={false} role="link" render={<a href={download} download={media ? nameOf(entry) : `${entry.artifact.replace(/[^\w.-]+/g, '-')}.txt`} />}><Download data-icon="inline-start" /></Button>}
         <Button variant="ghost" size="icon-sm" aria-label={t('closeEvidence')} onClick={onClose}><X data-icon="inline-start" /></Button>
       </header>
       <div className="relative flex min-h-0 flex-1 items-center justify-center gap-4 bg-muted px-4 py-6 sm:px-6">

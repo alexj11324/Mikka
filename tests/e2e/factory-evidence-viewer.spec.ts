@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { deflateSync } from 'node:zlib'
 import type { Page, Route } from '@playwright/test'
-import { test, expect, register, seedTask, openIssueFromSearch } from './fixtures'
+import { test, expect, register, seedTask, openIssueFromSearch, app } from './fixtures'
 
 // A3: the acceptance window's evidence viewer over run captures (Figma
 // 357:4750 frames 06, 12, 13, 14, 15). Server responses are fixtures; the
@@ -43,12 +43,12 @@ async function shoot(page: Page, name: string) {
 }
 
 type Media = (route: Route, captureId: string) => Promise<void>
-async function open(page: Page, artifacts: Record<string, unknown>[], media: Media) {
+async function open(page: Page, artifacts: Record<string, unknown>[], media: Media, taskId = randomUUID()) {
   await page.setViewportSize({ width: 1440, height: 960 })
   await register(page)
   const title = `Factory A3 ${randomUUID()}`
   const issueId = await seedTask(page, title)
-  const taskId = randomUUID(), candidateId = randomUUID()
+  const candidateId = randomUUID()
   const binding = { taskId, issueId, attemptId: randomUUID(), revision: 1, candidateId }
   const candidate = { sha: 'a3f9c2e' + 'b'.repeat(33), repository: 'alexj11324/Mikka', environment: 'preview', scope: 'home page' }
   await page.route('**/api/factory/tasks?issueId=*', route => route.fulfill({ json: { tasks: [{ id: taskId, issueId, stage: 'approval', status: 'pending', reason: '独立检查通过', candidateId, candidateRunId: null, isSkillCandidate: false }] } }))
@@ -82,8 +82,15 @@ const manifest = [
 const image = png(1280, 800)
 const serveImages: Media = (route, id) => id === clip ? route.fulfill({ status: 409, body: '' }) : route.fulfill({ status: 200, contentType: 'image/png', body: image })
 
+test.describe(() => {
+  // The recording is refused on purpose: the browser logs its first load and the retry, nothing else.
+  const viewerTask = randomUUID()
+  const refused = app(`/api/factory/tasks/${viewerTask}/evidence/${clip}`)
+  const conflict = 'Failed to load resource: the server responded with a status of 409 (Conflict)'
+  test.use({ expectedConsoleErrors: [{ path: refused, message: conflict }, { path: `${refused}?attempt=1`, message: conflict }] })
+
 test('evidence viewer: captures as thumbnails, image, recording error, text, keyboard and filmstrip', async ({ page }) => {
-  const { acceptance, served } = await open(page, manifest, serveImages)
+  const { acceptance, served } = await open(page, manifest, serveImages, viewerTask)
   const thumb = acceptance.getByRole('button', { name: '截图 · 首页首屏' })
   await expect(thumb).toBeVisible()
   await expect(acceptance.getByRole('button', { name: '录屏 · 向下滚动' })).toContainText('0:09')
@@ -128,6 +135,7 @@ test('evidence viewer: captures as thumbnails, image, recording error, text, key
   await viewer.getByRole('button', { name: '关闭证据' }).click()
   await expect(viewer).toHaveCount(0)
   await expect(acceptance.getByRole('heading', { name: 'Factory 验收' })).toBeVisible()
+})
 })
 
 test('evidence viewer: media keeps a placeholder while it loads', async ({ page }) => {
