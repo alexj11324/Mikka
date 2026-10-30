@@ -22,6 +22,12 @@ permissions:
 concurrency:
   group: unattended-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+env:
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+
 jobs:
   runtime:
     runs-on: ubuntu-22.04

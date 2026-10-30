@@ -6,6 +6,12 @@ on:
   merge_group:
 permissions:
   contents: read
+env:
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+
 jobs:
   postgres-http:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
