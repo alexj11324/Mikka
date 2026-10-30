@@ -1611,10 +1611,10 @@
         "title": "活动"
       },
       "computers": {
-        "title": "我的电脑"
+        "title": "设备"
       },
       "developer": {
-        "title": "开发者"
+        "title": "个人访问令牌"
       },
       "general": {
         "title": "常规"
@@ -1623,7 +1623,7 @@
         "title": "Bot 管理"
       },
       "permissions": {
-        "title": "权限与审批"
+        "title": "团队权限"
       },
       "secrets": {
         "title": "密钥与环境"
@@ -1697,14 +1697,22 @@
       }
     },
     "workspaceForm": {
-      "id": "工作区 ID",
-      "readOnlyNote": "当前工作区信息为只读。切换或新建工作区，请返回应用后点击左上角的工作区名称。",
-      "label": "工作区基本信息",
       "name": "名称",
-      "invalidSlug": "使用小写字母、数字和单个连字符，不能以连字符开头或结尾。",
-      "urlHelp": "URL 中的标识用于访问工作区。修改地址会影响现有链接。",
-      "previewNote": "表单预览：尚未连接工作区存储，修改不会保存。",
-      "previewLabel": "工作区表单预览"
+      "loading": "正在加载工作区",
+      "icon": "图标",
+      "changeIcon": "更换",
+      "removeIcon": "移除",
+      "address": "地址",
+      "danger": "危险操作",
+      "deleteWorkspace": "删除工作区",
+      "deleting": "正在删除…",
+      "deleteTitle": "删除「{name}」？",
+      "deleteLead": "会永久删除，不能恢复：",
+      "deleteBots": "{count} 个 Bot、它们的线程和云电脑",
+      "deleteTasks": "{tasks} 个任务和 {teams} 个团队",
+      "deletePoints": "未用完的 {points} 点另购点数",
+      "deleteKept": "成员的个人账户和模型订阅不会删除。",
+      "deleteConfirmLabel": "输入 {name} 确认"
     },
     "computerPolicy": {
       "heading": "云电脑",

@@ -1,24 +1,185 @@
 'use client'
 
+import { useRef, useState, type ChangeEvent } from 'react'
+import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { useWorkspace } from '@/hooks/use-workspace'
-import { Input } from '@/components/ui/input'
-import { Field, FieldLabel, FieldGroup } from '@/components/ui/field'
+import { deleteWorkspace, getWorkspaceDeletionImpact, getWorkspaceGeneral, updateWorkspace } from '@/app/actions/workspace-settings'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
+import { Label } from '@/components/ui/label'
+import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
+import { withBasePath } from '@/lib/base-path'
+import { useActionError } from '@/lib/use-action-error'
 
-export function WorkspaceSettings({ userKey, workspaceId }: { userKey: string; workspaceId?: string }) {
+const ICON_MAX_BYTES = 200 * 1024
+const ICON_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+
+type Field = 'name' | 'slug' | 'icon'
+interface FailedSave { field: Field; value: string | null; message: string }
+
+function readDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('read failed'))
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'))
+    reader.readAsDataURL(file)
+  })
+}
+
+/** V10 常规: icon, name and address; admins edit them and can delete the workspace (S-I). Members see plain values. */
+export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspaceId?: string }) {
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
-  const membersT = useTranslations('Members')
-  const { data, error, mutate } = useWorkspace(userKey, workspaceId)
-  if (!data && error) return <div role="alert" className="flex flex-col items-start gap-3"><p>{membersT('refreshFailed')}</p><Button variant="outline" onClick={() => void mutate()}>{commonT('retry')}</Button></div>
-  if (!data) return <Skeleton className="h-40 w-full" />
-  return <section className="flex flex-col gap-4" aria-label={t('label')}>
-    <FieldGroup data-settings-card className="gap-0 divide-y divide-border overflow-hidden rounded-2xl border bg-card">
-      <Field orientation="responsive" className="justify-between gap-3 px-5 py-5"><FieldLabel htmlFor="workspace-name" className="@md/field-group:flex-none">{t('name')}</FieldLabel><div className="min-w-0 @md/field-group:flex-[0_1_28rem]"><Input id="workspace-name" value={data.workspace.name} readOnly /></div></Field>
-      <Field orientation="responsive" className="justify-between gap-3 px-5 py-5"><FieldLabel htmlFor="workspace-id" className="@md/field-group:flex-none">{t('id')}</FieldLabel><div className="min-w-0 @md/field-group:flex-[0_1_28rem]"><Input id="workspace-id" value={data.workspace.id} readOnly /></div></Field>
-    </FieldGroup>
-    <p className="text-sm text-muted-foreground">{t('readOnlyNote')}</p>
-  </section>
+  const actionError = useActionError()
+  const general = useSWR(['workspace:general', workspaceId ?? ''], () => getWorkspaceGeneral(workspaceId))
+  const data = general.data && !general.data.error ? general.data : null
+  const [name, setName] = useState<string | null>(null)
+  const [slug, setSlug] = useState<string | null>(null)
+  const [saving, setSaving] = useState<Field | null>(null)
+  const [failed, setFailed] = useState<FailedSave | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const host = typeof window === 'undefined' ? '' : `${window.location.host}${withBasePath('/w/')}`
+
+  if (!general.data && !general.error) return <SettingsLoading label={t('loading')} rows={3} />
+  if (!data) return <div role="alert" className="flex flex-col items-start gap-3 text-sm">
+    <p className="text-destructive">{actionError(general.data?.error)}</p>
+    <Button variant="outline" size="sm" onClick={() => void general.mutate()}>{commonT('retry')}</Button>
+  </div>
+  const current = data
+
+  function clearDraft(field: Field) {
+    if (field === 'name') setName(null)
+    if (field === 'slug') setSlug(null)
+  }
+
+  async function save(field: Field, value: string | null) {
+    setSaving(field)
+    setFailed(null)
+    try {
+      const result = await updateWorkspace({ [field]: value }, current.id)
+      // S-O: the shown value goes back to the saved one; 重试 sends the same change again.
+      if (result.error) { setFailed({ field, value, message: actionError(result.error) }); return }
+      await general.mutate({ ...result, canEdit: true }, { revalidate: false })
+    } catch {
+      setFailed({ field, value, message: actionError() })
+    } finally {
+      clearDraft(field)
+      setSaving(null)
+    }
+  }
+
+  function commit(field: 'name' | 'slug') {
+    const draft = field === 'name' ? name : slug
+    if (draft === null) return
+    const value = field === 'slug' ? draft.trim().toLowerCase() : draft.trim()
+    const saved = field === 'name' ? current.name : current.slug ?? ''
+    if (!value || value === saved) { clearDraft(field); return }
+    void save(field, value)
+  }
+
+  async function pickIcon(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!ICON_TYPES.includes(file.type) || file.size > ICON_MAX_BYTES) { setFailed({ field: 'icon', value: null, message: actionError('workspaceIconInvalid') }); return }
+    try { await save('icon', await readDataUrl(file)) } catch { setFailed({ field: 'icon', value: null, message: actionError('workspaceIconInvalid') }) }
+  }
+
+  const initial = [...current.name.trim()][0]?.toUpperCase() ?? '?'
+  const icon = <Avatar className="size-8"><AvatarImage src={current.icon ?? undefined} alt="" /><AvatarFallback>{initial}</AvatarFallback></Avatar>
+
+  // S-P: members read the same rows as plain values, with no controls.
+  if (!current.canEdit) return <SettingsSection id="workspace-general">
+    <SettingRow title={t('icon')}>{icon}</SettingRow>
+    <SettingRow title={t('name')}><span>{current.name}</span></SettingRow>
+    {current.slug && <SettingRow title={t('address')}><span className="break-all">{host}{current.slug}</span></SettingRow>}
+  </SettingsSection>
+
+  return <>
+    <SettingsSection id="workspace-general">
+      <SettingRow title={t('icon')}>
+        <div className="flex items-center gap-2">
+          {icon}
+          <Input ref={fileRef} type="file" accept={ICON_TYPES.join(',')} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={event => void pickIcon(event)} />
+          {current.icon && <Button type="button" variant="ghost" size="sm" disabled={saving !== null} onClick={() => void save('icon', null)}>{t('removeIcon')}</Button>}
+          <Button type="button" variant="secondary" size="sm" disabled={saving !== null} onClick={() => fileRef.current?.click()}>{saving === 'icon' ? commonT('saving') : t('changeIcon')}</Button>
+        </div>
+      </SettingRow>
+      <SettingRow title={t('name')}>
+        <Input aria-label={t('name')} className="w-full sm:w-50" maxLength={120} value={name ?? current.name} disabled={saving === 'name'}
+          onChange={event => setName(event.target.value)} onBlur={() => commit('name')}
+          onKeyDown={event => { if (event.key === 'Enter') commit('name'); if (event.key === 'Escape') setName(null) }} />
+      </SettingRow>
+      <SettingRow title={t('address')}>
+        <InputGroup className="w-full sm:w-72">
+          <InputGroupAddon><InputGroupText>{host}</InputGroupText></InputGroupAddon>
+          <InputGroupInput aria-label={t('address')} maxLength={64} value={slug ?? current.slug ?? ''} disabled={saving === 'slug'}
+            onChange={event => setSlug(event.target.value)} onBlur={() => commit('slug')}
+            onKeyDown={event => { if (event.key === 'Enter') commit('slug'); if (event.key === 'Escape') setSlug(null) }} />
+        </InputGroup>
+      </SettingRow>
+    </SettingsSection>
+    {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => { if (failed.field === 'icon' && failed.value === null) { fileRef.current?.click(); return } void save(failed.field, failed.value) }} />}
+
+    <SettingsSection id="workspace-danger" title={t('danger')}>
+      <SettingRow title={t('deleteWorkspace')}>
+        <Button type="button" variant="destructive" size="sm" onClick={() => setDeleting(true)}>{commonT('delete')}</Button>
+      </SettingRow>
+    </SettingsSection>
+    {deleting && <DeleteWorkspaceDialog workspaceId={current.id} name={current.name} onClose={() => setDeleting(false)} />}
+  </>
+}
+
+/** S-I: lists what goes, then the name must be typed exactly. */
+function DeleteWorkspaceDialog({ workspaceId, name, onClose }: { workspaceId: string; name: string; onClose: () => void }) {
+  const t = useTranslations('Settings.workspaceForm')
+  const commonT = useTranslations('Common')
+  const actionError = useActionError()
+  const impact = useSWR(['workspace:deletion-impact', workspaceId], () => getWorkspaceDeletionImpact(workspaceId))
+  const counts = impact.data && !impact.data.error ? impact.data : null
+  const [typed, setTyped] = useState('')
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function confirm() {
+    setPending(true)
+    setError(null)
+    try {
+      const result = await deleteWorkspace(workspaceId, typed)
+      if (result.error) { setError(actionError(result.error)); setPending(false); return }
+      window.location.assign(withBasePath('/'))
+    } catch {
+      setError(actionError())
+      setPending(false)
+    }
+  }
+
+  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose() }}>
+    <DialogContent>
+      <DialogHeader><DialogTitle>{t('deleteTitle', { name })}</DialogTitle></DialogHeader>
+      <div className="flex flex-col gap-3 text-sm">
+        <p className="text-muted-foreground">{t('deleteLead')}</p>
+        {counts
+          ? <ul className="flex list-disc flex-col gap-1 pl-5">
+            <li>{t('deleteBots', { count: counts.bots })}</li>
+            <li>{t('deleteTasks', { tasks: counts.tasks, teams: counts.teams })}</li>
+            {counts.purchasedPoints > 0 && <li>{t('deletePoints', { points: counts.purchasedPoints })}</li>}
+          </ul>
+          : impact.data?.error ? <p role="alert" className="text-destructive">{actionError(impact.data.error)}</p> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
+        <p className="text-muted-foreground">{t('deleteKept')}</p>
+        <Label className="flex flex-col items-start gap-1.5 font-normal text-muted-foreground">{t('deleteConfirmLabel', { name })}
+          <Input value={typed} placeholder={name} autoComplete="off" onChange={event => setTyped(event.target.value)} />
+        </Label>
+        {error && <p role="alert" className="text-destructive">{error}</p>}
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" disabled={pending} onClick={onClose}>{commonT('cancel')}</Button>
+        <Button type="button" variant="destructive" disabled={pending || typed.trim() !== name} onClick={() => void confirm()}>{pending ? t('deleting') : t('deleteWorkspace')}</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 }

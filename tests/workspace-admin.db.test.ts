@@ -46,6 +46,22 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     assert.equal(cleared.icon, null)
   })
 
+  await t.test('readWorkspaceGeneral and workspaceDeletionImpact: members read values, only admins see the impact', async () => {
+    const admin = await seedUser(pool, 'admin'), member = await seedUser(pool, 'member'), stranger = await seedUser(pool, 'stranger')
+    const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
+    const other = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    assert.deepEqual(await general.readWorkspaceGeneral(member, ws.id), { id: ws.id, name: ws.name, slug: ws.slug, icon: null, canEdit: false })
+    assert.equal((await general.readWorkspaceGeneral(admin, ws.id)).canEdit, true)
+    await rejects(general.readWorkspaceGeneral(stranger, ws.id), 'workspaceAccessDenied')
+    await seedBot(pool, ws.id, admin); await seedBot(pool, ws.id, member); await seedBot(pool, other.id, admin)
+    const team = await seedTeam(pool, ws.id, admin)
+    await seedTeamIssue(pool, ws.id, team.id, admin); await seedTeamIssue(pool, ws.id, team.id, admin)
+    await pool.query(`insert into workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId") values ($1,$2,'purchased',1200,'pack',$3),($4,$2,'plan',5000,'invoice',$5),($6,$7,'purchased',99,'pack',$8)`,
+      [randomUUID(), ws.id, `x-${randomUUID()}`, randomUUID(), `y-${randomUUID()}`, randomUUID(), other.id, `z-${randomUUID()}`])
+    assert.deepEqual(await general.workspaceDeletionImpact(admin, ws.id), { bots: 2, tasks: 2, teams: 1, purchasedPoints: 1200 })
+    await rejects(general.workspaceDeletionImpact(member, ws.id), 'workspaceAccessDenied')
+  })
+
   await t.test('deleteWorkspaceData: name check, full cleanup, other workspace untouched, personal data kept', async () => {
     const admin = await seedUser(pool, 'admin'), member = await seedUser(pool, 'member')
     const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }], 'Doomed')

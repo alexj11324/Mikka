@@ -65,6 +65,30 @@ export async function updateWorkspaceGeneral(actorId: string, workspaceId: strin
   })
 }
 
+/** 常规 as the viewer sees it. Any active member may read; `canEdit` is true for admins only. */
+export async function readWorkspaceGeneral(actorId: string, workspaceId: string): Promise<WorkspaceGeneral & { canEdit: boolean }> {
+  return workspaceDb.transaction(async tx => {
+    const { workspace, membership } = await requireWorkspace(tx, workspaceId, actorId)
+    return { id: workspace.id, name: workspace.name, slug: workspace.slug, icon: workspace.icon, canEdit: membership.role === 'admin' }
+  })
+}
+
+/** What 删除工作区 (S-I) lists before the name is typed. Admins only. */
+export interface WorkspaceDeletionImpact { bots: number; tasks: number; teams: number; purchasedPoints: number }
+
+export async function workspaceDeletionImpact(actorId: string, workspaceId: string): Promise<WorkspaceDeletionImpact> {
+  const { teamCount, taskCount } = await workspaceDb.transaction(async tx => {
+    await requireWorkspace(tx, workspaceId, actorId, true)
+    const [teamRow] = await tx.select({ n: sql<number>`count(*)::int` }).from(teams).where(eq(teams.workspaceId, workspaceId))
+    const [taskRow] = await tx.select({ n: sql<number>`count(distinct ${teamIssues.issueId})::int` }).from(teamIssues).where(eq(teamIssues.workspaceId, workspaceId))
+    return { teamCount: teamRow?.n ?? 0, taskCount: taskRow?.n ?? 0 }
+  })
+  const [botRow] = await db.select({ n: sql<number>`count(*)::int` }).from(bots).where(eq(bots.workspaceId, workspaceId))
+  const [pointRow] = await db.select({ n: sql<number>`coalesce(sum(${workspaceCreditGrants.points}), 0)::int` }).from(workspaceCreditGrants)
+    .where(and(eq(workspaceCreditGrants.workspaceId, workspaceId), eq(workspaceCreditGrants.bucket, 'purchased')))
+  return { bots: botRow?.n ?? 0, tasks: taskCount, teams: teamCount, purchasedPoints: pointRow?.n ?? 0 }
+}
+
 /** /w/<slug> fallback: the current slug of the workspace that used to have this one, for its active members. */
 export async function resolveSlugRedirect(slug: string, userId: string): Promise<string | null> {
   const [row] = await workspaceDb.select({ slug: workspaces.slug }).from(workspaceSlugRedirects)

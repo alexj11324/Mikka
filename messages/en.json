@@ -1611,10 +1611,10 @@
         "title": "Activity"
       },
       "computers": {
-        "title": "My computers"
+        "title": "Devices"
       },
       "developer": {
-        "title": "Developer"
+        "title": "Personal access tokens"
       },
       "general": {
         "title": "General"
@@ -1623,7 +1623,7 @@
         "title": "Bots"
       },
       "permissions": {
-        "title": "Permissions and approvals"
+        "title": "Team permissions"
       },
       "secrets": {
         "title": "Secrets and environment"
@@ -1697,14 +1697,22 @@
       }
     },
     "workspaceForm": {
-      "id": "Workspace ID",
-      "readOnlyNote": "Workspace information is read-only. To switch or create a workspace, return to the app and select the workspace name at the top left.",
-      "label": "Workspace basics",
       "name": "Name",
-      "invalidSlug": "Use lowercase letters, numbers, and single hyphens; do not start or end with a hyphen.",
-      "urlHelp": "The URL slug identifies the workspace. Changing it affects existing links.",
-      "previewNote": "Form preview: workspace storage is not connected, so changes are not saved.",
-      "previewLabel": "Workspace form preview"
+      "loading": "Loading workspace",
+      "icon": "Icon",
+      "changeIcon": "Change",
+      "removeIcon": "Remove",
+      "address": "Address",
+      "danger": "Danger zone",
+      "deleteWorkspace": "Delete workspace",
+      "deleting": "Deleting…",
+      "deleteTitle": "Delete “{name}”?",
+      "deleteLead": "Permanently deleted, with no way back:",
+      "deleteBots": "{count, plural, one {# bot} other {# bots}}, their threads and cloud computers",
+      "deleteTasks": "{tasks, plural, one {# task} other {# tasks}} and {teams, plural, one {# team} other {# teams}}",
+      "deletePoints": "{points} unused purchased points",
+      "deleteKept": "Members’ personal accounts and model subscriptions are kept.",
+      "deleteConfirmLabel": "Type {name} to confirm"
     },
     "computerPolicy": {
       "heading": "Cloud computers",

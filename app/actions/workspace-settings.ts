@@ -1,19 +1,45 @@
 'use server'
 
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import type { ActionResult } from '@/lib/action-result'
+import { auditRequestContext, recordAuditSafe } from '@/lib/audit/record'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
-import { deleteWorkspaceData, updateWorkspaceGeneral, type UpdateWorkspaceInput, type WorkspaceDeletion, type WorkspaceGeneral } from '@/lib/workspace-admin/general'
+import { deleteWorkspaceData, readWorkspaceGeneral, updateWorkspaceGeneral, workspaceDeletionImpact, type UpdateWorkspaceInput, type WorkspaceDeletion, type WorkspaceDeletionImpact, type WorkspaceGeneral } from '@/lib/workspace-admin/general'
 import { removeMember, type MemberRemoval } from '@/lib/workspace-admin/members'
 
 const COOKIE = 'mikka-workspace'
 
-/** 设置 › 工作区 › 常规: name, URL slug (the old one keeps redirecting) and icon. Admins only. */
-export async function updateWorkspace(input: UpdateWorkspaceInput): Promise<ActionResult<WorkspaceGeneral>> {
+/** 常规 as the viewer sees it: values for everyone, `canEdit` for admins. */
+export async function getWorkspaceGeneral(workspaceId?: string): Promise<ActionResult<WorkspaceGeneral & { canEdit: boolean }>> {
   return workspaceAction(async () => {
-    const actor = await currentWorkspaceActor()
-    return updateWorkspaceGeneral(actor.userId, actor.workspaceId, input)
+    const actor = await currentWorkspaceActor(workspaceId)
+    return readWorkspaceGeneral(actor.userId, actor.workspaceId)
+  })
+}
+
+/** S-I: what deleting the workspace removes. Admins only. */
+export async function getWorkspaceDeletionImpact(workspaceId?: string): Promise<ActionResult<WorkspaceDeletionImpact>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return workspaceDeletionImpact(actor.userId, actor.workspaceId)
+  })
+}
+
+/**
+ * 设置 › 工作区 › 常规: name, URL slug (the old one keeps redirecting) and icon. Admins only.
+ * `workspaceId` is the workspace the settings page shows; without it the current one.
+ */
+export async function updateWorkspace(input: UpdateWorkspaceInput, workspaceId?: string): Promise<ActionResult<WorkspaceGeneral>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    const before = input.slug === undefined ? null : await readWorkspaceGeneral(actor.userId, actor.workspaceId)
+    const saved = await updateWorkspaceGeneral(actor.userId, actor.workspaceId, input)
+    // Workspace rows live in DATABASE_URL, so the audit row is written after the change commits.
+    if (before?.slug && saved.slug && before.slug !== saved.slug) {
+      await recordAuditSafe({ workspaceId: actor.workspaceId, actor: { type: 'user', id: actor.userId, name: actor.name }, action: 'workspace.slug_changed', target: { type: 'workspace', id: actor.workspaceId, label: saved.name }, metadata: { from: before.slug, to: saved.slug }, ...auditRequestContext(await headers()) })
+    }
+    return saved
   })
 }
 
