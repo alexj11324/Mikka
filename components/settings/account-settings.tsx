@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { ProfileName } from '@/components/settings/profile-name'
 import { withBasePath } from '@/lib/base-path'
@@ -20,15 +21,13 @@ async function shrinkAvatar(file: File): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(file)
     const side = Math.min(bitmap.width, bitmap.height, 256)
-    const canvas = document.createElement('canvas')
-    canvas.width = side
-    canvas.height = side
+    const canvas = new OffscreenCanvas(side, side)
     const context = canvas.getContext('2d')
     if (!context) return file
     // Centre crop, so a wide photo is not squashed into an oval.
     context.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, side, side)
     bitmap.close()
-    return await new Promise(resolve => canvas.toBlob(blob => resolve(blob ?? file), 'image/webp', 0.9))
+    return await canvas.convertToBlob({ type: 'image/webp', quality: 0.9 })
   } catch {
     return file
   }
@@ -92,9 +91,9 @@ export function AccountSettings({ user, onSignOut, signingOut }: {
             {shownImage && <AvatarImage src={shownImage} alt="" />}
             <AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
-          <input ref={picker} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" aria-label={t('changeAvatar')} onChange={event => { void changeAvatar(event.target.files?.[0]) }} />
+          <Input ref={picker} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" aria-label={t('changeAvatar')} onChange={event => { void changeAvatar(event.target.files?.[0]) }} />
           <Button type="button" variant="secondary" size="sm" disabled={uploading} onClick={() => picker.current?.click()}>
-            <Camera />{uploading ? t('uploading') : t('changeAvatar')}
+            <Camera data-icon="inline-start" />{uploading ? t('uploading') : t('changeAvatar')}
           </Button>
         </div>
       </SettingRow>
@@ -118,10 +117,10 @@ export function AccountSettings({ user, onSignOut, signingOut }: {
           <DialogTitle>{t('deleteTitle')}</DialogTitle>
           <DialogDescription>{t('deleteBody')}</DialogDescription>
         </DialogHeader>
-        <label className="flex flex-col gap-2 text-sm">
+        <Label className="flex flex-col items-start gap-2">
           {t('deleteConfirmLabel', { email: user.email })}
           <Input value={typed} onChange={event => setTyped(event.target.value)} placeholder={user.email} autoComplete="off" />
-        </label>
+        </Label>
         {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setConfirming(false)} disabled={deleting}>{t('cancel')}</Button>

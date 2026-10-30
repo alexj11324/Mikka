@@ -8,7 +8,9 @@ import type { SignedInDevice } from '@/lib/account/sessions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import { relativeTime } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
@@ -118,20 +120,20 @@ export function SecuritySettings() {
           <DialogDescription>{hasPassword ? t('changePasswordDescription') : t('setPasswordDescription')}</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
-          {hasPassword && <label className="flex flex-col gap-1.5 text-sm">{t('currentPassword')}
+          {hasPassword && <Label className="flex flex-col items-start gap-1.5">{t('currentPassword')}
             <Input type="password" autoComplete="current-password" value={current} onChange={event => setCurrent(event.target.value)} />
-          </label>}
-          <label className="flex flex-col gap-1.5 text-sm">{t('newPassword')}
+          </Label>}
+          <Label className="flex flex-col items-start gap-1.5">{t('newPassword')}
             <Input type="password" autoComplete="new-password" value={next} onChange={event => setNext(event.target.value)} />
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm">{t('confirmPassword')}
+          </Label>
+          <Label className="flex flex-col items-start gap-1.5">{t('confirmPassword')}
             <Input type="password" autoComplete="new-password" value={again} onChange={event => setAgain(event.target.value)} />
-          </label>
+          </Label>
           {mismatch && <p role="alert" className="text-sm text-destructive">{t('passwordMismatch')}</p>}
-          {hasPassword && <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={revokeOthers} onChange={event => setRevokeOthers(event.target.checked)} />
+          {hasPassword && <Label className="flex items-center gap-2">
+            <Checkbox checked={revokeOthers} onCheckedChange={checked => setRevokeOthers(checked === true)} />
             {t('revokeOthers')}
-          </label>}
+          </Label>}
           {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
         </div>
         <DialogFooter>
