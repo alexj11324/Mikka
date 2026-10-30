@@ -28,13 +28,13 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   const stored = async (id: string) => { const { rows: [row] } = await pool.query('select * from workspace_secrets where id=$1', [id]); return secretCrypto.openSecret(row, secretCrypto.secretAad(row)) }
   const META_KEYS = ['id', 'kind', 'name', 'scopeRef', 'scopeType']
 
-  await t.test('E2B status and capability report BYO separately from storage and honor membership', async () => {
+  await t.test('E2B status and capability report mandatory BYO regardless of the legacy flag and honor membership', async () => {
     const previous = process.env.MIKKA_BYO_E2B_KEY
     try {
       for (const enabled of ['0', '1']) {
         process.env.MIKKA_BYO_E2B_KEY = enabled
-        assert.deepEqual(await e2b.getE2BKeyCapabilityForUser(admin, ws.id), { canEdit: true, configured: false, byoEnabled: enabled === '1', lastErrorCode: null, lastErrorAt: null })
-        assert.deepEqual(await e2b.getE2BKeyCapabilityForUser(member, ws.id), { canEdit: false, configured: false, byoEnabled: enabled === '1', lastErrorCode: null, lastErrorAt: null })
+        assert.deepEqual(await e2b.getE2BKeyCapabilityForUser(admin, ws.id), { canEdit: true, configured: false, byoEnabled: true, lastErrorCode: null, lastErrorAt: null })
+        assert.deepEqual(await e2b.getE2BKeyCapabilityForUser(member, ws.id), { canEdit: false, configured: false, byoEnabled: true, lastErrorCode: null, lastErrorAt: null })
         await rejects(e2b.getE2BKeyCapabilityForUser(member, other.id), 'workspaceAccessDenied')
       }
     } finally { if (previous === undefined) delete process.env.MIKKA_BYO_E2B_KEY; else process.env.MIKKA_BYO_E2B_KEY = previous }

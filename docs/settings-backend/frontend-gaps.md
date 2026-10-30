@@ -11,7 +11,7 @@ These APIs complement the frontend in #533/#535; no frontend is changed here.
 | `resetOnboarding()` | No person id | Deletes only the authenticated person's completion row |
 
 `E2BKeyStatus` adds `byoEnabled`. `configured` still means a key is saved; it
-says nothing about whether runtime BYO is enabled. `canEdit` is true for admins
+is distinct from the effective BYO policy. Current main makes BYO mandatory (#523), so `byoEnabled` is true even if the retired `MIKKA_BYO_E2B_KEY` variable is `0`. `canEdit` is true for admins
 and false for members. Keys remain write-only. The workspace arguments follow
 the other settings actions: old callers may omit them, while pages should pass
 the workspace they display. Membership and write permissions are checked against
