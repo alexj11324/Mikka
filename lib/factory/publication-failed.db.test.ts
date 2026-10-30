@@ -5,6 +5,8 @@ import { readFile, readdir } from 'node:fs/promises';
 import { Pool } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { createFactoryStore } from './store';
+import { reservePublication } from './approval';
+import { FactoryError } from './approval-contract';
 
 const base = process.env.E2E_DATABASE_URL;
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true');
@@ -75,6 +77,35 @@ test('B2/B4 migrations: failed publications are terminal and a superseded candid
     await pool.query(`UPDATE factory_attempts SET status='failed' WHERE id=(SELECT "attemptId" FROM factory_tasks WHERE id=$1)`, [taskId]);
     await store.apply('owner', await binding(), randomUUID(), { action: 'retry', reason: 'again' });
     assert.deepEqual((await pool.query(`SELECT "invalidatedAt" FROM factory_approvals WHERE id=$1`, [approvalId])).rows[0].invalidatedAt, first, 'first invalidation time kept');
+
+    // BE-4 retry: the old logical UNIQUE is gone; the partial key ignores failed rows.
+    const { rows: keys } = await pool.query(`SELECT c.relname, i.indisvalid, pg_get_expr(i.indpred, i.indrelid) AS pred FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='factory_publications_active_key'`);
+    assert.deepEqual(keys, [{ relname: 'factory_publications_active_key', indisvalid: true, pred: "(status <> 'failed'::text)" }]);
+    assert.equal((await pool.query(`SELECT count(*)::int AS n FROM pg_constraint WHERE conname='factory_publications_taskId_candidateId_action_target_key'`)).rows[0].n, 0);
+    const [a2, a3, a4] = [randomUUID(), randomUUID(), randomUUID()];
+    for (const id of [a2, a3, a4]) await approve(id, candidateId, 'preview');
+    const row = (approvalId: string) => ({ approvalId, taskId, candidateId, action: 'deploy_preview', target: 'preview', eventId: randomUUID(), request: {} });
+    const claimed = (e: unknown) => e instanceof FactoryError && e.code === 'factoryPublicationAlreadyClaimed';
+    const c1 = await pool.connect(), c2 = await pool.connect();
+    try {
+      await c1.query('BEGIN'); await c2.query('BEGIN');
+      // Both retries pass the "no live row" check; the second blocks on the partial key.
+      const won = await reservePublication(c1, row(a2));
+      let settled = false;
+      const lost = reservePublication(c2, row(a3)).finally(() => { settled = true; });
+      lost.catch(() => {});
+      await new Promise(r => setTimeout(r, 300));
+      assert.equal(settled, false, 'second retry waits for the first');
+      await c1.query('COMMIT');
+      await assert.rejects(lost, claimed);
+      await c2.query('ROLLBACK');
+      const { rows: pubs } = await pool.query(`SELECT id,status FROM factory_publications WHERE "taskId"=$1 ORDER BY "createdAt"`, [taskId]);
+      assert.deepEqual(pubs.map(p => p.status), ['failed', 'reserved'], 'failed row kept, exactly one retry took effect');
+      assert.equal(pubs[1].id, won);
+    } finally { c1.release(); c2.release(); }
+    // A live (non-failed) row still blocks a fresh attempt.
+    const c3 = await pool.connect();
+    try { await assert.rejects(reservePublication(c3, row(a4)), claimed); } finally { c3.release(); }
   } finally {
     await pool.end();
     for (let i = 0; i < 100; i++) {

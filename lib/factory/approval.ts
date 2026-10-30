@@ -92,6 +92,38 @@ const output = z
   .object({ approvalId: z.uuid(), publicationId: z.uuid().optional() })
   .strict();
 
+/** Durably reserve one logical publication. A provider-confirmed `failed` row never blocks a
+ * retry (BE-4); any other row may be a performed action and does. The partial unique index
+ * factory_publications_active_key is the backstop when two retries race past the check: the
+ * loser inserts nothing and gets factoryPublicationAlreadyClaimed. */
+export async function reservePublication(
+  tx: PoolClient,
+  p: {
+    approvalId: string;
+    taskId: string;
+    candidateId: string;
+    action: string;
+    target: string;
+    eventId: string;
+    request: unknown;
+  },
+) {
+  const {
+    rows: [prior],
+  } = await tx.query(
+    `SELECT id FROM factory_publications WHERE "taskId"=$1 AND "candidateId"=$2 AND action=$3 AND target=$4 AND status <> 'failed'`,
+    [p.taskId, p.candidateId, p.action, p.target],
+  );
+  if (prior) fail("factoryPublicationAlreadyClaimed");
+  const id = randomUUID();
+  const inserted = await tx.query(
+    `INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'reserved') ON CONFLICT DO NOTHING`,
+    [id, p.approvalId, p.taskId, p.candidateId, p.action, p.target, p.eventId, JSON.stringify(p.request)],
+  );
+  if (inserted.rowCount !== 1) fail("factoryPublicationAlreadyClaimed");
+  return id;
+}
+
 /** Browser transport authentication, not a human-approval requirement. */
 async function browserSession(tx: PoolClient, actor: FactoryActor) {
   if (!actor?.userId) fail("factoryActorRequired");
@@ -701,27 +733,15 @@ export function createFactoryApprovals(
           a.request.targetEnvironment !== req.targetEnvironment
         )
           fail("factoryApprovalInvalid");
-        const {
-          rows: [prior],
-        } = await tx.query(
-          'SELECT id FROM factory_publications WHERE "taskId"=$1 AND "candidateId"=$2 AND action=$3 AND target=$4',
-          [task.id, task.candidateId, req.action, req.target],
-        );
-        if (prior) fail("factoryPublicationAlreadyClaimed");
-        const id = randomUUID();
-        await tx.query(
-          `INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'reserved')`,
-          [
-            id,
-            a.id,
-            task.id,
-            task.candidateId,
-            req.action,
-            req.target,
-            req.eventId,
-            JSON.stringify(req),
-          ],
-        );
+        const id = await reservePublication(tx, {
+          approvalId: a.id,
+          taskId: task.id,
+          candidateId: task.candidateId!,
+          action: req.action,
+          target: req.target,
+          eventId: req.eventId,
+          request: req,
+        });
         return { id };
       });
       if ("result" in reservation) return reservation.result;
