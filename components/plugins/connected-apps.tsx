@@ -206,9 +206,9 @@ export function useConnectedApps(enabled = true) {
 export type ConnectedApps = ReturnType<typeof useConnectedApps>
 
 /** A disabled button takes no pointer events, so its reason sits on a wrapper. */
-function WhyDisabled({ reason, className, children }: { reason?: string; className?: string; children: ReactNode }) {
+function WhyDisabled({ reason, fill = false, children }: { reason?: string; fill?: boolean; children: ReactNode }) {
   if (!reason) return children
-  return <span title={reason} className={cn('inline-flex', className)}>{children}</span>
+  return <span title={reason} className={cn('inline-flex', fill && 'w-full')}>{children}</span>
 }
 
 /** Loading, setup and result lines under the list or the detail page. */
@@ -367,7 +367,7 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
           </DropdownMenu>
         </div>
       })}
-      <WhyDisabled reason={apps.unavailable} className="w-full"><Button type="button" variant="ghost" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)} className="h-auto w-full justify-start gap-3 rounded-none py-2 pr-3 pl-5 font-normal text-muted-foreground hover:bg-transparent hover:text-foreground">
+      <WhyDisabled reason={apps.unavailable} fill><Button type="button" variant="ghost" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)} className="h-auto w-full justify-start gap-3 rounded-none py-2 pr-3 pl-5 font-normal text-muted-foreground hover:bg-transparent hover:text-foreground">
         <span className="flex size-10 items-center justify-center"><Plus data-icon="inline-start" aria-hidden="true" /></span>
         {apps.pending === app ? t('working') : t('connectAnotherAccount')}
       </Button></WhyDisabled>

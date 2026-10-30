@@ -159,7 +159,7 @@ test('data export: emailed to the account\'s address, offered as a download when
   assert.equal((await account.requestDataExport()).error, 'emailDeliveryFailed')
   assert.deepEqual(calls.releaseExport.mock.calls.at(-1)?.arguments, ['alice', 'r1'])
   mailOutcome = 'unavailable'
-  assert.equal((await account.requestDataExport()).downloadPath, '/api/account/export/mkx_token')
+  assert.equal((await account.requestDataExport() as { downloadPath?: string }).downloadPath, '/api/account/export/mkx_token')
 
   reservation = { ok: false, retryAfterMinutes: 42 }
   assert.deepEqual(await account.requestDataExport(), { error: 'dataExportRateLimited', params: { minutes: 42 } })
