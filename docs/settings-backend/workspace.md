@@ -12,8 +12,8 @@
 
 | 文件 | 目标库 | 内容 |
 |---|---|---|
-| `drizzle/20261029200300_workspace_admin_identity.sql` | `DATABASE_URL` | `mikka_workspaces.icon`；新表 `mikka_workspace_slug_redirects(slug PK, workspaceId)` |
-| `drizzle/20261029200301_workspace_admin_settings.sql` | `MIKKA_DATABASE_URL` | 新表 `workspace_settings`；`bots` 新增 `model`、`repository`、`monthlyCreditLimit` 列；`bot_subagents` 指向 bots 的外键改成 `ON UPDATE CASCADE`；计费表 `workspace_billing`、`workspace_credit_grants`、`stripe_webhook_events`（已建表，读写逻辑没有交付） |
+| `drizzle/20261029213938_workspace_admin_identity.sql` | `DATABASE_URL` | `mikka_workspaces.icon`；新表 `mikka_workspace_slug_redirects(slug PK, workspaceId)` |
+| `drizzle/20261029213939_workspace_admin_settings.sql` | `MIKKA_DATABASE_URL` | 新表 `workspace_settings`；`bots` 新增 `model`、`repository`、`monthlyCreditLimit` 列；`bot_subagents` 指向 bots 的外键改成 `ON UPDATE CASCADE`；计费表 `workspace_billing`、`workspace_credit_grants`、`stripe_webhook_events`（已建表，读写逻辑没有交付） |
 
 ## 常规
 

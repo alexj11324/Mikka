@@ -1,6 +1,6 @@
 // 设置 › 密钥与环境 + BYO E2B key against a real PostgreSQL. Uses a random per-run WORKSPACE_SECRETS_KEY only.
 import assert from 'node:assert/strict'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
@@ -201,12 +201,13 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     await store.createWorkspaceSecret(admin, third.id, { name: 'SHORT', kind: 'secret', value: 'abc1234' })
     await store.createWorkspaceSecret(admin, third.id, { name: 'REGION', kind: 'env', value: 'us-east-1-long' })
     await store.createWorkspaceSecret(admin, third.id, { name: 'REPO_ONLY', kind: 'secret', value: 'repo-scoped-value', scope: { type: 'repository', repository: 'acme/app' } })
-    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, off), {}, 'flag off: nothing injected')
+    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, 'production', off), {}, 'flag off: nothing injected')
     await store.createWorkspaceSecret(admin, third.id, { name: 'PROD_ONLY', kind: 'env', value: 'prod-value', environment: 'production' })
     await store.createWorkspaceSecret(admin, third.id, { name: 'PREVIEW_ONLY', kind: 'secret', value: 'preview-secret-value', environment: 'preview' })
     await store.createWorkspaceSecret(admin, third.id, { name: 'DEV_ONLY', kind: 'secret', value: 'dev-secret-value', environment: 'development' })
-    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long', PROD_ONLY: 'prod-value' }, 'only environment all + production are injected')
-    assert.equal((await runtime.workspaceSecretMasker(third.id, on))('preview-secret-value dev-secret-value'), 'preview-secret-value dev-secret-value', 'preview/development values are not loaded at runtime')
+    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, 'production', on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long', PROD_ONLY: 'prod-value' }, 'only environment all + production are injected')
+    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, 'preview', on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long', PREVIEW_ONLY: 'preview-secret-value' }, '4e3: a preview run gets all + preview, never production')
+    assert.equal((await runtime.workspaceSecretMasker(third.id, on))('preview-secret-value dev-secret-value'), '[secret:PREVIEW_ONLY] dev-secret-value', '4e3: preview values reach sandboxes so they are masked; development never does')
     const chunk = { type: 'text-delta', delta: `push ${TOKEN} b64=${Buffer.from(TOKEN).toString('base64')} short=abc1234 region=us-east-1-long`, nested: [{ url: `https://x/?t=${encodeURIComponent(TOKEN)}` }] }
     const offMask = await runtime.workspaceSecretMasker(third.id, off)
     assert.deepEqual(maskDeep(chunk, offMask), chunk, 'flag off: stored verbatim (today)')
@@ -218,7 +219,7 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     const otherMask = await runtime.workspaceSecretMasker(other.id, on)
     assert.ok(otherMask(TOKEN) === TOKEN, 'another workspace does not mask this one\'s values')
     assert.equal((await runtime.workspaceSecretMasker(null, on))('x'), 'x')
-    await assert.rejects(runtime.taskSecretEnv(third.id, null, { MIKKA_BYO_E2B_KEY: '1' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
+    await assert.rejects(runtime.taskSecretEnv(third.id, null, 'production', { MIKKA_BYO_E2B_KEY: '1' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
   })
 
   await t.test('4e3 task env: workspace + matching repo only, repo overrides, all/production, lowercase; masker covers repo secrets', async () => {
@@ -232,10 +233,10 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     await store.createWorkspaceSecret(admin, w.id, { name: 'REPO_ENV', kind: 'env', value: 'repo-prod', environment: 'production', scope: { type: 'repository', repository: 'acme/app' } })
     await store.createWorkspaceSecret(admin, w.id, { name: 'REPO_PREVIEW', kind: 'secret', value: 'repo-preview-value', environment: 'preview', scope: { type: 'repository', repository: 'acme/app' } })
     await store.createWorkspaceSecret(admin, w.id, { name: 'OTHER', kind: 'secret', value: OTHER_TOKEN, scope: { type: 'repository', repository: 'acme/other' } })
-    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'acme/app', off), {}, 'flag off: nothing')
-    assert.deepEqual(await runtime.taskSecretEnv(w.id, null, on), { API_TOKEN: 'workspace-api-token', REGION: 'ws-region' }, 'no repo: workspace only')
-    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'ACME/App', on), { API_TOKEN: REPO_TOKEN, REGION: 'ws-region', REPO_ENV: 'repo-prod' }, 'repo overrides workspace; case-insensitive; no preview; no other repo')
-    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'acme/unknown', on), { API_TOKEN: 'workspace-api-token', REGION: 'ws-region' })
+    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'acme/app', 'production', off), {}, 'flag off: nothing')
+    assert.deepEqual(await runtime.taskSecretEnv(w.id, null, 'production', on), { API_TOKEN: 'workspace-api-token', REGION: 'ws-region' }, 'no repo: workspace only')
+    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'ACME/App', 'production', on), { API_TOKEN: REPO_TOKEN, REGION: 'ws-region', REPO_ENV: 'repo-prod' }, 'repo overrides workspace; case-insensitive; no preview; no other repo')
+    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'acme/unknown', 'production', on), { API_TOKEN: 'workspace-api-token', REGION: 'ws-region' })
     assert.equal(runtime.remoteRepositoryRef('https://github.com/Acme/App.git'), 'acme/app')
     assert.equal(runtime.remoteRepositoryRef('git@github.com:Acme/App.git'), 'acme/app')
     assert.equal(runtime.remoteRepositoryRef('ssh://git@github.com/acme/app'), 'acme/app')
@@ -244,8 +245,28 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     assert.equal(runtime.remoteRepositoryRef('https://gitlab.com/acme/app.git'), null)
     assert.equal(runtime.remoteRepositoryRef('https://github.com/acme/../app'), null)
     assert.equal(runtime.remoteRepositoryRef(null), null)
+    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'acme/app', 'preview', on), { API_TOKEN: REPO_TOKEN, REGION: 'ws-region', REPO_PREVIEW: 'repo-preview-value' }, 'preview run: repo preview value, no production value')
+    await store.createWorkspaceSecret(admin, w.id, { name: 'REGION', kind: 'env', value: 'ws-region-prod', environment: 'production' })
+    assert.equal((await runtime.taskSecretEnv(w.id, null, 'production', on)).REGION, 'ws-region-prod', 'the specific environment beats all')
+    assert.equal((await runtime.taskSecretEnv(w.id, null, 'preview', on)).REGION, 'ws-region')
     const mask = await runtime.workspaceSecretMasker(w.id, on)
     assert.equal(mask(`${REPO_TOKEN} ${OTHER_TOKEN} repo-prod`), '[secret:API_TOKEN] [secret:OTHER] repo-prod', 'repo-scoped secrets masked; env not')
+    assert.equal(mask('repo-preview-value'), '[secret:REPO_PREVIEW]')
+  })
+
+  await t.test('#436 defense in depth: a reserved name reaching injection is skipped and audited by name only', async () => {
+    const events: { action: string; label: string; json: string }[] = []
+    const audit = async (_tx: unknown, e: { action: string; target: { label: string } }) => { events.push({ action: e.action, label: e.target.label, json: JSON.stringify(e) }) }
+    const value = 'reserved-value-' + randomUUID()
+    const runtime = await import('../lib/secrets/runtime')
+    const out = await runtime.reservedInjectionFilter(randomUUID(), [
+      { id: randomUUID(), name: 'BASH_ENV', kind: 'env', value },
+      { id: randomUUID(), name: 'npm_config_registry', kind: 'env', value },
+      { id: randomUUID(), name: 'OK_NAME', kind: 'secret', value: 'fine' },
+    ], { actorId: admin, audit })
+    assert.deepEqual(out, { OK_NAME: 'fine' })
+    assert.deepEqual(events.map(e => [e.action, e.label]), [['secret.injection_skipped', 'BASH_ENV'], ['secret.injection_skipped', 'npm_config_registry']])
+    assert.ok(events.every(e => !e.json.includes(value)), 'the value is never in the audit entry')
   })
 
   await t.test('4e2 item 4: run-scoped masking resolves the cloud token workspace; checkpoint patch/files masked', async () => {

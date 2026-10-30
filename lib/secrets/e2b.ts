@@ -10,14 +10,8 @@ import { e2bKeyAad, openSecret, sealSecret, SecretsKeyMissingError } from './cry
 import { e2bKeyInput } from './format'
 import { guardSecretsDb, logSecretFailure, noAudit, requireSecretPermission, type SecretAuditHook } from './store'
 
-export type E2BKeyErrorCode = 'e2b_key_missing' | 'e2b_key_invalid' | 'e2b_limit_reached' | 'e2b_template_unavailable' | 'e2b_unavailable'
-/** Thrown at dispatch / sandbox creation; the client shows a prompt per code. */
-export class E2BKeyError extends Error {
-  constructor(readonly code: E2BKeyErrorCode, readonly detail?: string) { super(code); this.name = 'E2BKeyError' }
-}
-
-/** Runtime flag. Off (default) = platform E2B_API_KEY exactly as today. On = workspace key only, no fallback. Enabling needs Alex's approval. */
-export const byoE2BKeyEnabled = (env: Record<string, string | undefined> = process.env) => env.MIKKA_BYO_E2B_KEY === '1'
+import { byoE2BKeyEnabled, E2BKeyError, type E2BKeyErrorCode } from './flag'
+export { byoE2BKeyEnabled, E2BKeyError, type E2BKeyErrorCode }
 
 /** Design update (#436): no last4, verifiedAt or updatedAt in responses (still stored). */
 export interface E2BKeyStatus { configured: boolean; lastErrorCode: string | null; lastErrorAt: string | null }

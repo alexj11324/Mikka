@@ -28,7 +28,8 @@ import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { PublicationError } from '@/lib/run-publication-result'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
-import { remoteRepositoryRef, taskSecretEnv } from '@/lib/secrets/runtime'
+import { remoteRepositoryRef, resolveRunSecretsEnvironment, taskSecretEnv, type RunSecretsEnvironment } from '@/lib/secrets/runtime'
+import { byoE2BKeyEnabled } from '@/lib/secrets/flag'
 
 export const dynamic = 'force-dynamic'
 
@@ -109,14 +110,34 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   let publication: Awaited<ReturnType<typeof import('@/lib/run-publications')['prepareRunPublication']>> | null = null
   let localComputer: Awaited<ReturnType<typeof localComputerAuthority>> = null
   let taskEnv: Record<string, string> = {}
+  let secretsEnvironment: RunSecretsEnvironment | null = null
   if (device.kind === 'cloud') {
     if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     // 4e3: the task's explicit user variables (workspace + this repo's secrets/env). Resolved before the
     // claim so a decrypt failure leaves the run queued. Flag off = {}. Only cloud workers get it.
-    try { taskEnv = await taskSecretEnv(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl)) }
-    catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
+    // Environment: default branch -> production, other/unknown -> preview; only an admin-started run may override to production.
+    if (byoE2BKeyEnabled(process.env)) {
+      let starterRole: 'admin' | 'member' | null = null
+      if (run.secretsEnvironmentOverride === 'production') {
+        try { starterRole = await (await import('@/lib/secrets/store')).workspaceRole(run.userId, caller.scopeWorkspaceId) } catch { starterRole = null }
+      }
+      const resolved = resolveRunSecretsEnvironment({ deviceKind: 'cloud', runBaseBranch: run.baseBranch, repoDefaultBranch: repo.baseBranch, override: run.secretsEnvironmentOverride, starterRole })
+      if (resolved.rejected) {
+        // Audited by ids only. TODO(audit): recordAudit (#432) 'secret.environment_override_rejected' once it lands.
+        console.warn(JSON.stringify({ audit: 'secret.environment_override_rejected', workspaceId: caller.scopeWorkspaceId, actorId: run.userId, runId, requested: 'production' }))
+        await db.update(agentRuns)
+          .set({ status: 'failed', stopReason: 'error', error: 'Only a workspace admin may run a task with production secrets.', finishedAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'queued')))
+        return NextResponse.json({ error: 'Only a workspace admin may run a task with production secrets.', code: 'secretEnvironmentForbidden' }, { status: 403 })
+      }
+      secretsEnvironment = resolved.environment
+      try { taskEnv = await taskSecretEnv(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl), resolved.environment) }
+      catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
+    }
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id, beforeClaim, afterClaim)
     if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
+    // 4e3: the run record keeps the environment its secrets came from.
+    if (secretsEnvironment) await db.update(agentRuns).set({ secretsEnvironment }).where(eq(agentRuns.id, runId))
   } else {
     const { prepareRunPublication, persistRunCompletion } = await import('@/lib/run-publications')
     try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
@@ -128,6 +149,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     }
     const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim)
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
+    // 4e3: local runs are development; nothing is injected into them.
+    await db.update(agentRuns).set({ secretsEnvironment: 'development' }).where(eq(agentRuns.id, runId))
   }
   if (device.kind !== 'cloud' && device.computerUse?.installed) {
     const current = await localComputerAuthority(pool, caller.userId, deviceId, runId)

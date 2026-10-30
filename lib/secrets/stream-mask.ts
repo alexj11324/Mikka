@@ -52,7 +52,7 @@ export function maskStreamedChunks(chunks: readonly Chunk[], mask: Masker, pendi
       const tail = flush(key)
       const previous = lastDelta.get(key)
       if (tail && end.deltaType && previous) previous[DELTAS[end.deltaType]!.textField] = `${previous[DELTAS[end.deltaType]!.textField] as string}${tail}`
-      else if (tail && end.deltaType) { out.push({ type: end.deltaType, id: chunk.id, delta: tail }); continue }
+      else if (tail && end.deltaType) out.push({ type: end.deltaType, id: chunk.id, delta: tail })
       out.push(maskDeep(chunk, mask))
       continue
     }
@@ -62,6 +62,14 @@ export function maskStreamedChunks(chunks: readonly Chunk[], mask: Masker, pendi
         const previous = lastDelta.get(key)
         const field = key.startsWith('tool:') ? 'inputTextDelta' : 'delta'
         if (tail && previous) previous[field] = `${previous[field] as string}${tail}`
+        else if (tail) {
+          const sep = key.indexOf(':')
+          const prefix = key.slice(0, sep)
+          const id = key.slice(sep + 1)
+          out.push(prefix === 'tool'
+            ? { type: 'tool-input-delta', toolCallId: id, inputTextDelta: tail }
+            : { type: `${prefix}-delta`, id, delta: tail })
+        }
       }
     }
     out.push(maskDeep(chunk, mask))
