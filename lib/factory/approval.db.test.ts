@@ -795,11 +795,14 @@ test(
             "UPDATE factory_approvals SET \"expiresAt\"=now()-interval '1 minute' WHERE id=$1",
             [p.approvalId],
           );
-          await rejects(() => s.publish(actor, p), "factoryApprovalInvalid");
-          await rejects(
-            () => s.reconcile(actor, { ...p, publicationId: r.publicationId }),
-            "factoryApprovalInvalid",
+          // Expiry gates only new reservations: the recorded outcome still replays, with no POST.
+          const before = provider.posts();
+          assert.deepEqual(await s.publish(actor, p), r);
+          assert.deepEqual(
+            await s.reconcile(actor, { ...p, publicationId: r.publicationId }),
+            r,
           );
+          assert.equal(provider.posts(), before);
           const tx = await pool.connect();
           try {
             assert.equal(
@@ -818,6 +821,12 @@ test(
               approvalId: p.approvalId,
               eventId: randomUUID(),
             });
+            await rejects(() => s.publish(actor, p), "factoryApprovalInvalid");
+            await rejects(
+              () =>
+                s.reconcile(actor, { ...p, publicationId: r.publicationId }),
+              "factoryApprovalInvalid",
+            );
             await rejects(
               () =>
                 readFactoryPublicationReceiptV2(
@@ -830,6 +839,121 @@ test(
             );
           } finally {
             tx.release();
+          }
+        },
+      );
+      await t.test(
+        "pending publication: an expired grant and a signed-out approver still let another session record the provider result",
+        async () => {
+          const x = await f.prepare(),
+            human = { ...x.approval } as Record<string, unknown>,
+            s = f.service([f.adapter], null);
+          delete human.decisionCredentialId;
+          const approved = await s.approve(actor, human);
+          const p = {
+            ...approved,
+            eventId: randomUUID(),
+            action: x.approval.action,
+            target: x.approval.target,
+            targetEnvironment: x.approval.targetEnvironment,
+          };
+          provider.state.readyState = "BUILDING";
+          const other = {
+            userId: actor.userId,
+            sessionId: `other-device-${randomUUID()}`,
+          };
+          try {
+            await assert.rejects(
+              () => s.publish(actor, p),
+              (e: unknown) =>
+                e instanceof PublicationDeferred && e.state === "pending",
+            );
+            const op = (await s.ledger(actor, x.task.id)).publications[0];
+            assert.equal(op.status, "reserved");
+            const posts = provider.posts();
+            // More than the grant's lifetime later, from another device, approver signed out.
+            await pool.query(
+              "UPDATE factory_approvals SET \"expiresAt\"=now()-interval '1 minute' WHERE id=$1",
+              [p.approvalId],
+            );
+            await pool.query(
+              'UPDATE "session" SET "expiresAt"=now()-interval \'1 minute\' WHERE id=$1',
+              [actor.sessionId],
+            );
+            await pool.query(
+              `INSERT INTO "session" VALUES ($1,$2,now()+interval '1 hour')`,
+              [other.sessionId, other.userId],
+            );
+            for (const d of provider.deployments.values())
+              d.readyState = "READY";
+            const result = await s.reconcile(other, {
+              ...p,
+              publicationId: op.id,
+            });
+            assert.equal(result.publicationId, op.id);
+            assert.equal(provider.posts(), posts, "reconcile never POSTs");
+            const ledger = await s.ledger(other, x.task.id);
+            assert.equal(ledger.publications[0].status, "succeeded");
+            assert.equal(ledger.binding.revision, result.binding.revision);
+            const {
+              rows: [task],
+            } = await pool.query(
+              "SELECT stage,status FROM factory_tasks WHERE id=$1",
+              [x.task.id],
+            );
+            assert.deepEqual(task, { stage: "publish", status: "passed" });
+            // The finished publish stage cannot be reserved again.
+            await rejects(
+              () => s.publish(other, { ...p, eventId: randomUUID() }),
+              "factoryStale",
+            );
+          } finally {
+            provider.state.readyState = "READY";
+            await pool.query(
+              'UPDATE "session" SET "expiresAt"=now()+interval \'1 hour\' WHERE id=$1',
+              [actor.sessionId],
+            );
+          }
+        },
+      );
+      await t.test(
+        "pending publication: a revoked grant blocks reconcile and every new publish",
+        async () => {
+          const x = await f.prepare(),
+            p = await x.publication(),
+            s = f.service();
+          provider.state.readyState = "BUILDING";
+          try {
+            await assert.rejects(
+              () => s.publish(actor, p),
+              (e: unknown) => e instanceof PublicationDeferred,
+            );
+            const op = (await s.ledger(actor, x.task.id)).publications[0];
+            await s.revoke(actor, {
+              binding: p.binding,
+              approvalId: p.approvalId,
+              eventId: randomUUID(),
+            });
+            for (const d of provider.deployments.values())
+              d.readyState = "READY";
+            const before = provider.posts(),
+              requests = provider.requests.length;
+            await rejects(
+              () => s.reconcile(actor, { ...p, publicationId: op.id }),
+              "factoryApprovalInvalid",
+            );
+            assert.equal(provider.requests.length, requests, "provider not asked");
+            assert.equal(
+              (await s.ledger(actor, x.task.id)).publications[0].status,
+              "reserved",
+            );
+            await rejects(
+              () => s.publish(actor, { ...p, eventId: randomUUID() }),
+              "factoryApprovalInvalid",
+            );
+            assert.equal(provider.posts(), before);
+          } finally {
+            provider.state.readyState = "READY";
           }
         },
       );
