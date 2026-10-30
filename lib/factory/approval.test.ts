@@ -273,7 +273,6 @@ test(
           targetEnvironment: "local-contract",
           expiresAt: new Date(Date.now() + 600000).toISOString(),
           evidenceDigest: e.evidenceDigest,
-          evidenceReadId: e.evidenceReadId,
           ...overrides,
         }, e);
       }
@@ -369,11 +368,6 @@ test(
           await rejects(
             () => service.approve({ ...actor, sessionId: "worker-token" }, req),
             "factoryHumanRequired",
-          );
-          await rejects(
-            () =>
-              service.approve(actor, { ...req, evidenceReadId: randomUUID() }),
-            "factoryEvidenceMismatch",
           );
           await rejects(
             () =>
@@ -557,7 +551,7 @@ test(
           );
           await rejects(
             () => service.approve(actor, req),
-            "factoryEvidenceMismatch",
+            "factoryPolicyDecisionMismatch",
           );
           await pool.query(
             `UPDATE factory_attempts SET "sessionId"='executor-session' WHERE "taskId"=$1 AND stage IN ('execute','review')`,
@@ -1562,7 +1556,6 @@ test(
               eventId: randomUUID(),
               candidate: e.manifest.candidate,
               evidenceDigest: e.evidenceDigest,
-              evidenceReadId: e.evidenceReadId,
               action: "deploy_preview",
               target: "local-isolated-filesystem",
               targetEnvironment: "local-contract",

@@ -41,7 +41,7 @@ export function createFactoryTestAuthority() {
         action: request.action,
         target: request.target,
         targetEnvironment: request.targetEnvironment,
-        evidenceDigest: request.evidenceDigest,
+        evidenceDigest: request.evidenceDigest!,
         expiresAt: request.expiresAt,
         visualEvidenceDigests: evidence.manifest.artifacts
           .filter(artifact => artifact.kind === 'screenshot' || artifact.kind === 'video')

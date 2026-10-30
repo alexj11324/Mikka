@@ -117,7 +117,7 @@ export async function factory194Fixture(connectionString: string) {
       action: req.action,
       target: req.target,
       targetEnvironment: req.targetEnvironment,
-      evidenceDigest: req.evidenceDigest,
+      evidenceDigest: req.evidenceDigest!,
       visualEvidenceDigests: [],
       expiresAt: req.expiresAt,
     };
@@ -143,7 +143,7 @@ export async function factory194Fixture(connectionString: string) {
         capability: "vision",
         visualInputRequired: false,
         scopeDigest: digest(scope),
-        evidenceDigest: req.evidenceDigest,
+        evidenceDigest: req.evidenceDigest!,
         imageDigests: [],
       },
     });
@@ -389,7 +389,6 @@ export async function factory194Fixture(connectionString: string) {
       targetEnvironment: "preview",
       expiresAt: new Date(Date.now() + 600000).toISOString(),
       evidenceDigest: e.evidenceDigest,
-      evidenceReadId: e.evidenceReadId,
       decisionCredentialId: randomUUID(),
     };
     Object.assign(approval, issuePolicyDecision(approval));

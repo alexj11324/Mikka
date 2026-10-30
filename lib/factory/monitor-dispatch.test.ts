@@ -285,7 +285,6 @@ test(
           targetEnvironment: environment,
           expiresAt: new Date(Date.now() + 600000).toISOString(),
           evidenceDigest: evidence.evidenceDigest,
-          evidenceReadId: evidence.evidenceReadId,
         }, evidence));
         const published = await service.publish(actor, {
           ...approval,
