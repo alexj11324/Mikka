@@ -180,7 +180,8 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, onOptimisticC
             <Field data-invalid={titleMissing > 0 && !title.trim() ? true : undefined}>
               <FieldLabel htmlFor="new-issue-title" className="sr-only">{i18nText("IssueDetail.dialog.taskTitleLabel")}</FieldLabel>
               <Input ref={titleRef} id="new-issue-title" aria-invalid={titleMissing > 0 && !title.trim() ? true : undefined} aria-describedby={titleMissing > 0 && !title.trim() ? 'new-issue-title-error' : undefined} autoFocus autoComplete="off" maxLength={200} placeholder={i18nText("IssueDetail.dialog.taskTitleLabel")} value={title} onChange={event => { setTitle(event.target.value); setError('') }} className="w-full border-none bg-transparent px-0 py-1 text-lg font-semibold shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent" />
-              {titleMissing > 0 && !title.trim() && <FieldError key={titleMissing} id="new-issue-title-error" className="animate-in fade-in-0 slide-in-from-left-1 duration-150 motion-reduce:animate-none">{i18nText("Issue.create.titleRequired")}</FieldError>}
+              {/* MIK-18: reserve the error row so its first appearance does not resize the dialog. */}
+              <div data-slot="new-issue-title-error-row" className="min-h-5">{titleMissing > 0 && !title.trim() && <FieldError key={titleMissing} id="new-issue-title-error" className="animate-in fade-in-0 slide-in-from-left-1 duration-150 motion-reduce:animate-none">{i18nText("Issue.create.titleRequired")}</FieldError>}</div>
             </Field>
             <Field>
               <FieldLabel className="sr-only">{i18nText("Editor.descriptionLabel")}</FieldLabel>

@@ -44,7 +44,9 @@ function TaskCard({ task, status, disabled, isOverlay = false, onOpen, onStatusC
   const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
   const optimistic = 'optimistic' in task && task.optimistic === true
   const controlsDisabled = disabled || isOverlay || optimistic
-  const card = <Card size="sm" className={cn('select-none gap-2 shadow-xs transition-shadow hover:ring-foreground/20 hover:shadow-sm', isOverlay && 'pointer-events-none shadow-lg')}>
+  // MIK-18: until the real id arrives the optimistic card is neither openable nor draggable, and looks it.
+  const blocked = disabled || optimistic
+  const card = <Card size="sm" className={cn('select-none gap-2 shadow-xs transition-shadow', !optimistic && 'hover:ring-foreground/20 hover:shadow-sm', isOverlay && 'pointer-events-none shadow-lg')}>
     <CardHeader className="flex min-w-0 items-center justify-between gap-2">
       <CardDescription className="truncate tabular-nums">{issueIdentifier(task.metadata.number, tIssue('unassignedNumber'))}</CardDescription>
       <div className="flex shrink-0 items-center gap-1">
@@ -63,16 +65,16 @@ function TaskCard({ task, status, disabled, isOverlay = false, onOpen, onStatusC
   </Card>
 
   return <KanbanItem value={task.id} disabled={disabled || optimistic} data-optimistic={optimistic ? '' : undefined} aria-busy={optimistic || undefined} className={cn('shrink-0', optimistic && 'max-h-64 overflow-hidden opacity-100 transition-[max-height,opacity] duration-200 ease-out starting:max-h-0 starting:opacity-0 motion-reduce:transition-none')} role="group" tabIndex={-1} aria-label={task.title}>
-    {isOverlay ? card : <KanbanItemHandle cursor={false} role="group" tabIndex={disabled ? -1 : 0} className="block cursor-pointer touch-pan-y rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging=true]:cursor-grabbing" aria-label={t('openTask', { title: task.title })} aria-roledescription={t('openableDraggableTask')} aria-keyshortcuts="Enter Space" onClick={event => {
-      if (disabled || event.defaultPrevented || (event.target as HTMLElement).closest('[data-card-control]')) return
+    {isOverlay ? card : <KanbanItemHandle cursor={false} role="group" tabIndex={blocked ? -1 : 0} className={cn("block touch-pan-y rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging=true]:cursor-grabbing", !blocked && 'cursor-pointer')} aria-label={t('openTask', { title: task.title })} aria-roledescription={t('openableDraggableTask')} aria-keyshortcuts="Enter Space" onClick={event => {
+      if (blocked || event.defaultPrevented || (event.target as HTMLElement).closest('[data-card-control]')) return
       onOpen(task.id)
     }} onKeyDownCapture={event => {
       if (event.target !== event.currentTarget || event.nativeEvent.isComposing || event.keyCode === 229 || event.currentTarget.dataset.dragging === 'true') return
-      if (event.key.toLowerCase() === 'a' && !disabled && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (event.key.toLowerCase() === 'a' && !blocked && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault(); event.stopPropagation()
         event.currentTarget.querySelector<HTMLButtonElement>('[data-assignee-trigger]')?.click()
       }
-      if (event.key === 'Enter' && !disabled) {
+      if (event.key === 'Enter' && !blocked) {
         event.preventDefault()
         event.stopPropagation()
         onOpen(task.id)
