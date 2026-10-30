@@ -79,7 +79,7 @@ jobs:
     # Preserve the historical status-check name even for docs-only PRs.
     name: analytics-ssr
     needs: [changes, analytics-ssr-full]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
