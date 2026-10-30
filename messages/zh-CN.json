@@ -1717,7 +1717,10 @@
       "transferTo": "新的所有者",
       "transferring": "正在转让…",
       "transferNoMembers": "没有其他成员",
-      "transferred": "已转让给 {name}"
+      "transferred": "已转让给 {name}",
+      "replayOnboarding": "重新播放引导",
+      "replay": "重新播放",
+      "replaying": "正在重新播放…"
     },
     "computerPolicy": {
       "heading": "电脑操作",
@@ -2129,7 +2132,8 @@
         "newKey": "新的 API Key",
         "remove": "移除",
         "removing": "正在移除…",
-        "verifying": "正在验证…"
+        "verifying": "正在验证…",
+        "byoOff": "未启用"
       }
     },
     "audit": {

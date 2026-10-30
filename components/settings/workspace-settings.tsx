@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { withBasePath } from '@/lib/base-path'
+import { resetOnboarding } from '@/lib/settings/backend-538'
 import { useActionError } from '@/lib/use-action-error'
 
 const ICON_MAX_BYTES = 200 * 1024
@@ -106,11 +107,11 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const icon = <Avatar className="size-8"><AvatarImage src={current.icon ?? undefined} alt="" /><AvatarFallback>{initial}</AvatarFallback></Avatar>
 
   // S-P: members read the same rows as plain values, with no controls.
-  if (!current.canEdit) return <SettingsSection id="workspace-general">
+  if (!current.canEdit) return <><SettingsSection id="workspace-general">
     <SettingRow title={t('icon')}>{icon}</SettingRow>
     <SettingRow title={t('name')}><span>{current.name}</span></SettingRow>
     {current.slug && <SettingRow title={t('address')}><span className="break-all">{host}{current.slug}</span></SettingRow>}
-  </SettingsSection>
+  </SettingsSection><ReplayOnboarding /></>
 
   return <>
     <SettingsSection id="workspace-general">
@@ -137,6 +138,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
       </SettingRow>
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => { if (failed.field === 'icon' && failed.value === null) { fileRef.current?.click(); return } void save(failed.field, failed.value) }} />}
+    <ReplayOnboarding />
 
     <SettingsSection id="workspace-danger" title={t('danger')}>
       {current.canTransfer && <SettingRow title={t('transferWorkspace')}>
@@ -150,6 +152,39 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
     {transferring && <TransferWorkspaceDialog workspaceId={current.id} name={current.name} onClose={() => setTransferring(false)}
       onDone={owner => { setTransferring(false); setTransferredTo(owner); void general.mutate() }} />}
     {deleting && <DeleteWorkspaceDialog workspaceId={current.id} name={current.name} onClose={() => setDeleting(false)} />}
+  </>
+}
+
+/**
+ * 重新播放引导 (docs/design/onboarding.md §3): clears this person's completion (#538 `resetOnboarding`)
+ * and reloads the app, which shows the first-run guide again. Personal, so members see it too.
+ */
+function ReplayOnboarding() {
+  const t = useTranslations('Settings.workspaceForm')
+  const commonT = useTranslations('Common')
+  const actionError = useActionError()
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function replay() {
+    setPending(true)
+    setError(null)
+    try {
+      await resetOnboarding()
+      window.location.assign(withBasePath('/'))
+    } catch {
+      setError(actionError())
+      setPending(false)
+    }
+  }
+
+  return <>
+    <SettingsSection id="workspace-onboarding">
+      <SettingRow title={t('replayOnboarding')}>
+        <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => void replay()}>{pending ? t('replaying') : t('replay')}</Button>
+      </SettingRow>
+    </SettingsSection>
+    {error && <SettingsSaveError message={error} retryLabel={commonT('retry')} onRetry={() => void replay()} />}
   </>
 }
 

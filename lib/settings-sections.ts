@@ -24,6 +24,12 @@ export interface SettingsSectionDef {
   unbuilt?: true
 }
 
+/**
+ * #538 point 5: the API routes accept a personal access token as a bearer. Set it to true when
+ * that backend merges and 个人访问令牌 appears; the section, its actions and `lastUsedAt` are built.
+ */
+export const PERSONAL_ACCESS_TOKENS_ACCEPTED: boolean = false
+
 export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'account', group: 'personal', title: 'Account' },
   { id: 'security', group: 'personal', title: 'Security' },
@@ -36,8 +42,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
   { id: 'activity', group: 'personal', title: 'Activity' },
   { id: 'computers', group: 'personal', title: 'Devices' },
-  // Hidden until an API accepts the tokens (Alex); the UI and token store are built. Delete `unbuilt` to ship it.
-  { id: 'developer', group: 'personal', title: 'Personal access tokens', unbuilt: true },
+  // Hidden until an API accepts the tokens (Alex); the UI and token store are built.
+  { id: 'developer', group: 'personal', title: 'Personal access tokens', ...(PERSONAL_ACCESS_TOKENS_ACCEPTED ? {} : { unbuilt: true }) },
   { id: 'general', group: 'workspace', title: 'General' },
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
