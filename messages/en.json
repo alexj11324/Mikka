@@ -3056,6 +3056,8 @@
     "publicationUnavailable": "Publication is unavailable: no publication target is configured.",
     "attestationRequired": "Production needs a signed attestation.",
     "artifactError": "The evidence did not open.",
+    "superseded": "{sha} · Invalidated",
+    "loadError": "Could not load the acceptance",
     "closeEvidence": "Close evidence",
     "skillState": {
       "pending": "Ready to enable",

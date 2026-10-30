@@ -3,11 +3,11 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ChevronRight, ClipboardCheck, FileText, Image as ImageIcon, Play, X } from 'lucide-react'
+import { ChevronRight, ClipboardCheck, FileText, Image as ImageIcon, Play, RefreshCw, X } from 'lucide-react'
 import { Alert, AlertAction, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
@@ -65,7 +65,7 @@ export function FactoryListError({ retrying, onRetry }: { retrying: boolean; onR
   const t = useTranslations('FactoryAcceptance')
   return <Alert>
     <AlertTitle>{t('listError')}</AlertTitle>
-    <AlertAction><Button size="sm" disabled={retrying} aria-busy={retrying} onClick={onRetry}>{retrying && <Spinner data-icon="inline-start" />}{t('retry')}</Button></AlertAction>
+    <AlertAction><Button size="sm" disabled={retrying} aria-busy={retrying} onClick={onRetry}>{retrying ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" aria-hidden="true" />}{t('retry')}</Button></AlertAction>
   </Alert>
 }
 
@@ -133,7 +133,8 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
   const t = useTranslations('FactoryAcceptance')
   const format = useFormatter()
   const { ledger, reload, ledgerError, derived: acceptance } = useAcceptance(task)
-  const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' ? `/api/factory/tasks/${task.id}/approval` : null, request)
+  // A voided approval puts the task back to pending, so the current candidate's evidence is needed to enable it again.
+  const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded ? `/api/factory/tasks/${task.id}/approval` : null, request)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [artifact, setArtifact] = useState<{ name: string; content: string } | null>(null)
@@ -146,7 +147,10 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
   const state = derived.state
   const active = derived.active as Approval | undefined
   const publication = derived.publication as Publication | undefined
-  const candidate = evidence?.manifest.candidate ?? active?.candidate ?? latest?.candidate
+  const superseded = derived.superseded as Approval | undefined
+  // Only an approval on the current candidate may describe it; a voided one carries the old sha.
+  const current = latest && latest.candidateId === task.candidateId ? latest : undefined
+  const candidate = evidence?.manifest.candidate ?? active?.candidate ?? current?.candidate
   const environment = environmentOf(candidate)
   const reference = publication?.receipt?.verifiedTarget?.reference
 
@@ -219,9 +223,9 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
         <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
       </header>
       <div className="flex min-h-0 flex-1">
-        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-background">
-          {(ledgerError || evidenceError) ? <p role="alert" className="px-8 py-6 text-xs text-destructive">{t('error')}</p>
-            : !ledger || (task.stage === 'approval' && !evidence) ? <div className="flex flex-1 items-center justify-center"><Spinner /></div>
+        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+          {(ledgerError || evidenceError) ? <p role="alert" className="px-8 py-6 text-xs text-destructive">{t('loadError')}</p>
+            : !ledger || ((task.stage === 'approval' || superseded) && !evidence) ? <div className="flex flex-1 items-center justify-center"><Spinner /></div>
               : <div className="mx-auto flex w-full max-w-[40rem] flex-col gap-8 px-8 py-6">
                 <section className="flex flex-col gap-2">
                   <h4 className="text-xs font-medium text-muted-foreground">{t('candidate')}</h4>
@@ -258,6 +262,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                     ...(candidate?.sha ? [candidate.sha.slice(0, 7)] : []),
                     ...(active ? [t('expires', { time: format.dateTime(new Date(active.expiresAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })] : []),
                   ]}
+                  superseded={superseded?.candidate?.sha?.slice(0, 7)}
                   reference={reference ? { href: reference, label: publication?.request.targetEnvironment === 'production' ? t('production') : t('preview') } : undefined}
                   onApprove={() => { void approve() }}
                   onPublish={() => { const approval = active; if (!approval || !ledger) return; void run('publish', { binding: ledger.binding, eventId: crypto.randomUUID(), approvalId: approval.id, action: approval.action, target: approval.target, targetEnvironment: approval.targetEnvironment }) }}
@@ -280,14 +285,11 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
 function ArtifactPreview({ name, content, onClose }: { name: string; content: string; onClose: () => void }) {
   const t = useTranslations('FactoryAcceptance')
   return <Dialog open onOpenChange={value => { if (!value) onClose() }}>
-    <DialogContent showCloseButton={false} className="flex max-h-[85svh] w-[min(64rem,calc(100vw-3rem))] max-w-none flex-col overflow-hidden sm:max-w-none">
-      <header className="flex shrink-0 items-center gap-2">
-        <FileText aria-hidden="true" className="size-4 text-muted-foreground" />
+    <DialogContent aria-describedby={undefined} closeLabel={t('closeEvidence')} className="flex max-h-[85svh] w-[min(64rem,calc(100vw-3rem))] max-w-none flex-col overflow-hidden sm:max-w-none">
+      <DialogHeader>
         <DialogTitle><code>{name}</code></DialogTitle>
-        <span className="flex-1" />
-        <Button variant="ghost" size="icon-sm" aria-label={t('closeEvidence')} onClick={onClose}><X data-icon="inline-start" /></Button>
-      </header>
-      <pre className="min-h-0 flex-1 overflow-auto bg-background px-4 py-3 font-mono text-xs whitespace-pre-wrap break-words">{content}</pre>
+      </DialogHeader>
+      <pre className="min-h-0 flex-1 overflow-auto px-4 py-3 font-mono text-xs whitespace-pre-wrap break-words">{content}</pre>
     </DialogContent>
   </Dialog>
 }

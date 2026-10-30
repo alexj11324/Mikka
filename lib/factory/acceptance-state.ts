@@ -15,15 +15,17 @@ export function acceptanceState(input: {
   approvals: AcceptanceApproval[]
   publications: AcceptancePublication[]
   now: number
-}): { state: AcceptanceState; active?: AcceptanceApproval; publication?: AcceptancePublication } {
+}): { state: AcceptanceState; active?: AcceptanceApproval; publication?: AcceptancePublication; superseded?: AcceptanceApproval } {
   // Precedence (R-56):
   // 1. Only approvals on the current candidate count; the latest of them decides
   //    (a newer revoke beats an older valid approval, a newer approval beats an older revoke).
   // 2. An approval is active only while now < expiresAt (expiresAt == now is expired).
   //    "Latest" is by createdAt, not by array order; ties keep the ledger's order.
   // 3. With no current candidate (candidateId null) no approval counts.
-  // 4. Approvals on an older candidate never count: with no current approval the task is
-  //    back to pending review at the approval stage, otherwise it reads invalidated.
+  // 4. Approvals on an older candidate never count. As on GitHub, a new commit voids the old
+  //    approval: with no approval on the current candidate it is back to pending (待启用 /
+  //    待你确认) and the old approval is returned as `superseded` (shown as 「<sha> · 已失效」).
+  //    With no current candidate at all nothing can be approved: unavailable.
   const { now } = input
   const time = (approval: AcceptanceApproval) => { const value = Date.parse(approval.createdAt); return Number.isNaN(value) ? -Infinity : value }
   const approvals = input.approvals
@@ -31,7 +33,9 @@ export function acceptanceState(input: {
     .filter(({ approval }) => input.candidateId !== null && approval.candidateId === input.candidateId)
     .sort((a, b) => time(a.approval) - time(b.approval) || a.index - b.index)
     .map(({ approval }) => approval)
-  const stale = input.approvals.length > approvals.length
+  const superseded = input.candidateId === null ? undefined : input.approvals
+    .filter(approval => approval.candidateId !== input.candidateId)
+    .reduce<AcceptanceApproval | undefined>((last, approval) => !last || time(approval) >= time(last) ? approval : last, undefined)
   const latest = approvals[approvals.length - 1]
   const active = latest && !latest.revokedAt && Date.parse(latest.expiresAt) > now ? latest : undefined
   const publication = active ? [...input.publications].reverse().find(item => item.approvalId === active.id) : undefined
@@ -42,7 +46,7 @@ export function acceptanceState(input: {
           : active ? 'approved'
             : latest?.revokedAt ? 'revoked'
               : latest ? 'expired'
-                : input.stage === 'approval' ? 'pending'
-                  : stale ? 'invalidated' : 'unavailable'
-  return { state, active, publication }
+                : input.stage === 'approval' || superseded ? 'pending'
+                  : 'unavailable'
+  return { state, active, publication, superseded: latest ? undefined : superseded }
 }

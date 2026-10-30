@@ -16,18 +16,21 @@ test('derives every acceptance state from the ledger', () => {
   assert.equal(state({ approvals: [approval()], publications: [{ approvalId: 'a1', status: 'succeeded' }] }), 'live')
   assert.equal(state({ approvals: [approval({ revokedAt: '2026-10-29T11:00:00Z' })] }), 'revoked')
   assert.equal(state({ approvals: [approval({ expiresAt: '2026-10-29T11:00:00Z' })] }), 'expired')
-  assert.equal(state({ candidateId: 'c2', approvals: [approval({ expiresAt: '2026-10-29T11:00:00Z' })] }), 'invalidated')
+  assert.equal(state({ candidateId: 'c2', approvals: [approval({ expiresAt: '2026-10-29T11:00:00Z' })] }), 'pending')
 })
 
 test('expiresAt equal to now is expired', () => {
   assert.equal(state({ approvals: [approval({ expiresAt: new Date(now).toISOString() })] }), 'expired')
 })
 
-test('a valid approval on an old candidate is not approved or publishable', () => {
+test('a new commit voids the old approval: back to pending, the old one is superseded', () => {
   const result = acceptanceState({ stage: 'publish', candidateId: 'c2', approvals: [approval()], publications: [{ approvalId: 'a1', status: 'reserved' }], now })
-  assert.equal(result.state, 'invalidated')
+  assert.equal(result.state, 'pending')
   assert.equal(result.active, undefined)
   assert.equal(result.publication, undefined)
+  assert.equal(result.superseded?.id, 'a1')
+  // Once the current candidate has its own approval, the old one is no longer shown.
+  assert.equal(acceptanceState({ stage: 'publish', candidateId: 'c2', approvals: [approval(), approval({ id: 'a2', candidateId: 'c2', createdAt: '2026-10-29T11:00:00Z' })], publications: [], now }).superseded, undefined)
   assert.equal(state({ stage: 'approval', candidateId: 'c2', approvals: [approval()] }), 'pending')
 })
 
@@ -36,7 +39,7 @@ test('the latest approval on the current candidate wins', () => {
   assert.equal(state({ approvals: [approval({ revokedAt: '2026-10-29T11:30:00Z' }), approval({ id: 'a2' })] }), 'approved')
   // After the candidate changed, approvals on the old candidate are ignored whatever their state.
   const old = [approval({ expiresAt: '2026-10-29T11:00:00Z' }), approval({ id: 'a2', revokedAt: '2026-10-29T11:30:00Z' })]
-  assert.equal(state({ candidateId: 'c2', approvals: old }), 'invalidated')
+  assert.equal(state({ candidateId: 'c2', approvals: old }), 'pending')
   assert.equal(state({ candidateId: 'c2', approvals: [...old, approval({ id: 'a3', candidateId: 'c2', expiresAt: '2026-10-29T11:00:00Z' })] }), 'expired')
   assert.equal(state({ candidateId: 'c2', approvals: [...old, approval({ id: 'a3', candidateId: 'c2', revokedAt: '2026-10-29T11:40:00Z' })] }), 'revoked')
 })
@@ -59,7 +62,8 @@ test('latest is chosen by createdAt, not by array order', () => {
 
 test('without a current candidate no approval counts', () => {
   const result = acceptanceState({ stage: 'publish', candidateId: null, approvals: [approval()], publications: [{ approvalId: 'a1', status: 'succeeded' }], now })
-  assert.equal(result.state, 'invalidated')
+  assert.equal(result.state, 'unavailable')
   assert.equal(result.active, undefined)
+  assert.equal(result.superseded, undefined)
   assert.equal(acceptanceState({ stage: 'approval', candidateId: null, approvals: [approval()], publications: [], now }).state, 'pending')
 })
