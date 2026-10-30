@@ -20,7 +20,7 @@ async function header(page: Page) {
 for (const scheme of ['light', 'dark'] as const) {
   test(`任务详情面包屑与右侧操作在各宽度不重叠，编号不截断 ${scheme}`, async ({ page }, testInfo) => {
     // 5 widths × sidebar states × screenshots outgrow the 90s default on CI runners.
-    test.setTimeout(240_000)
+    test.setTimeout(300_000)
     await page.emulateMedia({ colorScheme: scheme })
     await register(page)
     const title = `面包屑重叠检查 一个非常非常长的任务标题用来测试截断顺序 ${randomUUID().slice(0, 8)}`
@@ -30,13 +30,18 @@ for (const scheme of ['light', 'dark'] as const) {
     await openIssueFromSearch(page, title)
     await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
 
-    for (const width of [390, 768, 1024, 1280, 1440]) {
+    for (const width of [390, 560, 640, 768, 1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 800 })
       for (const sidebar of width < 768 ? ['mobile'] : ['open', 'collapsed']) {
         const toggle = page.getByRole('button', { name: '展开或收起侧栏', exact: true }).first()
-        const expanded = await page.locator('[data-slot="sidebar"][data-state]').first().getAttribute('data-state').catch(() => null)
-        if (sidebar === 'open' && expanded === 'collapsed') await toggle.click()
-        if (sidebar === 'collapsed' && expanded === 'expanded') await toggle.click()
+        const sidebarState = page.locator('[data-slot="sidebar"][data-state]').first()
+        if (sidebar !== 'mobile') {
+          // The state must be readable; a missing sidebar fails the test instead of silently skipping the toggle.
+          await expect(sidebarState).toHaveAttribute('data-state', /^(collapsed|expanded)$/)
+          const want = sidebar === 'open' ? 'expanded' : 'collapsed'
+          if (await sidebarState.getAttribute('data-state') !== want) await toggle.click()
+          await expect(sidebarState).toHaveAttribute('data-state', want)
+        }
         const { root, crumbs, id, actions } = await header(page)
         await expect(id).toBeVisible()
         await expect.poll(async () => {
@@ -56,5 +61,45 @@ for (const scheme of ['light', 'dark'] as const) {
         await page.screenshot({ path: testInfo.outputPath(`shots/fe6-${width}-${sidebar}-${scheme}.png`) })
       }
     }
+  })
+
+  test(`面包屑折叠菜单：打开、键盘焦点、保存中禁用 ${scheme}`, async ({ page }, testInfo) => {
+    await page.emulateMedia({ colorScheme: scheme })
+    await register(page)
+    const title = `面包屑菜单 ${randomUUID().slice(0, 8)}`
+    await seedTask(page, title)
+    await page.reload()
+    await rail(page, '看板').click()
+    await openIssueFromSearch(page, title)
+    await page.setViewportSize({ width: 640, height: 800 })
+    const more = page.getByRole('button', { name: '更多位置', exact: true })
+    await expect(more).toBeVisible()
+    await more.focus()
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Shift+Tab')
+    await expect(more).toBeFocused()
+    await page.screenshot({ path: testInfo.outputPath(`shots/fe6-menu-focus-${scheme}.png`) })
+    await page.keyboard.press('Enter')
+    const board = page.getByRole('menuitem', { name: '看板' })
+    await expect(board).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath(`shots/fe6-menu-open-${scheme}.png`) })
+    await page.keyboard.press('Escape')
+    await expect(board).toBeHidden()
+    // Hold the next save so the header stays pending: the board entry is disabled.
+    let release: () => void = () => {}
+    const held = new Promise<void>(resolve => { release = resolve })
+    await page.route('**/api/**', async route => {
+      if (['PATCH', 'PUT', 'POST'].includes(route.request().method())) await held
+      await route.fallback()
+    })
+    await page.getByLabel('任务标题', { exact: true }).fill(`${title} 改`)
+    await page.getByLabel('任务标题', { exact: true }).blur()
+    await expect(page.getByRole('button', { name: '关闭任务详情', exact: true })).toBeDisabled()
+    await more.click()
+    await expect(board).toHaveAttribute('aria-disabled', 'true')
+    await page.screenshot({ path: testInfo.outputPath(`shots/fe6-menu-pending-${scheme}.png`) })
+    await page.keyboard.press('Escape')
+    release()
+    await page.unrouteAll({ behavior: 'wait' })
   })
 }

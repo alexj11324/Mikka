@@ -27,7 +27,7 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
     <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
       <SidebarTrigger className="-ml-1" aria-label={t('toggleSidebar')} />
       <Separator orientation="vertical" className="mr-1 data-vertical:h-4 data-vertical:self-auto" />
-      <Breadcrumb aria-label={t('breadcrumb')}><BreadcrumbList>
+      <Breadcrumb aria-label={t('breadcrumb')}><BreadcrumbList className="flex-nowrap">
         <BreadcrumbItem className="@2xl/header:hidden">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label={tDetail('breadcrumbMore')} />}><BreadcrumbEllipsis /></DropdownMenuTrigger>
@@ -39,20 +39,20 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
             </DropdownMenuContent>
           </DropdownMenu>
         </BreadcrumbItem>
-        <BreadcrumbItem className="hidden @2xl/header:inline-flex"><span className="max-w-24 truncate @4xl/header:max-w-40" title={workspaceName}>{workspaceName}</span></BreadcrumbItem>
+        <BreadcrumbItem className="hidden @2xl/header:inline-flex"><span className="min-w-0 max-w-40 truncate" title={workspaceName}>{workspaceName}</span></BreadcrumbItem>
         <BreadcrumbSeparator className="hidden @2xl/header:block" />
         <BreadcrumbItem className="hidden @2xl/header:inline-flex"><Button variant="ghost" size="xs" disabled={pending} onClick={onClose}>{tDetail('breadcrumbBoard')}</Button></BreadcrumbItem>
         <BreadcrumbSeparator />
-        <BreadcrumbItem>
-          <BreadcrumbPage>{issueIdentifier({ identifier })}</BreadcrumbPage>
-          <span className="hidden max-w-32 truncate @lg/header:inline @2xl/header:max-w-40 @4xl/header:max-w-80" title={title}>{title}</span>
+        <BreadcrumbItem className="min-w-0">
+          <BreadcrumbPage className="shrink-0">{issueIdentifier({ identifier })}</BreadcrumbPage>
+          <span className="hidden min-w-0 truncate @lg/header:inline" title={title}>{title}</span>
         </BreadcrumbItem>
       </BreadcrumbList></Breadcrumb>
     </div>
     <div className="flex shrink-0 items-center gap-1">
       <span role="status" aria-live="polite" className="sr-only">{saveLabel}</span>
-      <Tooltip><TooltipTrigger render={<span tabIndex={0} className="mr-2 hidden items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground @sm/header:flex" />}>
-        {saved && <span className="inline-flex"><Check className="size-3.5" aria-hidden="true" /></span>}<span>{saveLabel}</span>
+      <Tooltip><TooltipTrigger render={<span tabIndex={0} className="mr-2 flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground" />}>
+        {saved && <span className="inline-flex"><Check className="size-3.5" aria-hidden="true" /></span>}<span className="sr-only @sm/header:not-sr-only">{saveLabel}</span>
       </TooltipTrigger><TooltipContent>{tDetail('autosaveHint')}</TooltipContent></Tooltip>
       {actions}
       {navigation.index >= 0 && <>
