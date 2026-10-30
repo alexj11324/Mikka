@@ -2,21 +2,44 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveRunSecretsEnvironment as resolve } from './run-environment'
 
-test('4e3: default branch -> production, other branch -> preview, unreadable default -> preview, local -> development', () => {
-  assert.deepEqual(resolve({ deviceKind: 'cloud', runBaseBranch: null, repoDefaultBranch: 'main' }), { environment: 'production', rejected: false }, 'null base = remote default')
-  assert.deepEqual(resolve({ deviceKind: 'cloud', runBaseBranch: 'main', repoDefaultBranch: 'main' }), { environment: 'production', rejected: false })
-  assert.deepEqual(resolve({ deviceKind: 'cloud', runBaseBranch: 'feature/x', repoDefaultBranch: 'main' }), { environment: 'preview', rejected: false })
-  assert.deepEqual(resolve({ deviceKind: 'cloud', runBaseBranch: 'main', repoDefaultBranch: null }), { environment: 'preview', rejected: false }, 'unknown default branch is preview')
-  assert.deepEqual(resolve({ deviceKind: 'cloud', runBaseBranch: 'main', repoDefaultBranch: '  ' }), { environment: 'preview', rejected: false })
-  assert.deepEqual(resolve({ deviceKind: 'cloud', runBaseBranch: 'Main', repoDefaultBranch: 'main' }), { environment: 'preview', rejected: false }, 'branch names are case-sensitive')
-  assert.deepEqual(resolve({ deviceKind: 'local', runBaseBranch: null, repoDefaultBranch: 'main', override: 'production', starterRole: 'admin' }), { environment: 'development', rejected: false }, 'local runs are always development')
+const cloud = (runBaseBranch: unknown, trustedDefaultBranch: unknown, override?: unknown) =>
+  resolve({ deviceKind: 'cloud', runBaseBranch: runBaseBranch as string | null, trustedDefaultBranch: trustedDefaultBranch as string | null, override })
+const production = { environment: 'production', rejected: false }
+const preview = { environment: 'preview', rejected: false }
+
+test('4e3: production only when a trusted default branch equals the run branch exactly', () => {
+  assert.deepEqual(cloud('main', 'main'), production)
+  assert.deepEqual(cloud('release/1', 'release/1'), production)
+  assert.deepEqual(cloud(' main ', 'main'), production, 'trimmed run branch')
+  assert.deepEqual(cloud('main', '  main\t'), production, 'trimmed trusted default (catches dropping trim)')
+  assert.deepEqual(cloud('feature/x', 'main'), preview)
+  assert.deepEqual(cloud('Main', 'main'), preview, 'case-sensitive')
 })
 
-test('4e3: only an admin-started run may override to production; a member override is rejected', () => {
-  const feature = { deviceKind: 'cloud' as const, runBaseBranch: 'feature/x', repoDefaultBranch: 'main' }
-  assert.deepEqual(resolve({ ...feature, override: 'production', starterRole: 'admin' }), { environment: 'production', rejected: false })
-  assert.deepEqual(resolve({ ...feature, override: 'production', starterRole: 'member' }), { environment: 'preview', rejected: true })
-  assert.deepEqual(resolve({ ...feature, override: 'production', starterRole: null }), { environment: 'preview', rejected: true }, 'not a member at all')
-  assert.deepEqual(resolve({ ...feature, runBaseBranch: 'main', override: 'production', starterRole: 'member' }), { environment: 'production', rejected: true }, 'even when the branch would be production, the member override itself is rejected')
-  assert.deepEqual(resolve({ deviceKind: 'cloud', runBaseBranch: 'main', repoDefaultBranch: 'main', override: 'preview', starterRole: 'member' }), { environment: 'preview', rejected: false }, 'anyone may lower to preview')
+test('4e3: no trusted source is always preview, including pass-throughs of the run branch or the schema default', () => {
+  // The claim route has no trusted default-branch source yet and passes null; device_repos.baseBranch is
+  // written from the run itself on the cloud path and defaults to 'main', so it is never a trusted source.
+  assert.deepEqual(cloud('feature/x', null), preview, '(feature/x, no source)')
+  assert.deepEqual(cloud('main', null), preview, "the 'main' default without a source")
+  assert.deepEqual(cloud(null, null), preview, '(null, null)')
+  assert.deepEqual(cloud(null, ''), preview, "(null, '')")
+  assert.deepEqual(cloud('  ', null), preview, "('  ', null)")
+  assert.deepEqual(cloud('', ''), preview, "('', '')")
+  assert.deepEqual(cloud('  ', '  '), preview, 'whitespace on both sides never matches')
+  assert.deepEqual(cloud(null, 'main'), preview, 'a null run branch is not "the remote default"')
+  assert.deepEqual(cloud('main', '   '), preview)
+  assert.deepEqual(cloud(42, 42), preview, 'non-string is unreadable')
+  assert.deepEqual(cloud(undefined, undefined), preview)
+})
+
+test('4e3: local runs are development', () => {
+  assert.deepEqual(resolve({ deviceKind: 'local', runBaseBranch: 'main', trustedDefaultBranch: 'main' }), { environment: 'development', rejected: false })
+})
+
+test('4e3: every override request is rejected (member, admin or forged), cloud or local', () => {
+  for (const override of ['production', 'preview', 'PRODUCTION', 'development', '', 0, {}]) {
+    assert.deepEqual(cloud('main', 'main', override), { environment: 'preview', rejected: true }, `cloud override ${JSON.stringify(override)}`)
+    assert.deepEqual(resolve({ deviceKind: 'local', runBaseBranch: 'main', trustedDefaultBranch: 'main', override }), { environment: 'development', rejected: true }, `local override ${JSON.stringify(override)}`)
+  }
+  assert.deepEqual(cloud('main', 'main', null), production)
 })

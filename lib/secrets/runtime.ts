@@ -58,7 +58,7 @@ function openRuntime(row: typeof workspaceSecrets.$inferSelect, env: Env): Runti
   }
 }
 
-export { resolveRunSecretsEnvironment, type RunSecretsEnvironment, type RunSecretsOverride } from './run-environment'
+export { resolveRunSecretsEnvironment, type RunSecretsEnvironment } from './run-environment'
 import type { RunSecretsEnvironment } from './run-environment'
 
 /**
