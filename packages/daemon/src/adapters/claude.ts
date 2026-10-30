@@ -88,6 +88,7 @@ export interface ClaudeAdapterOptions {
   /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
   spawnHosted?: (options: SpawnOptions, oauthPlaceholder: string) => SpawnedProcess
   onHostedSession?(sessionId:string):Promise<void>
+  onHostedBeforeFinish?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
   computerProvider?: ComputerSpecProvider
@@ -614,6 +615,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const close = async (event: Omit<ExitEvent, "type"> | null, revokeRunGate: boolean) => {
       ending = true
       approvalTransport.abort()
+      if (event && externalAuth && this.options.onHostedBeforeFinish) await this.options.onHostedBeforeFinish(sessionId).catch(() => undefined)
       if (revokeRunGate) options.toolApproval?.revoke()
       clearTimeout(graceTimer)
       clearTimeout(authTimer)

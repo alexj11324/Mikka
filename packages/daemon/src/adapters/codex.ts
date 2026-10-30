@@ -72,6 +72,7 @@ export interface CodexAdapterOptions {
   spawnCli?: typeof spawnCli
   /** Persist an owner-bound session before any prompt can execute. */
   onHostedSession?(sessionId:string):Promise<void>
+  onHostedBeforeFinish?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
   computerProvider?: ComputerSpecProvider
@@ -417,6 +418,7 @@ export class CodexAdapter implements AgentAdapter {
     const close = async (event: Parameters<EventQueue["exit"]>[0] | null) => {
       ending = true
       pendingMcp.clear()
+      if (event && externalAuth && this.options.onHostedBeforeFinish) await this.options.onHostedBeforeFinish(sessionId).catch(() => undefined)
       options.toolApproval?.revoke()
       if (pending.length > 0)
         log.warn(

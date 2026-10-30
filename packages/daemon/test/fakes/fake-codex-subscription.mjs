@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Offline official-auth protocol fixture. Contains only synthetic tokens.
-import { existsSync, lstatSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { spawn } from "node:child_process"
@@ -61,10 +61,16 @@ lines.on("line", async (line) => {
         id,
         error: { code: -1, message: "subscription login required" }
       })
+    mkdirSync(join(process.env.CODEX_HOME, 'sessions'), { recursive: true })
+    writeFileSync(join(process.env.CODEX_HOME, 'sessions', 'rollout-fixture-fixture-subscription-thread.jsonl'), 'synthetic transcript\n')
     return send({
       id,
       result: { thread: { id: "fixture-subscription-thread" } }
     })
+  }
+  if (method === 'thread/resume') {
+    if (!login || params.threadId !== 'fixture-subscription-thread' || !existsSync(join(process.env.CODEX_HOME, 'sessions', 'rollout-fixture-fixture-subscription-thread.jsonl'))) return send({id,error:{code:-1,message:'fixture session missing'}})
+    return send({id,result:{thread:{id:params.threadId}}})
   }
   if (method === "turn/start") {
     const turnId = `fixture-turn-${++turn}`

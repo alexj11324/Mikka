@@ -338,6 +338,15 @@ export class HttpServerLink implements ServerLink {
   async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
     return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
   }
+  async nativeSaveSession(deviceId:string,runId:string,sessionId:string,data:Buffer,signal?:AbortSignal) {
+    await this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'save_session',sessionId,data:data.toString('base64')},schema:z.object({data:z.null()}).strict(),signal})
+  }
+  async nativeRestoreSession(deviceId:string,runId:string,signal?:AbortSignal) {
+    const result = await this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'restore_session'},schema:z.object({data:z.string().min(1).max(2_800_000)}).strict(),signal})
+    const data = Buffer.from(result.data,'base64')
+    if (!data.length || data.toString('base64') !== result.data) throw new Error('subscription_native_unavailable')
+    return data
+  }
   async nativeRequest(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal) {
     const response=await this.send('POST',`${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`,{action:'request',payload},this.credential,{signal,timeoutMs:275_000})
     const contentType=response.headers.get('content-type')?.split(';')[0]

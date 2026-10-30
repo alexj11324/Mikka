@@ -123,7 +123,7 @@ export async function guardCiClaim(tx: PoolClient, userId: string, deviceId: str
   if (!row || !same(row.ciContinuation, expected) || row.status !== 'queued' || row.stopRequestedAt || row.originStop || row.deviceId !== deviceId || row.originDeviceId !== deviceId || row.agentId !== row.originAgentId || row.deviceRepoId !== row.originRepoId || row.botId !== row.originBotId || row.sessionId !== expected.originSessionId || !row.agentDefinition || row.agentDefinition.definitionDigest !== row.originDefinition?.definitionDigest) return null
   if (!await currentCiSubscriptionAuthorized(tx, userId, row.agentId, row.agentDefinition)) return null
   if (!await currentContinuationMailboxAuthorized(tx, userId, row.botId, row.originDefinition, row.agentDefinition, process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1')) throw new CiContinuationUnsupported('mailbox')
-  return { continuesRunId: expected.originRunId, resumeSessionId: expected.originSessionId, followUp: expected.followUp, requireSessionResume: true as const, ciSessionResume: true as const, preserveQuestionWorktree: true as const }
+  return { continuesRunId: expected.originRunId, resumeSessionId: expected.originSessionId, followUp: expected.followUp, requireSessionResume: true as const, ciSessionResume: true as const, ciHead: expected.head, preserveQuestionWorktree: true as const }
 }
 
 /** A known mailbox revocation must not leave an unclaimable run occupying the

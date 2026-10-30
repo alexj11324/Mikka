@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Synthetic native-auth process only; no provider/network requests.
-import { closeSync, existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs"
+import { closeSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { spawn } from "node:child_process"
@@ -9,7 +9,8 @@ const args = process.argv.slice(2)
 const flag = (key) => {
   const inline = args.find((arg) => arg.startsWith(`${key}=`))
   if (inline) return inline.slice(key.length + 1)
-  return args[args.indexOf(key) + 1]
+  const index = args.indexOf(key)
+  return index < 0 ? undefined : args[index + 1]
 }
 if (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR !== "3") process.exit(2)
 const token = readFileSync(3, "utf8")
@@ -27,6 +28,11 @@ if (
 )
   process.exit(2)
 const sessionId = flag("--session-id") ?? flag("--resume")
+const project = process.cwd().replace(/[^a-zA-Z0-9]/g, '-')
+const transcript = join(config, 'projects', project, `${sessionId}.jsonl`)
+if (args.includes('--resume') && !existsSync(transcript)) process.exit(2)
+mkdirSync(join(config, 'projects', project), { recursive: true })
+writeFileSync(transcript, 'synthetic transcript\n')
 const out = (value) => process.stdout.write(`${JSON.stringify(value)}\n`)
 const lines = createInterface({ input: process.stdin })
 lines.on("line", async (line) => {

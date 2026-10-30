@@ -949,6 +949,12 @@ export class RunSupervisor {
     repo: DeviceRepo,
     assignment: RunAssignment,
   ): Promise<string> {
+    if (assignment.subscriptionBinding && assignment.ciSessionResume && assignment.ciHead) {
+      if (!assignment.pushBranch) throw new Error('CI continuation branch unavailable')
+      const head = await this.deps.worktrees.fetchBranch(repo.path, repo.push?.remote ?? 'origin', assignment.pushBranch, runId)
+      if (head !== assignment.ciHead) throw new Error('CI continuation branch changed')
+      return head
+    }
     // Factory checks and benchmark replays use an immutable commit, never a
     // remote branch named after that SHA or a later issue-branch head.
     const fixed = fixedCandidateCheck(assignment) ? assignment.baseBranch : assignment.benchmark?.sourceCommit
@@ -1059,6 +1065,8 @@ export class RunSupervisor {
     if (assignment.skillReceipt && (this.leases.get(runId)??0)<=Date.now())
       throw new Error('Receipted Skill assignment requires a current server lease')
     const adapter = this.adapterFor(runId)
+    const hostedCiResume = Boolean(assignment.subscriptionBinding && assignment.ciSessionResume && assignment.ciHead)
+    const supportsResume = adapter.capabilities.supportsResume || hostedCiResume
     if (
       assignment.requireSessionResume &&
       entry.questionResumeState === "starting"
@@ -1070,7 +1078,7 @@ export class RunSupervisor {
       assignment.requireSessionResume &&
       (!assignment.resumeSessionId ||
         !assignment.continuesRunId ||
-        !adapter.capabilities.supportsResume ||
+        !supportsResume ||
         !["claude_code", "codex"].includes(adapter.harness))
     )
       throw new Error(
@@ -1107,7 +1115,7 @@ export class RunSupervisor {
             runId,
           )
         : null
-    if (assignment.requireSessionResume && !entry.worktree && !continued)
+    if (assignment.requireSessionResume && !entry.worktree && !continued && !hostedCiResume)
       throw new Error(
         "Original question worktree is unavailable; a fresh task cannot replace it",
       )
@@ -1202,14 +1210,14 @@ export class RunSupervisor {
       mailbox,
     }
     const resuming =
-      entry.sessionId !== null && adapter.capabilities.supportsResume
+      entry.sessionId !== null && supportsResume
     // A follow-up run goes on with the earlier run's conversation, sending
     // only what it adds; a run in a fresh worktree starts a new one with
     // the full brief (the old conversation is about files that are gone).
     // After a restart the worktree is already set: it was continued when
     // it is not this run's own.
     const inEarlierWorktree =
-      continued !== null ||
+      hostedCiResume || continued !== null ||
       (entry.worktree !== null &&
         resolve(entry.worktree) !== resolve(this.deps.worktrees.pathFor(runId)))
     const continueSession =
@@ -1217,7 +1225,7 @@ export class RunSupervisor {
       assignment.resumeSessionId &&
       assignment.continuesRunId &&
       inEarlierWorktree &&
-      adapter.capabilities.supportsResume
+      supportsResume
         ? {
             sessionId: assignment.resumeSessionId,
             runId: assignment.continuesRunId,
@@ -1226,7 +1234,7 @@ export class RunSupervisor {
         : undefined
     if (assignment.requireSessionResume &&
         ((assignment.subscriptionBinding && !hostedCiResumePermitted(assignment)) || !assignment.resumeSessionId || !assignment.continuesRunId ||
-          !adapter.capabilities.supportsResume || (!resuming && !continueSession) ||
+          !supportsResume || (!resuming && !continueSession) ||
           (resuming && entry.sessionId !== assignment.resumeSessionId)))
       throw new Error("factory_question_session_resume_required")
     const benchmark = assignment.benchmark

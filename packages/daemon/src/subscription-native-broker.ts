@@ -14,6 +14,7 @@ export async function createNativeSubscriptionBroker(host: {
   revision: number;
   check(): Promise<unknown>;
   worker: Pick<SubscriptionWorkerClient, "nativeRequest">;
+  retainResources?: boolean;
 }) {
   await host.check();
   mkdirSync(host.root, { recursive: true, mode: 0o700 });
@@ -104,7 +105,7 @@ export async function createNativeSubscriptionBroker(host: {
     });
     chmodSync(socket, 0o600);
   } catch {
-    rmSync(dir, { recursive: true, force: true });
+    if (!host.retainResources) rmSync(dir, { recursive: true, force: true });
     throw new Error("native_broker_unavailable");
   }
   return {
@@ -114,7 +115,7 @@ export async function createNativeSubscriptionBroker(host: {
       for (const abort of pending) abort.abort();
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
-      rmSync(dir, { recursive: true, force: true });
+      if (!host.retainResources) rmSync(dir, { recursive: true, force: true });
     },
   };
 }

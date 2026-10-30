@@ -97,6 +97,8 @@ export interface ServerLink {
   syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]>
   /** Private hosted-run channel; these methods never return provider tokens. */
   nativeContext?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeBrokerContext>
+  nativeSaveSession?(deviceId:string,runId:string,sessionId:string,data:Buffer,signal?:AbortSignal):Promise<void>
+  nativeRestoreSession?(deviceId:string,runId:string,signal?:AbortSignal):Promise<Buffer>
   nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>
   /**
    * Screenshots and recordings a run keeps as evidence (`@mikka/protocol/capture`).

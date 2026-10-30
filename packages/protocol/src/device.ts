@@ -334,6 +334,8 @@ export const runAssignmentSchema = z.object({
   requireSessionResume: z.boolean().optional(),
   /** Set only after the server authorizes a CI original-session continuation. */
   ciSessionResume: z.literal(true).optional(),
+  /** Commit verified by CI preflight; hosted recovery must reconstruct this tree. */
+  ciHead: z.string().regex(/^[a-f0-9]{40}$/).optional(),
   preserveQuestionWorktree: z.boolean().optional(),
   questionId: z.uuid().optional(),
   /**

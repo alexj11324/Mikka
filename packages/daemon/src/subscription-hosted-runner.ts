@@ -20,7 +20,7 @@ import type {
   SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk";
 import { HOSTED_NATIVE_IMAGE, nativeBrokerContextSchema, type RunAssignment } from "@mikka/protocol";
-import { ClaudeAdapter } from "./adapters/claude";
+import { ClaudeAdapter, claudeProjectDirName } from "./adapters/claude";
 import { CodexAdapter } from "./adapters/codex";
 import type { AgentSession, StartOptions } from "./adapters/types";
 import { runPaths, MCP_SERVER_SCRIPT } from "./agents/run-context";
@@ -31,6 +31,7 @@ import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
 import { hostedCiResumePermitted, matchesNativeContinuation } from "./subscription-continuation";
+import { captureNativeSession, restoreNativeSession } from './native-session-files';
 import type { ComputerBroker } from "./computer/broker.mjs";
 import { decide, runDomains, runPolicy } from "./permissions";
 import { startPublicEgress, type PublicEgress } from "./agents/public-egress";
@@ -58,6 +59,8 @@ export async function createHostedBotRunner(host: {
   dockerSocket?: "unix:///run/mikka-container/docker.sock";
   /** Optional trusted request-only desktop broker owned by the cloud daemon. */
   computerBroker?: ComputerBroker;
+  /** Test-only fixture preservation; production leaves this unset. */
+  retainResources?: boolean;
 }) {
   if (
     process.platform !== "linux" ||
@@ -135,7 +138,7 @@ export async function createHostedBotRunner(host: {
   };
   // Only this runner's durable references are considered. An uncertain create
   // with no visible object stays pending; absence is not proof of rollback.
-  for (const name of readdirSync(resources))
+  for (const name of host.retainResources ? [] : readdirSync(resources))
     if (name.endsWith(".json")) {
       const file = join(resources, name);
       const record = readJson(file) as Resource | undefined;
@@ -393,7 +396,7 @@ export async function createHostedBotRunner(host: {
           void brokerClosed.catch(() => undefined);
           try {
             await creating?.catch(() => undefined);
-            if (existsSync(resourceFile)) await removeResource(resourceFile, resource);
+            if (!host.retainResources && existsSync(resourceFile)) await removeResource(resourceFile, resource);
           } finally {
             try { await brokerClosed; }
             finally { offRevoke(); }
@@ -503,6 +506,17 @@ export async function createHostedBotRunner(host: {
             const continuation = options.continueSession;
             if (!continuation || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(continuation.runId)) throw unavailable();
             const originLedger = join(host.stateDir, "native-ledgers", continuation.runId + ".json");
+            if (!existsSync(originLedger)) {
+              if (!host.link.nativeRestoreSession) throw unavailable();
+              const oldRun = runPaths(host.stateDir, continuation.runId).runDir;
+              if (existsSync(oldRun)) throw unavailable();
+              const snapshot = await host.link.nativeRestoreSession(assignment.deviceId, assignment.runId, lifetime.signal);
+              await check();
+              const root = kind === 'codex' ? join(oldRun, 'codex-home', 'sessions') : join(oldRun, 'native-home', '.claude', 'projects', claudeProjectDirName(realpathSync(options.cwd)));
+              mkdirSync(dirname(root), {recursive:true,mode:0o700});
+              restoreNativeSession(root,kind,continuation.sessionId,snapshot);
+              writeJsonAtomic(originLedger, {scope:{...scope,runId:continuation.runId},sessionId:continuation.sessionId});
+            }
             const stat = lstatSync(originLedger, { throwIfNoEntry: false });
             if (!stat?.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || !matchesNativeContinuation(readJson(originLedger), scope, continuation)) throw unavailable();
           }
@@ -512,8 +526,17 @@ export async function createHostedBotRunner(host: {
           if (assignment.requireSessionResume && sessionId !== assignment.resumeSessionId) throw unavailable();
           writeJsonAtomic(ledger, { scope, sessionId });
         };
+        const saveSession = async (sessionId: string) => {
+          if (!host.link.nativeSaveSession) throw unavailable();
+          await check();
+          const root = kind === 'codex' ? join(paths.runDir, 'codex-home', 'sessions') : join(paths.runDir, 'native-home', '.claude', 'projects', claudeProjectDirName(realpathSync(options.cwd)));
+          const snapshot = captureNativeSession(root,kind,sessionId);
+          await host.link.nativeSaveSession(assignment.deviceId, assignment.runId, sessionId, snapshot, lifetime.signal);
+          await check();
+        };
         brokerStarting = createNativeSubscriptionBroker({
           root: join(host.stateDir, "native-brokers"),
+          retainResources: host.retainResources,
           revision,
           check,
           worker: {
@@ -712,6 +735,7 @@ export async function createHostedBotRunner(host: {
                   sandbox: blockedSandbox,
                   spawnCli: codexSpawn,
                   onHostedSession: record,
+                  onHostedBeforeFinish: saveSession,
                   computerMcp,
                   subscriptionAuth: {
                     accountId: first.accountId,
@@ -731,6 +755,7 @@ export async function createHostedBotRunner(host: {
               : new ClaudeAdapter({
                   stateDir: host.stateDir,
                   onHostedSession: record,
+                  onHostedBeforeFinish: saveSession,
                   computerMcp,
                   spawnHosted: (config, token) => {
                     if (token !== placeholder) throw unavailable();

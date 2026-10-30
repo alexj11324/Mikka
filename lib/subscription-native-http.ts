@@ -1,8 +1,12 @@
 import { z } from "zod";
 import type { SubscriptionService } from "./subscription-service";
+import { pool } from './db'
+import { nativeSessionSnapshot } from './ci-native-session-store'
 
 const input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("context") }).strict(),
+  z.object({ action: z.literal('save_session'), sessionId: z.string().min(1).max(500), data: z.string().min(1).max(2_800_000).regex(/^[A-Za-z0-9+/]*={0,2}$/) }).strict(),
+  z.object({ action: z.literal('restore_session') }).strict(),
   z
     .object({
       action: z.literal("request"),
@@ -47,7 +51,7 @@ export function subscriptionNativeHTTP(deps: {
           const { done, value } = await reader.read();
           if (done) break;
           size += value.length;
-          if (size > 393216) {
+          if (size > 2_801_024) {
             await reader.cancel();
             throw new Error("request refused");
           }
@@ -69,6 +73,15 @@ export function subscriptionNativeHTTP(deps: {
         return Response.json(await service.nativeContext(use, request.signal), {
           headers,
         });
+      if (body.action === 'save_session' || body.action === 'restore_session') {
+        const current = await service.nativeContext(use, request.signal)
+        const operation = body.action === 'save_session'
+          ? { kind: 'save' as const, sessionId: body.sessionId, data: Buffer.from(body.data, 'base64') }
+          : { kind: 'restore' as const }
+        if (body.action === 'save_session' && operation.kind === 'save' && operation.data.toString('base64') !== body.data) throw new Error('request refused')
+        const data = await nativeSessionSnapshot(pool, { ownerId: owner, deviceId, runId, accountId: current.accountId, revision: current.revision, route: current.route, modelId: current.modelId }, operation, process.env.BETTER_AUTH_SECRET ?? '')
+        return Response.json({ data: data?.toString('base64') ?? null }, { headers })
+      }
       const upstream = await service.nativeRequest(
         use,
         body.payload,
