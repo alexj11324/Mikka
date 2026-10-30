@@ -55,7 +55,9 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await register(page, '/settings/teams')
   await createTeam(page, '产品团队', 'PRODUCT')
   await createTeam(page, '工程团队', 'ENGINEER')
-  await page.getByLabel('搜索团队', { exact: true }).fill('PRODUCT')
+  // The settings sidebar rail is named in the UI language, not the library's English default.
+  await expect(page.locator('[data-sidebar="rail"]')).toHaveAttribute('aria-label', '展开或收起侧栏')
+  await page.getByRole('textbox', { name: '搜索团队', exact: true }).fill('PRODUCT')
   await expect(page.getByRole('row').filter({ hasText: '工程团队' })).toHaveCount(0)
   const team = page.getByRole('row').filter({ hasText: '产品团队' })
   await team.getByRole('button', { name: '产品团队 的操作', exact: true }).click()
