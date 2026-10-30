@@ -19,6 +19,18 @@ const approvedSchema=z.object({
   digest:z.string().regex(/^[a-f0-9]{64}$/),
 }).strict()
 type Judgment=Awaited<ReturnType<typeof judgeVisualBrowserAction>>
+type Query={query:(sql:string,params?:unknown[])=>Promise<unknown>}
+/** #438: the executable mutation lives only while the action can still run. Once it is done, declined,
+ * failed or expired the row keeps the masked summary and the digest (replay matching) only. */
+const SCRUB=`input=(input-'mutation')||'{"mutationScrubbed":true}'::jsonb`
+export async function scrubBrowserMutation(q:Query,actionId:string) {
+  await q.query(`UPDATE pending_actions SET ${SCRUB} WHERE id=$1 AND action='browser_operation' AND input ? 'mutation' AND status IN ('done','declined','failed')`,[actionId])
+}
+/** Expire this person's stale undecided browser actions and scrub every terminal one that still holds a mutation. */
+export async function sweepBrowserMutations(q:Query,userId:string) {
+  await q.query(`UPDATE pending_actions SET status='failed',error='browserActionExpired' WHERE "userId"=$1 AND action='browser_operation' AND status='pending' AND "createdAt"<=now()-interval '5 minutes'`,[userId])
+  await q.query(`UPDATE pending_actions SET ${SCRUB} WHERE "userId"=$1 AND action='browser_operation' AND input ? 'mutation' AND status IN ('done','declined','failed')`,[userId])
+}
 
 /** Only the workflow holding the real visual-model/Decisions response calls
  * this adapter. Neither HTTP input nor model output provides authorization. */
@@ -27,6 +39,7 @@ export async function browserAction(pool:Pool,actor:Actor,botId:string,id:string
   // 4e2 item 4: the summary is persisted (pending_actions, needs, step, subagent_events). The mutation is
   // the executable action and is NOT masked (masking would type the placeholder); see #438 table.
   const summary=await maskForWorkspace(actor.workspaceId,rawSummary)
+  await sweepBrowserMutations(pool,actor.userId)
   const client=await pool.connect()
   let input:z.infer<typeof approvedSchema>, permission:'allow'|'ask'|'deny'
   try {
@@ -64,12 +77,12 @@ export async function executeApprovedBrowserAction(pool:Pool,userId:string,raw:u
     await authorizeSubscriptionWorkspace(userId,input.workspaceId)
     await client.query('BEGIN')
     const actor={userId,workspaceId:input.workspaceId}
-    let action=(await client.query(`SELECT * FROM pending_actions WHERE id=$1 AND "userId"=$2 AND action='browser_operation' AND input=$3::jsonb AND "createdAt">now()-interval '5 minutes'`,[input.actionId,userId,JSON.stringify(raw)])).rows[0]
+    let action=(await client.query(`SELECT * FROM pending_actions WHERE id=$1 AND "userId"=$2 AND action='browser_operation' AND input->>'digest'=$3 AND "createdAt">now()-interval '5 minutes'`,[input.actionId,userId,digest])).rows[0]
     if(action?.status==='done' && action.result?.accepted===true) {
       await client.query('COMMIT');return {data:{subagentId:input.subagentId,accepted:true,replayed:true}}
     }
     const current=await lockBrowserAuthority(client,actor,input.botId,input.subagentId,input.effect)
-    action=(await client.query(`SELECT * FROM pending_actions WHERE id=$1 AND "userId"=$2 AND action='browser_operation' AND input=$3::jsonb FOR UPDATE`,[input.actionId,userId,JSON.stringify(raw)])).rows[0]
+    action=(await client.query(`SELECT * FROM pending_actions WHERE id=$1 AND "userId"=$2 AND action='browser_operation' AND input->>'digest'=$3 FOR UPDATE`,[input.actionId,userId,digest])).rows[0]
     if(action?.status==='done' && action.result?.accepted===true) {
       await client.query('COMMIT');return {data:{subagentId:input.subagentId,accepted:true,replayed:true}}
     }
@@ -77,6 +90,7 @@ export async function executeApprovedBrowserAction(pool:Pool,userId:string,raw:u
     bound=true
     if(!approved) {
       await client.query(`UPDATE bot_subagents SET status='running',needs=NULL,"activeActionId"=NULL,step='Operation declined; choosing another approach' WHERE id=$1`,[input.subagentId])
+      await client.query(`UPDATE pending_actions SET ${SCRUB} WHERE id=$1 AND action='browser_operation'`,[input.actionId])
       await client.query('COMMIT');return {data:{declined:true}}
     }
     if(current.permission==='ask' && !action.decidedAt) throw new Error('browserApprovalRequired')
@@ -91,7 +105,7 @@ export async function executeApprovedBrowserAction(pool:Pool,userId:string,raw:u
     invoking=true
     await client.query('BEGIN')
     const latest=await lockBrowserAuthority(client,actor,input.botId,input.subagentId,input.effect)
-    const completed=(await client.query(`SELECT result FROM pending_actions WHERE id=$1 AND "userId"=$2 AND input=$3::jsonb AND status='done' FOR SHARE`,[input.actionId,userId,JSON.stringify(raw)])).rows[0]
+    const completed=(await client.query(`SELECT result FROM pending_actions WHERE id=$1 AND "userId"=$2 AND input->>'digest'=$3 AND status='done' FOR SHARE`,[input.actionId,userId,input.digest])).rows[0]
     if(completed?.result?.accepted===true) {
       await client.query('COMMIT');return {data:{subagentId:input.subagentId,accepted:true,replayed:true}}
     }
@@ -99,7 +113,7 @@ export async function executeApprovedBrowserAction(pool:Pool,userId:string,raw:u
     const {runtimeRequest}=await import('./runtime')
     const receipt=await runtimeRequest(machine.sandboxId,latest.row,'/action',{...input.mutation,actionId:input.actionId,expectedObservationId:input.observationId})
     if(receipt.accepted!==true || receipt.actionId!==input.actionId) throw new Error('browserActionOutcomeUnknown')
-    await client.query(`UPDATE pending_actions SET status='done',result=$2,error=NULL WHERE id=$1 AND status='running'`,[input.actionId,{accepted:true,actionId:input.actionId}])
+    await client.query(`UPDATE pending_actions SET status='done',result=$2,error=NULL,${SCRUB} WHERE id=$1 AND status='running'`,[input.actionId,{accepted:true,actionId:input.actionId}])
     await client.query(`UPDATE bot_subagents SET status='running',needs=NULL,"activeActionId"=NULL,step=$2,"consecutiveFailures"=0 WHERE id=$1 AND status IN ('running','needs_you')`,[input.subagentId,input.summary])
     await client.query('COMMIT')
     return {data:{subagentId:input.subagentId,accepted:true}}
@@ -110,6 +124,7 @@ export async function executeApprovedBrowserAction(pool:Pool,userId:string,raw:u
     const stale=message==='observation_stale' || message==='browserActionExpired'
     if(input && bound) {
       await pool.query(`UPDATE pending_actions SET status='failed',error=$2 WHERE id=$1 AND "userId"=$3 AND status='running'`,[input.actionId,stale?'browserActionExpired':'browserActionOutcomeUnknown',userId])
+      await scrubBrowserMutation(pool,input.actionId)
       const store=new SubagentStore(pool),actor={userId,workspaceId:input.workspaceId}
       if(stale) await pool.query(`UPDATE bot_subagents SET "activeActionId"=NULL,status='running',needs=NULL,step='Page or authorization changed; observing again' WHERE id=$1 AND "ownerId"=$2 AND "activeActionId"=$3 AND status IN ('running','needs_you')`,[input.subagentId,userId,input.actionId])
       else if(invoking) {

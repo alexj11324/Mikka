@@ -75,7 +75,36 @@ async function stored(id:string){return (await pool.query('SELECT * FROM pending
 test('authorized browsing runs without a human decision and exact replay returns the stored receipt',{skip:!enabled},async()=>{
  const result=await propose();assert.equal(result.state,'running');assert.equal(effects,1)
  const record=await stored(result.actionId);assert.equal(record.status,'done');assert.equal(record.decidedAt,null)
- assert.deepEqual(await execute(pool,actor.userId,record.input,true),{data:{subagentId,accepted:true,replayed:true}});assert.equal(effects,1)
+ assert.equal(record.input.mutation,undefined,'done: executable mutation scrubbed');assert.equal(record.input.mutationScrubbed,true)
+ assert.ok('error' in await execute(pool,actor.userId,record.input,true),'a scrubbed row can never execute again');assert.equal(effects,1)
+})
+test('#438 mutation lifecycle: kept only while executable; scrubbed on done, declined, failed and expired; never returned',{skip:!enabled},async()=>{
+ const asked=await propose('write_external');assert.equal(asked.state,'needs_you');assert.ok(!('mutation' in asked),'proposer gets no mutation')
+ const pending=await stored(asked.actionId);assert.deepEqual(pending.input.mutation,{action:'click',x:20,y:40},'pending: kept for the executor')
+ // replay of the exact raw input still matches by digest after the row is scrubbed
+ await pool.query(`UPDATE pending_actions SET status='running',"decidedAt"=now() WHERE id=$1`,[asked.actionId])
+ assert.ok('data' in await execute(pool,actor.userId,pending.input,true));assert.equal((await stored(asked.actionId)).input.mutation,undefined)
+ assert.deepEqual(await execute(pool,actor.userId,pending.input,true),{data:{subagentId,accepted:true,replayed:true}});assert.equal(effects,1)
+ // declined
+ const d=await propose('write_external'),dRaw=(await stored(d.actionId)).input
+ await pool.query(`UPDATE pending_actions SET status='declined',"decidedAt"=now() WHERE id=$1`,[d.actionId])
+ assert.deepEqual(await execute(pool,actor.userId,dRaw,false),{data:{declined:true}})
+ const declined=await stored(d.actionId);assert.equal(declined.input.mutation,undefined);assert.equal(declined.input.summary,'Open the requested control');assert.equal(declined.input.digest,dRaw.digest)
+ // failed (stale)
+ mode='stale';await assert.rejects(propose(),/browserActionExpired/);mode='success'
+ const failed=(await pool.query(`SELECT input,status FROM pending_actions WHERE status='failed' ORDER BY "createdAt" DESC LIMIT 1`)).rows[0]
+ assert.equal(failed.input.mutation,undefined)
+ // expired: an undecided action older than 5 minutes is failed and scrubbed by the next proposal's sweep
+ const e=await propose('write_external');await pool.query(`UPDATE pending_actions SET "createdAt"=now()-interval '6 minutes' WHERE id=$1`,[e.actionId])
+ await pool.query(`UPDATE bot_subagents SET status='running',needs=NULL,"activeActionId"=NULL`)
+ await propose()
+ const expired=await stored(e.actionId);assert.equal(expired.status,'failed');assert.equal(expired.error,'browserActionExpired');assert.equal(expired.input.mutation,undefined)
+ const left=await pool.query(`SELECT id FROM pending_actions WHERE input ? 'mutation' AND status IN ('done','declined','failed')`)
+ assert.equal(left.rowCount,0,'no terminal row keeps a mutation')
+ // list endpoint and audit event expose summary-level fields only; errors are fixed codes
+ const src=await readFile(new URL('../pending-actions.ts',import.meta.url),'utf8'),list=await readFile(new URL('../pending-action-store.ts',import.meta.url),'utf8')
+ assert.match(src,/row\.action === 'credential_operation' \|\| row\.action === 'browser_operation' \? \{ summary/)
+ assert.match(list,/input: \{ summary: row\.input\.summary, origin: row\.input\.origin, operation: row\.input\.operation/)
 })
 test('ask waits, concurrent replay produces one effect, and unrelated targets cannot borrow that approval',{skip:!enabled},async()=>{
  const result=await propose('write_external');assert.equal(result.state,'needs_you');assert.equal(effects,0)
