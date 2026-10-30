@@ -10,7 +10,7 @@ import { IPC } from '@mikka/protocol/ipc'
 
 import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
-import { offlineRetryDelay } from './offline'
+import { AppLoadState, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { NotificationCenter } from './notification-center'
 import { appExternalUrl, desktopAuthState, externalUrl, navigationDecision } from './security'
@@ -162,6 +162,7 @@ function openWindow(url: string): void {
 }
 
 let offlineAttempt = 0
+const appLoad = new AppLoadState(APP_ORIGIN)
 
 function loadApp(): void {
   if (retrying) { clearTimeout(retrying); retrying = null }
@@ -221,9 +222,11 @@ function createMainWindow(): void {
   })
   mainWindow.webContents.on('will-navigate', (event, url) => handleNavigation(event, url))
   mainWindow.webContents.on('will-redirect', (event, url) => handleNavigation(event, url))
+  mainWindow.webContents.on('did-start-navigation', details => {
+    if (details.isMainFrame && !details.isSameDocument) appLoad.started(details.url)
+  })
   mainWindow.webContents.on('did-finish-load', () => {
-    const loaded = mainWindow?.webContents.getURL() ?? ''
-    if (loaded.startsWith(APP_ORIGIN)) {
+    if (appLoad.finished(mainWindow?.webContents.getURL() ?? '')) {
       offlineAttempt = 0
       if (retrying) { clearTimeout(retrying); retrying = null }
     }
@@ -237,6 +240,7 @@ function createMainWindow(): void {
   })
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, _description, validatedURL, isMainFrame) => {
     if (!isMainFrame || errorCode === -3 || !validatedURL.startsWith(APP_ORIGIN)) return
+    appLoad.failedLoad()
     showOffline()
   })
   void mainWindow.loadURL(APP_URL)
