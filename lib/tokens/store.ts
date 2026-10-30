@@ -33,6 +33,25 @@ const view = (row: Row, now: Date): PersonalAccessTokenView => ({
   expired: !!row.expiresAt && row.expiresAt.getTime() <= now.getTime(),
 })
 
+/** SQLSTATE (5 chars) on the error or its cause chain; app codes like 'tokenNotFound' are ignored. */
+const pgCode = (error: unknown): string | undefined => {
+  if (!error || typeof error !== 'object') return undefined
+  const code = (error as { code?: unknown }).code
+  return typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) ? code : pgCode((error as { cause?: unknown }).cause)
+}
+/** Generic stand-in for a DB failure: no cause, params (tokenHash) or query text. */
+export class TokenStoreError extends Error {
+  constructor(readonly pgCode?: string) { super(`personal access token store query failed${pgCode ? ` (${pgCode})` : ''}`); this.name = 'TokenStoreError' }
+}
+/** DrizzleQueryError puts the bound params (incl. tokenHash) in its message; replace it before it can reach a log. */
+async function guardTokenDb<T>(work: () => Promise<T>): Promise<T> {
+  try { return await work() } catch (error) {
+    if (error instanceof WorkspaceError || error instanceof TokenStoreError) throw error
+    if ((error as Error)?.name !== 'DrizzleQueryError' && pgCode(error) === undefined) throw error
+    throw new TokenStoreError(pgCode(error))
+  }
+}
+
 async function requireMember(userId: string, workspaceId: string) {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId))
 }
@@ -48,7 +67,7 @@ export async function createPersonalAccessToken(userId: string, workspaceId: str
   try { expiry = checkExpiry(expiresAt, now) } catch { throw new WorkspaceError('validationGeneric') }
   await requireMember(userId, workspaceId)
   const { token, tokenHash, hint } = generatePersonalAccessToken()
-  const row = await db.transaction(async tx => {
+  const row = await guardTokenDb(() => db.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`pat:${userId}:${workspaceId}`}, 0))`)
     const [{ active }] = await tx.select({ active: sql<number>`count(*)::int` }).from(personalAccessTokens)
       .where(and(eq(personalAccessTokens.userId, userId), eq(personalAccessTokens.workspaceId, workspaceId), isNull(personalAccessTokens.revokedAt),
@@ -60,16 +79,16 @@ export async function createPersonalAccessToken(userId: string, workspaceId: str
     // target: { type: 'token', id: saved.id, label: name }, ...auditRequestContext(headers) }) here. Rule (#432 lib/audit/record.ts):
     // MIKKA-DB token writes use recordAudit inside this transaction, never recordAuditSafe.
     return saved
-  })
+  }))
   return { ...view(row, now), token }
 }
 
 /** The person's unrevoked tokens in this workspace, newest first (expired ones included, flagged). */
 export async function listPersonalAccessTokens(userId: string, workspaceId: string, now = new Date()): Promise<PersonalAccessTokenView[]> {
   await requireMember(userId, workspaceId)
-  const rows = await db.select().from(personalAccessTokens)
+  const rows = await guardTokenDb(() => db.select().from(personalAccessTokens)
     .where(and(eq(personalAccessTokens.userId, userId), eq(personalAccessTokens.workspaceId, workspaceId), isNull(personalAccessTokens.revokedAt)))
-    .orderBy(desc(personalAccessTokens.createdAt), desc(personalAccessTokens.id))
+    .orderBy(desc(personalAccessTokens.createdAt), desc(personalAccessTokens.id)))
   return rows.map(row => view(row, now))
 }
 
@@ -77,7 +96,7 @@ export async function listPersonalAccessTokens(userId: string, workspaceId: stri
 export async function revokePersonalAccessToken(userId: string, workspaceId: string, input: unknown, now = new Date()): Promise<{ id: string }> {
   const { id } = revokeTokenInput.parse(input)
   await requireMember(userId, workspaceId)
-  return db.transaction(async tx => {
+  return guardTokenDb(() => db.transaction(async tx => {
     const [revoked] = await tx.update(personalAccessTokens).set({ revokedAt: now })
       .where(and(eq(personalAccessTokens.id, id), eq(personalAccessTokens.userId, userId), eq(personalAccessTokens.workspaceId, workspaceId), isNull(personalAccessTokens.revokedAt)))
       .returning({ id: personalAccessTokens.id, name: personalAccessTokens.name })
@@ -85,7 +104,7 @@ export async function revokePersonalAccessToken(userId: string, workspaceId: str
     // TODO(audit): after PR #432 merges, recordAudit(tx, { action: 'token.revoked', target: { type: 'token', id, label: revoked.name }, … })
     // inside this transaction (MIKKA-DB token write rule from #432).
     return { id: revoked.id }
-  })
+  }))
 }
 
 export interface TokenPrincipal { tokenId: string; userId: string; workspaceId: string }
@@ -97,6 +116,7 @@ export interface TokenPrincipal { tokenId: string; userId: string; workspaceId: 
  */
 export async function verifyPersonalAccessToken(token: string, now = new Date()): Promise<TokenPrincipal | null> {
   if (!PAT_SHAPE.test(token)) return null
+  return guardTokenDb(async () => {
   const [row] = await db.update(personalAccessTokens).set({ lastUsedAt: now })
     .where(and(
       eq(personalAccessTokens.tokenHash, hashPersonalAccessToken(token)),
@@ -112,4 +132,5 @@ export async function verifyPersonalAccessToken(token: string, now = new Date())
     .where(and(eq(personalAccessTokens.tokenHash, hashPersonalAccessToken(token)), isNull(personalAccessTokens.revokedAt),
       sql`(${personalAccessTokens.expiresAt} is null or ${personalAccessTokens.expiresAt} > ${now})`)).limit(1)
   return recent ?? null
+  })
 }

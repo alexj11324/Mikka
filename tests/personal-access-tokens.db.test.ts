@@ -131,4 +131,32 @@ test('personal access tokens', { skip: !dbUrl }, async t => {
     for (let i = 0; i < PAT_ACTIVE_LIMIT - 1; i++) await store.createPersonalAccessToken(user, ws.id, { name: `l${i}` })
     assert.equal(await outcome(store.createPersonalAccessToken(user, ws.id, { name: 'over' })), 'tokenLimitReached')
   })
+
+  await t.test('DB failures become a generic TokenStoreError: no tokenHash, params or SQL in the error or logs', async () => {
+    await pool.query(`create or replace function pg_temp_pat_boom() returns trigger language plpgsql as $$ begin raise exception 'boom' using errcode = 'P0001'; end $$`)
+    await pool.query('create trigger qa_pat_boom before insert or update on personal_access_tokens for each row execute function pg_temp_pat_boom()')
+    const existing = await pool.query('select "tokenHash" from personal_access_tokens limit 1')
+    const knownHashes = existing.rows.map(r => r.tokenHash as string)
+    const lines: string[] = [], original = console.error
+    console.error = (...args: unknown[]) => { lines.push(args.map(a => a instanceof Error ? `${a.stack} ${JSON.stringify(a)}` : String(a)).join(' ')) }
+    try {
+      for (const work of [
+        () => store.createPersonalAccessToken(owner, other.id, { name: 'Boom' }),
+        () => store.verifyPersonalAccessToken('mkp_' + 'A'.repeat(43)),
+      ]) {
+        let caught: unknown
+        try { await work() } catch (error) { caught = error; console.error(error) }
+        if (caught === undefined) continue // verify of an unknown token updates no row, so the trigger never fires
+        assert.ok(caught instanceof store.TokenStoreError, String(caught))
+        assert.equal((caught as { cause?: unknown }).cause, undefined)
+      }
+      const blob = lines.join('\n')
+      assert.ok(lines.length >= 1)
+      assert.ok(!/params:|insert into|update "|[0-9a-f]{64}|[A-Za-z0-9_-]{43}/.test(blob), blob.slice(0, 300))
+      for (const hash of knownHashes) assert.ok(!blob.includes(hash))
+    } finally {
+      console.error = original
+      await pool.query('drop trigger if exists qa_pat_boom on personal_access_tokens'); await pool.query('drop function if exists pg_temp_pat_boom()')
+    }
+  })
 })
