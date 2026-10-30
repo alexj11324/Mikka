@@ -132,7 +132,7 @@
     "test:factory-http": "node scripts/run-factory-http-tests.mjs",
     "test:skill-semantic-db": "TSX_DISABLE_CACHE=1 node --import ./scripts/server-test.mjs --import tsx --test lib/self-improvement/evaluation-comparison-postgres.test.ts lib/self-improvement/claim-composition-postgres.test.ts",
     "test:factory-routing": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/intake.test.ts lib/factory/tools.test.ts",
-    "test:factory-routing-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/routing.db.test.ts lib/factory/completion-reconcile.db.test.ts tests/factory-admission.db.test.ts",
+    "test:factory-routing-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/routing.db.test.ts lib/factory/completion-reconcile.db.test.ts lib/factory/run-end-paths.db.test.ts tests/factory-admission.db.test.ts",
     "test:factory-checks-db": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/checks.db.test.ts",
     "test:factory-check-recovery": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/check-recovery-tools.test.ts",
     "test:factory-approval-source": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/factory/browser-human.test.ts lib/factory/policy-authorization.test.ts lib/factory/decision-execution.test.ts lib/factory/worker-publication.test.ts lib/factory/publication-invocation.test.ts tests/helpers/factory194-target.test.ts",

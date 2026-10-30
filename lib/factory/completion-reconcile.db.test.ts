@@ -12,6 +12,7 @@ import { createFactoryQuestions } from "./questions/store";
 import { createFactoryReconciler } from "./reconcile";
 import { factoryCheckIndependent } from "./check-independence";
 import { reconcileFactoryAfterCompletion } from "../run-completion-effects";
+import { orchestratorSettings } from "@mikka/protocol/orchestrator";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -140,6 +141,48 @@ test("run completion enters review without the Coordinator; replays do not advan
       const { rows: [old] } = await pool.query(`SELECT status, output FROM factory_attempts WHERE id=$1`, [f.task.attemptId]);
       assert.equal(old.status, "failed");
       assert.equal(old.output?.reasonCode, "run_failed");
+    });
+
+    await t.test("G2: reconciling one finished run does not move another task whose run also finished", async () => {
+      const a = await runningTask(), b = await runningTask();
+      await succeed(a.runId); await succeed(b.runId); // b's hook has not fired yet
+      const bBefore = pick((await store.read("owner", b.task.id)).task);
+      await reconcileFactoryAfterCompletion(pool, "owner", a.runId, reconcileFor);
+      assert.equal((await store.read("owner", a.task.id)).task.stage, "review");
+      assert.deepEqual(pick((await store.read("owner", b.task.id)).task), bBefore, "reconcile.run must stay scoped to its own run binding");
+    });
+
+    await t.test("G3: past maxFixAttempts a failed run stays failed with repair_budget_exhausted and no new attempt", async () => {
+      const max = orchestratorSettings({}).maxFixAttempts;
+      let cur = await runningTask();
+      for (let i = 0; i < max; i++) {
+        await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',error='boom',"finishedAt"=clock_timestamp() WHERE id=$1`, [cur.runId]);
+        await reconcileFactoryAfterCompletion(pool, "owner", cur.runId, reconcileFor);
+        const task = (await store.read("owner", cur.task.id)).task;
+        assert.deepEqual({ stage: task.stage, status: task.status }, { stage: "execute", status: "pending" }, `retry ${i + 1} of ${max}`);
+        const runId = (await dispatch("owner", { binding: factoryBinding(task), agentId, deviceRepoId: repoId })).runId;
+        await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`, [runId]);
+        cur = { task: (await store.read("owner", cur.task.id)).task, runId };
+      }
+      const attempts = (await pool.query('SELECT count(*)::int n FROM factory_attempts WHERE "taskId"=$1', [cur.task.id])).rows[0].n;
+      await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',error='boom',"finishedAt"=clock_timestamp() WHERE id=$1`, [cur.runId]);
+      await reconcileFactoryAfterCompletion(pool, "owner", cur.runId, reconcileFor);
+      const after = (await store.read("owner", cur.task.id)).task;
+      assert.deepEqual({ stage: after.stage, status: after.status, attemptId: after.attemptId }, { stage: "execute", status: "failed", attemptId: cur.task.attemptId });
+      assert.equal((await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [cur.task.attemptId])).rows[0].output?.reasonCode, "repair_budget_exhausted");
+      assert.equal((await pool.query('SELECT count(*)::int n FROM factory_attempts WHERE "taskId"=$1', [cur.task.id])).rows[0].n, attempts, "no further attempt");
+    });
+
+    await t.test("G4: a failed run that already has a run-level retry child stays failed; no second loop", async () => {
+      const f = await runningTask();
+      await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',error='boom',"finishedAt"=clock_timestamp() WHERE id=$1`, [f.runId]);
+      await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"retryOf") SELECT $1,"userId","issueId","agentId","deviceId","deviceRepoId",'queued','Fixture',id FROM agent_runs WHERE id=$2`, [randomUUID(), f.runId]);
+      const attempts = (await pool.query('SELECT count(*)::int n FROM factory_attempts WHERE "taskId"=$1', [f.task.id])).rows[0].n;
+      await reconcileFactoryAfterCompletion(pool, "owner", f.runId, reconcileFor);
+      const after = (await store.read("owner", f.task.id)).task;
+      assert.deepEqual({ status: after.status, attemptId: after.attemptId }, { status: "failed", attemptId: f.task.attemptId });
+      assert.equal((await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [f.task.attemptId])).rows[0].output?.reasonCode, "run_failed");
+      assert.equal((await pool.query('SELECT count(*)::int n FROM factory_attempts WHERE "taskId"=$1', [f.task.id])).rows[0].n, attempts);
     });
 
     await t.test("firing the hook again (and the preparePrompt fallback) does not advance twice", async () => {

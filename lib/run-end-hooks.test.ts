@@ -19,14 +19,9 @@ test('lease expiry and device-lost retry both fire afterRunEnded', async () => {
   assert.match(leases.slice(leases.indexOf('if (retried) {'), leases.indexOf('if (retried) {') + 200), /await afterRunEnded\(run\.userId, run\.id\)/)
 })
 
-test('requestRunStop (run-control cancel path) fires afterRunEnded right after stopOwnedRun', async () => {
-  const runs = await source('./agent-runs.ts')
-  const start = runs.indexOf('export async function requestRunStop(')
-  assert.ok(start >= 0)
-  const body = runs.slice(start, runs.indexOf('\n}', start))
-  assert.match(body, /await stopOwnedRun\(db, userId, parsed\.data\)\s*\n\s*await afterRunEnded\(userId, parsed\.data\)/)
-  for (const caller of ['../app/actions/agents.ts', './mcp/actions.ts']) {
-    const text = await source(caller)
-    assert.ok(!/stopOwnedRun\(/.test(text), `${caller} must stop runs via requestRunStop, not stopOwnedRun`)
-  }
+// Supplement only; behaviour is covered by lib/factory/run-end-paths.db.test.ts.
+test('thread-machine end fires afterRunEnded after its stopped commit', async () => {
+  const machines = await source('./cloud-computer/thread-machines.ts')
+  const end = machines.slice(machines.indexOf("if (action === 'end') {"))
+  assert.match(end.slice(0, end.indexOf("return { runId, state: 'ended' }")), /await client\.query\('COMMIT'\)[\s\S]*await afterRunEnded\(actor\.userId, runId\)/)
 })

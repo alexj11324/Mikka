@@ -8,6 +8,7 @@ import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease
 import { installSubagentRuntime, runtimeRequest } from './runtime'
 import { threadMachineLimits, threadMachineViolation, type ThreadMachineLimits } from './thread-machine-limits'
 import type { Actor } from './subagents'
+import { afterRunEnded } from '@/lib/run-completion-effects'
 function options() {
   const key = process.env.E2B_API_KEY
   if (!key) throw new Error('Cloud runtime unavailable')
@@ -218,6 +219,9 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
       await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [locked.deviceId])
       await client.query('COMMIT')
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+    // This is a terminal write outside the daemon completion path: finalize a
+    // bound Factory task after commit. Flag-gated, idempotent, never throws.
+    await afterRunEnded(actor.userId, runId)
     if (creationPending) throw new ComputerError(409, 'Thread creation cleanup pending')
     // Run end has fenced new captures. Preserve existing recordings before
     // destroying the dedicated filesystem that still holds their bytes.
