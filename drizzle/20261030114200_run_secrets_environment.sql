@@ -4,10 +4,10 @@
 -- non-null value with 403 secretEnvironmentOverrideUnsupported (the audited override lands after #432).
 -- Two files = two transactions. Here: (1) nullable columns, no rewrite; (2) CHECKs added NOT VALID, enforced
 -- for new/changed rows without scanning history, so the ACCESS EXCLUSIVE lock is released at COMMIT right away.
--- 20261030054100 then runs VALIDATE in its own transaction under SHARE UPDATE EXCLUSIVE only.
+-- 20261030114300 then runs VALIDATE in its own transaction under SHARE UPDATE EXCLUSIVE only.
 -- Existing rows are NULL and satisfy both checks. Idempotent; retry safely after lock contention.
 -- Rollback: alter table agent_runs drop column "secretsEnvironment", drop column "secretsEnvironmentOverride";
---           delete from schema_migrations where name = '20261030054000_run_secrets_environment.sql';
+--           delete from schema_migrations where name = '20261030114200_run_secrets_environment.sql';
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 -- Step 1: columns.

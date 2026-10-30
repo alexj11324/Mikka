@@ -1,4 +1,4 @@
-// Settings › 个人访问令牌. Mirrors drizzle/20261030021745_personal_access_tokens.sql (MIKKA_DATABASE_URL).
+// Settings › 个人访问令牌. Mirrors drizzle/20261030113800_personal_access_tokens.sql (MIKKA_DATABASE_URL).
 import { sql } from 'drizzle-orm'
 import { index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { users } from './schema'

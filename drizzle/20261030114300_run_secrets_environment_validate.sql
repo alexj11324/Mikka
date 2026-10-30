@@ -1,8 +1,8 @@
 -- target: MIKKA_DATABASE_URL
--- Second half of 20261030054000 (CHECKs added NOT VALID there). Separate file = separate transaction:
+-- Second half of 20261030114200 (CHECKs added NOT VALID there). Separate file = separate transaction:
 -- VALIDATE takes SHARE UPDATE EXCLUSIVE, so agent_runs reads and writes continue while existing rows
 -- are scanned. Validating an already valid constraint is a no-op; retry safely after lock contention.
--- Rollback: delete from schema_migrations where name = '20261030054100_run_secrets_environment_validate.sql';
+-- Rollback: delete from schema_migrations where name = '20261030114300_run_secrets_environment_validate.sql';
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '15min';

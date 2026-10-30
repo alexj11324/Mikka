@@ -4,7 +4,7 @@
 -- plaintext is never stored. "workspaceId" has no FK: workspaces live in the
 -- workspace database (DATABASE_URL). Mirrors lib/db/secrets-schema.ts.
 -- Rollback: drop table workspace_e2b_verify_attempts, workspace_e2b_keys, workspace_network_policy, workspace_secrets;
---           delete from schema_migrations where name = '20261030022723_workspace_secrets_env.sql';
+--           delete from schema_migrations where name = '20261030113900_workspace_secrets_env.sql';
 
 create table workspace_secrets (
   id uuid primary key,

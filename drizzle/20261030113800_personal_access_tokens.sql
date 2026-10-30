@@ -4,7 +4,7 @@
 -- creation and never again. "workspaceId" has no FK: workspaces live in the
 -- workspace database (DATABASE_URL). Mirrors lib/db/token-schema.ts.
 -- Revoked rows are kept (revokedAt) so a hash can never be reissued silently.
--- Rollback: DROP TABLE IF EXISTS personal_access_tokens; DELETE FROM schema_migrations WHERE name = '20261030021745_personal_access_tokens.sql';
+-- Rollback: DROP TABLE IF EXISTS personal_access_tokens; DELETE FROM schema_migrations WHERE name = '20261030113800_personal_access_tokens.sql';
 create table if not exists personal_access_tokens (
   id uuid primary key,
   "userId" text not null references "user"(id) on delete cascade,
