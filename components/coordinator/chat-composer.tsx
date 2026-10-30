@@ -85,7 +85,7 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   }
 
   return <form onSubmit={event => { event.preventDefault(); if (!sending && !submitDisabled && value.trim()) onSubmit() }}>
-    <FieldGroup className="sr-only"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
+    <FieldGroup className="sr-only w-px"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
     <InputGroup className={cn('min-h-12 rounded-3xl bg-background shadow-xs has-[[data-slot=input-group-control]:focus-visible]:ring-0', quote && 'rounded-2xl')}>
       {quote && <InputGroupAddon align="block-start" className="px-2 pt-2 pb-0">{quote}</InputGroupAddon>}
       {!quote && <InputGroupAddon align="inline-start" className="self-end pb-2">
