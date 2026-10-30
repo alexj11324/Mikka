@@ -69,6 +69,7 @@ test('latest save fails while an older one is in flight: wait, then show the ser
   await page.getByRole('option', { name: 'Codex' }).click() // in flight, succeeds after a delay
   // Fixed width: the right-aligned trigger keeps its left edge whatever is selected.
   expect((await model.boundingBox())!.width).toBe(width)
+  const top = (await model.boundingBox())!.y
   await model.click()
   await page.getByRole('option', { name: 'Claude' }).click() // fails at once
   await page.waitForTimeout(400)
@@ -79,6 +80,8 @@ test('latest save fails while an older one is in flight: wait, then show the ser
   await expect(page.getByText('操作未成功')).toHaveCount(1)
   await expect(page.getByRole('alert').filter({ hasText: '操作未成功' })).toHaveCount(1)
   await expect(page.locator('[data-sonner-toast]').filter({ hasText: '操作未成功' })).toHaveCount(0)
+  // The bar floats: the rows below the title do not move when it appears.
+  expect((await model.boundingBox())!.y).toBe(top)
 })
 
 test('thread drawer pages with a cursor; a failed next page can be retried', async ({ page }) => {

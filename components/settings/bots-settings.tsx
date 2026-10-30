@@ -33,9 +33,14 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
   const [loadFailed, setLoadFailed] = useState(false)
   const [saveFailed, setSaveFailed] = useState<null | BotDefaultsChange>(null)
 
+  // Cleared on unmount so a late load or save answer sets no state on a gone page.
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+
   const load = useCallback(async () => {
     setLoadFailed(false)
     const [nextDefaults, nextBots] = await Promise.all([api.getDefaults(), api.listBots()])
+    if (!alive.current) return
     if (nextDefaults.error || nextBots.error) { setLoadFailed(true); return }
     saver.current?.confirm({ defaultModel: nextDefaults.defaultModel, defaultRepository: nextDefaults.defaultRepository })
     setDefaults(nextDefaults)
@@ -49,6 +54,7 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
     apply: patch => setDefaults(current => current && { ...current, ...patch }),
     onSaved: () => toast(t('saved')),
     onFailed: change => setSaveFailed(change),
+    isActive: () => alive.current,
   })
   function save(change: BotDefaultsChange) {
     setSaveFailed(null)
@@ -59,7 +65,6 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
   if (!defaults || !bots) return <div className="flex flex-col gap-6"><SettingsLoading label={t('defaultsTitle')} rows={2} /><SettingsLoading label={t('allBotsTitle')} rows={3} /></div>
 
   return <div className="flex flex-col gap-6">
-    {saveFailed && <div className="animate-in fade-in duration-200"><SettingsSaveError message={errorsT('generic')} retryLabel={commonT('retry')} onRetry={() => void save(saveFailed)} /></div>}
     <SettingsSection id="bot-defaults-heading" title={t('defaultsTitle')}>
       <SettingRow title={t('model')}>
         {api.isAdmin ? <ModelSelect defaults={defaults} onChange={model => void save({ defaultModel: model })} /> : <ModelLabel defaults={defaults} />}
@@ -73,6 +78,10 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
         ? <Empty><EmptyHeader><EmptyTitle>{t('noBots')}</EmptyTitle></EmptyHeader></Empty>
         : bots.map(bot => <BotRow key={bot.id} bot={bot} api={api} />)}
     </SettingsSection>
+    {/* Floats over the panel's bottom edge so a failed save never shifts the rows (Design Lead: no content push). */}
+    {saveFailed && <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 animate-in fade-in duration-200" data-testid="bots-save-error">
+      <div className="pointer-events-auto w-full max-w-md"><SettingsSaveError message={errorsT('generic')} retryLabel={commonT('retry')} onRetry={() => void save(saveFailed)} /></div>
+    </div>}
   </div>
 }
 

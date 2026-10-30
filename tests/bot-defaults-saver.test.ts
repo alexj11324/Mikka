@@ -9,18 +9,20 @@ function setup() {
   const pending: { change: BotDefaultsChange; resolve: (ok: boolean | 'reject') => void }[] = []
   const events = { saved: 0, failed: [] as BotDefaultsChange[] }
   const history: (BotModelId | null)[] = []
+  const owner = { active: true }
   const saver = createBotDefaultsSaver({
     update: change => new Promise((resolve, reject) => pending.push({ change, resolve: ok => ok === 'reject' ? reject(new Error('network')) : resolve(ok ? { defaultModel: state.defaultModel, defaultRepository: state.defaultRepository, ...change } as never : { error: 'generic' } as never) })),
     apply: patch => { Object.assign(state, patch); history.push(state.defaultModel) },
     onSaved: () => { events.saved++ },
     onFailed: change => { events.failed.push(change) },
+    isActive: () => owner.active,
   })
   saver.confirm({ defaultModel: null, defaultRepository: 'r1' })
   const runs: Promise<void>[] = []
   const save = (model: BotModelId | null) => { runs.push(saver.save({ defaultModel: model })) }
   const saveRepository = (repository: string) => { runs.push(saver.save({ defaultRepository: repository })) }
   const answer = async (index: number, ok: boolean | 'reject') => { pending[index]!.resolve(ok); await new Promise(resolve => setImmediate(resolve)) }
-  return { saver, history, state, events, save, saveRepository, answer, done: () => Promise.all(runs) }
+  return { saver, owner, history, state, events, save, saveRepository, answer, done: () => Promise.all(runs) }
 }
 
 test('in order: an older failure after a newer choice changes nothing', async () => {
@@ -114,4 +116,13 @@ test('reject: the only save rejects → rolls back and reports, later saves stil
   assert.equal(s.state.defaultModel, null); assert.deepEqual(s.events.failed, [{ defaultModel: 'codex' }])
   s.save('claude'); await s.answer(1, false); await s.done()
   assert.equal(s.state.defaultModel, null); assert.equal(s.events.failed.length, 2)
+})
+
+test('unmount: a success or failure that lands after unmount changes nothing and reports nothing', async () => {
+  const s = setup(); s.save('codex'); s.save('claude')
+  const applied = s.history.length
+  s.owner.active = false
+  await s.answer(0, true); await s.answer(1, false); await s.done()
+  assert.equal(s.history.length, applied, 'no apply after unmount')
+  assert.equal(s.events.saved, 0); assert.deepEqual(s.events.failed, [])
 })
