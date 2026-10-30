@@ -2,7 +2,7 @@
 
 Server actions behind the Settings sections 偏好设置, 通知 and 记忆与建议. Every action reads the signed-in person from the Better Auth session and never takes a user id from the client. Actions marked `ActionResult` use `runAction`, so expected failures come back as `{ error, params? }` with a code from `ACTION_ERROR_CODES` (`lib/action-result.ts`), translated under `Errors` in `messages/*.json`. Anything else throws and shows in the server logs.
 
-Migration: `drizzle/20261029195850_settings_preferences.sql`. Every new column has a default, so existing rows keep today's behaviour.
+Migration: `drizzle/20261029213936_settings_preferences.sql`. Every new column has a default, so existing rows keep today's behaviour.
 
 | Table | Column | Default | Meaning |
 | --- | --- | --- | --- |

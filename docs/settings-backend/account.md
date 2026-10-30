@@ -149,7 +149,7 @@ deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true }>
 
 ## 数据库变更
 
-`drizzle/20261029200358_account_settings.sql`（同步 `lib/db/schema.ts`）：
+`drizzle/20261029213940_account_settings.sql`（同步 `lib/db/schema.ts`）：
 
 - `user_avatars`：`userId` 主键（FK → user，CASCADE），`sha256`、`contentType`、`size`（≤204800）、`storageKey` / `inlineContent` 二选一。
 - `account_data_exports`：`id`、`userId`（FK → user，CASCADE）、`tokenHash`（唯一）、`createdAt`、`expiresAt`、`downloadedAt`。
