@@ -54,10 +54,9 @@ export async function handleFactoryQuestionList(
   const { taskId, runId } = parsed.data;
   try {
     const rows = (taskId ? await service.list(request.actor.userId, taskId.toLowerCase()) : await service.pending(request.actor.userId, runId?.toLowerCase())) as QuestionView[];
-    const run = runId?.toLowerCase();
+    // runId (origin or continuation) is filtered in SQL by `pending`, before its 50-row cap.
     const questions = rows
       .filter((q) => (PENDING_QUESTION_STATUSES as readonly string[]).includes(q.status))
-      .filter((q) => !run || q.originRunId === run || q.continuationRunId === run)
       .map(toAskUserQuestion);
     return { status: 200, body: { questions } };
   } catch (error) {
