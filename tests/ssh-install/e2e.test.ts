@@ -13,7 +13,7 @@ import { randomUUID } from 'node:crypto'
 import { SshInstaller, runProcess } from '../../apps/desktop/src/main/ssh-install'
 
 // The runner starts a disposable SSH/systemd container and copies the packed daemon to /tmp/mikka.tgz.
-test('real SSH key confirmation → tarball install → systemd → registration → redetect → restart', { timeout: 240_000 }, async () => {
+test('real SSH key confirmation → tarball install → systemd → registration → redetect → restart → uninstall', { timeout: 300_000 }, async () => {
   const container = process.env.MIKKA_SSH_TEST_CONTAINER
   if (!container || !/^mikka-491-[a-z0-9-]+$/.test(container)) throw new Error('Disposable SSH fixture required')
   const home = await mkdtemp(join(tmpdir(), 'mikka-ssh-e2e-'))
@@ -21,7 +21,8 @@ test('real SSH key confirmation → tarball install → systemd → registration
   const deviceId = randomUUID(), workspaceId = randomUUID()
   const credential = `orv_${'t'.repeat(43)}`
   let enrollments = 0, registrations = 0, heartbeats = 0
-  let command: { id: string; kind: 'redetect' | 'restart' } | undefined
+  let command: { id: string; kind: 'redetect' | 'restart' | 'uninstall' } | undefined
+  let removed = false, revoked = false
   const acked = new Set<string>()
   let tunnel: ChildProcess | undefined
   const server = createServer(async (request, response) => {
@@ -32,6 +33,7 @@ test('real SSH key confirmation → tarball install → systemd → registration
     const route = request.url ?? ''
     if (route.endsWith('/enroll')) { enrollments++; response.end(JSON.stringify({ credential })); return }
     if (request.headers.authorization !== `Bearer ${credential}`) { response.writeHead(401).end('{}'); return }
+    if (revoked || (removed && !route.endsWith('/heartbeat'))) { response.writeHead(401).end('{}'); return }
     if (route.endsWith('/register')) {
       assert.equal(body.deviceType, 'server'); registrations++
       response.end(JSON.stringify({ deviceId, workspaceId })); return
@@ -40,6 +42,7 @@ test('real SSH key confirmation → tarball install → systemd → registration
       heartbeats++
       if (command) console.log(JSON.stringify({ heartbeat: heartbeats, command: command.kind, acknowledged: (body.completedDeviceCommands ?? []).includes(command.id) }))
       for (const id of body.completedDeviceCommands ?? []) acked.add(id)
+      if (command?.kind === 'uninstall' && acked.has(command.id)) revoked = true
       response.end(JSON.stringify({ leases: {}, deviceCommands: command && !acked.has(command.id) ? [command] : [] })); return
     }
     if (route.endsWith('/repos')) { response.end('{"repos":[]}'); return }
@@ -103,15 +106,31 @@ test('real SSH key confirmation → tarball install → systemd → registration
     const pidAfter = await runProcess('docker', ['exec', container, 'systemctl', '--user', '--machine=root@.host', 'show', 'mikka-daemon.service', '--property=MainPID', '--value'])
     assert.notEqual(reinstalledPid, pidAfter)
     assert.ok(registrations >= 2)
+    await runProcess('docker', ['exec', container, 'sh', '-c', 'mkdir -p /root/keep-repository /root/.config/Mikka/worktrees; echo keep > /root/keep-repository/file; echo keep > /root/.config/Mikka/worktrees/keep'])
+    removed = true
+    command = { id: randomUUID(), kind: 'uninstall' }
+    await waitUntil(() => acked.has(command!.id), 45_000)
+    assert.equal(revoked, true)
+    const daemonPid = Number(pidAfter.trim())
+    assert.ok(Number.isSafeInteger(daemonPid) && daemonPid > 0)
+    await waitUntil(async () => {
+      try {
+        await runProcess('docker', ['exec', container, 'sh', '-c', `test ! -e /root/.config/systemd/user/mikka-daemon.service && ! systemctl --user --machine=root@.host is-active --quiet mikka-daemon.service && ! kill -0 ${daemonPid} 2>/dev/null`])
+        return true
+      } catch { return false }
+    }, 45_000)
+    const device = JSON.parse(await runProcess('docker', ['exec', container, 'cat', '/root/.config/Mikka/device.json']))
+    assert.equal(device.credential, undefined)
+    await runProcess('docker', ['exec', container, 'sh', '-c', 'test ! -e /root/.config/Mikka/daemon.secret; command -v mikka; test "$(cat /root/keep-repository/file)" = keep; test "$(cat /root/.config/Mikka/worktrees/keep)" = keep'])
   } finally {
     tunnel?.kill()
     server.closeAllConnections(); server.close()
     await rm(home, { recursive: true, force: true })
   }
 })
-async function waitUntil(check: () => boolean, timeout: number) {
+async function waitUntil(check: () => boolean | Promise<boolean>, timeout: number) {
   const deadline = Date.now() + timeout
-  while (!check()) {
+  while (!await check()) {
     if (Date.now() > deadline) throw new Error('SSH acceptance timed out')
     await new Promise(resolve => setTimeout(resolve, 200))
   }

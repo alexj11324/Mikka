@@ -239,8 +239,9 @@ dbTest('devices: rename is owner-only and survives re-register; removal waits fo
   assert.deepEqual(await deviceActions.removeDevice(deviceId), { error: 'deviceHasActiveRuns', params: undefined })
   assert.equal((await daemonCall(`/v1/devices/${deviceId}/heartbeat`, token, {}, deviceId)).status, 400, 'still authorized while refused (invalid body only)')
   await pool.query(`UPDATE agent_runs SET status='stopped' WHERE "deviceId"=$1 AND status='running'`, [deviceId])
+  await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '2 minutes' WHERE id=$1`, [deviceId])
 
-  assert.deepEqual(await deviceActions.removeDevice(deviceId), { id: deviceId, revokedTokens: 1 })
+  assert.deepEqual(await deviceActions.removeDevice(deviceId), { id: deviceId, revokedTokens: 1, uninstall: 'not_possible' })
   assert.deepEqual(await deviceActions.removeDevice(deviceId), { error: 'deviceNotFound', params: undefined })
 
   // The removed device's daemon is locked out of every /v1/devices call.

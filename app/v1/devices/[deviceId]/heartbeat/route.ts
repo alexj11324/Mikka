@@ -28,6 +28,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
+  if (caller.removingDeviceId === deviceId) {
+    const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
+    // No registration, harness refresh, run leases or other commands after removal.
+    return NextResponse.json({ leases: {}, deviceCommands: await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? []) }, { headers: { 'Cache-Control': 'private, no-store' } })
+  }
   // Also records this credential as the device's, so removing it revokes the credential.
   if (!await linkDeviceToken(caller, deviceId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
