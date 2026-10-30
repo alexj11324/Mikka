@@ -218,7 +218,7 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     const calls: string[] = []
     let failStart = false, gone = false
     const runtime = {
-      async connectComputer(id: string) { if (gone) throw new Error('https://api.e2b.invalid/secret'); calls.push(`connect ${id}`); return { sandboxId: id } },
+      async connectComputer(_workspaceId: string, id: string) { if (gone) throw new Error('https://api.e2b.invalid/secret'); calls.push(`connect ${id}`); return { sandboxId: id } },
       async captureScreenshot(_sandbox: unknown, display: number) { calls.push(`shot :${display}`); return PNG },
       async startScreenRecording(_sandbox: unknown, display: number, id: string, seconds: number) { if (failStart) throw new Error('ffmpeg missing'); calls.push(`record :${display} ${id} ${seconds}`) },
       async stopScreenRecording(_sandbox: unknown, display: number, id: string) { calls.push(`stop :${display} ${id}`); return { bytes: MP4, durationMs: 4200 } },

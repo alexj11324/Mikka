@@ -6,12 +6,11 @@ import { z } from 'zod'
 import { ComputerError } from '@/lib/computer/store'
 import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant, ensureHostedRunnerImage } from '@/lib/computer/e2b-provider'
 import { installSubagentRuntime, runtimeRequest } from './runtime'
+import { e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import { threadMachineLimits, threadMachineViolation, type ThreadMachineLimits } from './thread-machine-limits'
 import type { Actor } from './subagents'
-function options() {
-  const key = process.env.E2B_API_KEY
-  if (!key) throw new Error('Cloud runtime unavailable')
-  return { apiKey: key, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
+async function options(workspaceId: string) {
+  return { apiKey: await e2bApiKey(workspaceId, 'Cloud runtime unavailable'), proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
 }
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 /** Register only while this provisioning lease still owns a non-ended row. */
@@ -83,7 +82,8 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     let machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
     if (machine?.state === 'ended') throw new ComputerError(409, 'Thread ended')
     if (machine?.state === 'running' && machine.sandboxId) {
-      const state = await Sandbox.getInfo(machine.sandboxId, options())
+      const base = await options(actor.workspaceId)
+      const state = await withE2BErrors(actor.workspaceId, false, () => Sandbox.getInfo(machine.sandboxId, base))
       if (state.state !== 'paused') { await client.query('COMMIT'); return { runId, state: 'running' } }
       // The provider paused this sandbox on its own timeout. E2B stops billing
       // at pause, so persist the end of the running interval before resuming.
@@ -97,7 +97,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machines:owner:${actor.userId}`])
     await assertThreadMachineCapacity(client, actor, runId)
     if (!machine || machine.snapshotId === 'pending') {
-      const source = await connectComputer(run.botSandboxId)
+      const source = await connectComputer(actor.workspaceId, run.botSandboxId)
       const snapshotId = await workspaceSnapshot(client as unknown as Pool, actor, source, run.repoPath)
       machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state)
         VALUES ($1,$2,$3,$4,$5,$6,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.botId, snapshotId, randomUUID()])).rows[0]
@@ -105,7 +105,8 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     // Persist snapshot and operation ID before provider requests.
     await client.query('UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval \'15 minutes\' WHERE "runId"=$1', [runId, leaseId])
     await client.query('COMMIT')
-    const sandbox = machine.sandboxId ? await connectComputer(machine.sandboxId) : await Sandbox.create(machine.snapshotId, { ...options(), idempotencyKey: machine.operationId, timeoutMs: 15 * 60_000, metadata: { application: 'mikka-thread', workspaceId: actor.workspaceId, runId }, lifecycle: { onTimeout: 'pause', autoResume: false } })
+    const createOptions = machine.sandboxId ? null : await options(actor.workspaceId)
+    const sandbox = machine.sandboxId ? await connectComputer(actor.workspaceId, machine.sandboxId) : await withE2BErrors(actor.workspaceId, true, () => Sandbox.create(machine.snapshotId, { ...createOptions, idempotencyKey: machine.operationId, timeoutMs: 15 * 60_000, metadata: { application: 'mikka-thread', workspaceId: actor.workspaceId, runId }, lifecycle: { onTimeout: 'pause', autoResume: false } }))
     const recorded = await recordThreadSandbox(pool, runId, sandbox.sandboxId, leaseId)
     if (!recorded) {
       // An end can win while Sandbox.create is in flight. The just-created
@@ -113,7 +114,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       if (!machine.sandboxId) {
         // Record it even after end so a failed kill remains retryable. A newer
         // lease may share the idempotent sandbox and must not have it killed.
-        if (await recordCancelledSandbox(pool, runId, sandbox.sandboxId, machine.operationId)) await Sandbox.kill(sandbox.sandboxId, options())
+        if (await recordCancelledSandbox(pool, runId, sandbox.sandboxId, machine.operationId)) await Sandbox.kill(sandbox.sandboxId, await options(actor.workspaceId))
       }
       throw new ComputerError(409, 'Thread provisioning cancelled')
     }
@@ -183,7 +184,7 @@ export async function openThreadDesktop(pool: Pool, actor: Actor, runId: string,
     const permission = policy?.permission ?? 'ask', policyVersion = Number(policy?.version ?? 0)
     if (permission === 'deny') throw new ComputerError(403, 'Computer use is disabled')
     if (!['ask','allow'].includes(permission) || !Number.isSafeInteger(policyVersion) || policyVersion < 0) throw new ComputerError(409, 'Computer policy unavailable')
-    const sandbox = await runtime.connectComputer(machine.sandboxId)
+    const sandbox = await runtime.connectComputer(actor.workspaceId, machine.sandboxId)
     const lease = { botId: machine.botId, ownerId: actor.userId, display: 1, epoch: machine.epoch, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion }
     await runtime.startDesktop(sandbox, 1, true)
     await runtime.syncDesktopLease(sandbox, lease)
@@ -223,13 +224,13 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
     // destroying the dedicated filesystem that still holds their bytes.
     const { screenCaptures } = await import('@/lib/captures/screen')
     await screenCaptures.stopRunRecordings([runId])
-    if (sandboxId) await Sandbox.kill(sandboxId, options())
+    if (sandboxId) await Sandbox.kill(sandboxId, await options(actor.workspaceId))
     return { runId, state: 'ended' }
   }
   if (action === 'resume') return ensureThreadMachine(pool, actor, runId)
   if (action === 'desktop') return openThreadDesktop(pool, actor, runId)
   if (!machine.sandboxId) throw new ComputerError(409, 'Thread machine has not started')
-  const sandbox = await connectComputer(machine.sandboxId)
+  const sandbox = await connectComputer(actor.workspaceId, machine.sandboxId)
   if (action === 'pause') {
     const client = await pool.connect()
     try {

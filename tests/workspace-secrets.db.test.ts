@@ -182,4 +182,42 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     await e2b.recordE2BKeyError(other.id, 'invalid')
     assert.equal((await e2b.getE2BKeyStatus(admin, other.id)).lastErrorCode, 'invalid')
   })
+
+  await t.test('4e2 runtime: sandbox env + output masking are flag-gated and workspace-scoped', async () => {
+    const runtime = await import('../lib/secrets/runtime')
+    const { maskDeep } = await import('../lib/secrets/mask')
+    const third = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const TOKEN = 'ghp_' + randomBytes(12).toString('hex')
+    const keyEnv = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
+    const on = { ...keyEnv, MIKKA_BYO_E2B_KEY: '1' }, off = { ...keyEnv }
+    await store.createWorkspaceSecret(admin, third.id, { name: 'GH_TOKEN', kind: 'secret', value: TOKEN })
+    await store.createWorkspaceSecret(admin, third.id, { name: 'SHORT', kind: 'secret', value: 'abc1234' })
+    await store.createWorkspaceSecret(admin, third.id, { name: 'REGION', kind: 'env', value: 'us-east-1-long' })
+    await store.createWorkspaceSecret(admin, third.id, { name: 'REPO_ONLY', kind: 'secret', value: 'repo-scoped-value', scope: { type: 'repository', repository: 'acme/app' } })
+    assert.deepEqual(await runtime.sandboxSecretEnv(third.id, off), {}, 'flag off: nothing injected')
+    assert.deepEqual(await runtime.sandboxSecretEnv(third.id, on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long' })
+    const chunk = { type: 'text-delta', delta: `push ${TOKEN} b64=${Buffer.from(TOKEN).toString('base64')} short=abc1234 region=us-east-1-long`, nested: [{ url: `https://x/?t=${encodeURIComponent(TOKEN)}` }] }
+    const offMask = await runtime.workspaceSecretMasker(third.id, off)
+    assert.deepEqual(maskDeep(chunk, offMask), chunk, 'flag off: stored verbatim (today)')
+    const masked = maskDeep(chunk, await runtime.workspaceSecretMasker(third.id, on))
+    const text = JSON.stringify(masked)
+    assert.ok(!text.includes(TOKEN) && !text.includes(Buffer.from(TOKEN).toString('base64')))
+    assert.match(masked.delta, /push \[secret:GH_TOKEN\] b64=\[secret:GH_TOKEN\] short=abc1234 region=us-east-1-long/)
+    assert.equal(masked.nested[0].url, 'https://x/?t=[secret:GH_TOKEN]')
+    const otherMask = await runtime.workspaceSecretMasker(other.id, on)
+    assert.ok(otherMask(TOKEN) === TOKEN, 'another workspace does not mask this one\'s values')
+    assert.equal((await runtime.workspaceSecretMasker(null, on))('x'), 'x')
+    await assert.rejects(runtime.sandboxSecretEnv(third.id, { MIKKA_BYO_E2B_KEY: '1' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
+  })
+
+  await t.test('4e2 runtime: E2B errors map to codes and mark the card (flag on only)', async () => {
+    const { withE2BErrors } = await import('../lib/secrets/e2b-runtime')
+    const { AuthenticationError, NotFoundError } = await import('e2b')
+    const on = { MIKKA_BYO_E2B_KEY: '1' }
+    await assert.rejects(withE2BErrors(other.id, false, async () => { throw new AuthenticationError('nope') }, {}), AuthenticationError, 'flag off: unchanged')
+    await assert.rejects(withE2BErrors(other.id, true, async () => { throw new NotFoundError('template x not found') }, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_template_unavailable')
+    assert.equal((await e2b.getE2BKeyStatus(admin, other.id)).lastErrorCode, 'template_unavailable')
+    await assert.rejects(withE2BErrors(other.id, false, async () => { throw new AuthenticationError('nope') }, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_invalid')
+    assert.equal((await e2b.getE2BKeyStatus(admin, other.id)).lastErrorCode, 'invalid')
+  })
 })

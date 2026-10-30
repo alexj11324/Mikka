@@ -110,7 +110,7 @@ export class SubagentStore {
   async viewer(actor: Actor, botId: string, id: string) {
     const { row, sandboxId } = await this.machine(actor, botId, id)
     if (!['running', 'needs_you'].includes(row.status)) throw new ComputerError(409, 'Browser unavailable')
-    const capability = await grant(await connectComputer(sandboxId), row, 'view')
+    const capability = await grant(await connectComputer(actor.workspaceId, sandboxId), row, 'view')
     return { url: endpointPath(capability.endpoint, '/viewer').replace('https:', 'wss:'), expiresAt: new Date(capability.expiresAt).toISOString() }
   }
   async stop(actor: Actor, botId: string, id: string) {

@@ -80,7 +80,8 @@ export async function listWorkspaceSecrets(userId: string, workspaceId: string):
 
 /** D6 新建. Errors: validationGeneric, secretNameTaken, secretLimitReached, secretsUnavailable, workspaceAccessDenied. */
 /** Values shorter than this are not masked in runtime output (4e2), so saving one returns a warning. */
-export const MASK_MIN_LENGTH = 8
+export { MASK_MIN_LENGTH } from './mask'
+import { MASK_MIN_LENGTH } from './mask'
 export type SavedSecretView = WorkspaceSecretView & { warning: 'shortValueNotMasked' | null }
 const withWarning = (row: WorkspaceSecretView, value: string): SavedSecretView => ({ ...row, warning: value.length < MASK_MIN_LENGTH ? 'shortValueNotMasked' : null })
 

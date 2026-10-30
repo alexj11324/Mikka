@@ -6,6 +6,8 @@ import { agentRuns, devices, runChunks } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
 import { computerEventsMatch } from '@/lib/computer/events'
 import { freshChunks, nextReply } from '@/lib/thread-groups'
+import { workspaceSecretMasker } from '@/lib/secrets/runtime'
+import { maskDeep } from '@/lib/secrets/mask'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,16 +57,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
       : undefined
     if (!computerEventsMatch(parsed.data.chunks, runId, binding?.botId ?? null)) return NextResponse.json({ error: 'Invalid computer event.' }, { status: 400 })
   }
+  // 4e2 ②: chunks from a cloud worker (workspace-scoped token) are masked before they are stored.
+  // Identity when MIKKA_BYO_E2B_KEY is off or the workspace has no secret of 8+ characters.
+  const mask = await workspaceSecretMasker(caller.scopeWorkspaceId)
+  const chunks = maskDeep(parsed.data.chunks, mask)
   await db.transaction(async tx => {
     const inserted = await tx.insert(runChunks)
-      .values(parsed.data.chunks.map((chunk, index) => ({
+      .values(chunks.map((chunk, index) => ({
         id: crypto.randomUUID(), runId, seq: parsed.data.fromSeq + index,
         chunk: chunk as Record<string, unknown>,
       })))
       .onConflictDoNothing()
       .returning({ seq: runChunks.seq })
     // Only chunks stored now count, so a re-sent batch never appends its text twice.
-    await recordLastReply(tx, runId, freshChunks(parsed.data.chunks as Record<string, unknown>[], parsed.data.fromSeq, inserted.map(row => row.seq)))
+    await recordLastReply(tx, runId, freshChunks(chunks as Record<string, unknown>[], parsed.data.fromSeq, inserted.map(row => row.seq)))
   })
   await db.update(agentRuns)
     .set({ status: 'running', updatedAt: new Date() })

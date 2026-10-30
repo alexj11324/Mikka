@@ -12,6 +12,8 @@ import { agentRuns, devices } from '@/lib/db/schema'
 import { dispatchCompletedIssue } from '@/lib/run-completion'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { ImprovementError } from '@/lib/self-improvement/contract'
+import { workspaceSecretMasker } from '@/lib/secrets/runtime'
+import { maskDeep } from '@/lib/secrets/mask'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,7 +32,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     return NextResponse.json({ error: 'Invalid completion.' }, { status: 400 })
   }
   let result: Awaited<ReturnType<typeof persistRunCompletion>>
-  try { result = await persistRunCompletion(caller.userId, runId, parsed.data, caller.scopeDeviceId) }
+  // 4e2 ②: report / error text from a cloud worker is masked before it is stored.
+  const completion = maskDeep(parsed.data, await workspaceSecretMasker(caller.scopeWorkspaceId))
+  try { result = await persistRunCompletion(caller.userId, runId, completion, caller.scopeDeviceId) }
   catch (error) {
     if (error instanceof ImprovementError) return NextResponse.json({ error: error.code }, { status: 409 })
     throw error
