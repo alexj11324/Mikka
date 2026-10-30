@@ -12,8 +12,8 @@ export async function pendingDeviceCommands(deviceId: string, completed: string[
   const connection = await pool.connect()
   try {
     await connection.query('BEGIN')
-    if (completed.length) await connection.query(`UPDATE device_management_commands SET "completedAt"=now() WHERE "deviceId"=$1 AND id=ANY($2::uuid[])`, [deviceId, completed])
-    for (const failure of failed) await connection.query(`UPDATE device_management_commands SET "completedAt"=now(),error=$3 WHERE "deviceId"=$1 AND id=$2`, [deviceId, failure.id, failure.error])
+    if (completed.length) await connection.query(`UPDATE device_management_commands SET "completedAt"=now() WHERE "deviceId"=$1 AND id=ANY($2::uuid[]) AND "completedAt" IS NULL`, [deviceId, completed])
+    for (const failure of failed) await connection.query(`UPDATE device_management_commands SET "completedAt"=now(),error=$3 WHERE "deviceId"=$1 AND id=$2 AND "completedAt" IS NULL`, [deviceId, failure.id, failure.error])
     const result = await connection.query<{ id: string; kind: DeviceCommandKind }>(`SELECT id,kind FROM device_management_commands WHERE "deviceId"=$1 AND "completedAt" IS NULL ORDER BY "createdAt" LIMIT 1`, [deviceId])
     await connection.query('COMMIT')
     return result.rows

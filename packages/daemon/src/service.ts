@@ -26,7 +26,8 @@ export async function installService(server: string, deviceType = 'server') {
     // Permission varies by host. A denied linger request does not prevent the user service.
     await exec('loginctl', ['enable-linger'], { timeout: 10_000 }).catch(() => undefined)
     await exec('systemctl', ['--user', 'daemon-reload'])
-    await exec('systemctl', ['--user', 'enable', '--now', 'mikka-daemon.service'])
+    await exec('systemctl', ['--user', 'enable', 'mikka-daemon.service'])
+    await exec('systemctl', ['--user', 'restart', 'mikka-daemon.service'])
   } else {
     const file = join(home, 'Library/LaunchAgents', `${label}.plist`)
     await mkdir(dirname(file), { recursive: true, mode: 0o700 })

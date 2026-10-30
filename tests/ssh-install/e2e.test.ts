@@ -91,12 +91,16 @@ test('real SSH key confirmation → tarball install → systemd → registration
     assert.equal(enrollments, 1)
     assert.ok(registrations >= 1 && heartbeats >= 1)
     const pidBefore = await runProcess('docker', ['exec', container, 'systemctl', '--user', '--machine=root@.host', 'show', 'mikka-daemon.service', '--property=MainPID', '--value'])
+    // Reinstallation must replace an already-running service, including its server flags.
+    await runProcess('ssh', ['-F', config, '-oBatchMode=yes', '-oStrictHostKeyChecking=yes', `-oUserKnownHostsFile=${join(home, '.ssh/known_hosts')}`, 'fixture', "mikka daemon service install --server 'http://127.0.0.1:34991/mikka' --device-type server"])
+    const reinstalledPid = await runProcess('docker', ['exec', container, 'systemctl', '--user', '--machine=root@.host', 'show', 'mikka-daemon.service', '--property=MainPID', '--value'])
+    assert.notEqual(pidBefore, reinstalledPid)
     command = { id: randomUUID(), kind: 'redetect' }
     await waitUntil(() => acked.has(command!.id), 45_000)
     command = { id: randomUUID(), kind: 'restart' }
     await waitUntil(() => acked.has(command!.id), 60_000)
     const pidAfter = await runProcess('docker', ['exec', container, 'systemctl', '--user', '--machine=root@.host', 'show', 'mikka-daemon.service', '--property=MainPID', '--value'])
-    assert.notEqual(pidBefore, pidAfter)
+    assert.notEqual(reinstalledPid, pidAfter)
     assert.ok(registrations >= 2)
   } finally {
     tunnel?.kill()

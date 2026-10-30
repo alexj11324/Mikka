@@ -57,4 +57,8 @@ test('management queue is owner-scoped, serial and acknowledges only its device'
   assert.deepEqual(await pendingDeviceCommands(a, [first!]), [{ id: second, kind: 'restart' }])
   assert.deepEqual(await pendingDeviceCommands(a, [], [{ id: second!, error: 'not managed' }]), [{ id: third, kind: 'update' }])
   assert.deepEqual(await pendingDeviceCommands(a, [third!]), [])
+  const receipt = await pool.query(`SELECT "completedAt" FROM device_management_commands WHERE id=$1`, [third])
+  await pendingDeviceCommands(a, [third!])
+  const replay = await pool.query(`SELECT "completedAt" FROM device_management_commands WHERE id=$1`, [third])
+  assert.equal(receipt.rows[0].completedAt.getTime(), replay.rows[0].completedAt.getTime())
 }))
