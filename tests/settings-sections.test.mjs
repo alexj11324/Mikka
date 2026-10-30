@@ -28,12 +28,12 @@ test('hrefs keep the workspace and use the routed paths for members and teams', 
   assert.equal(settingsHref('preferences'), '/settings?section=preferences')
 })
 
-const UNBUILT = ['bots']
+const UNBUILT = ['developer', 'bots']
 
 test('members do not see admin-only sections; admins see every built one', () => {
   const member = visibleSettingsSections({ admin: false }).map(s => s.id)
   assert.equal(member.includes('permissions'), false)
-  for (const id of ['general', 'members', 'teams', 'computers', 'developer', 'usage']) assert.equal(member.includes(id), true, id)
+  for (const id of ['general', 'members', 'teams', 'computers', 'usage']) assert.equal(member.includes(id), true, id)
   for (const id of ['secrets', 'audit', 'billing']) assert.equal(member.includes(id), false, id)
   assert.deepEqual(visibleSettingsSections({ admin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id)).map(s => s.id))
 })

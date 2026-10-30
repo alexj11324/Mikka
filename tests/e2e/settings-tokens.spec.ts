@@ -1,5 +1,9 @@
 import { test, expect, register } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
+import { SETTINGS_SECTIONS } from '../../lib/settings-sections'
+
+// Runs again once 个人访问令牌 ships (its `unbuilt` flag in lib/settings-sections.ts is removed).
+test.skip(Boolean(SETTINGS_SECTIONS.find(s => s.id === 'developer')?.unbuilt), '个人访问令牌 is hidden until an API accepts tokens')
 
 // N3 个人访问令牌 (Figma 554:8440) against the real token store.
 test('新建令牌只显示一次明文，撤销后从列表消失', async ({ page }, testInfo) => {

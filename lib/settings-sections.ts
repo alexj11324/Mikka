@@ -36,7 +36,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
   { id: 'activity', group: 'personal', title: 'Activity' },
   { id: 'computers', group: 'personal', title: 'Devices' },
-  { id: 'developer', group: 'personal', title: 'Personal access tokens' },
+  // Hidden until an API accepts the tokens (Alex); the UI and token store are built. Delete `unbuilt` to ship it.
+  { id: 'developer', group: 'personal', title: 'Personal access tokens', unbuilt: true },
   { id: 'general', group: 'workspace', title: 'General' },
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
