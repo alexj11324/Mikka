@@ -5,7 +5,7 @@
 // present pg/DB test files must map to a package script or inventory fails closed.
 import { spawnSync } from 'node:child_process'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { posix, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const REQUIRED_SUITES = [
@@ -67,6 +67,7 @@ export const BROWSER_SUITES = [
 // filesystem destruction denied. They run in the existing pure scope gate.
 export const OFFLINE_GUARDED = [
   {file:'scripts/scope-native-offline.test.mjs',script:'test:scope-acceptance-guard',guard:'scripts/credential-diagnostics-offline.mjs',reason:'real pg/Drizzle API and denied-startup tests; no server SQL'},
+  {file:'lib/personal-mailbox-runtime-off.test.ts',script:'test:personal-mailbox-core',guard:'scripts/credential-diagnostics-offline.mjs',reason:'spies on pg Pool/Client to assert the mailbox-off path submits no SQL; transport denied'},
   {file:'scripts/scope-fresh.test.mjs',script:'test:scope-acceptance-guard',guard:'scripts/credential-diagnostics-offline.mjs',reason:'fresh target models and native connection rejection; no server SQL'},
 ]
 // This destructive empty-database bootstrap must stay BEFORE test:e2e:setup.
@@ -114,7 +115,8 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
   const offline = new Set()
   for(const {file,script,guard,reason} of offlineGuarded){
     if(!has(file))continue
-    const localGuard='./'+guard.split('/').at(-1)
+    const rel=posix.relative(posix.dirname(file),guard)
+    const localGuard=rel.startsWith('.')?rel:'./'+rel
     if(!reason||!has(guard)||!files[file].includes(`import '${localGuard}'`)||!commandHas(scripts[script],file)||!scripts[script].includes(`--import ./${guard}`))throw Error(`Offline suite ${file} requires its source guard and explicit guarded pure script`)
     offline.add(file)
   }
