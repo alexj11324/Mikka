@@ -284,6 +284,12 @@ export const runAssignmentSchema = z.object({
     display: z.string().regex(/^:[1-9][0-9]{0,2}$/),
     policyVersion: z.number().int().nonnegative().max(2147483647),
   }).strict().optional(),
+  /**
+   * 4e3: the task's explicit user variables (workspace + matching repository secrets/env, NAME -> value).
+   * Cloud workers only. Passed into the task container through its own channel, never into the worker's
+   * env, and never written to the run journal.
+   */
+  taskEnv: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/), z.string().max(65_536)).optional(),
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
   fixture: z.string().max(200).optional(),
   /**
