@@ -34,7 +34,7 @@ test('out of order: the newer success lands first, the older failure is ignored'
   assert.equal(s.state.defaultModel, 'claude'); assert.deepEqual(s.events.failed, []); assert.equal(s.events.saved, 1)
 })
 
-test('the latest save failing rolls back to the last confirmed value and reports once', async () => {
+test('Codex succeeds (older) → Claude fails (latest) → rolls back to Codex, the last confirmed value, and reports once', async () => {
   const s = setup(); s.save('codex'); s.save('claude')
   await s.answer(0, true); await s.answer(1, false); await s.done()
   assert.equal(s.state.defaultModel, 'codex'); assert.deepEqual(s.events.failed, [{ defaultModel: 'claude' }]); assert.equal(s.events.saved, 0)
