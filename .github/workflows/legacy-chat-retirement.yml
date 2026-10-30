@@ -5,6 +5,12 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+
 jobs:
   browser-e2e:
     name: Retired POST, archived history and current Bot entry

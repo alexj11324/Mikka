@@ -28,6 +28,9 @@ export async function rememberLocale(userId: string, locale: ActionLocale): Prom
  * when a call fails, the items keep their raw title. Never throws.
  */
 export async function writeActionTitles(userId: string, items: readonly ActionTitleInput[]): Promise<void> {
+  'use step'
+  const { hostedModel } = await import('@/lib/abuse/model')
+  const { executionWorkspace } = await import('@/lib/execution-settings')
   const key = process.env.DECISION_GATEWAY_API_KEY
   if (!key || !items.length) return
   try {
@@ -36,7 +39,7 @@ export async function writeActionTitles(userId: string, items: readonly ActionTi
     for (let start = 0; start < items.length; start += ACTION_BATCH) {
       const batch = items.slice(start, start + ACTION_BATCH)
       const { instructions, prompt } = actionTitlePrompt(batch, locale)
-      const { text } = await generateText({ model: gateway(ACTION_TITLE_MODEL), instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(ACTION_TITLE_TIMEOUT_MS) })
+      const { text } = await generateText({ model: await hostedModel(await executionWorkspace(userId,null),ACTION_TITLE_MODEL,gateway(ACTION_TITLE_MODEL)), instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(ACTION_TITLE_TIMEOUT_MS) })
       for (const [id, actionTitle] of parseActionTitles(text, batch.map(item => item.id), locale)) {
         await db.update(suggestions).set({ actionTitle }).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId)))
       }

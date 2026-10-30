@@ -3,6 +3,7 @@ import { factoryCheckIndependent } from "./check-independence";
 import { maskFactoryNote } from "./note-mask";
 import { factoryTaskDetail, type FactoryTaskDetail } from "./task-detail";
 import { factoryScopeAllows, type FactoryIssueScope } from "./scope";
+import { captureIdOf } from "./evidence";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import {
@@ -340,7 +341,7 @@ export function createFactoryStore(
         const task = await owned(tx, userId, taskId, false);
         return {
           ...(await snapshot(tx, task)),
-          ...(await factoryTaskDetail(tx, task, lifecycle?.independent as never)),
+          ...(await factoryTaskDetail(tx, task)),
         };
       });
     },
@@ -672,6 +673,16 @@ export function createFactoryStore(
                   run.report
                 )
                   continue;
+                const captureId = captureIdOf(evidence.artifact);
+                if (captureId && (evidence.kind === "screenshot" || evidence.kind === "video")) {
+                  // The run's own ready capture of the stated kind; no other run's file.
+                  const { rows } = await tx.query(
+                    `SELECT id FROM run_captures WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND status='ready' AND kind=$4`,
+                    [captureId, run.id, task.userId, evidence.kind === "video" ? "video" : "image"],
+                  );
+                  if (!rows.length) fail("factoryArtifactMissing");
+                  continue;
+                }
                 if (
                   evidence.kind !== "log" ||
                   !evidence.artifact.startsWith("run-chunk:")

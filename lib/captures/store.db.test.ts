@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
@@ -216,7 +216,7 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     const calls: string[] = []
     let failStart = false, gone = false
     const runtime = {
-      async connectComputer(id: string) { if (gone) throw new Error('https://api.e2b.invalid/secret'); calls.push(`connect ${id}`); return { sandboxId: id } },
+      async connectComputer(_workspaceId: string, id: string) { if (gone) throw new Error('https://api.e2b.invalid/secret'); calls.push(`connect ${id}`); return { sandboxId: id } },
       async captureScreenshot(_sandbox: unknown, display: number) { calls.push(`shot :${display}`); return PNG },
       async startScreenRecording(_sandbox: unknown, display: number, id: string, seconds: number) { if (failStart) throw new Error('ffmpeg missing'); calls.push(`record :${display} ${id} ${seconds}`) },
       async stopScreenRecording(_sandbox: unknown, display: number, id: string) { calls.push(`stop :${display} ${id}`); return { bytes: MP4, durationMs: 4200 } },
@@ -478,11 +478,15 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     const { Sandbox } = await import('e2b')
     const { screenCaptures } = await import('./screen')
     const { threadMachineAction } = await import('../cloud-computer/thread-machines')
-    const originalKill = Sandbox.kill, originalStop = screenCaptures.stopRunRecordings, originalKey = process.env.E2B_API_KEY
+    const originalKill = Sandbox.kill, originalStop = screenCaptures.stopRunRecordings, originalSecretKey = process.env.WORKSPACE_SECRETS_KEY
     try {
-      process.env.E2B_API_KEY = 'synthetic-captures'
+      process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
+      const {sealSecret,e2bKeyAad}=await import('../secrets/crypto')
+      const sealed=sealSecret('synthetic-captures',e2bKeyAad(workspaceId))
+      await pool.query('INSERT INTO workspace_e2b_keys ("workspaceId",ciphertext,iv,"keyVersion",last4,"createdBy","updatedBy") VALUES ($1,$2,$3,$4,$5,$6,$6)',[workspaceId,sealed.ciphertext,sealed.iv,sealed.keyVersion,'ures',alice])
       screenCaptures.stopRunRecordings = ids => screen.stopRunRecordings(ids)
-      Sandbox.kill = async (id: string) => {
+      Sandbox.kill = async (id: string, options?: {apiKey?:string}) => {
+        assert.equal(options?.apiKey,'synthetic-captures','the end path uses the workspace BYO key')
         assert.equal(id, `sandbox-${threadRun}`)
         const recording = (await pool.query('SELECT status FROM run_captures WHERE id=$1', [threadRecording.recordingId])).rows[0]
         assert.equal(recording.status, 'ready', 'the actual end path saves evidence before destroying the filesystem')
@@ -496,8 +500,9 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     } finally {
       Sandbox.kill = originalKill
       screenCaptures.stopRunRecordings = originalStop
-      if (originalKey === undefined) delete process.env.E2B_API_KEY
-      else process.env.E2B_API_KEY = originalKey
+      await pool.query('DELETE FROM workspace_e2b_keys WHERE "workspaceId"=$1',[workspaceId])
+      if (originalSecretKey === undefined) delete process.env.WORKSPACE_SECRETS_KEY
+      else process.env.WORKSPACE_SECRETS_KEY = originalSecretKey
     }
     assert.ok(calls.every(call => !call.includes(`sandbox-${workspaceId}`)), 'completion never reads the source Bot machine')
     // A missing dedicated sandbox must not reinterpret the run as a Bot run.

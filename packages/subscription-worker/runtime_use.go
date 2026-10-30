@@ -18,12 +18,12 @@ func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, m
 	if w.Use == nil || !uuidPattern.MatchString(w.Use.BindingID) || w.Use.ConsumerID == "" || len(w.Use.ConsumerID) > 128 {
 		return ErrUnavailable
 	}
+	var runModelMode, runModel string
 	if w.Use.RunID != "" {
 		if !uuidPattern.MatchString(w.Use.RunID) {
 			return ErrUnavailable
 		}
-		var active bool
-		if w.Repo.DB.QueryRowContext(ctx, `select exists(select 1 from agent_runs r join byos_native_runs n on n."runId"=r.id where r.id=$1 and r."userId"=$2 and r."agentId"::text=$3 and n."bindingId"=$4 and r.status in ('preparing','running','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null)`, w.Use.RunID, w.Scope.OwnerID, w.Use.ConsumerID, w.Use.BindingID).Scan(&active) != nil || !active {
+		if w.Repo.DB.QueryRowContext(ctx, `select coalesce(r."agentDefinition"->>'cliModelSelection',''),coalesce(r."agentDefinition"->>'model','') from agent_runs r join byos_native_runs n on n."runId"=r.id where r.id=$1 and r."userId"=$2 and r."agentId"::text=$3 and n."bindingId"=$4 and r.status in ('preparing','running','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, w.Use.RunID, w.Scope.OwnerID, w.Use.ConsumerID, w.Use.BindingID).Scan(&runModelMode, &runModel) != nil {
 			return ErrUnavailable
 		}
 	}
@@ -50,6 +50,15 @@ func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, m
 	}
 	if execution == "quota" && route != w.Scope.Provider+"_cpa" && route != nativeRoute {
 		return ErrUnavailable
+	}
+	// Only a server-frozen native run can delegate model choice to the CLI.
+	// Hosted model calls and historical native runs keep their exact binding.
+	if execution == "native" && w.Use.RunID != "" {
+		if runModelMode == "auto" {
+			boundModel = model
+		} else if runModelMode == "explicit" && runModel != "" {
+			boundModel = runModel
+		}
 	}
 	if model != "" && model != boundModel {
 		return ErrUnavailable

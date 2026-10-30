@@ -82,9 +82,20 @@ test("run completion enters review without the Coordinator; replays do not advan
     await t.test("completed run moves execute → review via the completion hook alone", async () => {
       const report = { publish: { commit: "b".repeat(40) }, verify: { status: "passed" }, summary: "done" };
       await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='s1',report=$2,"startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp() WHERE id=$1`, [d.runId, JSON.stringify(report)]);
+      // A3: the run's ready captures become evidence by reference; failed or unfinished ones do not.
+      const shot = randomUUID(), clip = randomUUID(), broken = randomUUID();
+      const capture = (id: string, kind: string, type: string, status: string) => pool.query(
+        `INSERT INTO run_captures (id,"userId","runId",kind,"contentType",source,status,title,size,sha256,"storageKey","inlineContent","updatedAt") VALUES ($1,'owner',$2,$3,$4,'local',$5,$6,3,$7,$8,'\\x010203',clock_timestamp())`,
+        [id, d.runId, kind, type, status, `capture ${id.slice(0, 4)}`, "c".repeat(64), `owner/captures/${id}`]);
+      await capture(shot, "image", "image/png", "ready");
+      await capture(clip, "video", "video/mp4", "ready");
+      await capture(broken, "image", "image/png", "failed");
       assert.equal(await reconcileFactoryAfterCompletion(pool, "owner", d.runId, reconcileFor), 1);
       const after = await store.read("owner", routed.task.id);
       assert.equal(after.task.stage, "review");
+      const { rows: [execute] } = await pool.query(`SELECT evidence FROM factory_attempts WHERE "taskId"=$1 AND stage='execute' AND status='passed'`, [routed.task.id]);
+      assert.deepEqual(execute.evidence.map((e: { artifact: string; kind: string }) => [e.artifact, e.kind]),
+        [[`run-report:${d.runId}`, "report"], [`run-capture:${shot}`, "screenshot"], [`run-capture:${clip}`, "video"]]);
       // The unrelated running task (its own run still running) did not move.
       assert.deepEqual(pick((await store.read("owner", other.task.id)).task), pick(otherBefore));
     });

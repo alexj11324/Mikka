@@ -12,6 +12,7 @@ const stub = (path: string, namedExports: Record<string, unknown>) => mock.modul
 const conversation: { summary: string | null; memory: string; messages: StoredMessage[] } = { summary: null, memory: '', messages: [] }
 const saved: unknown[][] = [], enqueued: unknown[][] = [], forwarded: unknown[][] = []
 let modelCalls = 0, finishReason = 'stop'
+stub('../abuse/resolve.ts',{resolveDefaultHostedModel:async(_scope:unknown,model:string)=>model})
 stub('./store.ts', { loadConversation: async () => conversation, saveSummary: async (...args: unknown[]) => { saved.push(args) } })
 stub('./native.ts', { nativeCoordinatorEnabled: () => true, nativeCoordinatorStore: { enqueue: async (...args: unknown[]) => { enqueued.push(args); return 'pure-turn' } } })
 stub('./bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })

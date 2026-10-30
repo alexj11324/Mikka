@@ -159,28 +159,23 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
     assert.equal(await stopRequested(theirs), false); assert.equal(await stopRequested(theirRerun), false)
   })
 
-  await t.test('cycle A <-> B (+ C off B): terminates, root falls back to earliest createdAt, thread still listed', async () => {
+  await t.test('cycles are rejected by the depth limit without a fallback root', async () => {
     const me = await owner(), issueId = await me.issue()
     const a = randomUUID(), b = randomUUID()
     await run(me, issueId, 'succeeded', { id: a, origin: b })
     await run(me, issueId, 'succeeded', { id: b, retryOf: a })
-    const c = await run(me, issueId, 'running', cont(b))
-    const chains = await listIssueRunChains(pool, issueId, [me.userId], 20)
-    assert.equal(chains.length, 1)
-    assert.equal(chains[0].rootRunId, a)
-    assert.deepEqual(ids(chains[0]), [a, b, c])
-    for (const from of [a, b, c]) assert.equal((await readRunChain(pool, me.userId, from))?.rootRunId, a)
-    assert.deepEqual(await requestRunStop(me.userId, a), { stoppedRunIds: [c] })
+    await assert.rejects(listIssueRunChains(pool, issueId, [me.userId], 20), /runChainDepthExceeded/)
+    await assert.rejects(readRunChain(pool, me.userId, a), /runChainDepthExceeded/)
   })
 
-  await t.test('cycle with tied createdAt: root falls back to the smaller uuid', async () => {
+  await t.test('64 parent links are accepted; a 65th is rejected', async () => {
     const me = await owner(), issueId = await me.issue()
-    const [x, y] = [randomUUID(), randomUUID()].sort()
-    clock += 1000
-    await run(me, issueId, 'succeeded', { id: y, origin: x, at: clock })
-    await run(me, issueId, 'succeeded', { id: x, origin: y, at: clock })
-    const chains = await listIssueRunChains(pool, issueId, [me.userId], 20)
-    assert.equal(chains.length, 1); assert.equal(chains[0].rootRunId, x); assert.equal(chains[0].latestRunId, y)
+    let tail = await run(me, issueId, 'succeeded')
+    for (let i = 0; i < 64; i++) tail = await run(me, issueId, 'succeeded', cont(tail))
+    assert.equal((await readRunChain(pool, me.userId, tail))?.attempts.length, 65)
+    tail = await run(me, issueId, 'running', cont(tail))
+    await assert.rejects(readRunChain(pool, me.userId, tail), /runChainDepthExceeded/)
+    await assert.rejects(listIssueRunChains(pool, issueId, [me.userId], 20), /runChainDepthExceeded/)
   })
 
   await t.test('fork with tied createdAt: latest is the larger uuid, deterministically', async () => {

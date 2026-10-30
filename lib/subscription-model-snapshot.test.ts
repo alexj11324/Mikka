@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { before,test,mock } from 'node:test'
 import { MockLanguageModelV4 } from 'ai/test'
 import type { SubscriptionService } from './subscription-service'
-import { freezeHostedModelSelection, resolveFrozenHostedModel, type HostedRuntimeSnapshot } from './subscription-model-snapshot'
+import type { HostedRuntimeSnapshot } from './subscription-model-snapshot'
+const defaults:Array<{scope:unknown;model:string}>=[]
+mock.module(new URL('./abuse/resolve.ts',import.meta.url).href,{namedExports:{resolveDefaultHostedModel:async(scope:unknown,model:string)=>{defaults.push({scope,model});return {modelId:model}}}})
+let freezeHostedModelSelection:typeof import('./subscription-model-snapshot')['freezeHostedModelSelection'],resolveFrozenHostedModel:typeof import('./subscription-model-snapshot')['resolveFrozenHostedModel']
+before(async()=>{({freezeHostedModelSelection,resolveFrozenHostedModel}=await import('./subscription-model-snapshot'))})
 
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12,'0')}`
 const scope = { ownerId:'alice',botId:id(1),workspaceId:id(2) }
@@ -23,7 +27,8 @@ test('first selection freezes authoritative model, route, owner, consumer, works
 test('default stays frozen and never constructs a subscription backend', async () => {
   const f=fixture();f.deps.service=() => {throw new Error('backend called')}
   const frozen=await freezeHostedModelSelection(scope,{harness:'ai_sdk',model:'original-default'},undefined,f.deps)
-  assert.equal(await resolveFrozenHostedModel(scope,frozen,f.deps),'original-default')
+  assert.equal((await resolveFrozenHostedModel(scope,frozen,f.deps) as {modelId:string}).modelId,'original-default')
+  assert.deepEqual(defaults.at(-1),{scope,model:'original-default'})
 })
 test('internal coordinator key, foreign scope and native route cannot become a hosted subscription selection', async () => {
   for(const changed of [{...scope,botId:null,workspaceId:null},{...scope,botId:'coordinator'},{...scope,ownerId:'other'}]) {
@@ -55,4 +60,12 @@ test('abort and malformed explicit snapshot fail closed without provider calls',
   await assert.rejects(resolveFrozenHostedModel(scope,frozen,f.deps,controller.signal),{name:'AbortError'})
   await assert.rejects(resolveFrozenHostedModel(scope,{...frozen,modelSelection:null} as unknown as HostedRuntimeSnapshot,f.deps))
   assert.equal(f.calls(),0)
+})
+test('Coordinator freezes an owned connected binding with distinct replay identity',async()=>{
+  const f=fixture(),coordinatorScope={...scope,botId:null}
+  const frozen=await freezeHostedModelSelection(coordinatorScope,{harness:'ai_sdk',model:null},{type:'subscription',bindingId:id(3)},f.deps)
+  assert.equal(frozen.modelSelection?.coordinator,true)
+  assert.notEqual(typeof await resolveFrozenHostedModel(coordinatorScope,frozen,f.deps),'string')
+  await assert.rejects(resolveFrozenHostedModel(scope,frozen,f.deps))
+  await assert.rejects(resolveFrozenHostedModel({...coordinatorScope,workspaceId:id(99)},frozen,f.deps))
 })

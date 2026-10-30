@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { answerModel } from './model.mjs'
+import { subscriptionPrompt, subscriptionChunks, MVP_SUBSCRIPTION_MODEL } from './subscription.mjs'
 import { REPOSITORY } from './isolated-env.mjs'
 import { finishMvpResources, indexMvpResource } from './retention.mjs'
 
@@ -70,6 +71,14 @@ export async function startMvpServices(port = 3191) {
         scenario.deviceId = deviceId
         return reply({ configured: true })
       }
+      if (url.pathname === '/subscription/model' && request.method === 'POST') {
+        const payload=await readBody(request)
+        assert.equal(payload.model,MVP_SUBSCRIPTION_MODEL)
+        observe({kind:'subscription-model-request',requestId})
+        const answer=answerModel(subscriptionPrompt(payload),scenario,observe)
+        response.writeHead(200,{'content-type':'text/event-stream'})
+        return response.end(subscriptionChunks(answer,payload.model))
+      }
       if (url.pathname === '/v1/language-model' && request.method === 'POST') {
         observe({ kind: 'model-request', requestId })
         return reply(answerModel(await readBody(request), scenario, observe))
@@ -102,7 +111,7 @@ export async function startMvpServices(port = 3191) {
         observe({ kind: 'decision-request', requestId, eventId: host.eventId, eventKind: host.eventKind })
         return reply({
           model: input.model,
-          provider_metadata: { gateway: { generationId: `mvp-synthetic-${randomUUID()}` } },
+          provider_metadata: { gateway: { generationId: `mvp-synthetic-${randomUUID()}`, cost: '0.001' } },
           answers: [{ type: 'choice', name: 'tier', choice: 'result' }],
         })
       }

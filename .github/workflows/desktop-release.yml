@@ -1,14 +1,14 @@
 name: Desktop release
 
-# Builds signed installers for an existing desktop-vX.Y.Z tag and attaches them
-# to a draft GitHub Release. Publishing the draft is a manual step after the
-# artifacts and release notes have been checked.
+# Builds signed installers from main and attaches them to a draft GitHub
+# Release. The version is the UTC build time, YYYY.MMDD.HHMM (for example
+# 2026.1030.1834): nobody bumps a version or creates a tag by hand, and the
+# release step tags the built commit desktop-<version>. Publishing the draft is
+# a manual step after the artifacts and release notes have been checked.
 #
-# Dispatch this workflow from `main` (Actions -> Desktop release -> Run
-# workflow) instead of pushing the tag. GitHub scopes Actions caches by ref, so
-# a cache saved by a run on desktop-vX is invisible to desktop-vY; a run
-# dispatched from main reuses the pnpm store and electron-builder downloads
-# saved by the previous release.
+# Dispatch from main (Actions -> Desktop release -> Run workflow). GitHub
+# scopes Actions caches by ref, so a run on main reuses the pnpm store and
+# electron-builder downloads saved by the previous release.
 #
 # Required repository secrets for macOS:
 #   APPLE_DEVELOPER_ID_P12_BASE64  Developer ID Application certificate (base64)
@@ -20,10 +20,6 @@ name: Desktop release
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: Existing tag to build, for example desktop-v0.1.0
-        required: true
-        type: string
       skip_notarization:
         description: Build macOS without notarization (internal testing only)
         required: false
@@ -34,11 +30,14 @@ permissions:
   contents: write
 
 concurrency:
-  group: desktop-release-${{ inputs.tag }}
+  group: desktop-release
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: ${{ inputs.tag }}
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
   NODE_VERSION: '24'
   PNPM_VERSION: '10.34.3'
 
@@ -46,6 +45,8 @@ jobs:
   preflight:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Dispatch from main
         run: |
@@ -53,19 +54,13 @@ jobs:
             echo "::error::Dispatch this workflow from main, not from a tag or branch. Actions caches are scoped per ref; a tag run cannot reuse the previous release's cache."
             exit 1
           }
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.RELEASE_TAG }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: Tag and package version agree
+      - name: Version from build time (UTC)
+        id: version
         run: |
-          version=$(node -p "require('./apps/desktop/package.json').version")
-          test "$RELEASE_TAG" = "desktop-v$version" || {
-            echo "::error::tag $RELEASE_TAG does not match apps/desktop/package.json version $version"
-            exit 1
-          }
+          # Numeric fields drop leading zeros so the version stays valid semver
+          # and sorts in time order for electron-updater.
+          version="$(date -u +%Y).$((10#$(date -u +%m%d))).$((10#$(date -u +%H%M)))"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Building Mikka Desktop $version"
 
   macos:
@@ -73,6 +68,7 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 60
     env:
+      RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
       CSC_LINK: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 }}
       CSC_KEY_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -83,8 +79,6 @@ jobs:
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.RELEASE_TAG }}
       - uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -124,6 +118,9 @@ jobs:
             echo "::error::Public macOS releases need notarization secrets (APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID or APPLE_API_KEY_P8_BASE64/APPLE_API_KEY_ID/APPLE_API_ISSUER). Use skip_notarization only for internal builds."
             exit 1
           fi
+      - name: Stamp the build-time version
+        working-directory: apps/desktop
+        run: npm pkg set version="$RELEASE_VERSION"
       - name: Package signed macOS app
         run: pnpm --filter @mikka/desktop package:mac
       - name: Verify updater metadata
@@ -146,22 +143,23 @@ jobs:
           retention-days: 7
 
   release:
-    needs: macos
+    needs: [preflight, macos]
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: release
           merge-multiple: true
-      - name: Read release version
-        run: echo "RELEASE_VERSION=${RELEASE_TAG#desktop-v}" >> "$GITHUB_ENV"
       - name: Write checksums
         working-directory: release
         run: find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
+          tag_name: desktop-${{ env.RELEASE_VERSION }}
+          target_commitish: ${{ github.sha }}
           name: Mikka Desktop ${{ env.RELEASE_VERSION }}
           draft: true
           prerelease: false

@@ -1,7 +1,12 @@
 import { z } from "zod";
 
 import { bindingSchema, candidateSchema } from "./contract";
-export { bindingSchema, candidateSchema, evidenceSchema, FactoryError } from "./contract";
+export {
+  bindingSchema,
+  candidateSchema,
+  evidenceSchema,
+  FactoryError,
+} from "./contract";
 export type { FactoryBinding, FactoryEvidence } from "./contract";
 
 // Additive consumer contract: stage/candidate ownership remains #192's source.
@@ -20,12 +25,12 @@ export const approvalRequest = z
     target: z.string().trim().min(1).max(2000),
     targetEnvironment: z.string().trim().min(1).max(4000),
     expiresAt: z.iso.datetime(),
-    // Returned by the authenticated evidence read, never an agent's assertion.
-    evidenceDigest: z.string().regex(/^[a-f0-9]{64}$/),
-    evidenceReadId: z.uuid(),
-    // Opaque reference to the existing host policy authority, not an LLM claim.
-    // Optional only for historical receipt parsing; new grants require it.
-    decisionCredentialId: z.string().min(1).max(2000).optional(),
+    // Compatibility with older clients only; human approval does not require a read receipt.
+    evidenceDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    evidenceReadId: z.uuid().optional(),
   })
   .strict();
 export const approvalControl = z

@@ -122,7 +122,7 @@ export async function executeCredentialOperation(pool: Pool, userId: string, raw
       const { grant, endpointPath } = await import('./runtime')
       // Declining Submit is explicitly labelled Clear instead in the owner UI.
       const operation = approved ? (plan.operation==='login'?'submit':plan.operation) : 'clear'
-      const capability = await grant(await connectComputer(current.sandboxId), current, 'credential-continuation', { actionId: plan.actionId, operation, targetId: plan.targetId, origin: plan.origin, loaderId: plan.loaderId, inputs: plan.inputs })
+      const capability = await grant(await connectComputer(plan.workspaceId, current.sandboxId), current, 'credential-continuation', { actionId: plan.actionId, operation, targetId: plan.targetId, origin: plan.origin, loaderId: plan.loaderId, inputs: plan.inputs })
       const response = await fetch(endpointPath(capability.endpoint, '/credentials/continue'), { method: 'POST', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(25_000) })
       if (!response.ok) throw new Error('Credential action outcome unknown')
       const result = z.object({ resumed: z.boolean(), operation: z.enum(['submit','clear']) }).strict().parse(await response.json())

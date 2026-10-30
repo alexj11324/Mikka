@@ -21,14 +21,13 @@ test("human reject sends the candidate back to execute", { skip: !db, timeout: 1
   const f = await factory194Fixture(db!);
   try {
     const { actor, pool } = f;
-    const service = f.service([f.adapter], null);
+    const service = f.service([f.adapter]);
     await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2) ON CONFLICT DO NOTHING', [actor.userId, "Alex"]);
 
     await t.test("reject revokes open grants, repairs to execute and is idempotent", async () => {
       // Once a grant moved the task past approval, reject is no longer allowed.
       const granted = await f.prepare();
       const human = { ...granted.approval } as Record<string, unknown>;
-      delete human.decisionCredentialId;
       const approved = await service.approve(actor, human);
       await rejects(
         () => service.reject(actor, { binding: approved.binding, eventId: randomUUID(), candidateId: granted.approval.binding.candidateId! }),

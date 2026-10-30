@@ -8,6 +8,7 @@ import { authenticateDevice, linkDeviceToken } from '@/lib/device-link'
 import { reclaimLostRuns, renewRunLeases } from '@/lib/run-leases'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
 import { skillAssignments } from '@/lib/self-improvement/server'
+import { pendingDeviceCommands } from '@/lib/device-management'
 import { renewCloudDeviceToken } from '@/lib/computer/cloud-device'
 import { factoryLifecycleEnabled } from '@/lib/factory/runtime'
 import { factoryDispatchRecovery } from '@/lib/factory/dispatch-recovery-server'
@@ -33,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
   const factoryOn = factoryLifecycleEnabled()
   const [prior] = factoryOn ? await db.select({ enabled: devices.enabled, lastSeenAt: devices.lastSeenAt, harnesses: devices.harnesses }).from(devices).where(eq(devices.id, deviceId)).limit(1) : []
-  await db.update(devices).set({ harnesses: parsed.data.harnesses, computerUse: parsed.data.computerUse ?? { installed: false, version: null }, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
+  await db.update(devices).set({ ...(parsed.data.deviceType ? { deviceType: parsed.data.deviceType } : {}), harnesses: parsed.data.harnesses, computerUse: parsed.data.computerUse ?? { installed: false, version: null }, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
   await ensureDeviceAgents(pool, caller.userId, deviceId, parsed.data.harnesses)
   const selected=await skillAssignments.renewHeartbeat(caller.userId,deviceId,parsed.data.runs.map(run=>run.runId),request.headers.get(SKILL_ARTIFACT_HEADER)==='1')
   const result=await renewRunLeases(deviceId,selected.legacy)
@@ -44,5 +45,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     : null
   if (factoryOn) after(() => factoryDispatchRecovery.deviceOnline(caller.userId, deviceId, !prior || !factoryDeviceOnline(prior)).catch((error: unknown) => console.error('Could not resume Factory dispatch', error instanceof Error ? error.message : error)))
   after(() => reclaimLostRuns(caller.userId).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error)))
-  return NextResponse.json({ ...result, ...(cloudCredential ? { cloudCredential } : {}) }, { headers: { 'Cache-Control': 'private, no-store' } })
+  return NextResponse.json({ ...result, deviceCommands: await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? [], parsed.data.failedDeviceCommands ?? []), ...(cloudCredential ? { cloudCredential } : {}) }, { headers: { 'Cache-Control': 'private, no-store' } })
 }

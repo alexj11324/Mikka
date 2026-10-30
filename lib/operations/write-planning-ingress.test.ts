@@ -17,6 +17,7 @@ const conversation:{summary:string|null;memory:string;messages:StoredMessage[]} 
 let userId:string|null='authenticated-owner'
 const unavailable = () => { throw Error('External effects unavailable in ingress fixture') }
 const stub = (path:string,namedExports:Record<string,unknown>) => mock.module(new URL(path,import.meta.url).href,{namedExports})
+stub('../abuse/resolve.ts',{resolveDefaultHostedModel:async(_scope:unknown,model:string)=>model})
 stub('../auth.ts',{auth:{api:{getSession:async()=>userId?{user:{id:userId}}:null}}})
 stub('../db/index.ts',{pool:null,withDatabaseClient:unavailable,db:{insert:()=>({values:(event:Event)=>({onConflictDoNothing:()=>({returning:async()=>{events.push(structuredClone(event));return [{id:event.id}]}})})})}})
 stub('../request-log.ts',{noteLogUser:()=>undefined,withRequestLog:(_path:string,handler:unknown)=>handler})

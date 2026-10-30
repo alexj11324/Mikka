@@ -13,6 +13,7 @@ import {
 } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS, issueDeviceToken } from '@/lib/device-link'
 import { removeOwnedDevice, renameOwnedDevice } from '@/lib/device-removal'
+import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-management'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
 import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
@@ -42,6 +43,7 @@ export interface DeviceRepoView {
 export interface DeviceView {
   id: string
   name: string
+  deviceType: 'laptop' | 'server'
   hostname: string | null
   platform: string | null
   arch: string | null
@@ -71,7 +73,7 @@ export async function listDevices(): Promise<DeviceView[]> {
     ? await db.select().from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []
   return rows.map(device => ({
-    id: device.id, name: device.name, hostname: device.hostname, platform: device.platform, arch: device.arch,
+    id: device.id, name: device.name, deviceType: device.deviceType, hostname: device.hostname, platform: device.platform, arch: device.arch,
     harnesses: device.harnesses, lastSeenAt: device.lastSeenAt, enabled: device.enabled,
     online: device.lastSeenAt ? Date.now() - device.lastSeenAt.getTime() < DEVICE_ONLINE_WINDOW_MS : false,
     repos: repos.filter(repo => repo.deviceId === device.id).map(repo => ({
@@ -269,4 +271,15 @@ export async function getThreadName(runId: string): Promise<string | null> {
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
 export async function stopRun(runId: string): Promise<{ stoppedRunIds: string[] }> {
   return requestRunStop(await getUserId(), runId)
+}
+
+/** Settings #504 queues maintenance through the same owner-scoped backend as HTTP. */
+export async function sendDeviceCommand(input: { deviceId: string; kind: DeviceCommandKind }): Promise<ActionResult<{ id: string }>> {
+  return runAction(async () => {
+    const userId = await getUserId()
+    const parsed = z.object({ deviceId: z.uuid(), kind: z.enum(['redetect', 'restart', 'update']) }).safeParse(input)
+    if (!parsed.success) return { error: 'deviceNotFound' }
+    const id = await enqueueDeviceCommand(userId, parsed.data.deviceId, parsed.data.kind)
+    return id ? { id } : { error: 'deviceNotFound' }
+  })
 }

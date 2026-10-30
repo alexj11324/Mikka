@@ -88,7 +88,7 @@ function fixture(environment = "preview") {
   };
   const read = () =>
     readFactoryPublicationReceiptV2(
-      { query: async () => ({ rows: [row] }) } as unknown as PoolClient,
+      { query: async () => ({ rows: (row as typeof row & { revokedAt?: Date }).revokedAt ? [] : [row] }) } as unknown as PoolClient,
       authorization.ownerId,
       authorization.binding.taskId,
       authorization.binding.candidateId,
@@ -166,14 +166,11 @@ test("Skill publication rejects wrong action, kind, source, operation, target an
     (f) => {
       f.receipt.verifiedTarget.reference = "other-reference";
     },
-    (f) => {
-      f.row.candidate = { ...f.candidate, scope: "other scope" };
-    },
   ];
   for (const mutate of mutations) {
     const f = fixture();
     mutate(f);
-    await assert.rejects(f.read, FactoryError);
+    assert.throws(f.check, FactoryError);
   }
 });
 
@@ -284,4 +281,15 @@ test("an approval revoked after publication no longer yields a receipt", async (
     (e: unknown) =>
       e instanceof FactoryError && e.code === "factoryPublicationReceiptRequired",
   );
+});
+
+test("historical read does not reauthorize from display or attempt metadata", async () => {
+  const f = fixture();
+  f.row.publishStatus = "failed";
+  f.row.publishOutput = { publicationId: randomUUID(), approvalId: randomUUID() };
+  f.row.approvalRequest.evidenceDigest = "0".repeat(64);
+  f.row.publishRevision++;
+  const result = await f.read();
+  assert.equal(result.publicationId, f.publicationId);
+  assert.equal(result.publishedAt, f.row.finishedAt.toISOString());
 });

@@ -12,6 +12,7 @@ import { authOAuthProxyOptions, authTrustedOrigins } from '@/lib/auth-config'
 import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
 import { after } from 'next/server'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
+import { beforeSignup } from '@/lib/abuse/signup'
 import { newUserAvatar } from '@/lib/default-avatar'
 import { daemonAuthorizationOptions, exchangeDaemonSession } from '@/lib/daemon-authorization'
 import { issueDeviceToken } from '@/lib/device-link'
@@ -69,7 +70,7 @@ export const auth = betterAuth({
   basePath: withBasePath('/api/auth'),
   emailAndPassword: email.emailAndPassword,
   emailVerification: email.emailVerification,
-  rateLimit: email.rateLimit,
+  rateLimit: { ...email.rateLimit, storage: 'database' },
   trustedOrigins: [
     ...authTrustedOrigins(process.env),
     ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : []),
@@ -105,7 +106,7 @@ export const auth = betterAuth({
     nextCookies(),
   ],
   hooks: {
-    before: createAuthMiddleware(async ctx => email.before(ctx)),
+    before: createAuthMiddleware(async ctx => { await beforeSignup(pool,ctx); return email.before(ctx) }),
     after: createAuthMiddleware(async ctx => {
       const deviceToken = await exchangeDaemonSession({
         path: ctx.path, clientId: ctx.body?.client_id,

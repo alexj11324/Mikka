@@ -19,7 +19,7 @@ export async function maintainThreadMachine(actor: { userId: string; workspaceId
     }
     // Do not let the provider's timeout suspend an active native process with
     // a live 90-second run lease. Only an idle, unclaimed machine is paused.
-    await (await connectComputer(row.sandboxId)).setTimeout(15 * 60_000)
+    await (await connectComputer(actor.workspaceId, row.sandboxId)).setTimeout(15 * 60_000)
   }
   return true
 }

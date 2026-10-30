@@ -12,6 +12,12 @@ import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
 })
+/** A finished or skipped first-run guide; no row means not yet. */
+export const userOnboarding = pgTable('user_onboarding', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  completedAt: timestamp('completedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const issueMembers = pgTable('issue_members', {
   issueId: uuid('issueId').notNull(), userId: text('userId').notNull(), memberId: text('memberId').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
@@ -104,6 +110,19 @@ export const bots = pgTable('bots', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
+
+/** Personal execution preferences in the same workspace scope as Bots. The
+ * fixed default rule is virtual and is never stored in this editable table. */
+export const executionRules = pgTable('execution_rules', {
+  id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull().references(()=>users.id,{onDelete:'cascade'}),
+  workspaceId: uuid('workspaceId').notNull(), label: text('label').notNull(),
+  place: text('place').notNull().default('auto'), harness: text('harness').notNull().default('auto'),
+  model: text('model').notNull().default('auto'), position: integer('position').notNull(),
+}, table=>[index('execution_rules_scope_idx').on(table.ownerId,table.workspaceId)])
+export const botModelChoices = pgTable('bot_model_choices', {
+  ownerId:text('ownerId').notNull().references(()=>users.id,{onDelete:'cascade'}),workspaceId:uuid('workspaceId').notNull(),
+  botKey:text('botKey').notNull(),bindingId:uuid('bindingId').notNull(),
+}, table=>[primaryKey({columns:[table.ownerId,table.workspaceId,table.botKey]})])
 
 export const agentSessions = pgTable('agent_sessions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(), title: varchar('title', { length: 200 }).notNull(),
@@ -208,13 +227,14 @@ export const linearSyncInbox = pgTable('linear_sync_inbox', {
 // heartbeat, so the UI never guesses what a machine has installed.
 
 /** Harnesses this app drives. Cursor and mock stay out until we support them. */
-export const SUPPORTED_HARNESSES = ['claude_code', 'codex'] as const
+export const SUPPORTED_HARNESSES = ['claude_code', 'codex', 'cursor'] as const
 export type SupportedHarness = (typeof SUPPORTED_HARNESSES)[number]
 
 export const devices = pgTable('devices', {
   id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull(),
   name: text('name').notNull(), hostname: text('hostname'),
   kind: text('kind').$type<'local' | 'cloud'>().notNull().default('local'),
+  deviceType: text('deviceType').$type<'laptop' | 'server'>().notNull().default('laptop'),
   platform: text('platform'), arch: text('arch'),
   daemonVersion: text('daemonVersion'), protocolVersion: integer('protocolVersion'),
   harnesses: jsonb('harnesses').$type<HarnessInfo[]>().notNull().default([]),

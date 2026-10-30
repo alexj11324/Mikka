@@ -11,14 +11,16 @@ import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
 const DEVICE = "device-1"
 const daemons: Daemon[] = []
 
-async function setup() {
+async function setup(configure?:(link:ReturnType<MemoryServer["link"]>)=>void) {
   const repo = await makeRepo()
   const server = new MemoryServer(DEVICE)
   server.addRepo(DEVICE, { repoId: "repo-1", name: "sandbox", path: repo })
+  const link=server.link()
+  configure?.(link)
   const daemon = await new Daemon({
     dataDir: tempDir(),
     flavor: "dev",
-    link: server.link(),
+    link,
     credential: "cred-1",
     harnesses: [{ harness: "mock", installed: true, version: "test" }],
     mockSpeed: 2,
@@ -50,6 +52,24 @@ function text(chunks: RunChunk[]) {
 afterEach(async () => {
   for (const daemon of daemons.splice(0)) await daemon.stop()
   cleanupTempDirs()
+})
+
+it("redetect refreshes harnesses through the shared device command channel", async()=>{
+  const commandId="10000000-0000-4000-8000-000000000001"
+  let pending=true
+  const reports: {completedDeviceCommands?:string[];harnesses:{version:string|null}[]}[]=[]
+  await setup(link=>{
+    const heartbeat=link.heartbeat.bind(link)
+    link.heartbeat=async(deviceId,status)=>{
+      reports.push(status)
+      const result=await heartbeat(deviceId,status)
+      if(pending){pending=false;return {...result,deviceCommands:[{id:commandId,kind:'redetect'}]}}
+      return result
+    }
+  })
+  await waitFor(()=>reports.some(report=>report.completedDeviceCommands?.includes(commandId)))
+  const refreshed=reports.find(report=>report.completedDeviceCommands?.includes(commandId))!
+  expect(refreshed.harnesses.every(info=>info.version!=='test')).toBe(true)
 })
 
 describe("run commands", () => {

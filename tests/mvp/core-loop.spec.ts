@@ -14,6 +14,8 @@ import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session
 import { assertMvpEnvironment, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from './isolated-env.mjs'
 import { RepositoryCache } from '../../packages/daemon/src/repositories'
 import { finishMvpResources, indexMvpResource } from './retention.mjs'
+import { seedMvpSubscription } from './subscription.mjs'
+import { HostedUsageStore } from '../../lib/abuse/store'
 
 const execute = promisify(execFile)
 type Device = { id: string; name: string; protocolVersion: number }
@@ -52,6 +54,10 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
   await pool.query('INSERT INTO issue_prefixes ("userId",prefix) VALUES ($1,$2) ON CONFLICT ("userId") DO UPDATE SET prefix=EXCLUDED.prefix', [user.id, prefix])
   await page.goto(app('/'))
   checkpoint('home-open', 'Authenticated home loaded')
+  const subscription=await seedMvpSubscription(pool,user.id)
+  // The subscription model remains BYO. Its scripted hosted event-classifier
+  // has a separate, explicitly verified fixture allowance; no gate is bypassed.
+  await new HostedUsageStore(pool).verify(subscription.workspaceId,`cus_mvp_${user.id}`,`card_mvp_${user.id}`)
   await indexMvpResource('owner-id', user.id)
   await indexMvpResource('scenario-id', marker)
   const githubAccountId = String(randomInt(1_000_000, 2_000_000_000))
@@ -115,8 +121,8 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     const sha = (await execute('git', ['rev-parse', 'HEAD'])).stdout.trim()
     const runs = (await pool.query('SELECT id, "issueId", "deviceId", status, "stopReason" FROM agent_runs WHERE "userId" = $1', [user.id])).rows
     const publications = (await pool.query('SELECT "runId", status, "workflowRunId", "errorCode", "pullRequest" FROM run_publications WHERE "userId" = $1', [user.id])).rows
-    const evidence = { sha, githubSha: process.env.GITHUB_SHA ?? null, environment: 'disposable GitHub Actions Postgres / Next production build', authentication: { mode: 'automatic-account-pool', environmentId: accounts.lease.environmentId, leaseId: accounts.lease.id, generation: accounts.lease.generation, ownerId: user.id, oauthProviderVerified: false }, startedAt, finishedAt: new Date().toISOString(), scenarioAssertions: assertionsCompleted ? 'completed' : 'incomplete or failed', overallResult: 'See the Playwright report; runtime guard and teardown run after this attachment', marker, deviceId: device?.id ?? null, runId: runId ?? null, checkpoints, runs, publications, requestIds: { browser: browserRequests, fixture: services.observations.flatMap(row => row.requestId ? [row.requestId] : []) }, services,
-      boundaries: ['Scripted AI SDK provider; real Mikka WorkflowAgent and durable tools', 'GitHub API stub; real daemon clone/worktree/verify/commit/push', 'Synthetic GitHub repository identity; daemon-only file:// transport rewrite', 'Synthetic proposal through real store and authenticated browser decision; GitHub identity is seeded', 'No production or Preview acceptance performed by this suite'] }
+    const evidence = { subscription, sha, githubSha: process.env.GITHUB_SHA ?? null, environment: 'disposable GitHub Actions Postgres / Next production build', authentication: { mode: 'automatic-account-pool', environmentId: accounts.lease.environmentId, leaseId: accounts.lease.id, generation: accounts.lease.generation, ownerId: user.id, oauthProviderVerified: false }, startedAt, finishedAt: new Date().toISOString(), scenarioAssertions: assertionsCompleted ? 'completed' : 'incomplete or failed', overallResult: 'See the Playwright report; runtime guard and teardown run after this attachment', marker, deviceId: device?.id ?? null, runId: runId ?? null, checkpoints, runs, publications, requestIds: { browser: browserRequests, fixture: services.observations.flatMap(row => row.requestId ? [row.requestId] : []) }, services,
+      boundaries: ['Scripted subscription worker/model boundary; real binding/workspace authorization, Mikka WorkflowAgent and durable tools', 'GitHub API stub; real daemon clone/worktree/verify/commit/push', 'Synthetic GitHub repository identity; daemon-only file:// transport rewrite', 'Synthetic proposal through real store and authenticated browser decision; GitHub identity is seeded', 'No production or Preview acceptance performed by this suite'] }
     console.info(JSON.stringify({ mvpScenario: prefix === 'STPM' ? 'stop' : 'publish', assertionsCompleted, checkpoints: checkpoints.map(row => row.code), runCount: runs.length, publicationCount: publications.length, syntheticPullRequests: services.pullRequests.length, syntheticErrors: services.errors.length }))
     await testInfo.attach('mvp-acceptance-evidence.json', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' })
     if (daemonOutput) await testInfo.attach('daemon-output', { body: daemonOutput, contentType: 'text/plain' })

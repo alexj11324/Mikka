@@ -8,13 +8,10 @@ import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
  * No column and no migration: chains are resolved on the read path with a recursive CTE
  * over those two links. A link counts only between runs of the same owner on the same
  * issue (an issue belongs to exactly one personal or workspace scope, so this also keeps a
- * chain inside one workspace). The recursion carries a path array (no run is visited
- * twice) and a depth cap, so corrupt cyclic links terminate.
- *
- * Each run's root is its earliest parentless ancestor. Cycle members with no parentless
- * ancestor (corrupt data such as A ↔ B) fall back to the earliest run of the cycle by
- * createdAt, uuid as tiebreak, so the thread still shows. Within a chain, attempts are
- * ordered by createdAt then uuid; the last one is latestRunId (deterministic on ties).
+ * chain inside one workspace). Recursion has a depth limit of 64. Chains that
+ * exceed it are rejected, including corrupt cycles; no path arrays or fallback
+ * roots are maintained. Within a chain, attempts are ordered by createdAt then
+ * uuid; the last one is latestRunId (deterministic on ties).
  * Reads are plain SELECTs: no row locks.
  */
 export interface RunChainQueryable {
@@ -54,22 +51,24 @@ function chainSql(scope: string, depth: string) {
       SELECT r.id, r."userId", r."issueId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf" FROM agent_runs r WHERE ${scope}
     ), edges AS (
       SELECT DISTINCT c.id AS child, p.id AS parent FROM runs c JOIN runs p
-        ON p.id IN (c.origin, c."retryOf") AND p.id <> c.id
+        ON p.id IN (c.origin, c."retryOf")
         AND p."userId" = c."userId" AND p."issueId" IS NOT DISTINCT FROM c."issueId"
     ), up AS (
-      SELECT id AS start, id AS node, ARRAY[id] AS path, 0 AS depth FROM runs
-      UNION ALL
-      SELECT u.start, e.parent, u.path || e.parent, u.depth + 1
+      SELECT id AS start, id AS node, 0 AS depth FROM runs
+      UNION
+      SELECT u.start, e.parent, u.depth + 1
       FROM up u JOIN edges e ON e.child = u.node
-      WHERE NOT e.parent = ANY(u.path) AND u.depth < ${depth}
+      WHERE u.depth < ${depth}
     ), assigned AS (
-      SELECT DISTINCT ON (u.start) u.start AS id, u.node AS root
+      SELECT DISTINCT ON (u.start) u.start AS id, u.node AS root,
+        EXISTS (SELECT 1 FROM up tail JOIN edges e ON e.child=tail.node
+          WHERE tail.start=u.start AND tail.depth=${depth}) AS "depthExceeded"
       FROM up u JOIN runs n ON n.id = u.node
-      ORDER BY u.start, (NOT EXISTS (SELECT 1 FROM edges e WHERE e.child = u.node)) DESC, n."createdAt", n.id
+      ORDER BY u.start, u.depth DESC, n."createdAt", n.id
     )`
 }
 
-const SELECT_ATTEMPTS = `a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x."stopRequestedAt", x."createdAt", x."finishedAt"`
+const SELECT_ATTEMPTS = `a."depthExceeded", a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x."stopRequestedAt", x."createdAt", x."finishedAt"`
 
 /**
  * The newest `limit` chains on an issue among `userIds`' runs. Runs are folded by root
@@ -88,6 +87,7 @@ export async function listIssueRunChains(q: RunChainQueryable, issueId: string, 
 }
 
 function foldChains(rows: Record<string, unknown>[]): RunChain[] {
+  if (rows.some(row => row.depthExceeded)) throw new Error('runChainDepthExceeded')
   const byRoot = new Map<string, { rootCreatedAt: Date; runs: Omit<RunAttempt, 'attempt'>[] }>()
   for (const row of rows) {
     const root = String(row.rootRunId)

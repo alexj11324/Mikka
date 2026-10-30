@@ -12,16 +12,18 @@ test('only workspace admins may change policy, using an exact same-origin reques
   let role: 'admin' | 'member' | 'absent' = 'member'
   const handler = createComputerPolicyHandler({ enabled: () => true,
     authorize: async () => role === 'absent' ? null : { canEdit: role === 'admin' },
-    store: { policy: async () => 'ask', setPolicy: async (_, permission) => { writes++; return { permission } } },
+    store: { policy: async () => 'allow', setPolicy: async (_, permission) => { writes++; return { permission } } },
   })
   let response = await handler(new Request(endpoint), workspace)
-  assert.deepEqual(await response.json(), { enabled: true, permission: 'ask', canEdit: false })
+  assert.deepEqual(await response.json(), { enabled: true, permission: 'allow', canEdit: false })
   assert.equal((await handler(request('{"permission":"deny"}'), workspace)).status, 403)
   role = 'absent'
   assert.equal((await handler(new Request(endpoint), workspace)).status, 403)
   role = 'admin'
   assert.equal((await handler(request('{"permission":"deny"}', 'https://other.example'), workspace)).status, 403)
   assert.equal((await handler(request('{"permission":"unknown"}'), workspace)).status, 400)
+  // Per-step approval was retired on 2026-10-30; it is no longer a choice.
+  assert.equal((await handler(request('{"permission":"ask"}'), workspace)).status, 400)
   assert.equal((await handler(request(JSON.stringify({ permission: 'deny', extra: 'x'.repeat(250) })), workspace)).status, 400)
   assert.equal(writes, 0)
   response = await handler(request('{"permission":"deny"}'), workspace)

@@ -107,6 +107,7 @@ export const devicePaths = {
 /** `POST /v1/devices/register` */
 export const deviceComputerCapability = z.object({ installed: z.boolean(), version: z.string().max(100).nullable() }).strict()
 export const deviceRegistration = z.object({
+  deviceType: z.enum(["laptop", "server"]).optional(),
   name: z.string().trim().min(1).max(200),
   hostname: z.string().max(255).nullable().optional(),
   platform: z.string().max(50),
@@ -144,9 +145,13 @@ export const heartbeatRunSchema = z.object({
 export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>
 
 /** `POST /v1/devices/:deviceId/heartbeat` */
+export const deviceManagementCommand = z.object({ id: z.uuid(), kind: z.enum(['redetect', 'restart', 'update']) })
 export const deviceHeartbeatSchema = z.object({
+  completedDeviceCommands: z.array(z.uuid()).max(100).optional(),
+  failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),
   harnesses: z.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
+  deviceType: z.enum(["laptop", "server"]).optional(),
   runs: z.array(heartbeatRunSchema).max(500),
   worktreeDiskBytes: z.number().int().nonnegative(),
   /**
@@ -158,6 +163,7 @@ export const deviceHeartbeatSchema = z.object({
 export type DeviceHeartbeat = z.input<typeof deviceHeartbeatSchema>
 
 export const heartbeatResultSchema = z.object({
+  deviceCommands: z.array(deviceManagementCommand).max(1).optional(),
   /** Renewed lease expiry per run id; a run missing here is not renewed. */
   leases: z.record(z.string(), isoTime),
   /**
@@ -284,6 +290,18 @@ export const runAssignmentSchema = z.object({
     display: z.string().regex(/^:[1-9][0-9]{0,2}$/),
     policyVersion: z.number().int().nonnegative().max(2147483647),
   }).strict().optional(),
+  /**
+   * 4e3: the task's explicit user variables (workspace + matching repository secrets/env, NAME -> value).
+   * Cloud workers only. Passed into the task container through its own channel, never into the worker's
+   * env, and never written to the run journal.
+   */
+  taskEnv: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/), z.string().max(65_536)).optional(),
+  /**
+   * Names in `taskEnv` that are secrets (kind 'secret'; env vars are not listed). The daemon masks
+   * their values (raw + standard base64) in run output before anything is uploaded; the server
+   * masks again. Older daemons strip this field and rely on server-side masking only.
+   */
+  taskSecretNames: z.array(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/)).max(500).optional(),
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
   fixture: z.string().max(200).optional(),
   /**

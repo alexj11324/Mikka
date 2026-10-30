@@ -18,10 +18,6 @@ import {
   approvalRequest,
 } from "../../lib/factory/approval-contract";
 import type { z } from "zod";
-import type {
-  FactoryDecisionAuthority,
-  FactoryVerifiedPolicyDecision,
-} from "../../lib/factory/policy-authorization";
 import { digest } from "../../lib/factory/evidence";
 import {
   createVercelPublicationAdapter,
@@ -67,6 +63,7 @@ export async function factory194Fixture(connectionString: string) {
     CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean);
     CREATE TABLE run_tokens (id uuid PRIMARY KEY,"runId" uuid,"userId" text,"tokenHash" text,"revokedAt" timestamptz,"expiresAt" timestamptz);
     CREATE TABLE run_chunks (id uuid PRIMARY KEY,"runId" uuid,chunk jsonb,"createdAt" timestamptz,seq integer NOT NULL DEFAULT 1);
+    CREATE TABLE run_captures (id uuid PRIMARY KEY,"userId" text NOT NULL,"runId" uuid NOT NULL,kind text NOT NULL,"contentType" text NOT NULL,status text NOT NULL,title text NOT NULL,size integer,sha256 text,"durationMs" integer,"createdAt" timestamptz NOT NULL DEFAULT now(),"updatedAt" timestamptz NOT NULL DEFAULT now());
   `);
   await pool.query(
     await readFile(
@@ -99,57 +96,8 @@ export async function factory194Fixture(connectionString: string) {
         )
       ).rowCount,
     );
-  // Contract-only policy/model substitute. No signer, real review issuer or LLM.
-  const decisions = new Map<string, FactoryVerifiedPolicyDecision>();
-  const authority: FactoryDecisionAuthority = {
-    verify: async (_tx, id) => {
-      const d = decisions.get(id);
-      if (!d) throw Error("unknown fixture credential");
-      return d;
-    },
-  };
-  function issuePolicyDecision(input: z.infer<typeof approvalRequest>) {
-    const req = { ...input, decisionCredentialId: randomUUID() };
-    const scope = {
-      ownerId: actor.userId,
-      binding: req.binding,
-      candidate: req.candidate,
-      action: req.action,
-      target: req.target,
-      targetEnvironment: req.targetEnvironment,
-      evidenceDigest: req.evidenceDigest,
-      visualEvidenceDigests: [],
-      expiresAt: req.expiresAt,
-    };
-    decisions.set(req.decisionCredentialId!, {
-      version: 1,
-      credentialId: req.decisionCredentialId!,
-      issuer: "synthetic-policy-authority",
-      policyId: "synthetic-policy",
-      policyRevision: "1",
-      permissionAction: req.action,
-      ownerId: actor.userId,
-      scopeDigest: digest(scope),
-      decision: "allow",
-      issuedAt: new Date(Date.now() - 1000).toISOString(),
-      expiresAt: req.expiresAt,
-      verification: {
-        receiptId: randomUUID(),
-        signatureDigest: "d".repeat(64),
-      },
-      judgment: {
-        receiptId: randomUUID(),
-        model: "synthetic-vision-model",
-        capability: "vision",
-        visualInputRequired: false,
-        scopeDigest: digest(scope),
-        evidenceDigest: req.evidenceDigest,
-        imageDigests: [],
-      },
-    });
-    return req;
-  }
-  const gates = createFactoryApprovalGates(authority);
+  const approvalRequestForHuman = (input: z.infer<typeof approvalRequest>) => input;
+  const gates = createFactoryApprovalGates();
   function makeStore(installedGates = gates): FactoryApprovalStore {
     return {
       async lockTask(tx, userId, taskId) {
@@ -256,16 +204,16 @@ export async function factory194Fixture(connectionString: string) {
     );
   const service = (
     adapters: PublicationAdapter[] = [adapter],
-    configuredAuthority: FactoryDecisionAuthority | null = authority,
   ) =>
     createFactoryApprovals(
       pool,
       authorize,
       store,
       adapters,
-      configuredAuthority ?? undefined,
     );
-  async function prepare(executionActor: FactoryActor = actor) {
+  /** `capture`: the verify run also took a screenshot, referenced as run capture evidence (A3). */
+  async function prepare(executionActor: FactoryActor = actor, options: { capture?: boolean } = {}) {
+    let captureId: string | null = null;
     const task: FactoryTask = {
       id: randomUUID(),
       userId: actor.userId,
@@ -335,6 +283,7 @@ export async function factory194Fixture(connectionString: string) {
       const runId = randomUUID(),
         sessionId = `synthetic-${stage}-${randomUUID()}`,
         recordedAt = new Date().toISOString();
+      const capturedAt = new Date(Date.now() - 1000).toISOString();
       const evidence = {
         artifact: `run-report:${runId}`,
         kind: "report",
@@ -360,6 +309,15 @@ export async function factory194Fixture(connectionString: string) {
           recordedAt,
         ],
       );
+      const evidenceList: Record<string, unknown>[] = [evidence];
+      if (options.capture && stage === "verify") {
+        captureId = randomUUID();
+        await pool.query(
+          `INSERT INTO run_captures (id,"userId","runId",kind,"contentType",status,title,size,sha256,"durationMs","createdAt","updatedAt") VALUES ($1,$2,$3,'image','image/png','ready','Home',3,$4,NULL,$5,$5)`,
+          [captureId, task.userId, runId, "e".repeat(64), capturedAt],
+        );
+        evidenceList.push({ ...evidence, artifact: `run-capture:${captureId}`, kind: "screenshot" });
+      }
       await pool.query(
         `INSERT INTO factory_attempts VALUES ($1,$2,$3,$4,$5,$6,$7,'passed',$8,'{}',$9)`,
         [
@@ -370,7 +328,7 @@ export async function factory194Fixture(connectionString: string) {
           position,
           runId,
           sessionId,
-          JSON.stringify([evidence]),
+          JSON.stringify(evidenceList),
           recordedAt,
         ],
       );
@@ -389,10 +347,8 @@ export async function factory194Fixture(connectionString: string) {
       targetEnvironment: "preview",
       expiresAt: new Date(Date.now() + 600000).toISOString(),
       evidenceDigest: e.evidenceDigest,
-      evidenceReadId: e.evidenceReadId,
-      decisionCredentialId: randomUUID(),
     };
-    Object.assign(approval, issuePolicyDecision(approval));
+    Object.assign(approval, approvalRequestForHuman(approval));
     const approve = () => service().approve(executionActor, approval);
     const publication = async () => ({
       ...(await approve()),
@@ -401,7 +357,7 @@ export async function factory194Fixture(connectionString: string) {
       target: approval.target,
       targetEnvironment: approval.targetEnvironment,
     });
-    return { task, candidate, approval, approve, publication };
+    return { task, candidate, approval, approve, publication, captureId };
   }
   return {
     permission,
@@ -409,9 +365,7 @@ export async function factory194Fixture(connectionString: string) {
     store,
     makeStore,
     authorize,
-    decisions,
-    authority,
-    issuePolicyDecision,
+    approvalRequestForHuman,
     pool,
     actor,
     provider,

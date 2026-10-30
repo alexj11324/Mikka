@@ -8,6 +8,7 @@ import {
 import { factoryCheckAssignment, verifierCommandEvidence } from "./checks";
 import { factoryCheckIndependent } from "./check-independence";
 import { factoryEventId } from "./event-id";
+import { runCaptureEvidence } from "./evidence";
 import type { FactoryTask, createFactoryStore } from "./store";
 
 const binding = (t: FactoryTask): FactoryBinding => ({
@@ -114,6 +115,11 @@ export async function reconcileFactoryCheck(
         kind: "log",
       });
   }
+  // Screenshots and recordings the check took are run captures; reference them.
+  if (evidence.length)
+    evidence.push(
+      ...(await runCaptureEvidence(tx, { id: run.id, userId: task.userId }, evidence[0], 100 - evidence.length)),
+    );
   const completion = { ...attempt?.output, completion: output };
   let status: "passed" | "failed" | "blocked" | "waiting" = "passed";
   let reason =

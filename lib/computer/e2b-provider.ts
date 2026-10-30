@@ -4,31 +4,34 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Sandbox } from 'e2b'
 import { HOSTED_NATIVE_IMAGE } from '@mikka/protocol/subscription'
+import { computerTemplate, e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 
 const lifetime = 15 * 60_000
 export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number; computerAllowed: boolean; policyVersion: number }
-const options = () => {
-  if (!process.env.E2B_API_KEY) throw new Error('Cloud computer is not configured')
-  return { apiKey: process.env.E2B_API_KEY, timeoutMs: lifetime, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
+// The sandbox belongs to the E2B team whose key created it, so every call for a workspace's
+// sandbox resolves that workspace's key (flag on) or the platform key (flag off, unchanged).
+const options = async (workspaceId: string) => ({ apiKey: await e2bApiKey(workspaceId, 'Cloud computer is not configured'), timeoutMs: lifetime, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy })
+
+export async function connectComputer(workspaceId: string, id: string, signal?: AbortSignal) {
+  const base = await options(workspaceId)
+  return withE2BErrors(workspaceId, false, () => Sandbox.connect(id, { ...base, ...(signal ? { signal, retries: 0 } : {}) }))
 }
 
-export async function connectComputer(id: string, signal?: AbortSignal) {
-  return Sandbox.connect(id, { ...options(), ...(signal ? { signal, retries: 0 } : {}) })
-}
-
-export async function computerState(id: string) {
-  const info = await Sandbox.getInfo(id, options())
+export async function computerState(workspaceId: string, id: string) {
+  const base = await options(workspaceId)
+  const info = await withE2BErrors(workspaceId, false, () => Sandbox.getInfo(id, base))
   return info.state === 'paused' ? 'sleeping' : 'running'
 }
 
 /** Template is built from scripts/e2b/bootstrap.sh, never a third-party CUA image. */
 export async function createComputer(workspaceId: string, operationId: string) {
-  const template = process.env.E2B_COMPUTER_TEMPLATE
-  if (!template) throw new Error('Cloud desktop template is not configured')
-  return Sandbox.create(template, { ...options(), idempotencyKey: operationId,
+  // Flag on: only the public template from E2B_BYO_COMPUTER_TEMPLATE; a 404 becomes e2b_template_unavailable.
+  const template = computerTemplate()
+  const base = await options(workspaceId)
+  return withE2BErrors(workspaceId, true, () => Sandbox.create(template, { ...base, idempotencyKey: operationId,
     metadata: { application: 'mikka', workspaceId },
     lifecycle: { onTimeout: 'pause', autoResume: false },
-  })
+  }))
 }
 
 export async function installComputerRuntime(sandbox: Sandbox) {

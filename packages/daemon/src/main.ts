@@ -59,6 +59,8 @@ import {
   ServerUnreachableError,
 } from "./errors"
 import { readJson, writeFileAtomic, writeJsonAtomic } from "./fs-util"
+import { restartService } from "./service"
+import { detectDeviceType } from "./device-type"
 import { detectHarnesses } from "./harnesses"
 import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
@@ -149,6 +151,8 @@ export interface DaemonOptions {
 
 /** Persisted in `device.json` (mode 0600). */
 interface DeviceFile {
+  completedDeviceCommands?: string[]
+  failedDeviceCommands?: { id: string; error: string }[]
   credential?: string
   /**
    * This machine's one device id, the same in every workspace it joins
@@ -829,6 +833,7 @@ export class Daemon {
         arch: arch(),
         daemonVersion: DAEMON_VERSION,
         protocolVersion: DAEMON_PROTOCOL_VERSION,
+        deviceType: process.env.MIKKA_DEVICE_TYPE === "server" ? "server" : process.env.MIKKA_DEVICE_TYPE === "laptop" ? "laptop" : await detectDeviceType(),
         harnesses: this.harnesses,
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
         ...(this.device.workspaceId
@@ -880,7 +885,9 @@ export class Daemon {
       const deviceId = this.device.deviceId as string
       // Heartbeat first: lease renewal must not wait on anything else.
       const quotas = this.quota?.snapshot().quotas
-      const { leases, revoked, cloudCredential } = await link.heartbeat(deviceId, {
+      const { leases, revoked, cloudCredential, deviceCommands } = await link.heartbeat(deviceId, {
+        completedDeviceCommands: this.device.completedDeviceCommands,
+        failedDeviceCommands: this.device.failedDeviceCommands,
         harnesses: this.harnesses,
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
         runs: this.supervisor.heartbeatRuns(),
@@ -895,6 +902,32 @@ export class Daemon {
         this.saveDevice({ credential: cloudCredential })
         this.revokeLocalComputerGrants()
         this.registered = false
+      }
+      const command = deviceCommands?.[0]
+      if (command && !this.device.completedDeviceCommands?.includes(command.id) && !this.device.failedDeviceCommands?.some(failure => failure.id === command.id)) {
+        if (command.kind === 'redetect' || this.supervisor.heartbeatRuns().length === 0) {
+          try {
+            if (command.kind === 'redetect') {
+              const detected = await detectHarnesses()
+              this.harnesses = detected.filter(info => this.adapters.has(info.harness)).map(info => {
+                const previous = this.harnesses.find(old => old.harness === info.harness && old.version === info.version)
+                return { ...info, toolApproval: previous?.toolApproval, coordinator: coordinatorCapable(info) }
+              })
+              this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+              // Queue an immediate heartbeat after this sync pass, without re-entering it.
+              void this.syncWithServer().catch(() => undefined)
+            } else {
+              await restartService(command.kind === 'update', () => {
+                // Persist only after an update succeeds and before scheduling restart.
+                this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+              })
+            }
+          } catch {
+            // Do not leak npm output or host details through the management API.
+            this.saveDevice({ completedDeviceCommands: [], failedDeviceCommands: [{ id: command.id, error: 'Device command failed; check daemon service logs.' }] })
+            this.log.warn({ command_id: command.id }, 'Device command failed')
+          }
+        }
       }
       // Work in progress leaves the machine, so another can take over.
       const checkpointRun = link.checkpointRun?.bind(link)

@@ -1,12 +1,13 @@
 import 'server-only'
 import type { Pool } from 'pg'
 import { checkedLocalReview } from '@/lib/cua/local-review'
+import { identityMasker, maskDeep, type Masker } from '@/lib/secrets/mask'
 import type { LocalComputerRequest } from '@mikka/protocol/computer'
 
 /** Sync only snapshots from an owned device's live runs. The server never
  * supplies operation arguments back to the daemon: it returns a decision for
  * the exact digest the daemon generated. */
-export async function syncComputerReviews(pool: Pool, deviceId: string, userId: string, snapshots: LocalComputerRequest[]) {
+export async function syncComputerReviews(pool: Pool, deviceId: string, userId: string, snapshots: LocalComputerRequest[], mask: Masker = identityMasker) {
   const now = Date.now()
   const rows = snapshots.map(row => checkedLocalReview(row, now))
   if (rows.length > 20 || new Set(rows.map(row => row.id)).size !== rows.length) throw new Error('Invalid snapshot')
@@ -31,7 +32,7 @@ export async function syncComputerReviews(pool: Pool, deviceId: string, userId: 
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now()) ON CONFLICT (id) DO UPDATE SET "seenAt"=now()
         WHERE local_computer_reviews."deviceId"=EXCLUDED."deviceId" AND local_computer_reviews."runId"=EXCLUDED."runId"
           AND local_computer_reviews."userId"=EXCLUDED."userId" AND local_computer_reviews.digest=EXCLUDED.digest RETURNING id`,
-      [row.id, deviceId, row.runId, userId, row.target, row.display ?? null, JSON.stringify(row.call), row.digest, new Date(row.expiresAt)])
+      [row.id, deviceId, row.runId, userId, row.target, row.display ?? null, JSON.stringify(maskDeep(row.call, mask)), row.digest, new Date(row.expiresAt)])
       if (!inserted.rowCount) throw new Error('Review changed')
       if (run.botId && run.approvedForRun) await client.query('UPDATE local_computer_reviews SET decision=true WHERE id=$1 AND decision IS NULL', [row.id])
     }

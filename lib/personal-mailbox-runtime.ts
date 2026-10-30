@@ -62,7 +62,13 @@ export async function personalWorkerMailboxAdvertised(userId: string, runId: str
     executionId: run.agentDefinition.parent.executionId, worker: run.agentDefinition }) }
   catch (error) { if (error instanceof MailboxError) return []; throw error }
 }
-export async function personalWorkerMailbox(userId: string, runId: string, input: unknown, verifiedToken: string, signal?: AbortSignal) {
+/** 4e2 item 4: the text a run sends to a peer, masked with the run's secret set before it is stored. */
+export async function maskWorkerMailboxInput(runId: string, rawInput: unknown): Promise<unknown> {
+  return rawInput && typeof rawInput === 'object' && typeof (rawInput as { text?: unknown }).text === 'string'
+    ? { ...rawInput, text: await (await import('@/lib/secrets/runtime')).maskForRun(runId, (rawInput as { text: string }).text) } : rawInput
+}
+export async function personalWorkerMailbox(userId: string, runId: string, rawInput: unknown, verifiedToken: string, signal?: AbortSignal) {
+  // 4e2 item 4: a run's outgoing peer message text is stored; mask it with the run's secret set (MCP and HTTP paths).
   if (!personalMailboxEnabled()) return { status: 503, body: { error: 'personal_mailbox_unavailable' } }
   // Resolve the existing private Bot namespace from trusted records, never a
   // body field. Unbound runs retain main's existing device namespace.
@@ -71,6 +77,8 @@ export async function personalWorkerMailbox(userId: string, runId: string, input
   if (!personalWorkerMailboxSupported(run.harness, run.agentDefinition)) return { status: 409, body: { error: 'Worker mailbox capability is not frozen for this runtime' } }
   const namespace = run.workspaceId ?? WORKSPACE_ID
   if (!personalWorkerMailboxScopeMatches(run.harness, run.agentDefinition, { botId: run.botId, workspaceId: namespace })) return { status: 403, body: { error: 'Worker mailbox scope changed' } }
+  // Mask only after the owner/namespace/scope checks: a foreign or stale run never reaches the secret set.
+  const input = await maskWorkerMailboxInput(runId, rawInput)
   const tokenHash = createHash('sha256').update(verifiedToken).digest('hex')
   const parsed = personalMailboxRequest.safeParse(input)
   if (!parsed.success) return { status: 400, body: { error: 'Invalid mailbox request' } }

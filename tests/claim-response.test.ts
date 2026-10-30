@@ -124,3 +124,46 @@ test('response authorization retries only rolled-back serialization or deadlock 
   await assert.rejects(claim(unexpected),error=>error===unknown)
   assert.equal(unexpected.transactions,1)
 })
+
+test('4e3: a cloud claim reads the task secrets (workspace + repo scope) before the claim',async()=>{
+  const saved={...process.env}
+  Object.assign(process.env,{MIKKA_CLOUD_COMPUTER_TASKS:'1',MIKKA_BYOS_ENABLED:'1',MIKKA_BYO_E2B_KEY:'1'})
+  try{
+    const probe=fixture()
+    Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:'ws'},cloud:{subscription:{id:'binding',workspaceId:'ws'}}})
+    Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
+    const response=await claim(probe,['skill-preflight','policy','secrets','claim','skill-claim','benchmark-claim','token'])
+    assert.equal(response.status,200)
+  } finally { for(const key of ['MIKKA_CLOUD_COMPUTER_TASKS','MIKKA_BYOS_ENABLED','MIKKA_BYO_E2B_KEY'])if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key] }
+})
+
+
+test('platform cloud claims inject the configured secret assignment with BYO off; an empty assignment stays omitted',async()=>{
+  const keys=['MIKKA_CLOUD_COMPUTER_TASKS','MIKKA_BYOS_ENABLED','MIKKA_BYO_E2B_KEY','WORKSPACE_SECRETS_KEY'] as const
+  const saved=keys.map(key=>process.env[key])
+  Object.assign(process.env,{MIKKA_CLOUD_COMPUTER_TASKS:'1',MIKKA_BYOS_ENABLED:'1',MIKKA_BYO_E2B_KEY:'0',WORKSPACE_SECRETS_KEY:'1'.repeat(64)})
+  try {
+    for(const configured of [true,false]) {
+      const probe=fixture()
+      const injection=configured ? {env:{TASK_SECRET:'synthetic-task-value',TASK_MODE:'fixture'},secretNames:['TASK_SECRET']} : {env:{},secretNames:[]}
+      if(!configured)delete process.env.WORKSPACE_SECRETS_KEY
+      Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:'ws'},cloud:{subscription:{id:'binding',workspaceId:'ws'}},secretInjection:injection,secretReads:[]})
+      Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
+      const response=await claim(probe,['skill-preflight','policy','secrets','claim','skill-claim','benchmark-claim','token'])
+      assert.equal(response.status,200)
+      const body=await response.json()
+      assert.deepEqual(body.taskEnv,configured ? injection.env : undefined)
+      assert.deepEqual(body.taskSecretNames,configured ? injection.secretNames : undefined)
+      assert.deepEqual((probe as typeof probe & {secretReads:unknown[][]}).secretReads,[['ws',probe.repo.remoteUrl]])
+    }
+    for(const denial of ['authentication','device-scope','workspace-scope'] as const) {
+      const probe=fixture()
+      Object.assign(probe,{caller:denial==='authentication' ? null : {userId:'member',scopeDeviceId:denial==='device-scope' ? 'foreign-device' : 'device',scopeWorkspaceId:'foreign-workspace'},cloud:{subscription:{id:'binding',workspaceId:'ws'}},secretInjection:{env:{TASK_SECRET:'must-not-leave'},secretNames:['TASK_SECRET']}})
+      Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
+      const response=await claim(probe,denial==='workspace-scope' ? ['skill-preflight','policy'] : [])
+      assert.equal(response.status,denial==='authentication' ? 401 : denial==='device-scope' ? 404 : 409)
+      assert.equal((await response.text()).includes('must-not-leave'),false)
+      assert.ok(!probe.preparation.includes('secrets'))
+    }
+  } finally {keys.forEach((key,i)=>{if(saved[i]===undefined)delete process.env[key];else process.env[key]=saved[i]})}
+})

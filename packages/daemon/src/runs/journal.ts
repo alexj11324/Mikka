@@ -10,6 +10,12 @@ import type { RunSkillMount, RunExecution, RunRuntime } from "@mikka/protocol/ru
 
 import { readJson, writeJsonAtomic } from "../fs-util"
 import type { RunAssignment } from "../server-link"
+import { withoutTaskEnv } from "../task-env"
+
+/** 4e3: the task's user variables (secrets) live in memory only, never in the journal file. */
+function persisted(entries: Record<string, JournalEntry>): Record<string, JournalEntry> {
+  return Object.fromEntries(Object.entries(entries).map(([id, entry]) => [id, { ...entry, assignment: withoutTaskEnv(entry.assignment) as RunAssignment }]))
+}
 
 export interface JournalEntry {
   assignment: RunAssignment
@@ -61,7 +67,7 @@ export class RunJournal {
       ...entry,
       updatedAt: new Date().toISOString(),
     }
-    writeJsonAtomic(this.file, { version: 1, runs: this.entries })
+    writeJsonAtomic(this.file, { version: 1, runs: persisted(this.entries) })
   }
 
   update(runId: string, patch: Partial<Omit<JournalEntry, "assignment">>) {

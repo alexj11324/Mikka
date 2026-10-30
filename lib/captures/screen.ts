@@ -55,8 +55,8 @@ export class ScreenCaptures {
     return { owner: { userId: caller.userId, runId, issueId: row.issueId, botId: row.botId }, sandboxId: row.sandboxId, display: Number(row.display) }
   }
 
-  private async connect(sandboxId: string, signal?: AbortSignal): Promise<Sandbox | null> {
-    return this.runtime.connectComputer(sandboxId, signal).catch(() => null)
+  private async connect(workspaceId: string, sandboxId: string, signal?: AbortSignal): Promise<Sandbox | null> {
+    return this.runtime.connectComputer(workspaceId, sandboxId, signal).catch(() => null)
   }
 
   /** Fence start/shot against workspace revocation, takeover and run end. */
@@ -103,7 +103,7 @@ export class ScreenCaptures {
       const target = await this.target(caller, runId, 'capture', client)
       signal.throwIfAborted()
       if ('error' in target) return target
-      const sandbox = await this.connect(target.sandboxId, signal)
+      const sandbox = await this.connect(caller.workspaceId, target.sandboxId, signal)
       signal.throwIfAborted()
       if (!sandbox) return unavailable
       // Provider errors may carry request URLs or headers; never pass them on.
@@ -130,7 +130,7 @@ export class ScreenCaptures {
         await this.finalize(existing, undefined, signal)
         signal.throwIfAborted()
       }
-      const sandbox = await this.connect(target.sandboxId, signal)
+      const sandbox = await this.connect(caller.workspaceId, target.sandboxId, signal)
       signal.throwIfAborted()
       if (!sandbox) return unavailable
       const stopsAt = new Date(this.now() + seconds * 1000)
@@ -154,19 +154,20 @@ export class ScreenCaptures {
     if ('error' in target) return target
     const row = await currentRecording(runId)
     if (!row || row.userId !== caller.userId) return { error: 'not_found', message: 'No recording is going for this thread.' }
-    return this.finalize(row, target.sandboxId)
+    return this.finalize(row, { sandboxId: target.sandboxId, workspaceId: caller.workspaceId })
   }
 
   /** Stops one recording and keeps the file; marks it failed when the machine or the file is gone. */
-  private async finalize(row: NonNullable<Awaited<ReturnType<typeof currentRecording>>>, sandboxId?: string, signal?: AbortSignal): Promise<CaptureView | CaptureError> {
+  private async finalize(row: NonNullable<Awaited<ReturnType<typeof currentRecording>>>, known?: { sandboxId: string; workspaceId: string }, signal?: AbortSignal): Promise<CaptureView | CaptureError> {
     // A durable thread binding always selects its own sandbox, including
     // after end. Missing thread resources must never fall back to the Bot.
-    const machine = sandboxId ?? (await pool.query(`SELECT CASE WHEN t."runId" IS NULL THEN m."sandboxId" ELSE t."sandboxId" END AS "sandboxId" FROM computer_run_bindings b
+    const bound = known ?? (await pool.query(`SELECT CASE WHEN t."runId" IS NULL THEN m."sandboxId" ELSE t."sandboxId" END AS "sandboxId",b."workspaceId" FROM computer_run_bindings b
       LEFT JOIN thread_machines t ON t."runId"=b."runId" AND t."workspaceId"=b."workspaceId" AND t."ownerId"=b."ownerId" AND t."botId"=b."botId"
       LEFT JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND t."runId" IS NULL
-      WHERE b."runId"=$1 AND b."ownerId"=$2`, [row.runId, row.userId])).rows[0]?.sandboxId
+      WHERE b."runId"=$1 AND b."ownerId"=$2`, [row.runId, row.userId])).rows[0] as { sandboxId: string | null; workspaceId: string } | undefined
+    const machine = bound?.sandboxId
     signal?.throwIfAborted()
-    const sandbox = machine && row.display ? await this.connect(machine, signal) : null
+    const sandbox = machine && bound && row.display ? await this.connect(bound.workspaceId, machine, signal) : null
     signal?.throwIfAborted()
     const file = sandbox ? await this.runtime.stopScreenRecording(sandbox, row.display!, row.id, signal).catch(() => null) : null
     signal?.throwIfAborted()
