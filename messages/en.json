@@ -2739,7 +2739,8 @@
     "moreOutputs": "+{count}",
     "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}",
     "send": "Send",
-    "retryStop": "Try stopping again"
+    "retryStop": "Try stopping again",
+    "waiting": "Waiting for you"
   },
   "Computer": {
     "status": {

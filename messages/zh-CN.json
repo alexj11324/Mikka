@@ -2739,7 +2739,8 @@
     "moreOutputs": "+{count}",
     "moreOutputsAria": "还有 {count} 个输出",
     "send": "发送",
-    "retryStop": "重试停止"
+    "retryStop": "重试停止",
+    "waiting": "等你回复"
   },
   "Computer": {
     "status": {
