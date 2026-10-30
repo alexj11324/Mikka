@@ -47,7 +47,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
   const questionPolls = useRef(0)
   const { data, error, mutate } = useSWR(['issue-thread', issueId, runId], () => getIssueThread(issueId, runId), {
     // A question changes only when it is answered or its continuation starts: back off, capped.
-    refreshInterval: detail => !detail ? 0 : runIsActive(detail.thread.status) ? 2000 : threadQuestionView(detail.thread).question ? Math.min(2000 * 2 ** questionPolls.current, 30_000) : 0,
+    refreshInterval: detail => !detail ? 0 : runIsActive(threadQuestionView(detail.thread).status) ? 2000 : threadQuestionView(detail.thread).question ? Math.min(2000 * 2 ** questionPolls.current, 30_000) : 0,
     onSuccess: detail => { questionPolls.current = threadQuestionView(detail.thread).question ? questionPolls.current + 1 : 0 },
     revalidateOnFocus: true,
   })
@@ -59,14 +59,16 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
   const stopAttemptRef = useRef<number | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const detail = data?.thread.detail
-  const active = !!data && runIsActive(data.thread.status)
   // 等你回复: the run ended on a question; the composer answers it (lib/agent-runs.ts addRunMessage).
-  // Once answered it reads as the running thread it continues, with nothing to send or stop yet.
+  // Once answered it reads as the running thread it continues, with nothing to send or stop yet;
+  // as soon as the resumed run starts, messages and stop go to that run.
   const view = data ? threadQuestionView(data.thread) : null
   const question = view?.question ?? null
+  const liveRunId = view?.runId ?? runId
+  const active = !!view && question !== 'resuming' && runIsActive(view.status)
   // Stop was asked for; the run keeps its live status until the daemon ends it.
   const requestedAt = stopAttempt ?? (data?.thread.stopRequestedAt ? new Date(data.thread.stopRequestedAt).getTime() : null)
-  const stopRequested = active && (requestedAt !== null || !!data?.thread.stopping)
+  const stopRequested = active && (requestedAt !== null || !!view?.stopping)
   const stopPending = stopRequested && !stopFailed
   const items = data ? threadItems(data.chunks, data.messages, runId) : []
   useEffect(() => {
@@ -77,12 +79,12 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
   useEffect(() => {
     // Acknowledgement updates the task's thread list as soon as this panel sees it.
     void mutateCache(['issue-threads', issueId])
-  }, [issueId, data?.thread.status, data?.thread.stopping, question, mutateCache])
+  }, [issueId, view?.status, view?.stopping, question, mutateCache])
   async function send() {
     const text = draft.trim()
     if (!text || sending || stopRequested || question === 'resuming') return
     setSending(true); setSendFailed(false)
-    try { await sendIssueThreadMessage({ issueId, runId, text }); setDraft(current => current.trim() === text ? '' : current); void mutate() }
+    try { await sendIssueThreadMessage({ issueId, runId: liveRunId, text }); setDraft(current => current.trim() === text ? '' : current); void mutate() }
     catch { setSendFailed(true) }
     finally { setSending(false) }
   }
@@ -91,8 +93,8 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
     const attempt = Date.now()
     stopAttemptRef.current = attempt
     setStopAttempt(attempt); setStopFailed(false)
-    void mutateCache<IssueThread[]>(['issue-threads', issueId], threads => threads?.map(thread => thread.id === runId ? { ...thread, stopping: true } : thread), { revalidate: false })
-    try { await stopRun(runId); void mutate(); void mutateCache(['issue-threads', issueId]) }
+    void mutateCache<IssueThread[]>(['issue-threads', issueId], threads => threads?.map(thread => thread.id === runId ? { ...thread, stopping: true, continuation: thread.continuation && { ...thread.continuation, stopping: true } } : thread), { revalidate: false })
+    try { await stopRun(liveRunId); void mutate(); void mutateCache(['issue-threads', issueId]) }
     catch {
       // A late response from an earlier request must not cancel a retry.
       if (stopAttemptRef.current === attempt) {
@@ -127,7 +129,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
               {item.kind === 'agent' && <div className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>}
               {item.kind === 'steps' && <span className="flex items-center gap-1 text-xs text-muted-foreground"><ChevronRight className="size-3.5" aria-hidden="true" />{t('steps', { harness: harnessLabel(detail?.harness ?? ''), count: item.count })}</span>}
               {item.kind === 'error' && <p role="alert" className="text-xs text-destructive">{item.text}</p>}
-              {item.kind === 'computer' && <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : data.thread.status === 'succeeded' ? 'done' : 'failed'} />}
+              {item.kind === 'computer' && <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : (view?.status ?? data.thread.status) === 'succeeded' ? 'done' : 'failed'} />}
               {item.kind === 'person' && (item.mine
                 // R-14: your own words are the blue bubble on the right.
                 ? <p className={cn(BUBBLE, 'self-end bg-sidebar-primary text-sidebar-primary-foreground')}>{item.text}</p>

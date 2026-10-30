@@ -37,6 +37,8 @@ class Selection {
         assert.ok(query.sql.includes('"agent_runs"."userId"') && query.params.includes('owner') && query.params.includes(runId), 'message snapshot must bind owner and run')
       }
       if (/"agent_runs"\."id"/.test(query.sql) && !query.params.includes(runId)) return []
+      // A thread's resumed-question continuation; this fixture's run has none.
+      if (query.sql.includes(`->>'originRunId'`)) return []
       return [{ ...current.run }]
     }
     if (this.table === runChunks) return []

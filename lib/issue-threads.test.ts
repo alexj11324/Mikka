@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { canReadThread, projectIssueThreads, threadName } from './issue-threads'
+import { canReadThread, projectIssueThreads, threadName, threadQuestionView, threadTime } from './issue-threads'
 
 const make = (id: string, userId = 'teammate', issueId = 'issue') => ({
   id, issueId, userId, status: 'running', prompt: 'Route group replies\nthen run e2e', report: { summary: 'Done' }, error: null,
@@ -62,4 +62,32 @@ test('a thread is named by the first line it was asked, shortened, else by its a
   assert.equal(threadName('\n  Fix the board  \nmore', 'Agent'), 'Fix the board')
   assert.equal(threadName('', 'Mikka Backend'), 'Mikka Backend')
   assert.equal(Array.from(threadName('长'.repeat(80), 'x')).length, 60)
+})
+
+test('a resumed question is one thread: the continuation run folds into its origin row, named as the origin', () => {
+  const members = new Set(['viewer'])
+  const origin = { ...make('origin', 'viewer'), status: 'succeeded', prompt: 'Speed up the home page', createdAt: new Date('2026-01-01T00:00:00Z') }
+  const continuation = { ...make('next', 'viewer'), status: 'queued', prompt: '# Thread question abc\n\nbody', createdAt: new Date('2026-01-01T00:05:00Z'), questionContinuation: { originRunId: 'origin' } }
+  const threads = projectIssueThreads([origin, continuation], 'issue', 'viewer', members)
+  assert.deepEqual(threads.map(thread => thread.id), ['origin'])
+  assert.equal(threads[0].detail?.name, 'Speed up the home page')
+  // Queued continuation: still 运行中, nothing to send or stop to yet.
+  const queued = threadQuestionView({ ...threads[0], question: 'resuming' })
+  assert.deepEqual([queued.question, queued.status, queued.runId], ['resuming', 'running', 'origin'])
+  // Started: the continuation is the live run that send and stop address.
+  const [started] = projectIssueThreads([origin, { ...continuation, status: 'running' }], 'issue', 'viewer', members)
+  const live = threadQuestionView({ ...started, question: 'resuming' })
+  assert.deepEqual([live.question, live.status, live.runId], [null, 'running', 'next'])
+})
+
+test('a continuation without its origin in view never shows raw markdown as its name', () => {
+  const [orphan] = projectIssueThreads([{ ...make('next', 'viewer'), prompt: '# Thread question abc', questionContinuation: { originRunId: 'gone' } }], 'issue', 'viewer', new Set(['viewer']))
+  assert.equal(orphan.detail?.name, 'Thread question abc')
+  assert.equal(threadName('## **Ship** it', 'x'), 'Ship it')
+})
+
+test('a thread time is never in the future relative to now', () => {
+  const now = new Date('2026-01-01T00:00:00Z')
+  assert.equal(threadTime({ createdAt: new Date('2026-01-01T00:00:01Z'), finishedAt: null }, now).getTime(), now.getTime())
+  assert.equal(threadTime({ createdAt: new Date('2025-12-31T23:59:00Z'), finishedAt: null }, now).getTime(), new Date('2025-12-31T23:59:00Z').getTime())
 })

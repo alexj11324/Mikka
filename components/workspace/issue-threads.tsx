@@ -4,7 +4,7 @@ import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
 import { listIssueThreads } from '@/app/actions/agents'
-import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
+import { threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'
 import { runListRefreshInterval, runStatusKey } from '@/lib/issue-run-conversation'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { Badge } from '@/components/reui/badge'
@@ -14,7 +14,7 @@ import { ThreadStatusIcon } from './thread-status-icon'
 import { cn } from '@/lib/utils'
 
 export function useIssueThreads(issueId: string) {
-  return useSWR(['issue-threads', issueId], () => listIssueThreads(issueId), { refreshInterval: runListRefreshInterval, revalidateOnFocus: true, revalidateOnReconnect: true })
+  return useSWR(['issue-threads', issueId], () => listIssueThreads(issueId), { refreshInterval: threads => runListRefreshInterval(threads?.map(threadQuestionView)), revalidateOnFocus: true, revalidateOnReconnect: true })
 }
 
 export function harnessLabel(harness: string) {
@@ -53,7 +53,7 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
             {meta && <span className="truncate text-xs font-normal text-muted-foreground">{meta}</span>}
           </span>
           <ThreadStatus status={view.status} stopping={thread.stopping} waiting={view.waiting} />
-          <time className="w-14 shrink-0 text-right text-xs font-normal text-muted-foreground" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(new Date(thread.finishedAt ?? thread.createdAt), now)}</time>
+          <time className="w-14 shrink-0 text-right text-xs font-normal text-muted-foreground" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(threadTime(thread, now), now)}</time>
         </>
         return <li key={thread.id}>
           {thread.detail

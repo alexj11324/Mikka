@@ -150,6 +150,7 @@ const threadColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt,
   sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
   agentName: runBotName, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt,
+  questionContinuation: agentRuns.questionContinuation,
 }
 
 /** The issue's threads, as much of each as this viewer may see (R-62). */
@@ -206,7 +207,11 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
-  const [thread] = await threadQuestions(projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id])), user.id)
+  // The run that resumes this one after an answered question is the same thread (see IssueThread.continuation).
+  const continuations = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
+    .where(and(eq(agentRuns.issueId, row.issueId ?? ''), eq(agentRuns.userId, user.id), sql`${agentRuns.questionContinuation}->>'originRunId' = ${row.id}`)).limit(ISSUE_THREAD_LIMIT)
+  const thread = (await threadQuestions(projectIssueThreads([row, ...continuations], row.issueId ?? '', user.id, new Set([user.id])), user.id)).find(item => item.id === row.id)
+  if (!thread) throw new ActionFailureError('runNotFound')
   return {
     thread: { ...thread, prompt: row.prompt, stopRequestedAt: row.stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
