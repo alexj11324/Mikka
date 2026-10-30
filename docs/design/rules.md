@@ -121,7 +121,7 @@ source wins in a conflict is in [`README.md`](README.md).
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
   shows a machine picker.
-- **R-23** Machine picker order: **Mikka Cloud** first and selected by
+- **R-23** Machine picker order: **E2B** first and selected by
   default; then the group **本机** (this Mac, a local Linux machine); then the
   group **Remote control** (VPS and SSH hosts reached through the user's
   machine). Settings › 设备 uses the same two groups.

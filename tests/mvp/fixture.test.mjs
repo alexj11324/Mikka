@@ -91,7 +91,7 @@ test('scripted model uses only the real tool results for dispatch, including exa
     globalThis.AI_SDK_DEFAULT_PROVIDER = createGateway({ baseURL: `${services.origin}/v1`, apiKey: 'synthetic-fixture' })
     const response = await generateText({
       model: 'fixture-model',
-      prompt: `${marker}\nThe person selected device ${deviceId} in the task dialog. Use a local execution identity on exactly this device; do not substitute another device or Mikka Cloud.`,
+      prompt: `${marker}\nThe person selected device ${deviceId} in the task dialog. Use a local execution identity on exactly this device; do not substitute another device or E2B.`,
       stopWhen: stepCountIs(5), maxRetries: 0,
       tools: {
         create_issue: tool({ inputSchema: z.object({ title: z.string(), body: z.string() }), execute: input => { calls.push({ tool: 'create_issue', input }); return { id: issueId } } }),

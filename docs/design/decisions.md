@@ -216,3 +216,7 @@ Preserve Linear's existing state. Availability follows the existing owner,
 workspace and allow/ask/deny checks; it does not create provider or publication
 authority. Track the concrete rollout prerequisites and verification in
 [the rollout record](../integration/non-linear-rollout-20261029.md).
+
+## 2026-10-30 — First-run onboarding spec
+
+Alex approved the first-run onboarding spec ([onboarding.md](onboarding.md), #129); its Figma page 241:4483 (「Onboarding · 我们的版本（Claude · 2026-10-25）」) is accepted.

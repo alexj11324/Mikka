@@ -1140,6 +1140,7 @@
   },
   "IssueDetail": {
     "breadcrumbBoard": "看板",
+    "breadcrumbMore": "更多位置",
     "connecting": "正在连接…",
     "deletedTitle": "此任务已被删除",
     "unavailableTitle": "任务不可用",
@@ -1613,10 +1614,10 @@
         "title": "活动"
       },
       "computers": {
-        "title": "我的电脑"
+        "title": "设备"
       },
       "developer": {
-        "title": "开发者"
+        "title": "个人访问令牌"
       },
       "general": {
         "title": "常规"
@@ -1626,7 +1627,7 @@
         "keywords": "可用模型 模型 允许"
       },
       "permissions": {
-        "title": "权限与审批"
+        "title": "团队权限"
       },
       "secrets": {
         "title": "密钥与环境"
@@ -1711,7 +1712,7 @@
       "previewLabel": "工作区表单预览"
     },
     "computerPolicy": {
-      "heading": "云电脑",
+      "heading": "电脑操作",
       "description": "控制工作区内的 Bot 是否可以操作电脑。",
       "label": "Bot 操作电脑",
       "help": "禁止后，电脑任务会停止，已有授权也会失效。你仍然可以接管电脑。",
@@ -2786,7 +2787,8 @@
     "moreOutputs": "+{count}",
     "moreOutputsAria": "还有 {count} 个输出",
     "send": "发送",
-    "retryStop": "重试停止"
+    "retryStop": "重试停止",
+    "waiting": "等你回复"
   },
   "Computer": {
     "status": {
@@ -2801,7 +2803,7 @@
     },
     "screenOf": "{name} 的屏幕",
     "computerOf": "{name} 的电脑",
-    "cloud": "Mikka Cloud",
+    "cloud": "E2B",
     "card": "电脑任务",
     "cardTitle": "电脑",
     "openScreen": "全屏查看 {name} 的屏幕",
@@ -2981,7 +2983,7 @@
       "noDevice": "未连接机器",
       "offline": "离线",
       "online": "在线",
-      "cloud": "Mikka Cloud",
+      "cloud": "E2B",
       "contextProject": "项目：{project}",
       "contextSeparator": "，",
       "prompt": "帮我新建一个任务：{text}",

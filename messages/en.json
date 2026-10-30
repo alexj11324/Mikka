@@ -1140,6 +1140,7 @@
   },
   "IssueDetail": {
     "breadcrumbBoard": "Board",
+    "breadcrumbMore": "More locations",
     "connecting": "Connecting…",
     "deletedTitle": "This task was deleted",
     "unavailableTitle": "Task unavailable",
@@ -1613,10 +1614,10 @@
         "title": "Activity"
       },
       "computers": {
-        "title": "My computers"
+        "title": "Devices"
       },
       "developer": {
-        "title": "Developer"
+        "title": "Personal access tokens"
       },
       "general": {
         "title": "General"
@@ -1626,7 +1627,7 @@
         "keywords": "available models model allowlist"
       },
       "permissions": {
-        "title": "Permissions and approvals"
+        "title": "Team permissions"
       },
       "secrets": {
         "title": "Secrets and environment"
@@ -1711,7 +1712,7 @@
       "previewLabel": "Workspace form preview"
     },
     "computerPolicy": {
-      "heading": "Cloud computers",
+      "heading": "Computer use",
       "description": "Control whether Bots may operate computers in this workspace.",
       "label": "Bot computer use",
       "help": "Denying stops computer tasks and revokes their approvals. People can still take control.",
@@ -2786,7 +2787,8 @@
     "moreOutputs": "+{count}",
     "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}",
     "send": "Send",
-    "retryStop": "Try stopping again"
+    "retryStop": "Try stopping again",
+    "waiting": "Waiting for you"
   },
   "Computer": {
     "status": {
@@ -2801,7 +2803,7 @@
     },
     "screenOf": "{name}'s screen",
     "computerOf": "{name}'s computer",
-    "cloud": "Mikka Cloud",
+    "cloud": "E2B",
     "card": "Computer task",
     "cardTitle": "Computer",
     "openScreen": "Open {name}'s screen full window",
@@ -2981,7 +2983,7 @@
       "noDevice": "No machine connected",
       "offline": "Offline",
       "online": "Online",
-      "cloud": "Mikka Cloud",
+      "cloud": "E2B",
       "contextProject": "project: {project}",
       "contextSeparator": ", ",
       "prompt": "Create a task for me: {text}",

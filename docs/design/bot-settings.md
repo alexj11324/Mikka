@@ -105,7 +105,7 @@ called from `workflows/coordinator/agent-kit-steps.ts`), which applies
   CHECKed to be in the allowlist; `"modelPolicyVersion"` is the optimistic lock
   (`drizzle/20261030170000_workspace_model_allowlist.sql`).
 - `bots.model`, `bots.repository`: the owner's choices (columns already exist).
-- `workspace_settings."defaultRepository"` and `"botDefaultsVersion"` (#466)
+- `workspace_settings."defaultRepository"`, and `"botDefaultsVersion"` where #466 (reverted) ran,
   are no longer read or written. They are dropped by a later contract
   migration after this one is deployed everywhere (expand/contract), not here.
 

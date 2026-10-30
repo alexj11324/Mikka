@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import posthog from 'posthog-js'
 import { authClient } from '@/lib/auth-client'
 import { analyticsPath } from '@/lib/analytics-policy'
+import { isSmokeAccountEmail } from '@/lib/smoke-account'
 
 export function PostHogAnalytics() {
   const pathname = usePathname()
@@ -20,6 +21,8 @@ export function PostHogAnalytics() {
       posthog.register({ app: 'mikka', environment: process.env.NODE_ENV, runtime: window.mikka?.app?.runtime === 'electron' ? 'electron' : 'browser' })
     }
     if (userId && posthog.get_distinct_id() !== userId) posthog.identify(userId)
+    // Smoke accounts still load their flags like anyone else; their events are tagged so dashboards can drop them.
+    if (isSmokeAccountEmail(session?.user.email)) posthog.register({ test_account: true })
     previousIdentity.current = userId
     if (!pathname) return
     const pageKey = `${userId ?? 'anonymous'}:${pathname}`
