@@ -64,7 +64,9 @@ scheme is registered.
 
 ## Release
 
-Run the **Desktop release** workflow **from `main`**. There is no version bump
+The **Desktop release** workflow runs by itself on every push to `main` that
+changes `apps/desktop`, `packages/daemon` or `packages/protocol`, and can also
+be run by hand from `main`. There is no version bump
 and no tag to create: the version is the UTC build time, `YYYY.MMDD.HHMM`
 (for example `2026.1030.1834`), stamped into the build, and the release is
 tagged `desktop-<version>` on the built commit. The version in
