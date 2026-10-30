@@ -9,6 +9,8 @@ type Field = keyof BotDefaultsChange
  * field it writes. Only the latest request of a field may commit or roll it
  * back; a rollback restores the last value the server confirmed (seqs are
  * compared, never values, so Codex → Mikka → Codex cannot be confused).
+ * If the latest request failed and rolled back, a late older success still
+ * moves the field to that newly confirmed value.
  */
 export function createBotDefaultsSaver(options: {
   update: BotsSettingsApi['updateDefaults']
@@ -20,6 +22,8 @@ export function createBotDefaultsSaver(options: {
   const latest: Partial<Record<Field, number>> = {}
   const confirmed: BotDefaultsChange = {}
   const confirmedSeq: Partial<Record<Field, number>> = {}
+  // A field whose latest request has already settled shows `confirmed`.
+  const settled: Partial<Record<Field, boolean>> = {}
   const pick = (source: BotDefaultsChange, keys: Field[]) => Object.fromEntries(keys.map(key => [key, source[key]])) as BotDefaultsChange
 
   return {
@@ -30,14 +34,20 @@ export function createBotDefaultsSaver(options: {
     async save(change: BotDefaultsChange) {
       const id = ++seq
       const keys = Object.keys(change) as Field[]
-      for (const key of keys) latest[key] = id
+      for (const key of keys) { latest[key] = id; settled[key] = false }
       options.apply(change)
       const result = await options.update(change)
+      const late: Field[] = []
       if (!result.error) {
         // Any success is server truth for its fields unless a later request already confirmed them.
-        for (const key of keys) if ((confirmedSeq[key] ?? -1) < id) { Object.assign(confirmed, { [key]: result[key] }); confirmedSeq[key] = id }
+        for (const key of keys) if ((confirmedSeq[key] ?? -1) < id) {
+          Object.assign(confirmed, { [key]: result[key] }); confirmedSeq[key] = id
+          if (latest[key] !== id && settled[key]) late.push(key)
+        }
       }
+      if (late.length) options.apply(pick(confirmed, late))
       const mine = keys.filter(key => latest[key] === id)
+      for (const key of mine) settled[key] = true
       if (mine.length === 0) return
       if (result.error) { options.apply(pick(confirmed, mine)); options.onFailed(pick(change, mine)); return }
       options.apply(pick(result, mine))

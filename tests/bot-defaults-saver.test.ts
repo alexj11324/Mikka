@@ -63,3 +63,20 @@ test('saves of different fields never undo each other', async () => {
   await s.answer(1, true); await s.answer(0, false); await s.done()
   assert.equal(s.state.defaultModel, null); assert.equal(s.state.defaultRepository, 'r2')
 })
+
+test('S5b: Claude (latest) fails first, then the older Codex succeeds late → the UI shows Codex, the server value', async () => {
+  const s = setup(); s.save('codex'); s.save('claude')
+  await s.answer(1, false)
+  assert.equal(s.state.defaultModel, null)
+  await s.answer(0, true); await s.done()
+  assert.equal(s.state.defaultModel, 'codex'); assert.deepEqual(s.events.failed, [{ defaultModel: 'claude' }]); assert.equal(s.events.saved, 0)
+})
+
+test('a late older success must not overwrite a newer confirmed value', async () => {
+  const s = setup(); s.save('codex'); s.save('claude')
+  await s.answer(1, true); await s.answer(0, true)
+  assert.equal(s.state.defaultModel, 'claude')
+  s.save('mikka'); await s.answer(2, false); await s.done()
+  // The rollback target is Claude (confirmed by the newer request), not the late Codex.
+  assert.equal(s.state.defaultModel, 'claude'); assert.deepEqual(s.events.failed, [{ defaultModel: 'mikka' }])
+})
