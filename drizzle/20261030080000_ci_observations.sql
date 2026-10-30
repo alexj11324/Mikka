@@ -36,3 +36,21 @@ CREATE TABLE IF NOT EXISTS github_ci_workflow_attempts (
   PRIMARY KEY ("userId","issueId","remoteKey","prNumber","runId"),
   FOREIGN KEY ("userId","issueId","remoteKey","prNumber") REFERENCES github_ci_observations ("userId","issueId","remoteKey","prNumber") ON DELETE CASCADE
 );
+-- Cost bound: one row per automatic resume, keyed by (task, PR, head SHA,
+-- check-set fingerprint) so a CI result resumes a session at most once; the
+-- per-task rolling-24h cap counts these rows. A follow-up retired before any
+-- claim deletes its row. Survives observation deletion so a reset watch cannot
+-- reset the cap.
+CREATE TABLE IF NOT EXISTS github_ci_resumes (
+  "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  "issueId" uuid NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+  "remoteKey" text NOT NULL,
+  "prNumber" integer NOT NULL CHECK ("prNumber" > 0),
+  head text NOT NULL,
+  fingerprint text NOT NULL,
+  "runId" uuid,
+  "createdAt" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("userId","issueId","remoteKey","prNumber",head,fingerprint)
+);
+CREATE INDEX IF NOT EXISTS github_ci_resumes_task_idx ON github_ci_resumes ("userId","issueId","createdAt");
+CREATE INDEX IF NOT EXISTS github_ci_resumes_run_idx ON github_ci_resumes ("runId");

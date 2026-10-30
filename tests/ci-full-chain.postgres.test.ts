@@ -112,6 +112,8 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     assert.ok(child)
     assert.match(child.ciContinuation.followUp, /build/)
     assert.equal(child.ciContinuation.originSessionId, 'synthetic-original-session')
+    // The resume holds one budget row for this exact (task, PR, head, result).
+    assert.deepEqual((await fixture.query('SELECT "runId",head,fingerprint FROM github_ci_resumes')).rows, [{ runId: child.id, head: sha, fingerprint: child.ciContinuation.fingerprint }])
     const { preflightCiClaim, guardCiClaim, retryUnsentCiClaim, retireStaleCiRun } = await import('../lib/ci-continuation')
     const preflight = await preflightCiClaim(owner, child.ciContinuation)
     assert.equal(preflight.kind, 'valid')
@@ -154,6 +156,8 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     assert.equal(rerunStale.kind, 'stale')
     if (rerunStale.kind !== 'stale') throw Error('rerun was not rejected')
     assert.equal(await retireStaleCiRun(owner, child.id, child.ciContinuation, rerunStale.generation), true)
+    // Retired before any claim: no model call was spent, so its budget is released.
+    assert.equal((await fixture.query('SELECT count(*)::int n FROM github_ci_resumes WHERE "runId"=$1', [child.id])).rows[0].n, 0)
     await fixture.query('UPDATE github_ci_observations SET "nextCheckAt"=now()')
     assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).pending, 1)
     await fixture.query(`UPDATE github_ci_observations SET "firstSeenAt"=now()-interval '5 minutes',"nextCheckAt"=now()`)

@@ -84,6 +84,7 @@ export async function retireStaleCiRun(userId: string, runId: string, expected: 
     const { rows: [observation] } = await tx.query('SELECT generation FROM github_ci_observations WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4 FOR UPDATE', [userId, expected.issueId, expected.remoteKey, expected.prNumber])
     if ((observation ? String(observation.generation) : null) !== generation) return false
     const result = await tx.query(`UPDATE agent_runs SET status='stopped',"stopReason"='superseded',error='CI result changed before the follow-up started.',"finishedAt"=now(),"updatedAt"=now() WHERE id=$1 AND "userId"=$2 AND status='queued' AND "stopRequestedAt" IS NULL AND "ciContinuation"=$3::jsonb RETURNING id`, [runId, userId, JSON.stringify(expected)])
+    if (result.rowCount) await releaseCiResumes(tx, [runId])
     if (result.rowCount && observation) await tx.query(`UPDATE github_ci_observations SET "deliveredFingerprint"=CASE WHEN "deliveredFingerprint"=$5 THEN NULL ELSE "deliveredFingerprint" END, "nextCheckAt"=now(),generation=generation+1,"updatedAt"=now() WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4`, [userId, expected.issueId, expected.remoteKey, expected.prNumber, expected.fingerprint])
     return Boolean(result.rowCount)
   })
@@ -124,11 +125,18 @@ export async function retireSupersededCiRuns(tx: PoolClient, userId: string, cur
       AND "ciContinuation"->>'remoteKey'=$3 AND "ciContinuation"->>'prNumber'=$4
       AND ("ciContinuation"->>'head' IS DISTINCT FROM $5 OR ($6::text IS NOT NULL AND "ciContinuation"->>'fingerprint' IS DISTINCT FROM $6))
     RETURNING id`, [userId, current.issueId, current.remoteKey, String(current.prNumber), current.head, current.fingerprint])
+  if (result.rowCount) await releaseCiResumes(tx, result.rows.map(row => row.id))
   return result.rowCount ?? 0
 }
 
+/** A retired follow-up was never claimed, so it spent no model call: give its
+ * resume budget back (lib/github/ci/budget.ts). */
+async function releaseCiResumes(tx: PoolClient, runIds: string[]) {
+  await tx.query('DELETE FROM github_ci_resumes WHERE "runId" = ANY($1)', [runIds])
+}
+
 /** Kill switch at claim: with MIKKA_CI_RESUME_ENABLED off, an already-queued CI
- * follow-up is stopped instead of reaching a model. */
+ * follow-up is stopped instead of reaching a model. Its budget row is kept. */
 export async function retireDisabledCiRun(userId: string, runId: string) {
   const result = await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='superseded',error='CI resume is disabled.',"finishedAt"=now(),"updatedAt"=now()
     WHERE id=$1 AND "userId"=$2 AND status='queued' AND "stopRequestedAt" IS NULL AND "ciContinuation" IS NOT NULL RETURNING id`, [runId, userId])

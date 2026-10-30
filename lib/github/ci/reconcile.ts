@@ -9,6 +9,7 @@ import { summarize } from './snapshot'
 import { observe, type Observation } from './observation'
 import { publicationPrNumber } from './register'
 import { listCiWorkflowAttempts } from './attempts'
+import { bindCiResume, reserveCiResume } from './budget'
 
 const QUIET_MS = 2 * 60_000
 const NEXT_MS = 15 * 60_000
@@ -25,7 +26,7 @@ type Row = {
 export type CiFollowUp = { originRunId: string; issueId: string; remoteKey: string; prNumber: number; scopeVersion: number; head: string; fingerprint: string; followUp: string }
 type Delivery = (tx: PoolClient, userId: string, input: CiFollowUp) => Promise<unknown>
 type Retire = (tx: PoolClient, userId: string, input: { issueId: string; remoteKey: string; prNumber: number; head: string | null; fingerprint: string | null }) => Promise<number>
-export type CiReconcileResult = { scanned: number; queued: number; pending: number; closed: number; failed: number; escalated: number }
+export type CiReconcileResult = { scanned: number; queued: number; pending: number; closed: number; failed: number; escalated: number; deduped: number; capped: number }
 
 /** Keep provider data in a bounded JSON value; never splice a JSON string mid-escape. */
 export function ciFollowUp(head: string, outcome: 'success' | 'failure', failed: readonly string[]): string {
@@ -41,12 +42,13 @@ export function ciFollowUp(head: string, outcome: 'success' | 'failure', failed:
 
 /** Provider I/O occurs outside locks. A short transaction revalidates the
  * binding and event generation before enqueue; claim re-reads GitHub again. */
-export async function reconcileCi(options: { pool: Pool; deadline: number; limit?: number; read?: typeof readCi; deliver?: Delivery; now?: () => number; lockPolicy?: typeof lockCliAgentPolicy; wake?: (userId: string) => Promise<void>; retire?: Retire; listAttempts?: typeof listCiWorkflowAttempts; recoverAttempts?: typeof readPendingCiAttempts }): Promise<CiReconcileResult> {
-  const result: CiReconcileResult = { scanned: 0, queued: 0, pending: 0, closed: 0, failed: 0, escalated: 0 }
+export async function reconcileCi(options: { pool: Pool; deadline: number; limit?: number; read?: typeof readCi; deliver?: Delivery; now?: () => number; lockPolicy?: typeof lockCliAgentPolicy; wake?: (userId: string) => Promise<void>; retire?: Retire; reserve?: typeof reserveCiResume; listAttempts?: typeof listCiWorkflowAttempts; recoverAttempts?: typeof readPendingCiAttempts }): Promise<CiReconcileResult> {
+  const result: CiReconcileResult = { scanned: 0, queued: 0, pending: 0, closed: 0, failed: 0, escalated: 0, deduped: 0, capped: 0 }
   const read = options.read ?? readCi
   const deliver: Delivery = options.deliver ?? (async (tx, userId, input) => (await import('@/lib/ci-continuation')).queueCiContinuation(tx, userId, input))
   const retire: Retire = options.retire ?? (async (tx, userId, input) => (await import('@/lib/ci-continuation')).retireSupersededCiRuns(tx, userId, input))
   const listAttempts = options.listAttempts ?? listCiWorkflowAttempts
+  const reserve = options.reserve ?? reserveCiResume
   const limit = Math.min(LIMIT, Math.max(0, options.limit ?? LIMIT))
   const now = options.now ?? Date.now
   const visited: string[] = []
@@ -149,7 +151,7 @@ export async function reconcileCi(options: { pool: Pool; deadline: number; limit
       const decision = observe(previous, current.head, summary, now(), QUIET_MS)
       let delivered = retired > 0 && row.head === current.head && summary.kind === 'complete' && row.deliveredFingerprint === summary.fingerprint
         ? null : decision.state?.deliveredFingerprint ?? (row.head === current.head ? row.deliveredFingerprint : null)
-      let queued = false, escalated = false, wakeAfterCommit = false
+      let queued = false, escalated = false, wakeAfterCommit = false, skipped: 'duplicate' | 'capped' | null = null
       const escalationKey = summary.kind === 'complete' ? `ci_escalation:${createHash('sha256').update(JSON.stringify([row.userId, row.issueId, row.remoteKey, row.prNumber, current.head, summary.fingerprint])).digest('hex')}` : null
       if (decision.deliver && summary.kind === 'complete') {
         const followUp = ciFollowUp(current.head, summary.outcome, summary.failed)
@@ -162,8 +164,16 @@ export async function reconcileCi(options: { pool: Pool; deadline: number; limit
           escalated = Boolean(inserted.rowCount)
           wakeAfterCommit = escalated
         } else {
-          await deliver(tx, row.userId, { originRunId: row.originRunId, issueId: row.issueId, remoteKey: row.remoteKey, prNumber: row.prNumber, scopeVersion: row.scopeVersion, head: current.head, fingerprint: summary.fingerprint, followUp })
-          queued = true
+          // Cost bound (lib/github/ci/budget.ts): one resume per exact CI
+          // result and a per-task daily cap; the issue lock above serializes it.
+          const key = { userId: row.userId, issueId: row.issueId, remoteKey: row.remoteKey, prNumber: row.prNumber, head: current.head, fingerprint: summary.fingerprint }
+          const budget = await reserve(tx, key)
+          if (budget === 'reserved') {
+            const queuedRun = await deliver(tx, row.userId, { originRunId: row.originRunId, issueId: row.issueId, remoteKey: row.remoteKey, prNumber: row.prNumber, scopeVersion: row.scopeVersion, head: current.head, fingerprint: summary.fingerprint, followUp })
+            const runId = queuedRun && typeof queuedRun === 'object' && 'runId' in queuedRun && typeof queuedRun.runId === 'string' ? queuedRun.runId : null
+            if (runId) await bindCiResume(tx, key, runId)
+            queued = true
+          } else skipped = budget
         }
         delivered = summary.fingerprint
       }
@@ -172,10 +182,12 @@ export async function reconcileCi(options: { pool: Pool; deadline: number; limit
         const pendingEvent = await tx.query('SELECT id FROM coordinator_events WHERE "dedupeKey"=$1 AND "userId"=$2 AND "deliveredAt" IS NULL LIMIT 1', [escalationKey, row.userId])
         wakeAfterCommit = Boolean(pendingEvent.rowCount)
       }
-      await tx.query('UPDATE github_ci_observations SET head=$5,fingerprint=$6,"firstSeenAt"=$7,"deliveredFingerprint"=$8,"nextCheckAt"=now()+($9 * interval \'1 millisecond\'),"lastError"=NULL,"updatedAt"=now() WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4', [row.userId, row.issueId, row.remoteKey, row.prNumber, current.head, decision.state?.fingerprint ?? null, decision.state ? new Date(decision.state.firstSeenAt) : null, delivered, NEXT_MS])
+      await tx.query('UPDATE github_ci_observations SET head=$5,fingerprint=$6,"firstSeenAt"=$7,"deliveredFingerprint"=$8,"nextCheckAt"=now()+($9 * interval \'1 millisecond\'),"lastError"=$10,"updatedAt"=now() WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4', [row.userId, row.issueId, row.remoteKey, row.prNumber, current.head, decision.state?.fingerprint ?? null, decision.state ? new Date(decision.state.firstSeenAt) : null, delivered, NEXT_MS, skipped === 'capped' ? 'resume_cap_reached' : null])
       await tx.query('COMMIT')
       if (queued) result.queued++
       else if (escalated) result.escalated++
+      else if (skipped === 'duplicate') result.deduped++
+      else if (skipped === 'capped') result.capped++
       else result.pending++
       if (wakeAfterCommit) {
         // The durable event is committed before the Coordinator is awakened.

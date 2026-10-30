@@ -23,12 +23,15 @@ try {
   await pool.query(`CREATE TABLE issues (id text PRIMARY KEY,"scopeVersion" integer NOT NULL);
     CREATE TABLE agent_runs (id text PRIMARY KEY,"userId" text,"issueId" text,"ciContinuation" jsonb,"agentId" text,"deviceRepoId" text,"botId" text,"deviceId" text,status text,"stopRequestedAt" timestamptz,"agentDefinition" jsonb,"sessionId" text,"stopReason" text,error text,"finishedAt" timestamptz,"updatedAt" timestamptz,"leaseExpiresAt" timestamptz);
     CREATE TABLE run_tokens ("runId" text,"userId" text,"revokedAt" timestamptz);
-    CREATE TABLE github_ci_observations ("userId" text,"issueId" text,"remoteKey" text,"prNumber" integer,"originRunId" text,"scopeVersion" integer,head text,fingerprint text,"expiresAt" timestamptz,generation bigint,"deliveredFingerprint" text,"nextCheckAt" timestamptz,"updatedAt" timestamptz, PRIMARY KEY ("userId","issueId","remoteKey","prNumber"));`)
+    CREATE TABLE github_ci_observations ("userId" text,"issueId" text,"remoteKey" text,"prNumber" integer,"originRunId" text,"scopeVersion" integer,head text,fingerprint text,"expiresAt" timestamptz,generation bigint,"deliveredFingerprint" text,"nextCheckAt" timestamptz,"updatedAt" timestamptz, PRIMARY KEY ("userId","issueId","remoteKey","prNumber"));
+    CREATE TABLE github_ci_resumes ("userId" text,"issueId" text,"remoteKey" text,"prNumber" integer,head text,fingerprint text,"runId" text,"createdAt" timestamptz DEFAULT now());`)
   await pool.query(`INSERT INTO issues VALUES ('issue',1);
     INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceRepoId","deviceId",status,"agentDefinition","sessionId") VALUES ('origin','owner','issue','agent','repo','device','succeeded','{"definitionDigest":"same"}','session');
     INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceRepoId","deviceId",status,"agentDefinition") VALUES ('child','owner','issue','agent','repo','device','queued','{"definitionDigest":"same"}');`)
   await pool.query('UPDATE agent_runs SET "ciContinuation"=$1 WHERE id=$2', [JSON.stringify(c), 'child'])
   await pool.query(`INSERT INTO github_ci_observations ("userId","issueId","remoteKey","prNumber","originRunId","scopeVersion",head,fingerprint,"expiresAt",generation,"deliveredFingerprint") VALUES ('owner','issue',$1,12,'origin',1,$2,$3,now()+interval '1 hour',4,$3)`, [c.remoteKey, c.head, c.fingerprint])
+  await pool.query(`INSERT INTO github_ci_resumes VALUES ('owner','issue',$1,12,$2,$3,'child',now()),('owner','issue',$1,12,$2,'other-result','unrelated',now())`, [c.remoteKey, c.head, c.fingerprint])
+  const budgetRows = async () => (await pool.query('SELECT "runId" FROM github_ci_resumes ORDER BY "runId"')).rows.map(row => row.runId)
   await t.test('an unsent claim is requeued with provisional token revoked', async () => {
     const lease = new Date(Date.now() + 120_000).toISOString()
     await pool.query(`UPDATE agent_runs SET status='preparing',"leaseExpiresAt"=$1 WHERE id='child'`, [lease])
@@ -50,6 +53,8 @@ try {
       assert.equal(await retireSupersededCiRuns(tx, 'owner', { ...current, fingerprint: null }), 0)
       assert.equal(await retireSupersededCiRuns(tx, 'owner', { ...current, head: 'new-head', fingerprint: null }), 1)
       assert.equal((await tx.query("SELECT status FROM agent_runs WHERE id='child'")).rows[0].status, 'stopped')
+      // Retired before claim: its resume budget is released, others are kept.
+      assert.deepEqual((await tx.query('SELECT "runId" FROM github_ci_resumes')).rows.map(row => row.runId), ['unrelated'])
       await tx.query('ROLLBACK')
     } finally { tx.release() }
   })
@@ -74,7 +79,9 @@ try {
       await tx.query('ROLLBACK')
       assert.equal(await retireStaleCiRun('owner', 'child', c, '4'), false)
       assert.equal((await pool.query("SELECT status FROM agent_runs WHERE id='child'")).rows[0].status, 'queued')
+      assert.deepEqual(await budgetRows(), ['child', 'unrelated'])
       assert.equal(await retireStaleCiRun('owner', 'child', c, '5'), true)
+      assert.deepEqual(await budgetRows(), ['unrelated'])
       assert.equal((await pool.query("SELECT status FROM agent_runs WHERE id='child'")).rows[0].status, 'stopped')
       const observed = (await pool.query('SELECT generation,"deliveredFingerprint" FROM github_ci_observations')).rows[0]
       assert.equal(observed.generation, '6')

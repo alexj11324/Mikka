@@ -20,6 +20,7 @@ function harness(rows: typeof base[]) {
     if (sql.startsWith('SELECT id FROM issues')) return { rows: [{ id: args[0] }], rowCount: 1 }
     if (sql.includes('FOR UPDATE OF o SKIP LOCKED')) { const row = rows.shift(); return { rows: row ? [row] : [], rowCount: row ? 1 : 0 } }
     if (sql.startsWith('SELECT 1 FROM agent_runs')) return { rows: [], rowCount: 0 }
+    if (sql.includes('github_ci_resumes')) { events.push(sql.startsWith('UPDATE') ? `bind:${String(args[6])}` : 'reserve'); return { rows: [{}], rowCount: 1 } }
     if (sql.includes('UPDATE github_ci_observations')) { events.push(sql.includes("'delivery_unavailable'") ? 'backoff' : `observation:${String(args[7])}`); return { rows: [], rowCount: 1 } }
     throw Error(`unexpected SQL: ${sql}`)
   }, release() {} } } } as unknown as Pool
@@ -57,4 +58,25 @@ test('bounded result contains parseable JSON despite hostile check names', () =>
 test('publication receipts cannot watch another repository or noncanonical URL', () => {
   assert.equal(publicationPrNumber(base.remoteKey, base.pullRequest.url), 3)
   for (const url of ['https://github.com/acme/other/pull/3', 'https://github.com/acme/repo/pull/3?x=1', 'https://evil.example/acme/repo/pull/3']) assert.equal(publicationPrNumber(base.remoteKey, url), null)
+})
+
+test('budget: a reserved resume is bound to its queued run; duplicate and capped results never queue and are not retried', async () => {
+  {
+    const { pool, events } = harness([{ ...base }])
+    const result = await reconcileCi({ pool, deadline: Date.now() + 30_000, lockPolicy: (async () => ({})) as never, listAttempts: async () => [], retire: async () => 0, now: () => 200_000, read: async () => ({ head: base.head, open: true, snapshot }), deliver: async () => ({ runId: 'queued-run' }) })
+    assert.equal(result.queued, 1)
+    assert.ok(events.indexOf('reserve') < events.indexOf('bind:queued-run'))
+  }
+  for (const outcome of ['duplicate', 'capped'] as const) {
+    const { pool, events } = harness([{ ...base }])
+    const reserved: unknown[] = []
+    const result = await reconcileCi({ pool, deadline: Date.now() + 30_000, lockPolicy: (async () => ({})) as never, listAttempts: async () => [], retire: async () => 0, now: () => 200_000, read: async () => ({ head: base.head, open: true, snapshot }),
+      reserve: async (_tx, key) => { reserved.push(key); return outcome }, deliver: async () => { throw Error('must not queue') } })
+    assert.deepEqual(reserved, [{ userId: 'owner', issueId: 'issue', remoteKey: base.remoteKey, prNumber: 3, head: base.head, fingerprint }])
+    assert.equal(result.queued, 0)
+    assert.equal(result[outcome === 'duplicate' ? 'deduped' : 'capped'], 1)
+    // Marked delivered (so it is not retried every pass) and committed.
+    assert.ok(events.includes(`observation:${fingerprint}`))
+    assert.ok(events.includes('COMMIT'))
+  }
 })
