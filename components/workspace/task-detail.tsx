@@ -12,7 +12,7 @@ import { IssueRelations } from './issue-relations'
 import type { MetadataRequest } from './issue-metadata-controls'
 import { toast } from 'sonner'
 import { getDeletedIssue, listIssueConnections, setIssueDeleted } from '@/app/actions/issue-operations'
-import { getIssue, saveIssue, listIssueVersions } from '@/app/actions/issues'
+import { getIssue, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
 import { IssueEditor, createDocumentSeed } from './issue-editor'
 import { DocumentSync } from '@/lib/document-sync'
 import { useActionError } from '@/lib/use-action-error'
@@ -29,7 +29,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
 
-type Issue = Awaited<ReturnType<typeof getIssue>>
+type Issue = IssueView
+
+// No access and deleted come back as an action error; SWR's error state renders UnavailableIssue.
+async function loadIssue(id: string) {
+  const result = await getIssue(id)
+  if (result.error) throw new Error(result.error)
+  return result.issue
+}
 type WorkspaceUser = { id: string; name: string; email: string }
 type DetailProps = { navigation: IssueDetailNavigation; workspaceName: string; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
 
@@ -52,7 +59,7 @@ function subscribeWide(onChange: () => void) {
 export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
   const t = useTranslations('Workspace.detail')
   const [loadedId, setLoadedId] = useState<string | null>(null)
-  const { data, error, mutate } = useSWR(['issue', id], () => getIssue(id), { revalidateOnFocus: false, revalidateOnMount: true, dedupingInterval: 0, onSuccess: () => setLoadedId(id) })
+  const { data, error, mutate } = useSWR(['issue', id], () => loadIssue(id), { revalidateOnFocus: false, revalidateOnMount: true, dedupingInterval: 0, onSuccess: () => setLoadedId(id) })
   if (error) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
   if (!data || loadedId !== id) return <div role="status" aria-label={t('reading')} className="mx-auto flex w-full max-w-170 flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
   return <SectionBoundary key={id} onClose={props.onClose}><TaskForm initial={data} {...props} /></SectionBoundary>
@@ -244,7 +251,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
       {threadPanel ? <div className="flex h-full w-108 flex-col">{threadPanel}</div> : <div className="w-80 overflow-y-auto px-6 py-10"><SectionBoundary onClose={onClose}>{properties}</SectionBoundary></div>}
     </div>}
     {!wide && threadPanel && <div className="fixed inset-0 z-30 flex flex-col bg-background">{threadPanel}</div>}
-    <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await getIssue(saved.id)) }} /></DialogContent></Dialog>
+    <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await loadIssue(saved.id)) }} /></DialogContent></Dialog>
     <IssueDescriptionHistory open={history} onOpenChange={setHistory} identifier={saved.identifier} title={title} currentContent={content} versions={versions} loadingError={!!historyError} onRetry={() => { void refreshVersions() }} onRestore={restore} />
   </div>
 }

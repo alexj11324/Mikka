@@ -64,6 +64,9 @@ more than once.
 - [ ] Greys are pure neutral; no slate, zinc or teal tint (R-30, R-38).
 - [ ] Only the allowed text styles and radii (R-32, R-33).
 - [ ] Status colours from the StatusBadge set (R-34).
+- [ ] Every device, agent, model, app and account name has its icon in
+      front of it; brand marks are bare colored logos, not in a white
+      circle (R-74).
 
 ### Layout against Figma
 

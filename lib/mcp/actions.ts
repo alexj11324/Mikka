@@ -15,7 +15,7 @@ import { agentRuns, agents, coordinatorSessions, devices, issueMembers, issues, 
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import type { IssueLabel } from '@/lib/issue-metadata'
 import { readIssueMetadata } from '@/lib/issue-metadata'
-import { getIssue as readIssue, saveIssue } from '@/app/actions/issues'
+import { getIssue, saveIssue } from '@/app/actions/issues'
 import { updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issue-metadata'
 import { updateIssueRelation } from '@/app/actions/issue-operations'
 import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
@@ -67,7 +67,7 @@ interface IssueChanges {
 
 /** Applies the changes one action at a time, each on the revision the last one left. */
 async function applyChanges(userId: string, issueId: string, changes: IssueChanges) {
-  let issue = await readIssue(issueId)
+  let issue = unwrap(await getIssue(issueId)).issue
   // Historical invitations do not grant personal-task or revoked workspace
   // access. Check the proposed person's effective access before any mutation.
   if (changes.assigneeUserId && !await issueForUser(changes.assigneeUserId, issue.id)) throw new ActionFailureError('memberNotJoined')
@@ -135,7 +135,7 @@ export async function updateIssue(userId: string, input: IssueChanges & { issueI
 
 export async function linkIssues(userId: string, input: { issueId: string; kind: 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'; targetId: string | null; remove?: boolean }, actor?: ActivityActor) {
   return attempt(() => actAs(userId, async () => {
-    const issue = await readIssue(input.issueId)
+    const issue = unwrap(await getIssue(input.issueId)).issue
     const saved = unwrap(await updateIssueRelation({ id: issue.id, revision: issue.revision, kind: input.kind, targetId: input.targetId, remove: input.remove ?? false })).issue
     return issueResult(saved)
   }, actor))
