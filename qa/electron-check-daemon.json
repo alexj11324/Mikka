@@ -1,0 +1,52 @@
+{
+ "addFileButtons": [
+  [
+   346,
+   884,
+   338,
+   false
+  ],
+  [
+   352,
+   895,
+   32,
+   false
+  ]
+ ],
+ "fileChooser": {
+  "multiple": true
+ },
+ "device": {
+  "status": "online",
+  "deviceId": "b79e00f7-49d1-44f7-a6e0-bfc030c8a3da",
+  "workspaceId": null,
+  "signedIn": true,
+  "server": "offline"
+ },
+ "quota": {
+  "observedAt": "2026-10-30T13:29:25.753Z",
+  "n": 3
+ },
+ "settingsHasLocal": true,
+ "computersText": "Q\nQA 桌面的工作区\n返回应用\n个人\n账户\n安全\n偏好设置\n通知\n记忆与建议\n连接\n模型与额度\n登录与密钥\n数据与隐私\n活动\n设备\n工作区\n常规\n成员\n团队\n团队权限\n你的团队\n创建团队\n设备\n连接设备\n本机\n在线\nvm\n\n这个分区还在设计中，暂时没有可用的操作。",
+ "boardUrl": "http://localhost:3100/mikka",
+ "afterReload": {
+  "url": "http://localhost:3100/mikka",
+  "current": "主页"
+ },
+ "zoomed": {
+  "inner": [
+   1200,
+   800
+  ],
+  "menuBottom": 787.9947700500488,
+  "scrollH": 800
+ },
+ "secondInstance": {
+  "exit": 0,
+  "ms": 392,
+  "windowsInFirst": 1
+ },
+ "errors": [],
+ "mainLogs": []
+}

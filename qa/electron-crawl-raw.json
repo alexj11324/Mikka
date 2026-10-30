@@ -1,0 +1,2923 @@
+{
+ "pages": {
+  "主页": {
+   "url": "/mikka",
+   "items": [
+    {
+     "role": "button",
+     "name": "后退",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "前进",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "全局搜索",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "浏览器",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "主页",
+     "result": "navigated /mikka?section=coordinator"
+    },
+    {
+     "role": "button",
+     "name": "建议",
+     "result": "navigated /mikka?section=suggestions"
+    },
+    {
+     "role": "button",
+     "name": "看板",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "插件",
+     "result": "navigated /mikka?section=plugins"
+    },
+    {
+     "role": "button",
+     "name": "产物",
+     "result": "navigated /mikka?section=artifacts"
+    },
+    {
+     "role": "button",
+     "name": "工作区菜单",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "收起 Bot 列表",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "新建 Bot",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Coordinator",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "展开或收起侧栏边轨",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "textbox",
+     "name": "",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "添加文件",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "textbox",
+     "name": "给 Coordinator 发消息",
+     "result": "typed"
+    },
+    {
+     "role": "button",
+     "name": "发送",
+     "result": "disabled"
+    },
+    {
+     "role": "tab",
+     "name": "概览",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "tab",
+     "name": "全部线程",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "搜索",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "加宽右栏",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "关闭右栏",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "tab",
+     "name": "详情",
+     "result": "dom-changed"
+    },
+    {
+     "role": "tab",
+     "name": "线程",
+     "result": "gone"
+    },
+    {
+     "role": "tab",
+     "name": "PR",
+     "result": "gone"
+    }
+   ]
+  },
+  "section-suggestions": {
+   "url": "/mikka?section=suggestions",
+   "items": [
+    {
+     "role": "button",
+     "name": "后退",
+     "result": "navigated /mikka"
+    },
+    {
+     "role": "button",
+     "name": "前进",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "全局搜索",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "浏览器",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "主页",
+     "result": "navigated /mikka?section=coordinator"
+    },
+    {
+     "role": "button",
+     "name": "建议",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "看板",
+     "result": "navigated /mikka"
+    },
+    {
+     "role": "button",
+     "name": "插件",
+     "result": "navigated /mikka?section=plugins"
+    },
+    {
+     "role": "button",
+     "name": "产物",
+     "result": "navigated /mikka?section=artifacts"
+    },
+    {
+     "role": "button",
+     "name": "工作区菜单",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "刷新建议",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "连接应用",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "textbox",
+     "name": "",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "添加文件",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "textbox",
+     "name": "给 Coordinator 发消息",
+     "result": "typed"
+    },
+    {
+     "role": "button",
+     "name": "发送",
+     "result": "disabled"
+    }
+   ]
+  },
+  "section-projects": {
+   "url": "/mikka?section=projects",
+   "items": [
+    {
+     "role": "button",
+     "name": "后退",
+     "result": "navigated /mikka?section=suggestions"
+    },
+    {
+     "role": "button",
+     "name": "前进",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "全局搜索",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "浏览器",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "主页",
+     "result": "navigated /mikka?section=coordinator"
+    },
+    {
+     "role": "button",
+     "name": "建议",
+     "result": "navigated /mikka?section=suggestions"
+    },
+    {
+     "role": "button",
+     "name": "看板",
+     "result": "navigated /mikka"
+    },
+    {
+     "role": "button",
+     "name": "插件",
+     "result": "navigated /mikka?section=plugins"
+    },
+    {
+     "role": "button",
+     "name": "产物",
+     "result": "navigated /mikka?section=artifacts"
+    },
+    {
+     "role": "button",
+     "name": "工作区菜单",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "收起 Bot 列表",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "新建 Bot",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Coordinator",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "展开或收起侧栏边轨",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "新建项目",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "textbox",
+     "name": "搜索项目",
+     "result": "typed"
+    },
+    {
+     "role": "combobox",
+     "name": "筛选项目状态",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "刷新",
+     "result": "disabled"
+    },
+    {
+     "role": "textbox",
+     "name": "地址",
+     "result": "gone"
+    },
+    {
+     "role": "button",
+     "name": "选择元素",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "关闭浏览器",
+     "result": "gone"
+    }
+   ]
+  },
+  "section-plugins": {
+   "url": "/mikka?section=plugins",
+   "items": [
+    {
+     "role": "button",
+     "name": "后退",
+     "result": "navigated /mikka?section=projects"
+    },
+    {
+     "role": "button",
+     "name": "前进",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "全局搜索",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "浏览器",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "主页",
+     "result": "navigated /mikka?section=coordinator"
+    },
+    {
+     "role": "button",
+     "name": "建议",
+     "result": "navigated /mikka?section=suggestions"
+    },
+    {
+     "role": "button",
+     "name": "看板",
+     "result": "navigated /mikka"
+    },
+    {
+     "role": "button",
+     "name": "插件",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "产物",
+     "result": "navigated /mikka?section=artifacts"
+    },
+    {
+     "role": "button",
+     "name": "工作区菜单",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "收起 Bot 列表",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "新建 Bot",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Coordinator",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "展开或收起侧栏边轨",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "tab",
+     "name": "插件",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "tab",
+     "name": "技能",
+     "result": "dom-changed",
+     "errors": [
+      {
+       "ctx": "section-plugins › tab \"技能\"",
+       "kind": "http 503",
+       "text": "GET http://localhost:3100/mikka/api/skills/search"
+      },
+      {
+       "ctx": "section-plugins › tab \"技能\"",
+       "kind": "console.error",
+       "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+      }
+     ]
+    },
+    {
+     "role": "button",
+     "name": "管理设备",
+     "result": "gone"
+    },
+    {
+     "role": "button",
+     "name": "关联 Google",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "刷新 GitHub 状态",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "在设置中管理",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Gmail 重要邮件进建议，发信前要你确认",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "连接",
+     "result": "disabled"
+    },
+    {
+     "role": "link",
+     "name": "打开 Gmail",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Google 日历 查看日程，改动前要你确认",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "打开 Google 日历",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Notion 搜索和阅读你的 Notion 页面",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "打开 Notion",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Slack 搜索消息，阅读讨论串",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "打开 Slack",
+     "result": "skipped-destructive"
+    }
+   ]
+  },
+  "section-artifacts": {
+   "url": "/mikka?section=artifacts",
+   "items": [
+    {
+     "role": "button",
+     "name": "后退",
+     "result": "navigated /mikka?section=plugins"
+    },
+    {
+     "role": "button",
+     "name": "前进",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "全局搜索",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "浏览器",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "主页",
+     "result": "navigated /mikka?section=coordinator"
+    },
+    {
+     "role": "button",
+     "name": "建议",
+     "result": "navigated /mikka?section=suggestions"
+    },
+    {
+     "role": "button",
+     "name": "看板",
+     "result": "navigated /mikka"
+    },
+    {
+     "role": "button",
+     "name": "插件",
+     "result": "navigated /mikka?section=plugins"
+    },
+    {
+     "role": "button",
+     "name": "产物",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "工作区菜单",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "全部",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "文档",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "网页",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "刷新",
+     "result": "disabled"
+    },
+    {
+     "role": "textbox",
+     "name": "地址",
+     "result": "gone"
+    },
+    {
+     "role": "button",
+     "name": "选择元素",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "关闭浏览器",
+     "result": "gone"
+    }
+   ]
+  },
+  "设置-account": {
+   "url": "/mikka/settings?section=account",
+   "items": [
+    {
+     "role": "button",
+     "name": "工作区菜单",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "返回工作台",
+     "result": "navigated /mikka"
+    },
+    {
+     "role": "textbox",
+     "name": "搜索设置",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "账户",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "安全",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "偏好设置",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "通知",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "记忆与建议",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "连接",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "模型与额度",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "登录与密钥",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "数据与隐私",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "活动",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "设备",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "常规",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "成员",
+     "result": "navigated /mikka/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "团队",
+     "result": "navigated /mikka/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "团队权限",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "创建团队",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "textbox",
+     "name": "更换",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "更换",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "textbox",
+     "name": "名称",
+     "result": "typed"
+    },
+    {
+     "role": "button",
+     "name": "保存",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "退出登录",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "删除账户",
+     "result": "skipped-destructive"
+    }
+   ]
+  },
+  "设置-security": {
+   "url": "/mikka/settings?section=security",
+   "items": [
+    {
+     "role": "button",
+     "name": "工作区菜单",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "返回工作台",
+     "result": "navigated /mikka"
+    },
+    {
+     "role": "textbox",
+     "name": "搜索设置",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "账户",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "安全",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "偏好设置",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "通知",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "记忆与建议",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "连接",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "模型与额度",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "登录与密钥",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "数据与隐私",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "活动",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "设备",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "常规",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "成员",
+     "result": "navigated /mikka/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "团队",
+     "result": "navigated /mikka/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "团队权限",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "创建团队",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "修改密码",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "退出",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "全部退出",
+     "result": "gone"
+    },
+    {
+     "role": "button",
+     "name": "关联 Google",
+     "result": "skipped-destructive"
+    }
+   ]
+  },
+  "设置-preferences": {
+   "url": "/mikka/settings?section=preferences",
+   "items": [
+    {
+     "role": "button",
+     "name": "工作区菜单",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "返回工作台",
+     "result": "navigated /mikka"
+    },
+    {
+     "role": "textbox",
+     "name": "搜索设置",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "账户",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "安全",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "偏好设置",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "通知",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "记忆与建议",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "连接",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "模型与额度",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "登录与密钥",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "数据与隐私",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "活动",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "设备",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "常规",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "成员",
+     "result": "navigated /mikka/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "团队",
+     "result": "navigated /mikka/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "团队权限",
+     "result": "navigated /mikka/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "创建团队",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "浅色",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "深色",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "跟随系统",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "简体中文",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "English",
+     "result": "navigated /mikka/en/settings?section=preferences"
+    },
+    {
+     "role": "textbox",
+     "name": "QAEL",
+     "result": "typed"
+    },
+    {
+     "role": "button",
+     "name": "保存",
+     "result": "disabled"
+    }
+   ]
+  },
+  "设置-notifications": {
+   "url": "/mikka/en/settings?section=notifications",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "navigated /mikka/en/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "switch",
+     "name": "Proactive messages",
+     "result": "toggled+restored",
+     "toggled": "true -> false"
+    },
+    {
+     "role": "switch",
+     "name": "Needs your decision",
+     "result": "toggled+restored",
+     "toggled": "true -> false"
+    },
+    {
+     "role": "switch",
+     "name": "Ready for review",
+     "result": "toggled+restored",
+     "toggled": "true -> false"
+    },
+    {
+     "role": "switch",
+     "name": "Thread finished",
+     "result": "toggled+restored",
+     "toggled": "false -> true"
+    },
+    {
+     "role": "switch",
+     "name": "Daily briefing",
+     "result": "toggled+restored",
+     "toggled": "true -> false"
+    },
+    {
+     "role": "button",
+     "name": "Immediately",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "When the computer is away",
+     "result": "no-visible-effect"
+    }
+   ]
+  },
+  "设置-memory": {
+   "url": "/mikka/en/settings?section=memory",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "navigated /mikka/en/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "switch",
+     "name": "Learn from connected apps",
+     "result": "skipped-destructive"
+    }
+   ]
+  },
+  "设置-connections": {
+   "url": "/mikka/en/settings?section=connections",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "gone"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "Refresh GitHub status",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Gmail Important mail in suggestions; sending needs your appr",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Connect",
+     "result": "disabled"
+    },
+    {
+     "role": "link",
+     "name": "Open Gmail",
+     "result": "navigated /mikka/en?section=plugins&app=gmail"
+    },
+    {
+     "role": "link",
+     "name": "Google Calendar Reads your schedule; changes need your appro",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Open Google Calendar",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Notion Search and read your Notion pages",
+     "result": "navigated /mikka/en?section=plugins&app=notion"
+    },
+    {
+     "role": "link",
+     "name": "Open Notion",
+     "result": "navigated /mikka/en?section=plugins&app=notion"
+    },
+    {
+     "role": "link",
+     "name": "Slack Search messages and read threads",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Open Slack",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Connect Linear",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "Generate link",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "Refresh status",
+     "result": "no-visible-effect"
+    }
+   ]
+  },
+  "设置-models": {
+   "url": "/mikka/en/settings?section=models",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "navigated /mikka/en/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    }
+   ]
+  },
+  "设置-logins": {
+   "url": "/mikka/en/settings?section=logins",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "navigated /mikka/en/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "Add a login in a chat",
+     "result": "navigated /mikka/en"
+    }
+   ]
+  },
+  "设置-privacy": {
+   "url": "/mikka/en/settings?section=privacy",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "navigated /mikka/en/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "Export",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Manage",
+     "result": "disabled"
+    }
+   ]
+  },
+  "设置-activity": {
+   "url": "/mikka/en/settings?section=activity",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "navigated /mikka/en/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "All",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "Used my accounts",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "Reminders",
+     "result": "no-visible-effect"
+    }
+   ]
+  },
+  "设置-computers": {
+   "url": "/mikka/en/settings?section=computers",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "navigated /mikka/en/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "Connect device",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "More for vm",
+     "result": "overlay-opened"
+    }
+   ]
+  },
+  "设置-general": {
+   "url": "/mikka/en/settings?section=general",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "navigated /mikka/en/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "textbox",
+     "name": "QA 桌面的工作区",
+     "result": "error",
+     "error": "TimeoutError: locator.fill: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "textbox",
+     "name": "8d58fc27-906d-4419-80a1-f192bfba3378",
+     "result": "error",
+     "error": "TimeoutError: locator.fill: Timeout 5000ms exceeded."
+    }
+   ]
+  },
+  "设置-permissions": {
+   "url": "/mikka/en/settings?section=permissions",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "navigated /mikka/en/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    }
+   ]
+  },
+  "设置-members": {
+   "url": "/mikka/en/settings/members",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "navigated /mikka/en/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "textbox",
+     "name": "Search members or invitations",
+     "result": "typed"
+    },
+    {
+     "role": "combobox",
+     "name": "Filter by member status",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "Export CSV",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Invite members",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Sort names descending",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "Manage QA 桌面",
+     "result": "gone"
+    }
+   ]
+  },
+  "设置-teams": {
+   "url": "/mikka/en/settings/teams",
+   "items": [
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "link",
+     "name": "Back to workspace",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "Search settings",
+     "result": "typed"
+    },
+    {
+     "role": "link",
+     "name": "Account",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=account"
+    },
+    {
+     "role": "link",
+     "name": "Security",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=security"
+    },
+    {
+     "role": "link",
+     "name": "Preferences",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=preferences"
+    },
+    {
+     "role": "link",
+     "name": "Notifications",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=notifications"
+    },
+    {
+     "role": "link",
+     "name": "Memory and suggestions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=memory"
+    },
+    {
+     "role": "link",
+     "name": "Connections",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "link",
+     "name": "Models and quota",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=models"
+    },
+    {
+     "role": "link",
+     "name": "Logins and keys",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=logins"
+    },
+    {
+     "role": "link",
+     "name": "Data and privacy",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=privacy"
+    },
+    {
+     "role": "link",
+     "name": "Activity",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=activity"
+    },
+    {
+     "role": "link",
+     "name": "Devices",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=computers"
+    },
+    {
+     "role": "link",
+     "name": "General",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=general"
+    },
+    {
+     "role": "link",
+     "name": "Members",
+     "result": "navigated /mikka/en/settings/members?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Teams",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378"
+    },
+    {
+     "role": "link",
+     "name": "Team permissions",
+     "result": "navigated /mikka/en/settings?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&section=permissions"
+    },
+    {
+     "role": "link",
+     "name": "Create team",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "Toggle Sidebar",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "textbox",
+     "name": "Could not save the team. The identifier may already be in us",
+     "result": "typed"
+    },
+    {
+     "role": "combobox",
+     "name": "Team scope",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "Export teams CSV",
+     "result": "skipped-destructive"
+    },
+    {
+     "role": "button",
+     "name": "New team",
+     "result": "navigated /mikka/en/settings/teams?workspace=8d58fc27-906d-4419-80a1-f192bfba3378&create=1"
+    }
+   ]
+  },
+  "dashboard": {
+   "url": "/mikka/en",
+   "items": [
+    {
+     "role": "button",
+     "name": "Back",
+     "result": "navigated /mikka/en/settings/teams"
+    },
+    {
+     "role": "button",
+     "name": "Forward",
+     "result": "disabled"
+    },
+    {
+     "role": "button",
+     "name": "Search everything",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "Browser",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "Home",
+     "result": "navigated /mikka/en?section=coordinator"
+    },
+    {
+     "role": "button",
+     "name": "Suggestions",
+     "result": "navigated /mikka/en?section=suggestions"
+    },
+    {
+     "role": "button",
+     "name": "Board",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "Plugins",
+     "result": "navigated /mikka/en?section=plugins"
+    },
+    {
+     "role": "button",
+     "name": "Artifact",
+     "result": "navigated /mikka/en?section=artifacts"
+    },
+    {
+     "role": "button",
+     "name": "Workspace menu",
+     "result": "overlay-opened"
+    },
+    {
+     "role": "button",
+     "name": "Collapse bot list",
+     "result": "dom-changed"
+    },
+    {
+     "role": "button",
+     "name": "New bot",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "Coordinator",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "Expand or collapse the sidebar rail",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "textbox",
+     "name": "",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "Add file",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "textbox",
+     "name": "Message the Coordinator",
+     "result": "typed"
+    },
+    {
+     "role": "button",
+     "name": "Send",
+     "result": "disabled"
+    },
+    {
+     "role": "tab",
+     "name": "Overview",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "tab",
+     "name": "All threads",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "Search",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "Widen panel",
+     "result": "no-visible-effect"
+    },
+    {
+     "role": "button",
+     "name": "Close panel",
+     "result": "error",
+     "error": "TimeoutError: locator.click: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "tab",
+     "name": "Details",
+     "result": "dom-changed"
+    },
+    {
+     "role": "tab",
+     "name": "Threads",
+     "result": "gone"
+    },
+    {
+     "role": "tab",
+     "name": "PRs",
+     "result": "gone"
+    }
+   ]
+  },
+  "device": {
+   "url": "/mikka/en/device",
+   "items": [
+    {
+     "role": "link",
+     "name": "Mikka home",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "ABCD-EFGH",
+     "result": "typed"
+    },
+    {
+     "role": "button",
+     "name": "Continue",
+     "result": "disabled"
+    }
+   ]
+  },
+  "workspaces/new": {
+   "url": "/mikka/en/workspaces/new",
+   "items": [
+    {
+     "role": "link",
+     "name": "Back",
+     "result": "navigated /mikka/en"
+    },
+    {
+     "role": "textbox",
+     "name": "For example: Product development",
+     "result": "typed"
+    },
+    {
+     "role": "textbox",
+     "name": "design-team",
+     "result": "typed"
+    },
+    {
+     "role": "textbox",
+     "name": "United States (Ohio)",
+     "result": "error",
+     "error": "TimeoutError: locator.fill: Timeout 5000ms exceeded."
+    },
+    {
+     "role": "button",
+     "name": "Create workspace",
+     "result": "disabled"
+    }
+   ]
+  }
+ },
+ "desktop": {
+  "webPreferences": {
+   "contextIsolation": true,
+   "sandbox": true,
+   "nodeIntegration": false,
+   "nodeIntegrationInSubFrames": false,
+   "webviewTag": false,
+   "webSecurity": true,
+   "title": "Mikka · 任务与文档工作台",
+   "menuBarVisible": false,
+   "minSize": [
+    900,
+    600
+   ]
+  },
+  "renderer": {
+   "require": "undefined",
+   "process": "undefined",
+   "module": "undefined",
+   "Buffer": "undefined",
+   "ipcRenderer": "undefined",
+   "electron": "undefined",
+   "bridgeKeys": [
+    "app",
+    "notifications",
+    "device",
+    "quota"
+   ],
+   "appKeys": [
+    "version",
+    "flavor",
+    "runtime",
+    "serverUrl",
+    "zeroUrl",
+    "openExternal",
+    "prepareAuth"
+   ],
+   "runtime": "electron",
+   "flavor": "dev",
+   "version": "0.1.2",
+   "serverUrl": "http://localhost:3100/mikka",
+   "platformAttr": "linux",
+   "overwriteRuntime": "electron"
+  },
+  "iframe": {
+   "mikkaInIframe": "undefined"
+  },
+  "device": {
+   "status": "offline",
+   "deviceId": null,
+   "workspaceId": null,
+   "signedIn": false,
+   "server": null
+  },
+  "quota": {
+   "observedAt": null,
+   "vendors": [
+    "claude_code:unknown",
+    "codex:unknown",
+    "cursor:unknown"
+   ]
+  },
+  "openExternal": {
+   "https://example.com/x": "rejected: Error invoking remote method 'mikka:app:open-external': Error: openExternal accepts only app-origin HTTP(S) URLs | opened=[]",
+   "http://localhost:3100/mikka/sign-in": "resolved | opened=[\"http://localhost:3100/mikka/sign-in\"]",
+   "file:///etc/passwd": "rejected: Error invoking remote method 'mikka:app:open-external': Error: openExternal accepts only app-origin HTTP(S) URLs | opened=[]",
+   "javascript:alert(1)": "rejected: Error invoking remote method 'mikka:app:open-external': Error: openExternal accepts only app-origin HTTP(S) URLs | opened=[]",
+   "http://evil.example/": "rejected: Error invoking remote method 'mikka:app:open-external': Error: openExternal accepts only app-origin HTTP(S) URLs | opened=[]"
+  },
+  "prepareAuth": {
+   "short": "rejected Error invoking remote method 'mikka:app:prepare-auth': Error: prepareAuth needs a desktop nonce",
+   "AAAAAAAAAAAAAAAAAAAA": "resolved http://127.0.0.1:38977/auth/callback",
+   "../../etc/passwd_xxxxxxx": "rejected Error invoking remote method 'mikka:app:prepare-auth': Error: prepareAuth needs a desktop nonce"
+  },
+  "loopback": {
+   "wrongPath": 404,
+   "badState": 400,
+   "afterBadStateClosed": "closed"
+  },
+  "windowOpenExternal": "null",
+  "windowOpenExternalOpened": [
+   "https://example.com/from-window-open"
+  ],
+  "locationExternal": {
+   "url": "http://localhost:3100/mikka",
+   "stayed": true,
+   "opened": [
+    "https://example.com/from-location"
+   ]
+  },
+  "locationHttpExternal": {
+   "url": "http://localhost:3100/mikka",
+   "opened": []
+  },
+  "windowOpenSameOrigin": [
+   {
+    "url": "http://localhost:3100/mikka/settings?section=preferences",
+    "parent": true,
+    "menu": false
+   },
+   {
+    "url": "http://localhost:3100/mikka",
+    "parent": false,
+    "menu": false
+   }
+  ],
+  "childBridge": {
+   "mikka": "object",
+   "platform": "linux"
+  },
+  "windowCountBefore": 1,
+  "notification": {
+   "supported": false,
+   "badgeBefore": 0
+  },
+  "notifyShow": "resolved",
+  "notifyInvalid": "rejected Error invoking remote method 'mikka:notifications:show': [\n  {\n    \"origin\": \"string\",\n    \"code\": \"invalid_format\",\n    \"format\": \"regex\",\n    \"pattern\": \"/^\\\\",
+  "badge": [
+   "3:ok",
+   "-1:rejected",
+   "1.5:rejected",
+   "x:rejected",
+   "100000:rejected"
+  ],
+  "badgeAfter": 3,
+  "pendingClick": null,
+  "notificationClickRoutes": "http://localhost:3100/mikka",
+  "protocol": {
+   "mikka": false,
+   "name": "Mikka Dev",
+   "version": "0.1.2",
+   "locale": "zh-CN",
+   "electron": "45.1.0",
+   "chrome": "156.0.8078.49",
+   "packaged": false
+  },
+  "menu": [
+   {
+    "label": "Edit",
+    "sub": [
+     "Undo",
+     "Redo",
+     null,
+     "Cut",
+     "Copy",
+     "Paste",
+     "Select All"
+    ]
+   },
+   {
+    "label": "View",
+    "sub": [
+     "Reload",
+     "Actual Size",
+     "Zoom In",
+     "Zoom Out",
+     "Force Reload",
+     "Toggle Developer Tools"
+    ]
+   }
+  ],
+  "zoom": {
+   "before": 0,
+   "afterCtrlEquals": 0.5,
+   "afterResetMenu": 0.5
+  },
+  "headers": 200,
+  "rail": {
+   "label": "主导航",
+   "items": [
+    {
+     "text": "主页",
+     "w": 60,
+     "textW": 24,
+     "overflow": false,
+     "current": "page"
+    },
+    {
+     "text": "建议",
+     "w": 60,
+     "textW": 24,
+     "overflow": false,
+     "current": null
+    },
+    {
+     "text": "看板",
+     "w": 60,
+     "textW": 24,
+     "overflow": false,
+     "current": null
+    },
+    {
+     "text": "插件",
+     "w": 60,
+     "textW": 24,
+     "overflow": false,
+     "current": null
+    },
+    {
+     "text": "产物",
+     "w": 60,
+     "textW": 24,
+     "overflow": false,
+     "current": null
+    },
+    {
+     "text": "Q\nQA 桌面的工作区",
+     "w": 36,
+     "textW": 1,
+     "overflow": true,
+     "current": null
+    }
+   ]
+  },
+  "windowBar": {
+   "h": 43.98896408081055,
+   "display": "grid",
+   "appRegion": "none"
+  },
+  "avatar": [],
+  "railShot": "01-rail-home.png"
+ },
+ "railNav": [
+  {
+   "n": "主页",
+   "url": "/mikka?section=coordinator",
+   "current": "主页"
+  },
+  {
+   "n": "建议",
+   "url": "/mikka?section=suggestions",
+   "current": "建议"
+  },
+  {
+   "n": "看板",
+   "url": "/mikka",
+   "current": "看板"
+  },
+  {
+   "n": "插件",
+   "url": "/mikka?section=plugins",
+   "current": "插件"
+  },
+  {
+   "n": "产物",
+   "url": "/mikka?section=artifacts",
+   "current": "产物"
+  },
+  {
+   "n": "Q\nQA 桌面的工作区"
+  },
+  {
+   "n": "Q\nQA 桌面的工作区",
+   "url": "/mikka?section=artifacts",
+   "current": "产物"
+  }
+ ],
+ "events": []
+}

@@ -1,0 +1,25 @@
+import { writeFileSync, rmSync } from 'node:fs'
+import { launch, log, sleep, OUT, APP, ORIGIN } from './lib.mjs'
+const { app, page, mainLogs } = await launch('/tmp/qa-electron')
+await page.goto(APP, { waitUntil: 'domcontentloaded' }); await sleep(2000)
+await app.evaluate(({ BrowserWindow }) => {
+  const wc = BrowserWindow.getAllWindows()[0].webContents; const t0 = Date.now(); globalThis.__nav = []
+  const rec = (ev, ...a) => globalThis.__nav.push(`${((Date.now() - t0) / 1000).toFixed(1)}s ${ev} ${a.map(x => String(x).replace(/file:\/\/\S+offline\.html\S*/, 'offline.html')).join(' ')}`)
+  wc.on('did-start-navigation', (e) => rec('start', e.url, e.isMainFrame))
+  wc.on('did-fail-load', (_e, code, desc, url, main) => rec('fail', code, desc, url, main))
+  wc.on('did-finish-load', () => rec('finish', wc.getURL()))
+  wc.on('did-navigate', (_e, url, code) => rec('navigate', url, code))
+})
+const up = () => fetch(ORIGIN + '/mikka/sign-in').then(() => true, () => false)
+writeFileSync(`${OUT}/o5-ready`, 'x')
+while (await up()) await sleep(300)
+await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.reload())
+await sleep(45000)
+writeFileSync(`${OUT}/o5-restart`, 'x')
+while (!(await up())) await sleep(500)
+await app.evaluate(() => globalThis.__nav.push('--- server up'))
+await sleep(45000)
+const nav = await app.evaluate(() => globalThis.__nav)
+writeFileSync(`${OUT}/check5.json`, JSON.stringify({ nav, main: mainLogs.filter(([, l]) => /Failed to load/.test(l)).length }, null, 1))
+log(nav.join('\n'))
+await app.close()
