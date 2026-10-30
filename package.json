@@ -25,7 +25,7 @@
     "lint": "pnpm lint:code && pnpm lint:ui",
     "lint:code": "oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory",
     "lint:ui": "node scripts/lint-ui.mjs",
-    "test:ui-policy": "node --test scripts/ui-policy.test.mjs scripts/interaction-policy.test.mjs scripts/ci-docs-only.test.mjs",
+    "test:ui-policy": "node --test scripts/ui-policy.test.mjs scripts/interaction-policy.test.mjs scripts/ci-docs-only.test.mjs scripts/copy-policy.test.mjs",
     "test:platform": "node --import tsx --test lib/platform/detect.test.ts lib/platform/desktop-notifications.test.ts && pnpm --filter @mikka/protocol exec vitest run src/platform.test.ts",
     "test:motion": "node --import tsx --test lib/message-navigation.test.ts",
     "test:unread": "node --import tsx --test lib/unread.test.ts",

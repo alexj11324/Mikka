@@ -39,7 +39,7 @@ CI/loopback environment; remote deployment support is not claimed.
 
 1. The real daemon CLI authenticates with its tracked test token, registers over
    HTTP and reports its mock harness and protocol capabilities.
-2. The real task dialog defaults to Mikka Cloud and accepts the selected local
+2. The real task dialog defaults to E2B and accepts the selected local
    device. The stored host event fixes that device and is atomically bound to
    the issue produced by the actual Coordinator tool.
 3. The real WorkflowAgent and durable tools create one issue and dispatch one
