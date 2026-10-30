@@ -9,7 +9,7 @@
 | `lib/settings/saved-logins.ts` | 已保存登录的查询和删除 |
 | `lib/settings/activity.ts`、`lib/settings/activity-cursor.ts` | 活动时间线和游标 |
 | `lib/device-removal.ts` | 设备改名和移除 |
-| `drizzle/20261029200203_settings_activity_devices.sql` | 数据库变更 |
+| `drizzle/20261029213937_settings_activity_devices.sql` | 数据库变更 |
 
 新增错误码：`savedLoginNotFound`、`deviceHasActiveRuns`（`messages/*.json` 的 `Errors` 下有对应文案）。
 
@@ -169,7 +169,7 @@ type ActivitySummary =
 - 没有在这台设备上用过的同用户 token 不受影响；用它拿墓碑 id 去 register 会得到一台新设备，不会复活墓碑。
 - 剩余的竞态：上线后某个 token 第一次心跳的同时用户移除设备，这个 token 可能没被记录；它之后只能注册成一台新设备（出现在设置里，可以再移除），拿不到被移除设备的任何东西。
 
-## 数据库变更（`drizzle/20261029200203_settings_activity_devices.sql`）
+## 数据库变更（`drizzle/20261029213937_settings_activity_devices.sql`）
 
 - `devices."removedAt" timestamptz`、`devices."nameLocked" boolean NOT NULL DEFAULT false`
 - 新表 `device_token_devices`，主键 `("tokenId","deviceId")`，两列都 `ON DELETE CASCADE`
