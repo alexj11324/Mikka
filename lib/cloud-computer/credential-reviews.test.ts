@@ -28,7 +28,7 @@ before(async () => {
     async stop(...args: unknown[]) { updates.push(args) }
   } } })
   mock.module('@/lib/credentials/runtime', { namedExports: {
-    credentialStore: { authorize: async () => {}, lease: async () => { leaseCalls++; return { status: 'needs_login' } } },
+    credentialStore: { authorize: async () => {}, lease: async () => { leaseCalls++; return { status: 'no_credential' } } },
     executeCredentialLease: async () => { throw new Error('unexpected fill') },
   } })
   mock.module('./subagent-browser', { namedExports: { resolveSubagentBrowserTarget: async () => freshTarget } })

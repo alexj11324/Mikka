@@ -95,7 +95,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
       await client.query('COMMIT'); completed = true
       // The guard must stay closed while an inserted value may be visible.
       // A subsequent trusted host action is needed to submit or clear it.
-      return { status: 'guarded' as const, origin: context.origin }
+      return { fill: 'inserted' as const, origin: context.origin }
     }
     // Never resume viewing merely because insertion succeeded. On failure the
     // gateway stays locked, including across broker timeout or process death.
@@ -121,7 +121,8 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
       SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`,
       [caller.subagentId, caller.userId, caller.workspaceId, caller.botId, 'running', null, 'running'])
     }
-    return { status: sessionApplied ? 'session_applied' as const : 'submitted' as const, origin: context.origin }
+    // Mechanical only (BE-17): never a login verdict; signed_in comes from login-signal.ts.
+    return { fill: sessionApplied ? 'session_applied' as const : 'submitted' as const, origin: context.origin }
   } catch (error) {
     if (!completed) await client.query('ROLLBACK').catch(() => undefined)
     await pool.query(`INSERT INTO credential_access_events(user_id,bot_id,run_id,subagent_id,origin_seen,decision) VALUES($1,$2,$3,$4,$5,'denied_or_failed')`, [context.userId, caller.botId, caller.runId, caller.subagentId, context.origin]).catch(() => undefined)

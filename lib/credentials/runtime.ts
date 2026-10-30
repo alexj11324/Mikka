@@ -7,8 +7,22 @@ import { resolveSubagentBrowserTarget, resolveThreadBrowserTarget } from '@/lib/
 import { canonicalOrigin, CredentialError, type BrowserCaller } from './contracts'
 import { awsKms } from './kms'
 import { CredentialStore, type BrowserTarget } from './store'
+import { LoginAttemptRuntime } from './login-attempts'
+import { openCdpLoginSession } from './login-session'
+import type { MechanicalFill } from '@/lib/cloud-computer/login-result'
 
 export const credentialStore = new CredentialStore(pool, awsKms('app'))
+/** BE-17: pending logins live in this process only; the credential is persisted
+ * through credentialStore.persistVerified only after a definite signed_in. */
+export const loginAttempts = new LoginAttemptRuntime({
+  db: pool,
+  async openSession(caller, site) {
+    const target = await resolveCredentialBrowser(caller)
+    if (!caller.subagentId || !target.observedInputs?.length || canonicalOrigin(target.origin) !== canonicalOrigin(site)) throw new CredentialError()
+    return openCdpLoginSession(target)
+  },
+  saveCredential: (caller, input) => credentialStore.persistVerified(caller, input),
+})
 export async function credentialActor(request: Request) {
   if (process.env.CREDENTIAL_VAULT_ENABLED !== '1') throw new CredentialError()
   const session = await auth.api.getSession({ headers: request.headers })
@@ -72,8 +86,9 @@ export async function executeCredentialLease(lease: string, origin: string) {
     }
     // Do not forward arbitrary responses from another process to the model.
     const result = await response.json().catch(() => null)
-    if (!result || !['submitted', 'session_applied', 'guarded'].includes(result.status) || result.origin !== origin) throw new CredentialError('credential_outcome_unknown', 409)
-    return { status: result.status as 'submitted' | 'session_applied' | 'guarded', origin }
+    // Mechanical fill step only; it is never read as signed_in (see login-signal.ts).
+    if (!result || !['submitted', 'session_applied', 'inserted'].includes(result.fill) || result.origin !== origin) throw new CredentialError('credential_outcome_unknown', 409)
+    return { fill: result.fill as MechanicalFill, origin }
   } catch (error) {
     if (error instanceof CredentialError && error.code === 'credential_outcome_unknown') throw error
     if (dispatched && !responseReceived) throw new CredentialError('credential_outcome_unknown', 409)

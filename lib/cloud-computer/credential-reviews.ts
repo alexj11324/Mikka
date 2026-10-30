@@ -48,7 +48,7 @@ export async function proposeCredentialOperation(pool: Pool, caller: BrowserCall
   const raw={...plan,digest:credentialPlanDigest(caller.userId,plan)}
   const outcome=await executeCredentialOperation(pool,caller.userId,raw,true)
   if('error' in outcome) throw new Error(outcome.error)
-  return {status:String(outcome.data.status ?? 'guarded'),origin:target.origin}
+  return {...outcome.data,origin:target.origin} as { status?: string; fill?: string; origin: string }
 }
 
 export async function executeCredentialOperation(pool: Pool, userId: string, raw: unknown, approved: boolean): Promise<{ data: Record<string, unknown> } | { error: string }> {
@@ -85,7 +85,7 @@ export async function executeCredentialOperation(pool: Pool, userId: string, raw
       const fresh = await resolveSubagentBrowserTarget(caller)
       if (fresh.targetId !== plan.targetId || fresh.origin !== plan.origin || JSON.stringify(fresh.observedInputs) !== JSON.stringify(target.observedInputs)) return { error: 'browserActionExpired' }
       const lease = await credentialStore.lease(caller, plan.origin, fresh, plan.submittedUsername, plan.forcePassword, plan.operation==='login' ? {credentialId:plan.credentialId!,revision:plan.credentialRevision!} : undefined)
-      if (lease.status === 'needs_login') {
+      if (lease.status === 'no_credential') {
         if(plan.operation==='login') {
           await pool.query(`UPDATE pending_actions SET status='done',result=$2 WHERE id=$1 AND "userId"=$3`,[plan.actionId,{status:'needs_login'},userId])
           await pool.query('UPDATE bot_subagents SET "activeActionId"=NULL WHERE id=$1 AND "ownerId"=$2 AND "activeActionId"=$3',[plan.subagentId,userId,plan.actionId])
@@ -95,14 +95,15 @@ export async function executeCredentialOperation(pool: Pool, userId: string, raw
       }
       // Broker itself holds policy+credential locks and rechecks exact version.
       const result = await executeCredentialLease(lease.lease, plan.origin)
-      if (result.status !== 'guarded') {
+      if (result.fill !== 'inserted') {
+        // submitted/session_applied are mechanical: resume to observe, never "signed in".
         await store.update(actor,plan.botId,plan.subagentId,'running','Observe login outcome')
-        if(plan.operation==='login') await pool.query(`UPDATE pending_actions SET status='done',result=$2 WHERE id=$1`,[plan.actionId,{status:result.status}])
-        return {data:{status:result.status}}
+        if(plan.operation==='login') await pool.query(`UPDATE pending_actions SET status='done',result=$2 WHERE id=$1`,[plan.actionId,{fill:result.fill}])
+        return {data:{fill:result.fill}}
       }
       if(plan.operation==='fill') {
         await proposeCredentialOperation(pool,caller,target,'submit')
-        return {data:{status:result.status}}
+        return {data:{fill:result.fill}}
       }
       // The saved-login grant covers one sign-in, not just a fill. Continue to
       // same-document submission without requesting the same consent twice.
@@ -135,13 +136,13 @@ export async function executeCredentialOperation(pool: Pool, userId: string, raw
     // A clear that cannot prove safety remains needs_you; never retry implicitly.
     else await store.update(actor, plan.botId, plan.subagentId, 'needs_you', 'Credential page remains hidden', { kind: 'login', site: plan.origin })
     if(plan.operation==='login') {
-      await pool.query(`UPDATE pending_actions SET status='done',result=$2 WHERE id=$1`,[plan.actionId,{status:resumed?'resumed':'guarded'}])
+      await pool.query(`UPDATE pending_actions SET status='done',result=$2 WHERE id=$1`,[plan.actionId,resumed?{status:'resumed'}:{fill:'inserted'}])
       if(!resumed) {
         await pool.query('UPDATE bot_subagents SET "activeActionId"=NULL WHERE id=$1 AND "ownerId"=$2 AND "activeActionId"=$3',[plan.subagentId,userId,plan.actionId])
         await store.update(actor,plan.botId,plan.subagentId,'needs_you','Login needs additional input',{kind:'login',site:plan.origin})
       }
     }
-    return { data: { status: resumed ? 'resumed' : 'guarded' } }
+    return { data: resumed ? { status: 'resumed' } : { fill: 'inserted' } }
   } catch {
     // Never release the gateway guard on an unknown result or manufacture an
     // authentication result. The consumed ledger prevents an automatic retry.

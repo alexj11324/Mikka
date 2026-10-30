@@ -35,26 +35,57 @@ export class CredentialStore {
     return { nonce: value, origin: canonicalOrigin(origin), expiresIn: 300 }
   }
   async save(caller: BrowserCaller, input: { nonce: string; origin: string; username: string; password: string }) {
-    const origin = canonicalOrigin(input.origin), client = await this.pool.connect()
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      await this.consumeChallengeIn(client, caller, input.nonce, input.origin)
+      const result = await this.persistIn(client, caller, input)
+      await client.query('COMMIT')
+      return result
+    } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  }
+  /** BE-17: the card's one-use challenge is consumed when the login attempt starts; the
+   * credential itself is only persisted (persistVerified) after the site shows signed_in. */
+  async consumeChallenge(caller: BrowserCaller, nonceValue: string, origin: string) {
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      await this.consumeChallengeIn(client, caller, nonceValue, origin)
+      await client.query('COMMIT')
+    } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  }
+  /** The existing secret path (KMS envelope in credential_secrets), without a challenge:
+   * only the login-attempt runtime calls it, after a definite signed_in signal. */
+  async persistVerified(caller: BrowserCaller, input: { origin: string; username: string; password: string }) {
+    const client = await this.pool.connect()
     try {
       await client.query('BEGIN')
       await this.authorize(caller, client)
-      const challenge = await client.query(`UPDATE credential_challenges SET consumed_at=now() WHERE nonce_hash=$1 AND user_id=$2 AND workspace_id=$3 AND bot_id=$4 AND subagent_id IS NOT DISTINCT FROM $5::uuid AND run_id IS NOT DISTINCT FROM $6::uuid AND origin=$7 AND consumed_at IS NULL AND expires_at>now() RETURNING nonce_hash`, [hashNonce(input.nonce), ...callerValues(caller), origin])
-      if (!challenge.rowCount) throw denied()
-      // Serializes upserts, use and deletion for this account/site; no workspace credential sharing.
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${caller.userId}:${origin}`])
-      const existing = (await client.query('SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND username=$3 FOR UPDATE', [caller.userId, origin, input.username])).rows[0]
-      const id = existing?.id ?? randomUUID()
-      const leak = fingerprint(caller.userId, input.password)
-      const envelope = await seal(this.kms, { userId: caller.userId, credentialId: id, origin }, Buffer.from(JSON.stringify({ username: input.username, password: input.password })))
-      await client.query(`INSERT INTO credentials(id,user_id,origin,username) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,origin,username) DO UPDATE SET revoked_at=NULL`, [id, caller.userId, origin, input.username])
-      await client.query(`INSERT INTO credential_secrets(credential_id,wrapped_dek,nonce,ciphertext,leak_hmac,leak_length) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(credential_id) DO UPDATE SET wrapped_dek=$2,nonce=$3,ciphertext=$4,leak_hmac=$5,leak_length=$6`, [id, envelope.wrappedDek, envelope.nonce, envelope.ciphertext, leak.digest, leak.length])
-      // Retain the snapshot but prevent reuse after replacing the secret.
-      // Leases also bind the secret nonce and are rechecked under this lock.
-      await client.query('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now()) WHERE credential_id=$1', [id])
+      const result = await this.persistIn(client, caller, input)
       await client.query('COMMIT')
-      return { status: 'saved' as const, origin }
+      return result
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  }
+  private async consumeChallengeIn(client: PoolClient, caller: BrowserCaller, nonceValue: string, rawOrigin: string) {
+    const origin = canonicalOrigin(rawOrigin)
+    await this.authorize(caller, client)
+    const challenge = await client.query(`UPDATE credential_challenges SET consumed_at=now() WHERE nonce_hash=$1 AND user_id=$2 AND workspace_id=$3 AND bot_id=$4 AND subagent_id IS NOT DISTINCT FROM $5::uuid AND run_id IS NOT DISTINCT FROM $6::uuid AND origin=$7 AND consumed_at IS NULL AND expires_at>now() RETURNING nonce_hash`, [hashNonce(nonceValue), ...callerValues(caller), origin])
+    if (!challenge.rowCount) throw denied()
+  }
+  private async persistIn(client: PoolClient, caller: BrowserCaller, input: { origin: string; username: string; password: string }) {
+    const origin = canonicalOrigin(input.origin)
+    // Serializes upserts, use and deletion for this account/site; no workspace credential sharing.
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${caller.userId}:${origin}`])
+    const existing = (await client.query('SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND username=$3 FOR UPDATE', [caller.userId, origin, input.username])).rows[0]
+    const id = existing?.id ?? randomUUID()
+    const leak = fingerprint(caller.userId, input.password)
+    const envelope = await seal(this.kms, { userId: caller.userId, credentialId: id, origin }, Buffer.from(JSON.stringify({ username: input.username, password: input.password })))
+    await client.query(`INSERT INTO credentials(id,user_id,origin,username) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,origin,username) DO UPDATE SET revoked_at=NULL`, [id, caller.userId, origin, input.username])
+    await client.query(`INSERT INTO credential_secrets(credential_id,wrapped_dek,nonce,ciphertext,leak_hmac,leak_length) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(credential_id) DO UPDATE SET wrapped_dek=$2,nonce=$3,ciphertext=$4,leak_hmac=$5,leak_length=$6`, [id, envelope.wrappedDek, envelope.nonce, envelope.ciphertext, leak.digest, leak.length])
+    // Retain the snapshot but prevent reuse after replacing the secret.
+    // Leases also bind the secret nonce and are rechecked under this lock.
+    await client.query('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now()) WHERE credential_id=$1', [id])
+    return { status: 'saved' as const, origin }
   }
   async lease(caller: BrowserCaller, origin: string, target: BrowserTarget, username?: string, forcePassword = false, expected?: { credentialId: string; revision: string }) {
     await this.authorize(caller)
@@ -62,7 +93,7 @@ export class CredentialStore {
     if (canonicalOrigin(target.origin) !== origin || target.expiresAt < Date.now() + 5000) throw denied()
     const rows = (await this.pool.query(`SELECT c.id,s.nonce FROM credentials c JOIN credential_secrets s ON s.credential_id=c.id WHERE c.user_id=$1 AND c.origin=$2 AND ($3::text IS NULL OR c.username=$3) AND c.revoked_at IS NULL AND c.unattended_allowed=true ORDER BY c.last_used_at DESC NULLS LAST,c.created_at DESC LIMIT 2`, [caller.userId, origin, username ?? null])).rows
     // Never choose a different account silently when several logins exist.
-    if (rows.length !== 1 || expected && (rows[0].id !== expected.credentialId || rows[0].nonce !== expected.revision)) return { status: 'needs_login' as const, origin }
+    if (rows.length !== 1 || expected && (rows[0].id !== expected.credentialId || rows[0].nonce !== expected.revision)) return { status: 'no_credential' as const, origin }
     const value = nonce()
     await this.pool.query(`INSERT INTO credential_fill_leases(nonce_hash,credential_id,user_id,workspace_id,bot_id,subagent_id,run_id,origin,target,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '30 seconds')`, [hashNonce(value), rows[0].id, ...callerValues(caller), origin, { ...target, credentialRevision: rows[0].nonce, credentialMode: forcePassword ? 'password' : 'session-first' }])
     return { status: 'ready' as const, lease: value }

@@ -184,7 +184,7 @@ test('broker reports mechanical session application or submission without judgin
       async evaluate(expression: string) { calls.push(`evaluate:${expression}`); return [] },
     }
     const result = await fillCredential(pool as never, 'a'.repeat(43), { kms, guard: { begin: async () => ({ cdpUrl: 'wss://example.e2b.app/', targetId: 'target', guardToken: 'fixture' }), end: async () => { guardEnded = true } }, connect: (async () => cdp) as never })
-    assert.equal(result.status, forcePassword ? 'guarded' : 'session_applied')
+    assert.equal(result.fill, forcePassword ? 'inserted' : 'session_applied')
     assert.equal(calls.includes('insertAtObservedInput'), forcePassword)
     assert.equal(calls.includes('Page.reload'), !forcePassword)
     assert.deepEqual(locks, ['computer-policy:workspace', `credentials:${owner.userId}:${owner.origin}`])
@@ -378,9 +378,11 @@ test('guard continuation requires safe inputs and a matching origin', async () =
 
 
 test('subagent resumes after broker session application but never after guarded insertion', () => {
-  assert.equal(browserLoginContinuation('session_applied'), 'running')
-  assert.equal(browserLoginContinuation('submitted'), 'running')
-  assert.equal(browserLoginContinuation('guarded'), 'guarded')
-  assert.equal(browserLoginContinuation('needs_login'), 'needs_login')
-  assert.equal(browserLoginContinuation('unexpected'), 'needs_login')
+  assert.equal(browserLoginContinuation({ fill: 'session_applied' }), 'observe')
+  assert.equal(browserLoginContinuation({ fill: 'submitted' }), 'observe')
+  assert.equal(browserLoginContinuation({ fill: 'inserted' }), 'guarded')
+  assert.equal(browserLoginContinuation({ status: 'needs_login' }), 'needs_login')
+  assert.equal(browserLoginContinuation({ status: 'unexpected' }), 'needs_login')
+  // Legacy wire values are not accepted as a status any more.
+  assert.equal(browserLoginContinuation({ status: 'submitted' }), 'needs_login')
 })

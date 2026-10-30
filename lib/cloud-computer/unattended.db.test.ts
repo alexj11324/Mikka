@@ -18,7 +18,7 @@ let provision:typeof import('../computer/provision').ensureCloudMachine
 let proposeLogin:typeof import('./credential-reviews').proposeCredentialOperation
 const actor={userId:'alice',workspaceId:randomUUID()},botId=randomUUID(),subagentId=randomUUID(),credentialId=randomUUID()
 let effects=0,mode:'success'|'stale'|'unknown'='success',receipt=new Map<string,unknown>()
-let loginMode:'session_applied'|'guarded'='session_applied',leaseCalls=0,submissions=0
+let loginMode:'session_applied'|'inserted'='session_applied',leaseCalls=0,submissions=0
 const target={targetId:'chromium-target',origin:'https://example.com',endpoint:'https://broker.invalid',expiresAt:Date.now()+60000,observedInputs:[{backendNodeId:12,credentialRole:'password' as const,loaderId:'document',epoch:1,permissionVersion:0}]}
 const bytes=Buffer.from([0xff,0xd8,0xff,...Array.from({length:40},()=>0),0xff,0xd9]),imageDigest=createHash('sha256').update(bytes).digest('hex')
 const observation=():VisualObservation=>({observationId:'a'.repeat(32),loaderId:'document',origin:target.origin,observedAt:Date.now(),screenshot:'data:image/jpeg;base64,'+bytes.toString('base64'),width:1280,height:800,observation:{url:target.origin,title:'Fixture',text:'Fixture',elements:[],needsLogin:false}})
@@ -58,7 +58,7 @@ before(async()=>{
  }})
  mock.module('@/lib/computer/e2b-provider',{namedExports:{connectComputer:async()=>({sandboxId:'isolated-test-machine'}),createComputer:async()=>({sandboxId:'isolated-test-machine'}),installComputerRuntime:async()=>undefined}})
  mock.module('./subagent-browser',{namedExports:{resolveSubagentBrowserTarget:async()=>target}})
- mock.module('@/lib/credentials/runtime',{namedExports:{credentialStore:{authorize:async()=>undefined,lease:async(_caller:unknown,_origin:unknown,_target:unknown,_username:unknown,_force:unknown,expected:any)=>{assert.equal(expected.credentialId,credentialId);assert.equal(expected.revision,'secret-version-1');leaseCalls++;return {status:'ready',lease:'synthetic-lease'}}},executeCredentialLease:async()=>({status:loginMode,origin:target.origin})}})
+ mock.module('@/lib/credentials/runtime',{namedExports:{credentialStore:{authorize:async()=>undefined,lease:async(_caller:unknown,_origin:unknown,_target:unknown,_username:unknown,_force:unknown,expected:any)=>{assert.equal(expected.credentialId,credentialId);assert.equal(expected.revision,'secret-version-1');leaseCalls++;return {status:'ready',lease:'synthetic-lease'}}},executeCredentialLease:async()=>({fill:loginMode,origin:target.origin})}})
  const actions=await import('./action-reviews');browserAction=actions.browserAction;execute=actions.executeApprovedBrowserAction
  provision=(await import('../computer/provision')).ensureCloudMachine
  proposeLogin=(await import('./credential-reviews')).proposeCredentialOperation
@@ -106,7 +106,7 @@ test('stale observations resume observation, unknown outcomes are not silently r
 })
 test('a saved same-owner/site unattended grant reuses a login without an approval card',{skip:!enabled},async()=>{
  const result=await proposeLogin(pool,{...actor,botId,subagentId},target,'login')
- assert.equal(result.status,'session_applied');assert.equal(leaseCalls,1)
+ assert.equal(result.fill,'session_applied');assert.equal(result.status,undefined);assert.equal(leaseCalls,1)
  const row=(await pool.query('SELECT * FROM bot_subagents WHERE id=$1',[subagentId])).rows[0]
  assert.equal(row.status,'running');assert.equal(row.activeActionId,null)
  const events=(await pool.query('SELECT event FROM subagent_events WHERE "subagentId"=$1',[subagentId])).rows
@@ -138,7 +138,7 @@ test('machine allocation does not hold a SQL connection while the provider is cr
 })
 
 test('saved login covers guarded fill and one same-document submission, never two approval cards',{skip:!enabled},async()=>{
- loginMode='guarded'
+ loginMode='inserted'
  globalThis.fetch=(async(input:any)=>{assert.equal(String(input),'https://owned-broker.invalid/credentials/continue');return Response.json({resumed:true,operation:'submit'})}) as typeof fetch
  try {
   const result=await proposeLogin(pool,{...actor,botId,subagentId},target,'login')

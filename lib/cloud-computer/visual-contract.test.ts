@@ -25,7 +25,9 @@ test('visual actions admit bounded coordinates but no JavaScript, selectors or a
  for(const value of [{action:'click',selector:'button'},{action:'click',x:-1,y:20},{action:'click',x:5,y:9,allow:true},{action:'type',text:'x',javascript:'alert(1)'},{action:'drag',x:0,y:0,toX:9000,toY:0}]) assert.equal(browserMutationSchema.safeParse(value).success,false)
 })
 test('login continuation resumes observation, never turns guarded or unknown results into success',()=>{
- for(const status of ['resumed','session_applied','submitted']) assert.equal(browserLoginContinuation(status),'running')
- assert.equal(browserLoginContinuation('guarded'),'guarded')
- for(const status of ['needs_login','outcome_unknown','failed','authenticated']) assert.equal(browserLoginContinuation(status),'needs_login')
+ assert.equal(browserLoginContinuation({status:'resumed'}),'observe')
+ for(const fill of ['session_applied','submitted']) assert.equal(browserLoginContinuation({fill}),'observe')
+ assert.equal(browserLoginContinuation({fill:'inserted'}),'guarded')
+ assert.equal(browserLoginContinuation({status:'guarded'}),'needs_login')
+ for(const status of ['needs_login','outcome_unknown','failed','authenticated','submitted','signed_in']) assert.equal(browserLoginContinuation({status}),'needs_login')
 })

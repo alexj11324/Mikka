@@ -64,9 +64,9 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
       const site=new URL(page.url).origin
       const {requestBrowserLogin}=await import('@/lib/cloud-computer/login-provider')
       const login=await requestBrowserLogin({...actor,botId,subagentId:id},site)
-      if(login.status==='needs_approval') return 'waiting'
-      const continuation=browserLoginContinuation(login.status)
-      if(continuation==='running') return 'running'
+      if('status' in login && login.status==='needs_approval') return 'waiting'
+      const continuation=browserLoginContinuation(login)
+      if(continuation==='observe') return 'running'
       await store.update(actor,botId,id,'needs_you','Login required',{kind:'login',site})
       await report(actor.userId,botId,id,`The web task needs the secure login card for ${site}; never request credentials in chat.`,'login')
       return 'waiting'
