@@ -173,29 +173,21 @@ function decisionScope(
   };
 }
 
-async function unusedEvent(tx: PoolClient, taskId: string, eventId: string) {
-  const { rows } = await tx.query(
-    `
-    SELECT 1 FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2
-    UNION ALL SELECT 1 FROM factory_approvals WHERE "taskId"=$1 AND "eventId"=$2
-    UNION ALL SELECT 1 FROM factory_approval_controls WHERE "taskId"=$1 AND "eventId"=$2
-    UNION ALL SELECT 1 FROM factory_publications WHERE "taskId"=$1 AND "eventId"=$2`,
-    [taskId, eventId],
-  );
-  if (rows.length) fail("factoryReplayMismatch");
-}
-
-async function validApproval(
+/** The approval as bound to this task's current candidate and attempt. Revocation and a
+ * superseded candidate always void it. Expiry and the approver's session do not: they gate
+ * only a new reservation (validApproval). Once a publication is reserved, checking or
+ * replaying its outcome needs only the caller's normal acceptance auth (owned), as on
+ * GitHub/Vercel where a started deployment is still reported after the approver signs out. */
+async function boundApproval(
   tx: PoolClient,
   task: FactoryTask,
   id: string,
   publish: boolean,
-  authority?: FactoryDecisionAuthority,
 ) {
   const {
     rows: [a],
   } = await tx.query(
-    'SELECT * FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL AND "invalidatedAt" IS NULL AND "expiresAt">clock_timestamp() FOR UPDATE',
+    'SELECT *,"expiresAt">clock_timestamp() AS unexpired FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL FOR UPDATE',
     [id, task.id, task.userId, task.candidateId],
   );
   if (
@@ -208,6 +200,11 @@ async function validApproval(
       : a.approvedRevision !== task.revision || a.attemptId !== task.attemptId)
   )
     fail("factoryApprovalInvalid");
+  return a;
+}
+
+/** The task's evidence, which must still be exactly what was approved. */
+async function approvedEvidence(tx: PoolClient, task: FactoryTask, a: any) {
   const current = await approvalEvidence(tx, task);
   if (
     current.evidenceDigest !== a.evidenceDigest ||
@@ -215,6 +212,21 @@ async function validApproval(
     digest(current.manifest) !== digest(a.evidence)
   )
     fail("factoryApprovalInvalid");
+  return current;
+}
+
+/** Full authorization for a new decision or reservation: bound, unexpired, same evidence,
+ * and the granting human session or policy decision still valid. */
+async function validApproval(
+  tx: PoolClient,
+  task: FactoryTask,
+  id: string,
+  publish: boolean,
+  authority?: FactoryDecisionAuthority,
+) {
+  const a = await boundApproval(tx, task, id, publish);
+  if (!a.unexpired) fail("factoryApprovalInvalid");
+  const current = await approvedEvidence(tx, task, a);
   // A row without policy fields is a human approval: the live linked session
   // that granted it is the authority, exactly as in the Warp-aligned model.
   if (!a.decisionCredentialId && !a.decisionScope && !a.decisionEvidence) {
@@ -244,6 +256,32 @@ async function validApproval(
   return { a, current };
 }
 
+/** What the transaction's row locks cannot freeze: the clock, the granting session and an
+ * external policy authority. Re-asked right before the provider call, without rereading
+ * or rehashing the evidence validApproval already checked in this transaction. */
+async function grantStillLive(
+  tx: PoolClient,
+  a: any,
+  authority?: FactoryDecisionAuthority,
+) {
+  const {
+    rows: [live],
+  } = await tx.query("SELECT $1::timestamptz>clock_timestamp() AS ok", [
+    a.expiresAt,
+  ]);
+  if (!live.ok) fail("factoryApprovalInvalid");
+  if (!a.decisionCredentialId)
+    return humanApproval(tx, { userId: a.userId, sessionId: a.humanSessionId });
+  const decision = await authorizeFactoryDecision(
+    tx,
+    authority,
+    a.decisionCredentialId,
+    a.decisionScope,
+  );
+  if (digest(decision) !== digest(a.decisionEvidence))
+    fail("factoryPolicyDecisionMismatch");
+}
+
 function gatesFor(authority?: FactoryDecisionAuthority) {
   const approvalGate: FactoryGate = async (tx, task, _attempt, change) => {
     const parsed = output.safeParse(change.output);
@@ -270,45 +308,27 @@ function gatesFor(authority?: FactoryDecisionAuthority) {
       !parsed.data.publicationId
     )
       return false;
-    const { a, current } = await validApproval(
-      tx,
-      task,
-      parsed.data.approvalId,
-      true,
-      authority,
-    );
+    // complete() authorized the approval and verified this receipt against it earlier in the
+    // same locked transaction; the gate only confirms the named publication is that row.
     const {
       rows: [p],
     } = await tx.query(
-      `SELECT * FROM factory_publications WHERE id=$1 AND "approvalId"=$2 AND status='succeeded' AND receipt IS NOT NULL`,
-      [parsed.data.publicationId, a.id],
+      `SELECT p.receipt,p."createdAt" FROM factory_publications p JOIN factory_approvals a ON a.id=p."approvalId" AND a."taskId"=p."taskId"
+        WHERE p.id=$1 AND p."approvalId"=$2 AND p."taskId"=$3 AND p."candidateId"=$4 AND p.status='succeeded' AND p.receipt IS NOT NULL
+          AND a."publishAttemptId"=$5 AND a."revokedAt" IS NULL`,
+      [
+        parsed.data.publicationId,
+        parsed.data.approvalId,
+        task.id,
+        task.candidateId,
+        task.attemptId,
+      ],
     );
-    if (p) {
-      const receipt = publicationAdapterReceipt.safeParse(p.receipt);
-      if (!receipt.success) return false;
-      providerBinding(receipt.data, providerInput(task, a, p.request, p.id));
-      assertPublicationTarget(
-        receipt.data,
-        a.candidate,
-        a.action,
-        a.target,
-        a.request.targetEnvironment,
-        p.id,
-        publicationBindingHash(providerInput(task, a, p.request, p.id)),
-      );
-      if (
-        new Date(receipt.data.verifiedTarget.observedAt).getTime() <
+    const receipt = publicationAdapterReceipt.safeParse(p?.receipt);
+    return (
+      receipt.success &&
+      new Date(receipt.data.verifiedTarget.observedAt).getTime() >=
         p.createdAt.getTime()
-      )
-        return false;
-    }
-    return Boolean(
-      p &&
-      p.taskId === task.id &&
-      p.candidateId === task.candidateId &&
-      p.action === a.action &&
-      p.target === a.target &&
-      digest(change.evidence) === digest(current.evidence),
     );
   };
 
@@ -461,9 +481,14 @@ export function createFactoryApprovals(
       if (!z.uuid().safeParse(taskId).success) fail("factoryInvalid");
       return transaction(async (tx) => {
         const task = await owned(tx, actor, taskId, true);
+        // B4: an approval stops counting once its candidate is no longer current. That is
+        // derived here, not stored: every authorization query already requires the task's
+        // current candidateId.
         const { rows: approvals } = await tx.query(
-          'SELECT id,"candidateId","userId",candidate,action,target,request->>\'targetEnvironment\' AS "targetEnvironment","evidenceDigest",evidence,"expiresAt","revokedAt","invalidatedAt","invalidationReason","createdAt" FROM factory_approvals WHERE "taskId"=$1 ORDER BY "createdAt"',
-          [task.id],
+          `SELECT id,"candidateId","userId",candidate,action,target,request->>'targetEnvironment' AS "targetEnvironment","evidenceDigest",evidence,"expiresAt","revokedAt",
+                  CASE WHEN "candidateId" IS DISTINCT FROM $2::uuid AND "revokedAt" IS NULL THEN 'candidateSuperseded' END AS "invalidationReason","createdAt"
+             FROM factory_approvals WHERE "taskId"=$1 ORDER BY "createdAt"`,
+          [task.id, task.candidateId],
         );
         const { rows: publications } = await tx.query(
           'SELECT id,"approvalId","candidateId",action,target,request,request->>\'targetEnvironment\' AS "targetEnvironment",status,receipt,"createdAt","finishedAt" FROM factory_publications WHERE "taskId"=$1 ORDER BY "createdAt"',
@@ -550,7 +575,6 @@ export function createFactoryApprovals(
           await validApproval(tx, task, prior.id, true, authority);
           return { approvalId: prior.id, binding: bindingOf(task) };
         }
-        await unusedEvent(tx, task.id, req.eventId);
         fence(task, req.binding);
         if (
           task.stage !== "approval" ||
@@ -693,7 +717,6 @@ export function createFactoryApprovals(
             binding: FactoryBinding;
           };
         }
-        await unusedEvent(tx, task.id, req.eventId);
         fence(task, req.binding);
         if (
           task.stage !== "approval" ||
@@ -782,7 +805,6 @@ export function createFactoryApprovals(
             fail("factoryReplayMismatch");
           return prior.result as { approvalId: string; revoked: boolean };
         }
-        await unusedEvent(tx, task.id, req.eventId);
         const { rowCount } = await tx.query(
           'UPDATE factory_approvals SET "revokedAt"=coalesce("revokedAt",clock_timestamp()) WHERE id=$1 AND "taskId"=$2 AND "userId"=$3',
           [req.approvalId, task.id, actor.userId],
@@ -828,18 +850,19 @@ export function createFactoryApprovals(
           if (replay.status !== "succeeded" || !replay.result)
             fail("factoryPublicationAlreadyClaimed");
           // Historical receipts never reopen a later candidate, retry or revoked task.
+          // A revoked approval blocks the replay; its expiry does not (boundApproval).
           if (
             task.stage !== "publish" ||
             task.status !== "passed" ||
+            replay.candidateId !== task.candidateId ||
             digest(bindingOf(task)) !== digest(replay.result.binding)
           )
             fail("factoryStale");
-          await validApproval(
+          await boundApproval(
             tx,
             { ...task, revision: req.binding.revision },
             req.approvalId,
             true,
-            authority,
           );
           return {
             result: replay.result as {
@@ -849,7 +872,6 @@ export function createFactoryApprovals(
             },
           };
         }
-        await unusedEvent(tx, task.id, req.eventId);
         fence(task, req.binding);
         if (task.stage !== "publish" || task.status !== "pending")
           fail("factoryTransition");
@@ -902,10 +924,10 @@ export function createFactoryApprovals(
             authority,
           );
           const trustedInput = providerInput(task, a, req, publicationId);
+          // Authorized once above; the task and approval rows stay locked until COMMIT.
           trustedInput.beforeCreate = async () => {
-            const latest = await owned(tx, actor, task.id);
-            fence(latest, req.binding);
-            await validApproval(tx, latest, req.approvalId, true, authority);
+            fence(await owned(tx, actor, task.id), req.binding);
+            await grantStillLive(tx, a, authority);
           };
           const receipt = publicationAdapterReceipt.parse(
             await adapter.execute(trustedInput, tx),
@@ -937,19 +959,22 @@ export function createFactoryApprovals(
           // Terminal: a confirmed provider failure is not asked again (B2).
           if (p.status === "failed")
             throw new PublicationDeferred(p.id, "failed", p.receipt);
+          // Reconcile reports an already reserved publication: the caller's normal acceptance
+          // auth (owned) is enough, so an expired grant or a signed-out approver never hides a
+          // deployment the provider already made. Revocation still blocks (boundApproval).
           if (p.status === "succeeded") {
             if (
               task.stage !== "publish" ||
               task.status !== "passed" ||
+              p.candidateId !== task.candidateId ||
               digest(bindingOf(task)) !== digest(p.result?.binding)
             )
               fail("factoryStale");
-            await validApproval(
+            await boundApproval(
               tx,
               { ...task, revision: req.binding.revision },
               req.approvalId,
               true,
-              authority,
             );
             return p.result as {
               publicationId: string;
@@ -960,13 +985,8 @@ export function createFactoryApprovals(
           fence(task, req.binding);
           if (task.stage !== "publish" || task.status !== "pending")
             fail("factoryTransition");
-          const { a, current } = await validApproval(
-            tx,
-            task,
-            req.approvalId,
-            true,
-            authority,
-          );
+          const a = await boundApproval(tx, task, req.approvalId, true);
+          const current = await approvedEvidence(tx, task, a);
           const adapter = adapters.find(
             (x) =>
               x.action === a.action &&

@@ -23,7 +23,8 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
   const tWorkspaceDetail = useTranslations('Workspace.detail')
   const { isMobile, openMobile, open } = useSidebar()
   // The header lays itself out by its own width (the sidebar changes it, the viewport doesn't).
-  // Narrowing order: the title truncates, then the workspace name; then both fold into the ellipsis. The ID never truncates.
+  // Narrowing order: the title truncates, then the workspace name; then both fold into the ellipsis; then the save
+  // label text and the previous/next arrows go (the list still opens any task). The ID never truncates.
   return <header className="@container/header sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-rule bg-background px-3 sm:px-4">
     <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
       <SidebarTrigger className="-ml-1" aria-label={t('toggleSidebar')} aria-expanded={isMobile ? openMobile : open} />
@@ -53,13 +54,13 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
     <div className="flex shrink-0 items-center gap-1">
       {saveLabel && <><span role="status" aria-live="polite" className="sr-only">{saveLabel}</span>
       <Tooltip><TooltipTrigger render={<span tabIndex={0} className="mr-2 flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground" />}>
-        {saved && <span className="inline-flex"><Check className="size-3.5" aria-hidden="true" /></span>}<span className="sr-only @sm/header:not-sr-only">{saveLabel}</span>
+        {saved && <span className="inline-flex"><Check className="size-3.5" aria-hidden="true" /></span>}<span className="sr-only @md/header:not-sr-only">{saveLabel}</span>
       </TooltipTrigger><TooltipContent>{tDetail('autosaveHint')}</TooltipContent></Tooltip></>}
       {actions}
       {navigation.index >= 0 && <>
         <span className="hidden px-2 text-xs tabular-nums text-muted-foreground @xl/header:inline">{navigation.index + 1} / {navigation.total}</span>
-        <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={tDetail('previousTask')} disabled={pending || navigation.index === 0} onClick={() => navigation.onOpen(-1)} />}><ArrowUp /></TooltipTrigger><TooltipContent>{tDetail('previousTask')}</TooltipContent></Tooltip>
-        <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={tDetail('nextTask')} disabled={pending || navigation.index >= navigation.total - 1} onClick={() => navigation.onOpen(1)} />}><ArrowDown /></TooltipTrigger><TooltipContent>{tDetail('nextTask')}</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={tDetail('previousTask')} className="hidden @sm/header:inline-flex" disabled={pending || navigation.index === 0} onClick={() => navigation.onOpen(-1)} />}><ArrowUp /></TooltipTrigger><TooltipContent>{tDetail('previousTask')}</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={tDetail('nextTask')} className="hidden @sm/header:inline-flex" disabled={pending || navigation.index >= navigation.total - 1} onClick={() => navigation.onOpen(1)} />}><ArrowDown /></TooltipTrigger><TooltipContent>{tDetail('nextTask')}</TooltipContent></Tooltip>
       </>}
       <Button variant="ghost" size="icon-sm" aria-label={tWorkspaceDetail('closeDetail')} disabled={pending} onClick={onClose}><X data-icon="inline-start" /></Button>
     </div>

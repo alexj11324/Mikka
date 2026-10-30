@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS factory_approvals (
   "approvedRevision" integer NOT NULL, "publishAttemptId" uuid NOT NULL,
   "publishRevision" integer NOT NULL,
   "expiresAt" timestamptz NOT NULL, "revokedAt" timestamptz,
-  "invalidatedAt" timestamptz, "invalidationReason" text,
   "createdAt" timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY ("taskId","candidateId") REFERENCES factory_candidates("taskId",id),
   FOREIGN KEY ("taskId","attemptId") REFERENCES factory_attempts("taskId",id),
