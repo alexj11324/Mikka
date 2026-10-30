@@ -31,8 +31,17 @@ test('hrefs keep the workspace and use the routed paths for members and teams', 
 test('members do not see admin-only sections; admins see all of them', () => {
   const member = visibleSettingsSections({ admin: false }).map(s => s.id)
   for (const id of ['permissions', 'secrets', 'audit', 'billing']) assert.equal(member.includes(id), false, id)
-  for (const id of ['general', 'members', 'teams', 'bots', 'usage']) assert.equal(member.includes(id), true, id)
-  assert.equal(visibleSettingsSections({ admin: true }).length, SETTINGS_SECTIONS.length)
+  for (const id of ['general', 'members', 'teams']) assert.equal(member.includes(id), true, id)
+  assert.equal(visibleSettingsSections({ admin: true }).length, SETTINGS_SECTIONS.filter(s => !s.placeholder).length)
+  assert.equal(visibleSettingsSections({ admin: true }).some(s => s.id === 'permissions'), true)
+})
+
+test('sections that are not built yet stay out of the nav but still resolve', () => {
+  const shown = visibleSettingsSections({ admin: true }).map(s => s.id)
+  for (const id of ['developer', 'bots', 'secrets', 'audit', 'usage', 'billing']) {
+    assert.equal(shown.includes(id), false, id)
+    assert.equal(resolveSettingsSection('/settings', id), id)
+  }
 })
 
 test('a current id wins over a legacy alias with the same name', () => {
