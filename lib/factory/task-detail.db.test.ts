@@ -5,6 +5,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { Pool } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { createFactoryStore } from './store';
+import { factoryCriteria } from './task-detail';
 
 const base = process.env.E2E_DATABASE_URL;
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true');
@@ -47,6 +48,7 @@ test('task detail GET exposes criteria, independence and the B11 header without 
     await c.query(`INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"runId",reason) VALUES ($1,$4,'execute',1,1,'passed',$5,'x'),($2,$4,'review',1,2,'passed',$6,'x'),($3,$4,'verify',1,3,'running',NULL,'x')`, [implAttempt, reviewAttempt, verifyAttempt, taskId, implRun, reviewRun]);
     await c.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,$3,'o/r','device:x','repo',$4)`, [candidateId, taskId, sha, implRun]);
     await c.query(`UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1`, [taskId, candidateId]);
+    await c.query(`UPDATE factory_attempts SET "candidateId"=$2 WHERE id=$1`, [reviewAttempt, candidateId]);
     await c.query('COMMIT'); c.release();
 
     const calls: string[] = [];
@@ -58,6 +60,7 @@ test('task detail GET exposes criteria, independence and the B11 header without 
     assert.deepEqual(await snapshot(), before, 'GET wrote nothing');
     assert.deepEqual(calls, [reviewRun], 'independence asked only for attempts with a run');
     assert.deepEqual(detail.checks?.map(x => [x.attemptId, x.stage, x.independent]), [[reviewAttempt, 'review', true], [verifyAttempt, 'verify', null]]);
+    assert.deepEqual(detail.checks?.map(x => [x.status, x.candidateId, x.candidateSha]), [['passed', candidateId, sha], ['running', null, null]], 'each check names its candidate');
     const [review] = detail.checks!;
     assert.equal(review.criteria.length, 2, 'malformed criterion dropped');
     assert.equal(review.criteria[0].passed, true);
@@ -65,7 +68,7 @@ test('task detail GET exposes criteria, independence and the B11 header without 
     assert.doesNotMatch(review.criteria[1].text!, /xyz/);
     assert.equal(review.criteria[1].criterionId, null);
     assert.deepEqual(review.verify, { status: 'passed', command: 'pnpm test', exitCode: 0 });
-    assert.deepEqual(detail.delivery, { candidateSha: sha, pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null });
+    assert.deepEqual(detail.delivery, { candidateSha: sha, repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, databaseBranch: null });
 
     await pool.query(`INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,'owner','session:s','s',$5,'{}','{}','deploy_preview','preview','d','[]',1,$4,1,now()+interval '1 hour')`, [approvalId, taskId, candidateId, verifyAttempt, randomUUID()]);
     await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,'deploy_preview','preview',$5,'{}','succeeded',$6,now())`, [randomUUID(), approvalId, taskId, candidateId, randomUUID(), JSON.stringify({ verifiedTarget: { environment: 'preview', reference: 'https://mikka-git-x.vercel.app' } })]);
@@ -75,6 +78,21 @@ test('task detail GET exposes criteria, independence and the B11 header without 
     await pool.query(`INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,'owner','session:s','s',$5,'{}','{}','deploy_preview','preview-2','d','[]',1,$4,1,now()+interval '1 hour')`, [approval2, taskId, candidateId, verifyAttempt, randomUUID()]);
     await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,'deploy_preview','preview-2',$5,'{}','uncertain',$6,now()+interval '1 minute')`, [randomUUID(), approval2, taskId, candidateId, randomUUID(), JSON.stringify({ verifiedTarget: { environment: 'preview', reference: 'https://unverified.vercel.app' } })]);
     assert.equal((await store.read('owner', taskId)).delivery?.previewUrl, 'https://mikka-git-x.vercel.app', 'only succeeded publications count');
+    // The newest succeeded preview is http: previewUrl is null, no fallback to the older https one.
+    const approval3 = randomUUID();
+    await pool.query(`INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,'owner','session:s','s',$5,'{}','{}','deploy_preview','preview-3','d','[]',1,$4,1,now()+interval '1 hour')`, [approval3, taskId, candidateId, verifyAttempt, randomUUID()]);
+    await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,'deploy_preview','preview-3',$5,'{}','succeeded',$6,now()+interval '2 minutes')`, [randomUUID(), approval3, taskId, candidateId, randomUUID(), JSON.stringify({ verifiedTarget: { environment: 'preview', reference: 'http://mikka-git-y.vercel.app' } })]);
+    assert.equal((await store.read('owner', taskId)).delivery?.previewUrl, null, 'latest preview is http: null, no fallback');
+
+    // Closed status unions: a verify.status outside VERIFY_STATUSES drops verify; an attempt status outside
+    // FACTORY_STATUSES drops the row (the CHECK constraint is lifted in this throwaway DB to simulate drift).
+    await pool.query(`UPDATE agent_runs SET report=jsonb_set(report,'{verify,status}','"skipped"') WHERE id=$1`, [reviewRun]);
+    assert.equal((await store.read('owner', taskId)).checks?.[0].verify, null, 'unknown verify.status rejected');
+    const { rows: checks } = await pool.query(`SELECT conname FROM pg_constraint WHERE conrelid='factory_attempts'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%status%'`);
+    for (const { conname } of checks) await pool.query(`ALTER TABLE factory_attempts DROP CONSTRAINT "${conname}"`);
+    await pool.query(`UPDATE factory_attempts SET status='bogus' WHERE id=$1`, [verifyAttempt]);
+    assert.deepEqual((await store.read('owner', taskId)).checks?.map(x => x.attemptId), [reviewAttempt], 'unknown attempt status rejected');
+
     await assert.rejects(store.read('other', taskId), (e: { code?: string }) => e.code === 'factoryNotFound');
   } finally {
     await pool.end();
@@ -86,4 +104,14 @@ test('task detail GET exposes criteria, independence and the B11 header without 
     await adminPool.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
     await adminPool.end();
   }
+});
+
+test('criteria: malformed entries do not take slots; at most 200', () => {
+  const ok = (i: number) => ({ text: `c${i}`, passed: true });
+  const list = [...Array.from({ length: 5 }, () => ({ passed: 'no' })), ...Array.from({ length: 205 }, (_, i) => ok(i))];
+  const out = factoryCriteria({ criteria: list });
+  assert.equal(out.length, 200);
+  assert.equal(out[0].text, 'c0');
+  assert.equal(out[199].text, 'c199');
+  assert.equal(factoryCriteria({ criteria: Array.from({ length: 150 }, (_, i) => ok(i)) }).length, 150);
 });
