@@ -71,8 +71,20 @@ test('the real editor schema is the one wired into the editor, the detail page a
   assert.match(editor, /const editable = !disabled && !unreadable/)
   const detail = readFileSync(new URL('../components/workspace/task-detail.tsx', import.meta.url), 'utf8')
   assert.match(detail, /const readOnly = seed === null/)
-  assert.match(detail, /useSWR\(readOnly \? null :/)
-  assert.match(detail, /sharedDoc=\{readOnly \? undefined : sync\.doc\}/)
+  assert.match(detail, /useState\(\(\) => seed \? new DocumentSync\(initial\.id, seed\) : null\)/)
+  assert.match(detail, /useSWR\(sync \? \[/)
+  assert.match(detail, /sharedDoc=\{sync\?\.doc\}/)
+  assert.match(detail, /readOnly && <Alert><AlertDescription>\{t\('invalidContentReadOnly'\)\}/)
   for (const file of ['../app/actions/collaboration.ts', './issue-create.ts'])
     assert.match(readFileSync(new URL(file, import.meta.url), 'utf8'), /readableIssueContent/)
+})
+
+test('the server schema snapshot matches the live editor schema and validates identically', async (t) => {
+  t.mock.method(console, 'warn', () => {})
+  const { issueEditorSchemaSpec, readableIssueContentOnServer } = await import('./issue-editor-schema-snapshot')
+  const snapshot = JSON.parse(readFileSync(new URL('./issue-editor-schema-spec.json', import.meta.url), 'utf8'))
+  // On failure run: node --import tsx --import ./tests/support/server-only.mjs scripts/issue-editor-schema-spec.ts
+  assert.deepEqual(JSON.parse(JSON.stringify(issueEditorSchemaSpec(issueEditorSchema()))), snapshot)
+  for (const content of [null, { type: 'doc', content: [{ type: 'mystery' }] }, nested(3000), { type: 'doc', content: [{ type: 'table', content: [{ type: 'tableRow', content: [{ type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'cell' }] }] }] }] }] }, { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'mention', attrs: { id: 'u', label: 'U' } }, { type: 'text', text: 'x', marks: [{ type: 'comment', attrs: { id: 't' } }] }] }] }])
+    assert.deepEqual(readableIssueContentOnServer(content), readableIssueContent(content))
 })

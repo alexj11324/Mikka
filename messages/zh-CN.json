@@ -906,6 +906,7 @@
       "editorCrashedRetry": "重新载入",
       "titleLabel": "任务标题",
       "syncFailedLabel": "同步失败",
+      "invalidContentReadOnly": "这段描述无法显示，已切换为只读。原内容未被改动。",
       "syncingLabel": "正在同步",
       "syncedLabel": "已同步",
       "retrySync": "重试文档同步",

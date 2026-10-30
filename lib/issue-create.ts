@@ -6,7 +6,7 @@ import { allocateIssueNumbers } from '@/lib/issue-numbering'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { issueView } from '@/lib/task-identifier-server'
 import type { ActivityActor } from '@/lib/activity-actor'
-import { readableIssueContent } from '@/components/workspace/issue-editor-schema'
+import { readableIssueContentOnServer as readableIssueContent } from '@/lib/issue-editor-schema-snapshot'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
