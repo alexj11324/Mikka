@@ -59,7 +59,7 @@ test.describe('send-back', () => {
     const { dialog, calls, binding } = await setup(page, {
       taskId: sendBackTask,
       ledger: () => ({ approvals: [], publications: [], capabilities: { reject: true } }),
-      onPost: () => (++attempts === 1 ? { status: 409, json: { error: 'down' } } : { status: 200, json: {} }),
+      onPost: () => (++attempts === 1 ? { status: 409, json: { error: 'factoryStale' } } : { status: 200, json: {} }),
     })
     await page.route('**/api/factory/tasks/*/approval', async route => {
       if (route.request().method() === 'POST' && attempts === 0) await held
