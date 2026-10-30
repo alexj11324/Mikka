@@ -91,7 +91,8 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
       {!quote && <InputGroupAddon align="inline-start" className="self-end pb-2">
         <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
       </InputGroupAddon>}
-      <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 min-w-0 overflow-x-hidden py-3.5 wrap-break-word', quote ? 'min-h-10 pb-1' : 'min-h-12')} value={value} maxLength={MAX_LENGTH} rows={1} disabled={sending && !onStop && !editableWhileSending} onChange={event => onChange(event.target.value)} onKeyDown={onKeyDown} />
+      {/* readOnly, not disabled: a disabled field drops focus, so the next key went to page shortcuts. */}
+      <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 min-w-0 overflow-x-hidden py-3.5 wrap-break-word', quote ? 'min-h-10 pb-1' : 'min-h-12')} value={value} maxLength={MAX_LENGTH} rows={1} readOnly={sending && !onStop && !editableWhileSending} aria-busy={sending || undefined} onChange={event => onChange(event.target.value)} onKeyDown={onKeyDown} />
       <InputGroupAddon align={quote ? 'block-end' : 'inline-end'} className={cn(quote ? 'justify-between px-2 pt-0 pb-2' : 'self-end pb-2')}>
         {quote && <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>}
         {stoppable
