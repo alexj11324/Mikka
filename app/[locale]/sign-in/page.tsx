@@ -11,7 +11,7 @@ import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { COMPOSIO_AUTH_CALLBACK_PATH, oauthResumePath, safeAuthReturn } from '@/lib/auth-return'
 import { oauthAccountNotLinkedProvider } from '@/lib/auth-error'
 import { authCallbackURL } from '@/lib/auth-callback'
-import { desktopAuthReturnPath, desktopAuthState } from '@/lib/desktop-auth'
+import { desktopAuthReturnPath, desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale()
@@ -24,15 +24,16 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   const next = safeAuthReturn(typeof query.next === 'string' ? query.next : undefined)
   const addAccount = query.addAccount === '1'
   const desktopState = desktopAuthState(query.desktop_state)
-  const desktopFlow = query.desktop === '1' && desktopState
-    ? { state: desktopState, next: safeAuthReturn(typeof query.desktop_next === 'string' ? query.desktop_next : undefined) }
+  const desktopCallback = desktopLoopbackCallback(query.desktop_callback)
+  const desktopFlow = query.desktop === '1' && desktopState && desktopCallback
+    ? { state: desktopState, next: safeAuthReturn(typeof query.desktop_next === 'string' ? query.desktop_next : undefined), callback: desktopCallback }
     : null
   const oauthResume = oauthResumePath(query)
   const composioResume = next === COMPOSIO_AUTH_CALLBACK_PATH ? withBasePath(next) : undefined
   const session = await auth.api.getSession({ headers: await headers() })
   if (session?.user && !addAccount && oauthResume) redirect(withBasePath(oauthResume))
   if (session?.user && !addAccount && composioResume) redirect(composioResume)
-  if (session?.user && !addAccount && desktopFlow) redirect(desktopAuthReturnPath(desktopFlow.state, desktopFlow.next))
+  if (session?.user && !addAccount && desktopFlow) redirect(desktopAuthReturnPath(desktopFlow.state, desktopFlow.next, desktopFlow.callback))
   if (session?.user && !addAccount) {
     const locale = await getLocale()
     if (next.startsWith('/?')) redirect(`${getPathname({ locale, href: '/' })}${next.slice(1)}`)

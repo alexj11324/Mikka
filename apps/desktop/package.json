@@ -1,6 +1,6 @@
 {
   "name": "@mikka/desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Mikka desktop shell: the web UI with native capabilities",
   "author": "Aspectly Labs",
@@ -13,7 +13,7 @@
     "start": "electron .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "oxlint --deny-warnings -c oxlint.json src scripts",
-    "test": "node --import tsx --test src/main/notification-center.test.ts src/main/security.test.ts src/main/daemon-map.test.ts",
+    "test": "node --import tsx --test src/main/notification-center.test.ts src/main/security.test.ts src/main/daemon-map.test.ts src/main/loopback.test.ts",
     "package": "node scripts/build.mjs && electron-builder --config electron-builder.yml --publish never",
     "package:dir": "node scripts/build.mjs && electron-builder --dir --config electron-builder.yml --publish never",
     "package:mac": "node scripts/build.mjs && electron-builder --config electron-builder.yml --mac --arm64 --publish never"
