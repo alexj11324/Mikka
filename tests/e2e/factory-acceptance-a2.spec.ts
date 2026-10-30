@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, seedTask, openIssueFromSearch } from './fixtures'
+import { test, expect, register, seedTask, openIssueFromSearch, app } from './fixtures'
 
 // Server responses are fixtures: send-back and a failed publish have no backend yet (reject operation; BE-3).
 type Call = { operation: string; input: Record<string, unknown> }
@@ -12,11 +12,11 @@ const shot = async (page: Page, name: string) => {
   await page.emulateMedia({ colorScheme: 'light' })
 }
 
-async function setup(page: Page, opts: { stage?: string; ledger: (ids: { candidateId: string; binding: Record<string, unknown> }) => Record<string, unknown>; onPost?: (call: Call) => { status: number; json: unknown } }) {
+async function setup(page: Page, opts: { taskId?: string; stage?: string; ledger: (ids: { candidateId: string; binding: Record<string, unknown> }) => Record<string, unknown>; onPost?: (call: Call) => { status: number; json: unknown } }) {
   await register(page)
   const title = `Factory A2 ${randomUUID()}`
   const issueId = await seedTask(page, title)
-  const taskId = randomUUID(), candidateId = randomUUID()
+  const taskId = opts.taskId ?? randomUUID(), candidateId = randomUUID()
   const binding = { taskId, issueId, attemptId: randomUUID(), revision: 1, candidateId }
   const candidate = { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'preview', scope: 'run report' }
   const calls: Call[] = []
@@ -48,34 +48,40 @@ test('退回修改 hides without server support', async ({ page }) => {
   await expect(dialog.getByRole('button', { name: '退回修改' })).toHaveCount(0)
 })
 
-test('send-back: note, submitting, failure keeps the note, resubmit closes', async ({ page }) => {
-  let attempts = 0
-  let release!: () => void
-  const held = new Promise<void>(resolve => { release = resolve })
-  const { dialog, calls, binding } = await setup(page, {
-    ledger: () => ({ approvals: [], publications: [], capabilities: { reject: true } }),
-    onPost: () => (++attempts === 1 ? { status: 500, json: { error: 'down' } } : { status: 200, json: {} }),
+// The first send-back is refused on purpose (a 4xx, so the 5xx guard stays strict); the browser logs it once.
+const sendBackTask = randomUUID()
+test.describe('send-back', () => {
+  test.use({ expectedConsoleErrors: [{ path: app(`/api/factory/tasks/${sendBackTask}/approval`), message: 'Failed to load resource: the server responded with a status of 409 (Conflict)' }] })
+  test('send-back: note, submitting, failure keeps the note, resubmit closes', async ({ page }) => {
+    let attempts = 0
+    let release!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    const { dialog, calls, binding } = await setup(page, {
+      taskId: sendBackTask,
+      ledger: () => ({ approvals: [], publications: [], capabilities: { reject: true } }),
+      onPost: () => (++attempts === 1 ? { status: 409, json: { error: 'down' } } : { status: 200, json: {} }),
+    })
+    await page.route('**/api/factory/tasks/*/approval', async route => {
+      if (route.request().method() === 'POST' && attempts === 0) await held
+      return route.fallback()
+    })
+    await dialog.getByRole('button', { name: '退回修改' }).click()
+    const note = page.getByRole('dialog', { name: '退回修改' })
+    await expect(note.getByRole('button', { name: '退回', exact: true })).toBeDisabled()
+    await note.getByRole('textbox', { name: '退回备注' }).fill('标题和截图不一致')
+    await shot(page, `reject-editing-${test.info().project.name}`)
+    await note.getByRole('button', { name: '退回', exact: true }).click()
+    await expect(note.getByRole('button', { name: '提交中…' })).toBeDisabled()
+    await shot(page, `reject-submitting-${test.info().project.name}`)
+    release()
+    await expect(note.getByText('提交失败，请重试')).toBeVisible()
+    await expect(note.getByRole('textbox', { name: '退回备注' })).toHaveValue('标题和截图不一致')
+    await shot(page, `reject-failed-${test.info().project.name}`)
+    await note.getByRole('button', { name: '重新提交' }).click()
+    await expect(note).toBeHidden()
+    expect(calls).toHaveLength(2)
+    expect(calls[1]).toMatchObject({ operation: 'reject', input: { binding, note: '标题和截图不一致' } })
   })
-  await page.route('**/api/factory/tasks/*/approval', async route => {
-    if (route.request().method() === 'POST' && attempts === 0) await held
-    return route.fallback()
-  })
-  await dialog.getByRole('button', { name: '退回修改' }).click()
-  const note = page.getByRole('dialog', { name: '退回修改' })
-  await expect(note.getByRole('button', { name: '退回', exact: true })).toBeDisabled()
-  await note.getByRole('textbox', { name: '退回备注' }).fill('标题和截图不一致')
-  await shot(page, `reject-editing-${test.info().project.name}`)
-  await note.getByRole('button', { name: '退回', exact: true }).click()
-  await expect(note.getByRole('button', { name: '提交中…' })).toBeDisabled()
-  await shot(page, `reject-submitting-${test.info().project.name}`)
-  release()
-  await expect(note.getByText('提交失败，请重试')).toBeVisible()
-  await expect(note.getByRole('textbox', { name: '退回备注' })).toHaveValue('标题和截图不一致')
-  await shot(page, `reject-failed-${test.info().project.name}`)
-  await note.getByRole('button', { name: '重新提交' }).click()
-  await expect(note).toBeHidden()
-  expect(calls).toHaveLength(2)
-  expect(calls[1]).toMatchObject({ operation: 'reject', input: { binding, note: '标题和截图不一致' } })
 })
 
 test('publish failed keeps the approval and offers publish again', async ({ page }) => {
