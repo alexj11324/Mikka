@@ -1,6 +1,6 @@
 // 设置 › 密钥与环境 + BYO E2B key against a real PostgreSQL. Uses a random per-run WORKSPACE_SECRETS_KEY only.
 import assert from 'node:assert/strict'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
@@ -219,6 +219,21 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     assert.ok(otherMask(TOKEN) === TOKEN, 'another workspace does not mask this one\'s values')
     assert.equal((await runtime.workspaceSecretMasker(null, on))('x'), 'x')
     await assert.rejects(runtime.sandboxSecretEnv(third.id, { MIKKA_BYO_E2B_KEY: '1' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
+  })
+
+  await t.test('#436 defense in depth: a reserved name reaching injection is skipped and audited by name only', async () => {
+    const events: { action: string; label: string; json: string }[] = []
+    const audit = async (_tx: unknown, e: { action: string; target: { label: string } }) => { events.push({ action: e.action, label: e.target.label, json: JSON.stringify(e) }) }
+    const value = 'reserved-value-' + randomUUID()
+    const runtime = await import('../lib/secrets/runtime')
+    const out = await runtime.reservedInjectionFilter(randomUUID(), [
+      { id: randomUUID(), name: 'BASH_ENV', kind: 'env', value },
+      { id: randomUUID(), name: 'npm_config_registry', kind: 'env', value },
+      { id: randomUUID(), name: 'OK_NAME', kind: 'secret', value: 'fine' },
+    ], { actorId: admin, audit })
+    assert.deepEqual(out, { OK_NAME: 'fine' })
+    assert.deepEqual(events.map(e => [e.action, e.label]), [['secret.injection_skipped', 'BASH_ENV'], ['secret.injection_skipped', 'npm_config_registry']])
+    assert.ok(events.every(e => !e.json.includes(value)), 'the value is never in the audit entry')
   })
 
   await t.test('4e2 item 4: run-scoped masking resolves the cloud token workspace; checkpoint patch/files masked', async () => {

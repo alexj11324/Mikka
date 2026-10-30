@@ -137,6 +137,18 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     assert.ok(!seen.includes(SECRET), 'masked before the query: the secret is not in the error')
   })
 
+  await t.test('A: an unmasked lastReply built directly (stored text + new delta) is masked on rebuild', async () => {
+    const { persistRunEventBatch } = await import('../lib/secrets/run-events')
+    const mask = await runtime.workspaceSecretMasker(ws.id)
+    const runId = await newRun()
+    // Plaintext written straight into the row (as a pre-masking deploy would have), same part id.
+    await pool.query(`update agent_runs set "lastReply"=$2, "lastReplyPart"='p1' where id=$1`, [runId, `here ${SECRET}`])
+    await persistRunEventBatch(runId, 1, [{ type: 'text-delta', id: 'p1', delta: ' more' }, { type: 'text-end', id: 'p1' }], mask)
+    const { rows: [run] } = await pool.query(`select "lastReply" from agent_runs where id=$1`, [runId])
+    noPlain('lastReply', run.lastReply)
+    assert.equal(run.lastReply, 'here [secret:API_TOKEN] more')
+  })
+
   await t.test('subagent: step / needs from the model are masked in bot_subagents and subagent_events', async () => {
     const { SubagentStore } = await import('../lib/cloud-computer/subagents')
     const subagents = new SubagentStore(pool)

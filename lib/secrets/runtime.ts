@@ -7,11 +7,11 @@ import { workspaceSecrets } from '@/lib/db/secrets-schema'
 import { openSecret, secretAad, SecretsKeyMissingError } from './crypto'
 import { byoE2BKeyEnabled, E2BKeyError, getWorkspaceE2BApiKey } from './e2b'
 import { isReservedEnvName } from './format'
-import { guardSecretsDb } from './store'
+import { guardSecretsDb, type SecretAuditHook } from './store'
 import { createSecretMasker, identityMasker, maskDeep, type Masker } from './mask'
 
 type Env = Record<string, string | undefined>
-export interface RuntimeSecret { name: string; kind: 'secret' | 'env'; value: string }
+export interface RuntimeSecret { id?: string; name: string; kind: 'secret' | 'env'; value: string }
 
 /** Sandboxes run as production: only environment 'all' and 'production' are injected (preview/development never). */
 export const RUNTIME_ENVIRONMENTS = ['all', 'production'] as const
@@ -20,7 +20,7 @@ export const RUNTIME_ENVIRONMENTS = ['all', 'production'] as const
 export async function loadWorkspaceRuntimeSecrets(workspaceId: string, env: Env = process.env): Promise<RuntimeSecret[]> {
   const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), eq(workspaceSecrets.scopeType, 'workspace'), inArray(workspaceSecrets.environment, [...RUNTIME_ENVIRONMENTS]))))
   return rows.map(row => {
-    try { return { name: row.name, kind: row.kind, value: openSecret(row, secretAad(row), env) } } catch (error) {
+    try { return { id: row.id, name: row.name, kind: row.kind, value: openSecret(row, secretAad(row), env) } } catch (error) {
       if (error instanceof SecretsKeyMissingError) throw new E2BKeyError('e2b_unavailable', 'secrets key missing')
       console.error(`workspace secret ${row.id} failed to decrypt`)
       throw new E2BKeyError('e2b_unavailable', 'workspace secret unavailable')
@@ -30,9 +30,25 @@ export async function loadWorkspaceRuntimeSecrets(workspaceId: string, env: Env 
 
 /** Env for the sandbox worker process: NAME=value for every workspace secret / env var. {} when the flag is off.
  * #438 B: reserved names (PATH, NODE_OPTIONS, E2B_*, MIKKA_*…, lib/secrets/format.ts) are never injected, even if a row predates the create-time check. */
-export async function sandboxSecretEnv(workspaceId: string, env: Env = process.env): Promise<Record<string, string>> {
+export async function sandboxSecretEnv(workspaceId: string, env: Env = process.env, skipped?: { actorId: string; audit: SecretAuditHook }): Promise<Record<string, string>> {
   if (!byoE2BKeyEnabled(env)) return {}
-  return Object.fromEntries((await loadWorkspaceRuntimeSecrets(workspaceId, env)).filter(s => !isReservedEnvName(s.name)).map(s => [s.name, s.value]))
+  return reservedInjectionFilter(workspaceId, await loadWorkspaceRuntimeSecrets(workspaceId, env), skipped)
+}
+
+/**
+ * Defense in depth at the injection point (#436 reserves the names at create time). A reserved name that
+ * still reaches injection (a row from before the rule, or a name added to the list later) is skipped and
+ * audited with its NAME only, never the value.
+ */
+export async function reservedInjectionFilter(workspaceId: string, secrets: RuntimeSecret[], skipped?: { actorId: string; audit: SecretAuditHook }): Promise<Record<string, string>> {
+  const reserved = secrets.filter(s => isReservedEnvName(s.name))
+  if (reserved.length) {
+    console.warn(`workspace ${workspaceId}: skipped reserved variables at injection: ${reserved.map(s => s.name).join(', ')}`)
+    if (skipped) await db.transaction(async tx => {
+      for (const s of reserved) await skipped.audit(tx, { workspaceId, actorId: skipped.actorId, action: 'secret.injection_skipped', target: { type: s.kind, id: s.id ?? s.name, label: s.name }, metadata: { reason: 'reserved_name' } })
+    })
+  }
+  return Object.fromEntries(secrets.filter(s => !isReservedEnvName(s.name)).map(s => [s.name, s.value]))
 }
 
 /** #438 C: the workspace's own E2B key is masked like a secret. Absent key = nothing to add. */

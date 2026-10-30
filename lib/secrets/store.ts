@@ -13,7 +13,7 @@ import { secretActionAllowed, type SecretAction, type SecretTarget, type Workspa
 import { isReservedEnvName, checkEgressDomains, createSecretInput, deleteSecretInput, replaceSecretInput, scopeColumns, updateEgressInput, EGRESS_DOMAINS_MAX, WORKSPACE_SECRETS_LIMIT } from './format'
 
 export type SecretsTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
-export type SecretAuditAction = 'secret.created' | 'secret.replaced' | 'secret.deleted' | 'env.created' | 'env.updated' | 'env.deleted' | 'network.updated' | 'secret.replace_denied'
+export type SecretAuditAction = 'secret.created' | 'secret.replaced' | 'secret.deleted' | 'env.created' | 'env.updated' | 'env.deleted' | 'network.updated' | 'secret.replace_denied' | 'secret.injection_skipped'
 export interface SecretAuditEvent {
   workspaceId: string
   actorId: string
