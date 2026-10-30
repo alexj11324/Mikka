@@ -7,8 +7,10 @@ import { Link } from '@/i18n/navigation'
 import { useIsStreaming } from '@openuidev/react-lang'
 import { ApprovalCard, type ApprovalCardStatus } from '@/components/agents/approval-card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item'
+import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
 import { useAgentInteraction } from './agent-interaction'
 import { CitationChip } from './agent-citations'
@@ -136,21 +138,22 @@ function ChoiceCard({ title, options, task }: { title: string; options: { value:
     <div role={answered && !pending ? 'list' : undefined} className="flex flex-col gap-1.5">
       {options.map((option, index) => {
         const selected = chosen === option.value
-        const look = 'h-auto min-h-10 w-full justify-start gap-3 rounded-xl px-3 py-2 text-left font-normal whitespace-normal transition-[background-color,color,opacity] duration-150 motion-reduce:duration-100'
+        const label = option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup : option.label
         const body = <>
-          <span aria-hidden="true" className={cn('flex size-6 shrink-0 items-center justify-center rounded-md text-xs', selected && !pending ? 'bg-primary-foreground/15' : 'bg-background text-muted-foreground')}>{String.fromCharCode(65 + index)}</span>
-          <span className="min-w-0 flex-1">{option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup : option.label}</span>
-          {selected && (pending ? <Spinner data-icon="inline-end" aria-label={agentCopy.sendingChoice} /> : <Check data-icon="inline-end" aria-hidden="true" />)}
+          <ItemMedia><Kbd>{String.fromCharCode(65 + index)}</Kbd></ItemMedia>
+          <ItemContent><ItemTitle>{label}</ItemTitle></ItemContent>
+          {selected && <ItemActions>{pending ? <Spinner aria-label={agentCopy.sendingChoice} /> : <Check aria-hidden="true" />}</ItemActions>}
         </>
-        // Answered: the rows are a record, not controls — the pick stays dark, the rest dim.
-        if (answered && !pending) return <div key={option.value} role="listitem" aria-current={selected || undefined} className={cn(buttonVariants({ variant: selected ? 'default' : 'secondary' }), look, 'pointer-events-none', !selected && 'opacity-50')}>{body}</div>
+        // Answered: the rows are a record, not controls.
+        if (answered && !pending) return <Item key={option.value} role="listitem" size="sm" variant={selected ? 'muted' : 'default'} aria-current={selected || undefined}>{body}</Item>
         // No E2B key yet: this option opens the settings where the key is set instead of answering.
-        if (option.action === 'cloudKeySettings') return <Button key={option.value} variant="secondary" className={look} nativeButton={false}
-          render={<Link href={CLOUD_KEY_SETTINGS} />}>{body}<ChevronRight data-icon="inline-end" aria-hidden="true" /></Button>
-        return <Button key={option.value} type="button" variant={selected && !pending ? 'default' : 'secondary'} aria-pressed={selected} className={look}
-          disabled={status !== 'pending'} onClick={() => { setPicked(option.value); void send(option.label) }}>{body}</Button>
+        if (option.action === 'cloudKeySettings') return <Item key={option.value} size="sm" variant="outline" render={<Link href={CLOUD_KEY_SETTINGS} />}>{body}<ItemActions><ChevronRight aria-hidden="true" /></ItemActions></Item>
+        return <Button key={option.value} type="button" variant={selected ? 'default' : 'outline'} aria-pressed={selected}
+          disabled={status !== 'pending'} onClick={() => { setPicked(option.value); void send(option.label) }}>
+          <Kbd data-icon="inline-start">{String.fromCharCode(65 + index)}</Kbd>{label}{selected && <Spinner data-icon="inline-end" aria-label={agentCopy.sendingChoice} />}
+        </Button>
       })}
     </div>
-    {error && <Alert variant="destructive" className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><AlertDescription>{error}</AlertDescription></Alert>}
+    {error && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert></div>}
   </div>
 }
