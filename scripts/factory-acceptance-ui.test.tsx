@@ -97,3 +97,14 @@ test('the window hides 发布 when the active approval has no publishable enviro
   await render()
   assert.ok(button('发布'))
 })
+
+test('a failed publication shows 发布失败，批准仍保留 with 撤销批准 and 发布', async () => {
+  list = { data: { tasks: [task({ stage: 'publish', status: 'running' })] }, isLoading: false, mutate: async () => undefined }
+  const approval = { id: 'a1', candidateId: 'c1', candidate: { sha: 'a'.repeat(40), repository: 'r', environment: 'preview', scope: 'x' }, action: 'deploy', target: 't', targetEnvironment: 'preview', expiresAt: new Date(Date.now() + 3600000).toISOString(), revokedAt: null, createdAt: new Date().toISOString() }
+  ledger = { binding: {}, approvals: [approval], publications: [{ id: 'p1', approvalId: 'a1', status: 'failed', request: {} }] }
+  await render()
+  await act(async () => { (document.querySelector('[data-slot="item"] button') as unknown as HTMLButtonElement).click() })
+  assert.match(document.body.textContent ?? '', /发布失败，批准仍保留/)
+  assert.ok(button('撤销批准'))
+  assert.ok(button('发布'))
+})

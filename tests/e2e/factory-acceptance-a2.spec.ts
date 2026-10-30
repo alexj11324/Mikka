@@ -7,7 +7,7 @@ type Call = { operation: string; input: Record<string, unknown> }
 const shot = async (page: Page, name: string) => {
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme })
-    await page.screenshot({ path: test.info().outputPath(`../shots/fe2-${name}-${scheme}.png`) })
+    await page.screenshot({ path: test.info().outputPath(`shots/fe2-${name}-${scheme}.png`) })
   }
   await page.emulateMedia({ colorScheme: 'light' })
 }
@@ -88,7 +88,7 @@ test('publish failed keeps the approval and offers publish again', async ({ page
 })
 
 test('approvals on an older candidate read 已失效 with no actions', async ({ page }) => {
-  const { dialog } = await setup(page, { stage: 'verify', ledger: () => ({ approvals: [approval(randomUUID())], publications: [] }) })
+  const { dialog } = await setup(page, { stage: 'publish', ledger: () => ({ approvals: [approval(randomUUID())], publications: [] }) })
   await expect(dialog.getByText('已失效', { exact: true }).first()).toBeVisible()
   await expect(dialog.getByRole('button', { name: /批准|发布|退回修改/ })).toHaveCount(0)
   await shot(page, `invalidated-${test.info().project.name}`)
