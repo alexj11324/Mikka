@@ -2,7 +2,7 @@
 // the UI reads through `window.mikka`. The renderer is treated as untrusted;
 // every privileged call goes through the validated IPC surface in `./bridge`.
 
-import { app, BrowserWindow, Menu, Notification, dialog, session, shell } from 'electron'
+import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, session, shell } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'node:path'
 
@@ -127,6 +127,7 @@ function openChild(url: string): void {
   const child = new BrowserWindow({
     width: 1100,
     height: 800,
+    autoHideMenuBar: true,
     parent: mainWindow ?? undefined,
     webPreferences: {
       contextIsolation: true,
@@ -174,7 +175,10 @@ function createMainWindow(): void {
     minWidth: 900,
     minHeight: 600,
     show: false,
-    backgroundColor: '#f5f5f4',
+    // The page paints its own top bar, so the native one must not show as a separate band.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#000000' : '#f5f5f4',
+    autoHideMenuBar: true,
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 14 } } : {}),
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -191,6 +195,7 @@ function createMainWindow(): void {
       additionalArguments: [`--mikka-app-origin=${APP_ORIGIN}`],
     },
   })
+  mainWindow.setMenuBarVisibility(false)
   mainWindow.once('ready-to-show', () => mainWindow?.show())
   mainWindow.on('closed', () => { mainWindow = null })
   mainWindow.webContents.setWindowOpenHandler(details => {
@@ -285,7 +290,14 @@ async function checkForUpdates(interactive: boolean): Promise<void> {
 }
 
 function installMenu(): void {
-  if (process.platform !== 'darwin') return
+  if (process.platform !== 'darwin') {
+    // Windows and Linux show no menu bar; the menu stays only to keep its shortcuts.
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
+      { label: 'View', submenu: [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, ...(app.isPackaged ? [] : [{ role: 'reload' as const }, { role: 'forceReload' as const }, { role: 'toggleDevTools' as const }])] },
+    ]))
+    return
+  }
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     {
       label: app.name,
