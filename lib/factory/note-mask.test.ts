@@ -8,5 +8,6 @@ test("note masker hides secret values in their encoded forms and token patterns"
   for (const form of [value, Buffer.from(value).toString("base64"), Buffer.from(value).toString("hex"), encodeURIComponent(value + "/")])
     assert.doesNotMatch(maskFactoryNote(`x ${form} y`, secrets), /e2b_synthetic|ZTJiX3N5bnRoZXRpY|6532625f/);
   assert.equal(maskFactoryNote("Bearer abc.def", []), "[REDACTED]");
+  assert.equal(maskFactoryNote("E2B_API_KEY=e2b_live_xxx and GITHUB_TOKEN: abc", []), "E2B_API_KEY=[REDACTED] and GITHUB_TOKEN=[REDACTED]");
   assert.equal(maskFactoryNote("short ok", [{ name: "S", value: "short" }]), "short ok");
 });

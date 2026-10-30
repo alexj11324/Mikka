@@ -30,5 +30,7 @@ export function maskFactoryNote(text: string, secrets: readonly NoteSecret[] = s
   let out = text;
   for (const [needle, label] of [...needles].sort((a, b) => b[0].length - a[0].length))
     if (out.includes(needle)) out = out.split(needle).join(label);
+  // NAME_KEY=value / NAME_TOKEN: value forms the word-boundary patterns miss (E2B_API_KEY=…).
+  out = out.replace(/\b([A-Za-z0-9]+_)*[A-Za-z0-9]*(KEY|TOKEN|SECRET|PASSWORD|PASSWD)\s*[:=]\s*[^\s,;]+/gi, (m) => `${m.split(/[:=]/)[0].trim()}=[REDACTED]`);
   return redactFactoryCheckText(out);
 }
