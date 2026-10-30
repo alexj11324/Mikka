@@ -1123,6 +1123,7 @@
   },
   "IssueDetail": {
     "breadcrumbBoard": "看板",
+    "breadcrumbMore": "更多位置",
     "connecting": "正在连接…",
     "deletedTitle": "此任务已被删除",
     "unavailableTitle": "任务不可用",
