@@ -3023,6 +3023,7 @@
       },
       "title": "Board",
       "synced": "Synced with Linear",
+      "refresh": "Refresh",
       "onlyMine": "Only mine",
       "coordinatorPlaceholder": "Tell the Coordinator what to arrange…",
       "collapse": "Hide conversation",

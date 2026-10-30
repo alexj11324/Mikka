@@ -3023,6 +3023,7 @@
       },
       "title": "看板",
       "synced": "已与 Linear 同步",
+      "refresh": "刷新",
       "onlyMine": "只看我的",
       "coordinatorPlaceholder": "告诉 Coordinator 怎么安排…",
       "collapse": "收起对话",
