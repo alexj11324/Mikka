@@ -418,14 +418,18 @@ export class CodexAdapter implements AgentAdapter {
     const close = async (event: Parameters<EventQueue["exit"]>[0] | null) => {
       ending = true
       pendingMcp.clear()
-      if (event && externalAuth && this.options.onHostedBeforeFinish) await this.options.onHostedBeforeFinish(sessionId).catch(() => undefined)
+      rpc.dispose()
+      child.process.stdin.end()
+      if (event && externalAuth && this.options.onHostedBeforeFinish) {
+        try { await this.options.onHostedBeforeFinish(sessionId) }
+        catch { log.warn("Hosted session snapshot could not be finalized; CI continuation is unavailable") }
+      }
       options.toolApproval?.revoke()
       if (pending.length > 0)
         log.warn(
           { dropped: pending.length },
           "session ended with unsent messages",
         )
-      rpc.dispose()
       await child.kill()
       if (event) queue.exit(event)
     }

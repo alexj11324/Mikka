@@ -1,4 +1,5 @@
 import 'server-only'
+import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { openCiSession, sealCiSession, type CiSessionScope } from './ci-session-envelope'
 import { acquireCiCombined, ciIssueAuthorized } from './github/ci/authority'
@@ -11,7 +12,7 @@ const unavailable = (): never => { throw new Error('CI session snapshot unavaila
 /** A snapshot is written only by a live hosted run and read only by its
  * server-bound CI child. Both paths hold the connection row through commit so
  * disconnect/reconnect cannot race the release of session material. */
-export async function nativeSessionSnapshot(pool: Pool, context: Context, operation: { kind: 'save'; sessionId: string; data: Buffer } | { kind: 'restore' }, secret: string, workspacePool?:Pick<Pool,'connect'>): Promise<Buffer | null> {
+export async function nativeSessionSnapshot(pool: Pool, context: Context, operation: { kind: 'save'; sessionId: string; data: Buffer; epoch: string } | { kind: 'restore' } | { kind: 'invalidate' }, secret: string, workspacePool?:Pick<Pool,'connect'>): Promise<Buffer | null> {
   const {rows:[hint]} = await pool.query(`SELECT i.id,i."userId",i.scope,r."agentId" FROM agent_runs r JOIN issues i ON i.id=r."issueId" WHERE r.id=$1 AND r."userId"=$2`,[context.runId,context.ownerId])
   if (!hint) unavailable()
   const membership=await acquireCiCombined(context.workspaceId,hint.id,context.ownerId,hint.userId,hint.scope==='workspace',workspacePool)
@@ -32,18 +33,26 @@ export async function nativeSessionSnapshot(pool: Pool, context: Context, operat
     if (!ciIssueAuthorized(issue,context.ownerId,scopeVersion,membership.held,value => Boolean(readIssueMetadata(value as never).deletedAt))) unavailable()
     const current = { ownerId: r.ownerId, workspaceId: r.workspaceId, consumerId: r.consumerId, bindingId: r.bindingId, accountId: context.accountId, route: r.route, revision: context.revision, modelId: r.modelId }
     let result: Buffer | null = null
-    if (operation.kind === 'save') {
+    if (operation.kind === 'invalidate') {
+      const epoch=randomUUID()
+      await tx.query('INSERT INTO ci_native_session_epochs ("runId",epoch) VALUES ($1,$2) ON CONFLICT ("runId") DO UPDATE SET epoch=EXCLUDED.epoch',[context.runId,epoch])
+      await tx.query('UPDATE ci_native_sessions SET final=false WHERE "runId"=$1', [context.runId])
+      result=Buffer.from(epoch)
+
+    } else if (operation.kind === 'save') {
+      const {rows:[generation]}=await tx.query('SELECT epoch FROM ci_native_session_epochs WHERE "runId"=$1 FOR UPDATE',[context.runId])
+      if (!generation || generation.epoch !== operation.epoch) unavailable()
       // The daemon's session-id status patch may still be in its outbox. A
       // conflicting persisted ID is refused; restore always requires the
       // origin's subsequently persisted ID to match the encrypted scope.
       if (r.sessionId && r.sessionId !== operation.sessionId) unavailable()
       const scope: CiSessionScope = { ...current, runId: context.runId, sessionId: operation.sessionId }
       const ciphertext = sealCiSession(scope, operation.data, secret)
-      await tx.query(`INSERT INTO ci_native_sessions ("runId",ciphertext) VALUES ($1,$2) ON CONFLICT ("runId") DO UPDATE SET ciphertext=EXCLUDED.ciphertext,"createdAt"=now()`, [context.runId, ciphertext])
+      await tx.query(`INSERT INTO ci_native_sessions ("runId",ciphertext,final) VALUES ($1,$2,true) ON CONFLICT ("runId") DO UPDATE SET ciphertext=EXCLUDED.ciphertext,final=true,"createdAt"=now()`, [context.runId, ciphertext])
     } else {
       const c = r.ciContinuation
       if (!c || c.requireSessionResume !== true || typeof c.originRunId !== 'string' || typeof c.originSessionId !== 'string') unavailable()
-      const { rows: [origin] } = await tx.query(`SELECT r."sessionId",r."agentId",r."deviceId",r."issueId",r."agentDefinition",n."bindingId",s.ciphertext FROM agent_runs r JOIN byos_native_runs n ON n."runId"=r.id JOIN ci_native_sessions s ON s."runId"=r.id WHERE r.id=$1 AND r."userId"=$2 AND r."stopRequestedAt" IS NULL FOR SHARE OF r`, [c.originRunId, context.ownerId])
+      const { rows: [origin] } = await tx.query(`SELECT r."sessionId",r."agentId",r."deviceId",r."issueId",r."agentDefinition",n."bindingId",s.ciphertext FROM agent_runs r JOIN byos_native_runs n ON n."runId"=r.id JOIN ci_native_sessions s ON s."runId"=r.id AND s.final=true WHERE r.id=$1 AND r."userId"=$2 AND r."stopRequestedAt" IS NULL FOR SHARE OF r`, [c.originRunId, context.ownerId])
       if (!origin || origin.sessionId !== c.originSessionId || origin.agentId !== r.agentId || origin.issueId !== r.issueId || origin.deviceId !== context.deviceId || origin.bindingId !== r.bindingId || !r.agentDefinition?.definitionDigest || origin.agentDefinition?.definitionDigest !== r.agentDefinition.definitionDigest) unavailable()
       result = openCiSession({ ...current, runId: c.originRunId, sessionId: c.originSessionId }, origin.ciphertext, secret)
     }

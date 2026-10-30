@@ -34,6 +34,7 @@ import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
 import { hostedCiResumePermitted, matchesNativeContinuation } from "./subscription-continuation";
+import { finalizeHostedSession } from "./hosted-session-finalize";
 import { captureNativeSessionAt, restoreNativeSession } from './native-session-files';
 import type { ComputerBroker } from "./computer/broker.mjs";
 import { decide, runDomains, runPolicy } from "./permissions";
@@ -64,6 +65,8 @@ export async function createHostedBotRunner(host: {
   computerBroker?: ComputerBroker;
   /** Test-only fixture preservation; production leaves this unset. */
   retainResources?: boolean;
+  /** Disabled until finalized-session recovery is independently validated. */
+  enableSessionSnapshots?: boolean;
 }) {
   if (
     process.platform !== "linux" ||
@@ -526,19 +529,43 @@ export async function createHostedBotRunner(host: {
             if (!stat?.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || !matchesNativeContinuation(readJson(originLedger), scope, continuation)) throw unavailable();
           }
         }
+        // Invalidate any snapshot from an earlier execution of this run before
+        // a CLI can append to its history. A crash cannot leave stale data final.
+        let sessionEpoch: string | undefined;
+        if (host.enableSessionSnapshots) {
+          if (!host.link.nativeInvalidateSession) throw unavailable();
+          sessionEpoch = await host.link.nativeInvalidateSession(assignment.deviceId,assignment.runId,lifetime.signal);
+          await check();
+        }
         const record = async (sessionId: string) => {
           assertOpen();
           if (assignment.requireSessionResume && sessionId !== assignment.resumeSessionId) throw unavailable();
           writeJsonAtomic(ledger, { scope, sessionId });
         };
         const saveSession = async (sessionId: string) => {
-          if (!host.link.nativeSaveSession) throw unavailable();
+          if (!host.link.nativeSaveSession || !sessionEpoch) throw unavailable();
           await check();
           if(sessionRootFd===undefined)throw unavailable();
           const rootParts = kind === 'codex' ? ['codex-home','sessions'] : ['native-home','.claude','projects',claudeProjectDirName(realpathSync(options.cwd))];
-          const snapshot = captureNativeSessionAt(sessionRootFd,rootParts,kind,sessionId);
-          await host.link.nativeSaveSession(assignment.deviceId, assignment.runId, sessionId, snapshot, lifetime.signal);
-          await check();
+          await finalizeHostedSession(async () => {
+            // Closing the CLI transport asks it to end naturally. Confirm the
+            // container itself exited successfully, not merely its attach client.
+            // A timeout is never treated as a clean final flush.
+            try {
+              const result = await exec("docker", ["wait", name], {env:bareEnv,timeout:10000});
+              if (result.stdout.trim() !== "0") throw unavailable();
+              const state = await exec("docker", ["inspect", "--format", "{{.State.Running}} {{.State.ExitCode}}", name], {env:bareEnv,timeout:10000});
+              if (state.stdout.trim() !== "false 0") throw unavailable();
+            } catch {
+              await exec("docker", ["stop", "--time", "3", name], {env:bareEnv,timeout:10000}).catch(() => undefined);
+              throw unavailable();
+            }
+          }, async () => {
+            await check();
+            const snapshot = captureNativeSessionAt(sessionRootFd!,rootParts,kind,sessionId);
+            await host.link.nativeSaveSession!(assignment.deviceId, assignment.runId, sessionId, sessionEpoch, snapshot, lifetime.signal);
+            await check();
+          });
         };
         brokerStarting = createNativeSubscriptionBroker({
           root: join(host.stateDir, "native-brokers"),
@@ -741,7 +768,7 @@ export async function createHostedBotRunner(host: {
                   sandbox: blockedSandbox,
                   spawnCli: codexSpawn,
                   onHostedSession: record,
-                  onHostedBeforeFinish: saveSession,
+                  ...(host.enableSessionSnapshots ? {onHostedBeforeFinish: saveSession} : {}),
                   computerMcp,
                   subscriptionAuth: {
                     accountId: first.accountId,
@@ -761,7 +788,7 @@ export async function createHostedBotRunner(host: {
               : new ClaudeAdapter({
                   stateDir: host.stateDir,
                   onHostedSession: record,
-                  onHostedBeforeFinish: saveSession,
+                  ...(host.enableSessionSnapshots ? {onHostedBeforeFinish: saveSession} : {}),
                   computerMcp,
                   spawnHosted: (config, token) => {
                     if (token !== placeholder) throw unavailable();

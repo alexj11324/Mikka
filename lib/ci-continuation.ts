@@ -35,7 +35,7 @@ export async function queueCiContinuation(tx: PoolClient, userId: string, input:
   if (binding.agentDefinition?.subscription) {
     // Missing, oversized or failed snapshots must produce a durable attention
     // event rather than silently enqueueing an impossible hosted resume.
-    const snapshot = await tx.query('SELECT 1 FROM ci_native_sessions WHERE "runId"=$1', [input.originRunId])
+    const snapshot = await tx.query('SELECT 1 FROM ci_native_sessions WHERE "runId"=$1 AND final=true', [input.originRunId])
     if (!snapshot.rowCount) throw new CiContinuationUnsupported('session_missing')
   }
   const key = `ci:${createHash('sha256').update(JSON.stringify([userId, input.issueId, input.remoteKey, input.prNumber, input.head, input.fingerprint, binding.watchId, String(binding.generation)])).digest('hex')}`

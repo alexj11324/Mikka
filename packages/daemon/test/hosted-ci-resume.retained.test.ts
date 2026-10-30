@@ -21,18 +21,19 @@ for (const harness of ['codex','claude_code'] as const) it(`restores ${harness} 
   const link = Object.assign(new MemoryServer(deviceId).link(), {
     nativeContext: async () => ({ route: harness === 'codex' ? 'codex_cli' as const : 'claude_code_cli' as const,modelId:'fixture-model',revision:2,accountId:'fixture-account',expiresAt:new Date(Date.now()+60000).toISOString() }),
     nativeRequest: async () => { throw new Error('fixture must not call provider') },
-    nativeSaveSession: async (_device:string,_run:string,_session:string,data:Buffer) => { saved=Buffer.from(data) },
+    nativeInvalidateSession: async () => { saved=undefined; return randomUUID() },
+    nativeSaveSession: async (_device:string,_run:string,_session:string,_epoch:string,data:Buffer) => { saved=Buffer.from(data) },
     nativeRestoreSession: async () => { if (!saved) throw new Error('missing snapshot'); return saved },
   })
   const binary=resolve(import.meta.dirname,`fakes/fake-${harness === 'codex' ? 'codex' : 'claude'}-subscription.mjs`)
   const assignment = {runId:origin,deviceId,issueId:randomUUID(),repoId:randomUUID(),baseBranch:'main',harness,prompt:'hello',model:'fixture-model',subscriptionBinding:{bindingId,ownerId:'fixture-owner',workspaceId,consumerId,route:harness === 'codex' ? 'codex_cli' : 'claude_code_cli'}} as RunAssignment
   const options = (runId:string) => ({runId,toolApproval:new ToolApprovalGate(runId,{permission:()=> 'deny',ask:async()=> 'deny',isLive:()=>true}),cwd:repo,prompt:'hello',model:'fixture-model',env:buildChildEnv({host:{PATH:process.env.PATH,HOME:root}}),log:createLogger({level:'silent' as const})})
-  const first=await createHostedBotRunner({stateDir:join(root,'first'),link,binaries:{[harness]:binary},retainResources:true})
+  const first=await createHostedBotRunner({stateDir:join(root,'first'),link,binaries:{[harness]:binary},retainResources:true,enableSessionSnapshots:true})
   const original=await first.start(assignment,options(origin))
   const firstEvents=[]; for await(const e of original.events()) firstEvents.push(e)
   expect(firstEvents.at(-1)).toMatchObject({type:'exit',outcome:'succeeded'})
   expect(saved).toBeDefined()
-  const second=await createHostedBotRunner({stateDir:join(root,'second'),link,binaries:{[harness]:binary},retainResources:true})
+  const second=await createHostedBotRunner({stateDir:join(root,'second'),link,binaries:{[harness]:binary},retainResources:true,enableSessionSnapshots:true})
   const next={...assignment,runId:child,continuesRunId:origin,resumeSessionId:original.sessionId,requireSessionResume:true,ciSessionResume:true} as RunAssignment
   const resumed=await second.start(next,{...options(child),requireSessionResume:true,continueSession:{runId:origin,sessionId:original.sessionId,message:'CI finished'}})
   expect(resumed.sessionId).toBe(original.sessionId)

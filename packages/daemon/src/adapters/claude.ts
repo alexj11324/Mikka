@@ -615,12 +615,15 @@ export class ClaudeAdapter implements AgentAdapter {
     const close = async (event: Omit<ExitEvent, "type"> | null, revokeRunGate: boolean) => {
       ending = true
       approvalTransport.abort()
-      if (event && externalAuth && this.options.onHostedBeforeFinish) await this.options.onHostedBeforeFinish(sessionId).catch(() => undefined)
+      prompts.close()
+      session.close()
+      if (event && externalAuth && this.options.onHostedBeforeFinish) {
+        try { await this.options.onHostedBeforeFinish(sessionId) }
+        catch { log.warn("Hosted session snapshot could not be finalized; CI continuation is unavailable") }
+      }
       if (revokeRunGate) options.toolApproval?.revoke()
       clearTimeout(graceTimer)
       clearTimeout(authTimer)
-      prompts.close()
-      session.close()
       await gone
       if (event) queue.exit(event)
     }
