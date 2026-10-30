@@ -2918,7 +2918,8 @@
       "prompt": "Create a task for me: {text}",
       "create": "Create task",
       "sending": "Sending…",
-      "failed": "Could not send"
+      "failed": "Could not send",
+      "unavailable": "Task creation isn’t turned on for this workspace yet. You can hand the work to Coordinator in chat instead."
     },
     "board": {
       "toolbar": "Board toolbar",

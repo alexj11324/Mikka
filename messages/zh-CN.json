@@ -2918,7 +2918,8 @@
       "prompt": "帮我新建一个任务：{text}",
       "create": "创建任务",
       "sending": "正在发送…",
-      "failed": "发送失败"
+      "failed": "发送失败",
+      "unavailable": "这个工作区还没有开启任务创建，可以先在对话里交给 Coordinator。"
     },
     "board": {
       "toolbar": "看板工具栏",
