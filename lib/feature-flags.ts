@@ -36,6 +36,15 @@ export const proactiveFeatures = {
   research: 'mikka-proactive-research',
 } as const
 
+/**
+ * Switches that turn a shipped path off while PostHog says exactly true, so a
+ * deployment without PostHog (local, CI) keeps it on.
+ */
+export const killSwitches = {
+  /** Email/password sign-in and sign-up; GitHub and Google stay (Alex, 2026-10-30). */
+  emailSignIn: 'mikka-email-sign-in-off',
+} as const
+
 /** On only when PostHog says exactly true; unloaded, missing or multivariate values stay off. */
 export function gatedFeatureEnabled(remoteValue: boolean | string | undefined) {
   return remoteValue === true
