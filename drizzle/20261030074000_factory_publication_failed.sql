@@ -1,7 +1,7 @@
 -- target: MIKKA_DATABASE_URL
 -- BE-4 (B2/B4): a publication the provider confirmed as failed, and why an approval stopped counting.
--- Two files = two transactions, like 20261030054000: here (1) nullable columns, no rewrite;
--- (2) CHECKs added NOT VALID, so ACCESS EXCLUSIVE is held only until COMMIT. 20261030074300 VALIDATEs.
+-- One file, one transaction, two steps: (1) nullable columns, no rewrite; (2) CHECKs added NOT VALID,
+-- so the brief ACCESS EXCLUSIVE is held only until COMMIT. The VALIDATE is the separate file 20261030074300.
 -- factory_publications_status_check is swapped for factory_publications_status_v2_check ('failed' added);
 -- every existing row is reserved/succeeded/uncertain and satisfies both. Idempotent.
 -- Rollback: alter table factory_approvals drop column "invalidatedAt", drop column "invalidationReason";
