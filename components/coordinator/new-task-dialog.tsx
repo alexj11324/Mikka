@@ -23,7 +23,7 @@ const MAX_LENGTH = 8000
 
 type Machine = { value: string; label: string; cloud?: boolean; online?: boolean }
 
-/** A machine's icon with its state dot. Mikka Cloud stays green asleep, since picking it wakes it; red only when it failed (the workspace has one, so any bot's computer reports it). */
+/** A machine's icon with its state dot. E2B stays green asleep, since picking it wakes it; red only when it failed (the workspace has one, so any bot's computer reports it). */
 function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
   const t = useTranslations('Shell.newTaskDialog')
   const tStatus = useTranslations('Computer.status')
@@ -65,7 +65,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
   const { data: bots = [] } = useSWR(open ? 'bots' : null, listBots)
   const cloudBotId = bots[0]?.id
-  // Mikka Cloud first and by default: there the Coordinator picks the bot, so no bot is named.
+  // E2B first and by default: there the Coordinator picks the bot, so no bot is named.
   // Direct daemon devices are 本机, including Linux. OS is not evidence that
   // a computer is an SSH target reached through another machine (R-23).
   const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true }
