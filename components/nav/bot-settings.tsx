@@ -56,9 +56,9 @@ export function BotSettings({ botId }: { botId: string }) {
     return group ? allT(group.labelKey) : ''
   }
   // What the menu shows: the owner's choice while it is allowed, else what the bot falls back to.
-  const shownModel = values.model && data.allowedModels.includes(values.model) ? values.model : data.effectiveModel
+  const shownModel = values.model && data.selectableModels.includes(values.model) ? values.model : data.effectiveModel
   const shownRepository = values.repository && data.repositories.includes(values.repository) ? values.repository : NO_REPOSITORY
-  const modelItems = data.allowedModels.map(model => ({ value: model, label: label(model) }))
+  const modelItems = data.selectableModels.map(model => ({ value: model, label: label(model) }))
   const repositoryItems = [{ value: NO_REPOSITORY, label: t('noRepository') }, ...data.repositories.map(value => ({ value, label: value }))]
   const save = (change: BotSettingsChange) => void saver.current?.save(change)
   // Codex and Claude run on the owner's own subscription (设置 › 模型订阅).

@@ -22,6 +22,7 @@ export const AUDIT_ACTIONS = {
   // 权限
   'team.access_changed': 'permission',
   'bot.permissions_changed': 'permission',
+  'workspace.models_changed': 'permission',
   'integration.permission_changed': 'permission',
   // 密钥与环境
   'secret.created': 'secret',
@@ -68,6 +69,8 @@ export const AUDIT_METADATA = {
   'member.role_changed': z.object({ oldRole: role, newRole: role }).strict(),
   'team.access_changed': z.object({ team: label, from: access, to: access }).partial().strict(),
   'bot.permissions_changed': z.object({ capability: label, from: access, to: access }).partial().strict(),
+  // 可用模型 (docs/design/bot-settings.md): comma-separated families before and after, and the starting model.
+  'workspace.models_changed': z.object({ fromModels: label, toModels: label, fromStarting: label.nullable(), toStarting: label.nullable() }).partial().strict(),
   'integration.permission_changed': z.object({ integration: label, capability: label, from: access, to: access }).strict(),
   'secret.created': z.object({ scope }).partial().strict(),
   'secret.replaced': z.object({ scope }).partial().strict(),

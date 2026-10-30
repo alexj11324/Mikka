@@ -8,7 +8,9 @@ import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { issueVisibility } from '@/lib/issue-visibility'
-import { allowedModelsOf, botSettingsInput, modelPolicyInput, resolveBotModel, resolveBotRepository } from '@/lib/workspace-admin/bot-model-policy'
+import { recordAudit } from '@/lib/audit/record'
+import { allowedModelsOf, botSettingsInput, modelPolicyInput, resolveBotModel, resolveBotRepository, selectableModels } from '@/lib/workspace-admin/bot-model-policy'
+import { subscriptionModelsRunnable } from '@/lib/bot-runtime-model'
 import { BOT_MODEL_GROUPS, botThreadsInput, botThreadHref, botThreadTitle, decodeBotThreadCursor, encodeBotThreadCursor, type BotModelGroup } from '@/lib/workspace-admin/bot-threads'
 
 export interface ModelPolicy {
@@ -82,14 +84,24 @@ export async function saveModelPolicy(actorId: string, workspaceId: string, inpu
   if (startingModel && !allowedModels.includes(startingModel)) throw new WorkspaceError('botModelNotAllowed')
   const ordered = allowedModelsOf(allowedModels)
   return workspaceDb.transaction(async tx => {
-    await requireWorkspace(tx, workspaceId, actorId, true)
+    const { membership } = await requireWorkspace(tx, workspaceId, actorId, true)
     await db.insert(workspaceSettings).values({ workspaceId }).onConflictDoNothing({ target: workspaceSettings.workspaceId })
+    const before = await modelPolicy(workspaceId)
     const match = expectedVersion === undefined
       ? eq(workspaceSettings.workspaceId, workspaceId)
       : and(eq(workspaceSettings.workspaceId, workspaceId), eq(workspaceSettings.modelPolicyVersion, expectedVersion))
-    const [row] = await db.update(workspaceSettings)
-      .set({ allowedModels: ordered, defaultModel: startingModel, modelPolicyVersion: sql`${workspaceSettings.modelPolicyVersion} + 1`, updatedAt: new Date() })
-      .where(match).returning({ version: workspaceSettings.modelPolicyVersion })
+    // The change and its 审计日志 row commit together (lib/audit/record.ts).
+    const row = await db.transaction(async main => {
+      const [updated] = await main.update(workspaceSettings)
+        .set({ allowedModels: ordered, defaultModel: startingModel, modelPolicyVersion: sql`${workspaceSettings.modelPolicyVersion} + 1`, updatedAt: new Date() })
+        .where(match).returning({ version: workspaceSettings.modelPolicyVersion })
+      if (!updated) return null
+      await recordAudit(main, {
+        workspaceId, actor: { type: 'user', id: actorId, name: membership.name || actorId }, action: 'workspace.models_changed', target: { type: 'workspace', id: workspaceId },
+        metadata: { fromModels: before.allowedModels.join(','), toModels: ordered.join(','), fromStarting: before.startingModel, toStarting: startingModel },
+      })
+      return updated
+    })
     if (!row) throw new ModelPolicyConflictError(await modelPolicy(workspaceId))
     return { allowedModels: ordered, startingModel, version: row.version, modelGroups: BOT_MODEL_GROUPS }
   })
@@ -109,8 +121,10 @@ export interface BotSettingsView {
   modelUnavailable: boolean
   /** The stored repository is no longer covered by the workspace's GitHub App installations. */
   repositoryUnavailable: boolean
-  /** The choices: 可用模型 and the installed repositories. */
+  /** 可用模型, and the installed repositories. */
   allowedModels: WorkspaceBotModel[]
+  /** What the owner's 模型 menu offers: allowed and runnable here (Codex / Claude need the subscription backend). */
+  selectableModels: WorkspaceBotModel[]
   repositories: string[]
   modelGroups: readonly BotModelGroup[]
   /**
@@ -141,7 +155,7 @@ function settingsView(viewerId: string, bot: Awaited<ReturnType<typeof botIn>>, 
     model: bot.model, repository: bot.repository,
     effectiveModel: model.model, effectiveRepository: repository.repository,
     modelUnavailable: model.unavailable, repositoryUnavailable: repository.unavailable,
-    allowedModels: policy.allowedModels, repositories, modelGroups: policy.modelGroups,
+    allowedModels: policy.allowedModels, selectableModels: selectableModels(policy.allowedModels, subscriptionModelsRunnable()), repositories, modelGroups: policy.modelGroups,
     connectedProviders: bot.ownerId === viewerId ? providers : [],
   }
 }
@@ -170,6 +184,8 @@ export async function saveBotSettings(actorId: string, workspaceId: string, inpu
     const current = await botIn(workspaceId, botId, tx)
     if (current.ownerId !== actorId) throw new WorkspaceError('botOwnerOnly')
     if (values.model && !(await modelPolicy(workspaceId, tx)).allowedModels.includes(values.model)) throw new WorkspaceError('botModelNotAllowed')
+    // A choice that cannot run in this deployment is not offered, and not accepted either.
+    if (values.model && !selectableModels([values.model], subscriptionModelsRunnable()).length) throw new WorkspaceError('validationGeneric')
     if (values.model === undefined && values.repository === undefined) return current
     const [row] = await tx.update(bots).set({ ...values, updatedAt: new Date() })
       .where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId), eq(bots.ownerId, actorId)))
@@ -249,8 +265,6 @@ const iso = (column: ReturnType<typeof sql>) => sql<string>`to_char(${column} at
  * chat's prompt is only selected from the database for its own owner.
  * Keyset on (lastActivityAt, threadId) DESC with a row comparison.
  */
-// TODO(audit): reading threads is not audited; if bot settings writes need audit, call
-// recordAudit(tx, …) from lib/audit/record (PR #432) inside the bot/defaults update transaction.
 export async function listBotThreadsFor(viewerId: string, workspaceId: string, input: unknown): Promise<BotThreadPage> {
   const { botId, limit, cursor } = botThreadsInput.parse(input)
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, viewerId))

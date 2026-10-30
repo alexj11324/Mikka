@@ -51,3 +51,47 @@ export const botSettingsInput = z.object({
   model: model.nullable().optional(),
   repository: z.string().trim().min(1).max(300).nullable().optional(),
 }).strict()
+
+export type SubscriptionProvider = 'codex' | 'claude'
+
+/** Which provider a subscription binding route belongs to (byos_bindings.route). */
+export function bindingProvider(route: string): SubscriptionProvider {
+  return route.startsWith('claude') ? 'claude' : 'codex'
+}
+
+export type BotModelSource =
+  | { family: WorkspaceBotModel; source: { type: 'subscription'; bindingId: string } | undefined }
+  | { family: WorkspaceBotModel | null; refused: 'binding_required' | 'backend_unavailable' }
+
+/**
+ * What a bot's run actually uses, from its owner's choice and the workspace's 可用模型
+ * (resolveBotModel). 'mikka' runs on Mikka's hosted model; Codex / Claude run on the
+ * owner's own subscription binding for this bot, or the run is refused: a bot never
+ * moves to another provider because a subscription is missing.
+ * A bot whose owner never chose (`storedModel` null) keeps the subscription its
+ * definition already selected, as long as that provider is allowed.
+ */
+export function chooseBotModelSource(input: {
+  storedModel: WorkspaceBotModel | null
+  allowedModels: readonly WorkspaceBotModel[]
+  startingModel: WorkspaceBotModel | null
+  /** The binding the bot's agent definition selected, if any. */
+  definitionBinding: { id: string; provider: SubscriptionProvider } | null
+  /** The owner's newest live binding for this bot, per provider. */
+  latestBindings: Partial<Record<SubscriptionProvider, string>>
+  /** Subscriptions can run in this deployment (BYOS and the agent kit are on). */
+  subscriptionsRunnable: boolean
+}): BotModelSource {
+  const chosen = input.storedModel ?? input.definitionBinding?.provider ?? null
+  const { model: family } = resolveBotModel({ model: chosen, allowedModels: input.allowedModels, startingModel: input.startingModel })
+  if (family === null) return { family, refused: 'binding_required' }
+  if (family === 'mikka') return { family, source: undefined }
+  if (!input.subscriptionsRunnable) return { family, refused: 'backend_unavailable' }
+  const bindingId = input.definitionBinding?.provider === family ? input.definitionBinding.id : input.latestBindings[family]
+  return bindingId ? { family, source: { type: 'subscription', bindingId } } : { family, refused: 'binding_required' }
+}
+
+/** Families a bot can be set to here: allowed, and runnable in this deployment. */
+export function selectableModels(allowedModels: readonly WorkspaceBotModel[], subscriptionsRunnable: boolean): WorkspaceBotModel[] {
+  return allowedModels.filter(model => model === 'mikka' || subscriptionsRunnable)
+}

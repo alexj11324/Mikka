@@ -118,7 +118,7 @@ getWorkspaceModelPolicy(): Promise<ActionResult<{
 }>>
 ```
 
-- 权限：任何启用中的成员都能读（成员的 Bot 菜单来自这里）。
+- 权限：任何启用中的成员都能读（成员的 Bot 菜单来自这里）。从未保存过（NULL）= 全部允许，包括以后新增的模型；保存过明确列表后，新增的模型需要管理员手动开启。
 
 ### `updateWorkspaceModelPolicy(input)`
 
@@ -137,7 +137,13 @@ updateWorkspaceModelPolicy(input: { allowedModels: string[]; startingModel: stri
 
 ### `createBot(input)`
 
-不传 `model` 时用新 Bot 的初始模型（否则第一个允许的模型），`repository` 默认为空。显式传入的值同样校验可用模型和已安装仓库。注意：运行时现在还没有读取 `bots.model`，模型仍然由订阅绑定决定。
+不传 `model` 时用新 Bot 的初始模型（否则第一个允许的模型），`repository` 默认为空。显式传入的值同样校验可用模型和已安装仓库。
+
+### 运行时
+
+Bot 每一轮对话开始时调用 `botRunModelSource`（`lib/bot-runtime-model.ts`）：模型是 Mikka 默认时使用托管模型；是 Codex 或 Claude 时，使用创建者为这个 Bot 建立的、该 provider 最新的有效订阅绑定。没有绑定时拒绝这一轮（`binding_required`），绝不悄悄换到别的 provider。订阅后端或 agent kit 未开启时，菜单里不提供 Codex/Claude，保存会被拒绝，运行也会被拒绝（`backend_unavailable`）。
+
+可用模型的每次修改都会写一条审计事件 `workspace.models_changed`（权限类），和修改本身在同一个事务里提交。
 
 ### `listWorkspaceBots()`
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { allowedModelsOf, botSettingsInput, modelPolicyInput, resolveBotModel, resolveBotRepository } from './bot-model-policy'
+import { allowedModelsOf, bindingProvider, botSettingsInput, chooseBotModelSource, modelPolicyInput, resolveBotModel, resolveBotRepository, selectableModels } from './bot-model-policy'
 
 test('allowlist: null allows every family; stored lists come back in menu order without unknown values', () => {
   assert.deepEqual(allowedModelsOf(null), ['mikka', 'codex', 'claude'])
@@ -34,4 +34,27 @@ test('policy input: at least one known family, no duplicates; bot input: uuid an
   assert.ok(botSettingsInput.safeParse({ botId, model: 'codex', repository: null }).success)
   assert.ok(!botSettingsInput.safeParse({ botId: 'nope', model: 'codex' }).success)
   assert.ok(!botSettingsInput.safeParse({ botId, model: 'gpt-x' }).success)
+})
+
+test('a run uses the owner\'s model: hosted Mikka, that provider\'s binding, or a refusal; never another provider', () => {
+  const base = { allowedModels: ['mikka', 'codex', 'claude'] as const, startingModel: null, definitionBinding: null, latestBindings: {}, subscriptionsRunnable: true }
+  const all = [...base.allowedModels]
+  assert.deepEqual(chooseBotModelSource({ ...base, allowedModels: all, storedModel: 'mikka' }), { family: 'mikka', source: undefined })
+  assert.deepEqual(chooseBotModelSource({ ...base, allowedModels: all, storedModel: 'codex', latestBindings: { codex: 'b1', claude: 'b2' } }), { family: 'codex', source: { type: 'subscription', bindingId: 'b1' } })
+  assert.deepEqual(chooseBotModelSource({ ...base, allowedModels: all, storedModel: 'codex', latestBindings: { claude: 'b2' } }), { family: 'codex', refused: 'binding_required' })
+  assert.deepEqual(chooseBotModelSource({ ...base, allowedModels: all, storedModel: 'claude', subscriptionsRunnable: false }), { family: 'claude', refused: 'backend_unavailable' })
+  // The definition's binding wins for its own provider; a choice of another provider ignores it.
+  const definitionBinding = { id: 'd1', provider: 'claude' as const }
+  assert.deepEqual(chooseBotModelSource({ ...base, allowedModels: all, storedModel: 'claude', definitionBinding, latestBindings: { claude: 'b2' } }), { family: 'claude', source: { type: 'subscription', bindingId: 'd1' } })
+  assert.deepEqual(chooseBotModelSource({ ...base, allowedModels: all, storedModel: 'mikka', definitionBinding }), { family: 'mikka', source: undefined })
+  // Never chosen: the definition's provider stands in for the choice.
+  assert.deepEqual(chooseBotModelSource({ ...base, allowedModels: all, storedModel: null, definitionBinding }), { family: 'claude', source: { type: 'subscription', bindingId: 'd1' } })
+  // Disallowed: falls back to the starting model.
+  assert.deepEqual(chooseBotModelSource({ ...base, allowedModels: ['mikka', 'codex'], startingModel: 'codex', storedModel: 'claude', definitionBinding, latestBindings: { codex: 'b1' } }), { family: 'codex', source: { type: 'subscription', bindingId: 'b1' } })
+})
+
+test('routes map to providers; the menu offers only what can run here', () => {
+  assert.deepEqual(['codex_cpa', 'openai_siwc', 'claude_cpa'].map(bindingProvider), ['codex', 'codex', 'claude'])
+  assert.deepEqual(selectableModels(['mikka', 'codex', 'claude'], false), ['mikka'])
+  assert.deepEqual(selectableModels(['codex', 'claude'], true), ['codex', 'claude'])
 })

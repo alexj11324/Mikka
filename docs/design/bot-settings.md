@@ -40,8 +40,14 @@ The `models` id stays, so old links keep working. Search: 额度 / quota find
 
 ## Behaviour
 
-- A workspace that never saved 可用模型 allows every family. At least one
-  family stays allowed; the last switch is disabled.
+- A workspace that never saved 可用模型 (`allowedModels` NULL) allows every
+  family, including families Mikka adds later. Once an admin saves a list, a
+  new family is not enabled for that workspace until an admin turns it on, as
+  in enterprise admin consoles. At least one family stays allowed; the last
+  switch is disabled.
+- Every change to 可用模型 or the starting model is a 审计日志 event
+  (`workspace.models_changed`, category 权限) with the families and starting
+  model before and after. It commits in the same transaction as the change.
 - A new bot's model is 新 Bot 的初始模型 if set, else the first allowed
   family. Its repository starts empty.
 - A bot's model must be in 可用模型 and its repository must be covered by the
@@ -72,6 +78,26 @@ The `models` id stays, so old links keep working. Search: 额度 / quota find
   saves from one page are ordered by `lib/settings/bot-settings-saver.ts`
   (from #442): only the latest request of a field commits or rolls back.
 
+## What runs
+
+Every turn of a bot's chat starts with `botRunModelSource` (`lib/bot-runtime-model.ts`,
+called from `workflows/coordinator/agent-kit-steps.ts`), which applies
+`chooseBotModelSource`:
+
+- The family is the owner's choice when 可用模型 allows it; otherwise it falls back
+  as above. A bot whose owner never chose keeps the subscription its agent
+  definition already selected, if that provider is allowed.
+- Mikka 默认 runs on Mikka's hosted model, even when the definition selects a
+  subscription.
+- Codex or Claude runs on the owner's newest live binding for that bot and
+  provider. Without one, the turn is refused (`binding_required`) and 详情 shows
+  「未连接 Codex 订阅」. A bot never moves to another provider because a
+  subscription is missing.
+- Codex and Claude need the subscription backend and the agent kit
+  (`MIKKA_BYOS_ENABLED`, `MIKKA_AGENT_KIT`). Where those are off, the 模型 menu does
+  not offer them, saves refuse them, and a stale choice refuses the turn
+  (`backend_unavailable`) instead of running on Mikka.
+
 ## Data
 
 - `workspace_settings."allowedModels" text[]` (null = all), CHECKed to known
@@ -80,7 +106,8 @@ The `models` id stays, so old links keep working. Search: 额度 / quota find
   (`drizzle/20261030170000_workspace_model_allowlist.sql`).
 - `bots.model`, `bots.repository`: the owner's choices (columns already exist).
 - `workspace_settings."defaultRepository"` and `"botDefaultsVersion"` (#466)
-  are no longer read or written.
+  are no longer read or written. They are dropped by a later contract
+  migration after this one is deployed everywhere (expand/contract), not here.
 
 ## Layout and states
 
@@ -111,7 +138,4 @@ R-43, `docs/settings.md` rules 1–5. Components are shadcn defaults: `Switch`,
 
 ## Out of scope
 
-- The runtime does not read `bots.model` yet; the model still comes from the
-  subscription binding. `resolveBotModel` is what it must call when it does.
-- Per-member or per-team allowlists, specific model versions inside a family,
-  and audit-log events for 可用模型 changes.
+- Per-member or per-team allowlists, and specific model versions inside a family.
