@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { auditSource, auditCss, isComponentLibrarySource } from './ui-policy.mjs'
 import { auditInteractions } from './interaction-policy.mjs'
 import { auditSettingsSurface } from './settings-policy.mjs'
+import { auditIconButtons } from './icon-button-policy.mjs'
 
 const policy = JSON.parse(readFileSync('ui-policy.json', 'utf8'))
 const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).split('\0').filter(file => /\.(?:[cm]?[jt]sx?|css)$/.test(file) && !/^(?:apps|packages|scripts|node_modules|\.next|\.vercel|out|build|user_read_only_context|v0_memories|\.claude)\//.test(file) && !file.endsWith('.d.ts') && existsSync(file))
@@ -16,7 +17,10 @@ for (const file of businessFiles) {
   if (/\.[jt]sx$/.test(file)) diagnostics.push(...auditSettingsSurface(file, text))
 }
 const interactionFiles = files.filter(file => /\.[jt]sx$/.test(file) && !['components/ui/', 'components/reui/'].some(root => file.startsWith(root)))
-for (const file of interactionFiles) diagnostics.push(...auditInteractions(file, readFileSync(file, 'utf8')))
+for (const file of interactionFiles) {
+  const text = readFileSync(file, 'utf8')
+  diagnostics.push(...auditInteractions(file, text), ...auditIconButtons(file, text))
+}
 const counts = Object.fromEntries([...new Set(diagnostics.map(d => d.rule))].sort().map(rule => [rule, diagnostics.filter(d => d.rule === rule).length]))
 if (process.argv.includes('--json')) console.log(JSON.stringify({ files: businessFiles.length, libraryFiles: files.length - businessFiles.length, interactionFiles: interactionFiles.length, errors: diagnostics.length, counts, diagnostics }, null, 2))
 else {

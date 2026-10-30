@@ -31,15 +31,8 @@ import {
 import {
   PublicationDeferred,
   publicationBindingHash,
-  publicationPolicyBinding,
   type PublicationInput,
 } from "./publication-operation";
-
-import {
-  authorizeFactoryDecision,
-  type FactoryDecisionAuthority,
-  type FactoryDecisionScope,
-} from "./policy-authorization";
 
 const principalId = (actor: FactoryActor) =>
   actor.sessionId ? `session:${actor.sessionId}` : `owner:${actor.userId}`;
@@ -56,9 +49,7 @@ function providerInput(
     authorization: {
       approvalId: a.id,
       ownerId: task.userId,
-      ...(a.decisionEvidence
-        ? { policy: publicationPolicyBinding(a.decisionEvidence) }
-        : { humanSessionId: a.humanSessionId }),
+      humanSessionId: a.humanSessionId,
       expiresAt: a.request.expiresAt,
       binding: req.binding,
       eventId: req.eventId,
@@ -121,7 +112,16 @@ export async function reservePublication(
   const id = randomUUID();
   const inserted = await tx.query(
     `INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'reserved') ON CONFLICT DO NOTHING`,
-    [id, p.approvalId, p.taskId, p.candidateId, p.action, p.target, p.eventId, JSON.stringify(p.request)],
+    [
+      id,
+      p.approvalId,
+      p.taskId,
+      p.candidateId,
+      p.action,
+      p.target,
+      p.eventId,
+      JSON.stringify(p.request),
+    ],
   );
   if (inserted.rowCount !== 1) fail("factoryPublicationAlreadyClaimed");
   return id;
@@ -130,7 +130,7 @@ export async function reservePublication(
 /** Browser transport authentication, not a human-approval requirement. */
 async function browserSession(tx: PoolClient, actor: FactoryActor) {
   if (!actor?.userId) fail("factoryActorRequired");
-  if (!actor.sessionId) return; // Trusted backend owner still requires policy proof.
+  if (!actor.sessionId) return; // Approval itself requires a linked human session.
   const { rows } = await tx.query(
     `SELECT id FROM "session" WHERE id=$1 AND "userId"=$2 AND "expiresAt">clock_timestamp() FOR SHARE`,
     [actor.sessionId, actor.userId],
@@ -153,26 +153,6 @@ async function humanApproval(
   );
   if (!rows.length) fail("factoryHumanRequired");
 }
-function decisionScope(
-  task: FactoryTask,
-  req: z.infer<typeof approvalRequest>,
-  current: Awaited<ReturnType<typeof approvalEvidence>>,
-): FactoryDecisionScope {
-  return {
-    ownerId: task.userId,
-    binding: req.binding,
-    candidate: req.candidate,
-    action: req.action,
-    target: req.target,
-    targetEnvironment: req.targetEnvironment,
-    evidenceDigest: current.evidenceDigest,
-    expiresAt: req.expiresAt,
-    visualEvidenceDigests: current.manifest.artifacts
-      .filter((a) => a.kind === "screenshot" || a.kind === "video")
-      .map((a) => a.sha256),
-  };
-}
-
 /** The approval as bound to this task's current candidate and attempt. Revocation and a
  * superseded candidate always void it. Expiry and the approver's session do not: they gate
  * only a new reservation (validApproval). Once a publication is reserved, checking or
@@ -203,86 +183,41 @@ async function boundApproval(
   return a;
 }
 
-/** The task's evidence, which must still be exactly what was approved. */
+/** Evidence is for display; only replacement of the candidate invalidates approval. */
 async function approvedEvidence(tx: PoolClient, task: FactoryTask, a: any) {
   const current = await approvalEvidence(tx, task);
-  if (
-    current.evidenceDigest !== a.evidenceDigest ||
-    digest(current.manifest.candidate) !== digest(a.candidate) ||
-    digest(current.manifest) !== digest(a.evidence)
-  )
+  if (digest(current.manifest.candidate) !== digest(a.candidate))
     fail("factoryApprovalInvalid");
   return current;
 }
 
-/** Full authorization for a new decision or reservation: bound, unexpired, same evidence,
- * and the granting human session or policy decision still valid. */
+/** Authorization for a new reservation: bound, unexpired, with a live human session. */
 async function validApproval(
   tx: PoolClient,
   task: FactoryTask,
   id: string,
   publish: boolean,
-  authority?: FactoryDecisionAuthority,
 ) {
   const a = await boundApproval(tx, task, id, publish);
   if (!a.unexpired) fail("factoryApprovalInvalid");
   const current = await approvedEvidence(tx, task, a);
-  // A row without policy fields is a human approval: the live linked session
-  // that granted it is the authority, exactly as in the Warp-aligned model.
-  if (!a.decisionCredentialId && !a.decisionScope && !a.decisionEvidence) {
-    await humanApproval(tx, {
-      userId: a.userId,
-      sessionId: a.humanSessionId,
-    });
-    return { a, current };
-  }
-  if (!a.decisionCredentialId || !a.decisionScope || !a.decisionEvidence)
-    fail("factoryPolicyDecisionUnavailable");
-  const expected = decisionScope(
-    task,
-    approvalRequest.parse(a.request),
-    current,
-  );
-  if (digest(expected) !== digest(a.decisionScope))
-    fail("factoryPolicyDecisionMismatch");
-  const decision = await authorizeFactoryDecision(
-    tx,
-    authority,
-    a.decisionCredentialId,
-    expected,
-  );
-  if (digest(decision) !== digest(a.decisionEvidence))
-    fail("factoryPolicyDecisionMismatch");
+  await humanApproval(tx, { userId: a.userId, sessionId: a.humanSessionId });
   return { a, current };
 }
 
-/** What the transaction's row locks cannot freeze: the clock, the granting session and an
- * external policy authority. Re-asked right before the provider call, without rereading
+/** What the transaction's row locks cannot freeze: the clock, the granting session and its expiry. Re-asked right before the provider call, without rereading
  * or rehashing the evidence validApproval already checked in this transaction. */
-async function grantStillLive(
-  tx: PoolClient,
-  a: any,
-  authority?: FactoryDecisionAuthority,
-) {
+async function grantStillLive(tx: PoolClient, a: any) {
   const {
     rows: [live],
   } = await tx.query("SELECT $1::timestamptz>clock_timestamp() AS ok", [
     a.expiresAt,
   ]);
   if (!live.ok) fail("factoryApprovalInvalid");
-  if (!a.decisionCredentialId)
-    return humanApproval(tx, { userId: a.userId, sessionId: a.humanSessionId });
-  const decision = await authorizeFactoryDecision(
-    tx,
-    authority,
-    a.decisionCredentialId,
-    a.decisionScope,
-  );
-  if (digest(decision) !== digest(a.decisionEvidence))
-    fail("factoryPolicyDecisionMismatch");
+  return humanApproval(tx, { userId: a.userId, sessionId: a.humanSessionId });
 }
 
-function gatesFor(authority?: FactoryDecisionAuthority) {
+function gatesFor() {
   const approvalGate: FactoryGate = async (tx, task, _attempt, change) => {
     const parsed = output.safeParse(change.output);
     if (
@@ -296,7 +231,6 @@ function gatesFor(authority?: FactoryDecisionAuthority) {
       task,
       parsed.data.approvalId,
       false,
-      authority,
     );
     return digest(change.evidence) === digest(current.evidence);
   };
@@ -335,7 +269,7 @@ function gatesFor(authority?: FactoryDecisionAuthority) {
   return { approval: approvalGate, publish: publishGate };
 }
 export const createFactoryApprovalGates = gatesFor;
-/** No implicit human fallback and no synthetic allow when an authority is absent. */
+/** Publication gates require the linked session that approved the candidate. */
 export const { approval: approvalGate, publish: publishGate } = gatesFor();
 
 export interface PublicationAdapter {
@@ -343,7 +277,10 @@ export interface PublicationAdapter {
   action: z.infer<typeof publicationRequest>["action"];
   target: string;
   environment: string;
-  execute(input: PublicationInput, tx?: PoolClient): Promise<PublicationAdapterReceipt>;
+  execute(
+    input: PublicationInput,
+    tx?: PoolClient,
+  ): Promise<PublicationAdapterReceipt>;
   /** Read-only inspection. This method must never create/promote a deployment. */
   reconcile?(
     input: PublicationInput,
@@ -396,7 +333,6 @@ export function createFactoryApprovals(
   authorize: FactoryAuthorize,
   store: FactoryApprovalStore,
   adapters: PublicationAdapter[] = [],
-  authority?: FactoryDecisionAuthority,
 ) {
   async function transaction<T>(fn: (tx: PoolClient) => Promise<T>) {
     const tx = await pool.connect();
@@ -536,20 +472,8 @@ export function createFactoryApprovals(
           !["pending", "waiting"].includes(task.status)
         )
           fail("factoryTransition");
-        const current = await approvalEvidence(tx, task),
-          evidenceReadId = randomUUID();
-        await tx.query(
-          'INSERT INTO factory_evidence_reads (id,"taskId","userId","principalId",binding,"evidenceDigest") VALUES ($1,$2,$3,$4,$5,$6)',
-          [
-            evidenceReadId,
-            task.id,
-            actor.userId,
-            principalId(actor),
-            JSON.stringify(bindingOf(task)),
-            current.evidenceDigest,
-          ],
-        );
-        return { binding: bindingOf(task), ...current, evidenceReadId };
+        const current = await approvalEvidence(tx, task);
+        return { binding: bindingOf(task), ...current };
       });
     },
     async approve(actor: FactoryActor, input: unknown) {
@@ -572,7 +496,7 @@ export function createFactoryApprovals(
           )
             fail("factoryReplayMismatch");
           // No historical success response can revive an expired/revoked/stale approval.
-          await validApproval(tx, task, prior.id, true, authority);
+          await validApproval(tx, task, prior.id, true);
           return { approvalId: prior.id, binding: bindingOf(task) };
         }
         fence(task, req.binding);
@@ -582,24 +506,7 @@ export function createFactoryApprovals(
         )
           fail("factoryTransition");
         const current = await approvalEvidence(tx, task);
-        const {
-          rows: [read],
-        } = await tx.query(
-          `SELECT id FROM factory_evidence_reads WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "principalId"=$4 AND binding=$5::jsonb AND "evidenceDigest"=$6`,
-          [
-            req.evidenceReadId,
-            task.id,
-            actor.userId,
-            principalId(actor),
-            JSON.stringify(req.binding),
-            current.evidenceDigest,
-          ],
-        );
-        if (
-          !read ||
-          req.evidenceDigest !== current.evidenceDigest ||
-          digest(req.candidate) !== digest(current.manifest.candidate)
-        )
+        if (digest(req.candidate) !== digest(current.manifest.candidate))
           fail("factoryEvidenceMismatch");
         const {
           rows: [expiry],
@@ -608,27 +515,10 @@ export function createFactoryApprovals(
           [req.expiresAt],
         );
         if (!expiry.valid) fail("factoryApprovalExpiry");
-        // Warp-aligned default: a live linked browser session is the human
-        // decision. A caller-supplied credential instead asks the optional
-        // policy authority, for deployments that install one.
-        let scope: FactoryDecisionScope | null = null;
-        let decision: Awaited<
-          ReturnType<typeof authorizeFactoryDecision>
-        > | null = null;
-        if (req.decisionCredentialId) {
-          scope = decisionScope(task, req, current);
-          decision = await authorizeFactoryDecision(
-            tx,
-            authority,
-            req.decisionCredentialId,
-            scope,
-          );
-        } else {
-          await humanApproval(tx, actor);
-        }
+        await humanApproval(tx, actor);
         const approvalId = randomUUID();
         const inserted = await tx.query(
-          `INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","decisionCredentialId","decisionScope","decisionEvidence","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,$16,$17,$18,$19,$7,$8,$9,$10,$11,$12,$13,$14,$4,$14,$15) ON CONFLICT DO NOTHING RETURNING id`,
+          `INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,$16,$7,$8,$9,$10,$11,$12,$13,$14,$4,$14,$15) ON CONFLICT DO NOTHING RETURNING id`,
           [
             approvalId,
             task.id,
@@ -641,21 +531,14 @@ export function createFactoryApprovals(
             JSON.stringify(req.candidate),
             req.action,
             req.target,
-            current.evidenceDigest,
+            null,
             JSON.stringify(current.manifest),
             task.revision,
             req.expiresAt,
-            decision?.decision === "ask"
-              ? decision.confirmation!.sessionId
-              : decision
-                ? null
-                : (actor.sessionId ?? null),
-            req.decisionCredentialId ?? null,
-            scope ? JSON.stringify(scope) : null,
-            decision ? JSON.stringify(decision) : null,
+            actor.sessionId,
           ],
         );
-        if (!inserted.rowCount) fail("factoryPolicyDecisionAlreadyConsumed");
+        if (!inserted.rowCount) fail("factoryReplayMismatch");
         let result = await store.apply(
           actor.userId,
           req.binding,
@@ -663,9 +546,7 @@ export function createFactoryApprovals(
           {
             action: "finish",
             status: "passed",
-            reason: decision
-              ? "Existing policy authorized exact candidate and model-grounded evidence"
-              : "Live human session approved exact candidate and evidence",
+            reason: "Live human session approved exact candidate",
             evidence: current.evidence,
             output: { approvalId },
           },
@@ -696,7 +577,9 @@ export function createFactoryApprovals(
       if (!parsed.success) fail("factoryInvalid");
       // Mask before anything is digested or persisted: the stored request, the
       // ledger and the task/attempt reason only ever see the masked note.
-      const data = parsed.data.note ? { ...parsed.data, note: maskFactoryNote(parsed.data.note) } : parsed.data;
+      const data = parsed.data.note
+        ? { ...parsed.data, note: maskFactoryNote(parsed.data.note) }
+        : parsed.data;
       const req = { operation: "reject" as const, ...data };
       return transaction(async (tx) => {
         const task = await owned(tx, actor, req.binding.taskId);
@@ -727,7 +610,9 @@ export function createFactoryApprovals(
         await humanApproval(tx, actor);
         if (req.failedEvidence?.length) {
           const current = await approvalEvidence(tx, task);
-          const known = new Set(current.manifest.artifacts.map((a) => a.artifact));
+          const known = new Set(
+            current.manifest.artifacts.map((a) => a.artifact),
+          );
           if (
             new Set(req.failedEvidence).size !== req.failedEvidence.length ||
             req.failedEvidence.some((a) => !known.has(a))
@@ -748,23 +633,34 @@ export function createFactoryApprovals(
         try {
           await checkFactoryRepairBudget(tx, task);
         } catch (error) {
-          if (!(error instanceof FactoryError) || error.code !== "factoryRecoveryBudgetExceeded") throw error;
+          if (
+            !(error instanceof FactoryError) ||
+            error.code !== "factoryRecoveryBudgetExceeded"
+          )
+            throw error;
           exhausted = true;
         }
         let result = await store.apply(
           actor.userId,
           bindingOf(task),
           randomUUID(),
-          { action: "finish", status: "failed", reason: exhausted ? `Repair budget exhausted. ${reason}` : reason, evidence: [], output: exhausted ? { reasonCode: "repair_budget_exhausted" } : {} },
+          {
+            action: "finish",
+            status: "failed",
+            reason: exhausted ? `Repair budget exhausted. ${reason}` : reason,
+            evidence: [],
+            output: exhausted ? { reasonCode: "repair_budget_exhausted" } : {},
+          },
           tx,
         );
-        if (!exhausted) result = await store.apply(
-          actor.userId,
-          bindingOf(result.task),
-          randomUUID(),
-          { action: "repair", reason },
-          tx,
-        );
+        if (!exhausted)
+          result = await store.apply(
+            actor.userId,
+            bindingOf(result.task),
+            randomUUID(),
+            { action: "repair", reason },
+            tx,
+          );
         const response = {
           rejectionId: req.eventId,
           binding: bindingOf(result.task),
@@ -882,13 +778,7 @@ export function createFactoryApprovals(
         fence(task, req.binding);
         if (task.stage !== "publish" || task.status !== "pending")
           fail("factoryTransition");
-        const { a } = await validApproval(
-          tx,
-          task,
-          req.approvalId,
-          true,
-          authority,
-        );
+        const { a } = await validApproval(tx, task, req.approvalId, true);
         if (
           a.action !== req.action ||
           a.target !== req.target ||
@@ -928,13 +818,12 @@ export function createFactoryApprovals(
             task,
             req.approvalId,
             true,
-            authority,
           );
           const trustedInput = providerInput(task, a, req, publicationId);
           // Authorized once above; the task and approval rows stay locked until COMMIT.
           trustedInput.beforeCreate = async () => {
             fence(await owned(tx, actor, task.id), req.binding);
-            await grantStillLive(tx, a, authority);
+            await grantStillLive(tx, a);
           };
           const receipt = publicationAdapterReceipt.parse(
             await adapter.execute(trustedInput, tx),

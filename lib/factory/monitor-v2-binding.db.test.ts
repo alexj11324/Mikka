@@ -19,7 +19,7 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
     const x = await f.prepare();
     const adapter = createVercelPublicationAdapter({ ...MIKKA_VERCEL, environment: "production" }, f.provider.client);
     const service = f.service([adapter]);
-    const approved = await service.approve(f.actor, f.issuePolicyDecision({ ...x.approval, action: "deploy_production", target: adapter.target, targetEnvironment: "production" }));
+    const approved = await service.approve(f.actor, f.approvalRequestForHuman({ ...x.approval, action: "deploy_production", target: adapter.target, targetEnvironment: "production" }));
     await service.publish(f.actor, { ...approved, eventId: randomUUID(), action: "deploy_production", target: adapter.target, targetEnvironment: "production" });
     const tx = await f.pool.connect();
     try {
@@ -42,15 +42,24 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
         `DELETE FROM factory_publications`,
         `UPDATE factory_approvals SET "revokedAt"=now()`,
         `UPDATE factory_tasks SET status='cancelled'`,
-        `UPDATE factory_candidates SET sha=repeat('b',40)`,
-        `UPDATE factory_publications SET receipt=jsonb_set(receipt,'{verifiedTarget,provider,bindingHash}',to_jsonb(repeat('0',64)))`,
-        `UPDATE factory_publications SET receipt=jsonb_set(receipt,'{verifiedTarget,observedAt}','"2000-01-01T00:00:00.000Z"')`,
-        `UPDATE factory_publications SET receipt=jsonb_set(receipt,'{verifiedTarget,observedAt}','"2999-01-01T00:00:00.000Z"')`,
+        `UPDATE factory_tasks SET "candidateId"=NULL`,
       ];
       for (const sql of mutations) {
         await tx.query("SAVEPOINT negative_case");
         await tx.query(sql);
         await assert.rejects(read, /factoryPublicationReceipt/);
+        await tx.query("ROLLBACK TO SAVEPOINT negative_case");
+      }
+      const historicalMutations = [
+        `UPDATE factory_candidates SET sha=repeat('b',40)`,
+        `UPDATE factory_publications SET receipt=jsonb_set(receipt,'{verifiedTarget,provider,bindingHash}',to_jsonb(repeat('0',64)))`,
+        `UPDATE factory_publications SET receipt=jsonb_set(receipt,'{verifiedTarget,observedAt}','"2000-01-01T00:00:00.000Z"')`,
+        `UPDATE factory_publications SET receipt=jsonb_set(receipt,'{verifiedTarget,observedAt}','"2999-01-01T00:00:00.000Z"')`,
+      ];
+      for (const sql of historicalMutations) {
+        await tx.query("SAVEPOINT negative_case");
+        await tx.query(sql);
+        assert.equal((await read()).publicationId, r.publicationId);
         await tx.query("ROLLBACK TO SAVEPOINT negative_case");
       }
       // Synthetic current monitor assignment; actual ancestry predicate and

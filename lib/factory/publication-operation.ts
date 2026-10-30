@@ -6,7 +6,6 @@ import {
 } from "./approval-contract";
 import { publicationAction } from "./approval-contract";
 import { digest } from "./evidence";
-import { verifiedFactoryDecision } from "./policy-authorization";
 
 const baseAuthorization = z
   .object({
@@ -20,35 +19,9 @@ const baseAuthorization = z
     targetEnvironment: z.string().min(1),
   })
   .strict();
-const authorization = z.union([
-  baseAuthorization
-    .extend({
-      policy: z
-        .object({
-          credentialId: z.string().min(1),
-          issuer: z.string().min(1),
-          policyId: z.string().min(1),
-          policyRevision: z.string().min(1),
-          scopeDigest: z.string().regex(/^[a-f0-9]{64}$/),
-          decisionDigest: z.string().regex(/^[a-f0-9]{64}$/),
-        })
-        .strict(),
-    })
-    .strict(),
-  // Historical receipts only. New Factory grants use the existing policy proof.
-  baseAuthorization.extend({ humanSessionId: z.string().min(1) }).strict(),
-]);
-export function publicationPolicyBinding(value: unknown) {
-  const d = verifiedFactoryDecision.parse(value);
-  return {
-    credentialId: d.credentialId,
-    issuer: d.issuer,
-    policyId: d.policyId,
-    policyRevision: d.policyRevision,
-    scopeDigest: d.scopeDigest,
-    decisionDigest: digest(d),
-  };
-}
+const authorization = baseAuthorization
+  .extend({ humanSessionId: z.string().min(1) })
+  .strict();
 export interface PublicationInput {
   idempotencyKey: string;
   candidate: z.infer<typeof candidateSchema>;

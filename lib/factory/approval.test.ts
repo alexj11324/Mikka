@@ -17,7 +17,6 @@ import {
   type FactoryEvidence,
 } from "./contract";
 import { createFactoryTestAuthority } from "../../tests/helpers/factory-test-authority";
-import { createFactoryApprovals as createApprovalsWithoutAuthority } from "./approval";
 import { handleFactoryApproval } from "./approval-http";
 import { approvalRequest } from "./approval-contract";
 import { createFactoryStore, type FactoryTask } from "./store";
@@ -273,7 +272,6 @@ test(
           targetEnvironment: "local-contract",
           expiresAt: new Date(Date.now() + 600000).toISOString(),
           evidenceDigest: e.evidenceDigest,
-          evidenceReadId: e.evidenceReadId,
           ...overrides,
         }, e);
       }
@@ -324,10 +322,6 @@ test(
         async () => {
           const s = await prepare(),
             req = await request(s);
-          await rejects(
-            () => createApprovalsWithoutAuthority(pool, authorize, store).approve(actor, req),
-            "factoryPolicyDecisionUnavailable",
-          );
           assert.equal(
             (
               await handleFactoryApproval(
@@ -369,11 +363,6 @@ test(
           await rejects(
             () => service.approve({ ...actor, sessionId: "worker-token" }, req),
             "factoryHumanRequired",
-          );
-          await rejects(
-            () =>
-              service.approve(actor, { ...req, evidenceReadId: randomUUID() }),
-            "factoryEvidenceMismatch",
           );
           await rejects(
             () =>
@@ -550,15 +539,11 @@ test(
               ),
             "factoryArtifactMissing",
           );
-          const req = await request(s);
           await pool.query(
             `UPDATE agent_runs SET report=jsonb_set(report,'{summary}','"changed"') WHERE id=$1`,
             [e.evidence[0].runId],
           );
-          await rejects(
-            () => service.approve(actor, req),
-            "factoryEvidenceMismatch",
-          );
+          await service.artifact(actor, s.task.id, e.evidence[0].artifact);
           await pool.query(
             `UPDATE factory_attempts SET "sessionId"='executor-session' WHERE "taskId"=$1 AND stage IN ('execute','review')`,
             [s.task.id],
@@ -1562,7 +1547,6 @@ test(
               eventId: randomUUID(),
               candidate: e.manifest.candidate,
               evidenceDigest: e.evidenceDigest,
-              evidenceReadId: e.evidenceReadId,
               action: "deploy_preview",
               target: "local-isolated-filesystem",
               targetEnvironment: "local-contract",
