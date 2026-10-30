@@ -8,6 +8,7 @@ test('bot thread list', { skip: !dbUrl }, async t => {
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const { WorkspaceError } = await import('../lib/workspace-access')
   const botAdmin = await import('../lib/workspace-admin/bots')
+  const { botThreadPublicId } = await import('../lib/workspace-admin/bot-threads')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
@@ -42,7 +43,10 @@ test('bot thread list', { skip: !dbUrl }, async t => {
   await run(member, null, 'queued', 'Member private ask', 15, 10)
   await pool.query(`update agent_runs set "updatedAt"=(select max("updatedAt") from agent_runs where "botId"=$1 and "issueId" is null and "userId"=$2) where "botId"=$1 and "userId"=$3`, [bot, owner, member])
   await seedRun(pool, { userId: outsider, agentId: await seedAgent(pool, outsider), botId: foreignBot })
-  const allThreads = [`issue:${issueA}`, `issue:${issueB}`, `chat:${owner}`, `chat:${member}`]
+  await pool.query(`update "user" set image='/api/avatars/' || id || '/abc' where id=$1`, [owner])
+  const tid = (key: string) => botThreadPublicId(bot, key)
+  const T = { a: tid(`issue:${issueA}`), b: tid(`issue:${issueB}`), ownerChat: tid(`chat:${owner}`), memberChat: tid(`chat:${member}`) }
+  const allThreads = Object.values(T)
 
   await t.test('runs aggregate per thread: latest status, last activity, opening title, href', async () => {
     const page = await botAdmin.listBotThreadsFor(owner, ws.id, { botId: bot })
@@ -51,15 +55,15 @@ test('bot thread list', { skip: !dbUrl }, async t => {
     assert.equal(page.nextCursor, null)
     assert.deepEqual(page.threads.map(row => row.threadId).sort(), [...allThreads].sort())
     const by = new Map(page.threads.map(row => [row.threadId, row]))
-    assert.deepEqual(by.get(`issue:${issueA}`), { threadId: `issue:${issueA}`, title: 'Owner private task', status: 'running', lastActivityAt: by.get(`issue:${issueA}`)!.lastActivityAt, canOpen: true, href: `/?issue=${issueA}` })
-    assert.equal(by.get(`issue:${issueB}`)!.status, 'done')
-    assert.equal(page.threads[0].threadId, `issue:${issueB}`, 'lastReplyAt counts as activity; most recent first')
+    assert.deepEqual(by.get(T.a), { threadId: T.a, initiator: { id: owner, name: by.get(T.a)!.initiator.name, avatarUrl: `/api/avatars/${owner}/abc` }, title: 'Owner private task', status: 'running', lastActivityAt: by.get(T.a)!.lastActivityAt, canOpen: true, href: `/?issue=${issueA}` })
+    assert.equal(by.get(T.b)!.status, 'done')
+    assert.equal(page.threads[0].threadId, T.b, 'lastReplyAt counts as activity; most recent first')
     assert.equal(page.summary.lastActivityAt, page.threads[0].lastActivityAt)
-    const chat = by.get(`chat:${owner}`)!
+    const chat = by.get(T.ownerChat)!
     assert.deepEqual([chat.title, chat.status, chat.canOpen, chat.href], ['Chat opening', 'done', true, `/?section=coordinator&bot=${bot}`])
-    const memberChat = by.get(`chat:${member}`)!
+    const memberChat = by.get(T.memberChat)!
     assert.deepEqual([memberChat.title, memberChat.status, memberChat.canOpen, memberChat.href], [null, 'running', false, null])
-    assert.ok(Date.parse(by.get(`issue:${issueA}`)!.lastActivityAt) > Date.parse(chat.lastActivityAt) - 25 * 60_000)
+    assert.ok(Date.parse(by.get(T.a)!.lastActivityAt) > Date.parse(chat.lastActivityAt) - 25 * 60_000)
     assert.ok(!JSON.stringify(page).includes('Member private ask'))
   })
 
@@ -67,9 +71,18 @@ test('bot thread list', { skip: !dbUrl }, async t => {
     const page = await botAdmin.listBotThreadsFor(member, ws.id, { botId: bot })
     assert.equal(page.summary.totalThreads, 4)
     const by = new Map(page.threads.map(row => [row.threadId, row]))
-    for (const id of [`issue:${issueA}`, `issue:${issueB}`, `chat:${owner}`]) assert.deepEqual([by.get(id)!.title, by.get(id)!.canOpen, by.get(id)!.href], [null, false, null], id)
-    assert.deepEqual([by.get(`chat:${member}`)!.title, by.get(`chat:${member}`)!.href], ['Member private ask', `/?section=coordinator&bot=${bot}`])
+    for (const id of [T.a, T.b, T.ownerChat]) assert.deepEqual([by.get(id)!.title, by.get(id)!.canOpen, by.get(id)!.href], [null, false, null], id)
+    assert.deepEqual([by.get(T.memberChat)!.title, by.get(T.memberChat)!.href], ['Member private ask', `/?section=coordinator&bot=${bot}`])
     assert.ok(!JSON.stringify(page).includes('Chat opening'))
+    // Invisible tasks: no task reference at all (no id in threadId, href or anywhere), initiator still shown.
+    const json = JSON.stringify(page)
+    for (const issueId of [issueA, issueB]) assert.ok(!json.includes(issueId), 'issue id leaked')
+    for (const id of [T.a, T.b, T.ownerChat]) assert.equal(by.get(id)!.initiator.id, owner)
+    assert.ok(by.get(T.a)!.initiator.name, 'initiator name shown with a null title')
+    assert.equal(by.get(T.memberChat)!.initiator.avatarUrl, null)
+    // Cursors carry the opaque id only.
+    const first = await botAdmin.listBotThreadsFor(member, ws.id, { botId: bot, limit: 1 })
+    assert.ok(first.nextCursor && !Buffer.from(first.nextCursor, 'base64url').toString().match(/issue:|chat:/))
   })
 
   await t.test('keyset paging by threadId covers every thread exactly once, including ties', async () => {

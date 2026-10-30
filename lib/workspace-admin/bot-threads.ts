@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { WORKSPACE_BOT_MODELS, type WorkspaceBotModel } from '@/lib/db/schema'
 
@@ -30,8 +31,15 @@ export const BOT_THREAD_TITLE_MAX = 80
 /** Keyset position: the thread's last activity and its threadId. */
 export interface BotThreadPosition { at: string; threadId: string }
 
-/** `issue:<issueId>` for a task's thread, `chat:<userId>` for one person's chat with the bot. */
-export const BOT_THREAD_ID = /^(?:issue:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|chat:[^\s]{1,200})$/
+/**
+ * Public thread id: `t_` + 32 hex of sha256(`<botId>:<threadKey>`), where the
+ * internal key is `issue:<issueId>` (a task's thread) or `chat:<userId>` (one
+ * person's chat). Opaque for every row, so a task the viewer cannot see never
+ * leaks its id through the row key or the cursor. Same formula in SQL
+ * (listBotThreadsFor) and here (tests); stable across pages.
+ */
+export const BOT_THREAD_ID = /^t_[0-9a-f]{32}$/
+export const botThreadPublicId = (botId: string, threadKey: string) => `t_${createHash('sha256').update(`${botId}:${threadKey}`).digest('hex').slice(0, 32)}`
 
 export const botThreadsInput = z.object({
   botId: z.uuid(),

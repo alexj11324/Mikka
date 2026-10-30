@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { BOT_MODEL_GROUPS, BOT_THREAD_TITLE_MAX, botThreadHref, botThreadsInput, botThreadTitle, decodeBotThreadCursor, encodeBotThreadCursor } from './bot-threads'
+import { BOT_MODEL_GROUPS, BOT_THREAD_TITLE_MAX, botThreadHref, botThreadPublicId, botThreadsInput, botThreadTitle, decodeBotThreadCursor, encodeBotThreadCursor } from './bot-threads'
 
 test('model menu is three families in order: Mikka 默认 / Codex / Claude', () => {
   assert.deepEqual(BOT_MODEL_GROUPS.map(group => [group.id, group.source, group.isDefault]), [['mikka', 'hosted', true], ['codex', 'subscription', false], ['claude', 'subscription', false]])
@@ -8,10 +8,9 @@ test('model menu is three families in order: Mikka 默认 / Codex / Claude', () 
 })
 
 test('cursor round-trips and rejects anything foreign', () => {
-  const position = { at: '2026-10-29T12:00:00.123456Z', threadId: 'issue:00000000-0000-4000-8000-000000000001' }
-  assert.deepEqual(decodeBotThreadCursor(encodeBotThreadCursor({ at: position.at, threadId: 'chat:user_abc' })), { at: position.at, threadId: 'chat:user_abc' })
+  const position = { at: '2026-10-29T12:00:00.123456Z', threadId: botThreadPublicId('00000000-0000-4000-8000-0000000000b0', 'issue:00000000-0000-4000-8000-000000000001') }
   assert.deepEqual(decodeBotThreadCursor(encodeBotThreadCursor(position)), position)
-  for (const bad of ['', 'not base64!', Buffer.from('{"at":"x","threadId":"y"}').toString('base64url'), Buffer.from(JSON.stringify({ at: position.at, threadId: '00000000-0000-4000-8000-000000000001' })).toString('base64url'), Buffer.from(JSON.stringify({ at: position.at, threadId: 'issue:nope' })).toString('base64url'), Buffer.from(JSON.stringify({ ...position, extra: 1 })).toString('base64url'), 'a'.repeat(401)]) {
+  for (const bad of ['', 'not base64!', Buffer.from('{"at":"x","threadId":"y"}').toString('base64url'), Buffer.from(JSON.stringify({ at: position.at, threadId: '00000000-0000-4000-8000-000000000001' })).toString('base64url'), Buffer.from(JSON.stringify({ at: position.at, threadId: 'issue:nope' })).toString('base64url'), Buffer.from(JSON.stringify({ at: position.at, threadId: 'issue:00000000-0000-4000-8000-000000000001' })).toString('base64url'), Buffer.from(JSON.stringify({ ...position, extra: 1 })).toString('base64url'), 'a'.repeat(401)]) {
     assert.equal(decodeBotThreadCursor(bad), null, bad)
   }
 })
@@ -40,4 +39,13 @@ test('href: task thread when the task is visible, chat only for its owner, else 
   assert.equal(botThreadHref({ issueId, ownerId: 'u1', botId }, { id: 'u1', issueVisible: false }), null)
   assert.equal(botThreadHref({ issueId: null, ownerId: 'u1', botId }, { id: 'u1', issueVisible: false }), `/?section=coordinator&bot=${botId}`)
   assert.equal(botThreadHref({ issueId: null, ownerId: 'u1', botId }, { id: 'u2', issueVisible: true }), null)
+})
+
+test('public thread ids are opaque, stable and per bot', () => {
+  const issueId = '00000000-0000-4000-8000-000000000001', bot = '00000000-0000-4000-8000-0000000000b0'
+  const id = botThreadPublicId(bot, `issue:${issueId}`)
+  assert.match(id, /^t_[0-9a-f]{32}$/)
+  assert.equal(id, botThreadPublicId(bot, `issue:${issueId}`))
+  assert.notEqual(id, botThreadPublicId('00000000-0000-4000-8000-0000000000b1', `issue:${issueId}`))
+  assert.ok(!id.includes(issueId.replaceAll('-', '').slice(0, 8)))
 })

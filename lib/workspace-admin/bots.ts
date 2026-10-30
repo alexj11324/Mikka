@@ -2,7 +2,7 @@ import 'server-only'
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { agentRuns, bots, issues, githubRepositoryInstallations, WORKSPACE_BOT_MODELS, workspaceSettings, type WorkspaceBotModel } from '@/lib/db/schema'
+import { agentRuns, bots, issues, users, githubRepositoryInstallations, WORKSPACE_BOT_MODELS, workspaceSettings, type WorkspaceBotModel } from '@/lib/db/schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
@@ -106,8 +106,10 @@ export async function workspaceBots(workspaceId: string): Promise<WorkspaceBotVi
 }
 
 export interface BotThreadView {
-  /** `issue:<issueId>` (a task's thread) or `chat:<userId>` (one person's chat with this bot). Row key and cursor key. */
+  /** Opaque row/cursor key (`t_` + 32 hex, see botThreadPublicId). Never contains an issue or user id. */
   threadId: string
+  /** Who started the thread (first run's user). Shown to any workspace member, even when title is null. */
+  initiator: { id: string; name: string | null; avatarUrl: string | null }
   /** Task title or the chat's opening line; null when the viewer may not see it (show 私有线程). */
   title: string | null
   /** The thread's latest run: 运行中 for any unfinished status (queued included), else 已完成. */
@@ -116,7 +118,7 @@ export interface BotThreadView {
   lastActivityAt: string
   /** True only when the viewer may open the thread. */
   canOpen: boolean
-  /** In-app link to the thread; null when !canOpen. */
+  /** In-app link to the thread; null when !canOpen. The only place a task id appears, and only for tasks the viewer can see. */
   href: string | null
 }
 
@@ -149,9 +151,11 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
   const position = cursor ? decodeBotThreadCursor(cursor) : null
   if (cursor && !position) throw new WorkspaceError('validationGeneric')
   const threadKey = sql`case when ${agentRuns.issueId} is not null then 'issue:' || ${agentRuns.issueId}::text else 'chat:' || ${agentRuns.userId} end`
+  // Opaque public id, same formula as botThreadPublicId (sha256 of "<botId>:<key>", 32 hex).
+  const publicId = sql`'t_' || left(encode(sha256(convert_to(${botId}::text || ':' || ${threadKey}, 'UTF8')), 'hex'), 32)`
   const activity = sql`greatest(${agentRuns.updatedAt}, coalesce(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt}))`
   const runs = db.$with('bot_thread_runs').as(db.select({
-    threadId: sql<string>`${threadKey}`.as('threadId'),
+    threadId: sql<string>`${publicId}`.as('threadId'),
     issueId: agentRuns.issueId,
     ownerId: agentRuns.userId,
     status: agentRuns.status,
@@ -164,11 +168,12 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
   const threads = db.$with('bot_threads').as(db.with(runs).selectDistinctOn([runs.threadId], {
     threadId: runs.threadId, issueId: runs.issueId, ownerId: runs.ownerId, status: runs.status,
     lastActivity: sql<Date>`max(${runs.activity}) over (partition by ${runs.threadId})`.as('lastActivity'),
+    initiatorId: sql<string>`first_value(${runs.ownerId}) over (partition by ${runs.threadId} order by ${runs.createdAt}, ${runs.id})`.as('initiatorId'),
     opening: sql<string | null>`first_value(${runs.prompt}) over (partition by ${runs.threadId} order by ${runs.createdAt}, ${runs.id})`.as('opening'),
   }).from(runs).orderBy(runs.threadId, desc(runs.createdAt), desc(runs.id)))
   const after = position ? sql`(${threads.lastActivity}, ${threads.threadId}) < (${position.at}::timestamptz, ${position.threadId})` : undefined
   const rows = await db.with(runs, threads).select({
-    threadId: threads.threadId, issueId: threads.issueId, ownerId: threads.ownerId, status: threads.status, opening: threads.opening,
+    threadId: threads.threadId, issueId: threads.issueId, ownerId: threads.ownerId, initiatorId: threads.initiatorId, status: threads.status, opening: threads.opening,
     lastActivityAt: iso(sql`${threads.lastActivity}`), issueTitle: issues.title,
   }).from(threads).leftJoin(issues, eq(issues.id, threads.issueId))
     .where(after).orderBy(desc(threads.lastActivity), desc(threads.threadId)).limit(limit + 1)
@@ -184,12 +189,21 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
     const seen = await db.select({ id: issues.id }).from(issues).where(and(inArray(issues.id, issueIds), predicate))
     visible = new Set(seen.map(row => row.id))
   }
+  // Initiators: member display name (workspace DB) and profile picture (app DB). Any active member may see these.
+  const initiatorIds = [...new Set(page.map(row => row.initiatorId))]
+  const [memberNames, pictures] = initiatorIds.length ? await Promise.all([
+    workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, workspaceId), inArray(workspaceMembers.userId, initiatorIds))),
+    db.select({ id: users.id, name: users.name, image: users.image }).from(users).where(inArray(users.id, initiatorIds)),
+  ]) : [[], []]
+  const memberName = new Map(memberNames.map(row => [row.userId, row.name]))
+  const profile = new Map(pictures.map(row => [row.id, row]))
   const unfinished = new Set<string>(UNFINISHED_RUN_STATUSES)
   const views = page.map(row => {
     const issueVisible = !!row.issueId && visible.has(row.issueId)
     const href = botThreadHref({ issueId: row.issueId, ownerId: row.ownerId, botId }, { id: viewerId, issueVisible })
     return {
       threadId: row.threadId,
+      initiator: { id: row.initiatorId, name: memberName.get(row.initiatorId) ?? profile.get(row.initiatorId)?.name ?? null, avatarUrl: profile.get(row.initiatorId)?.image ?? null },
       title: botThreadTitle({ issueTitle: row.issueTitle, issueVisible, prompt: row.opening, startedByViewer: row.ownerId === viewerId }),
       status: unfinished.has(row.status) ? 'running' as const : 'done' as const,
       lastActivityAt: row.lastActivityAt,
