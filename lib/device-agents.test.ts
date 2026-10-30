@@ -10,8 +10,8 @@ const claude: HarnessInfo = { harness: 'claude_code', installed: true, version: 
 
 test('only installed production harnesses become local execution identities', () => {
   const all: HarnessInfo[] = [codex, claude, codex, { harness: 'mock', installed: true, version: 'test' }, { harness: 'cursor', installed: true, version: 'test' }]
-  assert.deepEqual(localExecutionHarnesses(all, {}), ['claude_code', 'codex'])
-  assert.deepEqual(localExecutionHarnesses(all, { NODE_ENV: 'test', MIKKA_TEST_MODE: '1' }), ['claude_code', 'codex', 'mock'])
+  assert.deepEqual(localExecutionHarnesses(all, {}), ['claude_code', 'codex', 'cursor'])
+  assert.deepEqual(localExecutionHarnesses(all, { NODE_ENV: 'test', MIKKA_TEST_MODE: '1' }), ['claude_code', 'codex', 'cursor', 'mock'])
   assert.deepEqual(localExecutionHarnesses([{ ...codex, installed: false }]), [])
 })
 

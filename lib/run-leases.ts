@@ -67,6 +67,7 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
     ))
     .limit(20)
   for (const { run } of stranded) {
+    if (run.agentDefinition?.pinnedDeviceId) continue
     const target = await takeoverTarget(run, now)
     if (target) {
       await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, updatedAt: now })
@@ -85,7 +86,7 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
  */
 async function takeoverTarget(run: { id: string; userId: string; agentId: string; deviceId: string | null; deviceRepoId: string | null; agentDefinition?: Run['agentDefinition'] }, now: Date): Promise<(TakeoverCandidate & { deviceRepoId: string }) | null> {
   if (run.agentDefinition?.repositoryAdmission) return null
-  if (!run.deviceRepoId) return null
+  if (run.agentDefinition?.pinnedDeviceId || !run.deviceRepoId) return null
   const [repo] = await db.select({ remoteUrl: deviceRepos.remoteUrl, repoPath: deviceRepos.repoPath }).from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
   const [agent] = await db.select({ harness: agents.harness }).from(agents).where(eq(agents.id, run.agentId)).limit(1)
   if (!repo?.remoteUrl || !agent || !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) return null

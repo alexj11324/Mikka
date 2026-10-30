@@ -204,7 +204,7 @@ test('Factory dispatch and ordinary dispatch keep separate host entry points and
   await invoke(tools, 'dispatch_run', ordinary)
   await invoke(tools, 'dispatch_factory_run', factory)
   assert.deepEqual(calls, [
-    {name: 'ordinary-dispatch', args: [owner, ordinary, scope, null, execution()]},
+    {name: 'ordinary-dispatch', args: [owner, {...ordinary,requestKey:'dispatch:synthetic-call'}, scope, null, execution()]},
     {name: 'factory-dispatch', args: [owner, factory, scope]},
   ])
   const saved = execution(parseDefinition({...DEFAULT_AGENT_DEFINITION, tools: DEFAULT_AGENT_DEFINITION.tools.filter(name => !(FACTORY_TOOL_IDS as readonly string[]).includes(name))}))

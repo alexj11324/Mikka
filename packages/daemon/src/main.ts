@@ -60,6 +60,7 @@ import {
 } from "./errors"
 import { readJson, writeFileAtomic, writeJsonAtomic } from "./fs-util"
 import { restartService } from "./service"
+import { detectDeviceType } from "./device-type"
 import { detectHarnesses } from "./harnesses"
 import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
@@ -832,7 +833,7 @@ export class Daemon {
         arch: arch(),
         daemonVersion: DAEMON_VERSION,
         protocolVersion: DAEMON_PROTOCOL_VERSION,
-        deviceType: process.env.MIKKA_DEVICE_TYPE === "server" ? "server" : "laptop",
+        deviceType: process.env.MIKKA_DEVICE_TYPE === "server" ? "server" : process.env.MIKKA_DEVICE_TYPE === "laptop" ? "laptop" : await detectDeviceType(),
         harnesses: this.harnesses,
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
         ...(this.device.workspaceId
@@ -913,6 +914,8 @@ export class Daemon {
                 return { ...info, toolApproval: previous?.toolApproval, coordinator: coordinatorCapable(info) }
               })
               this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+              // Queue an immediate heartbeat after this sync pass, without re-entering it.
+              void this.syncWithServer().catch(() => undefined)
             } else {
               await restartService(command.kind === 'update', () => {
                 // Persist only after an update succeeds and before scheduling restart.

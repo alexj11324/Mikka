@@ -13,6 +13,9 @@ export interface WorkerDefinitionSnapshot {
   promptDigest: string
   /** Pinned subscription provenance, or CLI default selection; neither is a model execution receipt. */
   modelSource: 'native-default' | 'subscription'
+  cliModelSelection?: 'auto' | 'explicit'
+  model?: string
+  pinnedDeviceId?: string
   subscription?: { bindingId: string; modelId: string; route: string }
   parent: { executionId: string; revisionId: string; revision: number; definitionDigest: string } | null
   /** Explicit parent-selected tools, frozen only for newly authorized runs. */
@@ -22,7 +25,7 @@ export interface WorkerDefinitionSnapshot {
 }
 
 /** Captured atomically with dispatch, not retroactively inferred from a renamed Agent. */
-export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; subscription?: { id: string; modelId: string; route: string } | null; mailboxEnabled?: boolean; mailboxScope?: WorkerMailboxScope }): WorkerDefinitionSnapshot {
+export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; model?: string; pinnedDeviceId?: string; subscription?: { id: string; modelId: string; route: string } | null; mailboxEnabled?: boolean; mailboxScope?: WorkerMailboxScope }): WorkerDefinitionSnapshot {
   if (Boolean(input.parent) !== Boolean(input.executionId)) throw new Error('agentWorkerParentIncomplete')
   const subscription = input.subscription ? { bindingId:z.uuid().parse(input.subscription.id),modelId:z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).parse(input.subscription.modelId),route:input.subscription.route } : undefined
   if (subscription && subscription.route !== (input.harness === 'codex' ? 'codex_cli' : input.harness === 'claude_code' ? 'claude_code_cli' : null)) throw new Error('agentWorkerSubscriptionMismatch')
@@ -30,8 +33,11 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
   const mailbox = tools.length && input.mailboxScope && ['claude_code', 'codex'].includes(input.harness)
     ? { version: 2 as const, tools, scope: workerMailboxScope.parse(input.mailboxScope) } : undefined
   return {
+    ...(input.model ? {model:z.string().trim().min(1).max(128).parse(input.model)} : {}),
+    ...(input.pinnedDeviceId ? {pinnedDeviceId:z.uuid().parse(input.pinnedDeviceId)} : {}),
+    cliModelSelection: input.model ? 'explicit' : 'auto',
     schemaVersion: 1, kind: 'worker', harness: input.harness, instructions: input.instructions,
-    definitionDigest: digest({ harness: input.harness, instructions: input.instructions, ...(subscription ? { subscription } : {}), ...(mailbox ? { mailbox } : {}) }),
+    definitionDigest: digest({ harness: input.harness, instructions: input.instructions, ...(input.model ? {model:input.model} : {}), ...(input.pinnedDeviceId ? {pinnedDeviceId:input.pinnedDeviceId} : {}), ...(subscription ? { subscription } : {}), ...(mailbox ? { mailbox } : {}) }),
     promptDigest: digest(input.prompt), modelSource: subscription ? 'subscription' : 'native-default', ...(subscription ? { subscription } : {}),
     parent: input.parent && input.executionId ? { executionId: input.executionId,revisionId: input.parent.revisionId,revision: input.parent.revision,definitionDigest: input.parent.definitionDigest } : null,
     ...(mailbox ? { mailbox } : {}),

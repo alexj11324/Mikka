@@ -56,3 +56,11 @@ test('abort and malformed explicit snapshot fail closed without provider calls',
   await assert.rejects(resolveFrozenHostedModel(scope,{...frozen,modelSelection:null} as unknown as HostedRuntimeSnapshot,f.deps))
   assert.equal(f.calls(),0)
 })
+test('Coordinator freezes an owned connected binding with distinct replay identity',async()=>{
+  const f=fixture(),coordinatorScope={...scope,botId:null}
+  const frozen=await freezeHostedModelSelection(coordinatorScope,{harness:'ai_sdk',model:null},{type:'subscription',bindingId:id(3)},f.deps)
+  assert.equal(frozen.modelSelection?.coordinator,true)
+  assert.notEqual(typeof await resolveFrozenHostedModel(coordinatorScope,frozen,f.deps),'string')
+  await assert.rejects(resolveFrozenHostedModel(scope,frozen,f.deps))
+  await assert.rejects(resolveFrozenHostedModel({...coordinatorScope,workspaceId:id(99)},frozen,f.deps))
+})

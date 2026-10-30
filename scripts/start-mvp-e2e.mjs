@@ -34,6 +34,9 @@ const preload = fileURLToPath(new URL('../tests/mvp/preload.mjs', import.meta.ur
 const child = spawn(process.execPath, ['--import', preload, 'node_modules/next/dist/bin/next', 'start', '--port', '3100'], {
   cwd: fileURLToPath(new URL('..', import.meta.url)), stdio: 'inherit',
   env: { ...process.env, AI_GATEWAY_API_KEY: '', DECISION_GATEWAY_API_KEY: MVP_DECISION_KEY,
+    MIKKA_BYOS_ENABLED:'1',MIKKA_BYOS_WORKER_BINARY:fileURLToPath(new URL('../tests/mvp/subscription-worker.mjs',import.meta.url)),
+    MIKKA_BYOS_INFISICAL_ORIGIN:'http://127.0.0.1:3191',MIKKA_BYOS_INFISICAL_PROJECT:'mvp-synthetic',MIKKA_BYOS_INFISICAL_ENVIRONMENT:'test',
+    MIKKA_BYOS_INFISICAL_PATH:'/custody',MIKKA_BYOS_ACCESS_INFISICAL_PATH:'/access',MIKKA_BYOS_INFISICAL_TOKEN:'mvp-synthetic-custody',MIKKA_BYOS_ACCESS_INFISICAL_TOKEN:'mvp-synthetic-access',MIKKA_BYOS_VALIDATED_MODEL_ROUTES:'codex_cpa',
     GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
     WORKFLOW_TARGET_WORLD: 'local', WORKFLOW_LOCAL_BASE_URL: `${MVP_ORIGIN}/mikka`, WORKFLOW_LOCAL_DATA_DIR: workflowDirectory },
 })
