@@ -256,7 +256,14 @@
     "retryIn": "Try again in {seconds}s",
     "verifyDescription": "Enter the email you signed up with to get a new verification link. It works for 15 minutes.",
     "verifyLinkInvalid": "This verification link is invalid, expired or already used. If your email is not verified yet, send a new link.",
-    "verifyEmailLink": "Verify your email or resend the link"
+    "verifyEmailLink": "Verify your email or resend the link",
+    "signupRefusal": {
+      "disposableEmail": "Temporary email addresses aren't supported. Please use a regular address.",
+      "signupRateLimited": "Too many sign-up attempts. Please try again later.",
+      "turnstileFailed": "Human verification failed",
+      "turnstileUnavailable": "Human verification is unavailable. Please try again later.",
+      "emailRegistered": "This email is already registered. Please sign in."
+    }
   },
   "Metadata": {
     "title": "Mikka · Tasks and documents workspace",
