@@ -44,6 +44,8 @@ function Columns() {
 }
 
 const ROW = 'hover:bg-transparent has-aria-expanded:bg-transparent'
+/** One framed list per section, like the device list: rules and bots are repeated subjects (docs/settings.md §4). */
+const FRAME = 'overflow-hidden rounded-xl border bg-card [&_td:first-child]:pl-3.5 [&_th:first-child]:pl-3.5 [&_td:last-child]:pr-2 [&_th:last-child]:pr-2'
 const CELL = 'py-3 pl-0'
 
 export function BotAgentsSettings() {
@@ -90,13 +92,15 @@ export function BotAgentsSettings() {
   return <div className="flex flex-col gap-10">
     <section aria-labelledby="bot-agents-bots" className="flex flex-col gap-2">
       <h2 id="bot-agents-bots" className="text-sm font-medium text-muted-foreground">{t('bots')}</h2>
-      <Table className="table-fixed border-t">
-        <Columns />
-        <TableBody className="divide-y">
-          <BotRow t={t} botId={null} name={null} rows={modelRows} onSave={save} onRefresh={async () => { await botModels.mutate() }} />
-          {bots.data.map(bot => <BotRow key={bot.id} t={t} botId={bot.id} name={bot} rows={modelRows} onSave={save} onRefresh={async () => { await botModels.mutate() }} />)}
-        </TableBody>
-      </Table>
+      <div className={FRAME}>
+        <Table className="table-fixed">
+          <Columns />
+          <TableBody className="divide-y">
+            <BotRow t={t} botId={null} name={null} rows={modelRows} onSave={save} onRefresh={async () => { await botModels.mutate() }} />
+            {bots.data.map(bot => <BotRow key={bot.id} t={t} botId={bot.id} name={bot} rows={modelRows} onSave={save} onRefresh={async () => { await botModels.mutate() }} />)}
+          </TableBody>
+        </Table>
+      </div>
     </section>
 
     <section aria-labelledby="bot-agents-agents" className="flex flex-col gap-2">
@@ -104,23 +108,25 @@ export function BotAgentsSettings() {
         <h2 id="bot-agents-agents" className="text-sm font-medium text-muted-foreground">{t('agents')}</h2>
         <LabelPicker t={t} mode="add" onSubmit={label => { void addRule(label) }} />
       </header>
-      <Table className="table-fixed">
-        <Columns />
-        <TableHeader>
-          <TableRow className={cn(ROW, 'border-b')}>
-            <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.label')}</TableHead>
-            <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.place')}</TableHead>
-            <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.harness')}</TableHead>
-            <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.model')}</TableHead>
-            <TableHead className="h-8 pl-0"><span className="sr-only">{t('columns.actions')}</span></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody className="divide-y">
-          {ruleList.map(rule => rule.id === DEFAULT_ID
-            ? <DefaultRow key={rule.id} t={t} />
-            : <RuleRow key={rule.id} t={t} rule={rule} places={placeList} onChange={value => { void updateRule(rule, value) }} onDelete={() => { void deleteRule(rule) }} onRedetect={redetect} />)}
-        </TableBody>
-      </Table>
+      <div className={FRAME}>
+        <Table className="table-fixed">
+          <Columns />
+          <TableHeader>
+            <TableRow className={cn(ROW, 'border-b')}>
+              <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.label')}</TableHead>
+              <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.place')}</TableHead>
+              <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.harness')}</TableHead>
+              <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.model')}</TableHead>
+              <TableHead className="h-8 pl-0"><span className="sr-only">{t('columns.actions')}</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y">
+            {ruleList.map(rule => rule.id === DEFAULT_ID
+              ? <DefaultRow key={rule.id} t={t} />
+              : <RuleRow key={rule.id} t={t} rule={rule} places={placeList} onChange={value => { void updateRule(rule, value) }} onDelete={() => { void deleteRule(rule) }} onRedetect={redetect} />)}
+          </TableBody>
+        </Table>
+      </div>
     </section>
     {failed && <SettingsSaveError message={t('notSaved')} retryLabel={t('retry')} onRetry={() => { void save(failed) }} />}
   </div>
