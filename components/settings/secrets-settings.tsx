@@ -14,9 +14,6 @@ import { SettingsLoading, SettingsSection, settingsSectionAction } from '@/compo
 import type { WorkspaceSecretView } from '@/lib/secrets/store'
 import { useActionError } from '@/lib/use-action-error'
 
-const ENVIRONMENTS = ['all', 'production', 'preview', 'development'] as const
-type Environment = (typeof ENVIRONMENTS)[number]
-
 /** Rows grouped as N5 shows them: 工作区 first, then one group per repository. */
 function groupByScope(secrets: WorkspaceSecretView[]) {
   const groups = new Map<string, WorkspaceSecretView[]>()
@@ -63,7 +60,6 @@ function SecretRow({ secret, onEdit }: { secret: WorkspaceSecretView; onEdit: ()
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
       <span className="truncate font-mono text-sm">{secret.name}</span>
       {secret.kind === 'env' && <Badge variant="secondary">{t('kinds.env')}</Badge>}
-      {secret.environment !== 'all' && <Badge variant="secondary">{t(`environments.${secret.environment}`)}</Badge>}
     </div>
     <Button type="button" variant="secondary" size="sm" aria-label={t('editNamed', { name: secret.name })} onClick={onEdit}>{t('edit')}</Button>
   </div>
@@ -80,12 +76,10 @@ function SecretDialog({ workspaceId, secret, onClose }: { workspaceId: string; s
   const [value, setValue] = useState('')
   const [scope, setScope] = useState<'workspace' | 'repository'>(secret?.scopeType ?? 'workspace')
   const [repository, setRepository] = useState(secret?.scopeRef ?? '')
-  const [environment, setEnvironment] = useState<Environment>(secret?.environment ?? 'all')
   const [pending, setPending] = useState<'save' | 'delete' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const kindItems = [{ value: 'secret', label: t('kinds.secret') }, { value: 'env', label: t('kinds.env') }]
   const scopeItems = [{ value: 'workspace', label: t('workspaceGroup') }, { value: 'repository', label: t('repository') }]
-  const environmentItems = ENVIRONMENTS.map(item => ({ value: item, label: t(`environments.${item}`) }))
   const scopeValue = scope === 'workspace' ? { type: 'workspace' as const } : { type: 'repository' as const, repository: repository.trim() }
   const ready = Boolean(value) && Boolean(name.trim()) && (scope === 'workspace' || /^[^/\s]+\/[^/\s]+$/.test(repository.trim()))
 
@@ -94,8 +88,8 @@ function SecretDialog({ workspaceId, secret, onClose }: { workspaceId: string; s
     setError(null)
     try {
       const result = secret
-        ? await replaceSecret({ id: secret.id, value, scope: scopeValue, environment }, workspaceId)
-        : await createSecret({ name: name.trim(), kind, value, scope: scopeValue, environment }, workspaceId)
+        ? await replaceSecret({ id: secret.id, value, scope: scopeValue }, workspaceId)
+        : await createSecret({ name: name.trim(), kind, value, scope: scopeValue }, workspaceId)
       if (result.error) { setError(actionError(result.error)); return }
       onClose({ name: result.name, warning: result.warning })
     } catch {
@@ -147,12 +141,6 @@ function SecretDialog({ workspaceId, secret, onClose }: { workspaceId: string; s
         {scope === 'repository' && <Label className="flex flex-col items-start gap-1.5">{t('repository')}
           <Input value={repository} placeholder="owner/repo" autoComplete="off" onChange={event => setRepository(event.target.value)} />
         </Label>}
-        <Label className="flex flex-col items-start gap-1.5">{t('environment')}
-          <Select value={environment} items={environmentItems} onValueChange={next => { if (next && (ENVIRONMENTS as readonly string[]).includes(next)) setEnvironment(next as Environment) }}>
-            <SelectTrigger aria-label={t('environment')} className="w-full"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectGroup>{environmentItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
-          </Select>
-        </Label>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       </div>
       <DialogFooter>

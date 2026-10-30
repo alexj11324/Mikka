@@ -2119,13 +2119,6 @@
       "value": "值",
       "newValue": "新的值",
       "scope": "范围",
-      "environment": "环境",
-      "environments": {
-        "all": "全部环境",
-        "production": "Production",
-        "preview": "Preview",
-        "development": "Development"
-      },
       "deleting": "正在删除…",
       "shortValueNotMasked": "{name} 少于 8 个字符，输出里不会遮住。"
     },

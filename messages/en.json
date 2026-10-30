@@ -2119,13 +2119,6 @@
       "value": "Value",
       "newValue": "New value",
       "scope": "Scope",
-      "environment": "Environment",
-      "environments": {
-        "all": "All environments",
-        "production": "Production",
-        "preview": "Preview",
-        "development": "Development"
-      },
       "deleting": "Deleting…",
       "shortValueNotMasked": "{name} is shorter than 8 characters and is not masked in output."
     },
