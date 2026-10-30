@@ -1,0 +1,53 @@
+name: SSH device backend
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - 'packages/daemon/**'
+      - 'packages/protocol/**'
+      - 'lib/device-*.ts'
+      - 'app/api/devices/**'
+      - 'app/v1/devices/**'
+      - 'drizzle/**'
+      - 'tests/ssh-install/**'
+      - '.github/workflows/ssh-device-backend.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ssh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mikka_491_e2e
+        ports:
+          - 55491:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Desktop state-machine and service tests
+        run: |
+          pnpm --filter @mikka/desktop test
+          pnpm --filter @mikka/daemon exec vitest run test/service.test.ts test/registration-login.test.ts test/device-file.test.ts test/commands.test.ts
+      - name: Enrollment and command isolation against PostgreSQL
+        env:
+          E2E_DATABASE_URL: postgres://postgres@127.0.0.1:55491/mikka_491_e2e
+        run: node --import ./tests/support/server-only.mjs --import tsx --test lib/device-enrollment.db.test.ts
+      - name: Packaged daemon over real SSH and systemd through the preload IPC
+        run: node tests/ssh-install/run.mjs

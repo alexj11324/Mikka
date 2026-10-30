@@ -107,6 +107,7 @@ export const devicePaths = {
 /** `POST /v1/devices/register` */
 export const deviceComputerCapability = z.object({ installed: z.boolean(), version: z.string().max(100).nullable() }).strict()
 export const deviceRegistration = z.object({
+  deviceType: z.enum(["laptop", "server"]).optional(),
   name: z.string().trim().min(1).max(200),
   hostname: z.string().max(255).nullable().optional(),
   platform: z.string().max(50),
@@ -144,7 +145,10 @@ export const heartbeatRunSchema = z.object({
 export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>
 
 /** `POST /v1/devices/:deviceId/heartbeat` */
+export const deviceManagementCommand = z.object({ id: z.uuid(), kind: z.enum(['redetect', 'restart', 'update']) })
 export const deviceHeartbeatSchema = z.object({
+  completedDeviceCommands: z.array(z.uuid()).max(100).optional(),
+  failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),
   harnesses: z.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
   runs: z.array(heartbeatRunSchema).max(500),
@@ -158,6 +162,7 @@ export const deviceHeartbeatSchema = z.object({
 export type DeviceHeartbeat = z.input<typeof deviceHeartbeatSchema>
 
 export const heartbeatResultSchema = z.object({
+  deviceCommands: z.array(deviceManagementCommand).max(1).optional(),
   /** Renewed lease expiry per run id; a run missing here is not renewed. */
   leases: z.record(z.string(), isoTime),
   /**

@@ -132,3 +132,15 @@ export async function deviceLogin(
   }
   throw new LoginError("expired_token", "The code expired; try again.")
 }
+
+/** Desktop SSH enrollment exchanges a one-use grant, never a browser session. */
+export async function registrationLogin(options: { serverUrl: string; token: string; fetchImpl?: typeof fetch }): Promise<string> {
+  if (!/^orv_[A-Za-z0-9_-]{43}$/.test(options.token)) throw new LoginError('failed', 'Invalid registration token.')
+  const response = await (options.fetchImpl ?? fetch)(serverUrl(options.serverUrl, '/v1/devices/enroll'), {
+    method: 'POST', headers: { authorization: `Bearer ${options.token}` }, redirect: 'error', signal: AbortSignal.timeout(30_000),
+  })
+  const body = await response.json().catch(() => null) as { credential?: unknown } | null
+  const parsed = tokenResponse.safeParse({ access_token: body?.credential })
+  if (!response.ok || !parsed.success) throw new LoginError('failed', 'Device registration token expired or already used.')
+  return parsed.data.access_token
+}
