@@ -148,6 +148,59 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[r.task.issueId])).rows[0].n,2);
     }finally{server.closeAllConnections();await new Promise<void>((resolve,reject)=>server.close(e=>e?reject(e):resolve()));}
   });
+  await t.test('BE-8(C) answer delivery: run_messages lands in the origin run once, continuation carries the resume contract, failure leaves nothing',async()=>{
+    const ask=async(sessionId:string)=>{
+      const r=await store.route('owner',await fixture());
+      const d=await dispatch('owner',{binding:factoryBinding(r.task),agentId,deviceRepoId:repoId});
+      await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"=$3,report=$2 WHERE id=$1`,[d.runId,JSON.stringify({question:{questionId:randomUUID(),kind:'context',question:'Which branch?',options:[]}}),sessionId]);
+      return {r,d,q:await questions.record('owner',d.runId)};
+    };
+    const messages=async(id:string)=>(await pool.query('SELECT "runId","userId","deliveredAt",text FROM run_messages WHERE id=$1',[id])).rows;
+    const runs=async(issueId:string)=>(await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[issueId])).rows[0].n;
+    // Failure path first: continuation unavailable rolls back the whole answer.
+    const bad=await ask('be8-bad-session');
+    await pool.query('UPDATE agent_runs SET "agentDefinition"=NULL WHERE id=$1',[bad.d.runId]);
+    const badAnswer={reference:questionReference(bad.q),answerId:randomUUID(),facts:[{kind:'issue' as const,quote:'Fixture'}]};
+    await denies(()=>questions.answer({source:'orchestrator',userId:'owner'},badAnswer),'factoryQuestionContinuationUnavailable');
+    assert.deepEqual(await messages(badAnswer.answerId),[],'no run_messages row on a refused continuation');
+    assert.equal(await runs(bad.r.task.issueId),1,'no continuation run left behind');
+    const badQ=(await pool.query('SELECT status,"continuationRunId" FROM factory_questions WHERE id=$1',[bad.q.id])).rows[0];
+    assert.equal(badQ.continuationRunId,null);
+    assert.ok(['open','waiting_user'].includes(badQ.status));
+    // Success path: ten concurrent identical answers deliver exactly once.
+    const {r,d,q}=await ask('be8-session');
+    const answer={reference:questionReference(q),answerId:randomUUID(),facts:[{kind:'issue' as const,quote:'Fixture'}]};
+    const results=await Promise.all(Array.from({length:10},()=>questions.answer({source:'orchestrator',userId:'owner'},answer)));
+    assert.equal(new Set(results.map(x=>x.continuationRunId)).size,1);
+    const continuationRunId=results[0].continuationRunId;
+    const delivered=await messages(answer.answerId);
+    assert.equal(delivered.length,1);
+    assert.equal(delivered[0].runId,d.runId,'answer is retained in the addressed (origin) run');
+    assert.notEqual(delivered[0].runId,continuationRunId);
+    assert.equal(delivered[0].userId,'owner');
+    assert.ok(delivered[0].deliveredAt,'already delivered: the continuation carries it, no inbox wait');
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_messages WHERE "runId"=$1',[d.runId])).rows[0].n,1);
+    assert.equal(await runs(r.task.issueId),2);
+    const cont=(await pool.query('SELECT status,"deviceId","agentId","deviceRepoId","questionContinuation" AS c FROM agent_runs WHERE id=$1',[continuationRunId])).rows[0];
+    assert.equal(cont.status,'queued');
+    assert.deepEqual([cont.deviceId,cont.agentId,cont.deviceRepoId],[deviceId,agentId,repoId]);
+    assert.equal(cont.c.questionId,q.id);
+    assert.equal(cont.c.originRunId,d.runId);
+    assert.equal(cont.c.originSessionId,'be8-session');
+    assert.equal(cont.c.requireSessionResume,true);
+    assert.equal(typeof cont.c.followUp,'string');
+    const stored=(await pool.query('SELECT status,"continuationRunId" FROM factory_questions WHERE id=$1',[q.id])).rows[0];
+    assert.deepEqual(stored,{status:'resuming',continuationRunId});
+    // The claim hands the worker the original session to resume.
+    const tx=await pool.connect();
+    try {
+      await tx.query('BEGIN');
+      const assignment=await claim(tx,'owner',deviceId,continuationRunId,new Date(Date.now()+60000).toISOString());
+      assert.equal(assignment.resumeSessionId,'be8-session');
+      assert.equal(assignment.requireSessionResume,true);
+      await tx.query('ROLLBACK');
+    } finally {tx.release();}
+  });
   await t.test('expired questions refuse new answers while another task progresses independently',async()=>{
     const r=await store.route('owner',await fixture());
     const d=await dispatch('owner',{binding:factoryBinding(r.task),agentId,deviceRepoId:repoId});
