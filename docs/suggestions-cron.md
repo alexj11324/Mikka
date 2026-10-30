@@ -5,7 +5,7 @@ Three schedules keep the 建议 page and each person's profile current (R-21, R-
 | Cron (UTC) | Endpoint | What it does |
 | --- | --- | --- |
 | `*/15 * * * *` | `GET /mikka/api/cron/briefings` | Writes the daily briefing for everyone whose local time is past 08:00 and who has none for today yet, and has the Coordinator push it |
-| `0 * * * *` | `GET /mikka/api/cron/suggestions-reconcile` | Backfills events a webhook may have missed in the last 26 hours, then sweeps Factory monitor completions (see below) |
+| `0 * * * *` | `GET /mikka/api/cron/suggestions-reconcile` | Backfills events a webhook may have missed in the last 26 hours, and, in parallel, sweeps Factory monitor completions (see below) |
 | `30 * * * *` | `GET /mikka/api/cron/user-facts` | Merges the profile facts of everyone whose local time is past 04:00 and who has not been merged today |
 
 All three endpoints answer 503 without `CRON_SECRET`, 401 for a wrong bearer, and otherwise a JSON summary of counts (no personal data). Reconciliation also returns 503 when GitHub is unconfigured, or 502 when a source fails. Each stops starting new people after about 40–45 seconds; the next run picks up whoever is left.
@@ -53,7 +53,7 @@ The hourly `suggestions-reconcile` run also sweeps the Factory monitor stage whe
 attempts that no `factory_monitor_observations` row records, and hands each (user, Bot) scope to that
 Bot's `monitor.reconcile`, until 50 seconds after the request started. Observed events are skipped
 and replays create no new transition. The response carries
-`factoryMonitor: { enabled, scopes, observed, failed, deferred }`; any failed scope answers 502.
+`factoryMonitor: { enabled, scopes, observed, failed, deferred }`; any failed scope answers 502. The backfill and the sweep run independently (`Promise.allSettled`): if either throws, the other still finishes, the answer is 502, `outcome: { suggestions, factoryMonitor }` reports `ok` or `failed` for each, and the failure is logged by name only.
 No Worker change, redeploy or new secret is needed: the Worker already calls this fixed path.
 
 ## Backfill

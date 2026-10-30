@@ -56,7 +56,7 @@ test('an authorized call preserves all nested counts and gives reconciliation a 
   const response = await GET(request())
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'no-store')
-  assert.deepEqual(await response.json(), { ...result(), factoryMonitor: sweepResult() })
+  assert.deepEqual(await response.json(), { ...result(), factoryMonitor: sweepResult(), outcome: { suggestions: 'ok', factoryMonitor: 'ok' } })
   assert.equal(reconcile.mock.callCount(), 1)
   const deadline = reconcile.mock.calls[0].arguments[0].deadline
   assert.ok(deadline >= started + 40_000 && deadline <= Date.now() + 40_000)
@@ -70,7 +70,7 @@ test('an unconfigured GitHub backfill reports 503 with the complete result', asy
   reconcile.mock.mockImplementation(async () => summary)
   const response = await GET(request())
   assert.equal(response.status, 503)
-  assert.deepEqual(await response.json(), { ...summary, factoryMonitor: sweepResult() })
+  assert.deepEqual(await response.json(), { ...summary, factoryMonitor: sweepResult(), outcome: { suggestions: 'ok', factoryMonitor: 'ok' } })
 })
 
 test('GitHub errors and caught source failures report 502 with the complete result', async () => {
@@ -84,22 +84,56 @@ test('GitHub errors and caught source failures report 502 with the complete resu
     reconcile.mock.mockImplementation(async () => summary)
     const response = await GET(request())
     assert.equal(response.status, 502, source)
-    assert.deepEqual(await response.json(), { ...summary, factoryMonitor: sweepResult() })
+    assert.deepEqual(await response.json(), { ...summary, factoryMonitor: sweepResult(), outcome: { suggestions: 'ok', factoryMonitor: 'ok' } })
   }
 })
 
-test('the Factory monitor sweep runs once after the backfill with a 50-second budget', async () => {
+test('the Factory monitor sweep runs once, alongside the backfill, with a 50-second budget', async () => {
   process.env.CRON_SECRET = secret
   verifyBearer.mock.mockImplementation(async () => true)
   const order: string[] = []
-  reconcile.mock.mockImplementation(async () => { order.push('suggestions'); return result() })
-  sweep.mock.mockImplementation(async () => { order.push('factory'); return sweepResult() })
+  let release!: () => void
+  const gate = new Promise<void>(r => { release = r })
+  reconcile.mock.mockImplementation(async () => { order.push('suggestions:start'); await gate; return result() })
+  sweep.mock.mockImplementation(async () => { order.push('factory'); release(); return sweepResult() })
   const started = Date.now()
   const response = await GET(request())
   assert.equal(response.status, 200)
-  assert.deepEqual(order, ['suggestions', 'factory'])
+  assert.deepEqual(order, ['suggestions:start', 'factory'], 'the sweep does not wait for the backfill')
+  assert.equal(sweep.mock.callCount(), 1)
   const deadline = sweep.mock.calls[0].arguments[0].deadline
   assert.ok(deadline >= started + 50_000 && deadline <= Date.now() + 50_000)
+})
+
+test('a missing Authorization header returns 401 without any read or write', async () => {
+  process.env.CRON_SECRET = secret
+  const response = await GET(new Request('https://preview.example.test/mikka/api/cron/suggestions-reconcile'))
+  assert.equal(response.status, 401)
+  assert.deepEqual(verifyBearer.mock.calls.map(call => call.arguments), [[null, secret]])
+  assert.equal(reconcile.mock.callCount(), 0)
+  assert.equal(sweep.mock.callCount(), 0)
+})
+
+test('suggestions still finish when the sweep throws, and the reverse; each failure is logged without its message', async () => {
+  process.env.CRON_SECRET = secret
+  verifyBearer.mock.mockImplementation(async () => true)
+  const errors = mock.method(console, 'error', () => {})
+  sweep.mock.mockImplementation(async () => { throw new Error('token=sweep-secret') })
+  let response = await GET(request())
+  assert.equal(response.status, 502)
+  assert.equal(reconcile.mock.callCount(), 1)
+  assert.deepEqual(await response.json(), { ...result(), factoryMonitor: { enabled: true, scopes: 0, observed: 0, failed: 1, deferred: 0 }, outcome: { suggestions: 'ok', factoryMonitor: 'failed' } })
+  sweep.mock.mockImplementation(async () => sweepResult())
+  reconcile.mock.mockImplementation(async () => { throw new Error('token=reconcile-secret') })
+  sweep.mock.resetCalls()
+  response = await GET(request())
+  assert.equal(response.status, 502)
+  assert.equal(sweep.mock.callCount(), 1, 'the sweep still runs when the backfill throws')
+  assert.deepEqual(await response.json(), { factoryMonitor: sweepResult(), outcome: { suggestions: 'failed', factoryMonitor: 'ok' } })
+  const logged = JSON.stringify(errors.mock.calls.map(c => c.arguments))
+  assert.ok(logged.includes('factory monitor sweep failed') && logged.includes('suggestions reconcile failed'))
+  assert.ok(!logged.includes('secret'), 'no error message is logged')
+  errors.mock.restore()
 })
 
 test('a failing Factory monitor scope or a thrown sweep reports 502 and keeps the backfill result', async () => {
@@ -108,7 +142,7 @@ test('a failing Factory monitor scope or a thrown sweep reports 502 and keeps th
   sweep.mock.mockImplementation(async () => ({ ...sweepResult(), failed: 1 }))
   let response = await GET(request())
   assert.equal(response.status, 502)
-  assert.deepEqual(await response.json(), { ...result(), factoryMonitor: { ...sweepResult(), failed: 1 } })
+  assert.deepEqual(await response.json(), { ...result(), factoryMonitor: { ...sweepResult(), failed: 1 }, outcome: { suggestions: 'ok', factoryMonitor: 'ok' } })
   const errors = mock.method(console, 'error', () => {})
   sweep.mock.mockImplementation(async () => { throw new Error('password=hunter2 leaked?') })
   response = await GET(request())
