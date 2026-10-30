@@ -53,6 +53,8 @@ test('issue numbering: no deadlock with FK KEY SHARE; concurrent numbers unique 
       }
       const [row] = await db.select().from(issues).where(eq(issues.id, issueId))
       assert.equal(readIssueMetadata(row.content).number, 1)
+      assert.equal(await ensureIssueNumbers(owner), 2)
+      assert.equal(await ensureIssueNumbers(owner), 2, 'page reads must not reserve unused numbers')
     })
 
     await t.test('concurrent allocations are serialized: numbers are unique and consecutive', async () => {
@@ -64,6 +66,44 @@ test('issue numbering: no deadlock with FK KEY SHARE; concurrent numbers unique 
         return number
       })))
       assert.deepEqual([...numbers].sort((x, y) => x - y), [1, 2, 3, 4, 5, 6, 7, 8])
+    })
+
+    await t.test('a failed creation rolls the counter back with its issue', async () => {
+      const owner = await user()
+      await assert.rejects(db.transaction(async tx => {
+        assert.equal(await allocateIssueNumbers(tx, owner), 1)
+        throw new Error('fixture rollback')
+      }), /fixture rollback/)
+      const number = await db.transaction(async tx => {
+        const allocated = await allocateIssueNumbers(tx, owner)
+        await tx.insert(issues).values({ id: randomUUID(), userId: owner, title: 'after rollback', content: content(allocated), status: 'todo', priority: 'normal' })
+        return allocated
+      })
+      assert.equal(number, 1)
+    })
+
+    await t.test('allocation does not wait for an existing issue row lock', async () => {
+      const owner = await user()
+      const issueId = randomUUID()
+      await db.insert(issues).values({ id: issueId, userId: owner, title: 'locked existing issue', content: content(1), status: 'todo', priority: 'normal' })
+      const locked = await pool.connect()
+      try {
+        await locked.query('BEGIN')
+        await locked.query('SELECT id FROM issues WHERE id=$1 FOR UPDATE', [issueId])
+        const number = await db.transaction(async tx => {
+          await tx.execute((await import('drizzle-orm')).sql`SET LOCAL lock_timeout = '1s'`)
+          return allocateIssueNumbers(tx, owner)
+        })
+        assert.equal(number, 2)
+      } finally { await locked.query('ROLLBACK'); locked.release() }
+    })
+
+    await t.test('database rejects duplicate owner numbers but permits the same number for another owner', async () => {
+      const owner = await user(), peer = await user()
+      const insert = (userId: string) => pool.query('INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,\'unique fixture\',$3,\'todo\',\'normal\')', [randomUUID(), userId, JSON.stringify(content(1))])
+      await insert(owner)
+      await assert.rejects(insert(owner), (error: unknown) => (error as { code: string }).code === '23505')
+      await insert(peer)
     })
   } finally {
     await pool.end()
@@ -87,7 +127,7 @@ test('counter expand backfills once and synchronizes legacy writers', { skip: !e
     await insert('owner', 12)
     await insert('owner')
     await insert('peer', 7)
-    const expand = await readFile(new URL('../drizzle/20261030194000_issue_number_counter_expand.sql', import.meta.url), 'utf8')
+    const expand = await readFile(new URL('../drizzle/20261030203400_issue_number_counter_expand.sql', import.meta.url), 'utf8')
     // A single client keeps the migration transaction and its search path together.
     const migration = await pool.connect()
     try { await migration.query(expand) } finally { migration.release() }
@@ -116,6 +156,10 @@ test('counter expand backfills once and synchronizes legacy writers', { skip: !e
     const retry = await pool.connect()
     try { await retry.query(expand) } finally { retry.release() }
     assert.equal((await pool.query('SELECT "lastIssueNumber" FROM "user" WHERE id=$1', ['owner'])).rows[0].lastIssueNumber, '22')
+    const unique = await readFile(new URL('../drizzle/20261030203401_issue_owner_number_unique.sql', import.meta.url), 'utf8')
+    await pool.query(unique)
+    await assert.rejects(insert('owner', 7), (error: unknown) => (error as { code: string }).code === '23505')
+    assert.equal((await pool.query('SELECT count(*) FROM issues WHERE "userId"=$1 AND number=7', ['owner'])).rows[0].count, '1')
   } finally {
     await pool.end()
     await admin.query(`DROP SCHEMA "${schema}" CASCADE`)

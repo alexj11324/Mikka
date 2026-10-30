@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { issues, users } from '@/lib/db/schema'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
@@ -7,22 +7,34 @@ import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 export async function allocateIssueNumbers(tx: Transaction, ownerId: string) {
-  // Lock the owner row so concurrent creates and legacy backfills never allocate the same number.
-  // NO KEY UPDATE still serializes allocators (it conflicts with itself) but does not
-  // conflict with the FOR KEY SHARE locks that FK inserts referencing "user" take
-  // (issues, agent_runs, ...). FOR UPDATE did, which deadlocked a page-load backfill
-  // against a concurrent transaction that already held an issue row lock.
-  await tx.select({ id: users.id }).from(users).where(eq(users.id, ownerId)).for('no key update')
-  const rows = await tx.select({ id: issues.id, content: issues.content }).from(issues).where(eq(issues.userId, ownerId)).orderBy(asc(issues.createdAt), asc(issues.id)).for('update')
-  let next = rows.reduce((max, row) => Math.max(max, readIssueMetadata(row.content).number ?? 0), 0)
-  for (const row of rows) {
-    const metadata = readIssueMetadata(row.content)
-    if (metadata.number) continue
-    await tx.update(issues).set({ content: withIssueMetadata(row.content, { ...metadata, number: ++next }) }).where(and(eq(issues.id, row.id), eq(issues.userId, ownerId)))
-  }
-  return next + 1
+  // Transactional UPDATE serializes each owner's allocations and rolls back
+  // with a failed creation. It never scans or locks the owner's issue rows.
+  // PostgreSQL takes NO KEY UPDATE here, compatible with FK KEY SHARE.
+  const result = await tx.execute<{ number: string }>(sql`
+    UPDATE "user" SET "lastIssueNumber" = "lastIssueNumber" + 1
+    WHERE id = ${ownerId} AND "lastIssueNumber" < ${Number.MAX_SAFE_INTEGER}
+    RETURNING "lastIssueNumber" AS number
+  `)
+  if (!result.rows[0]) throw new Error('Issue number owner unavailable or counter exhausted')
+  return Number(result.rows[0].number)
 }
 
 export async function ensureIssueNumbers(ownerId: string) {
-  return db.transaction(tx => allocateIssueNumbers(tx, ownerId))
+  return db.transaction(async tx => {
+    // Only historical/unversioned writers can leave missing metadata after the
+    // expand backfill. A page read fills those rows without reserving a number
+    // for a task that will never be created.
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, ownerId)).for('no key update')
+    const rows = await tx.select({ id: issues.id, content: issues.content }).from(issues)
+      .where(and(eq(issues.userId, ownerId), sql`number IS NULL`))
+      .orderBy(asc(issues.createdAt), asc(issues.id)).for('update')
+    for (const row of rows) {
+      const metadata = readIssueMetadata(row.content)
+      const number = await allocateIssueNumbers(tx, ownerId)
+      await tx.update(issues).set({ content: withIssueMetadata(row.content, { ...metadata, number }) }).where(and(eq(issues.id, row.id), eq(issues.userId, ownerId)))
+    }
+    const result = await tx.execute<{ number: string }>(sql`SELECT "lastIssueNumber" + 1 AS number FROM "user" WHERE id = ${ownerId}`)
+    if (!result.rows[0]) throw new Error('Issue number owner unavailable')
+    return Number(result.rows[0].number)
+  })
 }
