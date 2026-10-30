@@ -379,6 +379,17 @@ test('new-task machine choice is owner-checked, preserved separately from copy a
   delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
 })
 
+test('with the Coordinator off a new task is refused, not queued silently; a chat message still waits', async () => {
+  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  current = fixture(); callbacks.length = 0; userId = 'owner'; enabled = false
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { error: 'coordinatorUnavailable', params: undefined })
+  assert.equal(current.rows.size, 0)
+  assert.deepEqual(await sendCoordinatorMessage('hello', null, null, submissionId), { queued: true })
+  assert.equal(current.rows.size, 1)
+  enabled = true
+  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+})
+
 test('new-task submission fails closed when issue tools are disabled', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'
   delete process.env.MIKKA_ISSUE_TOOLS_ENABLED

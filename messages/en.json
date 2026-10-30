@@ -2447,6 +2447,7 @@
     "working": "Coordinator is working…",
     "loadError": "Could not load the conversation. Retrying.",
     "failedTitle": "Reply failed",
+    "unavailable": "{name} is unavailable",
     "input": "Message the Coordinator",
     "inputTo": "Message {name}",
     "placeholder": "Ask the Coordinator to start an issue…",
