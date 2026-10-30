@@ -102,7 +102,7 @@ test('all tracked SQL preflights without altering historical migration bytes', a
 
 test('dropInvalidIndex drops only an INVALID index, concurrently; valid or missing is left alone', async () => {
   const calls = []
-  const fake = (rows) => async (text, values) => { calls.push(text); return { rows: text.startsWith('select') ? rows : [] } }
+  const fake = (rows) => async (text, _values) => { calls.push(text); return { rows: text.startsWith('select') ? rows : [] } }
   assert.equal(await dropInvalidIndex(fake([{ indisvalid: true }]), 'i', 'x.sql', () => {}), false)
   assert.equal(await dropInvalidIndex(fake([]), 'i', 'x.sql', () => {}), false)
   assert.equal(calls.some(c => /drop/i.test(c)), false)
