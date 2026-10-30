@@ -33,10 +33,10 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
       </BreadcrumbList></Breadcrumb>
     </div>
     <div className="flex shrink-0 items-center gap-1">
-      <span role="status" aria-live="polite" className="sr-only">{saveLabel}</span>
+      {saveLabel && <><span role="status" aria-live="polite" className="sr-only">{saveLabel}</span>
       <Tooltip><TooltipTrigger render={<span tabIndex={0} className="mr-2 hidden items-center gap-1.5 text-xs text-muted-foreground md:flex" />}>
         {saved && <span className="inline-flex"><Check className="size-3.5" aria-hidden="true" /></span>}<span>{saveLabel}</span>
-      </TooltipTrigger><TooltipContent>{tDetail('autosaveHint')}</TooltipContent></Tooltip>
+      </TooltipTrigger><TooltipContent>{tDetail('autosaveHint')}</TooltipContent></Tooltip></>}
       {actions}
       {navigation.index >= 0 && <>
         <span className="hidden px-2 text-xs tabular-nums text-muted-foreground sm:inline">{navigation.index + 1} / {navigation.total}</span>

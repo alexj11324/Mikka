@@ -6,13 +6,15 @@ import { allocateIssueNumbers } from '@/lib/issue-numbering'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { issueView } from '@/lib/task-identifier-server'
 import type { ActivityActor } from '@/lib/activity-actor'
+import { readableIssueContentOnServer as readableIssueContent } from '@/lib/issue-editor-schema-snapshot'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 const createIssueSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  content: z.custom<JSONContent>(value => !!value && typeof value === 'object' && (value as JSONContent).type === 'doc' && JSON.stringify(value).length <= 250000),
+  // Same schema the issue editor uses: content it cannot render would open read-only, so reject it at creation.
+  content: z.custom<JSONContent>(value => !!value && typeof value === 'object' && JSON.stringify(value).length <= 250000 && readableIssueContent(value) !== null).transform(value => readableIssueContent(value) as JSONContent),
   status: z.enum(ISSUE_STATUS_CODES),
   priority: z.enum(ISSUE_PRIORITY_CODES),
 })

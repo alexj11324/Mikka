@@ -906,6 +906,7 @@
       "editorCrashedRetry": "Reload",
       "titleLabel": "Task title",
       "syncFailedLabel": "Sync failed",
+      "invalidContentReadOnly": "This description can't be displayed, so it is read-only. Nothing has been changed.",
       "syncingLabel": "Syncing",
       "syncedLabel": "Synced",
       "retrySync": "Retry document sync",
