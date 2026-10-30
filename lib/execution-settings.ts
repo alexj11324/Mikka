@@ -1,4 +1,5 @@
 import "server-only";
+import { enqueueDeviceCommand } from "./device-management";
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { z } from "zod";
@@ -69,7 +70,7 @@ export class ExecutionSettings {
         const value = ruleInput.parse(operation.value);
         if (!["auto", "cloud"].includes(value.place)) {
           const device = await client.query(
-            `SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local'`,
+            `SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL`,
             [value.place, scope.ownerId],
           );
           if (!device.rowCount) throw new Error("agentNoDevice");
@@ -122,7 +123,7 @@ export class ExecutionSettings {
   }
   async places(scope: ExecutionSettingsScope) {
     const { rows } = await this.pool.query(
-      `SELECT id,name,"deviceType",enabled,"lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' ORDER BY "createdAt",id`,
+      `SELECT id,name,"deviceType",enabled,"lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "createdAt",id`,
       [scope.ownerId],
     );
     return [
@@ -141,11 +142,14 @@ export class ExecutionSettings {
   }
   async redetect(scope: ExecutionSettingsScope, deviceId: string) {
     z.uuid().parse(deviceId);
-    const result = await this.pool.query(
-      `UPDATE devices SET "redetectRequestedAt"=now() WHERE id=$1 AND "ownerId"=$2 AND kind='local' RETURNING id`,
-      [deviceId, scope.ownerId],
+    const id = await enqueueDeviceCommand(
+      scope.ownerId,
+      deviceId,
+      "redetect",
+      this.pool,
     );
-    if (!result.rowCount) throw new Error("agentNoDevice");
+    if (!id) throw new Error("agentNoDevice");
+    return { commandId: id };
   }
   /** Only connected account bindings; no static or environment model catalogue. */
   async botModels(scope: ExecutionSettingsScope) {

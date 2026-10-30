@@ -24,10 +24,19 @@ test(
     });
     try {
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
-      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"lastSeenAt" timestamptz,enabled boolean,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
+      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
+      await pool.query(
+        await readFile(
+          new URL(
+            "../drizzle/20261030193000_device_enrollment_management.sql",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      );
       const migration = await readFile(
         new URL(
           "../drizzle/20261030194605_execution_rules.sql",
@@ -111,11 +120,23 @@ test(
       assert.ok(
         (
           await pool.query(
-            'SELECT "redetectRequestedAt" FROM devices WHERE id=$1',
+            'SELECT id FROM device_management_commands WHERE "deviceId"=$1',
             [own],
           )
-        ).rows[0].redetectRequestedAt,
+        ).rows[0].id,
       );
+      await pool.query('UPDATE devices SET "removedAt"=now() WHERE id=$1', [
+        own,
+      ]);
+      await assert.rejects(settings.redetect(alice, own));
+      assert.equal(
+        (await settings.places(alice)).some((place) => place.id === own),
+        false,
+      );
+      await assert.rejects(settings.mutate(alice, { kind: "save", value }));
+      await pool.query('UPDATE devices SET "removedAt"=NULL WHERE id=$1', [
+        own,
+      ]);
       await pool.query("INSERT INTO bots VALUES ($1,$2,$3)", [
         bot,
         alice.ownerId,

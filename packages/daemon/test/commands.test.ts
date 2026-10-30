@@ -54,21 +54,21 @@ afterEach(async () => {
   cleanupTempDirs()
 })
 
-it("redetect refreshes harnesses and acknowledges the request in a heartbeat", async()=>{
-  const requestedAt=new Date().toISOString()
+it("redetect refreshes harnesses through the shared device command channel", async()=>{
+  const commandId="10000000-0000-4000-8000-000000000001"
   let pending=true
-  const reports: {redetectedAt?:string;harnesses:{version:string|null}[]}[]=[]
+  const reports: {completedDeviceCommands?:string[];harnesses:{version:string|null}[]}[]=[]
   await setup(link=>{
-    const fetch=link.fetchCommands.bind(link)
-    link.fetchCommands=async(...args)=>{
-      if (pending) {pending=false;return [{kind:'redetect',requestedAt}]}
-      return fetch(...args)
-    }
     const heartbeat=link.heartbeat.bind(link)
-    link.heartbeat=async(deviceId,status)=>{reports.push(status);return heartbeat(deviceId,status)}
+    link.heartbeat=async(deviceId,status)=>{
+      reports.push(status)
+      const result=await heartbeat(deviceId,status)
+      if(pending){pending=false;return {...result,deviceCommands:[{id:commandId,kind:'redetect'}]}}
+      return result
+    }
   })
-  await waitFor(()=>reports.some(report=>report.redetectedAt===requestedAt))
-  const refreshed=reports.find(report=>report.redetectedAt===requestedAt)!
+  await waitFor(()=>reports.some(report=>report.completedDeviceCommands?.includes(commandId)))
+  const refreshed=reports.find(report=>report.completedDeviceCommands?.includes(commandId))!
   expect(refreshed.harnesses.every(info=>info.version!=='test')).toBe(true)
 })
 

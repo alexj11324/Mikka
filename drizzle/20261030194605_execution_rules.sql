@@ -18,5 +18,3 @@ CREATE TABLE IF NOT EXISTS bot_model_choices (
   "bindingId" uuid NOT NULL REFERENCES byos_bindings(id) ON DELETE CASCADE,
   PRIMARY KEY ("ownerId","workspaceId","botKey")
 );
-ALTER TABLE devices ADD COLUMN IF NOT EXISTS "deviceType" text CHECK ("deviceType" IN ('laptop','server'));
-ALTER TABLE devices ADD COLUMN IF NOT EXISTS "redetectRequestedAt" timestamptz;

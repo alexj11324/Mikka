@@ -230,8 +230,6 @@ export const devices = pgTable('devices', {
   kind: text('kind').$type<'local' | 'cloud'>().notNull().default('local'),
   deviceType: text('deviceType').$type<'laptop' | 'server'>().notNull().default('laptop'),
   platform: text('platform'), arch: text('arch'),
-  deviceType: text('deviceType').$type<'laptop' | 'server'>(),
-  redetectRequestedAt: timestamp('redetectRequestedAt', { withTimezone: true }),
   daemonVersion: text('daemonVersion'), protocolVersion: integer('protocolVersion'),
   harnesses: jsonb('harnesses').$type<HarnessInfo[]>().notNull().default([]),
   computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),

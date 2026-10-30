@@ -1,6 +1,6 @@
 import { test, expect } from "vitest";
 import { harnessInfoSchema } from "./harness";
-import { deviceHeartbeatSchema, runCommandSchema } from "./device";
+import { deviceHeartbeatSchema, deviceManagementCommand } from "./device";
 test("old harness and heartbeat payloads remain valid", () => {
   const harness = { harness: "codex", installed: true, version: null };
   expect(harnessInfoSchema.parse(harness)).toEqual(harness);
@@ -16,7 +16,12 @@ test("old harness and heartbeat payloads remain valid", () => {
   ).toEqual(["account-model"]);
 });
 test("redetect is a device command, independent of run ids", () => {
-  const command = { kind: "redetect", requestedAt: "2026-10-30T19:00:00.000Z" };
-  expect(runCommandSchema.parse(command)).toEqual(command);
-  expect(runCommandSchema.safeParse({ kind: "redetect" }).success).toBe(false);
+  const command = {
+    kind: "redetect",
+    id: "10000000-0000-4000-8000-000000000001",
+  };
+  expect(deviceManagementCommand.parse(command)).toEqual(command);
+  expect(deviceManagementCommand.safeParse({ kind: "redetect" }).success).toBe(
+    false,
+  );
 });

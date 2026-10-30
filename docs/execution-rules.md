@@ -71,7 +71,7 @@ set of editable ids; missing, duplicate, foreign and default ids are rejected.
 
 ## Daemon discovery
 
-`HarnessInfo.models`, `deviceType` and heartbeat `redetectedAt` are optional,
+`HarnessInfo.models`, `deviceType` and heartbeat device-command acknowledgements are optional,
 so older daemon payloads remain valid.
 
 - Codex: installed `codex app-server`, JSON-RPC `initialize` followed by
@@ -81,7 +81,7 @@ so older daemon payloads remain valid.
 - Claude Code: no CLI list operation is used; report no models, leaving only
   automatic selection. Failed or unsupported discovery also reports none.
 
-The device command channel delivers a timestamped `redetect` command. The daemon
-reruns detection, recomputes execution capabilities and sends a heartbeat. Only
-an acknowledgement at least as recent as the outstanding request clears it,
-so a normal or stale heartbeat cannot consume a newer refresh request.
+The shared device-management command channel from #491 delivers `redetect` by
+command id in the heartbeat response. The daemon reruns detection and sends an
+immediate follow-up heartbeat with its refreshed harness/model report and the
+completed command id. Normal heartbeats cannot consume an unacknowledged command.

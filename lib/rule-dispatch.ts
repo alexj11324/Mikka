@@ -20,7 +20,7 @@ export async function resolveIssueExecution(
     workspaceId,
   });
   const { rows } = await pool.query(
-    `SELECT id,enabled,"lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' ORDER BY "lastSeenAt" DESC NULLS LAST,id`,
+    `SELECT id,enabled,"lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "lastSeenAt" DESC NULLS LAST,id`,
     [ownerId],
   );
   const devices: ExecutionDevice[] = rows.map((row) => ({

@@ -116,7 +116,6 @@ export const deviceRegistration = z.object({
   protocolVersion: z.number().int(),
   harnesses: z.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
-  deviceType: z.enum(["laptop", "server"]).optional(),
   /**
    * This machine's one device id, the same in every workspace (ADR ORV-284).
    * Registering with it in another workspace joins the same device there.
@@ -150,7 +149,6 @@ export const deviceManagementCommand = z.object({ id: z.uuid(), kind: z.enum(['r
 export const deviceHeartbeatSchema = z.object({
   completedDeviceCommands: z.array(z.uuid()).max(100).optional(),
   failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),
-  redetectedAt: isoTime.optional(),
   harnesses: z.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
   deviceType: z.enum(["laptop", "server"]).optional(),
@@ -431,7 +429,6 @@ export const COMMANDS_MAX_SKIP = 100
  * until acked); `stop` repeats until the run has ended.
  */
 export const runCommandSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("redetect"), requestedAt: isoTime }),
   z.object({
     kind: z.literal("input"),
     runId: id,

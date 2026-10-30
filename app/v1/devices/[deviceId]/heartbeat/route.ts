@@ -1,5 +1,5 @@
 import { after, NextResponse } from 'next/server'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { deviceHeartbeatSchema } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { ensureDeviceAgents } from '@/lib/device-agents'
@@ -34,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
   const factoryOn = factoryLifecycleEnabled()
   const [prior] = factoryOn ? await db.select({ enabled: devices.enabled, lastSeenAt: devices.lastSeenAt, harnesses: devices.harnesses }).from(devices).where(eq(devices.id, deviceId)).limit(1) : []
-  await db.update(devices).set({ ...(parsed.data.deviceType ? { deviceType: parsed.data.deviceType } : {}), redetectRequestedAt: parsed.data.redetectedAt ? sql`CASE WHEN ${devices.redetectRequestedAt} <= ${parsed.data.redetectedAt}::timestamptz THEN NULL ELSE ${devices.redetectRequestedAt} END` : devices.redetectRequestedAt, harnesses: parsed.data.harnesses, computerUse: parsed.data.computerUse ?? { installed: false, version: null }, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
+  await db.update(devices).set({ ...(parsed.data.deviceType ? { deviceType: parsed.data.deviceType } : {}), harnesses: parsed.data.harnesses, computerUse: parsed.data.computerUse ?? { installed: false, version: null }, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
   await ensureDeviceAgents(pool, caller.userId, deviceId, parsed.data.harnesses)
   const selected=await skillAssignments.renewHeartbeat(caller.userId,deviceId,parsed.data.runs.map(run=>run.runId),request.headers.get(SKILL_ARTIFACT_HEADER)==='1')
   const result=await renewRunLeases(deviceId,selected.legacy)
