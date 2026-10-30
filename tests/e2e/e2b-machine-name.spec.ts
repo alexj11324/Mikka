@@ -63,7 +63,10 @@ for (const colorScheme of schemes) {
     await expect(region.getByText('休眠中', { exact: true }).first()).toBeVisible()
     await expect(region.getByText('E2B', { exact: true }).first()).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath(`shots/fe7-card-sleeping-${colorScheme}.png`) })
-    await page.getByRole('button', { name: '唤醒', exact: true }).first().click()
+    // The 唤醒 cover sits inside the card's open-screen button, so it is a presentational child in the
+    // accessibility tree; reach it by text and close the viewer the outer button opens.
+    await region.locator('button', { hasText: '唤醒' }).last().click()
+    if (await page.getByRole('dialog').isVisible()) await page.keyboard.press('Escape')
     await expect(region.getByText('唤醒中', { exact: true }).first()).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath(`shots/fe7-card-waking-${colorScheme}.png`) })
   })
