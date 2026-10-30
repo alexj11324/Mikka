@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getLocale } from 'next-intl/server'
 
 import { IssueWorkspace } from '@/components/workspace/issue-workspace'
+import { sectionFromQuery } from '@/components/workspace/workspace-navigation'
 import { redirect as localeRedirect } from '@/i18n/navigation'
 import { isAcceptanceEnabled } from '@/lib/acceptance'
 import { safeAuthReturn } from '@/lib/auth-return'
@@ -20,5 +21,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
     if (query.acceptance === '1') localeRedirect({ href: '/acceptance', locale: await getLocale() })
     redirect('/api/acceptance')
   }
-  return <IssueWorkspace key={user.id} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialSection={query.section === 'agent' || query.section === 'projects' || query.section === 'plugins' || query.section === 'suggestions' || query.section === 'artifacts' ? query.section : 'coordinator'} initialSettingsSection={query.settings === 'account' || (query.settings === 'integrations' && query.google) ? 'account' : query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
+  return <IssueWorkspace key={user.id} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialSection={sectionFromQuery(query.section)} initialSettingsSection={query.settings === 'account' || (query.settings === 'integrations' && query.google) ? 'account' : query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
 }

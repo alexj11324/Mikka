@@ -16,3 +16,16 @@ export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   suggestions: 'Nav.suggestions',
   artifacts: 'Nav.artifacts',
 }
+
+/** Sections a reload or a shared link reopens; the others start from their parent page. */
+const URL_SECTIONS = ['agent', 'coordinator', 'plugins', 'suggestions', 'artifacts', 'all-issues'] as const satisfies readonly WorkspaceSection[]
+
+export function sectionFromQuery(section: string | undefined): WorkspaceSection {
+  // Older links open the projects page by name too.
+  return [...URL_SECTIONS, 'projects' as const].find(item => item === section) ?? 'coordinator'
+}
+
+export function writeSectionQuery(params: URLSearchParams, section: WorkspaceSection): void {
+  if (URL_SECTIONS.some(item => item === section)) params.set('section', section)
+  else params.delete('section')
+}

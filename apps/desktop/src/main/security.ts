@@ -22,7 +22,7 @@ export function isTrustedFrame(frameUrl: string | undefined, appUrl: string): bo
 
 /**
  * `allow` keeps the navigation in the renderer: only the app's own origin.
- * Everything else is opened in the system browser when it is an HTTPS or
+ * Everything else is opened in the system browser when it is an HTTP(S) or
  * mailto URL, and denied otherwise. Third-party sign-in (Google, GitHub) must
  * run in the system browser: embedded webviews are not an allowed OAuth
  * user-agent for those providers.
@@ -43,7 +43,8 @@ export function externalUrl(candidate: string): string | null {
   try {
     const url = new URL(candidate)
     if (url.username || url.password) return null
-    if (url.protocol === 'https:' || url.protocol === 'mailto:') return url.href
+    // Plain HTTP opens in the system browser too, as the web app opens it in a new tab.
+    if (url.protocol === 'https:' || url.protocol === 'http:' || url.protocol === 'mailto:') return url.href
     return null
   } catch {
     return null
