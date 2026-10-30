@@ -2223,6 +2223,25 @@
         "slack": "Slack",
         "notion": "Notion"
       }
+    },
+    "usage": {
+      "loading": "Loading usage",
+      "month": "Month",
+      "groupBy": "Group by",
+      "byBot": "By bot",
+      "byMember": "By member",
+      "exportCsv": "Export CSV",
+      "threads": "Threads",
+      "runTime": "Run time",
+      "runSeconds": "Run seconds",
+      "bot": "Bot",
+      "member": "Member",
+      "yours": "Your usage",
+      "yourBots": "Your bots",
+      "chartLabel": "Threads per day",
+      "empty": "No threads this month.",
+      "minutes": "{count} min",
+      "hours": "{count} h"
     }
   },
   "TelegramBot": {

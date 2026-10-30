@@ -2223,6 +2223,25 @@
         "slack": "Slack",
         "notion": "Notion"
       }
+    },
+    "usage": {
+      "loading": "正在加载用量",
+      "month": "月份",
+      "groupBy": "分组",
+      "byBot": "按 Bot",
+      "byMember": "按成员",
+      "exportCsv": "导出 CSV",
+      "threads": "线程",
+      "runTime": "运行时长",
+      "runSeconds": "运行秒数",
+      "bot": "Bot",
+      "member": "成员",
+      "yours": "你的用量",
+      "yourBots": "你的 Bot",
+      "chartLabel": "每天的线程数",
+      "empty": "这个月没有线程。",
+      "minutes": "{count} 分钟",
+      "hours": "{count} 小时"
     }
   },
   "TelegramBot": {
