@@ -258,13 +258,18 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     if (!source.includes(anchor)) throw new Error(`BE-15 mutant ${label}: anchor not found in the real module; update the mutant`)
     return source.replace(anchor, replacement)
   }
-  const realImports = (source: string) => source.replaceAll("from '@/", `from '${root}/`)
+  // Only '@/' specifiers are rewritten. A relative import would resolve against the temp dir, so fail fast
+  // instead of silently loading the wrong module; extend this if bots.ts / workspace-access.ts ever gain one.
+  const realImports = (source: string, file: string) => {
+    if (/(?:from|import)\s*\(?\s*['"]\.\.?\//.test(source)) throw new Error(`BE-15 mutant: ${file} has a relative import; realImports only rewrites '@/'`)
+    return source.replaceAll("from '@/", `from '${root}/`)
+  }
   const botsMutant = async (guards: { lock: boolean; cas: boolean }): Promise<typeof botAdmin> => {
     const id = randomUUID().slice(0, 8)
-    let bots = realImports(await readFile('lib/workspace-admin/bots.ts', 'utf8'))
+    let bots = realImports(await readFile('lib/workspace-admin/bots.ts', 'utf8'), 'lib/workspace-admin/bots.ts')
     if (!guards.lock) {
       const access = mutate(await readFile('lib/workspace-access.ts', 'utf8'), LOCK_ANCHOR, ".limit(1)\n  if (!row || (admin", 'no-lock')
-      await writeFile(join(mutantDir, `access-${id}.ts`), realImports(access))
+      await writeFile(join(mutantDir, `access-${id}.ts`), realImports(access, 'lib/workspace-access.ts'))
       bots = mutate(bots, `from '${root}/lib/workspace-access'`, `from './access-${id}'`, 'no-lock')
     }
     if (!guards.cas) bots = mutate(bots, CAS_ANCHOR, CAS_MUTANT, 'no-cas')
@@ -340,6 +345,10 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
       second.catch(() => undefined)
       saves = [first, second]
       // A is not waiting on mikka_workspaces (its UPDATE sits on another connection), so any waiter there is B.
+      // This relies on the settings UPDATE in saveBotDefaults (lib/workspace-admin/bots.ts:77-87) going through
+      // `db`, not the `tx` connection that holds FOR UPDATE on mikka_workspaces. If that UPDATE moves into tx,
+      // A itself shows up as a waiter and the no-lock control below (waited === false) goes red, so the
+      // change cannot be silently masked.
       waited = await waitUntil(async () => {
         if ((await waitersOn('mikka_workspaces')).length > 0) return true
         if (await settingsWriters() >= 2) return false
