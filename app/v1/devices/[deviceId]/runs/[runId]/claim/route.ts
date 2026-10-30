@@ -29,6 +29,8 @@ import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { PublicationError } from '@/lib/run-publication-result'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
+import { remoteRepositoryRef, taskSecretInjection } from '@/lib/secrets/runtime'
+import { byoE2BKeyEnabled } from '@/lib/secrets/flag'
 
 export const dynamic = 'force-dynamic'
 
@@ -109,8 +111,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   let computer: Awaited<ReturnType<typeof claimCloudRun>> = null
   let publication: Awaited<ReturnType<typeof import('@/lib/run-publications')['prepareRunPublication']>> | null = null
   let localComputer: Awaited<ReturnType<typeof localComputerAuthority>> = null
+  let taskEnv: Record<string, string> = {}
+  let taskSecretNames: string[] = []
   if (device.kind === 'cloud') {
     if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
+    // 4e3: the task's explicit user variables (workspace + this repo's secrets/env). Resolved before the
+    // claim so a decrypt failure leaves the run queued. Flag off = {}. Only cloud workers get it.
+    if (byoE2BKeyEnabled(process.env)) {
+      try { ({ env: taskEnv, secretNames: taskSecretNames } = await taskSecretInjection(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl))) }
+      catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
+    }
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id, beforeClaim, afterClaim)
     if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
   } else {
@@ -196,6 +206,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...(subscription ? { ...(run.agentDefinition?.cliModelSelection ? {} : {model:subscription.modelId}), subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
     ...(localComputer ? { localComputer } : {}),
+    ...(Object.keys(taskEnv).length ? { taskEnv } : {}),
+    ...(taskSecretNames.length ? { taskSecretNames } : {}),
     ...retry,
     ...factoryClaim,
     ...skillAssignment,

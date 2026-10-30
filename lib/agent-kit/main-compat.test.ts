@@ -37,7 +37,7 @@ const tx={select(){let table='';const query={from(value:Record<symbol,unknown>){
 const db={select:()=>({from:()=>({where:()=>({limit:async()=>{
  if(selectIndex++===0){currentRun={id:randomUUID(),userId:mismatch==='run'?'other-owner':owner,agentId,deviceId,deviceRepoId:repoId,issueId,baseBranch:null,kind:'implement',prompt:'task',agentDefinition:definition,status:'queued',stopRequestedAt:null,leaseExpiresAt:null};return [{...currentRun}]}
  return selectIndex===2?[{id:agentId,userId:mismatch==='agent'?'other-owner':owner,deviceId:randomUUID(),harness:'claude_code'}]:[{id:repoId,userId:mismatch==='repo'?'other-owner':owner,deviceId:mismatch==='device'?randomUUID():deviceId,baseBranch:'main',repoPath:mismatch==='legacy-key'?'github.com/example/repo':'v2/github.com/example/repo',remoteUrl:mismatch==='repo-url'?'https://github.com:8443/example/repo.git':'https://github.com/example/repo.git'}]
-}})})}),transaction:async<T>(run:(value:typeof tx)=>Promise<T>)=>run(tx)}
+}})})}),update:()=>({set:()=>({where:async()=>undefined})}),transaction:async<T>(run:(value:typeof tx)=>Promise<T>)=>run(tx)}
 let cloud=false,localCapable=false
 let protocolVersion=3
 stub('../db/index.ts',{db,pool:{}})

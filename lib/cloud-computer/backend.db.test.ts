@@ -155,7 +155,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     // a denied workspace or another owner never reaches the provider.
     const desktopCalls: string[] = []
     const desktopRuntime = {
-      async connectComputer(id: string) { desktopCalls.push(`connect ${id}`); return { sandboxId: id } },
+      async connectComputer(_workspaceId: string, id: string) { desktopCalls.push(`connect ${id}`); return { sandboxId: id } },
       async startDesktop(_sandbox: unknown, display: number) { assert.equal(display, 1); desktopCalls.push('start') },
       async syncDesktopLease(_sandbox: unknown, lease: { botId: string; ownerId: string; policyVersion: number; computerAllowed: boolean }) {
         assert.equal(lease.botId, botA); assert.equal(lease.ownerId, alice.userId)

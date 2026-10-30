@@ -10,7 +10,7 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
   let row=await store.get(actor,botId,id)
   if(['done','failed','stopped'].includes(row.status)) {
     await store.cleanup(actor,botId,id)
-    await report(actor.userId,botId,id,`Web task ${row.task}: ${row.status}. ${row.step}`,row.status)
+    await report(actor,botId,id,`Web task ${row.task}: ${row.status}. ${row.step}`,row.status)
     return 'terminal'
   }
   if(row.nextAttemptAt && new Date(row.nextAttemptAt).getTime()>Date.now()) return 'retry'
@@ -68,7 +68,7 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
       const continuation=browserLoginContinuation(login.status)
       if(continuation==='running') return 'running'
       await store.update(actor,botId,id,'needs_you','Login required',{kind:'login',site})
-      await report(actor.userId,botId,id,`The web task needs the secure login card for ${site}; never request credentials in chat.`,'login')
+      await report(actor,botId,id,`The web task needs the secure login card for ${site}; never request credentials in chat.`,'login')
       return 'waiting'
     }
     const {chooseVisualBrowserStep,judgeVisualBrowserAction}=await import('@/lib/cloud-computer/visual-model')
@@ -83,12 +83,12 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
     }
     if(judgment.scope==='needs_user_information') {
       await store.update(actor,botId,id,'needs_you',next.step)
-      await report(actor.userId,botId,id,next.summary,'question')
+      await report(actor,botId,id,next.summary,'question')
       return 'waiting'
     }
     if(next.action==='done') {
       await store.update(actor,botId,id,'done',next.step)
-      await report(actor.userId,botId,id,next.summary,'done')
+      await report(actor,botId,id,next.summary,'done')
       return 'terminal'
     }
     if(next.action==='waiting') throw new Error('browserJudgmentUnavailable')
@@ -99,19 +99,23 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
   } catch(error) {
     const message=error instanceof Error?error.message:''
     if(message==='browserActionOutcomeUnknown') {
-      await report(actor.userId,botId,id,'The last browser operation has an uncertain outcome. Do not repeat it without reconciliation.','outcome-unknown')
+      await report(actor,botId,id,'The last browser operation has an uncertain outcome. Do not repeat it without reconciliation.','outcome-unknown')
       return 'waiting'
     }
     const failed=await pool.query(`UPDATE bot_subagents SET "consecutiveFailures"="consecutiveFailures"+1,"lastFailureCode"=$3,"nextAttemptAt"=now()+make_interval(secs=>least(60,power(2,least("consecutiveFailures"+1,5))::int)) WHERE id=$1 AND "ownerId"=$2 AND status IN ('running','queued') RETURNING "consecutiveFailures"`,[id,actor.userId,message==='observation_stale' || message==='browserActionExpired'?'observation_changed':'runtime_unavailable'])
     if(!failed.rows[0]) return 'waiting'
     if(failed.rows[0].consecutiveFailures<4) return 'retry'
     await store.update(actor,botId,id,'failed','Browser service unavailable after bounded retries; progress retained')
-    await report(actor.userId,botId,id,'The browser task could not continue after retrying. Report the retained failure without claiming the task completed.','runtime-failed')
+    await report(actor,botId,id,'The browser task could not continue after retrying. Report the retained failure without claiming the task completed.','runtime-failed')
     return 'terminal'
   }
 }
-async function report(userId:string,botId:string,id:string,text:string,state:string) {
+async function report(actor:Actor,botId:string,id:string,rawText:string,state:string) {
+  const userId=actor.userId
   const {db,pool}=await import('@/lib/db')
+  // 4e2 item 4: the report text is visual-model output persisted as a coordinator event.
+  const {maskForWorkspace}=await import('@/lib/secrets/runtime')
+  const text=await maskForWorkspace(actor.workspaceId,rawText)
   const {recordCoordinatorEvent}=await import('@/lib/coordinator-event-store')
   const {wakeCoordinator}=await import('@/lib/coordinator/wake')
   const fromSuggestion=Boolean((await pool.query('SELECT 1 FROM suggestion_executions WHERE "subagentId"=$1 AND "ownerId"=$2',[id,userId])).rowCount)

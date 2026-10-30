@@ -30,7 +30,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
   const syncedLeases: { sandboxId: string; policyVersion: number; computerAllowed?: boolean; display: number }[] = []
   const runtime = {
     async createComputer() { created++; return { sandboxId: created === 1 ? 'sandbox-test' : `sandbox-owner-${created}` } },
-    async connectComputer(sandboxId: string) { return { sandboxId } },
+    async connectComputer(_workspaceId: string, sandboxId: string) { return { sandboxId } },
     async computerState() { return 'sleeping' },
     async installComputerRuntime() {}, async startDesktop() { if (failStart) throw new Error('start response lost') },
     async syncDesktopLease(sandbox: { sandboxId: string }, lease: { epoch: number; computerAllowed?: boolean; policyVersion: number; display: number }) { syncedLeases.push({ sandboxId: sandbox.sandboxId, ...lease }); epoch = lease.epoch; computerAllowed = lease.computerAllowed === true; computerPolicyVersion = lease.policyVersion; if (failSync) throw new Error('transport failed') },

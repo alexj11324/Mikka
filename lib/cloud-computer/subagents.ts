@@ -5,6 +5,7 @@ import { ensureCloudMachine } from '@/lib/computer/provision'
 import { subagentEventSchema, type SubagentEvent } from '@mikka/protocol/subagent'
 import { ComputerError } from '@/lib/computer/store'
 import { connectComputer } from '@/lib/computer/e2b-provider'
+import { maskForWorkspace } from '@/lib/secrets/runtime'
 import { installSubagentRuntime, runtimeRequest, grant, endpointPath, type BrowserBinding } from './runtime'
 export type Actor = { userId: string; workspaceId: string }
 export type Subagent = BrowserBinding & { task: string; status: SubagentEvent['data']['state']; step: string; needs: SubagentEvent['data']['needs']; targetId: string | null; activeActionId?: string | null; nextAttemptAt?: Date | null; activeSteps?: number; consecutiveFailures?: number }
@@ -24,7 +25,8 @@ export class SubagentStore {
     return row
   }
   private async publish(client: Pool | PoolClient, row: Subagent) {
-    const event = subagentEventSchema.parse({ type: 'data-subagent', data: { botId: row.botId, subagentId: row.id, task: row.task, state: row.status, step: row.step, needs: row.needs } })
+    // 4e2 item 4: subagent_events are persisted and streamed; mask step/needs/task with the workspace's secret set.
+    const event = await maskForWorkspace(row.workspaceId, subagentEventSchema.parse({ type: 'data-subagent', data: { botId: row.botId, subagentId: row.id, task: row.task, state: row.status, step: row.step, needs: row.needs } }))
     await client.query('INSERT INTO subagent_events ("ownerId","workspaceId","botId","subagentId",event) VALUES ($1,$2,$3,$4,$5)', [row.ownerId, row.workspaceId, row.botId, row.id, JSON.stringify(event)])
     return event
   }
@@ -79,7 +81,9 @@ export class SubagentStore {
       throw error
     }
   }
-  async update(actor: Actor, botId: string, id: string, status: Subagent['status'], step: string, needs: Subagent['needs'] = null) {
+  async update(actor: Actor, botId: string, id: string, status: Subagent['status'], rawStep: string, rawNeeds: Subagent['needs'] = null) {
+    // 4e2 item 4: step / needs come from the visual model and page; bot_subagents keeps them masked.
+    const { step, needs } = await maskForWorkspace(actor.workspaceId, { step: rawStep, needs: rawNeeds })
     const client = await this.pool.connect()
     let changed: Subagent | undefined
     try {
@@ -110,7 +114,7 @@ export class SubagentStore {
   async viewer(actor: Actor, botId: string, id: string) {
     const { row, sandboxId } = await this.machine(actor, botId, id)
     if (!['running', 'needs_you'].includes(row.status)) throw new ComputerError(409, 'Browser unavailable')
-    const capability = await grant(await connectComputer(sandboxId), row, 'view')
+    const capability = await grant(await connectComputer(actor.workspaceId, sandboxId), row, 'view')
     return { url: endpointPath(capability.endpoint, '/viewer').replace('https:', 'wss:'), expiresAt: new Date(capability.expiresAt).toISOString() }
   }
   async stop(actor: Actor, botId: string, id: string) {

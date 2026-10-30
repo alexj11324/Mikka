@@ -46,6 +46,8 @@ async function routeFixture(unavailable=false,stopped=false) {
     '@/lib/computer/claim':{claimLocalRun:async(_pool:unknown,_runId:string,_deviceId:string,_lease:Date,_subscription:unknown,guard:(tx:object)=>Promise<boolean>,after:(tx:object)=>Promise<void>)=>{if(!await guard({}))return 'unavailable';calls.push('claim');run.status='preparing';await after({});return 'claimed'}},
     '@/lib/subscription-runtime':{},
     '@/lib/computer/native-run-binding':{},
+    '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
+    '@/lib/secrets/runtime':{taskSecretInjection:async()=>({env:{},secretNames:[]}),remoteRepositoryRef:()=>null},
     '@/lib/personal-mailbox-config':{personalMailboxEnabled:()=>false},
     '@/lib/factory/questions/retry':{},'@mikka/protocol/skill':{SKILL_ARTIFACT_HEADER:'x-mikka-skill-artifacts'},
     '@/lib/self-improvement/contract':{ImprovementError},'@/lib/factory/contract':{FactoryError},

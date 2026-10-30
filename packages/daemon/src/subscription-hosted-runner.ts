@@ -30,6 +30,7 @@ import { requireRunToolApproval } from "./agents/tool-approval";
 import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
+import { withTaskEnv } from "./task-env";
 import type { ComputerBroker } from "./computer/broker.mjs";
 import { decide, runDomains, runPolicy } from "./permissions";
 import { startPublicEgress, type PublicEgress } from "./agents/public-egress";
@@ -650,13 +651,16 @@ export async function createHostedBotRunner(host: {
                 (key === "CLAUDE_CODE_OAUTH_TOKEN" && value !== placeholder))
             )
               throw unavailable();
+          // 4e3: the user variables arrive through their own channel, after the platform guard above.
+          const task = withTaskEnv(env, assignment.taskEnv);
+          if (task.dropped.length) console.warn(`run ${assignment.runId}: skipped reserved task variables ${task.dropped.join(", ")}`);
           const child = spawn("docker", ["start", "-ai", name], {
             env: bareEnv,
             stdio: ["pipe", "pipe", "pipe"],
             signal: AbortSignal.any([lifetime.signal, ...(config.signal ? [config.signal] : [])]),
           });
           child.stdin.write(
-            JSON.stringify({ kind, args: config.args, cwd, env, publicEgress: Boolean(egress) }) + "\n",
+            JSON.stringify({ kind, args: config.args, cwd, env: task.env, publicEgress: Boolean(egress) }) + "\n",
           );
           return child;
         };

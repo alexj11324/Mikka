@@ -48,7 +48,7 @@ export function endpointPath(endpoint: string, path: string) {
   const url = new URL(endpoint); url.pathname += path; return url.toString()
 }
 export async function runtimeRequest(sandboxId: string, row: BrowserBinding, path: string, body?: unknown) {
-  const sandbox = await connectComputer(sandboxId)
+  const sandbox = await connectComputer(row.workspaceId, sandboxId)
   const capability = await grant(sandbox, row, 'runtime')
   const response = await fetch(endpointPath(capability.endpoint, path), { method: body === undefined ? 'GET' : 'POST', redirect: 'error', cache: 'no-store', headers: { 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(25_000) })
   if (!response.ok) {

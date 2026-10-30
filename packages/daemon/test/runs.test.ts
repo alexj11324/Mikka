@@ -176,6 +176,25 @@ describe("mock runs", () => {
     client.close()
   })
 
+  it("masks injected secrets (raw + base64, split across deltas) before upload; env vars and unlisted names are left", async () => {
+    const SECRET = "fixture_sk_live_0123456789abcdef"
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const runId = server.queueRun(DEVICE, {
+      issueId: "issue-secret-output", repoId: "repo-1", baseBranch: "main", harness: "mock", prompt: "do it",
+      fixture: "secret-output", verifyCommand: VERIFY,
+      taskEnv: { API_TOKEN: SECRET, REGION: "us-east-1-region" }, taskSecretNames: ["API_TOKEN"],
+    })
+    await runToEnd(daemon, server, runId)
+    const chunks = server.chunksFor(runId)
+    const uploaded = JSON.stringify([chunks, server.runs.get(runId)?.patches, server.runs.get(runId)?.completion])
+    expect(uploaded).not.toContain(SECRET)
+    expect(uploaded).not.toContain(Buffer.from(SECRET).toString("base64"))
+    const text = chunks.flatMap((c) => (c.type === "text-delta" ? [c.delta] : [])).join("")
+    expect(text).toBe("Using the token [secret:API_TOKEN] now; b64 [secret:API_TOKEN] done. Trailing fixture_sk_live")
+    expect(JSON.stringify(chunks.find((c) => c.type === "tool-input-available"))).toContain("curl -H [secret:API_TOKEN]")
+    expect(server.runs.get(runId)?.completion?.report).toMatchObject({ summary: "Deployed with [secret:API_TOKEN].", nextStep: "Rotate [secret:API_TOKEN]." })
+  })
   it("rejects an assignment whose repository URL differs from its approved identity", async () => {
     const { server, dataDir, repo } = await setup()
     const daemon = await boot(server, dataDir)
