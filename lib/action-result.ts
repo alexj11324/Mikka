@@ -1,6 +1,7 @@
 export const ACTION_ERROR_CODES = [
   'secretNotFound',
   'secretPermissionDenied',
+  'secretNameReserved',
   'secretNameTaken',
   'secretLimitReached',
   'secretsUnavailable',

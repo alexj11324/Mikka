@@ -6,6 +6,9 @@ import test from 'node:test'
 
 const points: Array<[string, string, RegExp]> = [
   ['run_chunks (events)', 'app/v1/runs/[runId]/events/route.ts', /workspaceSecretMasker\(caller\.scopeWorkspaceId\)/],
+  ['run_chunks (events) persists through the stream masker', 'app/v1/runs/[runId]/events/route.ts', /persistRunEventBatch\(/],
+  ['run_chunks stream masking + sealed hold-back', 'lib/secrets/run-events.ts', /maskStreamedChunks\(/],
+  ['checkpoint patch is gunzipped before masking', 'lib/secrets/checkpoint.ts', /gunzipSync\(/],
   ['completion result', 'app/v1/runs/[runId]/complete/route.ts', /workspaceSecretMasker|maskForWorkspace/],
   ['run PATCH error', 'app/v1/runs/[runId]/route.ts', /maskForWorkspace\(caller\.scopeWorkspaceId/],
   ['checkpoint patch/files', 'app/v1/runs/[runId]/checkpoint/route.ts', /maskCheckpoint\(/],

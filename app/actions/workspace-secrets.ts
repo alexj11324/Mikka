@@ -8,7 +8,7 @@ import { createWorkspaceSecret, deleteWorkspaceSecret, EgressDomainError, Egress
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 
-// 设置 › 密钥与环境. Permission tiers: lib/secrets/permissions.ts (members: repo-scoped non-production entries; admins: everything). Secret values are write-only; env values are readable.
+// 设置 › 密钥与环境. Permission tiers: lib/secrets/permissions.ts (members: repo-scoped non-production entries; admins: everything). All values (secret and env) are write-only: responses carry name/kind/scope/environment only.
 // TODO(audit): pass a recordAudit-backed hook (with actor name + request context) once #432 lands.
 
 const withActor = <T>(fn: (userId: string, workspaceId: string) => Promise<T>) => workspaceAction(async () => {

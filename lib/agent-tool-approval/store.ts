@@ -5,14 +5,16 @@ import { writeTransaction } from '@/lib/operations/write-transaction'
 
 /** No caller identity, policy, decision, or scope comes from the CLI. */
 export type DeviceActor = { userId: string; deviceId: string }
-export type ApprovalInput = { runId: string; requestId: string; harness: 'codex' | 'claude_code'; method: string; input: unknown; policyRevision: string }
+export type ApprovalInput = { runId: string; requestId: string; harness: 'codex' | 'claude_code'; method: string; input: unknown; policyRevision: string; /** #438 E: the unmasked input when `input` was masked; only its sha256 is kept. */ originalInput?: unknown }
 export class ApprovalUnavailable extends Error { constructor() { super('approvalUnavailable') } }
 
 const validate = (value: ApprovalInput) => {
   const serialized = JSON.stringify(value.input)
   if (!value.requestId || value.requestId.length > 256 || !value.method || value.method.length > 128 || !serialized || serialized.length > 20_000) throw new ApprovalUnavailable()
   const digest = createHash('sha256').update(JSON.stringify([value.runId, value.requestId, value.harness, value.method, value.policyRevision, JSON.parse(serialized)])).digest('hex')
-  return { serialized, digest }
+  // #438 E: compared on a repeated requestId, never returned.
+  const inputDigest = createHash('sha256').update(JSON.stringify([value.runId, value.requestId, 'originalInput' in value ? value.originalInput : JSON.parse(serialized)])).digest('hex')
+  return { serialized, digest, inputDigest }
 }
 
 export class AgentToolApprovalStore {
@@ -33,7 +35,7 @@ export class AgentToolApprovalStore {
     })
   }
   async propose(actor: DeviceActor, value: ApprovalInput) {
-    const { serialized, digest } = validate(value)
+    const { serialized, digest, inputDigest } = validate(value)
     return this.transaction(value.runId, actor.userId, async client => {
       const policy = await lockCliRunPolicy(client, value.runId, actor.userId)
       if (policy.revision !== value.policyRevision) throw new ApprovalUnavailable()
@@ -41,7 +43,7 @@ export class AgentToolApprovalStore {
       const valid = await client.query(`SELECT 1 FROM agent_runs r JOIN agents a ON a.id=r."agentId" AND a."userId"=r."userId" JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId" AND d.enabled=true WHERE r.id=$1 AND r."deviceId"=$2 AND COALESCE(r."agentDefinition"->>'harness', a.harness)=$3`, [value.runId, actor.deviceId, value.harness])
       if (!valid.rowCount) throw new ApprovalUnavailable()
       const id = randomUUID()
-      const { rows } = await client.query(`INSERT INTO agent_tool_approvals (id,"runId","userId","deviceId","requestId",harness,method,input,digest,status,"expiresAt","policyRevision") VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,'pending',now()+interval '5 minutes',$10) ON CONFLICT ("runId","requestId") DO UPDATE SET "requestId"=EXCLUDED."requestId" WHERE agent_tool_approvals.digest=EXCLUDED.digest AND agent_tool_approvals."userId"=EXCLUDED."userId" AND agent_tool_approvals."deviceId"=EXCLUDED."deviceId" RETURNING id,digest,status`, [id,value.runId,actor.userId,actor.deviceId,value.requestId,value.harness,value.method,serialized,digest,value.policyRevision])
+      const { rows } = await client.query(`INSERT INTO agent_tool_approvals (id,"runId","userId","deviceId","requestId",harness,method,input,digest,status,"expiresAt","policyRevision","inputDigest") VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,'pending',now()+interval '5 minutes',$10,$11) ON CONFLICT ("runId","requestId") DO UPDATE SET "requestId"=EXCLUDED."requestId" WHERE agent_tool_approvals.digest=EXCLUDED.digest AND agent_tool_approvals."inputDigest"=EXCLUDED."inputDigest" AND agent_tool_approvals."userId"=EXCLUDED."userId" AND agent_tool_approvals."deviceId"=EXCLUDED."deviceId" RETURNING id,digest,status`, [id,value.runId,actor.userId,actor.deviceId,value.requestId,value.harness,value.method,serialized,digest,value.policyRevision,inputDigest])
       if (!rows[0]) throw new ApprovalUnavailable()
       return rows[0] as { id: string; digest: string; status: string }
     })
