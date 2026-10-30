@@ -2038,11 +2038,8 @@
     "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again.",
     "botAgents": {
       "bots": "Bots",
-      "agents": "Agents",
       "addRule": "Add rule",
       "default": "Default",
-      "auto": "Auto",
-      "autoBotHint": "Switches when quota runs out or sign-in expires",
       "cloud": "Cloud",
       "online": "Online",
       "offline": "Offline",
@@ -2067,8 +2064,24 @@
         "model": "Model",
         "actions": "Actions"
       },
-      "coordinatorHint": "Talks with you and hands out tasks",
-      "defaultHint": "When no label matches"
+      "botHint": "Talks with you and hands out tasks",
+      "defaults": "Task defaults",
+      "noAccount": "No account connected",
+      "whenQuotaExhausted": "When quota runs out",
+      "whenQuotaExhaustedHint": "After the Bot's account runs out of quota",
+      "quotaStop": "Stop and wait for me",
+      "quotaSwitch": "Switch to another account",
+      "setting": "{name}: {value}",
+      "defaultsNote": "Tasks whose labels match no rule use these",
+      "placeHint": "Where a task runs",
+      "harnessHint": "The coding agent that runs the task",
+      "modelHint": "The model the harness uses",
+      "whenDeviceOffline": "When the device is offline",
+      "whenDeviceOfflineHint": "When the chosen device is not online",
+      "offlineWait": "Wait for it",
+      "offlineCloud": "Run in the cloud",
+      "labels": "By label",
+      "labelsNote": "Matched against task labels from top to bottom"
     }
   },
   "TelegramBot": {
