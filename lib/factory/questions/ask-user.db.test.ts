@@ -282,7 +282,8 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       } finally { await d.query("ROLLBACK"); d.release(); }
     });
 
-    await t.test("list by task: newest first with id tiebreak", async () => {
+    // M10: the list() id tiebreak subtest QA's mutation plan refers to.
+    await t.test("M10 list by task: newest first with id tiebreak", async () => {
       const first = await asked("decision", "Tiebreak 0", ["A"]);
       const ids = [first.questionId];
       // Move three more questions onto the same task, then give all four the same createdAt so only `id DESC` orders them.
@@ -294,6 +295,18 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       await pool.query(`UPDATE factory_questions SET "createdAt"='2020-06-01T00:00:00Z' WHERE "taskId"=$1`, [first.taskId]);
       const got = ((await get("owner", `?taskId=${first.taskId}`)).body as { questions: { questionId: string }[] }).questions.map((q) => q.questionId);
       assert.deepEqual(got, [...ids].sort().reverse());
+    });
+
+    await t.test("by continuation run: a resuming question is found by its continuationRunId", async () => {
+      const q = await asked("decision", "Continue with which branch?", ["A"]);
+      const c = await asked("decision", "Continuation run's own question", ["A"]);
+      // c's run plays the continuation; its own question is resolved so only q can match.
+      await pool.query("UPDATE factory_questions SET status='resolved' WHERE id=$1", [c.questionId]);
+      await pool.query(`UPDATE factory_questions SET status='resuming',"continuationRunId"=$2 WHERE id=$1`, [q.questionId, c.runId]);
+      const ids = ((await get("owner", `?runId=${c.runId}`)).body as { questions: { questionId: string }[] }).questions.map((x) => x.questionId);
+      assert.deepEqual(ids, [q.questionId]);
+      assert.deepEqual((await get("intruder", `?runId=${c.runId}`)).body, { questions: [] });
+      await pool.query("UPDATE factory_questions SET status='resolved' WHERE id=$1", [q.questionId]);
     });
 
     await t.test("rejects bad input and anonymous callers", async () => {
