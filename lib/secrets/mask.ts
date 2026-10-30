@@ -20,7 +20,7 @@ function forms(value: string): string[] {
 export function createSecretMasker(secrets: readonly MaskableSecret[]): Masker {
   const needles = new Map<string, string>()
   for (const { name, value } of secrets) {
-    if (value.length < MASK_MIN_LENGTH) continue
+    if ([...value].length < MASK_MIN_LENGTH) continue
     for (const form of forms(value)) if (form.length >= MASK_MIN_LENGTH && !needles.has(form)) needles.set(form, `[secret:${name}]`)
   }
   if (!needles.size) return identityMasker

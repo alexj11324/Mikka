@@ -1,23 +1,30 @@
 import 'server-only'
 // 4e2: workspace secrets at sandbox runtime. Everything here is gated by MIKKA_BYO_E2B_KEY
 // (off by default; turning it on needs Alex). Flag off = no injection, no masking, today's behaviour.
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaceSecrets } from '@/lib/db/secrets-schema'
 import { openSecret, secretAad, SecretsKeyMissingError } from './crypto'
 import { byoE2BKeyEnabled, E2BKeyError } from './e2b'
+import { guardSecretsDb } from './store'
 import { createSecretMasker, identityMasker, type Masker } from './mask'
 
 type Env = Record<string, string | undefined>
 export interface RuntimeSecret { name: string; kind: 'secret' | 'env'; value: string }
 
-/** Workspace-scoped secrets and env vars, decrypted. Repository-scoped rows are not included yet. */
+/** Sandboxes run as production: only environment 'all' and 'production' are injected (preview/development never). */
+export const RUNTIME_ENVIRONMENTS = ['all', 'production'] as const
+
+/** Workspace-scoped secrets and env vars for environment all/production, decrypted. Repository-scoped rows are not included yet. */
 export async function loadWorkspaceRuntimeSecrets(workspaceId: string, env: Env = process.env): Promise<RuntimeSecret[]> {
-  const rows = await db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), eq(workspaceSecrets.scopeType, 'workspace')))
-  try { return rows.map(row => ({ name: row.name, kind: row.kind, value: openSecret(row, secretAad(row), env) })) } catch (error) {
-    if (error instanceof SecretsKeyMissingError) throw new E2BKeyError('e2b_unavailable', 'secrets key missing')
-    throw error
-  }
+  const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), eq(workspaceSecrets.scopeType, 'workspace'), inArray(workspaceSecrets.environment, [...RUNTIME_ENVIRONMENTS]))))
+  return rows.map(row => {
+    try { return { name: row.name, kind: row.kind, value: openSecret(row, secretAad(row), env) } } catch (error) {
+      if (error instanceof SecretsKeyMissingError) throw new E2BKeyError('e2b_unavailable', 'secrets key missing')
+      console.error(`workspace secret ${row.id} failed to decrypt`)
+      throw new E2BKeyError('e2b_unavailable', 'workspace secret unavailable')
+    }
+  })
 }
 
 /** Env for the sandbox worker process: NAME=value for every workspace secret / env var. {} when the flag is off. */

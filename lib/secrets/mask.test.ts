@@ -25,3 +25,8 @@ test('maskDeep walks arrays, objects and keys, leaves non-strings alone', () => 
   const input = { a: 'tok_12345678' }
   assert.equal(maskDeep(input, identityMasker), input)
 })
+
+test('min length counts code points, not UTF-16 units', () => {
+  assert.equal(createSecretMasker([{ name: 'E', value: '😀😀😀😀' }]), identityMasker, '4 code points (8 UTF-16 units) is too short')
+  assert.equal(createSecretMasker([{ name: 'E', value: '😀😀😀😀😀😀😀😀' }])('x😀😀😀😀😀😀😀😀x'), 'x[secret:E]x')
+})
