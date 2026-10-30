@@ -1694,15 +1694,14 @@
     },
     "computerPolicy": {
       "heading": "Computer use",
-      "description": "Control whether Bots may operate computers in this workspace.",
       "label": "Bot computer use",
-      "help": "Denying stops computer tasks and revokes their approvals. People can still take control.",
+      "help": "Bots operate computers whenever you haven't taken control. Deny stops computer tasks.",
       "adminOnly": "Only workspace admins can change this setting.",
-      "ask": "Ask for approval",
+      "allow": "Allow",
       "deny": "Deny",
       "error": "Could not update or load the computer setting.",
-      "loading": "Loading approval settings…",
-      "unavailable": "Cloud computer tasks aren't turned on for this deployment, so there's nothing to approve yet."
+      "loading": "Loading computer setting…",
+      "unavailable": "Cloud computers are off"
     },
     "issuePrefix": {
       "title": "Personal task ids",
