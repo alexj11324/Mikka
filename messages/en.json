@@ -1066,6 +1066,8 @@
     "teamNotFound": "This team does not exist.",
     "teamDeleteNameMismatch": "The name you entered does not match the team name.",
     "botDefaultRepositoryUnavailable": "This repository is not in any workspace member’s GitHub App installation.",
+    "tokenNotFound": "This token does not exist or was already revoked.",
+    "tokenLimitReached": "You have reached the limit of 50 active tokens in this workspace. Revoke one first.",
     "usageLimitReached": "The usage limit has been reached. New tasks are paused; running tasks will finish.",
     "usageCreditsExhausted": "Credits have run out. New tasks are paused; running tasks will finish.",
     "billingNotConfigured": "Billing is not set up.",

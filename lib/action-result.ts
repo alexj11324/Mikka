@@ -141,6 +141,8 @@ export const ACTION_ERROR_CODES = [
   'teamNotFound',
   'teamDeleteNameMismatch',
   'botDefaultRepositoryUnavailable',
+  'tokenNotFound',
+  'tokenLimitReached',
   'usageLimitReached',
   'usageCreditsExhausted',
   'billingNotConfigured',

@@ -1,0 +1,89 @@
+// 设置 › 个人访问令牌 against a real PostgreSQL: hash-only storage, one-time plaintext, list, revoke, scoping.
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
+
+test('personal access tokens', { skip: !dbUrl }, async t => {
+  const { Pool } = await import('pg')
+  const pool = new Pool({ connectionString: dbUrl, max: 2 })
+  const { WorkspaceError } = await import('../lib/workspace-access')
+  const store = await import('../lib/tokens/store')
+  const { hashPersonalAccessToken, PAT_ACTIVE_LIMIT } = await import('../lib/tokens/format')
+  const { pool: appPool } = await import('../lib/db')
+  const { workspacePool } = await import('../lib/workspace-db')
+  t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
+  const rejects = (promise: Promise<unknown>, code: string) => assert.rejects(promise, (error: unknown) => error instanceof WorkspaceError && error.code === code)
+
+  const owner = await seedUser(pool, 'owner'), member = await seedUser(pool, 'member'), outsider = await seedUser(pool, 'outsider'), gone = await seedUser(pool, 'gone')
+  const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }, { userId: gone, role: 'member', status: 'suspended' }])
+  const other = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+
+  await t.test('create stores only the hash and returns the plaintext once', async () => {
+    const created = await store.createPersonalAccessToken(owner, ws.id, { name: ' Deploy ' })
+    assert.match(created.token, /^mkp_[A-Za-z0-9_-]{43}$/)
+    assert.deepEqual([created.name, created.hint, created.expiresAt, created.lastUsedAt, created.expired], ['Deploy', created.token.slice(-4), null, null, false])
+    const { rows } = await pool.query('select * from personal_access_tokens where id=$1', [created.id])
+    assert.equal(rows[0].tokenHash, hashPersonalAccessToken(created.token))
+    assert.ok(!JSON.stringify(rows).includes(created.token), 'plaintext never stored')
+    const listed = await store.listPersonalAccessTokens(owner, ws.id)
+    assert.ok(!JSON.stringify(listed).includes(created.token), 'list never returns plaintext')
+    assert.ok(!JSON.stringify(listed).includes(rows[0].tokenHash), 'list never returns the hash')
+  })
+
+  await t.test('optional expiry: future accepted, past/too far rejected, expired flagged and unusable', async () => {
+    const now = new Date()
+    const later = await store.createPersonalAccessToken(owner, ws.id, { name: 'Week', expiresAt: new Date(now.getTime() + 7 * 86_400_000).toISOString() })
+    assert.ok(later.expiresAt)
+    await rejects(store.createPersonalAccessToken(owner, ws.id, { name: 'Past', expiresAt: new Date(now.getTime() - 1000).toISOString() }), 'validationGeneric')
+    await rejects(store.createPersonalAccessToken(owner, ws.id, { name: 'Far', expiresAt: new Date(now.getTime() + 400 * 86_400_000).toISOString() }), 'validationGeneric')
+    const soon = await store.createPersonalAccessToken(owner, ws.id, { name: 'Soon', expiresAt: new Date(now.getTime() + 60_000).toISOString() })
+    const afterExpiry = new Date(now.getTime() + 120_000)
+    assert.equal((await store.listPersonalAccessTokens(owner, ws.id, afterExpiry)).find(row => row.id === soon.id)?.expired, true)
+    assert.equal(await store.verifyPersonalAccessToken(soon.token, afterExpiry), null)
+    assert.equal((await store.verifyPersonalAccessToken(soon.token))?.tokenId, soon.id)
+  })
+
+  await t.test('list: own tokens in this workspace only, newest first, revoked hidden', async () => {
+    const mine = await store.createPersonalAccessToken(member, ws.id, { name: 'Member token' })
+    const elsewhere = await store.createPersonalAccessToken(owner, other.id, { name: 'Other workspace' })
+    const ownerList = await store.listPersonalAccessTokens(owner, ws.id)
+    assert.ok(!ownerList.some(row => row.id === mine.id || row.id === elsewhere.id))
+    assert.deepEqual(ownerList.map(row => row.createdAt), ownerList.map(row => row.createdAt).sort().reverse())
+    await store.revokePersonalAccessToken(member, ws.id, { id: mine.id })
+    assert.deepEqual(await store.listPersonalAccessTokens(member, ws.id), [])
+  })
+
+  await t.test('revoke: only own unrevoked token; revoked token stops verifying', async () => {
+    const created = await store.createPersonalAccessToken(owner, ws.id, { name: 'Revoke me' })
+    assert.equal((await store.verifyPersonalAccessToken(created.token))?.userId, owner)
+    await rejects(store.revokePersonalAccessToken(member, ws.id, { id: created.id }), 'tokenNotFound')
+    await rejects(store.revokePersonalAccessToken(owner, other.id, { id: created.id }), 'tokenNotFound')
+    assert.deepEqual(await store.revokePersonalAccessToken(owner, ws.id, { id: created.id }), { id: created.id })
+    await rejects(store.revokePersonalAccessToken(owner, ws.id, { id: created.id }), 'tokenNotFound')
+    assert.equal(await store.verifyPersonalAccessToken(created.token), null)
+    const { rows } = await pool.query('select "revokedAt" from personal_access_tokens where id=$1', [created.id])
+    assert.ok(rows[0].revokedAt, 'revoked rows are kept')
+  })
+
+  await t.test('verify: unknown or malformed tokens fail; lastUsedAt updates', async () => {
+    assert.equal(await store.verifyPersonalAccessToken('mkp_' + 'A'.repeat(43)), null)
+    assert.equal(await store.verifyPersonalAccessToken('not-a-token'), null)
+    const created = await store.createPersonalAccessToken(owner, ws.id, { name: 'Used' })
+    await store.verifyPersonalAccessToken(created.token)
+    assert.ok((await store.listPersonalAccessTokens(owner, ws.id)).find(row => row.id === created.id)?.lastUsedAt)
+  })
+
+  await t.test('scoping and limit: outsiders/suspended refused, 50 active tokens max', async () => {
+    await rejects(store.createPersonalAccessToken(outsider, ws.id, { name: 'x' }), 'workspaceAccessDenied')
+    await rejects(store.listPersonalAccessTokens(gone, ws.id), 'workspaceAccessDenied')
+    await assert.rejects(store.createPersonalAccessToken(owner, ws.id, { name: '' }))
+    const fresh = await seedUser(pool, 'fresh')
+    await pool.query(`insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$2 || '@example.invalid','member','active')`, [ws.id, fresh])
+    for (let i = 0; i < PAT_ACTIVE_LIMIT; i++) await store.createPersonalAccessToken(fresh, ws.id, { name: `t${i}` })
+    await rejects(store.createPersonalAccessToken(fresh, ws.id, { name: 'one more' }), 'tokenLimitReached')
+    const [first] = await store.listPersonalAccessTokens(fresh, ws.id)
+    await store.revokePersonalAccessToken(fresh, ws.id, { id: first.id })
+    assert.ok((await store.createPersonalAccessToken(fresh, ws.id, { name: 'after revoke' })).token)
+  })
+
+})
