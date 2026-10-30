@@ -2063,6 +2063,34 @@
         "codex": "Codex",
         "claude": "Claude"
       }
+    },
+    "tokens": {
+      "loading": "正在加载令牌",
+      "create": "新建",
+      "creating": "正在新建…",
+      "createTitle": "新建令牌",
+      "createdTitle": "已新建「{name}」",
+      "name": "名称",
+      "expiryLabel": "过期时间",
+      "expiry": {
+        "30": "30 天",
+        "90": "90 天",
+        "365": "1 年",
+        "never": "永不过期"
+      },
+      "token": "令牌",
+      "copy": "复制",
+      "shownOnce": "只显示这一次。",
+      "done": "完成",
+      "cancel": "取消",
+      "empty": "还没有令牌。",
+      "revoke": "撤销",
+      "revokeTitle": "撤销「{name}」？",
+      "lastUsed": "最近使用 {when}",
+      "neverUsed": "从未使用",
+      "expires": "{date} 过期",
+      "noExpiry": "永不过期",
+      "expired": "已过期"
     }
   },
   "TelegramBot": {

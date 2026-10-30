@@ -2,6 +2,7 @@ import 'server-only'
 import { and, desc, eq, gt, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { personalAccessTokens } from '@/lib/db/token-schema'
+import { recordAudit } from '@/lib/audit/record'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { checkExpiry, createTokenInput, generatePersonalAccessToken, hashPersonalAccessToken, PAT_ACTIVE_LIMIT, PAT_SHAPE, revokeTokenInput } from './format'
@@ -52,6 +53,9 @@ async function guardTokenDb<T>(work: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Who made the change, for the audit row written inside the token transaction. */
+export interface TokenAuditContext { actorName: string; ip?: string | null; geoCity?: string | null; geoCountry?: string | null; geoRegion?: string | null }
+
 async function requireMember(userId: string, workspaceId: string) {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId))
 }
@@ -61,7 +65,7 @@ async function requireMember(userId: string, workspaceId: string) {
  * the plaintext is returned here once. Errors: validationGeneric (bad name or
  * expiry), tokenLimitReached (PAT_ACTIVE_LIMIT active tokens), workspaceAccessDenied.
  */
-export async function createPersonalAccessToken(userId: string, workspaceId: string, input: unknown, now = new Date()): Promise<CreatedPersonalAccessToken> {
+export async function createPersonalAccessToken(userId: string, workspaceId: string, input: unknown, now = new Date(), audit?: TokenAuditContext): Promise<CreatedPersonalAccessToken> {
   const { name, expiresAt } = createTokenInput.parse(input)
   let expiry: Date | null
   try { expiry = checkExpiry(expiresAt, now) } catch { throw new WorkspaceError('validationGeneric') }
@@ -75,9 +79,11 @@ export async function createPersonalAccessToken(userId: string, workspaceId: str
         or(isNull(personalAccessTokens.expiresAt), gt(personalAccessTokens.expiresAt, now))))
     if (active >= PAT_ACTIVE_LIMIT) throw new WorkspaceError('tokenLimitReached')
     const [saved] = await tx.insert(personalAccessTokens).values({ id: crypto.randomUUID(), userId, workspaceId, name, tokenHash, hint, createdAt: now, expiresAt: expiry }).returning()
-    // TODO(audit): after PR #432 merges, call recordAudit(tx, { workspaceId, actor: { type: 'user', id: userId, name }, action: 'token.created',
-    // target: { type: 'token', id: saved.id, label: name }, ...auditRequestContext(headers) }) here. Rule (#432 lib/audit/record.ts):
-    // MIKKA-DB token writes use recordAudit inside this transaction, never recordAuditSafe.
+    // MIKKA-DB token writes are audited inside this transaction (lib/audit/record.ts), never with recordAuditSafe.
+    if (audit) {
+      const { actorName, ...request } = audit
+      await recordAudit(tx, { workspaceId, actor: { type: 'user', id: userId, name: actorName }, action: 'token.created', target: { type: 'token', id: saved.id, label: name }, metadata: { tokenName: name, expiresAt: expiry?.toISOString() ?? null }, ...request })
+    }
     return saved
   }))
   return { ...view(row, now), token }
@@ -93,7 +99,7 @@ export async function listPersonalAccessTokens(userId: string, workspaceId: stri
 }
 
 /** Revokes one of the person's own tokens. Someone else's, unknown or already revoked → tokenNotFound. */
-export async function revokePersonalAccessToken(userId: string, workspaceId: string, input: unknown, now = new Date()): Promise<{ id: string }> {
+export async function revokePersonalAccessToken(userId: string, workspaceId: string, input: unknown, now = new Date(), audit?: TokenAuditContext): Promise<{ id: string }> {
   const { id } = revokeTokenInput.parse(input)
   await requireMember(userId, workspaceId)
   return guardTokenDb(() => db.transaction(async tx => {
@@ -101,8 +107,10 @@ export async function revokePersonalAccessToken(userId: string, workspaceId: str
       .where(and(eq(personalAccessTokens.id, id), eq(personalAccessTokens.userId, userId), eq(personalAccessTokens.workspaceId, workspaceId), isNull(personalAccessTokens.revokedAt)))
       .returning({ id: personalAccessTokens.id, name: personalAccessTokens.name })
     if (!revoked) throw new WorkspaceError('tokenNotFound')
-    // TODO(audit): after PR #432 merges, recordAudit(tx, { action: 'token.revoked', target: { type: 'token', id, label: revoked.name }, … })
-    // inside this transaction (MIKKA-DB token write rule from #432).
+    if (audit) {
+      const { actorName, ...request } = audit
+      await recordAudit(tx, { workspaceId, actor: { type: 'user', id: userId, name: actorName }, action: 'token.revoked', target: { type: 'token', id, label: revoked.name }, ...request })
+    }
     return { id: revoked.id }
   }))
 }
