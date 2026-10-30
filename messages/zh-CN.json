@@ -1066,6 +1066,7 @@
     "teamNotFound": "团队不存在。",
     "teamDeleteNameMismatch": "输入的名称与团队名称不一致。",
     "botDefaultRepositoryUnavailable": "这个仓库不在工作区成员已安装的 GitHub App 仓库中。",
+    "botDefaultsConflict": "其他人刚修改了这些默认值，已显示最新值。",
     "usageLimitReached": "已达到用量上限，新任务已暂停，运行中的任务会继续完成。",
     "usageCreditsExhausted": "点数已用完，新任务已暂停，运行中的任务会继续完成。",
     "billingNotConfigured": "计费尚未开通。",
