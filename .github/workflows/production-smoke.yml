@@ -38,7 +38,9 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /smoke
+          # The prod root holds only the smoke account; app secrets live in /vercel and /neon.
+          secret-path: /
+          recursive: false
           include-imports: false
       - run: pnpm test:smoke
         env:

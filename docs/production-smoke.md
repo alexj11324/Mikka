@@ -15,7 +15,7 @@ signs in and reads.
 | Made | 2026-10-30, through `/api/auth/sign-up/email`; verified from the Gmail inbox |
 | Workspace | Mikka Smoke的工作区 (made by the app on first sign-in) |
 | Bot | `Smoke Bot`, made once in the UI. The Coordinator has no computer, so the 电脑 tab is checked on this bot |
-| Credentials | Infisical `prod:/smoke`: `SMOKE_OWNER_EMAIL`, `SMOKE_OWNER_PASSWORD` |
+| Credentials | Infisical `prod:/` (the root, which holds nothing else and syncs nowhere): `SMOKE_OWNER_EMAIL`, `SMOKE_OWNER_PASSWORD` |
 
 The `+mikka-smoke` tag ([`lib/smoke-account.ts`](../lib/smoke-account.ts)) grants
 nothing. Its only effect is that the account's PostHog events carry
@@ -26,7 +26,8 @@ real users see.
 A new smoke account is made the same way: sign up with a `+mikka-smoke-<role>`
 address on an inbox you can read, open the verification link, sign in once so
 the workspace is created, create `Smoke Bot`, and store the email and password
-in `prod:/smoke`. Do not write to the database to make or repair one.
+in `prod:/`. Keep app secrets out of the root: the smoke job reads everything
+there. Do not write to the database to make or repair an account.
 
 ## What it checks
 
@@ -46,7 +47,7 @@ whether they are on; they need an active check (below).
 
 [`production-smoke.yml`](../.github/workflows/production-smoke.yml): after each
 successful Production deployment, daily at 14:17 UTC, and by hand. The job
-reads `prod:/smoke` through the existing GitHub OIDC identity.
+reads `prod:/` through the existing GitHub OIDC identity.
 
 Locally, with the credentials in the environment:
 
