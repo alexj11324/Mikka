@@ -3378,5 +3378,40 @@
       "deleteTeam": "删除团队",
       "deleteTeamDescription": "永久删除这个团队及其所有数据"
     }
+  },
+  "CredentialLogin": {
+    "title": "登录 {site}",
+    "close": "关闭",
+    "email": "邮箱",
+    "emailPlaceholder": "name@example.com",
+    "password": "密码",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码",
+    "submit": "登录",
+    "verify": "验证",
+    "securedBy": "安全保护",
+    "signedIn": "已登录 {site}",
+    "recheck": "再查一次",
+    "outcome": {
+      "invalidCredentials": "邮箱或密码不对",
+      "twoFactorInvalid": "验证码不对",
+      "rateLimited": "尝试太频繁，稍后再试",
+      "rateLimitedFor": "尝试太频繁，{seconds} 秒后再试",
+      "accountLocked": "账号已被锁定",
+      "rejected": "登录被拒绝",
+      "code": "验证码",
+      "codeTotp": "验证器 App 中的验证码",
+      "codeSms": "短信验证码",
+      "codeEmail": "邮件验证码",
+      "captchaRequired": "需要你亲自完成网站的人机验证",
+      "needsUser": "需要你亲自完成登录",
+      "outcomeUnknown": "没能确认是否已登录",
+      "waiting": "已提交，等待网站结果…",
+      "submissionInvalid": "提交内容无效，再试一次",
+      "denied": "这里不允许登录",
+      "loginPending": "另一次登录还在进行",
+      "unavailable": "登录暂时不可用",
+      "failed": "没登上，再试一次"
+    }
   }
 }

@@ -9,3 +9,10 @@ export function MikkaMark() {
     {SOLID.map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="4.8" />)}
   </svg>
 }
+
+/** Under 16px the ghost dots blur into a grey square (docs/design/brand.md): solid dots only. */
+export function MikkaMarkSmall() {
+  return <svg viewBox="19.2 19.2 61.6 61.6" aria-hidden="true" focusable="false" className="size-3 shrink-0" fill="currentColor">
+    {SOLID.map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="4.8" />)}
+  </svg>
+}
