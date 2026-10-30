@@ -51,6 +51,10 @@ test('通知设置可以关闭主动消息，刷新后保持', async ({ page }) 
 })
 
 // S-O: a refused save puts the switch back and offers a retry that sends the same change.
+test.describe('通知保存失败', () => {
+  // The test aborts the save itself; Chromium logs that aborted server-action POST once.
+  test.use({ expectedConsoleErrors: [{ path: '/mikka/settings?section=notifications', message: 'Failed to load resource: net::ERR_FAILED' }] })
+
 test('通知保存失败时开关恢复原值，重试后保存成功', async ({ page }) => {
   await register(page, '/settings?section=notifications')
   const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
@@ -58,14 +62,15 @@ test('通知保存失败时开关恢复原值，重试后保存成功', async ({
   // Server actions POST with a Next-Action header; drop exactly those.
   await page.route('**/*', route => route.request().headers()['next-action'] ? route.abort() : route.continue())
   await proactive.click()
-  await expect(page.getByRole('alert')).toContainText('这项设置没有保存，已恢复为原来的值。')
+  await expect(page.locator('[data-slot="alert"]')).toContainText('这项设置没有保存，已恢复为原来的值。')
   await expect(proactive).toBeChecked()
   await page.unroute('**/*')
   await page.getByRole('button', { name: '重试', exact: true }).click()
-  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(page.locator('[data-slot="alert"]')).toHaveCount(0)
   await expect(proactive).not.toBeChecked()
   await page.reload()
   await expect(page.getByRole('switch', { name: '主动消息', exact: true })).not.toBeChecked()
+})
 })
 
 // D14 follow-up: switching language keeps the section and the workspace in the URL.

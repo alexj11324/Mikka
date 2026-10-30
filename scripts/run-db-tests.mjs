@@ -98,6 +98,10 @@ export function validateTarget(env) {
   if (env.ORVILO_DATABASE_URL && env.ORVILO_DATABASE_URL !== env.E2E_DATABASE_URL) throw new Error('Legacy database fallback must not point outside ephemeral service')
 }
 
+// Shell steps of a package script: split on && / || / ; so a guard must sit on
+// the same step that runs the guarded file, not merely somewhere in the script.
+export const scriptSteps = command => (command ?? '').split(/&&|\|\||;/).map(step => step.trim()).filter(Boolean)
+
 export function inventory(files, scripts, expected = [], required = REQUIRED_SUITES, selfManaged = SELF_MANAGED, offlineGuarded = OFFLINE_GUARDED) {
   const has = path => Object.hasOwn(files, path)
   const selected = new Set()
@@ -117,7 +121,7 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
     if(!has(file))continue
     const rel=posix.relative(posix.dirname(file),guard)
     const localGuard=rel.startsWith('.')?rel:'./'+rel
-    if(!reason||!has(guard)||!files[file].includes(`import '${localGuard}'`)||!commandHas(scripts[script],file)||!scripts[script].includes(`--import ./${guard}`))throw Error(`Offline suite ${file} requires its source guard and explicit guarded pure script`)
+    if(!reason||!has(guard)||!files[file].includes(`import '${localGuard}'`)||!scriptSteps(scripts[script]).some(step=>commandHas(step,file)&&step.split(/\s+/).some((t,i,a)=>t==='--import'&&a[i+1]===`./${guard}`)))throw Error(`Offline suite ${file} requires its source guard and explicit guarded pure script`)
     offline.add(file)
   }
   for (const { file, runner, reason } of selfManaged) {

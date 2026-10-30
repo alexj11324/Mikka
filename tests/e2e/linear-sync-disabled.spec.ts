@@ -15,10 +15,9 @@ test('paused Linear settings do not poll state or start OAuth', async ({ page })
   await expect(section.getByText('同步已暂停', { exact: true })).toBeVisible()
   await expect(section.getByRole('button', { name: '连接 Linear', exact: true })).toBeDisabled()
   expect(availabilityReads).toBe(1)
-  // Other settings sections also read once on mount. Wait for those reads to
+  // The other 连接 sections also read once on mount. Wait for those reads to
   // settle before counting, otherwise their late server-action POSTs land in
   // the idle window and look like Linear polling.
-  await expect(page.locator('#issue-prefix')).toBeEnabled()
   await expect(page.getByRole('region', { name: '消息平台', exact: true }).getByText('正在检查…', { exact: true })).toBeHidden()
   await page.waitForLoadState('networkidle')
   const stateActions: string[] = []

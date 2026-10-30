@@ -72,11 +72,10 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   const dialog = await openCreateIssue(page)
   const request = `把群聊未读数接到侧栏 ${randomUUID()}`
   await dialog.getByLabel('任务描述', { exact: true }).fill(request)
-  await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
-  await expect(page.getByText('暂时无法创建任务。', { exact: true })).toBeVisible()
-  await expect(dialog).toBeVisible()
+  // With the gate off the dialog explains why and keeps 创建任务 disabled.
+  await expect(dialog.getByText('这个工作区还没有开启任务创建，可以先在对话里交给 Coordinator。', { exact: true })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '创建任务', exact: true })).toBeDisabled()
   await expect(dialog.getByLabel('任务描述', { exact: true })).toHaveValue(request)
-  await expect(dialog.getByRole('button', { name: '创建任务', exact: true })).toBeEnabled()
   await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true }).getByText(request)).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expect(dialog).not.toBeVisible()

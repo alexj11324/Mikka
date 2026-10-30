@@ -1,3 +1,5 @@
+import { isSettingsSectionParam } from './settings-sections'
+
 export const COMPOSIO_AUTH_CALLBACK_PATH = '/api/integrations/composio/callback'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -43,7 +45,7 @@ export function safeAuthReturn(value?: string) {
   if (url.pathname === '/settings') {
     const section = url.searchParams.get('section')
     return hasOnlyQueryKeys(url, ['section', 'workspace']) &&
-      (section === null || ['preferences', 'profile', 'account', 'workspace', 'integrations', 'devices'].includes(section)) &&
+      (section === null || isSettingsSectionParam(section)) &&
       optionalUuid(url, 'workspace') ? `${url.pathname}${url.search}` : '/'
   }
 
