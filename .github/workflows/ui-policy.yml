@@ -130,6 +130,7 @@ jobs:
       - run: pnpm test:factory-approval
       - run: pnpm test:personal-mailbox-core
       - run: pnpm test:factory-monitor
+      - run: pnpm test:execution-rules
       - run: pnpm test:agent-kit
       - run: pnpm test:agent-kit-compat
       - run: pnpm test:approved-writes
