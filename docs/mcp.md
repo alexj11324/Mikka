@@ -112,13 +112,13 @@ issue and its Bot, and only the run's owner reads it (R-62).
 - Factory evidence (A3): a Factory stage's screenshots and recordings are
   these captures, referenced as `run-capture:<id>` evidence (no second copy).
   The trusted reconcilers add the run's ready captures next to its report;
-  the manifest entry carries `captureId` and the file's own `sha256`, so the
-  evidence digest an approval binds changes when the file does. The window
-  serves them through `GET /api/factory/tasks/:taskId/evidence/:captureId`:
-  the acceptance authorization (task owner, issue access and scope) plus the
-  owner-scoped capture read, and only if the bytes still hash to the bound
-  sha256 (else 409). A recording still running when the run ends is not in
-  that stage's evidence.
+  the reviewer's manifest lists them with `captureId`. Approval binds the
+  candidate commit, as Factory.ai, Warp, Devin and Codex do: the evidence
+  digest covers the text artifacts only, exactly as before. The window serves
+  captures through `GET /api/factory/tasks/:taskId/evidence/:captureId`: the
+  acceptance authorization (task owner, issue access and scope) plus the
+  owner-scoped capture read. A recording still running when the run ends is
+  not in that stage's evidence.
 
 Two ways in, both through the daemon, since a run's agent has no server
 credential (cloud threads also have no network):

@@ -5,7 +5,7 @@ import { test, expect, register, seedTask, openIssueFromSearch } from './fixture
 
 // A3: the acceptance window's evidence viewer over run captures (Figma
 // 357:4750 frames 06, 12, 13, 14, 15). Server responses are fixtures; the
-// capture route's authorization and hash binding are covered by
+// capture route's authorization is covered by
 // lib/factory/evidence-media.test.ts and the approval DB test. Each state is
 // shot in light and dark, desktop and phone, for design review.
 
@@ -74,9 +74,9 @@ async function open(page: Page, artifacts: Record<string, unknown>[], media: Med
 const base = { runId: randomUUID(), sessionId: 's1', candidateId: null, sha: null, environment: 'preview', recordedAt: '2026-10-28T06:20:00.000Z' }
 const shot1 = randomUUID(), shot2 = randomUUID(), clip = randomUUID()
 const manifest = [
-  { ...base, stage: 'verify', kind: 'screenshot', artifact: `run-capture:${shot1}`, captureId: shot1, title: '首页首屏', contentType: 'image/png', size: 1, durationMs: null, sha256: 'c'.repeat(64) },
-  { ...base, stage: 'verify', kind: 'screenshot', artifact: `run-capture:${shot2}`, captureId: shot2, title: '图片加载完成', contentType: 'image/png', size: 1, durationMs: null, sha256: 'd'.repeat(64) },
-  { ...base, stage: 'verify', kind: 'video', artifact: `run-capture:${clip}`, captureId: clip, title: '向下滚动', contentType: 'video/mp4', size: 1, durationMs: 9000, sha256: 'e'.repeat(64) },
+  { ...base, stage: 'verify', kind: 'screenshot', artifact: `run-capture:${shot1}`, captureId: shot1, title: '首页首屏', contentType: 'image/png', size: 1, durationMs: null },
+  { ...base, stage: 'verify', kind: 'screenshot', artifact: `run-capture:${shot2}`, captureId: shot2, title: '图片加载完成', contentType: 'image/png', size: 1, durationMs: null },
+  { ...base, stage: 'verify', kind: 'video', artifact: `run-capture:${clip}`, captureId: clip, title: '向下滚动', contentType: 'video/mp4', size: 1, durationMs: 9000 },
   { ...base, stage: 'verify', kind: 'log', artifact: 'run-chunk:7d1c2a40-0000-4000-8000-000000000001' },
 ]
 const image = png(1280, 800)
@@ -104,7 +104,7 @@ test('evidence viewer: captures as thumbnails, image, recording error, text, key
   await expect(viewer.getByRole('img', { name: '图片加载完成' })).toBeVisible()
   await page.keyboard.press('ArrowRight')
   await expect(viewer.getByTestId('evidence-counter')).toHaveText('3 / 4')
-  // A capture whose bytes no longer match the bound sha256 is refused (409): error with retry.
+  // A capture the server refuses: error with retry.
   await expect(viewer.getByRole('alert')).toContainText('证据打开失败')
   await shoot(page, 'video-error')
   const before = served.filter(id => id === clip).length

@@ -498,26 +498,20 @@ export function createFactoryApprovals(
           ...ref,
           ...source,
           raw: redactArtifact(source.raw),
-          sourceSha256: source.sha256,
+          sourceSha256: digest(source.raw),
         };
       });
     },
-    /**
-     * Which run capture the reviewer may open as this task's evidence, and the
-     * sha256 the evidence digest binds. The caller serves the file only if its
-     * bytes still have that hash. Same authorization as every acceptance read.
-     */
+    /** Which run capture the reviewer may open as this task's evidence. Same authorization as every acceptance read. */
     async capture(actor: FactoryActor, taskId: string, captureId: string) {
       if (!z.uuid().safeParse(taskId).success || !z.uuid().safeParse(captureId).success)
         fail("factoryNotFound");
       return transaction(async (tx) => {
         const task = await owned(tx, actor, taskId, true);
         const current = await approvalEvidence(tx, task);
-        const entry = current.manifest.artifacts.find(
-          (a) => "captureId" in a && a.captureId === captureId,
-        );
-        if (!entry) fail("factoryArtifactMissing");
-        return { ownerId: task.userId, captureId, sha256: entry.sha256 };
+        if (!current.captures.some((a) => a.captureId === captureId))
+          fail("factoryArtifactMissing");
+        return { ownerId: task.userId, captureId };
       });
     },
     async evidence(actor: FactoryActor, taskId: string) {
@@ -542,7 +536,9 @@ export function createFactoryApprovals(
             current.evidenceDigest,
           ],
         );
-        return { binding: bindingOf(task), ...current, evidenceReadId };
+        // The digest covers `manifest`; the reviewer is shown it plus the run captures.
+        const { view, captures: _captures, ...bound } = current;
+        return { binding: bindingOf(task), ...bound, manifest: view, evidenceReadId };
       });
     },
     async approve(actor: FactoryActor, input: unknown) {
@@ -722,7 +718,7 @@ export function createFactoryApprovals(
         await humanApproval(tx, actor);
         if (req.failedEvidence?.length) {
           const current = await approvalEvidence(tx, task);
-          const known = new Set(current.manifest.artifacts.map((a) => a.artifact));
+          const known = new Set(current.view.artifacts.map((a) => a.artifact));
           if (
             new Set(req.failedEvidence).size !== req.failedEvidence.length ||
             req.failedEvidence.some((a) => !known.has(a))

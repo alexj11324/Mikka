@@ -677,7 +677,7 @@ export function createFactoryStore(
                 if (captureId && (evidence.kind === "screenshot" || evidence.kind === "video")) {
                   // The run's own ready capture of the stated kind; no other run's file.
                   const { rows } = await tx.query(
-                    `SELECT id FROM run_captures WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND status='ready' AND sha256 IS NOT NULL AND kind=$4`,
+                    `SELECT id FROM run_captures WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND status='ready' AND kind=$4`,
                     [captureId, run.id, task.userId, evidence.kind === "video" ? "video" : "image"],
                   );
                   if (!rows.length) fail("factoryArtifactMissing");
