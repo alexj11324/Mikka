@@ -2262,7 +2262,9 @@
       "chartLabel": "Threads per day",
       "empty": "No threads this month.",
       "minutes": "{count} min",
-      "hours": "{count} h"
+      "hours": "{count} h",
+      "hostedRemaining": "Mikka Default remaining",
+      "hostedUnverified": "Not verified"
     },
     "billing": {
       "loading": "Loading billing",
@@ -3698,6 +3700,33 @@
       "loginPending": "Another sign-in is still running",
       "unavailable": "Sign-in is unavailable right now",
       "failed": "Couldn’t sign in. Try again."
+    }
+  },
+  "Billing": {
+    "verify": {
+      "title": "Verify card",
+      "model": "Mikka Default",
+      "allowance": "One-off $1 allowance",
+      "verifiedLabel": "Verified",
+      "terms": "$0 check, nothing is charged. A first verification adds a one-off $1 to use with Mikka Default.",
+      "secured": "Secured by Stripe",
+      "submit": "Verify",
+      "cancel": "Cancel",
+      "loading": "Loading",
+      "confirming": "Confirming",
+      "unconfirmed": "Verification not confirmed yet",
+      "failed": "Verification failed",
+      "failedWith": "Verification failed: {reason}",
+      "verified": "Card verified",
+      "unavailable": "Unavailable"
+    },
+    "refusal": {
+      "verification_required": "Mikka Default needs a verified card",
+      "free_allowance_used": "Mikka Default's $1 allowance is used up",
+      "points_exhausted": "Mikka Default's points are used up",
+      "platform_paused": "Mikka Default is paused. Please try again later.",
+      "unavailable": "Mikka Default is unavailable. Please try again later.",
+      "switchModel": "Change model"
     }
   }
 }

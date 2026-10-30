@@ -6,6 +6,9 @@ import { useLocale, useTranslations } from 'next-intl'
 import { Download } from 'lucide-react'
 import { Bar, BarChart, XAxis } from 'recharts'
 import { getUsage } from '@/app/actions/usage'
+import { hostedUsageKey } from '@/components/billing/card-verification-row'
+import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
+import { getHostedUsage, hostedRemaining } from '@/lib/billing/verification-client'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { SettingsLoading } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
@@ -17,6 +20,7 @@ import { csvField } from '@/lib/audit/cursor'
 import { currentMonth, recentMonths } from '@/lib/usage/month'
 import type { BotUsageRow, UsageRow } from '@/lib/usage/read'
 import { useActionError } from '@/lib/use-action-error'
+import { cn } from '@/lib/utils'
 
 type View = 'bots' | 'members'
 
@@ -31,6 +35,10 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
   const [downloadUrl, setDownloadUrl] = useState<string | undefined>()
   const usage = useSWR(['settings:usage', workspaceId, month], () => getUsage(month, workspaceId), { keepPreviousData: true })
   const data = usage.data && !usage.data.error ? usage.data : null
+  // Mikka 默认's remaining allowance and points (#525); absent until the backend reports it.
+  const hosted = useSWR(hostedUsageKey(workspaceId), () => getHostedUsage(workspaceId))
+  const hostedData = hosted.data && !hosted.data.error ? hosted.data : null
+  const usd = new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' })
   const months = useMemo(() => recentMonths(6).map(value => ({ value, label: new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${value}-01T00:00:00Z`)) })), [locale])
   const day = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' })
   const number = new Intl.NumberFormat(locale)
@@ -71,9 +79,13 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
     {(usage.error || usage.data?.error) && <p role="alert" className="text-sm text-destructive">{actionError(usage.data?.error)}</p>}
     {data && <>
       {!admin && <h2 className="pl-1 text-sm font-medium">{t('yours')}</h2>}
-      <dl className="grid grid-cols-2 gap-4">
+      <dl className={cn('grid grid-cols-2 gap-4', hostedData && 'sm:grid-cols-3')}>
         <div className="flex flex-col gap-0.5 pl-1"><dd className="text-xl font-semibold">{number.format(data.totals.threads)}</dd><dt className="text-xs text-muted-foreground">{t('threads')}</dt></div>
         <div className="flex flex-col gap-0.5 pl-1"><dd className="text-xl font-semibold">{duration(data.totals.seconds)}</dd><dt className="text-xs text-muted-foreground">{t('runTime')}</dt></div>
+        {hostedData && <div data-slot="hosted-remaining" className="flex flex-col gap-0.5 pl-1">
+          <dd className="text-xl font-semibold tabular-nums">{hostedData.balance.verified ? usd.format(hostedRemaining(hostedData.balance)) : <span className="text-muted-foreground">{t('hostedUnverified')}</span>}</dd>
+          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground"><MikkaMarkSmall />{t('hostedRemaining')}</dt>
+        </div>}
       </dl>
       <div data-settings-card className="rounded-2xl border bg-card p-4">
         <ChartContainer config={chartConfig} className="aspect-auto h-44 w-full" aria-label={t('chartLabel')}>
