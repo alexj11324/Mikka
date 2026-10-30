@@ -7,6 +7,7 @@ import { redirect as localeRedirect } from '@/i18n/navigation'
 import { isAcceptanceEnabled } from '@/lib/acceptance'
 import { safeAuthReturn } from '@/lib/auth-return'
 import { auth, googleEnabled } from '@/lib/auth'
+import { onboardingDone } from '@/lib/onboarding'
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ acceptance?: string; issue?: string; section?: string; app?: string; settings?: string; google?: string }> }) {
   const query = await searchParams
@@ -20,5 +21,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
     if (query.acceptance === '1') localeRedirect({ href: '/acceptance', locale: await getLocale() })
     redirect('/api/acceptance')
   }
-  return <IssueWorkspace key={user.id} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialSection={query.section === 'agent' || query.section === 'projects' || query.section === 'plugins' || query.section === 'suggestions' || query.section === 'artifacts' ? query.section : 'coordinator'} initialSettingsSection={query.settings === 'account' || (query.settings === 'integrations' && query.google) ? 'account' : query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
+  // A failed read must not lock anyone into the guide.
+  const onboarding = !await onboardingDone(user.id).catch(() => true)
+  return <IssueWorkspace key={user.id} onboarding={onboarding} initialSelected={initialSelected} user={{ id: user.id, name: user.name, email: user.email, image: user.image }} initialSection={query.section === 'agent' || query.section === 'projects' || query.section === 'plugins' || query.section === 'suggestions' || query.section === 'artifacts' ? query.section : 'coordinator'} initialSettingsSection={query.settings === 'account' || (query.settings === 'integrations' && query.google) ? 'account' : query.settings === 'integrations' ? 'integrations' : undefined} googleEnabled={googleEnabled} />
 }

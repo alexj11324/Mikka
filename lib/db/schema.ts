@@ -918,6 +918,12 @@ export const mobilePushTokens = pgTable('mobile_push_tokens', {
 export const PUSH_WHEN = ['always', 'away'] as const
 export type PushWhen = (typeof PUSH_WHEN)[number]
 
+/** When the person finished or skipped the first-run guide (docs/design/onboarding.md). No row means not yet. */
+export const userOnboarding = pgTable('user_onboarding', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  completedAt: timestamp('completedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
 /**
  * The app's 通知 and 记忆 settings (docs/design/mobile.md). The push flags pick
  * which of the Coordinator's own messages reach the phone; 主动消息 itself is
