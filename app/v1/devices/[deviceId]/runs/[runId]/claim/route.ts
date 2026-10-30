@@ -195,7 +195,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...(mcp && publication?.pushBranch && /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) &&
       ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly && assignmentPolicy.permissions.git_push === 'allow' && harness !== 'mock'
       ? { github: { endpoint: mcp.url.replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), repository: repo.repoPath.slice('v2/github.com/'.length), branch: publication.pushBranch } } : {}),
-    ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
+    ...(run.agentDefinition?.model ? {model:run.agentDefinition.model} : {}),
+    ...(subscription ? { ...(run.agentDefinition?.cliModelSelection ? {} : {model:subscription.modelId}), subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
     ...(localComputer ? { localComputer } : {}),
     ...retry,

@@ -1,7 +1,7 @@
 import { runHostedWorkflowTurn } from '@/lib/subscription-workflow-turn'
 import { isStepCount } from 'ai'
 import { getWorkflowMetadata } from 'workflow'
-import { COORDINATOR_MODEL, coordinatorStep, turnWarning } from '@/lib/coordinator/model'
+import { coordinatorStep, turnWarning } from '@/lib/coordinator/model'
 import { AGENT_MAX_ROUNDS } from '@/lib/agent-rounds'
 import { splitTelegramText } from '@/lib/telegram/messages'
 import type { AgentExecution } from '@/lib/agent-kit/store'
@@ -37,7 +37,7 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
       if (execution && execution.snapshot.runtime.harness !== selected.harness) throw new Error('agent_runtime_changed')
       const mailboxTools = mailboxEnabled ? await steps.mailboxCatalogue(userId,botId,execution?.id) : []
       const result = selected.harness === 'ai_sdk'
-        ? await runHostedWorkflowTurn(execution?.snapshot.runtime ?? { harness:'ai_sdk',model:COORDINATOR_MODEL },coordinatorTools(userId,botId,undefined,{ execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}),...(inbox.approvedRepositoryKey ? { approvedRepositoryKey: inbox.approvedRepositoryKey } : {}) }),{ ...(await steps.preparePrompt(userId,botId,execution?.snapshot,mailboxTools)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep })
+        ? await runHostedWorkflowTurn(execution?.snapshot.runtime ?? await kit.botRuntime(userId,botId),coordinatorTools(userId,botId,undefined,{ execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}),...(inbox.approvedRepositoryKey ? { approvedRepositoryKey: inbox.approvedRepositoryKey } : {}) }),{ ...(await steps.preparePrompt(userId,botId,execution?.snapshot,mailboxTools)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep })
         : await nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scope,{ execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}),...(inbox.approvedRepositoryKey ? { approvedRepositoryKey: inbox.approvedRepositoryKey } : {}) }),botId,execution?.snapshot)
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       await steps.appendMessages(userId,holder,result.responseMessages,quiet ? null : turnWarning(result.finishReason,result.text),botId)

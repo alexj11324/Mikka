@@ -20,6 +20,7 @@ stub('../../workflows/coordinator/native-steps.ts',{runtime:async()=>({harness:'
 stub('../../workflows/coordinator/native-turn.ts',{nativeCoordinatorTurn:()=>{throw new Error('unexpected native dispatch')}})
 stub('../../workflows/coordinator/tools.ts',{coordinatorTools:(...args:unknown[])=>{record('tools')(...args);return {}}})
 stub('../../workflows/coordinator/agent-kit-steps.ts',{
+  botRuntime:async()=>({harness:'ai_sdk',model:'connected-account-default'}),
   beginAgentExecution:async(...args:unknown[])=>{record('begin')(...args);return execution},
   finishAgentExecution:async(...args:unknown[])=>{record('finish')(...args)},
 })
@@ -54,10 +55,10 @@ test('real workflow entry uses the returned execution snapshot for model, prompt
   assert.equal(calls.filter(c=>c.name==='failed').length,0)
   assert.equal(calls.filter(c=>c.name==='mailboxCatalogue').length,0, 'flag-off never resolves mailbox persistence')
 })
-test('disabled Agent Kit retains the existing default model entry without inventing a snapshot',async()=>{
+test('disabled Agent Kit still resolves the connected account model without inventing a definition snapshot',async()=>{
   reset()
   await coordinatorTurn(owner,bot)
-  assert.deepEqual(calls.find(c=>c.name==='hosted')?.args[0],{harness:'ai_sdk',model:'current-default'})
+  assert.deepEqual(calls.find(c=>c.name==='hosted')?.args[0],{harness:'ai_sdk',model:'connected-account-default'})
   assert.equal(calls.find(c=>c.name==='prompt')?.args[2],undefined)
 })
 test('a replayed harness mismatch fails before hosted or native dispatch',async()=>{

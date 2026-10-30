@@ -111,7 +111,15 @@ export class SubscriptionService {
   }
   async nativeRequest(use: SubscriptionUse, request: NativeBrokerRequest, signal?: AbortSignal) {
     const binding=await this.repository.binding(use.ownerId,use.bindingId)
-    if(!request.body || typeof request.body!=='object' || Array.isArray(request.body) || !('model' in request.body) || request.body.model!==binding.modelId)throw new SubscriptionRefusal('binding_mismatch')
+    if(!request.body || typeof request.body!=='object' || Array.isArray(request.body) || !('model' in request.body) || typeof request.body.model!=='string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(request.body.model))throw new SubscriptionRefusal('binding_mismatch')
+    let selectedModel: string | undefined = binding.modelId
+    if (use.runId) {
+      const row=(await this.repository.pool.query(`SELECT r."agentDefinition" FROM agent_runs r JOIN byos_native_runs n ON n."runId"=r.id WHERE r.id=$1 AND r."userId"=$2 AND r."agentId"::text=$3 AND n."bindingId"=$4 AND r.status IN ('preparing','running','waiting_input') AND r."leaseExpiresAt">now() AND r."stopRequestedAt" IS NULL`,[use.runId,use.ownerId,use.consumerId,use.bindingId])).rows[0]
+      if (!row) throw new SubscriptionRefusal('binding_mismatch')
+      if (row.agentDefinition?.cliModelSelection==='auto') selectedModel=undefined
+      if (row.agentDefinition?.cliModelSelection==='explicit') selectedModel=row.agentDefinition.model
+    }
+    if (selectedModel !== undefined && request.body.model!==selectedModel) throw new SubscriptionRefusal('binding_mismatch')
     if(binding.route==='codex_cli'?request.path!=='/responses':binding.route!=='claude_code_cli'||!['/v1/messages','/v1/messages?beta=true'].includes(request.path))throw new SubscriptionRefusal('backend_unavailable')
     const authorized=await this.check(use,signal)
     const row=await this.repository.connection(use.ownerId,binding.connectionId)

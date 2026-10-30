@@ -151,6 +151,7 @@ export const deviceHeartbeatSchema = z.object({
   failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),
   harnesses: z.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
+  deviceType: z.enum(["laptop", "server"]).optional(),
   runs: z.array(heartbeatRunSchema).max(500),
   worktreeDiskBytes: z.number().int().nonnegative(),
   /**

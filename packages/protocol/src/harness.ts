@@ -10,6 +10,7 @@ export type Harness = z.infer<typeof harnessSchema>
 export const harnessInfoSchema = z.object({
   harness: harnessSchema,
   installed: z.boolean(),
+  models: z.array(z.string().trim().min(1).max(128)).max(500).optional(),
   /** Deprecated (#312, 2026-10-27): could host the native Coordinator. The server keeps that runtime switched off. */
   coordinator: z.boolean().optional(),
   /** Set only by a runner with an isolated, owner-bound subscription broker. */

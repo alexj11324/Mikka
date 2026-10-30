@@ -1,10 +1,11 @@
 import 'server-only'
+import type { Pool } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { pool } from '@/lib/db'
 
 export type DeviceCommandKind = 'redetect' | 'restart' | 'update'
-export async function enqueueDeviceCommand(userId: string, deviceId: string, kind: DeviceCommandKind) {
-  const result = await pool.query(`INSERT INTO device_management_commands (id,"deviceId",kind)
+export async function enqueueDeviceCommand(userId: string, deviceId: string, kind: DeviceCommandKind, database: Pick<Pool, 'query'> = pool) {
+  const result = await database.query(`INSERT INTO device_management_commands (id,"deviceId",kind)
     SELECT $1,id,$4 FROM devices WHERE id=$2 AND "ownerId"=$3 AND kind='local' AND "removedAt" IS NULL RETURNING id`, [randomUUID(), deviceId, userId, kind])
   return result.rows[0]?.id as string | undefined
 }
