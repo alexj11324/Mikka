@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { factoryCheckIndependent } from "./check-independence";
+import { factoryTaskDetail, type FactoryTaskDetail } from "./task-detail";
 import { factoryScopeAllows, type FactoryIssueScope } from "./scope";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
@@ -306,10 +307,15 @@ export function createFactoryStore(
         return save(tx, task, route.eventId, route);
       });
     },
-    async read(userId: string, taskId: string) {
-      return transaction(async (tx) =>
-        snapshot(tx, await owned(tx, userId, taskId)),
-      );
+    async read(userId: string, taskId: string): Promise<FactorySnapshot & Partial<FactoryTaskDetail>> {
+      // Read-only: B8/B9 checks and the B11 header are computed, never stored.
+      return transaction(async (tx) => {
+        const task = await owned(tx, userId, taskId);
+        return {
+          ...(await snapshot(tx, task)),
+          ...(await factoryTaskDetail(tx, task, lifecycle?.independent as never)),
+        };
+      });
     },
     async listForIssue(userId: string, issueId: string) {
       uuid(issueId);
