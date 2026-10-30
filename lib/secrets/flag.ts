@@ -6,8 +6,8 @@ export class E2BKeyError extends Error {
   constructor(readonly code: E2BKeyErrorCode, readonly detail?: string) { super(code); this.name = 'E2BKeyError' }
 }
 
-/** Runtime flag. Off (default) = platform E2B_API_KEY exactly as today. On = workspace key only, no fallback. This cost switch leaves secret injection and masking independent. */
-export const byoE2BKeyEnabled = (env: Record<string, string | undefined> = process.env) => env.MIKKA_BYO_E2B_KEY === '1'
+/** Compatibility seam for existing settings callers. BYO is mandatory (#523); the old flag cannot enable platform spend. */
+export const byoE2BKeyEnabled = (_env: Record<string, string | undefined> = process.env) => true
 
 /** Storage cannot create secrets without this deployment encryption key. */
 export const workspaceSecretsConfigured = (env: Record<string, string | undefined> = process.env) => Boolean(env.WORKSPACE_SECRETS_KEY?.trim())

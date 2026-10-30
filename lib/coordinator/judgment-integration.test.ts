@@ -10,6 +10,9 @@ let starts=0
 const requests: Array<Record<string,unknown>>=[]
 let response:unknown
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
+stub('../execution-settings.ts',{executionWorkspace:async()=> 'fixture-workspace'})
+stub('../abuse/runtime.ts',{canUseMikkaPaid:async()=>({verified:true,free:1000000,purchased:0}),hostedUsage:{reserve:async()=>{},settle:async()=>{}}})
+stub('../abuse/alerts.ts',{checkAbuseAlerts:async()=>{}})
 stub('./store.ts',{
  untriagedEvents:async()=>events.filter(e=>e.tier===null),
  claimTriageAttempt:async(event:typeof events[number],scope:unknown)=>{assert.deepEqual(scope,{userId:'synthetic',botId:null});event.lastTriageAttemptAt=new Date();return event.lastTriageAttemptAt},

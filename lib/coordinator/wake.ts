@@ -20,13 +20,16 @@ export function coordinatorEnabled(): boolean {
 
 /** No answer leaves the event pending; it does not become background, result or a request for human approval. */
 export async function triageInbox(userId: string, botId: string | null = null): Promise<void> {
+  'use step'
+  const { hostedBillingScope } = await import('@/lib/abuse/context')
+  const { executionWorkspace } = await import('@/lib/execution-settings')
   const scope = { userId, botId }
   const budget = AbortSignal.timeout(TRIAGE_BATCH_BUDGET_MS)
   const outcome = await runTriageBatch(await untriagedEvents(userId, botId), {
     claim: event => claimTriageAttempt(event, scope),
     deliverUser: event => setEventTier(event.id, 'attention', scope),
     classify: async (event, signal) => {
-      const result = await invokeDecision('triage', triageInput(event), triageQuestions(event), signal)
+      const result = await hostedBillingScope.run({workspaceId:await executionWorkspace(userId,botId)},()=>invokeDecision('triage', triageInput(event), triageQuestions(event), signal))
       return { tier: tierFromDecision(result?.answers.get('tier')), execution: result?.execution ?? null }
     },
     complete: (event, attemptedAt, judgment) => completeTriageAttempt(event, scope, attemptedAt, judgment),

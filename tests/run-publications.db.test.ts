@@ -461,6 +461,10 @@ test('run result publication commits one owner-scoped result through retries and
       // This PG suite disables Coordinator/model network execution. Supply a
       // declared provider substitute through the real triage client and CAS;
       // do not turn an action_decided event into an automatic runtime tier.
+      const {seedWorkspace}=await import('./support/workspace-admin-db')
+      const workspace=await seedWorkspace(pool,f.userId,[{userId:f.userId,role:'admin'}])
+      const {hostedUsage}=await import('../lib/abuse/runtime')
+      await hostedUsage.verify(workspace.id,'cus_synthetic_admission',`card_admission_${randomUUID()}`)
       const { triageInbox } = await import('../lib/coordinator/wake')
       const { DECISION_MODEL, DECISIONS_URL } = await import('../lib/coordinator/decision')
       const originalFetch=globalThis.fetch,originalDecisionKey=process.env.DECISION_GATEWAY_API_KEY
@@ -472,7 +476,7 @@ test('run result publication commits one owner-scoped result through retries and
         assert.equal(request.model,DECISION_MODEL)
         assert.equal(request.questions[0].name,'tier')
         decisions++
-        return Response.json({model:DECISION_MODEL,provider_metadata:{gateway:{generationId:`synthetic-admission-${decisions}`}},answers:[{type:'choice',name:'tier',choice:'result'}]})
+        return Response.json({model:DECISION_MODEL,provider_metadata:{gateway:{generationId:`synthetic-admission-${decisions}`,cost:'0.001'}},answers:[{type:'choice',name:'tier',choice:'result'}]})
       }) as typeof fetch
       try {await triageInbox(f.userId);assert.equal(decisions,1)}
       finally {globalThis.fetch=originalFetch;if(originalDecisionKey===undefined)delete process.env.DECISION_GATEWAY_API_KEY;else process.env.DECISION_GATEWAY_API_KEY=originalDecisionKey}

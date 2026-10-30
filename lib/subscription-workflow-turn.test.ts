@@ -26,7 +26,7 @@ test('default snapshot retains generate mode and malformed subscription never fa
   let generated=0
   t.mock.method(WorkflowAgent.prototype,'generate',async ()=>{generated++;return {text:'default',responseMessages:[],finishReason:'stop'}})
   t.mock.method(WorkflowAgent.prototype,'stream',()=>{throw new Error('unexpected stream')})
-  const result=await runHostedWorkflowTurn({harness:'ai_sdk',model:'saved-default'}, {}, {prompt:'synthetic'})
+  const result=await runHostedWorkflowTurn({harness:'ai_sdk',model:'saved-default'}, {}, {prompt:'synthetic'}, {ownerId:'alice',botId:null})
   assert.equal(result.text,'default');assert.equal(generated,1)
   await assert.rejects(runHostedWorkflowTurn({...runtime,model:'different'}, {}, {prompt:'synthetic'}),/subscription_model_unavailable/)
   assert.equal(generated,1)

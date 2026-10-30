@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { ZodError } from 'zod'
+import { z, ZodError } from 'zod'
 import { applyStripeEvent } from '@/lib/billing/service'
 import { stripeConfig, verifyStripeSignature } from '@/lib/billing/stripe'
 
@@ -12,7 +12,10 @@ export async function POST(request: Request) {
   const body = await request.text()
   if (!verifyStripeSignature(body, request.headers.get('stripe-signature'), secret)) return new NextResponse(null, { status: 400 })
   try {
-    await applyStripeEvent(JSON.parse(body))
+    const event = JSON.parse(body)
+    if (event.type === 'setup_intent.succeeded') {
+      await (await import('@/lib/abuse/card')).applyCardSetup(z.object({data:z.object({object:z.record(z.string(),z.unknown())})}).parse(event).data.object)
+    } else await applyStripeEvent(event)
   } catch (error) {
     // A malformed event is refused for good; anything else (the database) is a 500 so Stripe retries.
     if (!(error instanceof ZodError || error instanceof SyntaxError)) throw error

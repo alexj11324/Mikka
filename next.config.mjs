@@ -10,6 +10,7 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingIncludes: {
+    '/*': ['./lib/abuse/data/disposable-email-domains.txt'],
     '/api/bots/*/subagents/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
     '/api/threads/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
     '/.well-known/workflow/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],

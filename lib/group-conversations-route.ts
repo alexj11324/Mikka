@@ -1,3 +1,4 @@
+import { hostedBillingScope } from '@/lib/abuse/context'
 import { groupDirectory } from '@/lib/group-conversations-directory'
 import { after, NextResponse } from 'next/server'
 import { processGroupTurn } from '@/lib/coordinator/group-turns'
@@ -43,7 +44,8 @@ export async function respondGroup(request: Request, resource: GroupRequest['res
       try {
         const deadline = Date.now() + 220000
         while (Date.now() < deadline - 20000) {
-          if (!await processGroupTurn(pool, id, groupRuntime, deadline)) break
+          const row = (await pool.query('SELECT "workspaceId" FROM conversations WHERE id=$1',[id])).rows[0]
+          if (!row || !await hostedBillingScope.run({workspaceId:row.workspaceId},()=>processGroupTurn(pool, id, groupRuntime, deadline))) break
         }
       } catch { console.error('Group turn failed; retained in group_turns without automatic replay') }
     })

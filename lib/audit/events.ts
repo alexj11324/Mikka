@@ -39,6 +39,7 @@ export const AUDIT_ACTIONS = {
   'workspace.deleted': 'security',
   'workspace.ownership_transferred': 'security',
   // 计费
+  'billing.card_verified': 'billing',
   'billing.checkout_started': 'billing',
   'billing.credits_purchased': 'billing',
   'billing.auto_recharge_changed': 'billing',
@@ -81,6 +82,7 @@ export const AUDIT_METADATA = {
   'workspace.slug_changed': z.object({ from: label, to: label }).strict(),
   'workspace.deleted': none,
   'workspace.ownership_transferred': none,
+  'billing.card_verified': z.object({ allowanceGranted:z.boolean() }).strict(),
   'billing.checkout_started': z.object({ amountCents: cents, currency }).partial().strict(),
   'billing.credits_purchased': z.object({ amountCents: cents, currency, credits: z.number().int().min(0) }).partial().strict(),
   'billing.auto_recharge_changed': z.object({ enabled: z.boolean(), thresholdCents: cents.nullable(), amountCents: cents.nullable() }).partial().strict(),
