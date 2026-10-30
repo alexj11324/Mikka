@@ -765,7 +765,7 @@
     "footer": "检查通过表示最近一次可用性检查成功，不代表工具正在运行。检查过期后需等待新的检查结果。",
     "connect": {
       "trigger": "连接设备",
-      "title": "连接电脑",
+      "title": "添加设备",
       "description": "一台你能 ssh 进去的机器。Mikka 会在上面安装并启动 daemon，然后把它检测到的 harness 带回来。",
       "host": "主机",
       "hostPlaceholder": "ssh 主机、主机名或 IP[:端口]",

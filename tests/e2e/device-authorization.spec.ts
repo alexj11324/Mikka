@@ -18,8 +18,8 @@ const test = base.extend<{ networkFailureGrant: DeviceGrant }>({
 test('a device grant is reviewed in the browser and exchanged for a daemon credential', async ({ page, request, networkFailureGrant }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   await register(page, '/settings?section=devices')
-  await page.getByRole('button', { name: '连接设备', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '连接电脑', exact: true })
+  await page.getByRole('button', { name: '添加设备', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '添加设备', exact: true })
   await expect(dialog).toContainText('npm install --global @aspectlylabs/mikka')
   await expect(dialog).toContainText('mikka daemon login --server')
   await expect(dialog).toContainText(new URL(page.url()).origin + app('/'))
