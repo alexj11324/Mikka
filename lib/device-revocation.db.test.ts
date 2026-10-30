@@ -9,6 +9,7 @@ import { sql } from 'drizzle-orm'
 import { createRequestDatabaseScope } from './db/request-scope'
 import { deviceScopedPool, withDeviceDatabaseAuthority, isDeviceAuthorityRevoked } from './db/device-scope'
 import { revokeDeviceCredential } from './device-revocation'
+import { removeOwnedDevice } from './device-removal'
 import { POST as reportEvents } from '../app/v1/runs/[runId]/events/route'
 import { GET as commands } from '../app/v1/devices/[deviceId]/commands/route'
 
@@ -167,4 +168,19 @@ test('a long poll loses token authority within its one-second database polling i
   await revokeDeviceCredential(raw, f.owner, f.tokenId)
   assert.equal((await poll).status, 401)
   assert.ok(Date.now() - started < 3000)
+})
+
+test('existing device removal still refuses live work, then records revocation without deleting history', async () => {
+  const f = await fixture()
+  await raw.query('INSERT INTO device_token_devices ("tokenId","deviceId","userId") VALUES($1,$2,$3)', [f.tokenId, f.device, f.owner])
+  await assert.rejects(scope.run(() => removeOwnedDevice(f.owner, f.device)), /deviceHasActiveRuns/)
+  assert.equal((await state(f)).revokedAt, null)
+  await raw.query(`UPDATE agent_runs SET status='succeeded' WHERE id=$1`, [f.run])
+  const removed = await scope.run(() => removeOwnedDevice(f.owner, f.device))
+  assert.equal(removed.revokedTokens, 1)
+  const stateAfter = await state(f)
+  assert.equal(stateAfter.revokedBy, f.owner)
+  assert.equal(stateAfter.receipts, 1)
+  assert.ok((await raw.query('SELECT "removedAt" FROM devices WHERE id=$1', [f.device])).rows[0].removedAt)
+  assert.equal((await raw.query('SELECT count(*)::int n FROM agent_runs WHERE id=$1', [f.run])).rows[0].n, 1)
 })

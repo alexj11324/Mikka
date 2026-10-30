@@ -12,8 +12,9 @@ export const db={select:query,transaction:async fn=>{const p=globalThis.claimRes
 export const pool={}
 `
 const sources = new Map([
+  ['/lib/device-route.ts', 'export const withDeviceRoute=handler=>handler'],
   ['/lib/db/index.ts', dbSource],
-  ['/lib/device-link.ts', 'export async function authenticateDevice(){return {userId:"member"}};export async function ownedDevice(){return globalThis.claimResponseProbe.device}'],
+  ['/lib/device-link.ts', 'export async function authenticateDevice(){return {userId:"member",tokenId:"synthetic-device-token"}};export async function ownedDevice(){return globalThis.claimResponseProbe.device}'],
   ['/lib/device-repositories.ts', 'export async function readRepositorySettings(){globalThis.claimResponseProbe.preparation.push("settings");return null}'],
   ['/lib/agent-tool-approval/policy-store.ts', 'export async function readCliRunPolicy(){const p=globalThis.claimResponseProbe;p.preparation.push("policy");return structuredClone(p.cliPolicy)}'],
   ['/lib/self-improvement/server.ts', 'export const skillAssignments={async preflight(){globalThis.claimResponseProbe.preparation.push("skill-preflight")},async recordClaim(){globalThis.claimResponseProbe.preparation.push("skill-claim")}};export async function claimBenchmarkAssignment(){globalThis.claimResponseProbe.preparation.push("benchmark-claim")}'],
@@ -22,7 +23,7 @@ const sources = new Map([
   ['/lib/run-publications.ts', 'export async function prepareRunPublication(){const p=globalThis.claimResponseProbe;p.preparation.push("publication");return structuredClone(p.publication)};export async function persistRunCompletion(){throw new Error("unexpected publication failure")}'],
   ['/lib/issue-team-access.ts', 'export async function issueTeamAccess(){return {allowed:globalThis.claimResponseProbe.memberAllowed}}'],
   ['/lib/mcp/worker.ts', 'export async function issueRunToken(){const p=globalThis.claimResponseProbe;p.preparation.push("token");await p.beforeToken?.();if(p.tokenError)throw new Error("synthetic token refusal");return {token:"synthetic-only"}}'],
-  ['/lib/computer/claim.ts', 'export async function claimLocalRun(_pool,_run,_device,lease,_binding,beforeClaim,afterClaim){const p=globalThis.claimResponseProbe;const tx={query(){throw new Error("unexpected SQL in ordinary claim fixture")}};if(typeof beforeClaim!=="function"||typeof afterClaim!=="function")throw new Error("claim callbacks missing");if(await beforeClaim(tx)===false)return "unavailable";p.preparation.push("claim");p.run.status="preparing";p.run.leaseExpiresAt=lease;await afterClaim(tx);return "claimed"};export async function claimCloudRun(){throw new Error("unexpected cloud claim")}'],
+  ['/lib/computer/claim.ts', 'export async function claimLocalRun(_pool,_run,_device,lease,_binding,beforeClaim,afterClaim){const p=globalThis.claimResponseProbe;const tx={query(sql,args){if(!sql.startsWith(\'UPDATE agent_runs SET "deviceTokenId"=$2\')||args[0]!==p.run.id||args[1]!=="synthetic-device-token"||args[2]!=="member")throw new Error("unexpected SQL in ordinary claim fixture");p.run.deviceTokenId=args[1];return Promise.resolve({rows:[],rowCount:1})}};if(typeof beforeClaim!=="function"||typeof afterClaim!=="function")throw new Error("claim callbacks missing");if(await beforeClaim(tx)===false)return "unavailable";p.preparation.push("claim");p.run.status="preparing";p.run.leaseExpiresAt=lease;await afterClaim(tx);return "claimed"};export async function claimCloudRun(){throw new Error("unexpected cloud claim")}'],
   ['/lib/run-leases.ts', 'export async function latestCheckpoint(){globalThis.claimResponseProbe.preparation.push("checkpoint");return null}'],
   ['/lib/subscription-runtime.ts', 'export function subscriptionRuntime(){throw new Error("unexpected subscription access")}'],
 ])
