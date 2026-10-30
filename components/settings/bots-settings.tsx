@@ -63,8 +63,7 @@ export function BotsSettings({ admin, workspaceId }: { admin: boolean; workspace
 
 /**
  * 可用模型: one switch per model family, at least one stays on, plus the model a
- * new bot starts with. Saves are serialised (one in flight) and carry the
- * version they were based on; a 409 shows the other admin's policy.
+ * new bot starts with. Saves are serialised (one in flight); the last save wins.
  */
 function ModelPolicySection({ policy, onChange }: { policy: Policy; onChange: (policy: Policy) => void }) {
   const t = useTranslations()
@@ -78,9 +77,9 @@ function ModelPolicySection({ policy, onChange }: { policy: Policy; onChange: (p
     const previous = policy
     onChange({ ...policy, allowedModels, startingModel })
     try {
-      const result = await updateWorkspaceModelPolicy({ allowedModels, startingModel, expectedVersion: policy.version })
+      const result = await updateWorkspaceModelPolicy({ allowedModels, startingModel })
       if (!result.error) { onChange(result); return }
-      onChange('current' in result && result.current ? result.current : previous)
+      onChange(previous)
       toast.error(actionError(result.error))
     } catch {
       onChange(previous)

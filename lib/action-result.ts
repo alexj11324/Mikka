@@ -155,7 +155,6 @@ export const ACTION_ERROR_CODES = [
   'botRepositoryUnavailable',
   'botModelNotAllowed',
   'botOwnerOnly',
-  'modelPolicyConflict',
   'botNotFound',
   'tokenNotFound',
   'tokenLimitReached',

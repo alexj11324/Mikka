@@ -72,11 +72,10 @@ The `models` id stays, so old links keep working. Search: 额度 / quota find
 - **A repository whose installation is gone** (uninstalled, or its member
   left): the bot has no default repository until its owner picks one; the
   row shows 「acme/app 未安装 GitHub App」.
-- Two admins saving 可用模型 at once: the workspace row lock serialises them
-  and each save carries the version it read; a stale save writes nothing and
-  shows the other admin's settings (`modelPolicyConflict`). A bot save holds
-  the settings row `FOR SHARE`, so a model cannot be allowed at check time and
-  disallowed before the write.
+- Two admins saving 可用模型 at once: the last save wins, as in the ChatGPT and
+  Claude Enterprise admin consoles; there is no version or conflict prompt. A bot
+  save that races an admin removing its model needs no lock either: the bot then
+  runs on the fallback above until its owner picks again.
 - A bot's own settings have no version: only the owner writes them. Overlapping
   saves from one page are ordered by `lib/settings/bot-settings-saver.ts`
   (from #442): only the latest request of a field commits or rolls back.
@@ -118,7 +117,7 @@ called from `workflows/coordinator/agent-kit-steps.ts`), which applies
 
 - `workspace_settings."allowedModels" text[]` (null = all), CHECKed to known
   families with at least one; `"defaultModel"` is the starting model and is
-  CHECKed to be in the allowlist; `"modelPolicyVersion"` is the optimistic lock
+  CHECKed to be in the allowlist
   (`drizzle/20261030170000_workspace_model_allowlist.sql`).
 - `bots.model`, `bots.repository`: the owner's choices (columns already exist).
 - `workspace_settings."defaultRepository"`, and `"botDefaultsVersion"` where #466 (reverted) ran,

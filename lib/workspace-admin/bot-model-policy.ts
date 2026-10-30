@@ -41,8 +41,6 @@ const model = z.enum(WORKSPACE_BOT_MODELS)
 export const modelPolicyInput = z.object({
   allowedModels: z.array(model).min(1).max(WORKSPACE_BOT_MODELS.length).refine(list => new Set(list).size === list.length),
   startingModel: model.nullable(),
-  /** Version the client last read; omitted = last write wins. */
-  expectedVersion: z.number().int().min(0).optional(),
 }).strict()
 
 /** A bot's own settings. Omitted fields stay as they are; null clears. */

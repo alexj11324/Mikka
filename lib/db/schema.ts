@@ -1027,8 +1027,6 @@ export const workspaceSettings = pgTable('workspace_settings', {
   defaultRepository: text('defaultRepository'),
   /** 可用模型: families members' bots may use, admin-set. Null (never saved) allows every family. */
   allowedModels: text('allowedModels').array().$type<WorkspaceBotModel[] | null>(),
-  /** Optimistic-lock version of allowedModels/defaultModel; bumped by every 可用模型 save. */
-  modelPolicyVersion: integer('modelPolicyVersion').notNull().default(0),
   monthlyCreditLimit: integer('monthlyCreditLimit'),
   botMonthlyCreditLimit: integer('botMonthlyCreditLimit'),
   backgroundDailyCreditLimit: integer('backgroundDailyCreditLimit'),

@@ -43,8 +43,8 @@ before(async () => {
   mock.module('@/lib/workspace-admin/bots', { namedExports: {
     newBotModel: async (workspaceId: string, ownerId: string) => { calls.push(['newBotModel', workspaceId, ownerId]); return startingModel },
     modelAllowed: async (workspaceId: string, model: string) => { calls.push(['modelAllowed', workspaceId, model]); return allowed.has(model) },
-    modelPolicy: respond('modelPolicy', { allowedModels: ['mikka', 'codex'], startingModel: 'codex', version: 3, modelGroups: [] }),
-    saveModelPolicy: respond('saveModelPolicy', { allowedModels: ['claude'], startingModel: null, version: 4, modelGroups: [] }),
+    modelPolicy: respond('modelPolicy', { allowedModels: ['mikka', 'codex'], startingModel: 'codex', modelGroups: [] }),
+    saveModelPolicy: respond('saveModelPolicy', { allowedModels: ['claude'], startingModel: null, modelGroups: [] }),
     botSettingsFor: respond('botSettingsFor', { canEdit: true }),
     saveBotSettings: respond('saveBotSettings', { canEdit: true, model: 'codex' }),
     repositoryAvailable: async (workspaceId: string, repository: string) => { calls.push(['repositoryAvailable', workspaceId, repository]); return repository === 'acme/app' },
@@ -137,13 +137,13 @@ test('createBot refuses a repository the workspace has not installed', async () 
 test('model policy, bot settings and workspace bot list actions act as the signed-in user in the current workspace', async () => {
   reset()
   assert.equal((await botActions.getWorkspaceModelPolicy()).error, undefined)
-  assert.equal((await botActions.updateWorkspaceModelPolicy({ allowedModels: ['claude'], startingModel: null, expectedVersion: 3 })).error, undefined)
+  assert.equal((await botActions.updateWorkspaceModelPolicy({ allowedModels: ['claude'], startingModel: null })).error, undefined)
   assert.equal((await botActions.getBotSettings({ botId: 'b' })).error, undefined)
   assert.equal((await botActions.updateBotSettings({ botId: 'b', model: 'codex' })).error, undefined)
   assert.deepEqual(await botActions.listWorkspaceBots(), { bots: [{ id: 'b', name: 'Bot', status: 'running', runningThreads: 2 }] })
   assert.deepEqual(calls, [
     ['modelPolicy', actor.workspaceId],
-    ['saveModelPolicy', actor.userId, actor.workspaceId, { allowedModels: ['claude'], startingModel: null, expectedVersion: 3 }],
+    ['saveModelPolicy', actor.userId, actor.workspaceId, { allowedModels: ['claude'], startingModel: null }],
     ['botSettingsFor', actor.userId, actor.workspaceId, 'b'],
     ['saveBotSettings', actor.userId, actor.workspaceId, { botId: 'b', model: 'codex' }],
     ['workspaceBots', actor.workspaceId],
@@ -152,7 +152,4 @@ test('model policy, bot settings and workspace bot list actions act as the signe
   assert.equal((await botActions.updateBotSettings({ botId: 'b', model: 'codex' })).error, 'botOwnerOnly')
   failure = new WorkspaceError('botModelNotAllowed')
   assert.equal((await botActions.updateWorkspaceModelPolicy({ allowedModels: ['mikka'], startingModel: 'claude' })).error, 'botModelNotAllowed')
-  const current = { allowedModels: ['mikka'], startingModel: null, version: 7, modelGroups: [] }
-  failure = Object.assign(new WorkspaceError('modelPolicyConflict'), { current })
-  assert.deepEqual(await botActions.updateWorkspaceModelPolicy({ allowedModels: ['claude'], startingModel: null, expectedVersion: 6 }), { error: 'modelPolicyConflict', status: 409, current })
 })

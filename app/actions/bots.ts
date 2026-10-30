@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
-import type { ActionFailure, ActionResult } from '@/lib/action-result'
+import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { db } from '@/lib/db'
@@ -77,27 +77,15 @@ export async function getWorkspaceModelPolicy(): Promise<ActionResult<ModelPolic
   return workspaceAction(async () => modelPolicy((await currentWorkspaceActor()).workspaceId))
 }
 
-/** 409: expectedVersion was stale. `current` is the stored policy to re-base on. */
-export type ModelPolicyConflict = ActionFailure & { error: 'modelPolicyConflict'; status: 409; current: ModelPolicy }
-
 /**
  * Admins only: which model families members' bots may use, and the model a new bot starts with.
- * Pass expectedVersion (from getWorkspaceModelPolicy or the last save) to make the save a
- * compare-and-set; a stale version returns ModelPolicyConflict and writes nothing.
+ * Last write wins.
  */
-export async function updateWorkspaceModelPolicy(input: { allowedModels: string[]; startingModel: string | null; expectedVersion?: number }): Promise<ActionResult<ModelPolicy> | ModelPolicyConflict> {
-  let conflict: ModelPolicy | null = null
-  const result = await workspaceAction(async () => {
+export async function updateWorkspaceModelPolicy(input: { allowedModels: string[]; startingModel: string | null }): Promise<ActionResult<ModelPolicy>> {
+  return workspaceAction(async () => {
     const actor = await currentWorkspaceActor()
-    try {
-      return await saveModelPolicy(actor.userId, actor.workspaceId, input as Parameters<typeof saveModelPolicy>[2])
-    } catch (error) {
-      const current = (error as { code?: string; current?: ModelPolicy }).code === 'modelPolicyConflict' ? (error as { current?: ModelPolicy }).current : undefined
-      if (current) conflict = current
-      throw error
-    }
+    return saveModelPolicy(actor.userId, actor.workspaceId, input as Parameters<typeof saveModelPolicy>[2])
   })
-  return conflict ? { error: 'modelPolicyConflict', status: 409, current: conflict } : result
 }
 
 /** A bot's own model and repository, with the choices the workspace allows. Any member may read; `canEdit` only for the owner. */

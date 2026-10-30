@@ -113,7 +113,6 @@ deleteTeam(teamId: string, confirmName: string): Promise<ActionResult<{ deleted:
 getWorkspaceModelPolicy(): Promise<ActionResult<{
   allowedModels: Array<'mikka' | 'codex' | 'claude'> // 可用模型，菜单顺序；从未保存过 = 全部
   startingModel: 'mikka' | 'codex' | 'claude' | null // 新 Bot 的初始模型
-  version: number // 乐观锁版本，保存时作为 expectedVersion 传回
   modelGroups: BotModelGroup[]
 }>>
 ```
@@ -123,11 +122,11 @@ getWorkspaceModelPolicy(): Promise<ActionResult<{
 ### `updateWorkspaceModelPolicy(input)`
 
 ```ts
-updateWorkspaceModelPolicy(input: { allowedModels: string[]; startingModel: string | null; expectedVersion?: number }): Promise<ActionResult<ModelPolicy> | ModelPolicyConflict>
+updateWorkspaceModelPolicy(input: { allowedModels: string[]; startingModel: string | null }): Promise<ActionResult<ModelPolicy>>
 ```
 
 - 权限：管理员（`requireWorkspace(..., true)` 锁工作区行，串行化）。`allowedModels` 至少一个、不重复；`startingModel` 必须在其中，否则 `botModelNotAllowed`。存在 `workspace_settings."allowedModels"` 和 `"defaultModel"`，数据库 CHECK 同样约束。
-- 乐观锁：带 `expectedVersion` 时是对 `"modelPolicyVersion"` 的 compare-and-set；版本过期不写入，返回 `{ error: 'modelPolicyConflict', status: 409, current }`。
+- 并发：最后一次保存生效（与 ChatGPT / Claude Enterprise 管理后台一致），没有版本号或 409。
 - 移出可用模型的模型：不改写任何 Bot 的 `bots.model`；Bot 按 `resolveBotModel` 回落到初始模型，否则第一个允许的模型。
 
 ### `getBotSettings({ botId })` / `updateBotSettings({ botId, model?, repository? })`
@@ -158,7 +157,7 @@ listWorkspaceBots(): Promise<ActionResult<{ bots: Array<{
 
 ## 新增错误码（`lib/action-result.ts`，`messages/*.json` 的 `Errors` 下）
 
-`workspaceSlugTaken`、`workspaceIconInvalid`、`workspaceDeleteNameMismatch`、`workspaceHasActiveSubscription`、`workspaceCannotRemoveSelf`、`workspaceTransferTargetInvalid`、`botTransferBusy`、`botTransferNameConflict`、`teamNotFound`、`teamDeleteNameMismatch`、`botRepositoryUnavailable`、`botModelNotAllowed`、`botOwnerOnly`、`modelPolicyConflict`。以下几个已经加好错误码和文案，但对应功能没有交付：`usageLimitReached`、`usageCreditsExhausted`、`billingNotConfigured`、`billingNoSubscription`、`billingPlanInvalid`、`billingProviderFailed`。
+`workspaceSlugTaken`、`workspaceIconInvalid`、`workspaceDeleteNameMismatch`、`workspaceHasActiveSubscription`、`workspaceCannotRemoveSelf`、`workspaceTransferTargetInvalid`、`botTransferBusy`、`botTransferNameConflict`、`teamNotFound`、`teamDeleteNameMismatch`、`botRepositoryUnavailable`、`botModelNotAllowed`、`botOwnerOnly`。以下几个已经加好错误码和文案，但对应功能没有交付：`usageLimitReached`、`usageCreditsExhausted`、`billingNotConfigured`、`billingNoSubscription`、`billingPlanInvalid`、`billingProviderFailed`。
 
 ## 测试
 

@@ -1080,7 +1080,6 @@
     "botRepositoryUnavailable": "This repository isn't covered by the workspace's GitHub App installations.",
     "botModelNotAllowed": "This workspace doesn't allow that model.",
     "botOwnerOnly": "Only the bot's owner can change its settings.",
-    "modelPolicyConflict": "Another admin just changed the available models. Showing the latest.",
     "usageLimitReached": "The usage limit has been reached. New tasks are paused; running tasks will finish.",
     "usageCreditsExhausted": "Credits have run out. New tasks are paused; running tasks will finish.",
     "billingNotConfigured": "Billing is not set up.",

@@ -1080,7 +1080,6 @@
     "botRepositoryUnavailable": "这个仓库不在工作区已安装的 GitHub App 仓库中。",
     "botModelNotAllowed": "工作区不允许使用这个模型。",
     "botOwnerOnly": "只有 Bot 的创建者可以修改它的设置。",
-    "modelPolicyConflict": "其他管理员刚修改了可用模型，已显示最新设置。",
     "usageLimitReached": "已达到用量上限，新任务已暂停，运行中的任务会继续完成。",
     "usageCreditsExhausted": "点数已用完，新任务已暂停，运行中的任务会继续完成。",
     "billingNotConfigured": "计费尚未开通。",

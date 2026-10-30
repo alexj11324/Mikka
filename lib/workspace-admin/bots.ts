@@ -20,15 +20,8 @@ export interface ModelPolicy {
   allowedModels: WorkspaceBotModel[]
   /** The model a new bot starts with; null = the first allowed family. */
   startingModel: WorkspaceBotModel | null
-  /** Optimistic-lock version; send it back as expectedVersion. */
-  version: number
   /** The 模型 menu: Mikka 默认 / Codex / Claude, in order (WS-05). */
   modelGroups: readonly BotModelGroup[]
-}
-
-/** expectedVersion no longer matches: another admin saved first. Carries the current policy. */
-export class ModelPolicyConflictError extends WorkspaceError {
-  constructor(readonly current: ModelPolicy) { super('modelPolicyConflict') }
 }
 
 async function activeMemberIds(workspaceId: string) {
@@ -55,11 +48,11 @@ type Reader = Pick<typeof db, 'select'>
 
 /** 可用模型 and the starting model. Any active member may read it (their bots' menus come from it). */
 export async function modelPolicy(workspaceId: string, reader: Reader = db): Promise<ModelPolicy> {
-  const [row] = await reader.select({ allowedModels: workspaceSettings.allowedModels, startingModel: workspaceSettings.defaultModel, version: workspaceSettings.modelPolicyVersion })
+  const [row] = await reader.select({ allowedModels: workspaceSettings.allowedModels, startingModel: workspaceSettings.defaultModel })
     .from(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId)).limit(1)
   const allowedModels = allowedModelsOf(row?.allowedModels)
   const startingModel = row?.startingModel && allowedModels.includes(row.startingModel) ? row.startingModel : null
-  return { allowedModels, startingModel, version: row?.version ?? 0, modelGroups: BOT_MODEL_GROUPS }
+  return { allowedModels, startingModel, modelGroups: BOT_MODEL_GROUPS }
 }
 
 /**
@@ -83,37 +76,30 @@ export async function modelAllowed(workspaceId: string, model: WorkspaceBotModel
 
 /**
  * Admins only. Saves 可用模型 (at least one family) and the starting model, which
- * must be one of them. The workspace row lock (requireWorkspace(..., true))
- * serialises admins; with expectedVersion the write is also a compare-and-set
- * on modelPolicyVersion, and a stale version throws ModelPolicyConflictError.
+ * must be one of them. Last write wins, as in the ChatGPT / Claude Enterprise admin
+ * consoles.
  * Bots whose model is no longer allowed keep their stored choice and run on the
  * fallback (resolveBotModel) until their owner picks again.
  */
 export async function saveModelPolicy(actorId: string, workspaceId: string, input: z.input<typeof modelPolicyInput>): Promise<ModelPolicy> {
-  const { expectedVersion, allowedModels, startingModel } = modelPolicyInput.parse(input)
+  const { allowedModels, startingModel } = modelPolicyInput.parse(input)
   if (startingModel && !allowedModels.includes(startingModel)) throw new WorkspaceError('botModelNotAllowed')
   const ordered = allowedModelsOf(allowedModels)
   return workspaceDb.transaction(async tx => {
     const { membership } = await requireWorkspace(tx, workspaceId, actorId, true)
     await db.insert(workspaceSettings).values({ workspaceId }).onConflictDoNothing({ target: workspaceSettings.workspaceId })
     const before = await modelPolicy(workspaceId)
-    const match = expectedVersion === undefined
-      ? eq(workspaceSettings.workspaceId, workspaceId)
-      : and(eq(workspaceSettings.workspaceId, workspaceId), eq(workspaceSettings.modelPolicyVersion, expectedVersion))
     // The change and its 审计日志 row commit together (lib/audit/record.ts).
-    const row = await db.transaction(async main => {
-      const [updated] = await main.update(workspaceSettings)
-        .set({ allowedModels: ordered, defaultModel: startingModel, modelPolicyVersion: sql`${workspaceSettings.modelPolicyVersion} + 1`, updatedAt: new Date() })
-        .where(match).returning({ version: workspaceSettings.modelPolicyVersion })
-      if (!updated) return null
+    await db.transaction(async main => {
+      await main.update(workspaceSettings)
+        .set({ allowedModels: ordered, defaultModel: startingModel, updatedAt: new Date() })
+        .where(eq(workspaceSettings.workspaceId, workspaceId))
       await recordAudit(main, {
         workspaceId, actor: { type: 'user', id: actorId, name: membership.name || actorId }, action: 'workspace.models_changed', target: { type: 'workspace', id: workspaceId },
         metadata: { fromModels: before.allowedModels.join(','), toModels: ordered.join(','), fromStarting: before.startingModel, toStarting: startingModel },
       })
-      return updated
     })
-    if (!row) throw new ModelPolicyConflictError(await modelPolicy(workspaceId))
-    return { allowedModels: ordered, startingModel, version: row.version, modelGroups: BOT_MODEL_GROUPS }
+    return { allowedModels: ordered, startingModel, modelGroups: BOT_MODEL_GROUPS }
   })
 }
 
@@ -181,16 +167,14 @@ export async function botSettingsFor(viewerId: string, workspaceId: string, botI
 /**
  * The bot's owner only (admins included: an admin cannot change someone else's bot).
  * The model must be in 可用模型 and the repository covered by the workspace's GitHub
- * App installations. The settings row is held FOR SHARE while the bot is written, so an
- * admin's 可用模型 save cannot slip between the check and the write.
+ * App installations. A model removed from 可用模型 right after is handled at run time
+ * (resolveBotModel falls back).
  */
 export async function saveBotSettings(actorId: string, workspaceId: string, input: z.input<typeof botSettingsInput>): Promise<BotSettingsView> {
   const { botId, ...values } = botSettingsInput.parse(input)
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId))
   if (values.repository && !(await repositoryAvailable(workspaceId, values.repository))) throw new WorkspaceError('botRepositoryUnavailable')
-  await db.insert(workspaceSettings).values({ workspaceId }).onConflictDoNothing({ target: workspaceSettings.workspaceId })
   const bot = await inAppTransaction(async client => {
-    await db.select({ id: workspaceSettings.workspaceId }).from(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId)).for('share')
     const current = await botIn(workspaceId, botId)
     if (current.ownerId !== actorId) throw new WorkspaceError('botOwnerOnly')
     if (values.model && !(await modelPolicy(workspaceId)).allowedModels.includes(values.model)) throw new WorkspaceError('botModelNotAllowed')

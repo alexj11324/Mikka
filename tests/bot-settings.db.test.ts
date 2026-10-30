@@ -35,7 +35,7 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
   const adminBot = await seedBot(pool, ws.id, admin, 'Admin bot')
 
   await t.test('a workspace that never saved allows every family and has no starting model', async () => {
-    assert.deepEqual(await botAdmin.modelPolicy(ws.id), { allowedModels: ['mikka', 'codex', 'claude'], startingModel: null, version: 0, modelGroups: (await botAdmin.modelPolicy(ws.id)).modelGroups })
+    assert.deepEqual(await botAdmin.modelPolicy(ws.id), { allowedModels: ['mikka', 'codex', 'claude'], startingModel: null, modelGroups: (await botAdmin.modelPolicy(ws.id)).modelGroups })
     assert.equal(await botAdmin.newBotModel(ws.id, member), 'mikka')
   })
 
@@ -45,8 +45,8 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
     await assert.rejects(botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: [], startingModel: null }))
     await assert.rejects(botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['gpt-x' as never], startingModel: null }))
     await rejects(botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['mikka'], startingModel: 'claude' }), 'botModelNotAllowed')
-    const saved = await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['claude', 'codex'], startingModel: 'codex', expectedVersion: 0 })
-    assert.deepEqual([saved.allowedModels, saved.startingModel, saved.version], [['codex', 'claude'], 'codex', 1], 'stored in menu order')
+    const saved = await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['claude', 'codex'], startingModel: 'codex' })
+    assert.deepEqual([saved.allowedModels, saved.startingModel], [['codex', 'claude'], 'codex'], 'stored in menu order')
     // The member has no Codex or Claude account connected, so a new bot could not run on either: legacy null.
     assert.equal(await botAdmin.newBotModel(ws.id, member), null)
     // 审计日志: who changed 可用模型, from what to what.
@@ -56,26 +56,6 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
     // The database refuses what the action refuses.
     await assert.rejects(pool.query(`update workspace_settings set "allowedModels"='{}' where "workspaceId"=$1`, [ws.id]))
     await assert.rejects(pool.query(`update workspace_settings set "defaultModel"='mikka' where "workspaceId"=$1`, [ws.id]))
-  })
-
-  await t.test('optimistic lock: a stale version writes nothing; two admins racing from one version, one wins', async () => {
-    const stale = await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['mikka'], startingModel: null, expectedVersion: 0 }).then(() => null, (error: unknown) => error as { code?: string; current?: { version: number; allowedModels: string[] } })
-    assert.equal(stale?.code, 'modelPolicyConflict')
-    assert.deepEqual([stale?.current?.version, stale?.current?.allowedModels], [1, ['codex', 'claude']])
-    assert.equal((await pool.query('select count(*)::int as n from workspace_audit_events where "workspaceId"=$1', [ws.id])).rows[0].n, 1, 'a refused save leaves no audit row')
-    const admin2 = await seedUser(pool, 'admin2')
-    await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'admin\',\'active\')', [ws.id, admin2, `${admin2}@example.invalid`])
-    const race = await Promise.allSettled([
-      botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['codex', 'claude'], startingModel: 'claude', expectedVersion: 1 }),
-      botAdmin.saveModelPolicy(admin2, ws.id, { allowedModels: ['mikka', 'codex', 'claude'], startingModel: null, expectedVersion: 1 }),
-    ])
-    assert.deepEqual(race.map(result => result.status).sort(), ['fulfilled', 'rejected'])
-    assert.equal(((race.find(result => result.status === 'rejected') as PromiseRejectedResult).reason as { code?: string }).code, 'modelPolicyConflict')
-    const winner = (race.find(result => result.status === 'fulfilled') as PromiseFulfilledResult<{ version: number; startingModel: string | null }>).value
-    assert.equal(winner.version, 2)
-    assert.equal((await botAdmin.modelPolicy(ws.id)).startingModel, winner.startingModel)
-    // Back to a known state for the next cases.
-    await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['codex', 'claude'], startingModel: 'codex' })
   })
 
   await t.test("only the bot's owner changes its model and repository, within what the workspace allows", async () => {
@@ -131,26 +111,6 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
     assert.deepEqual([view.repository, view.effectiveRepository, view.repositoryUnavailable], [repo, null, true])
     await rejects(botAdmin.saveBotSettings(member, ws.id, { botId: memberBot, repository: repo }), 'workspaceAccessDenied')
     await pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=$2', [ws.id, member])
-  })
-
-  await t.test("a bot save waits for an admin's 可用模型 save on the same workspace (FOR SHARE on the settings row)", async () => {
-    const holder = await pool.connect()
-    let save: Promise<unknown> = Promise.resolve()
-    try {
-      await holder.query('begin')
-      await holder.query('select 1 from workspace_settings where "workspaceId"=$1 for update', [ws.id])
-      let settled = false
-      save = botAdmin.saveBotSettings(member, ws.id, { botId: memberBot, model: 'claude' }).finally(() => { settled = true })
-      save.catch(() => undefined)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      assert.equal(settled, false, 'the bot save is blocked while the policy row is being written')
-      // The held "admin" removes claude before releasing; the waiting bot save must then refuse it.
-      await holder.query(`update workspace_settings set "allowedModels"='{mikka,codex}', "defaultModel"=null where "workspaceId"=$1`, [ws.id])
-    } finally {
-      await holder.query('commit')
-      holder.release()
-    }
-    await rejects(save, 'botModelNotAllowed')
   })
 
   await t.test('全部 Bot: every bot with owner and live thread count, read-only', async () => {
