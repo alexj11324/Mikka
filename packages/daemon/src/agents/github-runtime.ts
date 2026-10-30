@@ -11,6 +11,16 @@ export const GITHUB_CREDENTIAL_SCRIPT = resolve(import.meta.dirname, 'github-cre
 const helper = GITHUB_CREDENTIAL_SCRIPT
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 
+/** Host-only receipt IO keeps its configured transport, not forge credentials. */
+export function githubReceiptEnvironment(host: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { NODE_ENV: host.NODE_ENV ?? 'production' }
+  for (const name of ['PATH', 'HTTP_PROXY', 'http_proxy', 'HTTPS_PROXY', 'https_proxy', 'NO_PROXY', 'no_proxy',
+    'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'GIT_SSL_CAINFO']) {
+    if (host[name] !== undefined) env[name] = host[name]
+  }
+  return env
+}
+
 /** Only run-local configuration is written; never a global gh or git login. */
 export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path: string, runtime?: { nodeBinary: string; ghBinary: string }): Record<string, string> {
   const endpoint = new URL(github.endpoint)
@@ -30,13 +40,13 @@ export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path
   if (!lstatSync(bin).isDirectory() || realpathSync(bin) !== join(realpathSync(dir), 'bin')) throw new Error('Invalid run GitHub executable directory')
   const wrapper = join(bin, 'gh')
   rmSync(wrapper, { force: true })
-  writeFileSync(wrapper, `#!/bin/sh\nexec ${process.versions.electron ? 'env ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} gh ${quote(config)} "$@"\n`, { mode: 0o700, flag: 'wx' })
+  writeFileSync(wrapper, `#!/bin/sh\nexec env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} gh ${quote(config)} "$@"\n`, { mode: 0o700, flag: 'wx' })
   return {
     PATH: `${bin}${delimiter}${path}`, GH_HOST: 'github.com', GH_REPO: github.repository,
     GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_COUNT: '3',
     GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '',
     GIT_CONFIG_KEY_1: 'credential.https://github.com.helper',
-    GIT_CONFIG_VALUE_1: `!${process.versions.electron ? 'env ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} git ${quote(config)}`,
+    GIT_CONFIG_VALUE_1: `!env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} git ${quote(config)}`,
     GIT_CONFIG_KEY_2: 'credential.useHttpPath', GIT_CONFIG_VALUE_2: 'true',
     GIT_AUTHOR_NAME: 'Mikka Agent', GIT_AUTHOR_EMAIL: 'agent@mikka.invalid',
     GIT_COMMITTER_NAME: 'Mikka Agent', GIT_COMMITTER_EMAIL: 'agent@mikka.invalid',

@@ -45,7 +45,7 @@ import { CursorAdapter } from "./adapters/cursor"
 import { MockAdapter } from "./adapters/mock"
 import type { AgentAdapter } from "./adapters/types"
 import { publishRun, snapshotTree } from "./agents/publish"
-import { agentPublishedReceipt } from './agents/github-runtime'
+import { agentPublishedReceipt, githubReceiptEnvironment } from './agents/github-runtime'
 import { runPaths } from "./agents/run-context"
 import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
@@ -462,7 +462,7 @@ export class Daemon {
             github: { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId },
             privateDir: join(paths.adapterState, 'pids'),
             ...(hosted ? { hosted: true } : {}),
-            env: { PATH: process.env.PATH },
+            env: githubReceiptEnvironment(),
           }) : publishRun({
             runId,
             repoPath: repo.path,

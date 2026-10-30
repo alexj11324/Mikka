@@ -1,9 +1,10 @@
 import { execFileSync } from 'node:child_process'
+import { execa } from 'execa'
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { join, delimiter } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
-import { agentPublishedReceipt, prepareGitHubEnvironment } from '../src/agents/github-runtime'
+import { agentPublishedReceipt, githubReceiptEnvironment, prepareGitHubEnvironment } from '../src/agents/github-runtime'
 import { RunContext } from '../src/agents/run-context'
 import { EventQueue } from '../src/agents/child'
 import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
@@ -40,6 +41,55 @@ else console.log(JSON.stringify({data:{repository:{object:{oid:process.env.TEST_
   mkdirSync(runDir)
   return { repo, worktree, root, path, runDir }
 }
+
+it('exchanges fresh credentials through the sandbox HTTP proxy in real helper children', async () => {
+  const f = await fixture()
+  let requests = 0
+  const proxy = createServer((request, response) => {
+    expect(['/api/runs/github-token', 'http://127.0.0.1:60999/api/runs/github-token']).toContain(request.url)
+    expect(request.headers.authorization).toBe('Bearer synthetic-run-token')
+    requests++
+    response.setHeader('content-type', 'application/json')
+    response.end(JSON.stringify({ repository: github.repository, token: 'synthetic-proxy-token', expiresAt: new Date(Date.now() + 3600_000).toISOString() }))
+  })
+  proxy.on('connect', (request, socket, head) => {
+    expect(request.url).toBe('127.0.0.1:60999')
+    socket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
+    proxy.emit('connection', socket)
+    if (head.length) socket.unshift(head)
+  })
+  await new Promise<void>(resolve => proxy.listen(0, '127.0.0.1', resolve))
+  const address = proxy.address()
+  if (!address || typeof address === 'string') throw new Error('Missing proxy address')
+  const endpoint = 'http://127.0.0.1:60999/api/runs/github-token'
+  const proxyURL = `http://127.0.0.1:${address.port}`
+  try {
+    // The unused target port has no application. Only a Node helper honoring HTTP_PROXY can
+    // obtain a token here; no preseeded cache or provider response is used.
+    const transport = githubReceiptEnvironment({ NODE_ENV: 'test', PATH: f.path,
+      HTTP_PROXY: proxyURL, http_proxy: proxyURL, NO_PROXY: '', no_proxy: '', GITHUB_TOKEN: 'synthetic-host-token' })
+    expect(transport.GITHUB_TOKEN).toBeUndefined()
+    const env = { ...transport, ...prepareGitHubEnvironment(f.runDir, { ...github, endpoint }, f.path) }
+    const result = await execa('git', ['credential', 'fill'], { env, extendEnv: false,
+      input: 'protocol=https\nhost=github.com\npath=owner/repo.git\n\n', cwd: f.worktree })
+    expect(result.stdout).toContain('password=synthetic-proxy-token')
+    expect(requests).toBe(1)
+    // A separate run has no reusable cache; the gh wrapper must also proxy
+    // its exchange before delegating to the CLI.
+    const other = tempDir()
+    const ghEnv = { ...env, ...prepareGitHubEnvironment(other, { ...github, endpoint }, f.path) }
+    await execa(join(other, 'github', 'bin', 'gh'), ['--version'], { env: ghEnv, extendEnv: false, cwd: f.worktree })
+    expect(requests).toBe(2)
+    // Reproduce the original failure with proxy handling disabled, proving
+    // that success above did not come from direct networking or a cache.
+    const original = tempDir()
+    const directEnv = { ...transport, ...prepareGitHubEnvironment(original, { ...github, endpoint }, f.path) }
+    const wrapper = join(original, 'github', 'bin', 'gh')
+    writeFileSync(wrapper, readFileSync(wrapper, 'utf8').replace('NODE_USE_ENV_PROXY=1', 'NODE_USE_ENV_PROXY=0'))
+    await expect(execa(wrapper, ['--version'], { env: directEnv, extendEnv: false, cwd: f.worktree })).rejects.toThrow('GitHub credentials')
+    expect(requests).toBe(2)
+  } finally { await new Promise<void>((resolve, reject) => proxy.close(error => error ? reject(error) : resolve())) }
+})
 
 it('supplies a private run-local helper to each real harness without modifying the repository', async () => {
   const f = await fixture()
