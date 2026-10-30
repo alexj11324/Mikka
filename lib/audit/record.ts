@@ -4,6 +4,9 @@
 // database, so the row commits or rolls back with it. Member/permission writes
 // live in DATABASE_URL and cannot share a transaction: call recordAuditSafe
 // after they commit; a failed audit write is logged, never surfaced.
+// Secret, token and egress (network policy) events live in the MIKKA database
+// and MUST use in-transaction recordAudit(tx, …), never recordAuditSafe.
+// Retention: no TTL/cleanup job yet (pending Alex).
 import 'server-only'
 import { db as defaultDb } from '@/lib/db'
 import { workspaceAuditEvents } from '@/lib/db/audit-schema'
@@ -23,6 +26,8 @@ export async function recordAudit(executor: Insertable, event: AuditEvent): Prom
 }
 
 /** Best effort: never throws. Logs action and error only (no metadata, labels or ip). */
+// TODO(audit): replace log-only failure with an outbox or retry; member/permission
+// writes live in DATABASE_URL, so they cannot share the audit transaction.
 export async function recordAuditSafe(executor: Insertable, event: AuditEvent): Promise<RecordedAudit | null> {
   try {
     return await recordAudit(executor, event)

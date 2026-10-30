@@ -58,3 +58,12 @@ test('auditRequestContext reads first forwarded ip and decoded Vercel city', () 
   assert.deepEqual(auditRequestContext(new Headers({ 'x-real-ip': '2001:db8::1' })), { ip: '2001:db8::1', geoCity: null })
   assert.deepEqual(auditRequestContext(new Headers({ 'x-forwarded-for': 'garbage', 'x-vercel-ip-city': '%E0' })), { ip: null, geoCity: '%E0' })
 })
+
+test('billing is prepaid credits: no plan or subscription actions, secret.deleted kept', () => {
+  for (const action of ['billing.plan_changed', 'billing.subscription_canceled']) {
+    assert.equal(action in AUDIT_ACTIONS, false)
+    assert.throws(() => toAuditRow({ workspaceId: '00000000-0000-4000-8000-000000000001', actor: { type: 'system' }, action } as unknown as AuditEvent), AuditEventError)
+  }
+  assert.equal(AUDIT_ACTIONS['billing.credits_purchased'], 'billing')
+  assert.equal(AUDIT_ACTIONS['secret.deleted'], 'secret')
+})

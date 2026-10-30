@@ -38,8 +38,6 @@ export const AUDIT_ACTIONS = {
   'workspace.deleted': 'security',
   // 计费
   'billing.checkout_started': 'billing',
-  'billing.plan_changed': 'billing',
-  'billing.subscription_canceled': 'billing',
   'billing.credits_purchased': 'billing',
   'billing.auto_recharge_changed': 'billing',
   'billing.limits_changed': 'billing',
