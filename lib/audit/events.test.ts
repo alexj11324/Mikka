@@ -109,6 +109,10 @@ test('per-action exemption: token.created may carry tokenName, nothing else may'
   assert.throws(() => toAuditRow({ ...token, metadata: { token_name: 'x' } }), /secret-bearing key/)
   assert.throws(() => toAuditRow({ ...base, action: 'token.revoked', metadata: { tokenName: 'x' } }), /secret-bearing key/)
   assert.throws(() => toAuditRow({ ...base, action: 'secret.created', metadata: { tokenName: 'x' } }), /secret-bearing key/)
+  // the exemption is exact, top-level and per action
+  assert.throws(() => toAuditRow({ ...token, metadata: { tokenName: { tokenName: 'x' } } as never }), /secret-bearing key metadata\.tokenName\.tokenName/)
+  assert.throws(() => toAuditRow({ ...token, metadata: { TokenName: 'x' } as never }), /secret-bearing key metadata\.TokenName/)
+  assert.throws(() => toAuditRow({ ...base, action: 'member.invited', metadata: { tokenName: 'x' } as never }), /secret-bearing key metadata\.tokenName/)
   // the exemption covers the key only; its value is still scanned
   assert.throws(() => toAuditRow({ ...token, metadata: { tokenName: 'gh~p_abcdefghijklmnopqrstuvwxyz0123456789'.replace('~', '') } }), /secret-bearing value/)
 })
@@ -158,4 +162,21 @@ test('metadata is a per-action allowlist; every allowlisted key passes the black
   assert.throws(() => toAuditRow({ ...base, metadata: { anything: 1 } }), /allowlist for member.removed/)
   const typed: AuditMetadata<'integration.permission_changed'> = { integration: 'Slack', capability: 'write', from: 'allow', to: 'deny' }
   assert.ok(typed)
+})
+
+test('key suffix: a trailing `key` word is secret, words merely ending in "key" are not', () => {
+  for (const key of ['monkey', 'turkey', 'hockey', 'jockey', 'whiskey', 'Monkey', 'monkeyCount']) assert.equal(isSecretBearingKey(key), false, key)
+  for (const key of ['apiKey', 'api_key', 'API_KEY', 'apikey', 'secretKey', 'secret_key', 'privateKey', 'private-key', 'privatekey', 'accessKey', 'signingKey', 'signing_key', 'SIGNING_KEY', 'encryptionKey', 'masterKey'])
+    assert.equal(isSecretBearingKey(key), true, key)
+  // passes the secret scan; only the per-action allowlist rejects it
+  assert.throws(() => toAuditRow({ ...base, metadata: { deep: { monkey: 'banana' } } }), /allowlist/)
+})
+
+test('Basic credentials are matched case-insensitively', () => {
+  const b64 = Buffer.from('alice:hunter2pass').toString('base64')
+  for (const prefix of ['Basic', 'BASIC', 'basic', 'bAsIc']) {
+    assert.equal(looksLikeSecretValue(`${prefix} ${b64}`), true, prefix)
+    assert.throws(() => toAuditRow({ ...base, metadata: { deep: { note: `Authorization: ${prefix} ${b64}` } } }), /secret-bearing value/, prefix)
+  }
+  assert.equal(looksLikeSecretValue(`BASIC ${Buffer.from('no colon here').toString('base64')}`), false)
 })

@@ -153,7 +153,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 //   describe a secret, they do not hold one (secretName, tokenId, otpEnabled).
 // - Blocked: exact value/plaintext/cardnumber/cvc/cvv; substrings token, secret,
 //   passw, pwd, apikey, credential, jwt, bearer, cookie, connectionstring,
-//   privatekey, accesskey; whole words otp and dsn; a `key` suffix except
+//   privatekey, accesskey; whole words otp and dsn; a trailing `key` word except
 //   benign ones (idempotencyKey, primaryKey, …); authorization / auth header-style
 //   names. oauth, author, footprint and pan pass.
 const SAFE_KEY_SUFFIXES = ['name', 'id', 'label', 'count', 'prefix', 'changed', 'enabled']
@@ -178,7 +178,8 @@ export function isSecretBearingKey(key: string): boolean {
   if (FORBIDDEN_KEY_EXACT.has(k)) return true
   if (FORBIDDEN_KEY_PARTS.some(part => k.includes(part))) return true
   if (words.some(word => FORBIDDEN_KEY_WORDS.has(word))) return true
-  if (k.endsWith('key') && !BENIGN_KEY_SUFFIXED.has(k)) return true
+  // `key` must be its own word (signingKey, signing_key, SIGNING_KEY); monkey/turkey pass.
+  if (words.length > 1 && words.at(-1) === 'key' && !BENIGN_KEY_SUFFIXED.has(k)) return true
   return FORBIDDEN_AUTH.test(k)
 }
 
