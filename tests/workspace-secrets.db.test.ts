@@ -98,10 +98,10 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   })
 
   await t.test('E2B key: verified before save, write-only, audited as secret.* with label "E2B API Key"', async () => {
-    await pool.query('delete from workspace_e2b_verify_attempts')
     const KEY = 'e2b_' + randomBytes(16).toString('hex')
     await rejects(e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: false, code: 'invalid' }) }), 'e2bKeyInvalid')
     await rejects(e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: false, code: 'unavailable' }) }), 'e2bKeyUnverifiable')
+    await rejects(e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: false, code: 'rate_limited' }) }), 'e2bKeyRateLimited') // E2B answered 429
     assert.equal((await e2b.getE2BKeyStatus(admin, ws.id)).configured, false, 'nothing saved on failure')
     const events: string[] = []
     const status = await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }), audit: async (_tx, e) => { events.push(`${e.action}:${e.target.type}:${e.target.label}`) } })
@@ -112,29 +112,10 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const { rows } = await pool.query('select * from workspace_e2b_keys where "workspaceId"=$1', [ws.id])
     assert.ok(!JSON.stringify(rows).includes(KEY), 'ciphertext only')
     await e2b.setE2BKey(admin, ws.id, { apiKey: KEY + 'z' }, { verify: async () => ({ ok: true }), audit: async (_tx, e) => { events.push(`${e.action}:${e.target.type}:${e.target.label}`) } })
-    await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) }) // 5th attempt in the window
-    await rejects(e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) }), 'e2bKeyRateLimited')
+    await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) }) // no hook
     assert.deepEqual((await e2b.removeE2BKey(admin, ws.id, async (_tx, e) => { events.push(`${e.action}:${e.target.type}:${e.target.label}`) })), { removed: true })
-    assert.deepEqual(events, ['secret.created:e2b_key:E2B API Key', 'secret.replaced:e2b_key:E2B API Key', 'secret.deleted:e2b_key:E2B API Key'] /* 5th set used no hook */)
+    assert.deepEqual(events, ['secret.created:e2b_key:E2B API Key', 'secret.replaced:e2b_key:E2B API Key', 'secret.deleted:e2b_key:E2B API Key'] /* the third set used no hook */)
     assert.deepEqual(await e2b.removeE2BKey(admin, ws.id), { removed: false })
-  })
-
-  await t.test('E2B verify limit is in Postgres: 10 parallel attempts admit exactly 5; window slides; per workspace', async () => {
-    await pool.query('delete from workspace_e2b_verify_attempts')
-    const now = new Date()
-    const results = await Promise.all(Array.from({ length: 10 }, () => e2b.takeVerifyAttempt(ws.id, now)))
-    assert.equal(results.filter(Boolean).length, 5)
-    assert.equal((await pool.query('select count(*)::int n from workspace_e2b_verify_attempts where "workspaceId"=$1', [ws.id])).rows[0].n, 5)
-    assert.equal(await e2b.takeVerifyAttempt(other.id, now), true, 'other workspace unaffected')
-    assert.equal(await e2b.takeVerifyAttempt(ws.id, new Date(now.getTime() + e2b.VERIFY_WINDOW_MS - 1)), false)
-    assert.equal(await e2b.takeVerifyAttempt(ws.id, new Date(now.getTime() + e2b.VERIFY_WINDOW_MS)), true, 'old attempts expire')
-    // through setE2BKey: failed checks count, the 6th is refused before E2B is called
-    await pool.query('delete from workspace_e2b_verify_attempts')
-    let calls = 0
-    const settled = await Promise.allSettled(Array.from({ length: 10 }, () => e2b.setE2BKey(admin, ws.id, { apiKey: 'e2b_' + randomBytes(16).toString('hex') }, { verify: async () => { calls++; return { ok: false, code: 'invalid' } } })))
-    assert.equal(calls, 5)
-    assert.equal(settled.filter(r => r.status === 'rejected' && (r.reason as { code?: string }).code === 'e2bKeyRateLimited').length, 5)
-    await pool.query('delete from workspace_e2b_verify_attempts')
   })
 
   await t.test('saving a value shorter than 8 chars returns shortValueNotMasked', async () => {
@@ -147,7 +128,6 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   })
 
   await t.test('E2B key delete: admin only; afterwards dispatch sees no key', async () => {
-    await pool.query('delete from workspace_e2b_verify_attempts')
     const KEY = 'e2b_' + randomBytes(16).toString('hex')
     const on = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, E2B_API_KEY: 'platform', MIKKA_BYO_E2B_KEY: '1' }
     await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) })
@@ -157,11 +137,9 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     assert.deepEqual(await e2b.removeE2BKey(admin, ws.id), { removed: true })
     await assert.rejects(e2b.getWorkspaceE2BApiKey(ws.id, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_missing')
     assert.equal(await e2b.getWorkspaceE2BApiKey(ws.id, { ...on, MIKKA_BYO_E2B_KEY: '0' }), 'platform')
-    await pool.query('delete from workspace_e2b_verify_attempts')
   })
 
   await t.test('BYO E2B getter: off = platform key (unchanged); on = workspace key or e2b_key_missing', async () => {
-    await pool.query('delete from workspace_e2b_verify_attempts')
     const PLATFORM = 'platform_' + randomBytes(8).toString('hex'), KEY = 'e2b_' + randomBytes(16).toString('hex')
     const base = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, E2B_API_KEY: PLATFORM }
     assert.equal(await e2b.getWorkspaceE2BApiKey(other.id, base), PLATFORM)
@@ -321,7 +299,6 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   })
 
   await t.test('moved E2B key fails to decrypt: e2b_unavailable, never the raw crypto Error, one id-only log line', async () => {
-    await pool.query('delete from workspace_e2b_verify_attempts')
     const a = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }]), b = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
     const K = 'e2b_' + randomBytes(16).toString('hex'), on = { MIKKA_BYO_E2B_KEY: '1', WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
     await e2b.setE2BKey(admin, a.id, { apiKey: K }, { verify: async () => ({ ok: true }) })
@@ -332,7 +309,6 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     assert.ok(error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable', 'mapped, not the raw crypto Error')
     assert.deepEqual(lines, [`[secrets] e2b_unavailable id=${b.id}`])
     assert.ok(!JSON.stringify([error, String((error as Error).stack), lines]).includes(K))
-    await pool.query('delete from workspace_e2b_verify_attempts')
   })
 
   await t.test('DB failures become a generic SecretsStoreError: params, ciphertext and iv never reach logs or the caller', async () => {
@@ -371,16 +347,6 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     assert.equal(rows[0].n, 500)
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 10)
     assert.deepEqual([...new Set(results.flatMap(r => r.status === 'rejected' ? [r.reason instanceof WorkspaceError ? r.reason.code : String(r.reason)] : []))], ['secretLimitReached'])
-  })
-
-  await t.test('E2B verify limiter admits exactly 5 of 10 concurrent attempts (advisory lock e2b.ts)', async () => {
-    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
-    let calls = 0
-    const now = new Date()
-    const results = await Promise.allSettled(Array.from({ length: 10 }, () => e2b.setE2BKey(admin, w.id, { apiKey: 'e2b_' + randomBytes(16).toString('hex') }, { now, verify: async () => { calls++; return { ok: false, code: 'invalid' } } })))
-    const codes = results.map(r => r.status === 'rejected' && r.reason instanceof WorkspaceError ? r.reason.code : 'other')
-    assert.equal(codes.filter(c => c === 'e2bKeyInvalid').length, 5); assert.equal(codes.filter(c => c === 'e2bKeyRateLimited').length, 5); assert.equal(calls, 5)
-    await pool.query('delete from workspace_e2b_verify_attempts where "workspaceId"=$1', [w.id])
   })
 
   await t.test('repository scope: . and .. rejected; owner/repo stored and compared lowercase', async () => {

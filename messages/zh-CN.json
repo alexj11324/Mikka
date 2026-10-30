@@ -1037,7 +1037,7 @@
     "secretsUnavailable": "密钥存储暂时不可用，请稍后重试。",
     "e2bKeyInvalid": "Key 无效或已被撤销。",
     "e2bKeyUnverifiable": "暂时无法验证，请稍后重试。",
-    "e2bKeyRateLimited": "尝试次数过多，请几分钟后再试。",
+    "e2bKeyRateLimited": "E2B 当前对该密钥限流，请几分钟后再试。",
     "workspaceAccessDenied": "没有管理此工作区的权限，或成员资格已被停用。",
     "workspaceNotFound": "没有可访问的工作区。",
     "workspaceMemberExists": "其中一个邮箱已经是工作区成员，请在成员列表中管理或恢复。",

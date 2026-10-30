@@ -2,9 +2,9 @@ import 'server-only'
 // Bring-your-own E2B API key (plan 1.3.1). One key per workspace, write-only: only last4 and
 // verification state are ever returned. Phase 1 supports E2B only, so there is no provider
 // abstraction: getWorkspaceE2BApiKey returns the E2B key itself.
-import { and, eq, lte, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { workspaceE2bKeys, workspaceE2bVerifyAttempts, type E2B_KEY_ERROR_CODES } from '@/lib/db/secrets-schema'
+import { workspaceE2bKeys, type E2B_KEY_ERROR_CODES } from '@/lib/db/secrets-schema'
 import { WorkspaceError } from '@/lib/workspace-access'
 import { e2bKeyAad, openSecret, sealSecret, SecretsKeyMissingError } from './crypto'
 import { e2bKeyInput } from './format'
@@ -29,23 +29,6 @@ export async function verifyE2BKey(apiKey: string, fetchImpl: typeof fetch = fet
   } catch { return { ok: false, code: 'unavailable' } }
 }
 
-// Postgres limiter: 5 verify attempts per workspace per sliding 10 minutes, shared by every
-// instance. One row per attempt in workspace_e2b_verify_attempts; a per-workspace advisory
-// transaction lock serialises count+insert, so N concurrent attempts admit exactly 5.
-// The attempt commits before E2B is called, so failed checks count too.
-export const VERIFY_ATTEMPTS = 5, VERIFY_WINDOW_MS = 10 * 60_000
-export async function takeVerifyAttempt(workspaceId: string, now = new Date()): Promise<boolean> {
-  return guardSecretsDb(() => db.transaction(async tx => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`e2b-verify:${workspaceId}`}, 0))`)
-    const since = new Date(now.getTime() - VERIFY_WINDOW_MS)
-    await tx.delete(workspaceE2bVerifyAttempts).where(and(eq(workspaceE2bVerifyAttempts.workspaceId, workspaceId), lte(workspaceE2bVerifyAttempts.attemptedAt, since)))
-    const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(workspaceE2bVerifyAttempts).where(eq(workspaceE2bVerifyAttempts.workspaceId, workspaceId))
-    if (n >= VERIFY_ATTEMPTS) return false
-    await tx.insert(workspaceE2bVerifyAttempts).values({ workspaceId, attemptedAt: now })
-    return true
-  }))
-}
-
 const sealKey = (apiKey: string, workspaceId: string) => {
   try { return sealSecret(apiKey, e2bKeyAad(workspaceId)) } catch (error) {
     if (error instanceof SecretsKeyMissingError) throw new WorkspaceError('secretsUnavailable')
@@ -63,17 +46,16 @@ export async function getE2BKeyStatus(userId: string, workspaceId: string): Prom
 
 /**
  * Sets or replaces the key after a live check. Nothing is saved unless E2B says 200.
- * Errors: e2bKeyInvalid (401/403), e2bKeyUnverifiable (network/5xx/429), e2bKeyRateLimited (our limiter),
+ * Errors: e2bKeyInvalid (401/403), e2bKeyRateLimited (E2B answered 429), e2bKeyUnverifiable (network/5xx),
  * secretsUnavailable (no WORKSPACE_SECRETS_KEY), workspaceAccessDenied. Failed checks are not audited and never logged with the key.
  */
 export async function setE2BKey(userId: string, workspaceId: string, input: unknown, options: { audit?: SecretAuditHook; verify?: (apiKey: string) => Promise<E2BVerifyResult>; now?: Date } = {}): Promise<E2BKeyStatus> {
   await requireSecretPermission(userId, workspaceId, 'e2b.write')
   const { apiKey } = e2bKeyInput.parse(input)
   const now = options.now ?? new Date()
-  if (!await takeVerifyAttempt(workspaceId, now)) throw new WorkspaceError('e2bKeyRateLimited')
   const sealed = sealKey(apiKey, workspaceId) // fail closed before calling E2B
   const result = await (options.verify ?? verifyE2BKey)(apiKey)
-  if (!result.ok) throw new WorkspaceError(result.code === 'invalid' ? 'e2bKeyInvalid' : 'e2bKeyUnverifiable')
+  if (!result.ok) throw new WorkspaceError(result.code === 'invalid' ? 'e2bKeyInvalid' : result.code === 'rate_limited' ? 'e2bKeyRateLimited' : 'e2bKeyUnverifiable')
   const audit = options.audit ?? noAudit
   const values = { ...sealed, last4: apiKey.slice(-4), verifiedAt: now, lastErrorCode: null, lastErrorAt: null, updatedBy: userId, updatedAt: now }
   await guardSecretsDb(() => db.transaction(async tx => {

@@ -1037,7 +1037,7 @@
     "secretsUnavailable": "Secret storage isn't available right now. Please try again later.",
     "e2bKeyInvalid": "This E2B key is invalid or has been revoked.",
     "e2bKeyUnverifiable": "Couldn't verify the key right now. Please try again later.",
-    "e2bKeyRateLimited": "Too many attempts. Wait a few minutes and try again.",
+    "e2bKeyRateLimited": "E2B is rate limiting this key right now. Wait a few minutes and try again.",
     "workspaceAccessDenied": "You do not have permission to manage this workspace, or your membership is suspended.",
     "workspaceNotFound": "No accessible workspace.",
     "workspaceMemberExists": "One of these emails is already a workspace member. Manage or restore them in the member list.",
