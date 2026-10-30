@@ -56,7 +56,6 @@ test('cloud dispatch is off until #438: constant false, switchToCloud refuses wi
   let keyChecks = 0;
   const recovery = createFactoryDispatchRecovery(pool as never, async () => { keyChecks++; return true; });
   assert.deepEqual(await recovery.switchToCloud('u', 't'), { status: 409, body: { error: 'cloudDispatchUnavailable' } });
-  assert.equal(queries.length, 1, 'only the ownership read; nothing written');
-  assert.ok(/^SELECT/i.test(queries[0]));
+  assert.ok(queries.every((sql) => !/\b(INSERT|UPDATE|DELETE|UPSERT|MERGE)\b|FOR\s+(UPDATE|SHARE)/i.test(sql)), 'no writes or row locks');
   assert.equal(keyChecks, 0);
 });

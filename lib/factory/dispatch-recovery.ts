@@ -122,8 +122,14 @@ export function createFactoryDispatchRecovery(pool: Pool, cloudKeyConfigured: Cl
   /**
    * The device is online again: every still-queued Factory run on it that could not be dispatched
    * just before this heartbeat (`wasUnavailable`) or that recorded `run_dispatch_failed` gets exactly
-   * one `run_redispatched` event (dedupe key per run) under a per-device lock.
+   * one `run_redispatched` event (dedupe key per run).
    * The run row stays queued, so the daemon's next claim starts it; nothing is queued twice.
+   *
+   * Single-dispatch guarantee: `ON CONFLICT ("dedupeKey") DO NOTHING` in insertEvent, and only a
+   * caller whose insert actually wrote a row (rowCount 1) counts the run as resumed. The per-device
+   * advisory lock, `FOR UPDATE OF r` and `SKIP LOCKED` only reduce contention between concurrent
+   * heartbeats; they are not what makes it correct (removing any of them still passes the
+   * concurrency test).
    */
   async function deviceOnline(userId: string, deviceId: string, wasUnavailable = false): Promise<string[]> {
     const tx = await pool.connect();
