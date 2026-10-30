@@ -33,6 +33,7 @@ import {
   publicationBindingHash,
   type PublicationInput,
 } from "./publication-operation";
+import { mergedFor } from "./merge";
 
 const principalId = (actor: FactoryActor) =>
   actor.sessionId ? `session:${actor.sessionId}` : `owner:${actor.userId}`;
@@ -219,6 +220,9 @@ async function grantStillLive(tx: PoolClient, a: any) {
 
 function gatesFor() {
   const approvalGate: FactoryGate = async (tx, task, _attempt, change) => {
+    // #528: a code candidate is accepted by the person's merge of its PR.
+    const mergeId = (change.output as { mergeId?: unknown } | null)?.mergeId;
+    if (mergeId !== undefined) return task.stage === "approval" && mergedFor(tx, task, mergeId);
     const parsed = output.safeParse(change.output);
     if (
       task.stage !== "approval" ||
@@ -235,6 +239,8 @@ function gatesFor() {
     return digest(change.evidence) === digest(current.evidence);
   };
   const publishGate: FactoryGate = async (tx, task, _attempt, change) => {
+    const mergeId = (change.output as { mergeId?: unknown } | null)?.mergeId;
+    if (mergeId !== undefined) return task.stage === "publish" && mergedFor(tx, task, mergeId);
     const parsed = output.safeParse(change.output);
     if (
       task.stage !== "publish" ||
@@ -439,11 +445,17 @@ export function createFactoryApprovals(
             WHERE c."taskId"=$1 AND c.request->>'operation'='reject' ORDER BY c."createdAt"`,
           [task.id],
         );
+        const { rows: merges } = await tx.query(
+          `SELECT id,"candidateId",status,source,code,"pullRequestUrl",sha,"headSha","mergeCommitSha","createdAt","finishedAt"
+             FROM factory_merges WHERE "taskId"=$1 ORDER BY "createdAt"`,
+          [task.id],
+        );
         return {
           binding: bindingOf(task),
           approvals,
           publications,
           rejections,
+          merges,
         };
       });
     },
@@ -518,6 +530,18 @@ export function createFactoryApprovals(
           !["pending", "waiting"].includes(task.status)
         )
           fail("factoryTransition");
+        // #528: approval never leaves an approved-but-unpublished candidate. Without a
+        // registered publication for this exact action (production registers only skill
+        // activation), a code candidate is accepted by merging its PR instead.
+        if (
+          !adapters.some(
+            (adapter) =>
+              adapter.action === req.action &&
+              adapter.target === req.target &&
+              adapter.environment === req.targetEnvironment,
+          )
+        )
+          fail("factoryAcceptanceIsMerge");
         const current = await approvalEvidence(tx, task);
         if (digest(req.candidate) !== digest(current.manifest.candidate))
           fail("factoryEvidenceMismatch");

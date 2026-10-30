@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { factoryApprovals } from "@/lib/factory/server";
+import { factoryApprovals, factoryMerges } from "@/lib/factory/server";
+import { GitHubAccessError, githubUserToken } from "@/lib/github/user-access";
 import { handleFactoryApproval } from "@/lib/factory/approval-http";
+import { FactoryMergeRefused } from "@/lib/factory/merge";
 import { factoryBrowserHuman } from "@/lib/factory/browser-human";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +28,18 @@ async function respond(
       request.method === "POST"
         ? await request.json().catch(() => null)
         : undefined,
-  });
+    // Acceptance merges as this person, with their own GitHub user token; never an app token.
+    githubToken: async () => {
+      try {
+        return (await githubUserToken(request.headers)).token;
+      } catch (error) {
+        if (error instanceof GitHubAccessError && error.code === "githubUnavailable")
+          throw new FactoryMergeRefused("githubUnavailable", null);
+        if (error instanceof GitHubAccessError) return null;
+        throw error;
+      }
+    },
+  }, factoryMerges);
   return NextResponse.json(result.body, {
     status: result.status,
     headers: { "Cache-Control": "private, no-store" },

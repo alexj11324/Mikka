@@ -8,8 +8,7 @@ import { issueForUser } from "@/lib/issue-access";
 import { lockCliAgentPolicy, lockCliRunPolicy } from "@/lib/agent-tool-approval/policy-store";
 import { createFactoryStore } from "./store";
 import { approvalGate, publishGate, createFactoryApprovals } from "./approval";
-import { configuredLocalPublicationAdapters } from "./local-publication";
-import { configuredVercelPublicationAdapters } from "./vercel-publication";
+import { createFactoryMerges, githubMergeApi } from "./merge";
 import { createFactoryCheckClaim, factoryCheckGates } from "./checks";
 import { createFactoryMonitor, createFactoryMonitorRunConsumer, monitorGate } from "./monitor";
 import { reconcileFactoryCheck } from "./reconcile-check";
@@ -34,13 +33,14 @@ export const factoryStore = createFactoryStore(pool, authorize, {
   publish: publishGate,
   monitor: monitorGate,
 });
+// #528: a code candidate is accepted by the person's merge of its PR
+// (factoryMerges); deploy_preview/deploy_production are not Factory steps. Only a
+// skill candidate, which has no PR, is still approved and activated here.
 export const factoryApprovals = createFactoryApprovals(
   pool,
   authorize,
   factoryStore,
   [
-    ...configuredLocalPublicationAdapters(process.env),
-    ...configuredVercelPublicationAdapters(process.env),
     ...createSkillActivationAdapters({
       readRegisteredCandidate: async (...args) =>
         (
@@ -53,6 +53,7 @@ export const factoryApprovals = createFactoryApprovals(
     }),
   ],
 );
+export const factoryMerges = createFactoryMerges(pool, authorize, factoryStore, githubMergeApi());
 export const claimFactoryCheckRun = createFactoryCheckClaim(pool, authorize);
 export const factoryMonitorWorkspaceKey: Parameters<typeof createFactoryMonitor>[3] = async (userId, issueId, tx) => {
     const [link] = await workspaceDb
