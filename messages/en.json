@@ -2209,6 +2209,20 @@
         "write": "read and write",
         "none": "off"
       }
+    },
+    "appPolicy": {
+      "loading": "Loading app permissions",
+      "heading": "Apps bots may use",
+      "access": {
+        "allow": "Allow",
+        "deny": "Block"
+      },
+      "apps": {
+        "gmail": "Gmail",
+        "googlecalendar": "Google Calendar",
+        "slack": "Slack",
+        "notion": "Notion"
+      }
     }
   },
   "TelegramBot": {

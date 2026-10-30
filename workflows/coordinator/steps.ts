@@ -27,7 +27,7 @@ import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
 import { issueMembers, issues } from '@/lib/db/schema'
-import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
+import { COMPOSIO_ACTIONS, type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
 import { proposeAction, proposeRepositoryPush } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
@@ -205,15 +205,26 @@ export async function forget(userId: string, input: { text: string }, scope?: Na
   }, botId)
 }
 
-export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope, accountId?: string) {
+/** 团队权限 › 允许使用的应用: a workspace can block an app for its bots. The personal Coordinator (no botId) is not governed. */
+async function appBlockedForBot(botId: string | null | undefined, action: ComposioActionName) {
+  if (!botId) return false
+  const { botMayUseApp } = await import('@/lib/app-policy/store')
+  const { isPolicyApp } = await import('@/lib/app-policy/apps')
+  const toolkit = COMPOSIO_ACTIONS[action]?.toolkit
+  return Boolean(toolkit && isPolicyApp(toolkit) && !(await botMayUseApp(botId, toolkit)))
+}
+
+export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return accountId ? runComposioAction(userId, action, input, accountId) : runComposioAction(userId, action, input)
 }
 
-export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string) {
+export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return accountId ? proposeAction(userId, action, input, accountId) : proposeAction(userId, action, input)
 }
 
@@ -459,6 +470,12 @@ export async function startWebSubagent(userId: string, input: { botId: string; t
 export async function personalWrite(userId:string, botId:string | null, executionId:string, call:import('@/lib/operations/model-write-tools').ModelWriteCall, scope?:NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  const { WRITE_TOOL_APPS } = await import('@/lib/app-policy/apps')
+  const app = WRITE_TOOL_APPS[call.action]
+  if (botId && app) {
+    const { botMayUseApp } = await import('@/lib/app-policy/store')
+    if (!(await botMayUseApp(botId, app))) return { error: 'integrationBlockedByWorkspace' }
+  }
   const { personalWriteFromRun } = await import('@/lib/operations/write-runtime')
   return personalWriteFromRun(userId,botId,executionId,call,scope)
 }

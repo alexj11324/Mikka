@@ -2209,6 +2209,20 @@
         "write": "可写",
         "none": "不可用"
       }
+    },
+    "appPolicy": {
+      "loading": "正在加载应用权限",
+      "heading": "允许使用的应用",
+      "access": {
+        "allow": "允许",
+        "deny": "禁止"
+      },
+      "apps": {
+        "gmail": "Gmail",
+        "googlecalendar": "Google 日历",
+        "slack": "Slack",
+        "notion": "Notion"
+      }
     }
   },
   "TelegramBot": {

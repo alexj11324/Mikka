@@ -13,7 +13,7 @@ import { MembersPanel } from '@/components/settings/members-panel'
 import { LinearSettings } from '@/components/settings/linear-settings'
 import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings'
 import { IntegrationsSettings } from '@/components/settings/integrations-settings'
-import { ComputerPolicySettings } from '@/components/settings/computer-policy-settings'
+import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
@@ -96,7 +96,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
-    case 'permissions': return workspaceId && !preview ? <ComputerPolicySettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return <p className="py-8 text-sm text-muted-foreground">{t('sectionUnavailable')}</p>
   }
 }
