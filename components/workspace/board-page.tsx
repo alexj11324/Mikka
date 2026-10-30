@@ -14,6 +14,7 @@ import { ConversationPill } from '@/components/nav/conversation-pill'
 import { CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { AGENT_STATES, CARD_PROPERTIES, DEFAULT_CARD_PROPERTIES, DEFAULT_HIDDEN_COLUMNS, agentStateOf, type AgentState, type CardProperty } from '@/components/blocks/kanban-board-1/components/data'
 import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { ButtonGroup, ButtonGroupText } from '@/components/ui/button-group'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
@@ -106,6 +107,15 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const [settings, update] = useBoardSettings()
   const { scope, view, filters, display } = settings
   const [sidebar, setSidebar] = useStoredFlag(SIDEBAR_KEY, true)
+  // Below lg the panel has no room beside the board; it opens as a sheet instead.
+  const [sheet, setSheet] = useState(false)
+  useEffect(() => {
+    const wide = window.matchMedia('(min-width: 64rem)')
+    const close = () => { if (wide.matches) setSheet(false) }
+    wide.addEventListener('change', close)
+    return () => wide.removeEventListener('change', close)
+  }, [])
+  const openPanel = () => { setSidebar(true); if (!window.matchMedia('(min-width: 64rem)').matches) setSheet(true) }
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
   const [newTask, setNewTask] = useState(false)
   const { data: agents } = useSWR('agents', () => listAgents(), { revalidateOnFocus: false })
@@ -222,11 +232,11 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
             </PopoverContent>
           </Popover>
           <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setNewTask(true)}><Plus data-icon="inline-start" />{t('newTask')}</Button>
-          {!sidebar && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-expanded={false} aria-label={t('expand')} onClick={() => setSidebar(true)} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}</TooltipContent></Tooltip>}
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'lg:hidden')} aria-expanded={sheet} aria-label={t('expand')} onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}</TooltipContent></Tooltip>
         </div>
       </div>
       {view === 'board'
-        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} narrow={sidebar ? ['done'] : undefined} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { setSidebar(true); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} narrow={sidebar ? ['done'] : undefined} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
         : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l lg:flex">
@@ -236,6 +246,14 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
       <div aria-hidden="true" className="h-14 shrink-0" />
       <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { onOpen(id) }} />
     </aside>}
-    <NewTaskDialog open={newTask} onOpenChange={setNewTask} onSent={() => setSidebar(true)} />
+    <Sheet open={sheet} onOpenChange={setSheet}>
+      <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-sm">
+        <SheetHeader className="sr-only"><SheetTitle>{tNav('coordinator')}</SheetTitle></SheetHeader>
+        <ConversationPill name={tNav('coordinator')} avatar={<CoordinatorAvatar size="pill" />} />
+        <div aria-hidden="true" className="h-14 shrink-0" />
+        <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { setSheet(false); onOpen(id) }} />
+      </SheetContent>
+    </Sheet>
+    <NewTaskDialog open={newTask} onOpenChange={setNewTask} onSent={openPanel} />
   </div>
 }
