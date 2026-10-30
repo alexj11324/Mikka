@@ -24,7 +24,6 @@ import { SavedLoginsSettings } from '@/components/settings/saved-logins-settings
 import { TelegramSettings } from '@/components/settings/telegram-settings'
 import { DevicesSettings } from '@/components/devices/devices-settings'
 import { MemorySettings } from '@/components/settings/memory-settings'
-import { ProfileName } from '@/components/settings/profile-name'
 import { LocaleSetting } from '@/components/settings/locale-setting'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
