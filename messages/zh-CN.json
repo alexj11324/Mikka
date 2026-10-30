@@ -2490,7 +2490,8 @@
     "forExampleProductTeam": "例如：产品团队",
     "cancel": "取消",
     "creating": "正在创建…",
-    "createWorkspace": "创建工作区"
+    "createWorkspace": "创建工作区",
+    "sendingChoice": "发送中"
   },
   "IssueThreads": {
     "title": "线程",

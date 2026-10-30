@@ -2490,7 +2490,8 @@
     "forExampleProductTeam": "For example: Product team",
     "cancel": "Cancel",
     "creating": "Creating…",
-    "createWorkspace": "Create workspace"
+    "createWorkspace": "Create workspace",
+    "sendingChoice": "Sending"
   },
   "IssueThreads": {
     "title": "Threads",

@@ -445,3 +445,13 @@ E = mc^2 \quad \text{（质能方程）}
   assert.match(markup, /<code>\\\(x\\\)<\/code>/)
   assert.doesNotMatch(markup, /katex-error/)
 })
+
+test('单选 BeQuestions 可带真实任务 id，用于 Factory 派发前澄清与派发失败二选一', () => {
+  const { BeQuestions } = agentComponentCatalog
+  const question = { id: 'net', title: '2 秒按哪种网络来算？', options: [{ value: '4g', label: '手机 4G' }, { value: 'wifi', label: '桌面宽带' }] }
+  assert.equal(BeQuestions.props.safeParse({ context: '官网首页提速', questions: [question], task: '0b7d5a3e-1c2f-4e5a-9b8c-7d6e5f4a3b2c' }).success, true)
+  assert.equal(BeQuestions.props.safeParse({ context: '官网首页提速', questions: [question], task: 'MIK-48' }).success, false)
+  const parser = createParser(library.toJSONSchema(), library.root)
+  const result = parser.parse('root = Stack([q])\nq = BeQuestions("派发失败", [{id:"route", title:"等它上线，还是换到 Mikka Cloud？", options:[{value:"wait", label:"等它上线"}, {value:"cloud", label:"换到 Mikka Cloud"}]}], "0b7d5a3e-1c2f-4e5a-9b8c-7d6e5f4a3b2c")')
+  assert.deepEqual(result.meta.errors, [])
+})

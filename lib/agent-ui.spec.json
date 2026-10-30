@@ -375,8 +375,8 @@
         "description": "对应 AI Elements Confirmation 的 beUI ApprovalCard，用于确认建议方案，不是工具授权。title 和 description 必须完整描述待确认建议；context 包含完整上下文。用户在卡片内确认、拒绝或要求修改后，直接提交意见并继续对话，不经输入框；不授权或执行工作区操作。"
       },
       "BeQuestions": {
-        "signature": "BeQuestions(context: string, questions: {id: string, title: string, options?: {value: string, label: string, description?: string}[], multiple?: boolean, allowCustom?: boolean}[])",
-        "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。"
+        "signature": "BeQuestions(context: string, questions: {id: string, title: string, options?: {value: string, label: string, description?: string}[], multiple?: boolean, allowCustom?: boolean}[], task?: string)",
+        "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。只有一个单选问题时显示为 A/B/C/D 选项行，点击的选项文字即用户回复：Factory 任务派发前澄清（intake 路由到 clarify）或派发失败需用户二选一时用它，问题写清楚、选项 2–4 个；task 可选，为工具返回的真实任务 id，宿主在问题前显示任务引用。"
       },
       "BeTodoList": {
         "signature": "BeTodoList(title: string, items: {id: string, title: string, status?: \"pending\" | \"in-progress\" | \"completed\" | \"cancelled\", progress?: number, detail?: string}[], source?: \"suggestion\" | \"user\")",
@@ -4941,6 +4941,10 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "task": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           },
           "required": [
@@ -4948,7 +4952,7 @@
             "questions"
           ],
           "additionalProperties": false,
-          "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。"
+          "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。只有一个单选问题时显示为 A/B/C/D 选项行，点击的选项文字即用户回复：Factory 任务派发前澄清（intake 路由到 clarify）或派发失败需用户二选一时用它，问题写清楚、选项 2–4 个；task 可选，为工具返回的真实任务 id，宿主在问题前显示任务引用。"
         },
         "BeTodoList": {
           "type": "object",
