@@ -9,7 +9,7 @@ async function mock(page: Page, results: Array<{ status: string }>) {
   await page.route(API, async (route: Route) => {
     bodies.push(route.request().postData() ?? '')
     expect(route.request().headers()['x-mikka-credential']).toBe('1')
-    await new Promise(resolve => setTimeout(resolve, 300))
+    await new Promise(resolve => setTimeout(resolve, 800))
     await route.fulfill({ json: results.shift() })
   })
   return bodies
@@ -36,12 +36,17 @@ test('wrong password, then two-step code, then signed in', async ({ page }) => {
   await open(page)
   await page.getByRole('textbox', { name: '邮箱' }).fill('alex@mikka.app')
   await page.getByLabel('密码', { exact: true }).fill(SECRET)
-  const submit = page.getByRole('button', { name: '登录', exact: true })
-  const box = await submit.boundingBox()
+  const submit = page.getByTestId('credential-login-card').locator('button[type=submit]')
+  const card = page.getByTestId('credential-login-card')
+  const box = (await submit.boundingBox())!
+  const cardBox = await card.boundingBox()
   await submit.click()
   await expect(submit).toBeDisabled()
   await expect(submit.getByRole('status')).toBeVisible()
-  expect(await submit.boundingBox()).toEqual(box)
+  // No layout jump: the card keeps its size and the right-aligned button keeps its right edge and row.
+  const pendingBox = (await submit.boundingBox())!
+  expect(await card.boundingBox()).toEqual(cardBox)
+  expect([pendingBox.y, pendingBox.height, pendingBox.x + pendingBox.width]).toEqual([box.y, box.height, box.x + box.width])
   await expect(page.getByText('密码不对')).toBeVisible()
   // The secret left the input as soon as it was sent.
   await expect(page.getByLabel('密码', { exact: true })).toHaveValue('')
@@ -50,7 +55,7 @@ test('wrong password, then two-step code, then signed in', async ({ page }) => {
   await expect(page.getByText('密码不对')).toBeHidden()
   await submit.click()
   await expect(page.getByText('验证码', { exact: true })).toBeVisible()
-  await page.keyboard.type('482913')
+  await page.locator('#credential-login-code').fill('482913')
   await page.getByRole('button', { name: '验证' }).click()
   await expect(page.getByTestId('credential-login-done')).toContainText('已登录 Cloudflare')
 
