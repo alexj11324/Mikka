@@ -62,7 +62,9 @@ test('list rows use the same ledger state as the window', () => {
   assert.match(list(), />发布失败</)
   swr.data = { tasks: [task({ stage: 'publish', status: 'running', candidateId: 'c2' })] }
   ledger = { approvals: [approval], publications: [] }
-  assert.match(list(), />已失效</)
+  // A new commit voids the old approval: the row is back to pending (GitHub-style).
+  assert.match(list(), />待你确认</)
+  assert.doesNotMatch(list(), />已失效</)
   ledger = { approvals: [{ ...approval, expiresAt: new Date(Date.now() - 1000).toISOString(), candidateId: 'c2' }], publications: [] }
   assert.match(list(), />已过期</)
 })
@@ -103,4 +105,26 @@ test('pending without a decision source hides 批准; busy actions show a spinne
   const busy = renderToStaticMarkup(<ApprovalBar state="approved" isSkill={false} details={[]} busy />)
   assert.match(busy, /aria-busy="true"[^>]*>[^<]*<svg[^>]*role="status"|aria-busy="true"/)
   assert.match(busy, /data-icon="inline-start"/)
+})
+
+test('revoke is secondary and busy actions swap the icon for the spinner (fixed width)', () => {
+  for (const state of ['approved', 'failed'] as const) {
+    const idle = renderToStaticMarkup(<ApprovalBar state={state} isSkill={false} details={[]} />)
+    assert.match(idle, /<button[^>]*class="[^"]*bg-secondary [^"]*"[^>]*>撤销批准</)
+    const busy = renderToStaticMarkup(<ApprovalBar state={state} isSkill={false} details={[]} busy />)
+    // Each action has exactly one inline-start icon whether idle or busy, so its width does not change.
+    assert.equal((idle.match(/data-icon="inline-start"/g) ?? []).length, (busy.match(/data-icon="inline-start"/g) ?? []).length)
+    assert.ok((idle.match(/data-icon="inline-start"/g) ?? []).length >= 1)
+  }
+  const pendingIdle = renderToStaticMarkup(<ApprovalBar state="pending" isSkill details={[]} />)
+  const pendingBusy = renderToStaticMarkup(<ApprovalBar state="pending" isSkill details={[]} busy />)
+  assert.equal((pendingIdle.match(/data-icon="inline-start"/g) ?? []).length, 1)
+  assert.equal((pendingBusy.match(/data-icon="inline-start"/g) ?? []).length, 1)
+})
+
+test('a voided approval shows only the 「<sha> · 已失效」 badge next to the enable action', () => {
+  const html = renderToStaticMarkup(<ApprovalBar state="pending" isSkill details={[]} superseded="ccccccc" />)
+  assert.match(html, />ccccccc · 已失效</)
+  assert.match(html, />启用</)
+  assert.doesNotMatch(html, /<p/)
 })

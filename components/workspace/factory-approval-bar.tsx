@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Ban, CircleCheck, CircleX, Clock, ExternalLink } from 'lucide-react'
+import { Ban, Check, CircleCheck, CircleX, Clock, ExternalLink, RefreshCw, Upload, type LucideIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item'
@@ -17,6 +17,8 @@ export type ApprovalBarProps = {
   /** Publishing needs a complete environment; without one 发布 is hidden, not disabled. */
   canPublish?: boolean
   reference?: { href: string; label: string }
+  /** Short sha of an approval voided by a newer commit, shown as 「<sha> · 已失效」. */
+  superseded?: string
   onApprove?: () => void
   onPublish?: () => void
   onRevoke?: () => void
@@ -32,25 +34,33 @@ function StateIcon({ state }: { state: AcceptanceState }) {
   return null
 }
 
+/** A busy action swaps its icon for the Spinner, so the button keeps its width (no layout jump). */
+function ActionIcon({ icon: Icon, busy }: { icon: LucideIcon; busy: boolean }) {
+  return busy ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" aria-hidden="true" />
+}
+
 /** The publication decision for one candidate (Figma 358:6855). Purely presentational. */
-export function ApprovalBar({ state, isSkill, details, busy = false, canApprove = true, canPublish = true, reference, onApprove, onPublish, onRevoke, onReconcile }: ApprovalBarProps) {
+export function ApprovalBar({ state, isSkill, details, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile }: ApprovalBarProps) {
   const t = useTranslations('FactoryAcceptance')
   const icon = StateIcon({ state })
   return <Item variant="muted" data-state={state}>
     {icon && <ItemMedia variant="icon">{icon}</ItemMedia>}
     <ItemContent>
       <ItemTitle>{t(acceptanceStateKey(state, isSkill))}</ItemTitle>
-      {details.length > 0 && <div className="flex flex-wrap gap-1">{details.map(detail => <Badge key={detail} variant="outline">{detail}</Badge>)}</div>}
+      {(details.length > 0 || superseded) && <div className="flex flex-wrap gap-1">
+        {details.map(detail => <Badge key={detail} variant="outline">{detail}</Badge>)}
+        {superseded && <Badge variant="outline" tone="neutral">{t('superseded', { sha: superseded })}</Badge>}
+      </div>}
     </ItemContent>
     <ItemActions>
-      {state === 'pending' && canApprove && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onApprove}>{busy && <Spinner data-icon="inline-start" />}{isSkill ? t('enable') : t('approve')}</Button>}
+      {state === 'pending' && canApprove && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onApprove}><ActionIcon icon={Check} busy={busy} />{isSkill ? t('enable') : t('approve')}</Button>}
       {state === 'approved' && <>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
-        {canPublish && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onPublish}>{busy && <Spinner data-icon="inline-start" />}{t('publish')}</Button>}
+        <Button size="sm" variant="secondary" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
+        {canPublish && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onPublish}><ActionIcon icon={Upload} busy={busy} />{t('publish')}</Button>}
       </>}
       {(state === 'publishing' || state === 'checking' || state === 'failed') && <>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
-        <Button size="sm" disabled={busy} aria-busy={busy} onClick={onReconcile}>{busy && <Spinner data-icon="inline-start" />}{t('reconcile')}</Button>
+        <Button size="sm" variant="secondary" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
+        <Button size="sm" disabled={busy} aria-busy={busy} onClick={onReconcile}><ActionIcon icon={RefreshCw} busy={busy} />{t('reconcile')}</Button>
       </>}
       {state === 'live' && reference && <Button size="sm" variant="outline" render={<a href={reference.href} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-end" />{reference.label}</Button>}
     </ItemActions>

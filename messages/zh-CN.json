@@ -3056,6 +3056,8 @@
     "publicationUnavailable": "发布暂不可用：尚未配置发布目标。",
     "attestationRequired": "生产发布需要签名证明。",
     "artifactError": "证据打开失败。",
+    "superseded": "{sha} · 已失效",
+    "loadError": "验收内容加载失败",
     "closeEvidence": "关闭证据",
     "skillState": {
       "pending": "待启用",
