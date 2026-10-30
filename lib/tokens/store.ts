@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { personalAccessTokens } from '@/lib/db/token-schema'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
@@ -51,7 +51,9 @@ export async function createPersonalAccessToken(userId: string, workspaceId: str
   const row = await db.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`pat:${userId}:${workspaceId}`}, 0))`)
     const [{ active }] = await tx.select({ active: sql<number>`count(*)::int` }).from(personalAccessTokens)
-      .where(and(eq(personalAccessTokens.userId, userId), eq(personalAccessTokens.workspaceId, workspaceId), isNull(personalAccessTokens.revokedAt)))
+      .where(and(eq(personalAccessTokens.userId, userId), eq(personalAccessTokens.workspaceId, workspaceId), isNull(personalAccessTokens.revokedAt),
+        // Expired tokens no longer hold a slot toward PAT_ACTIVE_LIMIT.
+        or(isNull(personalAccessTokens.expiresAt), gt(personalAccessTokens.expiresAt, now))))
     if (active >= PAT_ACTIVE_LIMIT) throw new WorkspaceError('tokenLimitReached')
     const [saved] = await tx.insert(personalAccessTokens).values({ id: crypto.randomUUID(), userId, workspaceId, name, tokenHash, hint, createdAt: now, expiresAt: expiry }).returning()
     // TODO(audit): after PR #432 merges, call recordAudit(tx, { workspaceId, actor: { type: 'user', id: userId, name }, action: 'token.created',

@@ -86,4 +86,49 @@ test('personal access tokens', { skip: !dbUrl }, async t => {
     assert.ok((await store.createPersonalAccessToken(fresh, ws.id, { name: 'after revoke' })).token)
   })
 
+  const member_ = async (label: string) => {
+    const id = await seedUser(pool, label)
+    await pool.query(`insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$2 || '@example.invalid','member','active')`, [ws.id, id])
+    return id
+  }
+  const outcome = async (promise: Promise<unknown>) => { try { await promise; return 'ok' } catch (error) { return error instanceof WorkspaceError ? error.code : 'error' } }
+
+  await t.test('QA: concurrent creates never exceed the limit (from 45 and from 49 active)', async () => {
+    for (const start of [45, 49]) {
+      const user = await member_(`cc${start}`)
+      for (let i = 0; i < start; i++) await store.createPersonalAccessToken(user, ws.id, { name: `p${i}` })
+      const results = await Promise.all(Array.from({ length: 10 }, (_, i) => outcome(store.createPersonalAccessToken(user, ws.id, { name: `c${i}` }))))
+      assert.equal(results.filter(r => r === 'ok').length, PAT_ACTIVE_LIMIT - start)
+      assert.equal(results.filter(r => r === 'tokenLimitReached').length, 10 - (PAT_ACTIVE_LIMIT - start))
+      const { rows } = await pool.query(`select count(*)::int n from personal_access_tokens where "userId"=$1 and "revokedAt" is null`, [user])
+      assert.equal(rows[0].n, PAT_ACTIVE_LIMIT)
+    }
+  })
+
+  await t.test('QA: expiry is capped at exactly 366 days', async () => {
+    const user = await member_('cap'), now = new Date('2026-10-30T00:00:00Z'), day = 86_400_000
+    const at = (ms: number) => new Date(now.getTime() + ms).toISOString()
+    assert.equal(await outcome(store.createPersonalAccessToken(user, ws.id, { name: 'd366', expiresAt: at(366 * day) }, now)), 'ok')
+    assert.equal(await outcome(store.createPersonalAccessToken(user, ws.id, { name: 'd366+1ms', expiresAt: at(366 * day + 1) }, now)), 'validationGeneric')
+    assert.equal(await outcome(store.createPersonalAccessToken(user, ws.id, { name: 'd367', expiresAt: at(367 * day) }, now)), 'validationGeneric')
+    assert.equal(await outcome(store.createPersonalAccessToken(user, ws.id, { name: 'now', expiresAt: at(0) }, now)), 'validationGeneric')
+    assert.equal(await outcome(store.createPersonalAccessToken(user, ws.id, { name: 'never', expiresAt: null }, now)), 'ok')
+  })
+
+  await t.test('QA: a token stops working exactly at expiresAt', async () => {
+    const now = new Date(), expiresAt = new Date(now.getTime() + 60_000)
+    const created = await store.createPersonalAccessToken(owner, ws.id, { name: 'Boundary', expiresAt: expiresAt.toISOString() }, now)
+    assert.ok(await store.verifyPersonalAccessToken(created.token, new Date(expiresAt.getTime() - 1)))
+    assert.equal(await store.verifyPersonalAccessToken(created.token, expiresAt), null)
+    assert.equal(await store.verifyPersonalAccessToken(created.token, new Date(expiresAt.getTime() + 1)), null)
+  })
+
+  await t.test('QA: expired tokens do not count toward the limit', async () => {
+    const user = await member_('expired'), past = new Date(Date.now() - 3 * 86_400_000)
+    for (let i = 0; i < PAT_ACTIVE_LIMIT; i++) await store.createPersonalAccessToken(user, ws.id, { name: `e${i}`, expiresAt: new Date(past.getTime() + 86_400_000).toISOString() }, past)
+    assert.equal(await outcome(store.createPersonalAccessToken(user, ws.id, { name: 'new' })), 'ok')
+    // Still capped by live tokens: 49 more fill it, the next is refused.
+    for (let i = 0; i < PAT_ACTIVE_LIMIT - 1; i++) await store.createPersonalAccessToken(user, ws.id, { name: `l${i}` })
+    assert.equal(await outcome(store.createPersonalAccessToken(user, ws.id, { name: 'over' })), 'tokenLimitReached')
+  })
 })

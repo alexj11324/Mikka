@@ -1,4 +1,5 @@
 // Settings › 个人访问令牌. Mirrors drizzle/20261030021745_personal_access_tokens.sql (MIKKA_DATABASE_URL).
+import { sql } from 'drizzle-orm'
 import { index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { users } from './schema'
 
@@ -18,5 +19,5 @@ export const personalAccessTokens = pgTable('personal_access_tokens', {
   revokedAt: timestamp('revokedAt', { withTimezone: true }),
 }, table => [
   uniqueIndex('personal_access_tokens_hash_key').on(table.tokenHash),
-  index('personal_access_tokens_owner_idx').on(table.userId, table.workspaceId, table.createdAt),
+  index('personal_access_tokens_owner_idx').on(table.userId, table.workspaceId, table.createdAt.desc()).where(sql`${table.revokedAt} is null`),
 ])

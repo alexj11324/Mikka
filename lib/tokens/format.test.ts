@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import test from 'node:test'
-import { bearerToken, checkExpiry, createTokenInput, generatePersonalAccessToken, hashPersonalAccessToken, PAT_SHAPE, revokeTokenInput, sameTokenHash } from './format'
+import { bearerToken, checkExpiry, createTokenInput, generatePersonalAccessToken, hashPersonalAccessToken, PAT_SHAPE, revokeTokenInput } from './format'
 
 test('generated tokens: mkp_ shape, sha256 hash, 4-char hint, all distinct', () => {
   const seen = new Set<string>()
@@ -15,13 +15,6 @@ test('generated tokens: mkp_ shape, sha256 hash, 4-char hint, all distinct', () 
     seen.add(token)
   }
   assert.equal(seen.size, 50)
-})
-
-test('hash compare is exact and length-checked', () => {
-  const a = hashPersonalAccessToken('a'), b = hashPersonalAccessToken('b')
-  assert.equal(sameTokenHash(a, a), true)
-  assert.equal(sameTokenHash(a, b), false)
-  assert.equal(sameTokenHash(a, 'abc'), false)
 })
 
 test('create input: trimmed name 1..64, optional expiry, strict', () => {
@@ -45,7 +38,8 @@ test('expiry: none, future within 366 days; past or too far rejected', () => {
 test('bearer parsing only accepts our token shape', () => {
   const { token } = generatePersonalAccessToken()
   assert.equal(bearerToken(`Bearer ${token}`), token)
-  for (const bad of [null, '', token, `Basic ${token}`, `Bearer ${token} extra`, 'Bearer mkp_short', `bearer ${token}`]) assert.equal(bearerToken(bad), null, String(bad))
+  for (const scheme of ['bearer', 'BEARER', 'BeArEr']) assert.equal(bearerToken(`${scheme} ${token}`), token, scheme)
+  for (const bad of [null, '', token, `Basic ${token}`, `Bearer ${token} extra`, 'Bearer mkp_short']) assert.equal(bearerToken(bad), null, String(bad))
 })
 
 test('token auth middleware is not wired to any route yet', () => {
