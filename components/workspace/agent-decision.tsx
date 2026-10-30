@@ -6,7 +6,7 @@ import { Check } from 'lucide-react'
 import { useIsStreaming } from '@openuidev/react-lang'
 import { ApprovalCard, type ApprovalCardStatus } from '@/components/agents/approval-card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { useAgentInteraction } from './agent-interaction'
@@ -129,16 +129,19 @@ function ChoiceCard({ title, options, task }: { title: string; options: { value:
     <p className={cn('w-fit max-w-full min-w-0', bubbles ? 'rounded-2xl bg-muted px-4 py-2.5' : 'font-medium')}>
       {task && <><CitationChip id={task.toLowerCase()} kind="issue" />{' '}</>}{title}
     </p>
-    <div className="flex flex-col gap-1.5">
+    <div role={answered && !pending ? 'list' : undefined} className="flex flex-col gap-1.5">
       {options.map((option, index) => {
         const selected = chosen === option.value
-        return <Button key={option.value} type="button" variant={selected && !pending ? 'default' : 'secondary'} aria-pressed={selected}
-          className="h-auto min-h-10 justify-start gap-3 rounded-xl px-3 py-2 text-left font-normal whitespace-normal transition-[background-color,color,opacity] duration-150 motion-reduce:duration-100"
-          disabled={answered || status !== 'pending'} onClick={() => { setPicked(option.value); void send(option.label) }}>
+        const look = 'h-auto min-h-10 w-full justify-start gap-3 rounded-xl px-3 py-2 text-left font-normal whitespace-normal transition-[background-color,color,opacity] duration-150 motion-reduce:duration-100'
+        const body = <>
           <span aria-hidden="true" className={cn('flex size-6 shrink-0 items-center justify-center rounded-md text-xs', selected && !pending ? 'bg-primary-foreground/15' : 'bg-background text-muted-foreground')}>{String.fromCharCode(65 + index)}</span>
           <span className="min-w-0 flex-1">{option.label}</span>
           {selected && (pending ? <Spinner data-icon="inline-end" aria-label={agentCopy.sendingChoice} /> : <Check data-icon="inline-end" aria-hidden="true" />)}
-        </Button>
+        </>
+        // Answered: the rows are a record, not controls — the pick stays dark, the rest dim.
+        if (answered && !pending) return <div key={option.value} role="listitem" aria-current={selected || undefined} className={cn(buttonVariants({ variant: selected ? 'default' : 'secondary' }), look, 'pointer-events-none', !selected && 'opacity-50')}>{body}</div>
+        return <Button key={option.value} type="button" variant={selected && !pending ? 'default' : 'secondary'} aria-pressed={selected} className={look}
+          disabled={status !== 'pending'} onClick={() => { setPicked(option.value); void send(option.label) }}>{body}</Button>
       })}
     </div>
     {error && <Alert variant="destructive" className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><AlertDescription>{error}</AlertDescription></Alert>}
