@@ -56,7 +56,9 @@ export function FactoryAcceptance({ issueId, identifier }: { issueId: string; id
   const t = useTranslations('FactoryAcceptance')
   const { data, error } = useSWR<{ tasks: FactoryTask[] }>(`/api/factory/tasks?issueId=${encodeURIComponent(issueId)}`, request, { refreshInterval: 15000 })
   const [open, setOpen] = useState<FactoryTask | null>(null)
-  const tasks = data?.tasks.filter(task => (task.stage === 'approval' && ['pending', 'waiting'].includes(task.status)) || task.stage === 'publish') ?? []
+  // A 200 body that is not `{ tasks: [...] }` (an HTML fallback parsed as `{}`,
+  // or an API that omits `tasks`) must read as no tasks, not crash the issue page.
+  const tasks = data && Array.isArray(data.tasks) ? data.tasks.filter(task => (task.stage === 'approval' && ['pending', 'waiting'].includes(task.status)) || task.stage === 'publish') : []
   if (error || !tasks.length) return null
   return <section className="flex flex-col gap-2">
     <h3 className="text-sm font-medium">{t('title')}</h3>
@@ -87,12 +89,14 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
   const [artifact, setArtifact] = useState<{ name: string; content: string } | null>(null)
   const [artifactError, setArtifactError] = useState(false)
 
-  const approvals = ledger?.approvals ?? []
+  const approvals = ledger && Array.isArray(ledger.approvals) ? ledger.approvals : []
+  const publications = ledger && Array.isArray(ledger.publications) ? ledger.publications : []
   const latest = approvals[approvals.length - 1]
   const now = Date.now()
   const active = [...approvals].reverse().find(item => !item.revokedAt && Date.parse(item.expiresAt) > now)
-  const publication = active ? [...(ledger?.publications ?? [])].reverse().find(item => item.approvalId === active.id) : undefined
-  const candidate = evidence?.manifest.candidate ?? active?.candidate ?? latest?.candidate
+  const publication = active ? [...publications].reverse().find(item => item.approvalId === active.id) : undefined
+  const candidate = evidence?.manifest?.candidate ?? active?.candidate ?? latest?.candidate
+  const artifacts = evidence && Array.isArray(evidence.manifest?.artifacts) ? evidence.manifest.artifacts : []
   const environment = environmentOf(candidate)
   const state: AcceptanceState = publication?.status === 'succeeded' ? 'live'
     : publication?.status === 'uncertain' ? 'checking'
@@ -117,12 +121,13 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
   }
 
   async function approve() {
-    if (!evidence || !environment) return
+    const binding = evidence?.binding
+    const approvedCandidate = evidence?.manifest?.candidate
+    if (!binding || !approvedCandidate || !environment) return
     const action = task.isSkillCandidate ? 'activate_skill' : publicationActionFor(environment)
     const target = task.isSkillCandidate ? 'mikka-builtin:run-report' : vercelTarget({ ...MIKKA_VERCEL, environment })
-    const binding = evidence.binding
     const approved = await run('approve', {
-      binding, eventId: crypto.randomUUID(), candidate: evidence.manifest.candidate, action, target,
+      binding, eventId: crypto.randomUUID(), candidate: approvedCandidate, action, target,
       targetEnvironment: environment, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       evidenceDigest: evidence.evidenceDigest, evidenceReadId: evidence.evidenceReadId,
     })
@@ -168,7 +173,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
           <Button size="sm" variant="outline" disabled={busy} onClick={() => { void revoke() }}>{t('revoke')}</Button>
           <Button size="sm" disabled={busy} onClick={() => { void reconcile() }}>{t('reconcile')}</Button>
         </>}
-        {state === 'live' && reference && <Button size="sm" variant="outline" render={<a href={reference} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-end" />{publication?.request.targetEnvironment === 'production' ? t('production') : t('preview')}</Button>}
+        {state === 'live' && reference && <Button size="sm" variant="outline" render={<a href={reference} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-end" />{publication?.request?.targetEnvironment === 'production' ? t('production') : t('preview')}</Button>}
         <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
       </header>
       <div className="flex min-h-0 flex-1">
@@ -191,7 +196,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                 {evidence && <section className="flex flex-col gap-2">
                   <h4 className="text-xs font-medium text-muted-foreground">{t('evidence')}</h4>
                   <div className="flex flex-col gap-1">
-                    {evidence.manifest.artifacts.map(item => <Button key={item.artifact} variant="ghost" onClick={() => { void view(item.artifact) }}
+                    {artifacts.map(item => <Button key={item.artifact} variant="ghost" onClick={() => { void view(item.artifact) }}
                       className="h-auto min-w-0 justify-start gap-3 rounded-xl bg-control px-3 py-2 text-left font-normal hover:bg-control-hover">
                       {item.kind === 'screenshot' ? <ImageIcon aria-hidden="true" data-icon="inline-start" className="text-muted-foreground" />
                         : item.kind === 'video' ? <Play aria-hidden="true" data-icon="inline-start" className="text-muted-foreground" />
