@@ -28,3 +28,19 @@ export async function startPlanCheckout(returnUrl: string, workspaceId?: string)
     return planCheckoutUrl(actor.userId, actor.workspaceId, returnUrl)
   })
 }
+
+/** Backend contract for Claude's card-verification screen. */
+export async function startCardVerification(workspaceId?: string) {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return (await import('@/lib/abuse/card')).createCardSetup(actor.userId,actor.workspaceId,undefined,actor.email)
+  })
+}
+export async function getHostedUsage(workspaceId?: string) {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    const { hostedUsage, ensureLegacyVerification } = await import('@/lib/abuse/runtime')
+    await ensureLegacyVerification(actor.workspaceId)
+    return { ...await hostedUsage.status(actor.workspaceId),recent:actor.role === 'admin' ? await hostedUsage.recent(actor.workspaceId) : [] }
+  })
+}

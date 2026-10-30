@@ -30,6 +30,12 @@ env:
   # otherwise hang for actions/cache's 10-minute default before falling back
   # to a normal install, which outlasts the short jobs' own timeouts.
   SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+  # Ephemeral CI registration fixtures share one loopback IP. Keep finite
+  # limits while leaving the production defaults at 5 signups/IP/hour.
+  MIKKA_SIGNUP_IP_HOURLY: '1000'
+  MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+  MIKKA_VERIFICATION_IP_HOURLY: '1000'
+  MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
 
 jobs:
   changes:

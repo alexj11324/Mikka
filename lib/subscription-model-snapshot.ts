@@ -1,3 +1,4 @@
+import { resolveDefaultHostedModel } from './abuse/resolve'
 import type { LanguageModel } from 'ai'
 import { z } from 'zod'
 import { SubscriptionRefusal } from '@mikka/protocol/subscription'
@@ -55,7 +56,9 @@ export async function freezeHostedModelSelection(scope: HostedModelScope, runtim
 export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, dependencies: HostedModelDependencies, signal?: AbortSignal): Promise<LanguageModel> {
   cancelled(signal)
   if (runtime.harness !== 'ai_sdk' || !runtime.model) throw refuse()
-  if (runtime.modelSelection === undefined) return runtime.model as LanguageModel
+  if (runtime.modelSelection === undefined) {
+    return resolveDefaultHostedModel(scope,runtime.model)
+  }
   const frozen = hostedSubscriptionSnapshotSchema.parse(runtime.modelSelection)
   checkScope(scope, frozen)
   if (runtime.model !== frozen.modelId) throw refuse()

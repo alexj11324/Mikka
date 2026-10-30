@@ -111,7 +111,7 @@ export async function startMvpServices(port = 3191) {
         observe({ kind: 'decision-request', requestId, eventId: host.eventId, eventKind: host.eventKind })
         return reply({
           model: input.model,
-          provider_metadata: { gateway: { generationId: `mvp-synthetic-${randomUUID()}` } },
+          provider_metadata: { gateway: { generationId: `mvp-synthetic-${randomUUID()}`, cost: '0.001' } },
           answers: [{ type: 'choice', name: 'tier', choice: 'result' }],
         })
       }

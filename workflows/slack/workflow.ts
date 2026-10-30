@@ -1,3 +1,4 @@
+import { HostedWorkflowModel } from '@/lib/abuse/workflow-model'
 import { WorkflowAgent } from '@ai-sdk/workflow'
 import { isStepCount } from 'ai'
 import { COORDINATOR_MODEL, coordinatorStep } from '@/lib/coordinator/model'
@@ -17,10 +18,11 @@ Do not include private memories, unrelated issues, or other integration content 
 
 export async function slackTurn(userId: string, threadId: string, text: string) {
   'use workflow'
-  const agent = new WorkflowAgent({ model: COORDINATOR_MODEL, tools: coordinatorTools(userId, null) })
+  const agent = new WorkflowAgent({ model: new HostedWorkflowModel(userId,null,COORDINATOR_MODEL), tools: coordinatorTools(userId, null) })
   try {
     const result = await agent.generate({
       instructions: SLACK_INSTRUCTIONS,
+      maxRetries: 0,
       messages: [{ role: 'user', content: text }],
       stopWhen: isStepCount(AGENT_MAX_ROUNDS),
       prepareStep: coordinatorStep,

@@ -10,7 +10,7 @@ export async function seedMvpSubscription(pool, ownerId) {
   const connectionId=randomUUID(),bindingId=randomUUID(),consumerId=randomUUID()
   await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,"secretName","secretDigest","providerSubject",quota) VALUES ($1,$2,$3,'codex','connected',$4,$5,'mvp-synthetic',$6)`,[connectionId,ownerId,workspace.id,`mvp-synthetic-${connectionId}`,'0'.repeat(64),JSON.stringify({vendor:'codex',source:'official',status:'ok',observedAt:new Date().toISOString(),plan:null,windows:[{kind:'five_hour',used:0.1,resetsAt:null}]})])
   await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,1,'codex_cpa',$6)`,[bindingId,ownerId,workspace.id,consumerId,connectionId,MVP_SUBSCRIPTION_MODEL])
-  return { connectionId,bindingId }
+  return { connectionId,bindingId,workspaceId:workspace.id }
 }
 
 /** Adapt the real OpenAI-compatible subscription request to the same scripted model. */
