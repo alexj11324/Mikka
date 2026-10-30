@@ -2,6 +2,8 @@ import 'server-only'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { pool } from '@/lib/db'
+import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
+import { DEVICE_UNINSTALL_GRACE_MS, enqueueDeviceCommand } from '@/lib/device-management'
 
 /** Same limit as a device token's name (createDeviceToken). */
 export const DEVICE_NAME_MAX = 60
@@ -40,12 +42,11 @@ export async function renameOwnedDevice(userId: string, id: unknown, name: unkno
  * Removes one of the person's local devices from settings.
  *
  * Refused while a thread is live on it. Otherwise, in one transaction: every
- * credential that acted as the device is revoked (the daemon gets 401 on its
- * next call), its agents lose the device binding (no new runs), and the row
- * becomes a disabled tombstone. Run history keeps its device, repository and
- * agent references; nothing is cascaded away.
+ * agents lose their binding and the row becomes a disabled tombstone. An online
+ * daemon receives uninstall, with credentials restricted until receipt or expiry;
+ * offline credentials are revoked immediately. History references remain intact.
  */
-export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ id: string; revokedTokens: number }> {
+export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ id: string; revokedTokens: number; uninstall: 'queued' | 'not_possible' }> {
   const target = deviceId(id)
   const client = await pool.connect()
   try {
@@ -54,18 +55,22 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
     await client.query(`SELECT id FROM agents WHERE "deviceId"=$1 AND "userId"=$2 FOR UPDATE`, [target, userId])
     // Run admission reads this row FOR SHARE and requires enabled, so no run
     // can be admitted between the check below and the commit.
-    const device = await client.query(`SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL FOR UPDATE`, [target, userId])
+    const device = await client.query(`SELECT id,"lastSeenAt" FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL FOR UPDATE`, [target, userId])
     if (!device.rowCount) throw new ActionFailureError('deviceNotFound')
     const live = await client.query(`SELECT 1 FROM agent_runs WHERE "deviceId"=$1 AND status = ANY($2::text[]) LIMIT 1`, [target, [...LIVE_RUN_STATUSES]])
     if (live.rowCount) throw new ActionFailureError('deviceHasActiveRuns')
-    const revoked = await client.query(`UPDATE device_tokens SET "revokedAt"=now()
+    const row = device.rows[0]
+    const online = row.lastSeenAt && Date.now() - new Date(row.lastSeenAt).getTime() < DEVICE_ONLINE_WINDOW_MS
+    if (online) await enqueueDeviceCommand(userId, target, 'uninstall', client)
+    const revoked = await client.query(`UPDATE device_tokens SET "revokedAt"=CASE WHEN $3::boolean THEN NULL ELSE now() END,
+      "expiresAt"=CASE WHEN $3::boolean THEN LEAST("expiresAt",$4::timestamptz) ELSE "expiresAt" END
       WHERE "userId"=$2 AND "revokedAt" IS NULL
         AND (id IN (SELECT "tokenId" FROM device_token_devices WHERE "deviceId"=$1) OR "boundDeviceId"=$1)
-      RETURNING id`, [target, userId])
+      RETURNING id`, [target, userId, Boolean(online), new Date(Date.now() + DEVICE_UNINSTALL_GRACE_MS)])
     await client.query(`UPDATE agents SET "deviceId"=NULL,"updatedAt"=now() WHERE "deviceId"=$1 AND "userId"=$2`, [target, userId])
     await client.query(`UPDATE devices SET "removedAt"=now(),enabled=false,"updatedAt"=now() WHERE id=$1`, [target])
     await client.query('COMMIT')
-    return { id: target, revokedTokens: revoked.rowCount ?? 0 }
+    return { id: target, revokedTokens: online ? 0 : revoked.rowCount ?? 0, uninstall: online ? 'queued' : 'not_possible' }
   } catch (error) {
     await client.query('ROLLBACK')
     throw error
