@@ -1,6 +1,7 @@
 import 'server-only'
 import { and, eq } from 'drizzle-orm'
 import { db, pool, withDatabaseClient } from '@/lib/db'
+import { currentCiSubscriptionAuthorized } from '@/lib/ci-subscription-authority'
 import { currentContinuationMailboxAuthorized } from '@/lib/ci-mailbox-continuation'
 import { agentRuns, devices, issues, githubCiObservations } from '@/lib/db/schema'
 import { issueTeamAccess } from '@/lib/issue-team-access'
@@ -62,6 +63,7 @@ async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | '
       const [observation] = await tx.select().from(githubCiObservations).where(and(eq(githubCiObservations.userId, userId), eq(githubCiObservations.issueId, issue.id), eq(githubCiObservations.remoteKey, c.remoteKey), eq(githubCiObservations.prNumber, c.prNumber))).for('update')
       const [origin] = await tx.select().from(agentRuns).where(and(eq(agentRuns.id, c.originRunId), eq(agentRuns.userId, userId), eq(agentRuns.issueId, issue.id))).for('share')
       if (!observation || ciGeneration === undefined || String(observation.generation) !== ciGeneration || observation.originRunId !== c.originRunId || observation.scopeVersion !== c.scopeVersion || issue.scopeVersion !== c.scopeVersion || observation.head !== c.head || observation.fingerprint !== c.fingerprint || observation.expiresAt.getTime() <= Date.now() || !origin || origin.stopRequestedAt || origin.sessionId !== c.originSessionId || origin.agentId !== run.agentId || origin.deviceId !== run.deviceId || origin.deviceRepoId !== run.deviceRepoId || origin.botId !== run.botId || origin.agentDefinition?.definitionDigest !== run.agentDefinition?.definitionDigest) return null
+      if (!await currentCiSubscriptionAuthorized(client, userId, run.agentId, run.agentDefinition)) return null
       if (!await currentContinuationMailboxAuthorized(client, userId, run.botId, origin.agentDefinition, run.agentDefinition, process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1')) return null
       try { await (await import('@/lib/self-improvement/server')).skillAssignments.validateCiClaim(client, userId, run.id, leaseExpiresAt) }
       catch (error) { const { ImprovementError } = await import('@/lib/self-improvement/contract'); if (error instanceof ImprovementError) return null; throw error }

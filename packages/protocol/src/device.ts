@@ -209,6 +209,8 @@ export const setupRecipeSchema = z.object({
 export type SetupRecipe = z.infer<typeof setupRecipeSchema>
 
 export const REPO_ORIGIN_HEADER = "x-mikka-repo-origin-check"
+/** Worker advertises CI-bound, account-pinned hosted session continuation. */
+export const CI_HOSTED_RESUME_HEADER = "x-mikka-ci-hosted-resume"
 
 /** A repository record and its identity-scoped settings. */
 export const deviceRepoSchema = z.object({
@@ -330,6 +332,8 @@ export const runAssignmentSchema = z.object({
    */
   resumeSessionId: z.string().max(500).optional(),
   requireSessionResume: z.boolean().optional(),
+  /** Set only after the server authorizes a CI original-session continuation. */
+  ciSessionResume: z.literal(true).optional(),
   preserveQuestionWorktree: z.boolean().optional(),
   questionId: z.uuid().optional(),
   /**

@@ -19,7 +19,7 @@
 import { spawn } from "node:child_process"
 import { computerDomain, computerSandboxPolicy, sandboxComputerSpec } from '../computer/transport'
 import { randomUUID } from "node:crypto"
-import { realpathSync } from "node:fs"
+import { lstatSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type { Writable } from "node:stream"
@@ -54,7 +54,7 @@ import type { AgentSandbox, SandboxPolicy } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
 import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
 import { runNetworkApproval } from "../agents/run-network"
-import { ownDir } from "../agents/harness-home"
+import { carryHistory, ownDir } from "../agents/harness-home"
 import { buildChildEnv } from "../env"
 import { mailboxInputs } from '@mikka/protocol/mailbox'
 import { mailboxToolResult, type RunMailbox } from '../run-mailbox'
@@ -413,7 +413,7 @@ export class ClaudeAdapter implements AgentAdapter {
     sessionId: string,
     mode: "new" | "restart" | "continue",
     firstMessage: string,
-    options: SessionOptions & { prompt?: string },
+    options: SessionOptions & Partial<Pick<StartOptions, "prompt" | "continueSession">>,
   ): Promise<AgentSession> {
     const approval = requireRunToolApproval(options.runId, options.toolApproval)
     if (!await approval.checkLive()) { approval.revoke(); throw new Error('Run tool approval unavailable') }
@@ -462,6 +462,26 @@ export class ClaudeAdapter implements AgentAdapter {
       ? join(nativeHome, ".claude")
       : (this.options.configDir ?? join(homedir(), ".claude"))
     if (nativeHome) ownDir(configDir)
+    if (nativeHome && mode === "continue" && options.requireSessionResume) {
+      const origin = options.continueSession?.runId
+      if (!origin || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(origin) || !/^[a-z0-9_-]{1,128}$/i.test(sessionId)) throw new Error("Original hosted Claude session is unavailable")
+      const project = claudeProjectDirName(realpathSync(options.cwd))
+      const oldRun = runPaths(this.options.stateDir, origin).runDir
+      let source = oldRun
+      for (const part of ["native-home", ".claude", "projects", project]) {
+        source = join(source, part)
+        const stat = lstatSync(source, { throwIfNoEntry: false })
+        if (!stat?.isDirectory() || stat.isSymbolicLink()) throw new Error("Original hosted Claude session is unavailable")
+      }
+      if (!realpathSync(source).startsWith(realpathSync(oldRun) + "/")) throw new Error("Original hosted Claude session is unavailable")
+      const target = join(configDir, "projects", project)
+      const file = join(source, `${sessionId}.jsonl`)
+      const stat = lstatSync(file, { throwIfNoEntry: false })
+      if (!stat?.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw new Error("Original hosted Claude session is unavailable")
+      carryHistory(source, target, [`${sessionId}.jsonl`, sessionId])
+      const copied = lstatSync(join(target, `${sessionId}.jsonl`), { throwIfNoEntry: false })
+      if (!copied?.isFile() || copied.isSymbolicLink() || copied.nlink !== 1) throw new Error("Original hosted Claude session is unavailable")
+    }
     const ctx = new RunContext({
       mailboxEnabled: Boolean(options.mailbox),
       harness: "claude_code",

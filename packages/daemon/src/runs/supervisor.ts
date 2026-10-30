@@ -29,6 +29,7 @@
 // agent. An explicitly approved, pushed submission can finish unverified;
 // its report keeps `not_run`, and the server may open only a draft PR.
 import { fixedCheckSnapshot } from "./check"
+import { hostedCiResumePermitted } from "../subscription-continuation"
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
 import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 import { runPaths } from "../agents/run-context"
@@ -1224,7 +1225,7 @@ export class RunSupervisor {
           }
         : undefined
     if (assignment.requireSessionResume &&
-        (assignment.subscriptionBinding || !assignment.resumeSessionId || !assignment.continuesRunId ||
+        ((assignment.subscriptionBinding && !hostedCiResumePermitted(assignment)) || !assignment.resumeSessionId || !assignment.continuesRunId ||
           !adapter.capabilities.supportsResume || (!resuming && !continueSession) ||
           (resuming && entry.sessionId !== assignment.resumeSessionId)))
       throw new Error("factory_question_session_resume_required")
@@ -1247,7 +1248,10 @@ export class RunSupervisor {
     try {
       session = assignment.subscriptionBinding
       ? this.deps.startSubscription
-        ? await this.deps.startSubscription(assignment,{...options,prompt:assignment.prompt})
+        ? await (async () => {
+            if (assignment.requireSessionResume && !resuming) this.deps.journal.update(runId, { questionResumeState: "starting" })
+            return this.deps.startSubscription!(assignment, { ...options, prompt: assignment.prompt, continueSession, requireSessionResume: assignment.requireSessionResume })
+          })()
         : (()=>{throw new Error('subscription_hosted_runtime_unavailable')})()
       : resuming
       ? await adapter.resume(entry.sessionId as string, options)

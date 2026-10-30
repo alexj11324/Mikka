@@ -9,6 +9,7 @@ import { summarize } from '@/lib/github/ci/snapshot'
 import { listCiWorkflowAttempts } from '@/lib/github/ci/attempts'
 import { verifyGitHubRepositoryAccess } from '@/lib/github/run-pull-request'
 import { linkedGitHubAccountId } from '@/lib/github/repository-installation'
+import { currentCiSubscriptionAuthorized } from '@/lib/ci-subscription-authority'
 import { currentContinuationMailboxAuthorized } from '@/lib/ci-mailbox-continuation'
 
 export type CiFollowUp = Omit<CiContinuation, 'originSessionId' | 'requireSessionResume'>
@@ -31,7 +32,6 @@ export async function queueCiContinuation(tx: PoolClient, userId: string, input:
   if (!binding || !binding.agentId || !binding.deviceId || !binding.deviceRepoId || binding.stopRequestedAt || !['succeeded', 'stopped'].includes(binding.runStatus) || binding.stopReason !== 'submitted' || !['open', 'draft'].includes(binding.pullRequest?.state)) unavailable()
   if (!binding.sessionId || typeof binding.sessionId !== 'string' || binding.sessionId.length > 500) throw new CiContinuationUnsupported('session_missing')
   if (!binding.agentDefinition?.definitionDigest) throw new CiContinuationUnsupported('definition_missing')
-  if (binding.agentDefinition.subscription) throw new CiContinuationUnsupported('subscription')
   const key = `ci:${createHash('sha256').update(JSON.stringify([userId, input.issueId, input.remoteKey, input.prNumber, input.head, input.fingerprint, binding.watchId, String(binding.generation)])).digest('hex')}`
   // An unsupported skill or revoked mailbox may be reported to the user by
   // the caller. Roll back the child before turning it into a recoverable notice.
@@ -121,8 +121,9 @@ export async function guardCiClaim(tx: PoolClient, userId: string, deviceId: str
     WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$4 AND o.head=$8 AND o.fingerprint=$9 AND o."expiresAt">now() AND o.generation=$10::bigint
     FOR UPDATE OF i,r,o FOR SHARE OF origin`, [runId, userId, expected.originRunId, expected.issueId, expected.scopeVersion, expected.remoteKey, expected.prNumber, expected.head, expected.fingerprint, generation])
   if (!row || !same(row.ciContinuation, expected) || row.status !== 'queued' || row.stopRequestedAt || row.originStop || row.deviceId !== deviceId || row.originDeviceId !== deviceId || row.agentId !== row.originAgentId || row.deviceRepoId !== row.originRepoId || row.botId !== row.originBotId || row.sessionId !== expected.originSessionId || !row.agentDefinition || row.agentDefinition.definitionDigest !== row.originDefinition?.definitionDigest) return null
+  if (!await currentCiSubscriptionAuthorized(tx, userId, row.agentId, row.agentDefinition)) return null
   if (!await currentContinuationMailboxAuthorized(tx, userId, row.botId, row.originDefinition, row.agentDefinition, process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1')) throw new CiContinuationUnsupported('mailbox')
-  return { continuesRunId: expected.originRunId, resumeSessionId: expected.originSessionId, followUp: expected.followUp, requireSessionResume: true as const, preserveQuestionWorktree: true as const }
+  return { continuesRunId: expected.originRunId, resumeSessionId: expected.originSessionId, followUp: expected.followUp, requireSessionResume: true as const, ciSessionResume: true as const, preserveQuestionWorktree: true as const }
 }
 
 /** A known mailbox revocation must not leave an unclaimable run occupying the

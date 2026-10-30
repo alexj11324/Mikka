@@ -30,6 +30,7 @@ import { requireRunToolApproval } from "./agents/tool-approval";
 import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
+import { hostedCiResumePermitted, matchesNativeContinuation } from "./subscription-continuation";
 import type { ComputerBroker } from "./computer/broker.mjs";
 import { decide, runDomains, runPolicy } from "./permissions";
 import { startPublicEgress, type PublicEgress } from "./agents/public-egress";
@@ -338,7 +339,10 @@ export async function createHostedBotRunner(host: {
         selected.consumerId.length !== 36 ||
         selected.route !==
           (kind === "codex" ? "codex_cli" : "claude_code_cli") ||
-        options.continueSession
+        !hostedCiResumePermitted(assignment) ||
+        (options.continueSession && (!assignment.requireSessionResume || assignment.ciSessionResume !== true ||
+          options.continueSession.runId !== assignment.continuesRunId ||
+          options.continueSession.sessionId !== assignment.resumeSessionId))
       )
         throw unavailable();
       const name = `mikka-native-${randomUUID()}`;
@@ -491,8 +495,21 @@ export async function createHostedBotRunner(host: {
         )
           throw unavailable();
         mkdirSync(dirname(ledger), { recursive: true, mode: 0o700 });
+        if (assignment.requireSessionResume) {
+          if (!assignment.resumeSessionId || !assignment.continuesRunId) throw unavailable();
+          if (previous) {
+            if (previous.sessionId !== assignment.resumeSessionId) throw unavailable();
+          } else {
+            const continuation = options.continueSession;
+            if (!continuation || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(continuation.runId)) throw unavailable();
+            const originLedger = join(host.stateDir, "native-ledgers", continuation.runId + ".json");
+            const stat = lstatSync(originLedger, { throwIfNoEntry: false });
+            if (!stat?.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || !matchesNativeContinuation(readJson(originLedger), scope, continuation)) throw unavailable();
+          }
+        }
         const record = async (sessionId: string) => {
           assertOpen();
+          if (assignment.requireSessionResume && sessionId !== assignment.resumeSessionId) throw unavailable();
           writeJsonAtomic(ledger, { scope, sessionId });
         };
         brokerStarting = createNativeSubscriptionBroker({

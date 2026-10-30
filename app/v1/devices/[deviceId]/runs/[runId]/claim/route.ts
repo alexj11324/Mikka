@@ -5,7 +5,7 @@ import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
-import { RUN_LEASE_MS, REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
+import { RUN_LEASE_MS, REPO_ORIGIN_HEADER, CI_HOSTED_RESUME_HEADER } from '@mikka/protocol/device'
 import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
@@ -70,6 +70,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
+  // Older workers cannot enforce the hosted session/account ledger.
+  if (run.ciContinuation && run.agentDefinition?.subscription && request.headers.get(CI_HOSTED_RESUME_HEADER) !== '1') {
+    try {
+      const c = run.ciContinuation
+      const { rows: [observation] } = await pool.query(`SELECT "watchId",generation FROM github_ci_observations WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4 AND "originRunId"=$5 AND "scopeVersion"=$6 AND head=$7 AND fingerprint=$8 AND "expiresAt">now()`, [caller.userId,c.issueId,c.remoteKey,c.prNumber,c.originRunId,c.scopeVersion,c.head,c.fingerprint])
+      if (observation) {
+        const { recordCiAttention } = await import('@/lib/github/ci/notice')
+        const inserted = await recordCiAttention(pool, { userId: caller.userId, issueId: c.issueId, remoteKey: c.remoteKey, prNumber: c.prNumber, originRunId: c.originRunId, scopeVersion: c.scopeVersion, generation: observation.generation, watchId: observation.watchId }, `ci_escalation:hosted-update:${observation.watchId}:${c.fingerprint}`, `The original hosted CI session needs a platform update before it can continue.\n${c.followUp}`)
+        if (inserted) after(async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
+      }
+    } catch { return NextResponse.json({ error: 'CI follow-up notice is temporarily unavailable.' }, { status: 503 }) }
+    return NextResponse.json({ error: 'Hosted CI session continuation unavailable.' }, { status: 409 })
+  }
   let ciGeneration: string | undefined
   if (run.ciContinuation) {
     const { preflightCiClaim, retireStaleCiRun } = await import('@/lib/ci-continuation')
