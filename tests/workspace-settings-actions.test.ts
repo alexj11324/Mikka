@@ -32,8 +32,10 @@ before(async () => {
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => ({ id: actor.userId, email: actor.email, name: actor.name }) } })
   mock.module('@/lib/workspace-admin/general', { namedExports: {
     updateWorkspaceGeneral: respond('updateWorkspaceGeneral', { id: actor.workspaceId, name: 'New', slug: 'new', icon: null }),
-    readWorkspaceGeneral: async (...args: unknown[]) => { calls.push(['readWorkspaceGeneral', ...args]); return { id: args[1], name: 'Old', slug: 'old', icon: null, canEdit: true } },
+    readWorkspaceGeneral: async (...args: unknown[]) => { calls.push(['readWorkspaceGeneral', ...args]); return { id: args[1], name: 'Old', slug: 'old', icon: null, canEdit: true, canTransfer: true } },
     workspaceDeletionImpact: respond('workspaceDeletionImpact', { bots: 3, tasks: 128, teams: 3, purchasedPoints: 1200 }),
+    workspaceTransferTargets: respond('workspaceTransferTargets', [{ userId: 'm-1', name: 'Mia', email: 'm@example.invalid' }]),
+    transferWorkspaceOwnership: respond('transferWorkspaceOwnership', { owner: { userId: 'm-1', name: 'Mia', email: 'm@example.invalid' }, previousRole: 'member' }),
     deleteWorkspaceData: async (...args: unknown[]) => { calls.push(['deleteWorkspaceData', ...args]); if (failure) throw failure; return { deleted: { bots: 0, threads: 0, tasks: 0, projects: 0, teams: 0, invitations: 0, members: 1 }, nextWorkspaceId: args[2] === 'Last' ? null : '22222222-2222-4222-8222-222222222222' } },
   } })
   mock.module('@/lib/workspace-admin/members', { namedExports: { removeMember: respond('removeMember', { removed: true, transferred: { bots: 2 }, label: 'Mia' }), transferOnSuspend: respond('transferOnSuspend', { bots: 0 }) } })
@@ -80,7 +82,7 @@ test('updateWorkspace targets the workspace the settings page shows; a rename al
 
 test('general and deletion impact reads go through the same actor', async () => {
   reset()
-  assert.deepEqual(await actions.getWorkspaceGeneral(), { id: actor.workspaceId, name: 'Old', slug: 'old', icon: null, canEdit: true })
+  assert.deepEqual(await actions.getWorkspaceGeneral(), { id: actor.workspaceId, name: 'Old', slug: 'old', icon: null, canEdit: true, canTransfer: true })
   assert.deepEqual(await actions.getWorkspaceDeletionImpact(actor.workspaceId), { bots: 3, tasks: 128, teams: 3, purchasedPoints: 1200 })
   assert.deepEqual(relevant(), [['readWorkspaceGeneral', actor.userId, actor.workspaceId], ['workspaceDeletionImpact', actor.userId, actor.workspaceId]])
 })
@@ -161,4 +163,18 @@ test('bot defaults and workspace bot list actions', async () => {
   assert.deepEqual(relevant(), [['botDefaultOptions', actor.workspaceId], ['saveBotDefaults', actor.userId, actor.workspaceId, { defaultModel: 'claude' }], ['workspaceBots', actor.workspaceId]])
   failure = new WorkspaceError('botDefaultRepositoryUnavailable')
   assert.equal((await botActions.updateWorkspaceBotDefaults({ defaultRepository: 'x/y' })).error, 'botDefaultRepositoryUnavailable')
+})
+
+test('transferWorkspace acts on the shown workspace and audits the promotion and the transfer', async () => {
+  reset()
+  const other = '33333333-3333-4333-8333-333333333333'
+  assert.deepEqual(await actions.getWorkspaceTransferTargets(other), [{ userId: 'm-1', name: 'Mia', email: 'm@example.invalid' }])
+  assert.deepEqual(await actions.transferWorkspace('m-1', other), { owner: { userId: 'm-1', name: 'Mia', email: 'm@example.invalid' } })
+  assert.deepEqual(relevant(), [['workspaceTransferTargets', actor.userId, other], ['transferWorkspaceOwnership', actor.userId, other, 'm-1']])
+  assert.deepEqual(audits.map(event => (event as { action: string }).action), ['member.role_changed', 'workspace.ownership_transferred'])
+  assert.deepEqual((audits[0] as { metadata: unknown }).metadata, { oldRole: 'member', newRole: 'admin' })
+  assert.deepEqual((audits[1] as { workspaceId: string; target: unknown }).target, { type: 'member', id: 'm-1', label: 'Mia' })
+  assert.equal((audits[1] as { workspaceId: string }).workspaceId, other)
+  failure = new WorkspaceError('workspaceTransferTargetInvalid')
+  assert.deepEqual(await actions.transferWorkspace('m-1', other), { error: 'workspaceTransferTargetInvalid', params: undefined })
 })

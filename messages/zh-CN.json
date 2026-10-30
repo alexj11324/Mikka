@@ -1712,7 +1712,14 @@
       "deleteTasks": "{tasks} 个任务和 {teams} 个团队",
       "deletePoints": "未用完的 {points} 点另购点数",
       "deleteKept": "成员的个人账户和模型订阅不会删除。",
-      "deleteConfirmLabel": "输入 {name} 确认"
+      "deleteConfirmLabel": "输入 {name} 确认",
+      "transferWorkspace": "转让工作区",
+      "transfer": "转让",
+      "transferTitle": "转让「{name}」",
+      "transferTo": "新的所有者",
+      "transferring": "正在转让…",
+      "transferNoMembers": "没有其他成员",
+      "transferred": "已转让给 {name}"
     },
     "computerPolicy": {
       "heading": "电脑操作",
@@ -2186,7 +2193,8 @@
         },
         "workspace": {
           "slug_changed": "把地址从 {from} 改为 {to}",
-          "deleted": "删除了工作区"
+          "deleted": "删除了工作区",
+          "ownership_transferred": "把工作区转让给 {target}"
         },
         "billing": {
           "checkout_started": "打开了结账",

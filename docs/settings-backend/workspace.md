@@ -34,6 +34,18 @@ updateWorkspace(input: { name?: string; slug?: string; icon?: string | null }): 
 
 按 slug 找不到工作区时，会调用 `resolveSlugRedirect(slug, userId)`（`lib/workspace-admin/general.ts`）查重定向表，找到就 308 跳到当前 slug。
 
+### `transferWorkspace(toUserId, workspaceId?)` / `getWorkspaceTransferTargets(workspaceId?)`
+
+```ts
+getWorkspaceTransferTargets(workspaceId?: string): Promise<ActionResult<{ userId: string; name: string; email: string }[]>>
+transferWorkspace(toUserId: string, workspaceId?: string): Promise<ActionResult<{ owner: { userId: string; name: string; email: string } }>>
+```
+
+- 所有者就是 `mikka_workspaces.userId`（创建者）。权限：所有者本人且是启用中的管理员；所有者已经不是这个工作区启用中的管理员（离开、停用或降级）时，任何管理员都可以转让，免得工作区再也转不出去。`getWorkspaceGeneral` 返回的 `canTransfer` 用的是同一条判断。
+- 目标必须是这个工作区里另一个启用中的成员，否则返回 `workspaceTransferTargetInvalid`。普通成员会被升为管理员；原所有者仍是管理员（要退下来去「成员」里改）。
+- 锁：`requireWorkspace` 锁住工作区行，两次转让依次执行。
+- 审计（提交之后写，跨库）：目标原来是成员时先写 `member.role_changed`（member → admin），再写 `workspace.ownership_transferred`（安全）。
+
 ### `deleteWorkspace(id, confirmName)`
 
 ```ts

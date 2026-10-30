@@ -1712,7 +1712,14 @@
       "deleteTasks": "{tasks, plural, one {# task} other {# tasks}} and {teams, plural, one {# team} other {# teams}}",
       "deletePoints": "{points} unused purchased points",
       "deleteKept": "Members’ personal accounts and model subscriptions are kept.",
-      "deleteConfirmLabel": "Type {name} to confirm"
+      "deleteConfirmLabel": "Type {name} to confirm",
+      "transferWorkspace": "Transfer workspace",
+      "transfer": "Transfer",
+      "transferTitle": "Transfer “{name}”",
+      "transferTo": "New owner",
+      "transferring": "Transferring…",
+      "transferNoMembers": "No other members",
+      "transferred": "Transferred to {name}"
     },
     "computerPolicy": {
       "heading": "Computer use",
@@ -2186,7 +2193,8 @@
         },
         "workspace": {
           "slug_changed": "changed the address from {from} to {to}",
-          "deleted": "deleted the workspace"
+          "deleted": "deleted the workspace",
+          "ownership_transferred": "transferred the workspace to {target}"
         },
         "billing": {
           "checkout_started": "opened checkout",

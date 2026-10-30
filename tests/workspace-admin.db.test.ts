@@ -50,7 +50,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     const admin = await seedUser(pool, 'admin'), member = await seedUser(pool, 'member'), stranger = await seedUser(pool, 'stranger')
     const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
     const other = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
-    assert.deepEqual(await general.readWorkspaceGeneral(member, ws.id), { id: ws.id, name: ws.name, slug: ws.slug, icon: null, canEdit: false })
+    assert.deepEqual(await general.readWorkspaceGeneral(member, ws.id), { id: ws.id, name: ws.name, slug: ws.slug, icon: null, canEdit: false, canTransfer: false })
     assert.equal((await general.readWorkspaceGeneral(admin, ws.id)).canEdit, true)
     await rejects(general.readWorkspaceGeneral(stranger, ws.id), 'workspaceAccessDenied')
     await seedBot(pool, ws.id, admin); await seedBot(pool, ws.id, member); await seedBot(pool, other.id, admin)
@@ -60,6 +60,41 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
       [randomUUID(), ws.id, `x-${randomUUID()}`, randomUUID(), `y-${randomUUID()}`, randomUUID(), other.id, `z-${randomUUID()}`])
     assert.deepEqual(await general.workspaceDeletionImpact(admin, ws.id), { bots: 2, tasks: 2, teams: 1, purchasedPoints: 1200 })
     await rejects(general.workspaceDeletionImpact(member, ws.id), 'workspaceAccessDenied')
+  })
+
+  await t.test('transferWorkspaceOwnership: owner only, target active, member promoted, fallback when the owner left', async () => {
+    const owner = await seedUser(pool, 'owner'), admin = await seedUser(pool, 'admin'), member = await seedUser(pool, 'member'), away = await seedUser(pool, 'away')
+    const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: admin, role: 'admin' }, { userId: member, role: 'member' }, { userId: away, role: 'member', status: 'suspended' }])
+    const other = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
+    const ownerOf = async (id: string) => (await pool.query('select "userId" from mikka_workspaces where id=$1', [id])).rows[0].userId
+    const roleOf = async (id: string, userId: string) => (await pool.query('select role from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [id, userId])).rows[0].role
+    assert.equal((await general.readWorkspaceGeneral(owner, ws.id)).canTransfer, true)
+    assert.equal((await general.readWorkspaceGeneral(admin, ws.id)).canTransfer, false, 'another admin cannot while the owner is an active admin')
+    assert.equal((await general.readWorkspaceGeneral(member, ws.id)).canTransfer, false)
+    await rejects(general.transferWorkspaceOwnership(admin, ws.id, member), 'workspaceAccessDenied')
+    await rejects(general.transferWorkspaceOwnership(member, ws.id, member), 'workspaceAccessDenied')
+    await rejects(general.workspaceTransferTargets(admin, ws.id), 'workspaceAccessDenied')
+    assert.deepEqual((await general.workspaceTransferTargets(owner, ws.id)).map(row => row.userId).sort(), [admin, member].sort(), 'active members other than the caller')
+    await rejects(general.transferWorkspaceOwnership(owner, ws.id, owner), 'workspaceTransferTargetInvalid')
+    await rejects(general.transferWorkspaceOwnership(owner, ws.id, away), 'workspaceTransferTargetInvalid')
+    await rejects(general.transferWorkspaceOwnership(owner, ws.id, await seedUser(pool, 'stranger')), 'workspaceTransferTargetInvalid')
+
+    const done = await general.transferWorkspaceOwnership(owner, ws.id, member)
+    assert.equal(done.owner.userId, member)
+    assert.equal(done.previousRole, 'member')
+    assert.equal(await ownerOf(ws.id), member)
+    assert.equal(await roleOf(ws.id, member), 'admin', 'the new owner is an admin')
+    assert.equal(await roleOf(ws.id, owner), 'admin', 'the previous owner stays an admin')
+    assert.equal(await ownerOf(other.id), owner, 'other workspace untouched')
+    assert.equal(await roleOf(other.id, member), 'member')
+    assert.equal((await general.readWorkspaceGeneral(owner, ws.id)).canTransfer, false)
+    assert.equal((await general.readWorkspaceGeneral(member, ws.id)).canTransfer, true)
+
+    // Once the owner is no longer an active admin, any admin can hand the workspace on.
+    await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [ws.id, member])
+    assert.equal((await general.readWorkspaceGeneral(admin, ws.id)).canTransfer, true)
+    await general.transferWorkspaceOwnership(admin, ws.id, owner)
+    assert.equal(await ownerOf(ws.id), owner)
   })
 
   await t.test('deleteWorkspaceData: name check, full cleanup, other workspace untouched, personal data kept', async () => {

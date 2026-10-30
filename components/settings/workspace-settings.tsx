@@ -3,13 +3,14 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { deleteWorkspace, getWorkspaceDeletionImpact, getWorkspaceGeneral, updateWorkspace } from '@/app/actions/workspace-settings'
+import { deleteWorkspace, getWorkspaceDeletionImpact, getWorkspaceGeneral, getWorkspaceTransferTargets, transferWorkspace, updateWorkspace } from '@/app/actions/workspace-settings'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { useActionError } from '@/lib/use-action-error'
@@ -29,7 +30,11 @@ function readDataUrl(file: File) {
   })
 }
 
-/** V10 常规: icon, name and address; admins edit them and can delete the workspace (S-I). Members see plain values. */
+/**
+ * V10 常规: icon, name and address; admins edit them and can delete the workspace (S-I).
+ * The owner can transfer it (Alex: 常规 fully wired; no frame draws the row, so it sits in 危险操作 like 删除).
+ * Members see plain values.
+ */
 export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspaceId?: string }) {
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
@@ -41,6 +46,8 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const [saving, setSaving] = useState<Field | null>(null)
   const [failed, setFailed] = useState<FailedSave | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [transferring, setTransferring] = useState(false)
+  const [transferredTo, setTransferredTo] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const host = typeof window === 'undefined' ? '' : `${window.location.host}${withBasePath('/w/')}`
 
@@ -63,7 +70,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
       const result = await updateWorkspace({ [field]: value }, current.id)
       // S-O: the shown value goes back to the saved one; 重试 sends the same change again.
       if (result.error) { setFailed({ field, value, message: actionError(result.error) }); return }
-      await general.mutate({ ...result, canEdit: true }, { revalidate: false })
+      await general.mutate({ ...current, ...result }, { revalidate: false })
     } catch {
       setFailed({ field, value, message: actionError() })
     } finally {
@@ -126,12 +133,68 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => { if (failed.field === 'icon' && failed.value === null) { fileRef.current?.click(); return } void save(failed.field, failed.value) }} />}
 
     <SettingsSection id="workspace-danger" title={t('danger')}>
+      {current.canTransfer && <SettingRow title={t('transferWorkspace')}>
+        <Button type="button" variant="secondary" size="sm" onClick={() => setTransferring(true)}>{t('transfer')}</Button>
+      </SettingRow>}
       <SettingRow title={t('deleteWorkspace')}>
         <Button type="button" variant="destructive" size="sm" onClick={() => setDeleting(true)}>{commonT('delete')}</Button>
       </SettingRow>
     </SettingsSection>
+    {transferredTo && <p role="status" className="text-sm text-muted-foreground">{t('transferred', { name: transferredTo })}</p>}
+    {transferring && <TransferWorkspaceDialog workspaceId={current.id} name={current.name} onClose={() => setTransferring(false)}
+      onDone={owner => { setTransferring(false); setTransferredTo(owner); void general.mutate() }} />}
     {deleting && <DeleteWorkspaceDialog workspaceId={current.id} name={current.name} onClose={() => setDeleting(false)} />}
   </>
+}
+
+/** 转让工作区: pick another active member; they become the owner (and an admin). */
+function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone }: { workspaceId: string; name: string; onClose: () => void; onDone: (owner: string) => void }) {
+  const t = useTranslations('Settings.workspaceForm')
+  const commonT = useTranslations('Common')
+  const actionError = useActionError()
+  const targets = useSWR(['workspace:transfer-targets', workspaceId], () => getWorkspaceTransferTargets(workspaceId))
+  const people = targets.data && !targets.data.error ? targets.data : null
+  const [to, setTo] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const items = (people ?? []).map(person => ({ value: person.userId, label: person.name ? `${person.name} · ${person.email}` : person.email }))
+
+  async function confirm() {
+    if (!to) return
+    setPending(true)
+    setError(null)
+    try {
+      const result = await transferWorkspace(to, workspaceId)
+      if (result.error) { setError(actionError(result.error)); setPending(false); return }
+      onDone(result.owner.name || result.owner.email)
+    } catch {
+      setError(actionError())
+      setPending(false)
+    }
+  }
+
+  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose() }}>
+    <DialogContent>
+      <DialogHeader><DialogTitle>{t('transferTitle', { name })}</DialogTitle></DialogHeader>
+      <div className="flex flex-col gap-3 text-sm">
+        {people
+          ? people.length
+            ? <Label className="flex flex-col items-start gap-1.5 font-normal text-muted-foreground">{t('transferTo')}
+              <Select value={to} items={items} onValueChange={next => setTo(typeof next === 'string' ? next : null)}>
+                <SelectTrigger aria-label={t('transferTo')} className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectGroup>{items.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+            </Label>
+            : <p className="text-muted-foreground">{t('transferNoMembers')}</p>
+          : targets.data?.error ? <p role="alert" className="text-destructive">{actionError(targets.data.error)}</p> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
+        {error && <p role="alert" className="text-destructive">{error}</p>}
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" disabled={pending} onClick={onClose}>{commonT('cancel')}</Button>
+        <Button type="button" variant="destructive" disabled={pending || !to} onClick={() => void confirm()}>{pending ? t('transferring') : t('transfer')}</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 }
 
 /** S-I: lists what goes, then the name must be typed exactly. */

@@ -65,11 +65,61 @@ export async function updateWorkspaceGeneral(actorId: string, workspaceId: strin
   })
 }
 
-/** 常规 as the viewer sees it. Any active member may read; `canEdit` is true for admins only. */
-export async function readWorkspaceGeneral(actorId: string, workspaceId: string): Promise<WorkspaceGeneral & { canEdit: boolean }> {
+/**
+ * Who may 转让工作区: the owner (`mikka_workspaces.userId`) while an admin, or any
+ * admin once the owner is no longer an active admin here (left, suspended or demoted),
+ * so a workspace never ends up with nobody able to hand it on.
+ */
+async function mayTransfer(tx: WorkspaceTransaction, workspace: typeof workspaces.$inferSelect, role: 'admin' | 'member', actorId: string) {
+  if (role !== 'admin') return false
+  if (workspace.userId === actorId) return true
+  const [owner] = await tx.select({ userId: workspaceMembers.userId }).from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.userId, workspace.userId), eq(workspaceMembers.role, 'admin'), eq(workspaceMembers.status, 'active'))).limit(1)
+  return !owner
+}
+
+/** 常规 as the viewer sees it. Any active member may read; `canEdit` is true for admins only, `canTransfer` per mayTransfer. */
+export async function readWorkspaceGeneral(actorId: string, workspaceId: string): Promise<WorkspaceGeneral & { canEdit: boolean; canTransfer: boolean }> {
   return workspaceDb.transaction(async tx => {
     const { workspace, membership } = await requireWorkspace(tx, workspaceId, actorId)
-    return { id: workspace.id, name: workspace.name, slug: workspace.slug, icon: workspace.icon, canEdit: membership.role === 'admin' }
+    const canTransfer = await mayTransfer(tx, workspace, membership.role, actorId)
+    return { id: workspace.id, name: workspace.name, slug: workspace.slug, icon: workspace.icon, canEdit: membership.role === 'admin', canTransfer }
+  })
+}
+
+export interface WorkspaceTransferTarget { userId: string; name: string; email: string }
+
+/** 转让工作区: the active members other than the caller, who could become the owner. */
+export async function workspaceTransferTargets(actorId: string, workspaceId: string): Promise<WorkspaceTransferTarget[]> {
+  return workspaceDb.transaction(async tx => {
+    const { workspace, membership } = await requireWorkspace(tx, workspaceId, actorId, true)
+    if (!await mayTransfer(tx, workspace, membership.role, actorId)) throw new WorkspaceError('workspaceAccessDenied')
+    return tx.select({ userId: workspaceMembers.userId, name: workspaceMembers.name, email: workspaceMembers.email }).from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.status, 'active'), ne(workspaceMembers.userId, actorId)))
+      .orderBy(asc(workspaceMembers.createdAt))
+  })
+}
+
+export interface WorkspaceTransfer { owner: WorkspaceTransferTarget; previousRole: 'admin' | 'member' }
+
+/**
+ * 转让工作区: makes another active member the owner; a member is promoted to admin.
+ * The previous owner stays an admin (they can step down in 成员).
+ */
+export async function transferWorkspaceOwnership(actorId: string, workspaceId: string, toUserId: string): Promise<WorkspaceTransfer> {
+  z.uuid().parse(workspaceId)
+  const to = z.string().min(1).max(200).parse(toUserId)
+  return workspaceDb.transaction(async tx => {
+    // requireWorkspace locks the workspace row, so two transfers run one after the other.
+    const { workspace, membership } = await requireWorkspace(tx, workspaceId, actorId, true)
+    if (!await mayTransfer(tx, workspace, membership.role, actorId)) throw new WorkspaceError('workspaceAccessDenied')
+    if (to === actorId) throw new WorkspaceError('workspaceTransferTargetInvalid')
+    const [target] = await tx.select().from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, to), eq(workspaceMembers.status, 'active'))).for('update').limit(1)
+    if (!target) throw new WorkspaceError('workspaceTransferTargetInvalid')
+    if (target.role !== 'admin') await tx.update(workspaceMembers).set({ role: 'admin' }).where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, to)))
+    await tx.update(workspaces).set({ userId: to }).where(eq(workspaces.id, workspaceId))
+    return { owner: { userId: target.userId, name: target.name, email: target.email }, previousRole: target.role }
   })
 }
 
