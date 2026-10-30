@@ -47,6 +47,14 @@ test('invalid count values and malformed responses never leak content to logs or
   assert.equal(logs.length, 1)
 })
 
+test('wake recovery exposes started and exhausted counts in existing Worker logs', async t => {
+  const logs = []
+  t.mock.method(console, 'log', line => logs.push(line))
+  const { fetcher } = recorder(200, { due: 3, started: 1, failed: 1, deferred: 1, exhausted: 2, eventId: 'private-event-id' })
+  await runSchedule('* * * * *', env, fetcher)
+  assert.deepEqual(logs, ['/api/cron/coordinator-wakes 200 {"due":3,"failed":1,"deferred":1,"started":1,"exhausted":2}'])
+})
+
 test('wrangler uploads the native module with every production schedule', () => {
   const source = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
   const config = JSON.parse(source.replace(/^\s*\/\/.*$/gm, ''))

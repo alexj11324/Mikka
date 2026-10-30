@@ -33,7 +33,7 @@ export async function runSchedule(cron, env, fetcher = fetch) {
   try { summary = await response.json() }
   catch { throw new Error(`${endpoint} returned invalid JSON`) }
   const counts = {}
-  for (const key of ['zones', 'due', 'written', 'empty', 'skipped', 'failed', 'deferred', 'pushed', 'people']) {
+  for (const key of ['zones', 'due', 'written', 'empty', 'skipped', 'failed', 'deferred', 'pushed', 'people', 'started', 'exhausted']) {
     const value = summary?.[key]
     if (Number.isSafeInteger(value) && value >= 0) counts[key] = value
   }
