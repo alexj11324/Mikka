@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { agentRuns, devices, runCheckpoints } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
 import { LEASED_RUN_STATUSES } from '@/lib/run-retry'
-import { maskCheckpoint } from '@/lib/secrets/checkpoint'
+import { CheckpointUnmaskable, maskCheckpoint } from '@/lib/secrets/checkpoint'
 import { workspaceSecretMasker } from '@/lib/secrets/runtime'
 
 export const dynamic = 'force-dynamic'
@@ -32,7 +32,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   const patch = Buffer.from(parsed.data.patch, 'base64')
   if (patch.length > RUN_CHECKPOINT_MAX_BYTES) return NextResponse.json({ error: 'Checkpoint too large.' }, { status: 413 })
   // 4e2 item 4: the patch is the agent's work tree diff; secrets written to files are masked.
-  const masked = maskCheckpoint({ patch, files: parsed.data.files }, await workspaceSecretMasker(caller.scopeWorkspaceId))
+  const mask = await workspaceSecretMasker(caller.scopeWorkspaceId)
+  let masked: ReturnType<typeof maskCheckpoint<number>>
+  try { masked = maskCheckpoint({ patch, files: parsed.data.files }, mask) } catch (error) {
+    if (error instanceof CheckpointUnmaskable) return NextResponse.json({ error: 'Checkpoint could not be read.' }, { status: 422 })
+    throw error
+  }
   const values = { baseCommit: parsed.data.baseCommit, patch: masked.patch, files: masked.files, takenAt: new Date(parsed.data.takenAt), updatedAt: new Date() }
   await db.insert(runCheckpoints).values({ runId: run.id, userId: run.userId, ...values })
     .onConflictDoUpdate({ target: runCheckpoints.runId, set: values })

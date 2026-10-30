@@ -5,9 +5,8 @@ import { db, pool } from '@/lib/db'
 import { agentRuns, devices, runChunks } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
 import { computerEventsMatch } from '@/lib/computer/events'
-import { freshChunks, nextReply } from '@/lib/thread-groups'
 import { workspaceSecretMasker } from '@/lib/secrets/runtime'
-import { maskDeep } from '@/lib/secrets/mask'
+import { persistRunEventBatch } from '@/lib/secrets/run-events'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,23 +19,6 @@ async function ownedRun(runId: string, userId: string): Promise<boolean> {
     .where(and(eq(agentRuns.id, runId), eq(devices.ownerId, userId)))
     .limit(1)
   return Boolean(row)
-}
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
-
-/**
- * Keeps `agent_runs.lastReply` on the opening of the agent's latest text part
- * (lib/thread-groups.ts `nextReply`), in the same transaction as the insert.
- * The row is locked so two batches of one run cannot interleave.
- */
-async function recordLastReply(tx: Tx, runId: string, chunks: Record<string, unknown>[]) {
-  if (!chunks.some(chunk => chunk.type === 'text-delta')) return
-  const [stored] = await tx.select({ lastReply: agentRuns.lastReply, lastReplyPart: agentRuns.lastReplyPart }).from(agentRuns)
-    .where(eq(agentRuns.id, runId)).for('no key update')
-  if (!stored) return
-  const next = nextReply(stored, chunks)
-  if (!next) return
-  await tx.update(agentRuns).set({ ...next, lastReplyAt: new Date() }).where(eq(agentRuns.id, runId))
 }
 
 /**
@@ -60,18 +42,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   // 4e2 ②: chunks from a cloud worker (workspace-scoped token) are masked before they are stored.
   // Identity when MIKKA_BYO_E2B_KEY is off or the workspace has no secret of 8+ characters.
   const mask = await workspaceSecretMasker(caller.scopeWorkspaceId)
-  const chunks = maskDeep(parsed.data.chunks, mask)
-  await db.transaction(async tx => {
-    const inserted = await tx.insert(runChunks)
-      .values(chunks.map((chunk, index) => ({
-        id: crypto.randomUUID(), runId, seq: parsed.data.fromSeq + index,
-        chunk: chunk as Record<string, unknown>,
-      })))
-      .onConflictDoNothing()
-      .returning({ seq: runChunks.seq })
-    // Only chunks stored now count, so a re-sent batch never appends its text twice.
-    await recordLastReply(tx, runId, freshChunks(chunks as Record<string, unknown>[], parsed.data.fromSeq, inserted.map(row => row.seq)))
-  })
+  await persistRunEventBatch(runId, parsed.data.fromSeq, parsed.data.chunks, mask)
   await db.update(agentRuns)
     .set({ status: 'running', updatedAt: new Date() })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing')))

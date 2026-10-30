@@ -5,7 +5,8 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { workspaceSecrets } from '@/lib/db/secrets-schema'
 import { openSecret, secretAad, SecretsKeyMissingError } from './crypto'
-import { byoE2BKeyEnabled, E2BKeyError } from './e2b'
+import { byoE2BKeyEnabled, E2BKeyError, getWorkspaceE2BApiKey } from './e2b'
+import { isReservedEnvName } from './format'
 import { guardSecretsDb } from './store'
 import { createSecretMasker, identityMasker, maskDeep, type Masker } from './mask'
 
@@ -27,16 +28,26 @@ export async function loadWorkspaceRuntimeSecrets(workspaceId: string, env: Env 
   })
 }
 
-/** Env for the sandbox worker process: NAME=value for every workspace secret / env var. {} when the flag is off. */
+/** Env for the sandbox worker process: NAME=value for every workspace secret / env var. {} when the flag is off.
+ * #438 B: reserved names (PATH, NODE_OPTIONS, E2B_*, MIKKA_*…, lib/secrets/format.ts) are never injected, even if a row predates the create-time check. */
 export async function sandboxSecretEnv(workspaceId: string, env: Env = process.env): Promise<Record<string, string>> {
   if (!byoE2BKeyEnabled(env)) return {}
-  return Object.fromEntries((await loadWorkspaceRuntimeSecrets(workspaceId, env)).map(s => [s.name, s.value]))
+  return Object.fromEntries((await loadWorkspaceRuntimeSecrets(workspaceId, env)).filter(s => !isReservedEnvName(s.name)).map(s => [s.name, s.value]))
+}
+
+/** #438 C: the workspace's own E2B key is masked like a secret. Absent key = nothing to add. */
+async function workspaceE2BKeySecret(workspaceId: string, env: Env): Promise<{ name: string; value: string }[]> {
+  try { return [{ name: 'E2B_API_KEY', value: await getWorkspaceE2BApiKey(workspaceId, env) }] } catch (error) {
+    if (error instanceof E2BKeyError && error.code === 'e2b_key_missing') return []
+    throw error
+  }
 }
 
 /** Masker for persisted output. Identity when the flag is off or the workspace has no maskable secret. Env vars (kind='env') are not masked: they are plain config shown in settings. */
 export async function workspaceSecretMasker(workspaceId: string | null | undefined, env: Env = process.env): Promise<Masker> {
   if (!workspaceId || !byoE2BKeyEnabled(env)) return identityMasker
-  return createSecretMasker((await loadWorkspaceRuntimeSecrets(workspaceId, env)).filter(s => s.kind === 'secret'))
+  const [secrets, e2bKey] = await Promise.all([loadWorkspaceRuntimeSecrets(workspaceId, env), workspaceE2BKeySecret(workspaceId, env)])
+  return createSecretMasker([...secrets.filter(s => s.kind === 'secret'), ...e2bKey])
 }
 
 /** Workspace whose secrets a run's sandbox received: the workspace its cloud device token is bound to. Null for local devices (nothing injected, nothing to mask). */

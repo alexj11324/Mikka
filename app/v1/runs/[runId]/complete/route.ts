@@ -14,6 +14,7 @@ import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 import { workspaceSecretMasker } from '@/lib/secrets/runtime'
 import { maskDeep } from '@/lib/secrets/mask'
+import { runMaskBuffers } from '@/lib/db/secrets-schema'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,6 +41,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     throw error
   }
   if (!result) return NextResponse.json({ error: 'Unknown run.' }, { status: 404 })
+  // #438 A: a finished run streams no more; drop any sealed hold-back left by a part that never ended.
+  if (caller.scopeWorkspaceId) await db.delete(runMaskBuffers).where(eq(runMaskBuffers.runId, runId)).catch(() => undefined)
   stopRecordingsAfter([runId])
   if (result.publicationPending) {
     try { await startRunPublication(runId) }
