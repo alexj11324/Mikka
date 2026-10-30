@@ -20,6 +20,7 @@ import { runPrompt } from '@/lib/run-prompt'
 import { dispatchInput, dispatchRequestKey, type DispatchInput, type DispatchResult } from '@/lib/run-dispatch'
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
 import { runBotName } from '@/lib/run-bot-name'
+import { afterRunEnded } from '@/lib/run-completion-effects'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -248,4 +249,5 @@ export async function requestRunStop(userId: string, runId: string): Promise<voi
   const parsed = z.uuid().safeParse(runId)
   if (!parsed.success) throw new ActionFailureError('runNotFound')
   await stopOwnedRun(db, userId, parsed.data)
+  await afterRunEnded(userId, parsed.data)
 }

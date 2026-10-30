@@ -78,11 +78,11 @@ export async function settleRunCompletionEffects(client: PoolClient, run: RunIde
 }
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> }
-export type FactoryReconcileFor = (botId: string | null) => (userId: string) => Promise<unknown>
+export type FactoryReconcileFor = (botId: string | null) => (userId: string, runId: string) => Promise<unknown>
 
-const defaultReconcileFor: FactoryReconcileFor = botId => async userId => {
+const defaultReconcileFor: FactoryReconcileFor = botId => async (userId, runId) => {
   const { factoryRuntimeForBot } = await import('./factory/runtime')
-  return factoryRuntimeForBot(botId).reconcile(userId)
+  return factoryRuntimeForBot(botId).reconcile.run(userId, runId)
 }
 
 /** BE-9: like a GitHub check_suite "completed" event, a committed run
@@ -103,12 +103,32 @@ export async function reconcileFactoryAfterCompletion(db: Queryable, userId: str
       OR EXISTS (SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND q."userId"=$2
         AND (q."originRunId"=$1 OR q."continuationRunId"=$1)))`, [runId, userId])
     for (const row of rows) {
-      await reconcileFor((row.botId as string | null) ?? null)(userId)
+      await reconcileFor((row.botId as string | null) ?? null)(userId, runId)
       reconciled++
     }
   } catch (error) {
     const code = error instanceof FactoryError ? error.code : (error as { code?: unknown } | null)?.code
-    console.warn('factory completion reconcile deferred to Coordinator fallback', { runId, code: typeof code === 'string' ? code : 'unknown' })
+    const cause = (error as { cause?: { code?: unknown } } | null)?.cause?.code
+    console.warn('factory completion reconcile deferred to Coordinator fallback', {
+      runId,
+      error: error instanceof Error ? error.constructor.name : typeof error,
+      code: typeof code === 'string' ? code : 'unknown',
+      causeCode: typeof cause === 'string' ? cause : undefined,
+    })
   }
   return reconciled
+}
+
+/** Shared after-commit hook for every path that ends a run outside the daemon
+ * completion transaction (claim rejection, lease loss/retry, stop request).
+ * Call only after the ending write committed. Default-off and never throws. */
+export async function afterRunEnded(userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
+  if (process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return 0
+  try {
+    const { pool } = await import('./db')
+    return await reconcileFactoryAfterCompletion(pool, userId, runId, reconcileFor)
+  } catch (error) {
+    console.warn('factory run-end reconcile deferred to Coordinator fallback', { runId, error: error instanceof Error ? error.constructor.name : typeof error })
+    return 0
+  }
 }

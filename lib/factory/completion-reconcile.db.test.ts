@@ -47,13 +47,28 @@ test("run completion enters review without the Coordinator; replays do not advan
     };
     const dispatch = createFactoryDispatch(pool, store, queue, { configure: { execute: async () => {} }, freeze: async (tx, _task, id) => { await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [id, JSON.stringify({ schemaVersion: 1, definitionDigest: "fixture", harness: "codex" })]); } });
     const questions = createFactoryQuestions(pool, authorize, store, dispatch);
-    const reconcileFor = () => createFactoryReconciler(pool, store, questions);
+    const sweep = createFactoryReconciler(pool, store, questions);
+    const reconcileFor = () => (userId: string, runId: string) => sweep.run(userId, runId);
     const issueId = randomUUID(), sourceEventId = randomUUID();
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{}','todo','normal')`, [issueId]);
+    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId]);
+    /** A routed task on its own issue whose execute attempt is bound to a running run. */
+    const runningTask = async (iss?: string) => {
+      const ownIssue = iss ?? randomUUID(), src = randomUUID();
+      if (!iss) await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [ownIssue]);
+      await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [src, src]);
+      const r = await store.route("owner", { issueId: ownIssue, sourceEventId: src, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
+      const run = await dispatch("owner", { binding: factoryBinding(r.task), agentId, deviceRepoId: repoId });
+      await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`, [run.runId]);
+      return { task: r.task, runId: run.runId };
+    };
+    const succeed = (runId: string) => pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='s1',report=$2,"startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp() WHERE id=$1`, [runId, JSON.stringify({ publish: { commit: "b".repeat(40) }, verify: { status: "passed" }, summary: "done" })]);
     await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [sourceEventId, sourceEventId]);
     const routed = await store.route("owner", { issueId, sourceEventId, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
     const d = await dispatch("owner", { binding: factoryBinding(routed.task), agentId, deviceRepoId: repoId });
     await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`, [d.runId]);
+    const other = await runningTask();
+    const otherBefore = (await store.read("owner", other.task.id)).task;
+    const pick = (x: { stage: string; status: string; revision: number; attemptId: string | null }) => ({ stage: x.stage, status: x.status, revision: x.revision, attemptId: x.attemptId });
 
     await t.test("flags off: no SQL, no transition", async () => {
       delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED;
@@ -69,13 +84,69 @@ test("run completion enters review without the Coordinator; replays do not advan
       assert.equal(await reconcileFactoryAfterCompletion(pool, "owner", d.runId, reconcileFor), 1);
       const after = await store.read("owner", routed.task.id);
       assert.equal(after.task.stage, "review");
+      // The unrelated running task (its own run still running) did not move.
+      assert.deepEqual(pick((await store.read("owner", other.task.id)).task), pick(otherBefore));
+    });
+
+    await t.test("an old run's completion after the attempt was replaced does not move the task", async () => {
+      const stale = await runningTask();
+      await succeed(stale.runId); // the old run ends; its completion hook is delayed
+      // Meanwhile the attempt is replaced (finish failed + retry → fresh execute attempt, no run yet).
+      let cur = (await store.read("owner", stale.task.id)).task;
+      const failed = await store.apply("owner", factoryBinding(cur), randomUUID(), { action: "finish", status: "failed", reason: "replaced", evidence: [], output: {} });
+      await store.apply("owner", factoryBinding(failed.task), randomUUID(), { action: "retry", reason: "replaced" });
+      cur = (await store.read("owner", stale.task.id)).task;
+      assert.equal(await reconcileFactoryAfterCompletion(pool, "owner", stale.runId, reconcileFor), 1);
+      const after = (await store.read("owner", stale.task.id)).task;
+      assert.deepEqual({ stage: after.stage, status: after.status, attemptId: after.attemptId, revision: after.revision }, { stage: cur.stage, status: cur.status, attemptId: cur.attemptId, revision: cur.revision });
+    });
+
+    await t.test("attempt replaced between selection and lock: the stale item is skipped (QA 5)", async () => {
+      const race = await runningTask();
+      await succeed(race.runId);
+      let fresh = "";
+      // Same pool, but the moment `.run` has selected its pending items, the attempt is
+      // replaced and the replacement's own run also finishes (its hook not yet fired).
+      const racing = new Proxy(pool, { get(target, key) {
+        if (key !== "query") { const v = Reflect.get(target, key); return typeof v === "function" ? v.bind(target) : v; }
+        return async (text: string, params?: unknown[]) => {
+          const res = await target.query(text, params);
+          if (!fresh && typeof text === "string" && text.includes('AS "attemptId"')) {
+            const cur = (await store.read("owner", race.task.id)).task;
+            const failed = await store.apply("owner", factoryBinding(cur), randomUUID(), { action: "finish", status: "failed", reason: "replaced", evidence: [], output: {} });
+            const retried = await store.apply("owner", factoryBinding(failed.task), randomUUID(), { action: "retry", reason: "replaced" });
+            fresh = (await dispatch("owner", { binding: factoryBinding(retried.task), agentId, deviceRepoId: repoId })).runId;
+            await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`, [fresh]);
+            await succeed(fresh);
+          }
+          return res;
+        };
+      } }) as typeof pool;
+      const racer = createFactoryReconciler(racing, store, questions);
+      await racer.run("owner", race.runId);
+      assert.ok(fresh);
+      const after = (await store.read("owner", race.task.id)).task;
+      assert.equal(after.stage, "execute", "old run's completion must not advance the replacement attempt");
+      assert.notEqual(after.attemptId, race.task.attemptId);
+    });
+
+    await t.test("a failed run is a visible failure that re-enters the capped retry loop", async () => {
+      const f = await runningTask();
+      await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',error='boom',"finishedAt"=clock_timestamp() WHERE id=$1`, [f.runId]);
+      await reconcileFactoryAfterCompletion(pool, "owner", f.runId, reconcileFor);
+      const after = (await store.read("owner", f.task.id)).task;
+      assert.deepEqual({ stage: after.stage, status: after.status }, { stage: "execute", status: "pending" });
+      assert.notEqual(after.attemptId, f.task.attemptId);
+      const { rows: [old] } = await pool.query(`SELECT status, output FROM factory_attempts WHERE id=$1`, [f.task.attemptId]);
+      assert.equal(old.status, "failed");
+      assert.equal(old.output?.reasonCode, "run_failed");
     });
 
     await t.test("firing the hook again (and the preparePrompt fallback) does not advance twice", async () => {
       const before = await store.read("owner", routed.task.id);
       const events = (await pool.query('SELECT count(*)::int n FROM factory_attempts WHERE "taskId"=$1', [routed.task.id])).rows[0].n;
       await Promise.all([1, 2, 3].map(() => reconcileFactoryAfterCompletion(pool, "owner", d.runId, reconcileFor)));
-      await reconcileFor()("owner"); // the Coordinator-turn fallback
+      await sweep("owner"); // the Coordinator-turn fallback
       const after = await store.read("owner", routed.task.id);
       assert.equal(after.task.stage, before.task.stage);
       assert.equal(after.task.revision, before.task.revision);
@@ -90,7 +161,12 @@ test("run completion enters review without the Coordinator; replays do not advan
   } finally {
     if (flags.r === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = flags.r;
     if (flags.l === undefined) delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED; else process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = flags.l;
+    // pg-pool resolves end() once clients are asked to close, not once their
+    // backends are gone; wait for that before the FORCE drop so it never
+    // terminates a still-closing socket (an uncaught 57P01 after the test).
     await pool.end();
+    for (let i = 0; i < 100 && (await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount; i++) await new Promise((r) => setTimeout(r, 50));
+    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
   }
 });
