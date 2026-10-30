@@ -20,6 +20,14 @@ const controlSchema = z
     reason: z.string().trim().min(1).max(4000),
   })
   .strict();
+/** List contract: 401 authRequired, 422 factoryInvalid (bad issueId), 404 factoryNotFound
+ * (missing or not visible, never 403 to avoid an existence leak), 503 factoryUnavailable
+ * (database or other unexpected failure, no detail in the body). Nothing else is reachable. */
+export function factoryListStatus(code: string) {
+  if (code === "factoryNotFound") return 404;
+  if (code === "factoryInvalid") return 422;
+  return 503;
+}
 /** Read-only discovery; identity is always supplied by the session adapter. */
 export async function handleFactoryList(
   store: FactoryStore,
@@ -34,11 +42,13 @@ export async function handleFactoryList(
       body: await store.listForIssue(req.userId, req.issueId!),
     };
   } catch (error) {
-    if (!(error instanceof FactoryError)) throw error;
-    return {
-      status: error.code === "factoryNotFound" ? 404 : 422,
-      body: { error: error.code },
-    };
+    const status = error instanceof FactoryError ? factoryListStatus(error.code) : 503;
+    // Server-side only, masked: class name and code, never params or messages.
+    if (status === 503) {
+      const code = (error as { code?: unknown } | null)?.code;
+      console.error("factory list unavailable", { error: (error as Error | null)?.constructor?.name ?? "unknown", code: typeof code === "string" ? code : "unknown" });
+    }
+    return { status, body: { error: status === 503 ? "factoryUnavailable" : (error as FactoryError).code } };
   }
 }
 /** Session identity comes from the adapter. No runtime pass, dispatch or approval API. */
