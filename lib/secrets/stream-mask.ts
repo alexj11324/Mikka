@@ -57,7 +57,7 @@ export function maskStreamedChunks(chunks: readonly Chunk[], mask: Masker, pendi
       continue
     }
     if (RUN_ENDS.has(type)) {
-      for (const key of [...pending.keys()]) {
+      for (const key of Array.from(pending.keys())) {
         const tail = flush(key)
         const previous = lastDelta.get(key)
         const field = key.startsWith('tool:') ? 'inputTextDelta' : 'delta'
