@@ -21,6 +21,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, type IssueThread } from '@/lib/issue-threads'
+import { runIsActive } from '@/lib/issue-run-conversation'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
 async function getUserId(): Promise<string> {
@@ -158,7 +159,7 @@ export async function listIssueThreads(issueId: string): Promise<IssueThread[]> 
   const rows = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
     .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds])))
     .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
-  return projectIssueThreads(rows, issue.id, user.id, memberIds)
+  return threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds), user.id)
 }
 
 async function readableThread(issueId: string, runId: string) {
@@ -172,28 +173,29 @@ async function readableThread(issueId: string, runId: string) {
 
 export interface IssueThreadDetail {
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
-  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean
-    /** 等你回复 (Figma 382:6469): this ended run asked its owner a Factory question; `resuming` once answered. */
-    question: 'waiting' | 'resuming' | null }
+  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
 }
 
 /**
- * Whether the run's owner owes it an answer. Only the owner may answer (lib/agent-runs.ts),
- * and only while Factory lifecycle is on; the answer itself goes through sendIssueThreadMessage.
+ * Which of the viewer's own ended runs owe them an answer. Only the owner may answer
+ * (lib/agent-runs.ts), and only while Factory lifecycle is on; the answer itself goes
+ * through sendIssueThreadMessage. A teammate's or a live run never carries a question.
  */
-async function threadQuestion(runId: string, ownerId: string, viewerId: string): Promise<'waiting' | 'resuming' | null> {
-  if (ownerId !== viewerId || process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return null
-  const { rows: [q] } = await pool.query<{ status: string }>(
-    `SELECT q.status FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId"
-      WHERE q."originRunId"=$1 AND q."userId"=$2 AND t."userId"=$2 AND t.status NOT IN ('cancelled','revoked')
+async function threadQuestions(threads: readonly IssueThread[], viewerId: string): Promise<IssueThread[]> {
+  const asked = threads.filter(thread => thread.ownedByCurrentUser && !runIsActive(thread.status)).map(thread => thread.id)
+  if (!asked.length || process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return [...threads]
+  const { rows } = await pool.query<{ runId: string; status: string }>(
+    `SELECT DISTINCT ON (q."originRunId") q."originRunId" AS "runId", q.status FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId"
+      WHERE q."originRunId"=ANY($1::uuid[]) AND q."userId"=$2 AND t."userId"=$2 AND t.status NOT IN ('cancelled','revoked')
         AND t."candidateId" IS NOT DISTINCT FROM q."candidateId"
         AND (q.status='resuming' OR (q.status IN ('open','waiting_user') AND (q."expiresAt" IS NULL OR q."expiresAt">now())))
-      ORDER BY q."createdAt" DESC LIMIT 1`,
-    [runId, viewerId],
+      ORDER BY q."originRunId", q."createdAt" DESC`,
+    [asked, viewerId],
   )
-  return !q ? null : q.status === 'resuming' ? 'resuming' : 'waiting'
+  const byRun = new Map(rows.map(row => [row.runId, row.status === 'resuming' ? 'resuming' as const : 'waiting' as const]))
+  return threads.map(thread => ({ ...thread, question: byRun.get(thread.id) ?? null }))
 }
 
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
@@ -204,9 +206,9 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
-  const [thread] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
+  const [thread] = await threadQuestions(projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id])), user.id)
   return {
-    thread: { ...thread, question: await threadQuestion(row.id, row.userId, user.id), prompt: row.prompt, stopRequestedAt: row.stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, prompt: row.prompt, stopRequestedAt: row.stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
   }

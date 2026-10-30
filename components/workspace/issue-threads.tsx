@@ -4,7 +4,7 @@ import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
 import { listIssueThreads } from '@/app/actions/agents'
-import type { IssueThread } from '@/lib/issue-threads'
+import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
 import { runListRefreshInterval, runStatusKey } from '@/lib/issue-run-conversation'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { Badge } from '@/components/reui/badge'
@@ -45,13 +45,14 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
         const name = thread.detail?.name ?? (thread.ownerName ? t('ownerThread', { name: thread.ownerName }) : t('hidden'))
         // The bot runs the thread; the coding agent it hands work to is a step inside it, not the runner (R-05).
         const meta = thread.detail?.summary ?? null
+        const view = threadQuestionView(thread)
         const body = <>
-          <ThreadStatusIcon status={thread.status} />
+          <ThreadStatusIcon status={view.status} waiting={view.waiting} />
           <span className="flex min-w-0 flex-1 flex-col text-left">
             <span className="truncate text-sm font-medium">{name}</span>
             {meta && <span className="truncate text-xs font-normal text-muted-foreground">{meta}</span>}
           </span>
-          <ThreadStatus status={thread.status} stopping={thread.stopping} />
+          <ThreadStatus status={view.status} stopping={thread.stopping} waiting={view.waiting} />
           <time className="w-14 shrink-0 text-right text-xs font-normal text-muted-foreground" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(new Date(thread.finishedAt ?? thread.createdAt), now)}</time>
         </>
         return <li key={thread.id}>

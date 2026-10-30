@@ -16,6 +16,19 @@ export interface IssueThread {
   /** Whose thread it is, shown on a teammate's thread instead of its content. */
   ownerName: string | null
   detail: { name: string; agentName: string; harness: string; summary: string | null } | null
+  /** 等你回复 (Figma 382:6469): the owner's ended run asked a Factory question; `resuming` once answered. */
+  question: ThreadQuestion
+}
+
+export type ThreadQuestion = 'waiting' | 'resuming' | null
+
+/**
+ * The one place the list row, header and composer read a question from. An answered
+ * question shows as the run it is about to continue: the same running state, nothing new.
+ */
+export function threadQuestionView(thread: { status: string; question: ThreadQuestion }) {
+  const question = runIsActive(thread.status) ? null : thread.question
+  return { question, waiting: question === 'waiting', status: question === 'resuming' ? 'running' : thread.status }
 }
 
 export const ISSUE_THREAD_LIMIT = 20
@@ -51,5 +64,6 @@ export function projectIssueThreads(rows: readonly IssueThreadRow[], issueId: st
       detail: canReadThread(row.userId, viewerId, memberIds)
         ? { name: threadName(row.prompt, row.agentName), agentName: row.agentName, harness: row.harness, summary: runSummaryText({ report: row.report, error: row.error }) }
         : null,
+      question: null,
     }))
 }

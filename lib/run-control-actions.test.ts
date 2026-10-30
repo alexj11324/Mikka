@@ -15,7 +15,7 @@ let sessionUser: string | null = null
 let freshSession = true
 function fixture() {
   const run = { id: runId, issueId, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', report: null, error: null, createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
-  return { run, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined }
+  return { questions: new Map<string, string>(), questionReads: [] as unknown[][], run, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined }
 }
 let current = fixture()
 class Selection {
@@ -83,7 +83,13 @@ before(async () => {
     return viewer ? { user: { id: sessionUser ?? viewer }, session: { id: 'synthetic-session' } } : null
   } } } } })
   mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
-  mock.module('@/lib/db', { namedExports: { db: database, withDatabaseClient: () => { throw Error('Factory dispatch is outside thread-control fixture') }, pool: { query() { throw new Error('Unexpected SQL pool access outside thread control') } } } })
+  mock.module('@/lib/db', { namedExports: { db: database, withDatabaseClient: () => { throw Error('Factory dispatch is outside thread-control fixture') }, pool: { async query(sql: string, params: unknown[]) {
+    // Factory questions are the only pool read on the thread path (app/actions/agents.ts threadQuestions).
+    if (!/FROM factory_questions/.test(sql)) throw new Error('Unexpected SQL pool access outside thread control')
+    current.questionReads.push(params)
+    const [runIds, viewerId] = params as [string[], string]
+    return { rows: runIds.filter(id => viewerId === current.run.userId && current.questions.has(id)).map(id => ({ runId: id, status: current.questions.get(id) })) }
+  } } } })
   mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) } } })
   mock.module('@/lib/issue-access', { namedExports: {
     requireIssueAccess: async (id: string) => {
@@ -182,4 +188,39 @@ test('running UI messages require a fresh matching browser session without an AP
   } finally {
     requestHeaders = new Headers({cookie: 'synthetic-session'}); sessionUser = null; freshSession = true
   }
+})
+
+test('a question reaches only its owner, only on an ended run, and only behind the Factory flags', async () => {
+  const flags = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
+  const restore = () => {
+    for (const [key, value] of [['MIKKA_FACTORY_ROUTING_ENABLED', flags.routing], ['MIKKA_FACTORY_LIFECYCLE_ENABLED', flags.lifecycle]] as const) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value
+    }
+  }
+  try {
+    process.env.MIKKA_FACTORY_ROUTING_ENABLED = '1'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '1'
+    current = fixture(); viewer = 'owner'; current.run.status = 'succeeded'; current.questions.set(runId, 'waiting_user')
+    assert.equal((await actions.getIssueThread(issueId, runId)).thread.question, 'waiting')
+    assert.equal((await actions.listIssueThreads(issueId))[0].question, 'waiting')
+    current.questions.set(runId, 'resuming')
+    assert.equal((await actions.getIssueThread(issueId, runId)).thread.question, 'resuming')
+
+    // A live run is already answering: no question, and no read for one.
+    current = fixture(); viewer = 'owner'; current.questions.set(runId, 'waiting_user')
+    assert.equal((await actions.getIssueThread(issueId, runId)).thread.question, null)
+    assert.equal(current.questionReads.length, 0)
+
+    // A teammate sees the row, never the question.
+    current = fixture(); viewer = 'member'; current.run.status = 'succeeded'; current.questions.set(runId, 'waiting_user')
+    const [listed] = await actions.listIssueThreads(issueId)
+    assert.equal(listed.question, null); assert.equal(listed.detail, null)
+    assert.equal(current.questionReads.length, 0)
+
+    // Flags off: no question, and the store is never asked.
+    delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
+    current = fixture(); viewer = 'owner'; current.run.status = 'succeeded'; current.questions.set(runId, 'waiting_user')
+    assert.equal((await actions.getIssueThread(issueId, runId)).thread.question, null)
+    assert.equal((await actions.listIssueThreads(issueId))[0].question, null)
+    assert.equal(current.questionReads.length, 0)
+  } finally { restore() }
 })

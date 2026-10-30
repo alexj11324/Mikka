@@ -7,7 +7,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
 import { runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
-import type { IssueThread } from '@/lib/issue-threads'
+import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -44,8 +44,12 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
   const { mutate: mutateCache } = useSWRConfig()
+  const questionPolls = useRef(0)
   const { data, error, mutate } = useSWR(['issue-thread', issueId, runId], () => getIssueThread(issueId, runId), {
-    refreshInterval: detail => detail && (runIsActive(detail.thread.status) || detail.thread.question) ? 2000 : 0, revalidateOnFocus: true,
+    // A question changes only when it is answered or its continuation starts: back off, capped.
+    refreshInterval: detail => !detail ? 0 : runIsActive(detail.thread.status) ? 2000 : threadQuestionView(detail.thread).question ? Math.min(2000 * 2 ** questionPolls.current, 30_000) : 0,
+    onSuccess: detail => { questionPolls.current = threadQuestionView(detail.thread).question ? questionPolls.current + 1 : 0 },
+    revalidateOnFocus: true,
   })
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -57,7 +61,9 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
   const detail = data?.thread.detail
   const active = !!data && runIsActive(data.thread.status)
   // 等你回复: the run ended on a question; the composer answers it (lib/agent-runs.ts addRunMessage).
-  const question = active ? null : data?.thread.question ?? null
+  // Once answered it reads as the running thread it continues, with nothing to send or stop yet.
+  const view = data ? threadQuestionView(data.thread) : null
+  const question = view?.question ?? null
   // Stop was asked for; the run keeps its live status until the daemon ends it.
   const requestedAt = stopAttempt ?? (data?.thread.stopRequestedAt ? new Date(data.thread.stopRequestedAt).getTime() : null)
   const stopRequested = active && (requestedAt !== null || !!data?.thread.stopping)
@@ -71,7 +77,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
   useEffect(() => {
     // Acknowledgement updates the task's thread list as soon as this panel sees it.
     void mutateCache(['issue-threads', issueId])
-  }, [issueId, data?.thread.status, data?.thread.stopping, mutateCache])
+  }, [issueId, data?.thread.status, data?.thread.stopping, question, mutateCache])
   async function send() {
     const text = draft.trim()
     if (!text || sending || stopRequested || question === 'resuming') return
@@ -102,7 +108,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
         <Button variant="ghost" size="sm" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
         <span aria-hidden="true" className="text-muted-foreground">/</span>
       </>}
-      {detail && data && <ThreadStatusIcon status={data.thread.status} waiting={question === 'waiting'} />}
+      {detail && view && <ThreadStatusIcon status={view.status} waiting={view.waiting} />}
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{detail?.name ?? t('title')}</h2>
       {back && <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />}
       {!back && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
@@ -112,7 +118,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <ThreadStatus status={data.thread.status} stopping={stopRequested} waiting={question === 'waiting'} />
+            <ThreadStatus status={view?.status ?? data.thread.status} stopping={stopRequested} waiting={question === 'waiting'} />
             <span>{t('started', { time: format.dateTime(new Date(data.thread.createdAt), { hour: '2-digit', minute: '2-digit' }) })}</span>
           </div>
           {data.thread.prompt.trim() && <p className={cn(BUBBLE, data.thread.ownedByCurrentUser ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}>{data.thread.prompt.trim()}</p>}
@@ -138,7 +144,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
     {(active || question) && detail && <div className={cn('flex shrink-0 flex-col gap-1 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')}>
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={t('composer', { agent: detail.agentName })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
-        sending={sending || stopPending || question === 'resuming'} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={active} onStop={active && data.thread.ownedByCurrentUser && !sending && !stopPending ? () => { void stop() } : undefined} />
+        sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={active || question === 'resuming'} onStop={active && data.thread.ownedByCurrentUser && !sending && !stopPending ? () => { void stop() } : undefined} />
       {sendFailed && <p role="alert" className="px-3 text-xs text-destructive">{t('sendFailed')}</p>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="xs" onClick={() => { void stop() }}>{t('retry')}</Button></div>}
     </div>}
