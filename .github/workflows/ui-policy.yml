@@ -230,6 +230,7 @@ jobs:
       - run: pnpm test:csv
       - run: pnpm test:settings
       - run: pnpm test:settings-backend
+      - run: pnpm test:workspace-settings
       - run: pnpm test:settings-prefs
       - run: pnpm test:account
       - run: pnpm test:issues
