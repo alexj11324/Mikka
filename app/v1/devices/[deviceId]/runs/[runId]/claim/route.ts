@@ -30,7 +30,6 @@ import { PublicationError } from '@/lib/run-publication-result'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { remoteRepositoryRef, taskSecretInjection } from '@/lib/secrets/runtime'
-import { byoE2BKeyEnabled } from '@/lib/secrets/flag'
 
 export const dynamic = 'force-dynamic'
 
@@ -116,11 +115,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (device.kind === 'cloud') {
     if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     // 4e3: the task's explicit user variables (workspace + this repo's secrets/env). Resolved before the
-    // claim so a decrypt failure leaves the run queued. Flag off = {}. Only cloud workers get it.
-    if (byoE2BKeyEnabled(process.env)) {
-      try { ({ env: taskEnv, secretNames: taskSecretNames } = await taskSecretInjection(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl))) }
-      catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
-    }
+    // claim so a decrypt failure leaves the run queued. The injection helper returns an empty
+    // assignment without an encryption key; platform versus BYO billing does not change it.
+    try { ({ env: taskEnv, secretNames: taskSecretNames } = await taskSecretInjection(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl))) }
+    catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id, beforeClaim, afterClaim)
     if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
   } else {

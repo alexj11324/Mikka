@@ -33,8 +33,8 @@ export async function getE2BKey(): Promise<SettingsActionResult<E2BKeyStatus>> {
   return withActor((u, w) => getE2BKeyStatus(u, w))
 }
 export async function saveE2BKey(input: { apiKey: string }): Promise<SettingsActionResult<E2BKeyStatus>> {
-  return withActor((u, w) => setE2BKey(u, w, input))
+  return withActor((u, w, audit) => setE2BKey(u, w, input, { audit }))
 }
 export async function deleteE2BKey(): Promise<SettingsActionResult<{ removed: boolean }>> {
-  return withActor((u, w) => removeE2BKey(u, w))
+  return withActor((u, w, audit) => removeE2BKey(u, w, audit))
 }
