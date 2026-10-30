@@ -15,6 +15,7 @@ import { withBasePath } from '@/lib/base-path'
 import { MIKKA_VERCEL, publicationActionFor, vercelTarget, type PublicationEnvironment } from '@/lib/factory/vercel-target'
 import { acceptanceState, acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
 import { ApprovalBar } from './factory-approval-bar'
+import { ShortSha } from './short-sha'
 import { IssueThreadPanel } from './issue-thread-panel'
 
 type Candidate = { sha: string; repository: string; environment: string; scope: string }
@@ -205,7 +206,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
         <DialogTitle>{t(task.isSkillCandidate ? 'skillTitle' : 'title')}</DialogTitle>
         {identifier && <span className="font-mono text-xs text-muted-foreground">{identifier}</span>}
         <Badge variant="outline" tone={tone(state)}>{t(acceptanceStateKey(state, task.isSkillCandidate))}</Badge>
-        {candidate?.sha && <span className="font-mono text-xs text-muted-foreground">{candidate.sha.slice(0, 7)}</span>}
+        {candidate?.sha && <ShortSha sha={candidate.sha} />}
         <span className="flex-1" />
         <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
       </header>
@@ -218,7 +219,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                   <h4 className="text-xs font-medium text-muted-foreground">{t('candidate')}</h4>
                   <Item variant="muted">
                     <ItemContent>
-                      <ItemDescription><code>{candidate?.sha}</code></ItemDescription>
+                      {candidate?.sha && <ItemDescription><ShortSha sha={candidate.sha} /></ItemDescription>}
                       <ItemDescription>{candidate?.repository}</ItemDescription>
                       <ItemDescription>{task.isSkillCandidate ? t('internalSkill') : environment ? t(environment) : t('state.unavailable')}</ItemDescription>
                     </ItemContent>
@@ -245,10 +246,9 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                 {state !== 'unavailable' && <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={Boolean(evidence && environment)} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
                   details={[
                     ...(task.isSkillCandidate ? [t('internalSkill')] : environment ? [t(environment)] : []),
-                    ...(candidate?.sha ? [candidate.sha.slice(0, 7)] : []),
                     ...(active ? [t('expires', { time: format.dateTime(new Date(active.expiresAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })] : []),
                   ]}
-                  superseded={superseded?.candidate?.sha?.slice(0, 7)}
+                  sha={candidate?.sha} superseded={superseded?.candidate?.sha}
                   reference={reference ? { href: reference, label: publication?.request.targetEnvironment === 'production' ? t('production') : t('preview') } : undefined}
                   onApprove={() => { void approve() }}
                   onPublish={() => { const approval = active; if (!approval || !ledger) return; void run('publish', { binding: ledger.binding, eventId: crypto.randomUUID(), approvalId: approval.id, action: approval.action, target: approval.target, targetEnvironment: approval.targetEnvironment }) }}

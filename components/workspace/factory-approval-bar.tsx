@@ -6,18 +6,21 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Spinner } from '@/components/ui/spinner'
+import { ShortSha } from './short-sha'
 import { acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
 
 export type ApprovalBarProps = {
   state: AcceptanceState
   isSkill: boolean
   details: string[]
+  /** The candidate's full sha, shown short (hover for full, click to copy). */
+  sha?: string
   busy?: boolean
   canApprove?: boolean
   /** Publishing needs a complete environment; without one 发布 is hidden, not disabled. */
   canPublish?: boolean
   reference?: { href: string; label: string }
-  /** Short sha of an approval voided by a newer commit, shown as 「<sha> · 已失效」. */
+  /** Full sha of an approval voided by a newer commit, shown as 「<short sha> · 已失效」. */
   superseded?: string
   onApprove?: () => void
   onPublish?: () => void
@@ -40,16 +43,17 @@ function ActionIcon({ icon: Icon, busy }: { icon: LucideIcon; busy: boolean }) {
 }
 
 /** The publication decision for one candidate (Figma 358:6855). Purely presentational. */
-export function ApprovalBar({ state, isSkill, details, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile }: ApprovalBarProps) {
+export function ApprovalBar({ state, isSkill, details, sha, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile }: ApprovalBarProps) {
   const t = useTranslations('FactoryAcceptance')
   const icon = StateIcon({ state })
   return <Item variant="muted" data-state={state}>
     {icon && <ItemMedia variant="icon">{icon}</ItemMedia>}
     <ItemContent>
       <ItemTitle>{t(acceptanceStateKey(state, isSkill))}</ItemTitle>
-      {(details.length > 0 || superseded) && <div className="flex flex-wrap gap-1">
+      {(details.length > 0 || sha || superseded) && <div className="flex flex-wrap gap-1">
         {details.map(detail => <Badge key={detail} variant="outline">{detail}</Badge>)}
-        {superseded && <Badge variant="outline" tone="neutral">{t('superseded', { sha: superseded })}</Badge>}
+        {sha && <ShortSha sha={sha} />}
+        {superseded && <ShortSha sha={superseded} tone="neutral">{short => t('superseded', { sha: short })}</ShortSha>}
       </div>}
     </ItemContent>
     <ItemActions>
