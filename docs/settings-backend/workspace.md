@@ -113,6 +113,7 @@ getWorkspaceBotDefaults(): Promise<ActionResult<{
   defaultRepository: string | null
   models: ['mikka', 'codex', 'claude']
   repositories: string[]
+  version: number // 乐观锁版本，保存时作为 expectedVersion 传回
 }>>
 ```
 
@@ -127,7 +128,8 @@ updateWorkspaceBotDefaults(input: { defaultModel?: 'mikka' | 'codex' | 'claude' 
 ```
 
 - 权限：管理员。传 `null` 表示清除，不传的字段保持原值。仓库必须在上面的可选列表里，否则返回 `botDefaultRepositoryUnavailable`。值存在 `workspace_settings` 里。
-- 错误码：`workspaceAccessDenied`、`botDefaultRepositoryUnavailable`、`validationGeneric`。
+- 乐观锁（BE-15）：入参可带 `expectedVersion`（取自 `getWorkspaceBotDefaults().version` 或上次保存返回的 `version`）。成功返回 `{ defaultModel, defaultRepository, version }`（version +1）。版本不一致时不写入，返回 `{ error: 'botDefaultsConflict', status: 409, current: { defaultModel, defaultRepository, version } }`。不传 `expectedVersion` 时保持原来的“后写覆盖”。这是 server action，没有 HTTP 路由，所以不支持 If-Match 头。
+- 错误码：`workspaceAccessDenied`、`botDefaultRepositoryUnavailable`、`botDefaultsConflict`、`validationGeneric`。
 
 ### `createBot(input)`（已有，做了扩展）
 

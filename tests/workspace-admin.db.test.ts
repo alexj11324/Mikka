@@ -195,9 +195,30 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     await rejects(botAdmin.saveBotDefaults(member, ws.id, { defaultModel: 'codex' }), 'workspaceAccessDenied')
     await rejects(botAdmin.saveBotDefaults(admin, ws.id, { defaultRepository: foreignRepo }), 'botDefaultRepositoryUnavailable')
     await assert.rejects(botAdmin.saveBotDefaults(admin, ws.id, { defaultModel: 'gpt-x' as never }))
-    assert.deepEqual(await botAdmin.saveBotDefaults(admin, ws.id, { defaultModel: 'codex', defaultRepository: repo }), { defaultModel: 'codex', defaultRepository: repo })
-    assert.deepEqual(await botAdmin.saveBotDefaults(admin, ws.id, { defaultRepository: null }), { defaultModel: 'codex', defaultRepository: null })
+    assert.equal(options.version, 0)
+    assert.deepEqual(await botAdmin.saveBotDefaults(admin, ws.id, { defaultModel: 'codex', defaultRepository: repo }), { defaultModel: 'codex', defaultRepository: repo, version: 1 })
+    assert.deepEqual(await botAdmin.saveBotDefaults(admin, ws.id, { defaultRepository: null }), { defaultModel: 'codex', defaultRepository: null, version: 2 })
     assert.deepEqual(await botAdmin.workspaceBotDefaults(other.id), { defaultModel: null, defaultRepository: null }, 'defaults are per workspace')
+
+    // BE-15 optimistic lock: a stale expectedVersion writes nothing and reports the current value.
+    assert.deepEqual(await botAdmin.saveBotDefaults(admin, ws.id, { defaultModel: 'claude', expectedVersion: 2 }), { defaultModel: 'claude', defaultRepository: null, version: 3 })
+    const stale = await botAdmin.saveBotDefaults(admin, ws.id, { defaultModel: 'mikka', expectedVersion: 2 }).then(() => null, (error: unknown) => error as { code?: string; current?: unknown })
+    assert.equal(stale?.code, 'botDefaultsConflict')
+    assert.deepEqual(stale?.current, { defaultModel: 'claude', defaultRepository: null, version: 3 })
+    assert.deepEqual(await botAdmin.workspaceBotDefaults(ws.id), { defaultModel: 'claude', defaultRepository: null }, 'stale save left the row unchanged')
+    // A fresh workspace (no row yet) is version 0; a stale non-zero version must not create a row with its value.
+    await assert.rejects(botAdmin.saveBotDefaults(outsider, other.id, { defaultModel: 'codex', expectedVersion: 5 }), (error: { code?: string; current?: unknown }) => error.code === 'botDefaultsConflict' && (error.current as { version: number }).version === 0)
+    // Two admins race from the same version: exactly one wins.
+    const race = await Promise.allSettled([
+      botAdmin.saveBotDefaults(admin, ws.id, { defaultModel: 'codex', expectedVersion: 3 }),
+      botAdmin.saveBotDefaults(admin, ws.id, { defaultModel: 'mikka', expectedVersion: 3 }),
+    ])
+    assert.deepEqual(race.map(r => r.status).sort(), ['fulfilled', 'rejected'])
+    const winner = (race.find(r => r.status === 'fulfilled') as PromiseFulfilledResult<{ defaultModel: string; version: number }>).value
+    assert.equal(winner.version, 4)
+    assert.equal((await botAdmin.botDefaultOptions(ws.id)).defaultModel, winner.defaultModel)
+    // Omitting expectedVersion keeps last-write-wins for old clients.
+    assert.equal((await botAdmin.saveBotDefaults(admin, ws.id, { defaultModel: 'mikka' })).version, 5)
 
     const idle = await seedBot(pool, ws.id, admin, 'Idle')
     const busy = await seedBot(pool, ws.id, member, 'Busy')
