@@ -63,6 +63,8 @@ async function assertAnotherAdmin(tx: WorkspaceTransaction, workspaceId: string,
 }
 
 export interface MemberRemoval { removed: true; transferred: AssetTransfer }
+/** removeMember's result plus who was removed, for the audit row. */
+export interface RemovedMember extends MemberRemoval { label: string }
 
 /**
  * 移除成员. Not yourself (use leave) and never the last active admin. The
@@ -70,7 +72,7 @@ export interface MemberRemoval { removed: true; transferred: AssetTransfer }
  * membership check for this workspace at once. Team memberships in this
  * workspace and pending invitations to the same email go with it.
  */
-export async function removeMember(actorId: string, workspaceId: string, targetId: string, transferTo?: string): Promise<MemberRemoval> {
+export async function removeMember(actorId: string, workspaceId: string, targetId: string, transferTo?: string): Promise<RemovedMember> {
   memberId.parse(targetId)
   if (targetId === actorId) throw new WorkspaceError('workspaceCannotRemoveSelf')
   return workspaceDb.transaction(async tx => {
@@ -86,7 +88,7 @@ export async function removeMember(actorId: string, workspaceId: string, targetI
     await tx.update(workspaceInvitations).set({ status: 'revoked' })
       .where(and(eq(workspaceInvitations.workspaceId, workspaceId), eq(workspaceInvitations.email, target.email.toLowerCase()), eq(workspaceInvitations.status, 'pending')))
     await tx.delete(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, targetId)))
-    return { removed: true as const, transferred }
+    return { removed: true as const, transferred, label: target.name || target.email }
   })
 }
 

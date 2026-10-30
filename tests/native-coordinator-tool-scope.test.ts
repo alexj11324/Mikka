@@ -5,6 +5,8 @@ import type { RunDetail } from '../lib/agent-runs'
 import { workspaceRunView } from '../lib/run-visibility'
 import { FactoryError } from '../lib/factory/contract'
 
+let appAllowed = true
+const policyChecks = mock.fn(async () => appAllowed)
 let revoked = false
 let uncertain = false
 const checks = mock.fn(async () => { if (revoked) throw new NativeCoordinatorError(409,'coordinatorExpiredOrLeaseLost') })
@@ -42,6 +44,9 @@ stub('../lib/mcp/actions.ts',{listAgents:effect})
 stub('../lib/search/index.ts',{webSearch:effect})
 stub('../lib/device-link.ts',{DEVICE_ONLINE_WINDOW_MS:60_000})
 stub('../lib/composio.ts',{runComposioAction:effect})
+stub('../lib/app-policy/store.ts',{botMayUseApp:policyChecks})
+stub('../lib/composio-actions.ts',{COMPOSIO_ACTIONS:{fetch_recent_gmail:{toolkit:'gmail'},send_email:{toolkit:'gmail'}}})
+stub('../lib/operations/write-runtime.ts',{personalWriteFromRun:effect})
 stub('../lib/pending-action-store.ts',{proposeAction:effect,proposeRepositoryPush:effect})
 stub('../lib/issue-access.ts',{issueForUser:effect})
 stub('../lib/telegram/client.ts',{postTelegramText:effect})
@@ -60,6 +65,7 @@ const scope={holder:'holder',turnId:'turn',callId:'call'}
 const user='host-owned-user'
 
 beforeEach(()=>{
+  appAllowed=true;policyChecks.mock.resetCalls()
   revoked=false;uncertain=false;runDetail=null;questionReadError=null;revokeDuringQuestionRead=false;revokeDuringEventRead=false
   hostQuestionReference.binding.candidateId=null
   for (const fn of [checks,effect,readRunResult,readQuestion,escalateQuestion,readUserEvent]) fn.mock.resetCalls()
@@ -275,4 +281,31 @@ test('getRun preserves the restricted teammate projection with no host evidence'
   assert.ok('id' in result)
   assert.deepEqual([result.summary,result.sourceCommit,result.skillMount,result.runtime,result.verify],[null,null,null,null,null])
   assert.equal(JSON.stringify(result).includes('requested-model'),false)
+})
+
+
+test('workspace app denies block reads, approval proposals and personal writes before provider effects', async () => {
+  appAllowed=false
+  const calls = [
+    () => steps.composioAction(user,'fetch_recent_gmail',{query:'is:unread'},scope,undefined,'owned-bot'),
+    () => steps.proposeAccountAction(user,'send_email',{},scope,undefined,'owned-bot'),
+    () => steps.personalWrite(user,'owned-bot','execution',{action:'send_slack_message',input:{},toolCallId:'call'},scope),
+  ]
+  for(const call of calls) assert.deepEqual(await call(),{error:'integrationBlockedByWorkspace'})
+  assert.equal(effect.mock.callCount(),0)
+  assert.equal(checks.mock.callCount(),3)
+  appAllowed=true
+  for(const call of calls) await call()
+  assert.equal(effect.mock.callCount(),3)
+})
+
+test('a personal Coordinator remains outside workspace app policy and revoked native calls never check policy', async () => {
+  appAllowed=false
+  await steps.composioAction(user,'fetch_recent_gmail',{query:'is:unread'},scope,undefined,null)
+  assert.equal(effect.mock.callCount(),1)
+  assert.equal(policyChecks.mock.callCount(),0)
+  revoked=true
+  await assert.rejects(steps.composioAction(user,'fetch_recent_gmail',{},scope,undefined,'owned-bot'),/coordinatorExpiredOrLeaseLost/)
+  assert.equal(policyChecks.mock.callCount(),0)
+  assert.equal(effect.mock.callCount(),1)
 })
