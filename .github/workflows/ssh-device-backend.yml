@@ -48,6 +48,6 @@ jobs:
       - name: Enrollment and command isolation against PostgreSQL
         env:
           E2E_DATABASE_URL: postgres://postgres@127.0.0.1:55491/mikka_491_e2e
-        run: node --import ./tests/support/server-only.mjs --import tsx --test lib/device-enrollment.db.test.ts
+        run: pnpm test:device-enrollment-db
       - name: Packaged daemon over real SSH and systemd through the preload IPC
         run: node tests/ssh-install/run.mjs

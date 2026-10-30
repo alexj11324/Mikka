@@ -42,6 +42,8 @@ export interface DeviceCaller {
   tokenId: string
   scopeDeviceId?: string
   scopeWorkspaceId?: string
+  /** A removed local credential can only deliver its uninstall receipt. */
+  removingDeviceId?: string
 }
 
 /**
@@ -60,6 +62,17 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
     .limit(1)
   if (!row) return null
   if (row.expiresAt && row.expiresAt.getTime() <= Date.now()) return null
+  let removingDeviceId: string | undefined
+  if (row.expiresAt && !row.boundDeviceId && !row.boundWorkspaceId) {
+    const removed = await pool.query<{ id: string }>(`SELECT d.id FROM device_token_devices t JOIN devices d ON d.id=t."deviceId"
+      WHERE t."tokenId"=$1 AND d."ownerId"=$2 AND d."removedAt" IS NOT NULL`, [row.id, row.userId])
+    if (removed.rowCount) {
+      const path = new URL(request.url).pathname.replace(/^\/mikka(?=\/)/, '')
+      const heartbeat = /^\/v1\/devices\/([^/]+)\/heartbeat$/.exec(path)
+      if (request.method !== 'POST' || !heartbeat || !removed.rows.some(device => device.id === heartbeat[1])) return null
+      removingDeviceId = heartbeat[1]
+    }
+  }
   if (row.boundDeviceId || row.boundWorkspaceId) {
     if (!row.boundDeviceId || !row.boundWorkspaceId || !row.expiresAt) return null
     const machine = await pool.query(`SELECT 1 FROM (SELECT "deviceId","workspaceId","ownerId" FROM cloud_machines UNION ALL SELECT "deviceId","workspaceId","ownerId" FROM thread_machines WHERE state <> 'ended') m JOIN devices d ON d.id=m."deviceId" WHERE m."deviceId"=$1 AND m."workspaceId"=$2 AND m."ownerId"=$3 AND d."ownerId"=$3 AND d.kind=$4`, [row.boundDeviceId, row.boundWorkspaceId, row.userId, 'cloud'])
@@ -76,7 +89,7 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
   if (!row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > 60_000) {
     await db.update(deviceTokens).set({ lastUsedAt: new Date() }).where(eq(deviceTokens.id, row.id))
   }
-  return { userId: row.userId, tokenId: row.id, ...(row.boundDeviceId && row.boundWorkspaceId ? { scopeDeviceId: row.boundDeviceId, scopeWorkspaceId: row.boundWorkspaceId } : {}) }
+  return { userId: row.userId, tokenId: row.id, ...(row.boundDeviceId && row.boundWorkspaceId ? { scopeDeviceId: row.boundDeviceId, scopeWorkspaceId: row.boundWorkspaceId } : {}), ...(removingDeviceId ? { removingDeviceId } : {}) }
 }
 
 /** A removed device (a tombstone kept for run history) is no longer owned. */
