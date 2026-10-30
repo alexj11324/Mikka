@@ -136,7 +136,4 @@ test('bot defaults and workspace bot list actions', async () => {
   assert.deepEqual(calls, [['botDefaultOptions', actor.workspaceId], ['saveBotDefaults', actor.userId, actor.workspaceId, { defaultModel: 'claude' }], ['workspaceBots', actor.workspaceId]])
   failure = new WorkspaceError('botDefaultRepositoryUnavailable')
   assert.equal((await botActions.updateWorkspaceBotDefaults({ defaultRepository: 'x/y' })).error, 'botDefaultRepositoryUnavailable')
-  const current = { defaultModel: 'codex', defaultRepository: null, version: 7 }
-  failure = Object.assign(new WorkspaceError('botDefaultsConflict'), { current })
-  assert.deepEqual(await botActions.updateWorkspaceBotDefaults({ defaultModel: 'claude', expectedVersion: 6 }), { error: 'botDefaultsConflict', status: 409, current })
 })

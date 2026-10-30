@@ -4,7 +4,7 @@ import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
 import { listIssueThreads } from '@/app/actions/agents'
-import type { IssueThread } from '@/lib/issue-threads'
+import { threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'
 import { runListRefreshInterval, runStatusKey } from '@/lib/issue-run-conversation'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { Badge } from '@/components/reui/badge'
@@ -14,17 +14,18 @@ import { ThreadStatusIcon } from './thread-status-icon'
 import { cn } from '@/lib/utils'
 
 export function useIssueThreads(issueId: string) {
-  return useSWR(['issue-threads', issueId], () => listIssueThreads(issueId), { refreshInterval: runListRefreshInterval, revalidateOnFocus: true, revalidateOnReconnect: true })
+  return useSWR(['issue-threads', issueId], () => listIssueThreads(issueId), { refreshInterval: threads => runListRefreshInterval(threads?.map(threadQuestionView)), revalidateOnFocus: true, revalidateOnReconnect: true })
 }
 
 export function harnessLabel(harness: string) {
   return harness === 'claude_code' ? 'Claude Code' : harness === 'codex' ? 'Codex' : harness
 }
 
-export function ThreadStatus({ status, stopping = false }: { status: string; stopping?: boolean }) {
+export function ThreadStatus({ status, stopping = false, waiting = false }: { status: string; stopping?: boolean; waiting?: boolean }) {
   const statusLabel = useTranslations('Coordinator.citation.runStatus')
   const t = useTranslations('IssueThreads')
   const key = runStatusKey(status)
+  if (waiting) return <Badge variant="warning-light" size="sm">{t('waiting')}</Badge>
   if (stopping) return <Badge variant="secondary" size="sm">{t('stopping')}</Badge>
   return <Badge variant={RUN_BADGES[status] ?? 'secondary'} size="sm">{key ? statusLabel(key) : status}</Badge>
 }
@@ -44,14 +45,15 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
         const name = thread.detail?.name ?? (thread.ownerName ? t('ownerThread', { name: thread.ownerName }) : t('hidden'))
         // The bot runs the thread; the coding agent it hands work to is a step inside it, not the runner (R-05).
         const meta = thread.detail?.summary ?? null
+        const view = threadQuestionView(thread)
         const body = <>
-          <ThreadStatusIcon status={thread.status} />
+          <ThreadStatusIcon status={view.status} waiting={view.waiting} />
           <span className="flex min-w-0 flex-1 flex-col text-left">
             <span className="truncate text-sm font-medium">{name}</span>
             {meta && <span className="truncate text-xs font-normal text-muted-foreground">{meta}</span>}
           </span>
-          <ThreadStatus status={thread.status} stopping={thread.stopping} />
-          <time className="w-14 shrink-0 text-right text-xs font-normal text-muted-foreground" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(new Date(thread.finishedAt ?? thread.createdAt), now)}</time>
+          <ThreadStatus status={view.status} stopping={view.stopping} waiting={view.waiting} />
+          <time className="w-14 shrink-0 text-right text-xs font-normal text-muted-foreground" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(threadTime(thread, now), now)}</time>
         </>
         return <li key={thread.id}>
           {thread.detail

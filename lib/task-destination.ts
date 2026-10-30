@@ -9,6 +9,6 @@ export type TaskDestination = z.infer<typeof taskDestinationSchema>
 /** Model-only context. The person's displayed message keeps its normal copy. */
 export function taskDestinationPrompt(destination: TaskDestination): string {
   return destination.kind === 'cloud'
-    ? 'The person selected Mikka Cloud in the task dialog. Keep that destination; do not dispatch to a local device.'
-    : `The person selected device ${destination.deviceId} in the task dialog. Use a local execution identity on exactly this device; do not substitute another device or Mikka Cloud.`
+    ? 'The person selected E2B (their own cloud computer) in the task dialog. Keep that destination; do not dispatch to a local device.'
+    : `The person selected device ${destination.deviceId} in the task dialog. Use a local execution identity on exactly this device; do not substitute another device or E2B.`
 }
