@@ -445,3 +445,16 @@ E = mc^2 \quad \text{（质能方程）}
   assert.match(markup, /<code>\\\(x\\\)<\/code>/)
   assert.doesNotMatch(markup, /katex-error/)
 })
+
+test('单选 BeQuestions 可带真实任务 id，用于 Factory 派发前澄清与派发失败二选一', () => {
+  const { BeQuestions } = agentComponentCatalog
+  const question = { id: 'net', title: '2 秒按哪种网络来算？', options: [{ value: '4g', label: '手机 4G' }, { value: 'wifi', label: '桌面宽带' }] }
+  assert.equal(BeQuestions.props.safeParse({ context: '官网首页提速', questions: [question], task: '0b7d5a3e-1c2f-4e5a-9b8c-7d6e5f4a3b2c' }).success, true)
+  assert.equal(BeQuestions.props.safeParse({ context: '官网首页提速', questions: [question], task: 'MIK-48' }).success, false)
+  const parser = createParser(library.toJSONSchema(), library.root)
+  const result = parser.parse('root = Stack([q])\nq = BeQuestions("派发失败", [{id:"route", title:"派不出去：Alex 的 MacBook 不在线。等它上线，还是用你的 E2B 在云端运行？", options:[{value:"wait", label:"等它上线"}, {value:"cloud", label:"用你的 E2B 运行", action:"cloudKeySettings"}]}], "0b7d5a3e-1c2f-4e5a-9b8c-7d6e5f4a3b2c")')
+  assert.deepEqual(result.meta.errors, [])
+  const noKey = { ...question, options: [{ value: 'wait', label: '等它上线' }, { value: 'cloud', label: '用你的 E2B 运行', action: 'cloudKeySettings' }] }
+  assert.equal(BeQuestions.props.safeParse({ context: '派发失败', questions: [noKey] }).success, true)
+  assert.equal(BeQuestions.props.safeParse({ context: '派发失败', questions: [{ ...noKey, options: [{ value: 'cloud', label: '用你的 E2B 运行', action: 'https://evil.example' }] }] }).success, false)
+})

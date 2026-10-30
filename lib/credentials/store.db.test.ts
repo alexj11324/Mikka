@@ -103,7 +103,7 @@ test('real PostgreSQL: observed credential lease inserts once and stays guarded'
     await pool.query('INSERT INTO "user"(id) VALUES($1)', [actor.userId])
     await pool.query('INSERT INTO bots VALUES($1,$2,$3)', [actor.botId, actor.userId, actor.workspaceId])
     await pool.query(`INSERT INTO bot_subagents VALUES($1,$2,$3,$4,'running','fixture-target',1)`, [actor.subagentId, actor.userId, actor.workspaceId, actor.botId])
-    await pool.query(`INSERT INTO workspace_computer_policies VALUES($1,'ask',1)`, [actor.workspaceId])
+    await pool.query(`INSERT INTO workspace_computer_policies VALUES($1,'allow',1)`, [actor.workspaceId])
     let key: Buffer | undefined, decrypts = 0, ended = false, inserted = 0
     const kms: Kms = {
       async generate() { key = randomBytes(32); return { plaintext: Buffer.from(key), wrapped: 'synthetic-key' } },

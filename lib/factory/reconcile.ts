@@ -4,6 +4,45 @@ import { factoryEventId } from "./event-id";
 import type { FactoryTask, createFactoryStore } from "./store";
 import { MAX_RUN_ATTEMPTS } from "../run-retry";
 import type { createFactoryQuestions } from "./questions/store";
+import { checkFactoryRepairBudget } from "./check-recovery-evidence";
+
+/** A failed run or a failed verify gate is a visible failed attempt that
+ * re-enters the existing repair loop (retry at execute, repair from
+ * review/verify/monitor) under the check-recovery cap (maxFixAttempts). Past
+ * the cap the task stays failed with reasonCode repair_budget_exhausted. */
+async function failIntoRepairLoop(
+  tx: PoolClient,
+  store: ReturnType<typeof createFactoryStore>,
+  userId: string,
+  task: FactoryTask,
+  eventKey: string,
+  reason: string,
+  reasonCode: string,
+  output: Record<string, unknown> = {},
+) {
+  const loop = task.stage === "execute" ? "retry" : ["review", "verify", "monitor"].includes(task.stage) ? "repair" : null;
+  let exhausted = false;
+  if (loop) {
+    try {
+      await checkFactoryRepairBudget(tx, task);
+    } catch (error) {
+      if (!(error instanceof FactoryError) || error.code !== "factoryRecoveryBudgetExceeded") throw error;
+      exhausted = true;
+    }
+  }
+  const failed = await store.apply(userId, binding(task), factoryEventId(eventKey, task.attemptId), {
+    action: "finish",
+    status: "failed",
+    reason: (exhausted ? `Repair budget exhausted. ${reason}` : reason).slice(0, 4000),
+    evidence: [],
+    output: { ...output, reasonCode: exhausted ? "repair_budget_exhausted" : reasonCode },
+  }, tx);
+  if (!loop || exhausted) return failed;
+  return store.apply(userId, binding(failed.task), factoryEventId(`${eventKey}:${loop}`, task.attemptId), {
+    action: loop,
+    reason: `Repair after ${reasonCode}`,
+  }, tx);
+}
 const binding = (task: FactoryTask): FactoryBinding => ({
   taskId: task.id,
   issueId: task.issueId,
@@ -22,11 +61,8 @@ export function createFactoryReconciler(
   consumers: Partial<Record<"review" | "verify" | "monitor", (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, task: FactoryTask, run: Record<string, any>) => Promise<unknown>>> = {},
   botId: string | null = null,
 ) {
-  return async (userId: string) => {
-    const { rows: pending } = await pool.query(
-      `SELECT t.id FROM factory_tasks t WHERE t."userId"=$1 AND t."botId" IS NOT DISTINCT FROM $2::uuid AND t.stage IN ('spec','execute','review','verify','monitor') AND (t.status='running' OR (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId"))) ORDER BY t."updatedAt" LIMIT 50`,
-      [userId,botId],
-    );
+  const PENDING = `t.stage IN ('spec','execute','review','verify','monitor') AND (t.status='running' OR (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId")))`;
+  const reconcileTasks = async (userId: string, pending: { id: string; attemptId?: string }[]) => {
     let recovered = 0;
     for (const item of pending) {
       const tx = await pool.connect();
@@ -37,7 +73,10 @@ export function createFactoryReconciler(
         // deadlocking across concurrently reconciled Bot tasks.
         await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))",[JSON.stringify(["factory-monitor-owner",userId])]);
         let task = await store.lockTask(tx, userId, item.id);
-        if (!["running", "failed"].includes(task.status)) { await tx.query("COMMIT"); continue; }
+        // A run completion is bound to the attempt that was current when it was
+        // selected; if a reject/retry/repair replaced it meanwhile, that old
+        // run must not move the task (QA #449-5).
+        if (!["running", "failed"].includes(task.status) || (item.attemptId && task.attemptId !== item.attemptId)) { await tx.query("COMMIT"); continue; }
         let {
           rows: [run],
         } = await tx.query(
@@ -196,22 +235,12 @@ export function createFactoryReconciler(
         } else if (run.status === "stopped") {
           await store.apply(userId,binding(task),eventId,{action:"finish",status:"blocked",reason:"Run ended without completed submission",evidence:[],output:{runId:run.id}},tx);
         } else if (run.status === "failed") {
-          await store.apply(
-            userId,
-            binding(task),
-            eventId,
-            {
-              action: "finish",
-              status: "failed",
-              reason: String(run.error ?? run.stopReason ?? "Run failed").slice(
-                0,
-                4000,
-              ),
-              evidence: [],
-              output: { runId: run.id },
-            },
-            tx,
-          );
+          // A run-level retry (agent_runs.retryOf) owns recovery; do not start a second loop.
+          const { rows: retrying } = await tx.query('SELECT 1 FROM agent_runs WHERE "retryOf"=$1 LIMIT 1', [run.id]);
+          if (retrying.length)
+            await store.apply(userId, binding(task), eventId, { action: "finish", status: "failed", reason: String(run.error ?? run.stopReason ?? "Run failed").slice(0, 4000), evidence: [], output: { runId: run.id, reasonCode: "run_failed" } }, tx);
+          else
+            await failIntoRepairLoop(tx, store, userId, task, `run-completion:${run.id}`, `Run failed: ${String(run.error ?? run.stopReason ?? "unknown")}`, "run_failed", { runId: run.id });
         } else {
           const sha = run.report?.publish?.commit;
           const repository = run.remoteUrl ?? run.repoPath;
@@ -310,7 +339,10 @@ export function createFactoryReconciler(
           try {
             await tx.query("BEGIN");
             const current = await store.lockTask(tx, userId, item.id);
-            if (current.status === "running") await store.apply(userId,binding(current),
+            if (current.status === "running" && error.code === "factoryEvidenceMismatch")
+              // Like a failed required check: visible failure with a reason code, back into the capped repair loop.
+              await failIntoRepairLoop(tx, store, userId, current, `reconcile-evidence:${current.attemptId}`, "Verify gate rejected evidence: factoryEvidenceMismatch", "factoryEvidenceMismatch", { errorCode: error.code });
+            else if (current.status === "running") await store.apply(userId,binding(current),
               factoryEventId(`reconcile-blocked:${error.code}`,current.attemptId),
               {action:"finish",status:"blocked",reason:`Reconciliation blocked: ${error.code}`,evidence:[],output:{errorCode:error.code}},tx);
             await tx.query("COMMIT");
@@ -325,4 +357,26 @@ export function createFactoryReconciler(
     }
     return { recovered };
   };
+  /** Coordinator-turn sweep over this user's (and Bot's) pending tasks. */
+  const reconcile = async (userId: string) => {
+    const { rows: pending } = await pool.query(
+      `SELECT t.id FROM factory_tasks t WHERE t."userId"=$1 AND t."botId" IS NOT DISTINCT FROM $2::uuid AND ${PENDING} ORDER BY t."updatedAt" LIMIT 50`,
+      [userId, botId],
+    );
+    return reconcileTasks(userId, pending);
+  };
+  /** BE-9: only the task(s) whose current attempt is bound to this run (or to a
+   * run it retried), so a completion never advances an unrelated task. */
+  reconcile.run = async (userId: string, runId: string) => {
+    const { rows: pending } = await pool.query(
+      `SELECT t.id, a.id AS "attemptId" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
+        WHERE t."userId"=$1 AND t."botId" IS NOT DISTINCT FROM $2::uuid AND ${PENDING}
+          AND (a."runId"=$3::uuid OR EXISTS (SELECT 1 FROM agent_runs c WHERE c.id=$3::uuid AND c."retryOf"=a."runId")
+            OR EXISTS (SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND (q."originRunId"=$3::uuid OR q."continuationRunId"=$3::uuid)))
+        ORDER BY t.id`,
+      [userId, botId, runId],
+    );
+    return reconcileTasks(userId, pending);
+  };
+  return reconcile;
 }

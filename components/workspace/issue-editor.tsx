@@ -4,11 +4,11 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import type { EditorView } from "@tiptap/pm/view"
 import { useTranslations } from "next-intl"
 import { IssueActivity } from './issue-activity'
-import { useEditor, getSchema, type JSONContent } from "@tiptap/react"
+import { useEditor, type JSONContent } from "@tiptap/react"
+import { createEditorExtensions, readableIssueContent } from "./issue-editor-schema"
 import { TextSelection } from "@tiptap/pm/state"
 import { Collaboration } from "@tiptap/extension-collaboration"
 import { ySyncPluginKey } from "@tiptap/y-tiptap"
-import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap"
 import * as Y from "yjs"
 import { Check, FileText, MessageSquare, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -20,45 +20,30 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { FormattingToolbar } from "@/components/blocks/rich-text-editor-1/components/formatting-toolbar"
 import { RichTextContent } from "@/components/blocks/rich-text-editor-2/components/rich-text-content"
-import { createRichTextExtensions } from "@/components/blocks/rich-text-editor-2/components/rich-text-extensions"
-import { RichTextBlockActions } from "@/components/blocks/rich-text-editor-2/components/rich-text-block-actions"
 import { RichTextBlockGutter } from "@/components/blocks/rich-text-editor-2/components/rich-text-block-gutter"
 import { RichTextFormatBubble, showRichTextFormatBubble } from "@/components/blocks/rich-text-editor-2/components/rich-text-format-bubble"
 import { RichTextLinkBubble } from "@/components/blocks/rich-text-editor-2/components/rich-text-link"
-import { RichTextSlashCommand, RICH_TEXT_BASIC_SLASH_ITEMS } from "@/components/blocks/rich-text-editor-2/components/rich-text-slash-menu"
-import { RichTextOutlineBlock, RICH_TEXT_OUTLINE_SLASH_ITEM } from "@/components/blocks/rich-text-editor-2/components/rich-text-outline-node"
 import { useRichTextOutline, scrollToRichTextHeading } from "@/components/blocks/rich-text-editor-2/components/rich-text-outline"
-import { RichTextTable, RichTextTableBubble, RICH_TEXT_TABLE_PROSE, RICH_TEXT_TABLE_SLASH_ITEM } from "@/components/blocks/rich-text-editor-2/components/rich-text-table"
+import { RichTextTableBubble, RICH_TEXT_TABLE_PROSE } from "@/components/blocks/rich-text-editor-2/components/rich-text-table"
 import { DeleteTableDialog } from "@/components/blocks/rich-text-editor-2/components/delete-table-dialog"
-import { createRichTextMention, RICH_TEXT_MENTION_PROSE } from "@/components/blocks/rich-text-editor-2/components/rich-text-mention"
-import { RichTextChanges, useRichTextChanges, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_MARKUP_VIEW, type RichTextMarkupView } from "@/components/blocks/rich-text-editor-3/components/rich-text-changes"
-import { CommentMark, CommentPaint, addThread, createThreadStore, replyToThread, setThreadResolved, bindThreadRepaint, canAnchorComment, useCommentAnchors, RICH_TEXT_COMMENT_PROSE } from "@/components/blocks/rich-text-editor-4/components/rich-text-comments"
+import { RICH_TEXT_MENTION_PROSE } from "@/components/blocks/rich-text-editor-2/components/rich-text-mention"
+import { useRichTextChanges, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_MARKUP_VIEW, type RichTextMarkupView } from "@/components/blocks/rich-text-editor-3/components/rich-text-changes"
+import { addThread, createThreadStore, replyToThread, setThreadResolved, bindThreadRepaint, canAnchorComment, useCommentAnchors, RICH_TEXT_COMMENT_PROSE } from "@/components/blocks/rich-text-editor-4/components/rich-text-comments"
 
 const EMPTY_DOCUMENT: JSONContent = { type: "doc", content: [{ type: "paragraph" }] }
 const EMPTY_THREADS: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadIndex = {}
 
-export function createEditorExtensions(isOpen: (id: string) => boolean, author: string, collaborative: boolean, compact = false, placeholder = '') {
-  return [
-    ...createRichTextExtensions({ placeholder, collaborative }),
-    RichTextBlockActions, RichTextTable, RichTextOutlineBlock, createRichTextMention([]),
-    RichTextSlashCommand.configure({ items: [...RICH_TEXT_BASIC_SLASH_ITEMS, RICH_TEXT_TABLE_SLASH_ITEM, RICH_TEXT_OUTLINE_SLASH_ITEM] }),
-    RichTextChanges.configure({ author, tracking: false, now: () => new Date().toISOString() }),
-    CommentMark, CommentPaint.configure({ isOpen }),
-  ]
-}
-export function createDocumentSeed(content: JSONContent) {
-  const schema = getSchema(createEditorExtensions(() => false, 'seed', true))
-  const doc = prosemirrorJSONToYDoc(schema, content, 'default')
-  const update = Y.encodeStateAsUpdate(doc)
-  doc.destroy()
-  return update
-}
+export { createEditorExtensions, createDocumentSeed } from './issue-editor-schema'
 export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, persisted = false, compact = false, layout = 'document', activity, threadEvents, afterDescription, label: labelProp, disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; threadEvents?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
   const t = useTranslations('Editor')
   const author = authorProp ?? t('draftAuthor')
   const syncLabel = syncLabelProp ?? t('unsavedDraft')
   const label = labelProp ?? t('descriptionLabel')
-  const placeholder = compact ? t('placeholderCompact') : t('placeholderFull')
+  // Without a shared doc the editor renders `content` directly; content the schema rejects stays read-only and is never echoed back.
+  const [initialContent] = useState(() => content === undefined ? EMPTY_DOCUMENT : readableIssueContent(content))
+  const unreadable = !sharedDoc && initialContent === null
+  // Read-only shows no typing hint, including on the empty document that stands in for unreadable content.
+  const placeholder = disabled || unreadable ? null : compact ? t('placeholderCompact') : t('placeholderFull')
   const [localDoc] = useState(() => new Y.Doc())
   const threadDoc = sharedDoc ?? localDoc
   const threadStore = useMemo(() => createThreadStore(threadDoc), [threadDoc])
@@ -99,7 +84,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
   }), [label])
   const editor = useEditor({
     extensions,
-    content: sharedDoc ? undefined : content ?? EMPTY_DOCUMENT,
+    content: sharedDoc ? undefined : initialContent ?? EMPTY_DOCUMENT,
     immediatelyRender: false,
     editorProps,
     onUpdate: ({ editor: current, transaction }) => {
@@ -126,7 +111,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
   const { changes } = useRichTextChanges(editor)
   const { anchors, activeId } = useCommentAnchors(editor)
   const outline = useRichTextOutline(editor)
-  const editable = !disabled && mode !== "viewing" && markup === "all"
+  const editable = !disabled && !unreadable && mode !== "viewing" && markup === "all"
   useEffect(() => {
     if (!editor) return
     editor.storage.richTextChanges.tracking = mode === "suggesting"
@@ -201,7 +186,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
 
   return <TooltipProvider delay={300}><section aria-label={t('editorAria', { label: t('descriptionLabel') })} className="overflow-hidden rounded-lg border bg-background">
     <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/20 px-3 py-2">
-      <span className="flex items-center gap-2 text-xs font-medium"><FileText className="size-3.5 text-muted-foreground" />{t('document')}<Badge variant="outline">{syncLabel}</Badge></span>
+      <span className="flex items-center gap-2 text-xs font-medium"><FileText className="size-3.5 text-muted-foreground" />{t('document')}{syncLabel && <Badge variant="outline">{syncLabel}</Badge>}</span>
       <div className="flex items-center gap-2"><NativeSelect aria-label={t('editMode')} size="sm" value={mode} onChange={e => setMode(e.target.value)}><NativeSelectOption value="editing">{t('mode.editing')}</NativeSelectOption><NativeSelectOption value="suggesting">{t('mode.suggesting')}</NativeSelectOption><NativeSelectOption value="viewing">{t('mode.viewing')}</NativeSelectOption></NativeSelect><NativeSelect aria-label={t('markupView')} size="sm" value={markup} onChange={e => setMarkup(e.target.value as RichTextMarkupView)}><NativeSelectOption value="all">{t('markup.all')}</NativeSelectOption><NativeSelectOption value="final">{t('markup.final')}</NativeSelectOption><NativeSelectOption value="original">{t('markup.original')}</NativeSelectOption></NativeSelect></div>
     </div>
     {editable && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}

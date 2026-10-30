@@ -93,9 +93,9 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
     }
     if(next.action==='waiting') throw new Error('browserJudgmentUnavailable')
     const {browserAction}=await import('@/lib/cloud-computer/action-reviews')
-    const outcome=await browserAction(pool,actor,botId,id,mutationFromStep(next),next.summary||next.step,chosen.observation,judgment)
+    await browserAction(pool,actor,botId,id,mutationFromStep(next),next.summary||next.step,chosen.observation,judgment)
     await pool.query(`UPDATE bot_subagents SET "consecutiveFailures"=0,"nextAttemptAt"=NULL,"lastFailureCode"=NULL,"activeSteps"="activeSteps"+1 WHERE id=$1 AND "ownerId"=$2`,[id,actor.userId])
-    return outcome.state==='needs_you'?'waiting':'running'
+    return 'running'
   } catch(error) {
     const message=error instanceof Error?error.message:''
     if(message==='browserActionOutcomeUnknown') {

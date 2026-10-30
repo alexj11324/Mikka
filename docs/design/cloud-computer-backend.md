@@ -23,9 +23,9 @@ computer. The computer is keyed by `bots.id`, never `agents.id`:
 - **Full-window viewer**: starts view-only (仅观看). 取得控制权 pauses the agent
   and gives the user mouse and keyboard (你在操作); 交还给 <Bot 名> hands control back.
 - **Chat**: one 电脑 card per computer task. It shows the task sentence, a state
-  (<Bot 名> 操作中 / 等你审批 / 完成) and the live screen. Approval happens inside
-  the card (允许 / 拒绝 / 本任务内都允许). There is no step list and no operation
-  log anywhere.
+  (<Bot 名> 操作中 / 完成) and the live screen. The bot does not ask before
+  acting (decisions 2026-10-30); the person takes control to stop it. There is
+  no step list and no operation log anywhere.
 - **Sleep**: the computer sleeps when idle and keeps its disk. It wakes
   automatically when an agent needs it, or when the user presses 唤醒.
 - **设置 › 设备** lists only machines the user connected (this Mac, SSH hosts,

@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { db } from '@/lib/db'
 import { attentionLog, attentionMatters, attentionSettings, coordinatorEvents, type AttentionMatterState } from '@/lib/db/schema'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
-import { BUDGET_WINDOW_MS, budgetState, type BudgetKind } from './budget'
+import { BUDGET_WINDOW_MS, BUDGETS, budgetState, type BudgetKind } from './budget'
 import { mergeEvidence, notice, stateAfterNotice, type BudgetView, type HandoffPayload, type ItemEvidence } from './handoff'
 import { higherLevel, isRouted, levelRank, type MatterContext } from './judgment'
 import { onPersonTold } from './push'
@@ -130,6 +130,15 @@ export async function attentionBudgets(userId: string, now = new Date()) {
     handoff: view(budgetState('handoff', await spends(db, userId, 'handoff', now), now)),
     notify: view(budgetState('notify', await spends(db, userId, 'notify', now), now)),
   }
+}
+
+/**
+ * How many times the Coordinator told the person about a matter in the notify
+ * budget's window (the last 24 hours), and the cap: the same count the budget
+ * checks, for 提醒 in Settings.
+ */
+export async function notifiedToday(userId: string, now = new Date()): Promise<{ notified: number; limit: number }> {
+  return { notified: (await spends(db, userId, 'notify', now)).length, limit: BUDGETS.notify.limit }
 }
 
 function log(tx: Tx, matter: Pick<Matter, 'id' | 'userId'>, action: (typeof attentionLog.$inferInsert)['action'], spendsBudget: boolean, extra: { reason?: string | null; runAt?: Date | null } = {}) {

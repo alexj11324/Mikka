@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { ChevronRight, Laptop, Paperclip } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
 import { listBots } from '@/app/actions/bots'
+import { issueCreationAvailable } from '@/app/actions/coordinator'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import type { TaskDestination } from '@/lib/task-destination'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
@@ -58,6 +59,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const { mutate } = useSWRConfig()
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const { data: available = true } = useSWR(open ? 'issue-creation-available' : null, () => issueCreationAvailable(), { revalidateOnFocus: false })
   const fileRef = useRef<HTMLInputElement>(null)
   const composed = useRef<{ key: string; message: string; taskDestination: TaskDestination } | null>(null)
   const fileId = useId()
@@ -89,7 +91,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
 
   async function submit() {
     const text = draft.trim()
-    if (!text || sending) return
+    if (!text || sending || !available) return
     setSending(true)
     try {
       const key = JSON.stringify([text, picked, project ?? null])
@@ -137,10 +139,11 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
           }} />
         </Field>
       </FieldGroup>
-      <FieldGroup className="sr-only"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
+      <FieldGroup className="sr-only w-px"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
+      {!available && <p className="text-sm text-muted-foreground">{t('unavailable')}</p>}
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Paperclip data-icon="inline-start" /></Button>
-        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!draft.trim() || sending} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
+        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !draft.trim() || sending} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
       </div>
     </DialogContent>
   </Dialog>

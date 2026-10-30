@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS factory_approvals (
   "approvedRevision" integer NOT NULL, "publishAttemptId" uuid NOT NULL,
   "publishRevision" integer NOT NULL,
   "expiresAt" timestamptz NOT NULL, "revokedAt" timestamptz,
+  "invalidatedAt" timestamptz, "invalidationReason" text,
   "createdAt" timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY ("taskId","candidateId") REFERENCES factory_candidates("taskId",id),
   FOREIGN KEY ("taskId","attemptId") REFERENCES factory_attempts("taskId",id),
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS factory_publications (
   "taskId" uuid NOT NULL REFERENCES factory_tasks(id) ON DELETE CASCADE,
   "candidateId" uuid NOT NULL, action text NOT NULL, target text NOT NULL,
   "eventId" uuid NOT NULL, request jsonb NOT NULL,
-  status text NOT NULL CHECK (status IN ('reserved','succeeded','uncertain')),
+  status text NOT NULL CHECK (status IN ('reserved','succeeded','uncertain','failed')),
   receipt jsonb, result jsonb, "createdAt" timestamptz NOT NULL DEFAULT now(), "finishedAt" timestamptz,
   -- Fresh approvals cannot repeat a possibly performed logical action.
   UNIQUE ("taskId","candidateId",action,target), UNIQUE ("taskId","eventId")

@@ -76,6 +76,23 @@ const database = {
     })
   },
 }
+// The run-chain reads (lib/run-chain.ts) are the only raw SQL these actions may issue. The fixture has a
+// one-run chain; it answers only for the owner and the bound issue, like the real owner/issue filters.
+// Any other pool query still fails loudly.
+const chainRow = () => ({ rootRunId: current.run.id, runId: current.run.id, status: current.run.status, stopRequestedAt: current.run.stopRequestedAt, createdAt: current.run.createdAt, finishedAt: current.run.finishedAt, rootCreatedAt: current.run.createdAt })
+const chainReads: string[] = []
+async function runChainQuery(sql: string, params: unknown[]) {
+  if (!/^\s*WITH RECURSIVE/.test(sql)) throw new Error('Unexpected SQL pool access outside thread control')
+  if (/WHERE id = \$1::uuid AND "userId" = \$2/.test(sql)) { // readRunChain(runId, userId)
+    chainReads.push('chain')
+    return { rows: params[0] === current.run.id && params[1] === current.run.userId ? [chainRow()] : [] }
+  }
+  if (/r\."issueId" = \$1 AND r\."userId" = ANY\(\$2::text\[\]\)/.test(sql)) { // listIssueRunChains(issueId, userIds)
+    chainReads.push('issue')
+    return { rows: params[0] === current.run.issueId && (params[1] as string[]).includes(current.run.userId) ? [chainRow()] : [] }
+  }
+  throw new Error('Unexpected run-chain SQL shape')
+}
 let actions: typeof import('../app/actions/agents')
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async (input?: { query?: { disableCookieCache?: boolean } }) => {
@@ -83,7 +100,7 @@ before(async () => {
     return viewer ? { user: { id: sessionUser ?? viewer }, session: { id: 'synthetic-session' } } : null
   } } } } })
   mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
-  mock.module('@/lib/db', { namedExports: { db: database, withDatabaseClient: () => { throw Error('Factory dispatch is outside thread-control fixture') }, pool: { query() { throw new Error('Unexpected SQL pool access outside thread control') } } } })
+  mock.module('@/lib/db', { namedExports: { db: database, withDatabaseClient: () => { throw Error('Factory dispatch is outside thread-control fixture') }, pool: { query: runChainQuery } } })
   mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) } } })
   mock.module('@/lib/issue-access', { namedExports: {
     requireIssueAccess: async (id: string) => {
@@ -137,8 +154,9 @@ test('actual send rechecks completion after the first readable-thread snapshot',
 })
 
 test('actual stop action is idempotent for the owner and rejects ended/stopping sends', async () => {
-  current = fixture(); viewer = 'owner'
-  await actions.stopRun(runId)
+  current = fixture(); viewer = 'owner'; chainReads.length = 0
+  assert.deepEqual(await actions.stopRun(runId), { stoppedRunIds: [runId] })
+  assert.ok(chainReads.includes('chain'), 'stop resolves the run chain first')
   const stoppedAt = current.run.stopRequestedAt
   assert.ok(stoppedAt instanceof Date)
   const detail = await actions.getIssueThread(issueId, runId)
@@ -146,12 +164,13 @@ test('actual stop action is idempotent for the owner and rejects ended/stopping 
   assert.equal(detail.thread.stopRequestedAt, stoppedAt)
   const [listed] = await actions.listIssueThreads(issueId)
   assert.equal(listed.stopping, true)
-  await actions.stopRun(runId)
+  assert.deepEqual(await actions.stopRun(runId), { stoppedRunIds: [runId] })
   assert.equal(current.run.stopRequestedAt, stoppedAt); assert.equal(current.updates, 1)
   await assert.rejects(actions.sendIssueThreadMessage({ issueId, runId, text: 'after stop' }), rejected('runNotFound'))
   current.run.status = 'succeeded'
   assert.equal((await actions.getIssueThread(issueId, runId)).thread.stopping, false)
-  await assert.rejects(actions.stopRun(runId), rejected('runNotFound'))
+  // BE-18: an owned chain with nothing unfinished is a 409 runChainEnded with latestRunId, not a silent no-op.
+  await assert.rejects(actions.stopRun(runId), (error: unknown) => error instanceof ActionFailureError && error.code === 'runChainEnded' && (error.params as { latestRunId?: string } | undefined)?.latestRunId === runId)
   assert.equal(current.messages.length, 0); assert.equal(current.updates, 1)
 })
 

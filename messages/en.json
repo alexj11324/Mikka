@@ -65,7 +65,7 @@
       "discardAction": "Discard",
       "createFailed": "Could not create the task. Your draft has been kept.",
       "createdNotice": "Task created. You can add another one.",
-      "createError": "Could not create the task. Your draft has been kept; please try again.",
+      "createError": "Could not create the task. Your draft has been kept.",
       "collapse": "Collapse the create panel",
       "expand": "Expand the create panel",
       "close": "Close new task",
@@ -169,7 +169,7 @@
     "results": "Search results",
     "loading": "Loading skills…",
     "loadFailed": "Could not load the skills.sh directory right now.",
-    "loadFailedDescription": "Retry the request or browse skills.sh directly.",
+    "loadFailedDescription": "No results are shown; this does not mean no skills match.",
     "retry": "Retry",
     "browseSkills": "Open skills.sh",
     "noResults": "No matching skills found.",
@@ -211,7 +211,7 @@
     "passwordPlaceholder": "At least 8 characters",
     "submitCreate": "Create account and continue",
     "submitSignIn": "Sign in to the workspace",
-    "oauthFailed": "OAuth sign-in did not finish. It may have been canceled or expired; please try again.",
+    "oauthFailed": "OAuth sign-in did not finish. It may have been canceled or expired.",
     "googleAccountNotLinked": "This Google account is not linked to Mikka. Sign in with your existing method, then link Google in Settings → Account.",
     "githubAccountNotLinked": "This GitHub account is not linked to Mikka. Sign in with the method already linked to your account, or create a Mikka account first.",
     "continueNotice": "Click the provider button to finish OAuth authorization in this tab.",
@@ -220,15 +220,15 @@
     "browserFailed": "The browser could not be opened. Try again.",
     "browserUpdateRequired": "Update Mikka before using Google or GitHub sign-in.",
     "tabBlocked": "The browser blocked the new tab. Allow pop-ups and try again.",
-    "githubStartFailed": "Could not start GitHub sign-in. Please try again shortly.",
-    "googleStartFailed": "Could not start Google sign-in. Please try again shortly.",
+    "githubStartFailed": "Could not start GitHub sign-in.",
+    "googleStartFailed": "Could not start Google sign-in.",
     "submitFailed": "That did not work. Check the information you entered or try again.",
     "sessionNotKept": "Sign-in responded, but the browser did not keep the session. Allow third-party cookies for this preview, or open it in a separate tab and sign in.",
-    "connectionFailed": "Could not connect. Please try again shortly.",
+    "connectionFailed": "Could not connect.",
     "testWorkspaceCta": "Skip sign-in and open the test workspace",
     "testWorkspaceHint": "Development previews only · dedicated test account",
     "testWorkspaceSessionFailed": "The browser did not keep the test session. Allow third-party cookies or open the preview in its own tab and try again.",
-    "testWorkspaceFailed": "Could not open the test workspace. Please try again shortly.",
+    "testWorkspaceFailed": "Could not open the test workspace.",
     "testIssueLayoutTitle": "[Test] Issue detail layout and reading",
     "testIssueLayoutDescription": "A standalone test task for checking title editing, body layout, property changes, and autosave. It does not affect other accounts.",
     "testIssueSwitchTitle": "[Test] Task switching and session reuse",
@@ -251,7 +251,7 @@
     "requestNewLink": "Request a new link",
     "verifyTitle": "Verify your email",
     "sendVerification": "Send verification link",
-    "recoveryUnavailable": "This is not available right now. Try again later.",
+    "recoveryUnavailable": "Password recovery is unavailable. Try again later.",
     "requestProcessed": "Request processed. If the account qualifies, check your inbox. This does not confirm that an email was delivered.",
     "retryIn": "Try again in {seconds}s",
     "verifyDescription": "Enter the email you signed up with to get a new verification link. It works for 15 minutes.",
@@ -421,9 +421,9 @@
   },
   "Board": {
     "created": "Created “{title}”",
-    "createFailed": "Couldn't create the task. Try again.",
+    "createFailed": "Could not create the task. Try again.",
     "deleted": "Deleted “{title}”",
-    "deleteFailed": "Couldn't delete the task. Try again.",
+    "deleteFailed": "Could not delete the task. Try again.",
     "undo": "Undo",
     "label": "Task board",
     "saving": "Saving task status…",
@@ -896,16 +896,17 @@
       "history": "Version history",
       "manageMembers": "Manage members",
       "closeDetail": "Close task details",
-      "titleRequired": "Please enter a task title; your changes have not been saved.",
-      "documentNotConnected": "The document is not connected yet. Your changes are kept; please try again shortly.",
+      "titleRequired": "Task title is required; changes were not saved.",
+      "documentNotConnected": "The document is not connected yet. Your changes are kept.",
       "saveFailedShort": "The save did not go through.",
-      "autosaveFailed": "Autosave failed. Your changes are kept; please try again.",
+      "autosaveFailed": "Autosave failed. Your changes are kept.",
       "retryAutosave": "Retry autosave",
-      "editorCrashedTitle": "This part of the task hit an error",
+      "editorCrashedTitle": "Task content could not load",
       "editorCrashedDescription": "The rest of the page is still available. Reload to keep working.",
       "editorCrashedRetry": "Reload",
       "titleLabel": "Task title",
       "syncFailedLabel": "Sync failed",
+      "invalidContentReadOnly": "This description can't be displayed, so it is read-only. Nothing has been changed.",
       "syncingLabel": "Syncing",
       "syncedLabel": "Synced",
       "retrySync": "Retry document sync",
@@ -940,11 +941,11 @@
   },
   "Errors": {
     "generic": "Something went wrong. Please try again.",
-    "authRequired": "Please sign in first.",
+    "authRequired": "Sign in required",
     "validationGeneric": "Please check the information you entered.",
     "issueToolsDisabled": "Task creation is unavailable.",
-    "validationTitleRequired": "Please enter a task title.",
-    "validationNameRequired": "Please enter a name.",
+    "validationTitleRequired": "Task title is required",
+    "validationNameRequired": "Name is required",
     "teamIdentifierInvalid": "Use 2–12 uppercase letters or digits, starting with a letter.",
     "validationDocument": "The document format is invalid or exceeds the size limit.",
     "issueNotFound": "This task does not exist or you do not have access.",
@@ -954,7 +955,7 @@
     "issueMoveInvalid": "The task move information is invalid.",
     "issuePriorityInvalid": "The task priority is invalid.",
     "memberOwnerOnly": "Only the task owner can manage members.",
-    "memberInvalidEmail": "Please enter a valid email address.",
+    "memberInvalidEmail": "Enter a valid email address",
     "memberNotRegistered": "This account cannot be added. Make sure it is registered and is not your own.",
     "memberAlreadyAdded": "This member already has access to the task.",
     "deviceNameTooLong": "The name is too long.",
@@ -963,8 +964,8 @@
     "agentDuplicateName": "This name is already in use. Choose another name.",
     "botDuplicateName": "A bot with this name already exists. Choose another name.",
     "agentInvalidInput": "Please check the information you entered.",
-    "agentAddFailed": "Could not add this item. Please try again.",
-    "agentSaveFailed": "Could not save this item. Please try again.",
+    "agentAddFailed": "Could not add this item.",
+    "agentSaveFailed": "Could not save this item.",
     "agentNotFound": "The selected tool is unavailable.",
     "agentNoDevice": "The selected tool has no connected computer.",
     "agentRepoMissing": "This repository is not available on the device.",
@@ -992,7 +993,7 @@
     "issueRelationLimit": "Each relation type supports up to 100 items.",
     "issueRelationSaveFailed": "Could not save the relation. Please try again shortly.",
     "issueTitleInvalid": "Please check the new task title.",
-    "issueChildTitleRequired": "Please enter a subtask title.",
+    "issueChildTitleRequired": "Subtask title is required",
     "issueCreateFailed": "Could not create the task. Please try again shortly.",
     "issueOperationInvalid": "The operation information is invalid.",
     "issueUnavailable": "This task is no longer available.",
@@ -1008,8 +1009,8 @@
     "issueMetadataSaveFailed": "Could not save the task properties. Please try again shortly.",
     "memberNotFound": "This member does not exist.",
     "memberNotJoined": "Invite this member to the task first.",
-    "validationProjectNameRequired": "Please enter a project name.",
-    "validationProjectMilestoneName": "Please enter a milestone name.",
+    "validationProjectNameRequired": "Project name is required",
+    "validationProjectMilestoneName": "Milestone name is required",
     "validationProjectDuplicate": "Project properties cannot contain duplicates.",
     "validationProjectMilestoneDuplicate": "Milestones cannot be duplicated.",
     "validationProjectDateOrder": "The target date cannot be earlier than the start date.",
@@ -1052,7 +1053,46 @@
     "runAlreadyActive": "This task already has an active run.",
     "runDispatchKeyConflict": "This request key was already used for different run parameters.",
     "runNotActive": "This run has ended and has no answerable question.",
-    "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response."
+    "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
+    "savedLoginNotFound": "This login does not exist or was already deleted.",
+    "deviceHasActiveRuns": "Threads are running on this device. Stop them before removing it.",
+    "workspaceSlugTaken": "This URL is already in use. Choose another.",
+    "workspaceIconInvalid": "The icon must be a PNG, JPEG, WebP or GIF image of 200 KB or less.",
+    "workspaceDeleteNameMismatch": "The name you entered does not match the workspace name.",
+    "workspaceHasActiveSubscription": "This workspace still has an active subscription. Cancel it in Billing before deleting the workspace.",
+    "workspaceCannotRemoveSelf": "You cannot remove yourself. To go, use Leave workspace.",
+    "workspaceTransferTargetInvalid": "The new owner must be another active member of this workspace.",
+    "botTransferBusy": "This member’s bots still have running threads or background tasks. They can be handed over once those finish.",
+    "botTransferNameConflict": "The new owner already has a bot with the same name. Rename one of them, then hand it over.",
+    "teamNotFound": "This team does not exist.",
+    "teamDeleteNameMismatch": "The name you entered does not match the team name.",
+    "botDefaultRepositoryUnavailable": "This repository is not in any workspace member’s GitHub App installation.",
+    "botDefaultsConflict": "Someone else changed these defaults. Showing the latest values.",
+    "usageLimitReached": "The usage limit has been reached. New tasks are paused; running tasks will finish.",
+    "usageCreditsExhausted": "Credits have run out. New tasks are paused; running tasks will finish.",
+    "billingNotConfigured": "Billing is not set up.",
+    "billingNoSubscription": "This workspace has no subscription yet.",
+    "billingPlanInvalid": "This plan is not available.",
+    "billingProviderFailed": "The payment service could not complete the request.",
+    "timeZoneInvalid": "That time zone is not valid.",
+    "personalInstructionsTooLong": "Personal instructions can be at most 2000 characters.",
+    "dailySuggestionsNeedMemory": "Daily suggestions need memory turned on first.",
+    "suggestionSourceInvalid": "That source is not supported.",
+    "avatarInvalidType": "Avatars must be PNG, JPEG, or WebP images.",
+    "avatarTooLarge": "The avatar image must be 200 KB or smaller.",
+    "passwordIncorrect": "The current password is incorrect.",
+    "passwordTooShort": "The new password needs at least 8 characters.",
+    "passwordTooLong": "The new password can have at most 128 characters.",
+    "passwordNotSet": "This account has no password yet. Set one first.",
+    "passwordAlreadySet": "This account already has a password. Change it instead.",
+    "sessionNotFound": "That device is already signed out.",
+    "sessionIsCurrent": "This device signs out with Sign out.",
+    "emailUnavailable": "Email isn’t available right now.",
+    "emailDeliveryFailed": "The email wasn’t sent.",
+    "dataExportRateLimited": "You can export your data once an hour. Try again in {minutes} min.",
+    "accountEmailMismatch": "The email doesn’t match this account.",
+    "accountSoleAdmin": "You’re the only admin of {workspaces}. Make another member an admin before deleting your account.",
+    "runChainEnded": "Every attempt of this thread has already ended; there is nothing left to stop."
   },
   "Overview": {
     "sections": {
@@ -1092,7 +1132,7 @@
     "restoreTask": "Restore task",
     "reload": "Reload",
     "taskRestored": "Task restored",
-    "restoreFailed": "Could not restore the task. Please try again.",
+    "restoreFailed": "Could not restore the task.",
     "backToWorkspace": "Back to workspace",
     "descriptionRestored": "Description restored and saved as a new version",
     "membersDialogDescription": "Manage who can access and edit this task.",
@@ -1189,8 +1229,8 @@
       "confirmTitle": "Restore this description?",
       "confirmDescription": "The current description will be replaced with the selected version and saved as a new version. The title, status, task properties, and existing comments are kept.",
       "confirmAction": "Restore description",
-      "restoreIncomplete": "The restore did not complete. The current description is kept; please try again.",
-      "restoreFailed": "Could not restore the description. Please try again."
+      "restoreIncomplete": "The restore did not complete. The current description is kept.",
+      "restoreFailed": "Could not restore the description."
     }
   },
   "Members": {
@@ -1198,8 +1238,8 @@
     "membersCount": "{count, plural, =1 {# member} other {# members}}",
     "accessDescription": "Only the owner and added members can access this task.",
     "listUpdateFailed": "Could not update the member list",
-    "keptPrevious": "The previous results are kept. Try again to get the latest access.",
-    "readFailed": "Could not load members right now. Please try again shortly.",
+    "keptPrevious": "The previous results are kept; access may be out of date.",
+    "readFailed": "Could not load members right now.",
     "reload": "Reload",
     "loading": "Loading members",
     "addMember": "Add member",
@@ -1207,8 +1247,8 @@
     "emailHint": "They need an account first. Once added, they can edit the body, comment, and save versions. No invitation email is sent.",
     "adding": "Adding…",
     "addedMessage": "Member added. After signing in, they can open this task from Shared tasks.",
-    "addFailed": "Could not add the member. Please try again shortly.",
-    "removeFailed": "Could not remove the member. Please try again shortly.",
+    "addFailed": "Could not add the member.",
+    "removeFailed": "Could not remove the member.",
     "removed": "Removed {name}'s access.",
     "successTitle": "Success",
     "searchMembers": "Search members",
@@ -1329,7 +1369,7 @@
     "allStatuses": "All statuses",
     "loading": "Loading projects",
     "loadErrorTitle": "Could not load projects",
-    "loadErrorDescription": "Sample data was not substituted. Please check your connection and try again.",
+    "loadErrorDescription": "Sample data was not substituted.",
     "reload": "Reload",
     "savingProperties": "Saving properties…",
     "noMatchTitle": "No matching projects",
@@ -1520,40 +1560,68 @@
     },
     "sections": {
       "members": {
-        "title": "Members",
-        "description": "Manage workspace members, roles, and invitations."
+        "title": "Members"
       },
       "preferences": {
-        "title": "Preferences",
-        "description": "Make Mikka fit the way you work."
-      },
-      "profile": {
-        "title": "Profile",
-        "description": "See the account details used in your workspace."
+        "title": "Preferences"
       },
       "memory": {
-        "title": "Memory"
+        "title": "Memory and suggestions"
       },
       "account": {
-        "title": "Account",
-        "description": "Manage how you sign in to Mikka."
-      },
-      "integrations": {
-        "title": "Integrations",
-        "description": "Manage connected apps and message platforms.",
-        "keywords": "model subscriptions subscription quota usage"
-      },
-      "devices": {
-        "title": "Devices",
-        "description": "Machines you connected."
-      },
-      "workspace": {
-        "title": "Workspace",
-        "description": "Basic information about the current workspace."
+        "title": "Account"
       },
       "teams": {
-        "title": "Teams",
-        "description": "Organize teams and the work they own together."
+        "title": "Teams"
+      },
+      "notifications": {
+        "title": "Notifications"
+      },
+      "security": {
+        "title": "Security"
+      },
+      "connections": {
+        "title": "Connections"
+      },
+      "models": {
+        "title": "Models and quota",
+        "keywords": "model subscriptions subscription quota usage"
+      },
+      "logins": {
+        "title": "Logins and keys"
+      },
+      "privacy": {
+        "title": "Data and privacy"
+      },
+      "activity": {
+        "title": "Activity"
+      },
+      "computers": {
+        "title": "My computers"
+      },
+      "developer": {
+        "title": "Developer"
+      },
+      "general": {
+        "title": "General"
+      },
+      "bots": {
+        "title": "Bots"
+      },
+      "permissions": {
+        "title": "Permissions and approvals"
+      },
+      "secrets": {
+        "title": "Secrets and environment"
+      },
+      "audit": {
+        "title": "Audit log"
+      },
+      "usage": {
+        "title": "Usage"
+      },
+      "billing": {
+        "title": "Billing"
       }
     },
     "appearance": {
@@ -1567,7 +1635,9 @@
       "systemLabel": "Follow system",
       "language": "Language",
       "languageDescription": "The display language for this version.",
-      "languageName": "English"
+      "languageName": "English",
+      "languageZh": "Chinese (Simplified)",
+      "languageEn": "English"
     },
     "profile": {
       "heading": "Account",
@@ -1576,7 +1646,23 @@
       "name": "Name",
       "email": "Email",
       "notSet": "Not set",
-      "readOnly": "Account details are read-only; this version does not support editing them here."
+      "readOnly": "Account details are read-only; this version does not support editing them here.",
+      "save": "Save",
+      "saved": "Saved",
+      "changeAvatar": "Change",
+      "uploading": "Uploading…",
+      "sessionHeading": "Session",
+      "signOut": "Sign out",
+      "signOutDescription": "This device signs out now; other devices stay signed in.",
+      "signingOut": "Signing out…",
+      "deleteAccount": "Delete account",
+      "deleteAccountDescription": "Your account, bots, threads and memories are deleted for good.",
+      "deleteTitle": "Delete account",
+      "deleteBody": "This cannot be undone. Other members are not affected, but your own bots and threads are deleted.",
+      "deleteConfirmLabel": "Type {email} to confirm",
+      "deleting": "Deleting…",
+      "confirmDelete": "Delete account",
+      "cancel": "Cancel"
     },
     "memory": {
       "enabled": "Use memory",
@@ -1607,14 +1693,15 @@
       "previewLabel": "Workspace form preview"
     },
     "computerPolicy": {
-      "heading": "Cloud computers",
-      "description": "Control whether Bots may operate computers in this workspace.",
-      "label": "Bot computer use",
-      "help": "Denying stops computer tasks and revokes their approvals. People can still take control.",
+      "heading": "Computer use",
+      "label": "Bots operate computers",
+      "help": "Bots act without step-by-step confirmation and pause while you have control. Deny stops computer tasks.",
       "adminOnly": "Only workspace admins can change this setting.",
-      "ask": "Ask for approval",
+      "allow": "Allow (default)",
       "deny": "Deny",
-      "error": "Could not update or load the computer setting."
+      "error": "Could not update or load the computer setting.",
+      "loading": "Loading computer setting…",
+      "unavailable": "Cloud computers aren't turned on for this deployment."
     },
     "issuePrefix": {
       "title": "Personal task ids",
@@ -1626,8 +1713,8 @@
       "saved": "Saved. Personal tasks now show as {example}.",
       "invalid": "Enter four letters A–Z.",
       "taken": "That matches a connected Linear team key. Choose another.",
-      "loadError": "Couldn't load your personal task ids.",
-      "saveError": "Couldn't save. Try again."
+      "loadError": "Could not load your personal task ids.",
+      "saveError": "Could not save. Try again."
     },
     "linear": {
       "title": "Linear",
@@ -1699,7 +1786,9 @@
       "extraUsageOn": "Extra usage is on, so Bots won’t use this subscription",
       "extraUsageClaudeFix": "Turn it off in claude.ai Settings › Usage",
       "extraUsageUnverified": "Couldn’t confirm extra usage is off, so Bots won’t use this subscription for now",
-      "removeFailed": "The connection could not be removed."
+      "removeFailed": "The connection could not be removed.",
+      "loading": "Loading model subscriptions…",
+      "serviceOff": "Model subscriptions aren't turned on for this deployment. Bots use the workspace's default model quota."
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
@@ -1746,6 +1835,7 @@
       "callbackVerifierNotConfigured": "Connections stay disabled until COMPOSIO_CALLBACK_VERIFIER_URL matches the verifier URL set in Composio.",
       "loadFailed": "Could not load integration status.",
       "connectFailed": "Could not start the connection. Please try again.",
+      "connectUnavailable": "App connections aren't set up on this server yet. Ask an admin.",
       "disconnectFailed": "Could not disconnect this account.",
       "connectionCompleted": "The Composio connection was verified for this Mikka account.",
       "callbackVerificationFailed": "Composio could not verify this connection for the signed-in Mikka account. Sign in with the account that started it and try again.",
@@ -1789,7 +1879,8 @@
       "madeDefault": "{account} is now the default",
       "openInSettings": "Manage in Settings",
       "linkInBrowser": "Continue in the browser window to finish linking. Return here when you’re done.",
-      "browserUpdateRequired": "Update Mikka before linking accounts from the desktop app."
+      "browserUpdateRequired": "Update Mikka before linking accounts from the desktop app.",
+      "githubRefreshed": "GitHub status refreshed"
     },
     "telegram": {
       "heading": "Messaging",
@@ -1816,7 +1907,133 @@
     },
     "preview": {
       "userName": "Preview user"
-    }
+    },
+    "notifications": {
+      "heading": "Notifications",
+      "proactive": "Proactive messages",
+      "pushDecide": "Needs your decision",
+      "pushReview": "Ready for review",
+      "pushFinished": "Thread finished",
+      "pushBriefing": "Daily briefing",
+      "pushWhen": "When to push",
+      "always": "Immediately",
+      "away": "When the computer is away",
+      "loadError": "Notification settings could not load",
+      "loading": "Loading notification settings",
+      "notSaved": "This setting wasn't saved and is back to its previous value.",
+      "retry": "Retry"
+    },
+    "security": {
+      "signInMethods": "Sign-in methods",
+      "password": "Password",
+      "passwordSet": "Sign in to this account with an email and password.",
+      "passwordNotSet": "This account has no password yet and can only sign in with a third party.",
+      "changePassword": "Change password",
+      "setPassword": "Set password",
+      "changePasswordDescription": "This device stays signed in.",
+      "setPasswordDescription": "After this, you can sign in with your email and password.",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmPassword": "Repeat the password",
+      "passwordMismatch": "The two passwords differ.",
+      "revokeOthers": "Also sign out other devices",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "devices": "Signed-in devices",
+      "devicesDescription": "A revoked device has to sign in again.",
+      "devicesError": "Signed-in devices could not be read.",
+      "devicesLoading": "Reading signed-in devices…",
+      "unknownDevice": "Unknown device",
+      "lastActive": "Last active {when}",
+      "currentDevice": "This device",
+      "signOut": "Sign out",
+      "signingOut": "Signing out…",
+      "signOutOthers": "Sign out all",
+      "signOutOthersDescription": "Sign out every device except this one."
+    },
+    "privacy": {
+      "data": "Data",
+      "export": "Export my data",
+      "exportDescription": "Profile, bots, threads, tasks and memories — no passwords or keys.",
+      "exportButton": "Export",
+      "exporting": "Preparing…",
+      "exportSent": "Sent to {email}; the link works for 24 hours.",
+      "exportWait": "You just exported. Try again in {minutes} minutes.",
+      "sharing": "Sharing",
+      "sharedLinks": "Shared links",
+      "sharedLinksCount": "{count} artifacts are still public",
+      "sharedLinksNone": "No public links.",
+      "sharedLinksDescription": "Stopping a share kills every link already sent out.",
+      "manage": "Manage",
+      "stopSharing": "Stop sharing",
+      "stopping": "Stopping…",
+      "links": "{count} links",
+      "linksLoading": "Reading shared links…",
+      "exportReady": "Email isn’t available, so your export is ready to download here (valid for {hours, plural, one {# hour} other {# hours}}).",
+      "exportDownload": "Download export",
+      "manageNone": "You have no shared links right now"
+    },
+    "activity": {
+      "filtersLabel": "Filter activity",
+      "filters": {
+        "all": "All",
+        "accounts": "Used my accounts",
+        "reminders": "Reminders"
+      },
+      "loading": "Reading activity…",
+      "empty": "No activity yet.",
+      "loadError": "Activity could not be read.",
+      "loadMore": "Load older activity",
+      "loadingMore": "Loading…",
+      "view": "Open",
+      "credentialUse": "{bot} used the sign-in for {site}",
+      "someBot": "A bot",
+      "approved": "You approved: {action}",
+      "declined": "You declined: {action}",
+      "reminder": "Reminder: {title}",
+      "result": {
+        "input_inserted_guarded": "Filled, not submitted",
+        "password_submitted": "Password submitted",
+        "otp_submitted": "Code submitted",
+        "session_applied": "Session restored",
+        "denied_or_failed": "Refused or failed"
+      },
+      "emptyScope": "No activity yet. This lists bots using your logins, actions you approved or declined, and reminders from the Coordinator. Ordinary chats and tasks don’t show up here."
+    },
+    "logins": {
+      "heading": "Site sign-ins",
+      "description": "Bots use these only in operations you approve. Passwords and codes are never shown.",
+      "loading": "Reading site sign-ins…",
+      "loadError": "Site sign-ins could not be read.",
+      "empty": "No saved site sign-ins yet.",
+      "never": "Never used",
+      "lastUsedBy": "{when} · {bot}",
+      "unknownBot": "Unknown bot",
+      "usage": "Usage",
+      "usageTitle": "Usage for {site}",
+      "usageDescription": "Every use records who used it and when.",
+      "usageLoading": "Reading usage…",
+      "usageError": "Usage could not be read.",
+      "usageEmpty": "No usage yet.",
+      "delete": "Delete",
+      "deleting": "Deleting…",
+      "deleteTitle": "Delete the sign-in for {site}?",
+      "deleteBody": "After this, bots cannot fill this site. Browsers where you are signed in are not affected.",
+      "cancel": "Cancel",
+      "result": {
+        "input_inserted_guarded": "Filled, not submitted",
+        "password_submitted": "Password submitted",
+        "otp_submitted": "Code submitted",
+        "session_applied": "Session restored",
+        "denied_or_failed": "Refused or failed"
+      },
+      "emptyHow": "No saved site logins yet. When a bot needs to sign in to a site during a chat, it asks you first, and the login is saved here once you agree.",
+      "add": "Add a login in a chat"
+    },
+    "sectionUnavailable": "This section is still being designed and has nothing to act on yet.",
+    "workspaceLoading": "Loading the workspace…",
+    "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again."
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
@@ -1904,7 +2121,7 @@
       "fileTooLarge": "The CSV file must be 1 MB or smaller.",
       "readFailed": "Could not read the file. Use a UTF-8 encoded CSV.",
       "checkEmails": "Check the email addresses.",
-      "createFailed": "The invitation did not finish. Please try again shortly.",
+      "createFailed": "The invitation did not finish.",
       "emailRequired": "Enter at least one email address.",
       "tooManyEmails": "Invite at most {max} people at a time; you have {count} email addresses. Import them in batches.",
       "invalidEmails": "Invalid email addresses: {emails}. Fix them before inviting.",
@@ -1925,8 +2142,8 @@
     "signInToAccept": "Sign in and accept",
     "createAccount": "Create account",
     "backToWorkspace": "Back to workspace",
-    "acceptFailed": "Could not accept the invitation. Please try again shortly.",
-    "signOutFailed": "Sign out failed. Please try again."
+    "acceptFailed": "Could not accept the invitation.",
+    "signOutFailed": "Sign out failed."
   },
   "Acceptance": {
     "recovering": "Restoring acceptance session…",
@@ -1971,8 +2188,8 @@
     "c_8503b651": "Save team association",
     "c_d1394c98": "Save team assignment",
     "c_052ebc86": "Save failed.",
-    "c_85f5c4d3": "Save failed. Your input was kept; please try again.",
-    "c_281364f7": "Save failed. Your selection was kept; please try again.",
+    "c_85f5c4d3": "Save failed. Your input was kept.",
+    "c_281364f7": "Save failed. Your selection was kept.",
     "c_cd5cd93c": "Save changes",
     "c_bd2c65c3": "All teams",
     "c_e1b94a93": "All projects ·",
@@ -1990,7 +2207,7 @@
     "c_4eec1ff7": "Create a new team",
     "c_4598f1cb": "Create a Mikka workspace with a name and unique URL, then invite your team.",
     "c_0155bce8": "Create a new workspace",
-    "c_3f765954": "Workspace creation did not finish. Please try again later.",
+    "c_3f765954": "Workspace creation did not finish.",
     "c_e5305647": "Create your first team",
     "c_23926d61": "Go to",
     "c_8c9b2d51": "Go to team creation",
@@ -2062,7 +2279,7 @@
     "c_d4a4d764": "Could not complete the operation. Refresh or try again later.",
     "c_5f6216cb": "Saved tasks ·",
     "c_9f8fa756": "Discard unsaved team changes?",
-    "c_39f8d12d": "Could not load data. Please try again later.",
+    "c_39f8d12d": "Could not load data.",
     "c_af7a3f0c": "Create task",
     "c_929d5670": "New team",
     "c_d663b332": "No lead team",
@@ -2221,7 +2438,7 @@
       "approveSave": "Save to calendar",
       "sent": "Email sent",
       "saved": "Calendar updated",
-      "failed": "Didn't go through: {error}",
+      "failed": "Action failed: {error}",
       "site": "Site",
       "approveClear": "Clear fields",
       "approveSubmit": "Submit login",
@@ -2229,7 +2446,7 @@
     },
     "working": "Coordinator is working…",
     "loadError": "Could not load the conversation. Retrying.",
-    "failedTitle": "The last reply failed",
+    "failedTitle": "Reply failed",
     "input": "Message the Coordinator",
     "inputTo": "Message {name}",
     "placeholder": "Ask the Coordinator to start an issue…",
@@ -2254,7 +2471,8 @@
       },
       "sources": "{count, plural, one {# source} other {# sources}}"
     },
-    "sendUncertain": "Could not confirm the message was delivered. Resending it unchanged from this box will not duplicate it; after closing or switching boxes, reloading the page or changing accounts, a resend may."
+    "sendUncertain": "Could not confirm the message was delivered. Resending it unchanged from this box will not duplicate it; after closing or switching boxes, reloading the page or changing accounts, a resend may.",
+    "lengthCount": "{count} / {max}"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "Please sign in first.",
@@ -2270,8 +2488,8 @@
     "theConnectionWasInterruptedRefreshToSee": "The connection was interrupted. Refresh to see saved content.",
     "opencodeGoAuthenticationOrModelAccessFailed": "OpenCode Go authentication or model access failed. Check the server configuration.",
     "opencodeGoIsRateLimitedOrOut": "OpenCode Go is rate limited or out of credits. Check your subscription and try again.",
-    "theModelTimedOutReceivedContentIs": "The model timed out. Received content is preserved; please retry here.",
-    "opencodeGoConnectionFailedReceivedContentIs": "OpenCode Go connection failed. Received content is preserved; please retry here.",
+    "theModelTimedOutReceivedContentIs": "The model timed out. Received content is preserved.",
+    "opencodeGoConnectionFailedReceivedContentIs": "OpenCode Go connection failed. Received content is preserved.",
     "crosssiteRequestsAreNotAllowed": "Cross-site requests are not allowed.",
     "signInBeforeUsingAgent": "Sign in before chatting with a Bot.",
     "sendAJSONRequest": "Send a JSON request.",
@@ -2284,9 +2502,9 @@
     "imageKeywordsMustBe2160CharactersAnd": "Image keywords must be 2–160 characters and cannot be a URL.",
     "imageSourcesAreTemporarilyUnavailableTheResponse": "Image sources are temporarily unavailable. The response is unaffected.",
     "imageSourcesAreTemporarilyUnavailablePleaseTry": "Image sources are temporarily unavailable. Please try again.",
-    "theModelReachedItsOutputLimitAnd": "The model reached its output limit and the end was truncated. Received content is preserved; please retry.",
-    "theModelReturnedNoResponseContentPlease": "The model returned no response content. Please retry here.",
-    "theResponseEndedEarlyReceivedContentIs": "The response ended early. Received content is preserved; please retry here.",
+    "theModelReachedItsOutputLimitAnd": "The model reached its output limit and the end was truncated. Received content is preserved.",
+    "theModelReturnedNoResponseContentPlease": "The model returned no response content.",
+    "theResponseEndedEarlyReceivedContentIs": "The response ended early. Received content is preserved.",
     "requestStopped": "Request stopped",
     "retry": "Retry",
     "loadingMembers": "Loading members",
@@ -2350,7 +2568,7 @@
     "yourInputHasBeenPreserved": "Your input has been preserved.",
     "retryThisResponse": "Retry this response",
     "unableToDisplayResponse": "Unable to display response",
-    "aCardOrTableInThisResponse": "A card or table in this response could not be displayed. Please retry.",
+    "aCardOrTableInThisResponse": "A card or table in this response could not be displayed.",
     "loadingDiagram": "Loading diagram…",
     "image": "Image",
     "useTheIllustrationComponentForImages": " (use the illustration component for images)",
@@ -2366,7 +2584,7 @@
     "learnMore": "Learn more",
     "theQuestionIsEmptyOrTooLong2": "The question is empty or too long. Adjust it and submit again here.",
     "unableToContinueYourChoicesAndAnswers": "Unable to continue. Your choices and answers are preserved; retry here.",
-    "submissionFailedYourChoicesAndAnswersAre": "Submission failed. Your choices and answers are preserved; retry here.",
+    "submissionFailedYourChoicesAndAnswersAre": "Submission failed. Your choices and answers are preserved.",
     "taskContext": "Task context: ",
     "proposal": "Proposal: ",
     "description": "Description: ",
@@ -2463,7 +2681,7 @@
     "noDisplayableContent": "No displayable content",
     "theModelReturnedNoDisplayableTextOr": "The model returned no displayable text or cards.",
     "generatingResponse": "Generating response",
-    "pleaseWait": "Please wait",
+    "pleaseWait": "Working…",
     "loading": "Loading",
     "askAgent": "Ask Bot",
     "askAgent2": "Ask Bot…",
@@ -2477,7 +2695,7 @@
     "loadingProjectDetails": "Loading project details",
     "unableToSwitchPleaseTryAgain": "Unable to switch. Please try again.",
     "workspaceCreatedAndOpened": "Workspace created and opened.",
-    "unableToCreateWorkspacePleaseTryAgain": "Unable to create workspace. Please try again.",
+    "unableToCreateWorkspacePleaseTryAgain": "Unable to create workspace.",
     "workspaceMenu": "Workspace menu",
     "switching": "Switching…",
     "workspaceFailedToLoad": "Workspace failed to load",
@@ -2490,7 +2708,11 @@
     "forExampleProductTeam": "For example: Product team",
     "cancel": "Cancel",
     "creating": "Creating…",
-    "createWorkspace": "Create workspace"
+    "createWorkspace": "Create workspace",
+    "sendingChoice": "Sending",
+    "cloudKeySetup": "Set up your E2B key",
+    "dispatchWait": "Wait for it",
+    "dispatchCloud": "Run on your E2B"
   },
   "IssueThreads": {
     "title": "Threads",
@@ -2504,18 +2726,19 @@
     "close": "Close thread",
     "conversation": "Thread conversation",
     "loading": "Opening thread",
-    "loadFailed": "Couldn't load the thread",
+    "loadFailed": "Thread failed to load",
     "retry": "Retry",
     "started": "started {time}",
     "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
     "composer": "Tell {agent} what to do next…",
-    "sendFailed": "Not sent. Your draft is still here",
+    "sendFailed": "Not sent. Draft kept",
     "stopping": "Stopping…",
-    "stopFailed": "Couldn't stop it. Try again",
+    "stopFailed": "Stop not confirmed",
     "pullRequest": "PR #{number}",
     "moreOutputs": "+{count}",
     "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}",
-    "send": "Send"
+    "send": "Send",
+    "retryStop": "Try stopping again"
   },
   "Computer": {
     "status": {
@@ -2538,9 +2761,9 @@
     "sleeping": "The computer is asleep",
     "wake": "Wake",
     "waking": "Waking",
-    "machineError": "The computer didn't start",
+    "machineError": "Computer failed to start",
     "retry": "Retry",
-    "wakeFailed": "Couldn't wake it. Try again.",
+    "wakeFailed": "Could not wake it. Try again.",
     "viewer": {
       "title": "{name}'s screen",
       "close": "Exit full window",
@@ -2551,8 +2774,8 @@
       "takeover": "Take control",
       "handback": "Hand back to Bot",
       "takenByOther": "Someone else is controlling this computer.",
-      "takeoverFailed": "Couldn't take control. Try again.",
-      "handbackFailed": "Couldn't hand back. Try again."
+      "takeoverFailed": "Could not take control. Try again.",
+      "handbackFailed": "Could not hand back control. Try again."
     },
     "approval": {
       "action": {
@@ -2715,7 +2938,8 @@
       "prompt": "Create a task for me: {text}",
       "create": "Create task",
       "sending": "Sending…",
-      "failed": "Couldn't send. Try again."
+      "failed": "Could not send",
+      "unavailable": "Task creation isn’t turned on for this workspace yet. You can hand the work to Coordinator in chat instead."
     },
     "board": {
       "toolbar": "Board toolbar",
@@ -2835,7 +3059,9 @@
       "handle": "Handle",
       "read": "Read"
     },
-    "original": "Original: “{title}”"
+    "original": "Original: “{title}”",
+    "refreshed": "Suggestions refreshed",
+    "refreshFailed": "Couldn’t refresh suggestions. Try again later."
   },
   "ArtifactsPage": {
     "title": "Artifact",
@@ -2876,7 +3102,7 @@
     "copied": "Copied",
     "removeQuote": "Remove quote",
     "quoteLabel": "Quote: {text}",
-    "loadError": "This artifact can't be opened.",
+    "loadError": "Artifact could not open",
     "retry": "Retry",
     "showChat": "Chat",
     "showContent": "Content",
@@ -2890,9 +3116,11 @@
     "sharingOn": "Sharing is on. Links you sent still work.",
     "newLink": "Copy a new link",
     "shareStopped": "Sharing stopped",
+    "shareRecheckFailed": "Couldn't check the share status yet. Try again in a moment.",
+    "shareStillShared": "The link is still shared",
     "shareLink": "Share link",
     "sharedNotFoundHint": "Sharing was stopped, or the link is incomplete.",
-    "notFoundTitle": "This link no longer works",
+    "notFoundTitle": "This link is no longer active",
     "roles": {
       "image": "Image",
       "button": "Button",
@@ -2906,7 +3134,16 @@
       "field": "Field",
       "card": "Card",
       "block": "Block"
-    }
+    },
+    "createFailed": "Could not create a link",
+    "copyFailed": "Could not copy",
+    "copyFailedHint": "Select the link to copy it yourself",
+    "selectLink": "Select link",
+    "retryCopy": "Try copying again",
+    "stopUnconfirmed": "Stop not confirmed",
+    "shareStateUnknown": "Sharing status unknown",
+    "recheck": "Check again",
+    "retryStop": "Try stopping again"
   },
   "Unread": {
     "divider": "New messages start here",
@@ -2969,7 +3206,7 @@
     "returnToTerminal": "Return to your terminal to start the daemon",
     "done": "Done",
     "invalid": "This code is invalid or expired",
-    "failed": "Connection failed. Try again",
+    "failed": "Connection failed",
     "enterAgain": "Enter another code",
     "retry": "Retry"
   },
@@ -3033,7 +3270,9 @@
       "live": "Live",
       "revoked": "Revoked",
       "expired": "Expired",
-      "unavailable": "Cannot approve"
+      "unavailable": "Cannot approve",
+      "failed": "Publish failed",
+      "invalidated": "Invalidated"
     },
     "stage": {
       "execute": "Execute",
@@ -3049,11 +3288,154 @@
     "production": "Production",
     "expires": "Valid until {time}",
     "internalSkill": "Built-in skill",
-    "error": "That did not finish. Try again.",
+    "error": "That did not finish.",
     "decisionUnavailable": "Approval is unavailable: no publication decision is configured.",
     "publicationUnavailable": "Publication is unavailable: no publication target is configured.",
     "attestationRequired": "Production needs a signed attestation.",
     "artifactError": "The evidence did not open.",
-    "closeEvidence": "Close evidence"
+    "closeEvidence": "Close evidence",
+    "superseded": "{sha} · Invalidated",
+    "copySha": "Copy full sha {sha}",
+    "shaCopied": "Full sha copied",
+    "shaCopyFailed": "Copy failed. Allow clipboard access in your browser.",
+    "loadError": "Could not load the acceptance",
+    "skillState": {
+      "pending": "Ready to enable",
+      "live": "Enabled"
+    },
+    "listError": "Couldn't load acceptance",
+    "retry": "Retry",
+    "reject": "Request changes",
+    "rejectNote": "Note for changes",
+    "rejectSubmit": "Send back",
+    "rejecting": "Submitting…",
+    "rejectFailed": "Couldn't submit. Try again.",
+    "resubmit": "Resubmit",
+    "cancel": "Cancel",
+    "publishFailed": "Publish failed. The approval is kept."
+  },
+  "AccountEmail": {
+    "exportSubject": "Your Mikka data export",
+    "exportBody": "Your Mikka data export is ready.\n\n{url}\n\nOpen the link while signed in to Mikka as {email}. It expires in {hours} hours. If you did not ask for this, you can ignore this email."
+  },
+  "TeamSettings": {
+    "filterPlaceholder": "Filter by name…",
+    "active": "Active",
+    "joined": "Joined",
+    "exportCsv": "Export CSV",
+    "createTeam": "Create team",
+    "columns": {
+      "name": "Name",
+      "description": "Description",
+      "visibility": "Visibility",
+      "members": "Members"
+    },
+    "visibilityWorkspace": "Workspace",
+    "teamSettings": "Team settings",
+    "back": "Back",
+    "general": "General",
+    "generalDescription": "Manage the name, identifier, and description of {name}.",
+    "createHeading": "Create a new team",
+    "createDescription": "Create a new team to manage separate workflows and notifications.",
+    "iconAndName": "Icon & name",
+    "namePlaceholder": "e.g. Engineering",
+    "identifier": "Identifier",
+    "identifierDescription": "Used to identify issues from this team (e.g. ENG-123)",
+    "identifierPlaceholder": "e.g. ENG",
+    "saveChanges": "Save changes",
+    "settings": "Settings",
+    "overview": "Overview",
+    "members": "Members",
+    "leaveTeamEllipsis": "Leave team…",
+    "joinTeam": "Join team",
+    "accessibleToAll": "Accessible to all workspace members",
+    "teamOverview": "Team overview",
+    "memberCount": "{count, plural, one {# member} other {# members}}",
+    "hierarchy": "Team hierarchy",
+    "hierarchyDescription": "Teams can be nested to reflect your team structure and to share workflows and settings.",
+    "docs": "Docs",
+    "dangerZone": "Danger zone",
+    "rows": {
+      "general": "General",
+      "generalDescription": "Name, identifier, timezone, estimates, and broader settings",
+      "members": "Members",
+      "membersDescription": "Manage team members",
+      "slack": "Slack notifications",
+      "slackDescription": "Broadcast notifications to Slack",
+      "issuesSection": "Issues, projects, and documents",
+      "issueLabels": "Issue labels",
+      "issueLabelsDescription": "Labels available to this team’s issues",
+      "projectLabels": "Project labels",
+      "projectLabelsDescription": "Labels available to this team’s projects",
+      "templates": "Templates",
+      "templatesDescription": "Pre-filled templates for issues, documents, and projects",
+      "recurringIssues": "Recurring issues",
+      "recurringIssuesDescription": "Automatically create issues on a schedule",
+      "workflowSection": "Workflow",
+      "issueStatuses": "Issue statuses",
+      "issueStatusesDescription": "Customize the statuses issues go through",
+      "projectStatuses": "Project statuses",
+      "projectStatusesDescription": "Customize the statuses projects go through",
+      "workflows": "Workflows & automations",
+      "workflowsDescription": "Manage issue automations, git workflows and other workflows",
+      "triage": "Triage",
+      "triageDescription": "Streamline how you handle requests from outside your team",
+      "cycles": "Cycles",
+      "cyclesDescription": "Focus your team over short, time-boxed windows",
+      "agentsSection": "AI & bots",
+      "teamAgents": "Team bots",
+      "teamAgentsDescription": "Add guidance for how bots should operate within this team",
+      "agentSkills": "Bot skills",
+      "agentSkillsDescription": "Skills shared with this team",
+      "agentConnectors": "Bot connectors",
+      "agentConnectorsDescription": "MCP connectors shared with this team",
+      "projectUpdates": "Project updates",
+      "projectUpdatesDescription": "Automatically generate updates using recent activity and defined rules",
+      "threadSummaries": "Resolved thread summaries",
+      "threadSummariesDescription": "Automatically generate summaries for resolved threads",
+      "parentTeam": "Parent team",
+      "none": "None",
+      "leaveTeam": "Leave team",
+      "leaveTeamDescription": "Remove yourself as a member of this team",
+      "retireTeam": "Retire team",
+      "retireTeamDescription": "Prevent creating and updating issues in this team while preserving all historical data",
+      "deleteTeam": "Delete team",
+      "deleteTeamDescription": "Permanently delete this team and all its data"
+    }
+  },
+  "CredentialLogin": {
+    "title": "Sign in to {site}",
+    "close": "Close",
+    "email": "Email",
+    "emailPlaceholder": "name@example.com",
+    "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "submit": "Sign in",
+    "verify": "Verify",
+    "securedBy": "Secured by",
+    "signedIn": "Signed in to {site}",
+    "recheck": "Check again",
+    "outcome": {
+      "invalidCredentials": "Wrong email or password",
+      "twoFactorInvalid": "Wrong code",
+      "rateLimited": "Too many attempts. Try again later.",
+      "rateLimitedFor": "Too many attempts. Try again in {seconds}s.",
+      "accountLocked": "Account locked",
+      "rejected": "Sign-in was declined",
+      "code": "Verification code",
+      "codeTotp": "Code from your authenticator app",
+      "codeSms": "Code sent by text",
+      "codeEmail": "Code sent by email",
+      "captchaRequired": "This site needs you to finish a check yourself",
+      "needsUser": "This site needs you to finish signing in yourself",
+      "outcomeUnknown": "Couldn’t confirm whether you’re signed in",
+      "waiting": "Submitted. Waiting for the site…",
+      "submissionInvalid": "Couldn’t send that. Try again.",
+      "denied": "Sign-in isn’t allowed here",
+      "loginPending": "Another sign-in is still running",
+      "unavailable": "Sign-in is unavailable right now",
+      "failed": "Couldn’t sign in. Try again."
+    }
   }
 }

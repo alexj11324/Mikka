@@ -5,10 +5,11 @@ import { randomUUID } from "node:crypto";
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { factoryEventId } from "./event-id";
 import { recordMonitorIncident } from "./monitor-incidents";
+import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 const db = process.env.E2E_DATABASE_URL;
 test("atomic monitor incident concurrency/replay/recovery on the tracked ledger", { skip: !db, timeout: 120000 }, async () => {
-  assert.equal(process.env.CI,"true"); assert.equal(process.env.GITHUB_ACTIONS,"true"); assert.equal(process.env.REQUIRE_DB,"1");
-  const u = new URL(db!); assert.equal(u.hostname,"127.0.0.1"); assert.equal(u.port,"5432"); assert.equal(u.pathname,"/mikka_e2e");
+  assert.equal(process.env.REQUIRE_DB,"1");
+  assertE2eTarget(db);
   const f = await factory194Fixture(db!);
   try {
     await f.pool.query(await readFile(new URL("../../drizzle/20261029044005_factory_195_monitor.sql",import.meta.url),"utf8"));

@@ -4,6 +4,8 @@
 # must be launched with an explicit network and filesystem isolation policy.
 set -euo pipefail
 if [ "$(id -u)" -ne 0 ]; then exit 1; fi
+# Per-sandbox SSH host keys; the template image ships none.
+if command -v ssh-keygen >/dev/null; then ssh-keygen -A >/dev/null; fi
 install -d -m 710 -o root -g mikka-runner /run/mikka-container
 install -d -m 700 /workspace/.mikka-docker
 umask 077

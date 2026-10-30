@@ -57,6 +57,7 @@ export async function factory194Fixture(connectionString: string) {
     CREATE TABLE coordinator_events (id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,kind text,payload jsonb);
     CREATE TABLE "session" (id text PRIMARY KEY,"userId" text,"expiresAt" timestamptz);
     CREATE TABLE account (id text,"userId" text,"providerId" text);
+    CREATE TABLE "user" (id text PRIMARY KEY,name text);
     CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"attemptId" uuid,"candidateId" uuid,revision integer,stage text,status text,"botId" uuid,"sourceEventId" uuid,"scopeVersion" integer);
     CREATE TABLE factory_candidates (id uuid PRIMARY KEY,"taskId" uuid,sha text,repository text,environment text,scope text,UNIQUE("taskId",id));
     CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid,"candidateId" uuid,stage text,position integer,"runId" uuid,"sessionId" text,status text,evidence jsonb,output jsonb,"finishedAt" timestamptz,UNIQUE("taskId",id));
@@ -179,6 +180,37 @@ export async function factory194Fixture(connectionString: string) {
           'INSERT INTO factory_events ("taskId","eventId") VALUES ($1,$2)',
           [task.id, eventId],
         );
+        if (change.action === "finish" && change.status === "failed") {
+          // Contract substitute for #192: failing never needs a consumer gate.
+          await tx.query(
+            "UPDATE factory_attempts SET status='failed',\"finishedAt\"=clock_timestamp() WHERE id=$1",
+            [task.attemptId],
+          );
+          return {
+            task: (
+              await tx.query<FactoryTask>(
+                "UPDATE factory_tasks SET status='failed',revision=revision+1 WHERE id=$1 RETURNING *",
+                [task.id],
+              )
+            ).rows[0],
+          };
+        }
+        if (change.action === "repair") {
+          assert.equal(task.status, "failed");
+          const attempt = randomUUID();
+          await tx.query(
+            `INSERT INTO factory_attempts (id,"taskId","candidateId",stage,position,status,evidence,output) VALUES ($1,$2,NULL,'execute',5,'pending','[]','{}')`,
+            [attempt, task.id],
+          );
+          return {
+            task: (
+              await tx.query<FactoryTask>(
+                "UPDATE factory_tasks SET stage='execute',status='pending',\"candidateId\"=NULL,revision=revision+1,\"attemptId\"=$2 WHERE id=$1 RETURNING *",
+                [task.id, attempt],
+              )
+            ).rows[0],
+          };
+        }
         if (change.action === "finish") {
           const gate =
             task.stage === "approval"

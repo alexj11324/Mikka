@@ -9,8 +9,15 @@ export function bufferTypeAhead(current: string, key: string, dialogReady: boole
   return (current + key).slice(0, limit)
 }
 
+const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"], [role="combobox"], [role="searchbox"], [role="dialog"], [role="alertdialog"]'
+
 export function typingOrDialog(target: unknown) {
-  if (hasClosest(target) && target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="alertdialog"]')) return true
+  if (hasClosest(target) && target.closest(EDITABLE)) return true
   const root = globalThis.document
-  return !!root && root.querySelector('[role="dialog"][data-open], [role="alertdialog"][data-open]') !== null
+  if (!root) return false
+  // A key can arrive on <body> while focus is still in a field (or a field just
+  // went read-only); check the focused element as well as the event target.
+  const active = root.activeElement
+  if (active && active !== root.body && hasClosest(active) && active.closest(EDITABLE)) return true
+  return root.querySelector('[role="dialog"][data-open], [role="alertdialog"][data-open], [role="menu"][data-open], [role="listbox"][data-open]') !== null
 }

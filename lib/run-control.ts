@@ -38,14 +38,32 @@ export async function sendOwnedRunMessage(database: RunControlDatabase, userId: 
   })
 }
 
-/** Repeated stop requests preserve the original timestamp; foreign runs are rejected. */
-export async function stopOwnedRun(database: RunControlDatabase, userId: string, runId: string) {
-  await database.transaction(async tx => {
+/**
+ * Repeated stop requests preserve the original timestamp; foreign runs are rejected.
+ * A queued run has no daemon to acknowledge the stop, so it ends here: status 'stopped'
+ * in the same locked transaction (the claim route only takes status='queued' with no
+ * stopRequestedAt, so it cannot pick it up). Returns true when this call ended the run;
+ * the caller then runs afterRunEnded after commit.
+ */
+export async function stopOwnedRun(database: RunControlDatabase, userId: string, runId: string): Promise<boolean> {
+  return database.transaction(async tx => {
     const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt })
       .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1).for('update')
     if (!run || !UNFINISHED_RUN_STATUSES.some(status => status === run.status)) throw new ActionFailureError('runNotFound')
-    if (run.stopRequestedAt) return
-    await tx.update(agentRuns).set({ stopRequestedAt: new Date(), updatedAt: new Date() })
+    const now = new Date()
+    // A queued cloud run with a thread_machines binding may already hold (or be acquiring) a
+    // sandbox. Ending it here would skip machine release, so it keeps the stop-request path
+    // and the machine lifecycle acknowledges it. (Follow-up: release the binding directly.)
+    const machineBound = run.status === 'queued'
+      && (await tx.execute(sql`SELECT 1 FROM thread_machines WHERE "runId"=${runId} LIMIT 1`)).rows.length > 0
+    if (run.status === 'queued' && !machineBound) {
+      await tx.update(agentRuns).set({ status: 'stopped', stopRequestedAt: run.stopRequestedAt ?? now, finishedAt: now, updatedAt: now })
+        .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
+      return true
+    }
+    if (run.stopRequestedAt) return false
+    await tx.update(agentRuns).set({ stopRequestedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
+    return false
   })
 }

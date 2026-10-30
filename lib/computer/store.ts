@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from 'pg'
 import type { ComputerState } from '@mikka/protocol/computer'
 import * as provider from './e2b-provider'
 import { ensureCloudMachine } from './provision'
+import { computerPermission, type ComputerPermission } from './permission'
 
 export class ComputerError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -24,25 +25,25 @@ export class ComputerStore {
   async listBots(actor: Actor) {
     return (await this.pool.query<Bot>('SELECT id,name,"workspaceId","ownerId" FROM bots WHERE "workspaceId"=$1 AND "ownerId"=$2 ORDER BY "createdAt"', [actor.workspaceId, actor.userId])).rows
   }
-  async policy(workspaceId: string): Promise<'allow' | 'ask' | 'deny'> {
+  async policy(workspaceId: string): Promise<ComputerPermission> {
     const row = (await this.pool.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]
-    if (!row) return 'ask'
-    if (!['allow', 'ask', 'deny'].includes(row.permission)) throw new Error('Computer policy unavailable')
-    return row.permission
+    const permission = computerPermission(row?.permission)
+    if (!permission) throw new Error('Computer policy unavailable')
+    return permission
   }
   /** Caller must authorize an active workspace admin. Serializes policy
    * transitions with display wake/control and each actual driver call. */
-  async setPolicy(workspaceId: string, permission: 'allow' | 'ask' | 'deny') {
+  async setPolicy(workspaceId: string, permission: ComputerPermission) {
     const client = await this.pool.connect()
     const key = `computer-policy:${workspaceId}`
     try {
       await client.query('BEGIN')
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [key])
-      const previous = (await client.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]?.permission ?? 'ask'
+      const previous = computerPermission((await client.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]?.permission)
       const machines = (await client.query<Machine>('SELECT * FROM cloud_machines WHERE "workspaceId"=$1 ORDER BY "ownerId" FOR UPDATE', [workspaceId])).rows
       const desktops = (await client.query<Desktop>('SELECT * FROM bot_desktops WHERE "workspaceId"=$1 ORDER BY display FOR UPDATE', [workspaceId])).rows
       const policy = (await client.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version)
-        VALUES ($1,$2,CASE WHEN $2='ask' THEN 0 ELSE 1 END)
+        VALUES ($1,$2,CASE WHEN $2='allow' THEN 0 ELSE 1 END)
         ON CONFLICT ("workspaceId") DO UPDATE SET permission=$2,"updatedAt"=now(),
           version=CASE WHEN workspace_computer_policies.permission=$2 THEN workspace_computer_policies.version ELSE workspace_computer_policies.version+1 END
         RETURNING version`, [workspaceId, permission])).rows[0]

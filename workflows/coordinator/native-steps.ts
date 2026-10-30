@@ -6,6 +6,7 @@ import { loadConversation } from '@/lib/coordinator/store'
 import { instructionsWithMemory, promptMessages } from '@/lib/coordinator/context'
 import { nativeCoordinatorContext, personalCoordinatorInstructions } from '@/lib/coordinator/native-prompt'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
+import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { personalMailboxInstructions } from '@/lib/personal-mailbox-instructions'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
@@ -20,7 +21,7 @@ export async function enqueue(userId: string, holder: string, round: number, sel
   const base = snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, personalCoordinatorInstructions())
   const permitted = snapshotMailboxTools(snapshot).filter(name => tools.some(tool => tool.name === name))
   return nativeCoordinatorStore.enqueue(userId,holder,round,selected,{
-    instructions: instructionsWithMemory(personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base, memory),
+    instructions: instructionsWithMemory(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base), memory),
     context: nativeCoordinatorContext(promptMessages(summary,messages,{ key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) })), tools,
   })
 }

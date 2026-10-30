@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
+import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { SubagentStore } from './subagents'
 import { startSuggestion } from './suggestions'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
@@ -10,8 +11,21 @@ import { claimCloudRun } from '@/lib/computer/claim'
 import { assertThreadMachineCapacity, openThreadDesktop, recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
+// This suite runs DROP SCHEMA ... CASCADE, so the full target is checked before any
+// connection, not just the hostname. Legacy CI names (computer_test, subagent_test)
+// stay accepted until the workflow follow-up renames them to *_e2e.
+function isolatedTarget(value: string) {
+  if (isE2eTarget(value)) return true
+  if (value !== value.trim() || value.includes('?') || value.includes('#')) return false
+  try {
+    const u = new URL(value)
+    return ['postgres:', 'postgresql:'].includes(u.protocol) && ['localhost', '127.0.0.1'].includes(u.hostname)
+      && ['/computer_test', '/subagent_test'].includes(u.pathname)
+  } catch { return false }
+}
+if (databaseURL && !isolatedTarget(databaseURL)) throw new Error('backend DB test requires a loopback *_e2e (or legacy computer_test/subagent_test) database without URL options')
 test('real DB: additive migration, subagent owner isolation and separate thread claims', { skip: !databaseURL }, async () => {
-  assert.ok(['localhost', '127.0.0.1'].includes(new URL(databaseURL!).hostname))
+  assert.ok(isolatedTarget(databaseURL!))
   const schema = `subagent_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
@@ -151,7 +165,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
       async runtimeRequest() { return { targetId: 'thread-page' } },
       async viewerGrant() { desktopCalls.push('viewer'); return { url: 'wss://synthetic.invalid', expiresAt: new Date(Date.now() + 1000).toISOString() } },
     } as unknown as Parameters<typeof openThreadDesktop>[3]
-    await pool.query(`INSERT INTO workspace_computer_policies VALUES ($1,'ask',17)`, [alice.workspaceId])
+    await pool.query(`INSERT INTO workspace_computer_policies VALUES ($1,'allow',17)`, [alice.workspaceId])
     assert.equal((await openThreadDesktop(pool, alice, runA, desktopRuntime)).runId, runA)
     assert.deepEqual(desktopCalls, [`connect sandbox-${runA}`, 'start', 'lease', 'gateway', 'viewer'])
     assert.equal((await pool.query('SELECT "targetId" FROM thread_machines WHERE "runId"=$1', [runA])).rows[0].targetId, 'thread-page')

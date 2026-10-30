@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import { createHash } from 'node:crypto'
-import { resolveScopedWritePermission } from '@/lib/operations/write-policy'
 
 const coordinate = z.number().int().min(0).max(8191)
 const point = { x: coordinate, y: coordinate }
@@ -40,14 +39,14 @@ export function observationMetadata(observation: VisualObservation) {
   const { screenshot, ...metadata } = observation
   return { ...metadata, imageDigest: createHash('sha256').update(Buffer.from(screenshot.slice(screenshot.indexOf(',')+1),'base64')).digest('hex') }
 }
-export function browserPermission(effect: BrowserEffect, computer: 'allow'|'ask'|'deny', agent: unknown, workspace: unknown): 'allow'|'ask'|'deny' {
-  if (computer === 'deny') return 'deny'
-  // Reading/navigating/drafting within an already authorized web task does not
-  // require a second per-click approval. External effects use their registered
-  // action policy; a bare computer allow is not a payment or sharing grant.
+const scopedDecisions = z.record(z.string(), z.enum(['allow','ask','deny']))
+/** Bots operate their browsers without asking (Alex, 2026-10-30, as ChatGPT
+ * agent and Claude for Chrome act until the person takes over). The only gate
+ * before an action is the Decisions judgment that it serves the person's task;
+ * no effect, payment and sending included, waits for a human click. A workspace
+ * computer deny, or an explicit deny for this effect, still blocks it. */
+export function browserPermission(effect: BrowserEffect, computer: 'allow'|'deny', agent: unknown, workspace: unknown): 'allow'|'deny' {
   const action = `browser_${effect}`
-  const safe = effect === 'browse' || effect === 'edit_draft'
-  const fallback = safe ? { [action]:'allow' } : {}
-  const parsed = z.record(z.string(),z.enum(['allow','ask','deny'])).parse(agent)
-  return resolveScopedWritePermission(action, {...fallback,...parsed},workspace)
+  const layers = [scopedDecisions.parse(agent), scopedDecisions.parse(workspace)]
+  return computer === 'deny' || layers.some(layer => layer[action] === 'deny') ? 'deny' : 'allow'
 }

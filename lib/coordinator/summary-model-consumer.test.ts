@@ -15,6 +15,7 @@ let modelCalls = 0
 stub('./store.ts', { loadConversation: async () => conversation, saveSummary: async (...args: unknown[]) => { saved.push(args) } })
 stub('./native.ts', { nativeCoordinatorEnabled: () => true, nativeCoordinatorStore: { enqueue: async (...args: unknown[]) => { enqueued.push(args); return 'pure-turn' } } })
 stub('./bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })
+stub('./personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base })
 stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: () => { throw Error('No database transaction in prompt fixture') } })
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('No database in pure test') } })
 stub('../agent-runs.ts', { addRunMessage: async (...args: unknown[]) => { forwarded.push(args) }, queueRun: () => {}, queueFactoryRun: () => { throw Error('No Factory dispatch in prompt fixture') }, readRun: () => {}, requestRunStop: () => {}, visibleRuns: () => {} })

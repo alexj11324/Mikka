@@ -13,7 +13,7 @@ import type { SkillsSearchResult } from '@/lib/skills-search'
 import { ConnectedAppDetail, ConnectedAppsList, ConnectedAppsStatus, isComposioAppId, useConnectedApps, usePluginHref } from '@/components/plugins/connected-apps'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { IntegrationsSettings } from '@/components/settings/integrations-settings'
-import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { Frame, FramePanel } from '@/components/reui/frame'
 import { IconTile } from '@/components/reui/icon-tile'
 import { Button } from '@/components/ui/button'
@@ -96,12 +96,12 @@ export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean })
               <GoogleSignInSettings googleEnabled={googleEnabled} />
               <IntegrationsSettings showWebhookDetails={false} showConnectedApps={false} />
             </>}
+            <ConnectedAppsStatus apps={apps} />
             {app
               ? <ConnectedAppDetail apps={apps} app={app} rootLabel={t('pluginsTab')} rootHref={pluginHref(null)} onBack={() => openApp(null)} />
               : <ConnectedAppsList apps={apps} title={tApps('heading')} appHref={pluginHref} onOpen={openApp} action={
-                <Button variant="ghost" size="sm" nativeButton={false} role="link" render={<Link href="/settings?section=integrations" />}>{tApps('openInSettings')}</Button>
+                <Button {...settingsSectionAction} nativeButton={false} role="link" render={<Link href="/settings?section=connections" />}>{tApps('openInSettings')}</Button>
               } />}
-            <ConnectedAppsStatus apps={apps} />
           </TabsContent>
           <TabsContent value="skills" className="flex flex-col gap-5 pt-4">
             <div className="flex flex-col gap-3">

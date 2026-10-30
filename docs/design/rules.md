@@ -68,8 +68,9 @@ source wins in a conflict is in [`README.md`](README.md).
   Artifact waiting for acceptance is a bordered card under the reply (icon,
   name, state such as 待你确认); clicking it opens the Artifact window (R-56).
 - **R-16** The computer card in chat shows a title, a status, one sentence
-  about the task and a big screen. Approval is part of that card. It never
-  shows an operation log, a step checklist, or OS and spec lines.
+  about the task and a big screen. It has no approval step: the bot operates
+  until the person takes control (decisions 2026-10-30). It never shows an
+  operation log, a step checklist, or OS and spec lines.
 - **R-17** The 概览 header does not show 「<Bot 名> 的屏幕」. The 电脑 tab
   holds the bot's screen, the existing `AgentComputer` view (R-50).
 
@@ -348,7 +349,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 ## Copy
 
 - **R-40** No filler or explanatory copy in the UI (口水话; Alex repeated
-  this on 2026-10-23 and 2026-10-24). If a sentence only explains the screen
+  this on 2026-10-23 and 2026-10-24). How the remaining words must be written
+  — status lines, no colloquial phrasing, no apology, no 「请」 — is
+  [`copy.md`](copy.md) (C-01…C-08). If a sentence only explains the screen
   or narrates state, remove it. Examples that were removed: 「谁在工作 · 1 个
   agent 正在处理任务」 above the composer, 「和你的 Coordinator 聊聊」,
   「有值得看的会第一时间放到这里」, and on a login sheet the subtitle

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { factoryCheckIndependent } from "./check-independence";
+import { maskFactoryNote } from "./note-mask";
+import { factoryTaskDetail, type FactoryTaskDetail } from "./task-detail";
 import { factoryScopeAllows, type FactoryIssueScope } from "./scope";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
@@ -36,7 +38,28 @@ export type FactoryTaskSummary = Pick<FactoryTask, "id" | "issueId" | "stage" | 
   isSkillCandidate: boolean;
   /** The run that produced the candidate, so acceptance can sit beside its thread. */
   candidateRunId: string | null;
+  /** Commit of the current candidate, so a card can tell a stale approval apart without the ledger. */
+  candidateSha: string | null;
+  /** Latest publication for the current candidate, if any. */
+  publication: FactoryPublicationSummary | null;
 };
+/** Same status union as #441's AcceptancePublication (lib/factory/acceptance-state.ts). */
+export type FactoryPublicationStatus = "reserved" | "uncertain" | "succeeded" | "failed";
+export interface FactoryPublicationSummary {
+  id: string;
+  approvalId: string;
+  status: FactoryPublicationStatus;
+  action: string;
+  target: string;
+  /** ISO 8601 UTC, e.g. 2026-10-30T05:00:00.000Z */
+  createdAt: string;
+  finishedAt: string | null;
+}
+type PublicationRow = Omit<FactoryPublicationSummary, "createdAt" | "finishedAt"> & { createdAt: string; finishedAt: string | null };
+function publicationSummary(row: PublicationRow | null): FactoryPublicationSummary | null {
+  if (!row) return null;
+  return { ...row, createdAt: new Date(row.createdAt).toISOString(), finishedAt: row.finishedAt ? new Date(row.finishedAt).toISOString() : null };
+}
 export interface FactoryAttempt {
   id: string;
   taskId: string;
@@ -135,15 +158,18 @@ export function createFactoryStore(
     );
     return rows.length === 1;
   }
-  async function owned(tx: PoolClient, userId: string, taskId: string) {
+  /** lock=false is the read-only variant for GETs: same ownership/scope checks, no row locks. */
+  async function owned(tx: PoolClient, userId: string, taskId: string, lock = true) {
     uuid(taskId);
     const {
       rows: [task],
     } = await tx.query<FactoryTask>(
-      'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
+      lock
+        ? 'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE'
+        : 'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2',
       [taskId, userId],
     );
-    const issue = task ? await lockedIssue(tx, task.issueId) : undefined;
+    const issue = task ? await lockedIssue(tx, task.issueId, lock) : undefined;
     if (
       !task ||
       task.botId !== botId ||
@@ -154,8 +180,8 @@ export function createFactoryStore(
       fail("factoryNotFound");
     return task;
   }
-  async function lockedIssue(tx: PoolClient, issueId: string) {
-    const { rows: [issue] } = await tx.query<FactoryIssueScope>('SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1 FOR SHARE', [issueId]);
+  async function lockedIssue(tx: PoolClient, issueId: string, lock = true) {
+    const { rows: [issue] } = await tx.query<FactoryIssueScope>(lock ? 'SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1 FOR SHARE' : 'SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1', [issueId]);
     return issue;
   }
   async function snapshot(
@@ -230,7 +256,9 @@ export function createFactoryStore(
     task.status = "pending";
   }
   return {
-    lockTask: owned,
+    lockTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId),
+    /** Read-only GET paths: ownership/scope checked, nothing locked. */
+    readTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId, false),
     async route(userId: string, input: unknown) {
       const parsed = routeSchema.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
@@ -306,25 +334,31 @@ export function createFactoryStore(
         return save(tx, task, route.eventId, route);
       });
     },
-    async read(userId: string, taskId: string) {
-      return transaction(async (tx) =>
-        snapshot(tx, await owned(tx, userId, taskId)),
-      );
+    /** Task-detail GET: read-only, no row locks (BE-16). B8/B9 checks and the B11 header are computed, never stored. */
+    async read(userId: string, taskId: string): Promise<FactorySnapshot & Partial<FactoryTaskDetail>> {
+      return transaction(async (tx) => {
+        const task = await owned(tx, userId, taskId, false);
+        return {
+          ...(await snapshot(tx, task)),
+          ...(await factoryTaskDetail(tx, task, lifecycle?.independent as never)),
+        };
+      });
     },
     async listForIssue(userId: string, issueId: string) {
       uuid(issueId);
       return transaction(async (tx) => {
-        const issue = await lockedIssue(tx, issueId);
+        const issue = await lockedIssue(tx, issueId, false);
         if (!issue || !(await authorize(userId, issueId, tx))) fail("factoryNotFound");
-        const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null }>(
-          'SELECT t.*, c."runId" AS "candidateRunId", EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
+        const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null; candidateSha: string | null; publication: PublicationRow | null }>(
+          'SELECT t.*, c."runId" AS "candidateRunId", c.sha AS "candidateSha", (SELECT json_build_object(\'id\',p.id,\'approvalId\',p."approvalId",\'status\',p.status,\'action\',p.action,\'target\',p.target,\'createdAt\',p."createdAt",\'finishedAt\',p."finishedAt") FROM factory_publications p WHERE p."taskId"=t.id AND p."candidateId"=t."candidateId" ORDER BY p."createdAt" DESC,p.id DESC LIMIT 1) AS publication, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
           [userId, issueId, botId],
         );
         const tasks: FactoryTaskSummary[] = [];
         for (const row of rows)
           if (factoryScopeAllows(row, issue) && await sourceAllowed(tx, userId, row.sourceEventId, issueId)) {
-            const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId } = row;
-            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason,isSkillCandidate,candidateRunId});
+            const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId, candidateSha, publication } = row;
+            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication)});
+            // Same minimal masker copy as #444 (lib/factory/note-mask.ts); switch to #438's once merged.
           }
         return { contractVersion: 1 as const, issueId, tasks };
       });
@@ -699,7 +733,7 @@ export function createFactoryStore(
             fail("factoryTransition");
           if (
             change.action === "repair" &&
-            !["review", "verify", "monitor"].includes(task.stage)
+            !["review", "verify", "approval", "monitor"].includes(task.stage)
           )
             fail("factoryTransition");
           // A live old run must stop before another attempt can bind work.
@@ -738,6 +772,11 @@ export function createFactoryStore(
           );
         }
         task.revision++;
+        // B4: an approval stops counting the moment its candidate is no longer current.
+        await tx.query(
+          `UPDATE factory_approvals SET "invalidatedAt"=clock_timestamp(),"invalidationReason"='candidateSuperseded' WHERE "taskId"=$1 AND "candidateId" IS DISTINCT FROM $2::uuid AND "invalidatedAt" IS NULL`,
+          [task.id, task.candidateId],
+        );
         await tx.query(
           'UPDATE factory_tasks SET stage=$2,status=$3,revision=$4,"attemptId"=$5,"candidateId"=$6,reason=$7,"updatedAt"=now() WHERE id=$1',
           [

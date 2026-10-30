@@ -6,7 +6,7 @@ import { ArrowRight, RefreshCw, Unplug } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
-import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
 import { disconnectLinearAccount, disableLinearTeam, enableLinearTeam, getLinearIntegrationState, listLinearTeamOptions, retryLinearDelivery, retryLinearIssue, startLinearOAuth } from '@/app/actions/linear-sync'
@@ -139,7 +139,7 @@ export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | nu
       id="linear-heading"
       title={t('title')}
       description={enabled === false ? undefined : state?.connected ? t('connectedTo', { organization: state.organizationName ?? '' }) : t('description')}
-      action={<div className="flex flex-wrap items-center gap-2">{enabled === false && <Badge variant="secondary">{t('syncDisabled')}</Badge>}{state?.connected ? <><Badge variant="secondary">{t('connected')}</Badge><Button variant="outline" size="sm" disabled={busy} onClick={() => void disconnect()}><Unplug data-icon="inline-start" />{t('disconnect')}</Button></> : <Button size="sm" disabled={busy || enabled !== true || !state?.configured} onClick={() => void connect()}>{t('connect')}<ArrowRight data-icon="inline-end" /></Button>}</div>}
+      action={<div className="flex flex-wrap items-center gap-2">{enabled === false && <Badge variant="secondary">{t('syncDisabled')}</Badge>}{state?.connected ? <><Badge variant="secondary">{t('connected')}</Badge><Button {...settingsSectionAction} disabled={busy} onClick={() => void disconnect()}><Unplug data-icon="inline-start" />{t('disconnect')}</Button></> : <Button size="sm" disabled={busy || enabled !== true || !state?.configured} onClick={() => void connect()}>{t('connect')}<ArrowRight data-icon="inline-end" /></Button>}</div>}
     >
       {state?.connected && <SettingRow title={t('teamLabel')} description={t('teamDescription')}>
         <div className="flex flex-col items-start gap-2">
