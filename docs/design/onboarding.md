@@ -61,6 +61,7 @@
 | 起名按钮 | 就叫这个 | That's the one |
 | 电脑 | 我是{name}。等我一下，我去把电脑打开。 | I'm {name}. One sec, I'll switch my computer on. |
 | 电脑状态 | 正在开机 | Starting up |
+| 开机失败 | 电脑稍后再开 | Computer will start later |
 | 屏幕标签 | {name} 的屏幕 | {name}'s screen |
 | 应用 | 把常用的应用给我，我帮你盯着。 | Hand me the apps you use, and I'll keep an eye on them. |
 | 应用承接 | 好，以后这些我帮你盯着。 | Got it. I'll keep an eye on these from now on. |
@@ -77,7 +78,7 @@
 ## 7. 数据与接线
 
 - 第 1 步建的就是一个真的 Bot（`bots` 表现有的 name、colour、shape 字段），不另建表。
-- 第 2 步复用每个 Bot 一台的云电脑（`cloud-computer-backend.md`）。账号没开通云电脑时，这一步只播动画，不显示开机状态。
+- 第 2 步复用每个 Bot 一台的云电脑（`cloud-computer-backend.md`）。生产环境从 2026-10-28 起对所有人开放（`NEXT_PUBLIC_COMPUTER_ENABLED=1`，见 4e65ef8），所以开机是真的。只有开机失败、或者撞上花费上限（#420）时，才退回到只播动画，并显示「电脑稍后再开」，引导照常往下走。
 - 第 4 步发出的那句话，就是发给这个 Bot 的第一条真实消息。第 5 步的进度来自它真实的运行情况；网页上的事按 R-72 由它的分身来做。
 - 每个用户记一个 `onboarding_completed_at`，在点「进入 Mikka」或「跳过引导」时写入。中途关掉或刷新时，从 Bot 已经建好的下一步接着走。
 
