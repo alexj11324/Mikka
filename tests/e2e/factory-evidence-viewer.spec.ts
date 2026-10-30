@@ -87,7 +87,7 @@ test.describe(() => {
   const viewerTask = randomUUID()
   const refused = app(`/api/factory/tasks/${viewerTask}/evidence/${clip}`)
   const conflict = 'Failed to load resource: the server responded with a status of 409 (Conflict)'
-  test.use({ expectedConsoleErrors: [{ path: refused, message: conflict }, { path: `${refused}?attempt=1`, message: conflict }] })
+  test.use({ expectedConsoleErrors: async ({}, use) => { await use([{ path: refused, message: conflict }, { path: `${refused}?attempt=1`, message: conflict }]) } })
 
 test('evidence viewer: captures as thumbnails, image, recording error, text, keyboard and filmstrip', async ({ page }) => {
   const { acceptance, served } = await open(page, manifest, serveImages, viewerTask)
