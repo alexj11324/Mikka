@@ -1092,7 +1092,8 @@
     "dataExportRateLimited": "You can export your data once an hour. Try again in {minutes} min.",
     "accountEmailMismatch": "The email doesn’t match this account.",
     "accountSoleAdmin": "You’re the only admin of {workspaces}. Make another member an admin before deleting your account.",
-    "runChainEnded": "Every attempt of this thread has already ended; there is nothing left to stop."
+    "runChainEnded": "Every attempt of this thread has already ended; there is nothing left to stop.",
+    "botNotFound": "This bot does not exist in this workspace."
   },
   "Overview": {
     "sections": {
@@ -2034,7 +2035,14 @@
     },
     "sectionUnavailable": "This section is still being designed and has nothing to act on yet.",
     "workspaceLoading": "Loading the workspace…",
-    "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again."
+    "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again.",
+    "bots": {
+      "models": {
+        "mikka": "Mikka (default)",
+        "codex": "Codex",
+        "claude": "Claude"
+      }
+    }
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",

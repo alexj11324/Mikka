@@ -143,6 +143,7 @@ export const ACTION_ERROR_CODES = [
   'teamDeleteNameMismatch',
   'botDefaultRepositoryUnavailable',
   'botDefaultsConflict',
+  'botNotFound',
   'usageLimitReached',
   'usageCreditsExhausted',
   'billingNotConfigured',

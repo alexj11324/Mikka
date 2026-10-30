@@ -1092,7 +1092,8 @@
     "dataExportRateLimited": "每小时只能导出一次，{minutes} 分钟后可再次导出。",
     "accountEmailMismatch": "输入的邮箱与当前账户不一致。",
     "accountSoleAdmin": "你是工作区「{workspaces}」唯一的管理员。先把管理员身份转给其他成员，再删除账户。",
-    "runChainEnded": "此线程的所有尝试都已结束，没有可停止的运行。"
+    "runChainEnded": "此线程的所有尝试都已结束，没有可停止的运行。",
+    "botNotFound": "这个 Bot 不在当前工作区。"
   },
   "Overview": {
     "sections": {
@@ -2034,7 +2035,14 @@
     },
     "sectionUnavailable": "这个分区还在设计中，暂时没有可用的操作。",
     "workspaceLoading": "正在读取工作区…",
-    "workspaceUnavailable": "无法读取工作区，请刷新后重试。"
+    "workspaceUnavailable": "无法读取工作区，请刷新后重试。",
+    "bots": {
+      "models": {
+        "mikka": "Mikka 默认",
+        "codex": "Codex",
+        "claude": "Claude"
+      }
+    }
   },
   "TelegramBot": {
     "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
