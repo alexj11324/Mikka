@@ -22,6 +22,8 @@ export function featureAvailability(feature: UpcomingFeature, remoteValue: boole
 export const gatedFeatures = {
   /** The bots' cloud computer UI (#174); off until the E2B backend (#172) is live. */
   cloudComputer: 'mikka-cloud-computer',
+  /** Points that bill cloud computer time (计费 › 点数). Hidden while E2B runs on the workspace's own API key (Alex, 2026-10-30). */
+  computerBilling: 'mikka-computer-billing',
 } as const
 
 export type GatedFeature = keyof typeof gatedFeatures

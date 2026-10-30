@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { getBilling, openBillingPortal, startPlanCheckout } from '@/app/actions/billing'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
+import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { useActionError } from '@/lib/use-action-error'
 
 /**
@@ -15,6 +16,7 @@ import { useActionError } from '@/lib/use-action-error'
  */
 export function BillingSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.billing')
+  const computerBilling = useGatedFeature('computerBilling')
   const locale = useLocale()
   const actionError = useActionError()
   const billing = useSWR(['settings:billing', workspaceId], () => getBilling(workspaceId))
@@ -56,7 +58,7 @@ export function BillingSettings({ workspaceId }: { workspaceId: string }) {
       {data.live && <SettingRow title={t('seats')}><span>{t('seatsUsed', { used: data.members, total: data.seats })}</span></SettingRow>}
     </SettingsSection>
 
-    {(data.planPoints !== null || data.purchasedPoints > 0) && <SettingsSection id="billing-points" title={t('points')}>
+    {computerBilling && (data.planPoints !== null || data.purchasedPoints > 0) && <SettingsSection id="billing-points" title={t('points')}>
       {data.planPoints !== null && <SettingRow title={t('planPoints')}><span>{t('pointsValue', { points: number.format(data.planPoints) })}</span></SettingRow>}
       {data.purchasedPoints > 0 && <SettingRow title={t('purchasedPoints')} description={t('neverExpires')}><span>{t('pointsValue', { points: number.format(data.purchasedPoints) })}</span></SettingRow>}
     </SettingsSection>}

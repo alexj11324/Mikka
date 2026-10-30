@@ -12,6 +12,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
+import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { withBasePath } from '@/lib/base-path'
 import { useActionError } from '@/lib/use-action-error'
 
@@ -205,6 +206,7 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone }: { works
 /** S-I: lists what goes, then the name must be typed exactly. */
 function DeleteWorkspaceDialog({ workspaceId, name, onClose }: { workspaceId: string; name: string; onClose: () => void }) {
   const t = useTranslations('Settings.workspaceForm')
+  const computerBilling = useGatedFeature('computerBilling')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
   const impact = useSWR(['workspace:deletion-impact', workspaceId], () => getWorkspaceDeletionImpact(workspaceId))
@@ -235,7 +237,7 @@ function DeleteWorkspaceDialog({ workspaceId, name, onClose }: { workspaceId: st
           ? <ul className="flex list-disc flex-col gap-1 pl-5">
             <li>{t('deleteBots', { count: counts.bots })}</li>
             <li>{t('deleteTasks', { tasks: counts.tasks, teams: counts.teams })}</li>
-            {counts.purchasedPoints > 0 && <li>{t('deletePoints', { points: counts.purchasedPoints })}</li>}
+            {computerBilling && counts.purchasedPoints > 0 && <li>{t('deletePoints', { points: counts.purchasedPoints })}</li>}
           </ul>
           : impact.data?.error ? <p role="alert" className="text-destructive">{actionError(impact.data.error)}</p> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
         <p className="text-muted-foreground">{t('deleteKept')}</p>
