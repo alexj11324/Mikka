@@ -1,3 +1,4 @@
+import { CiBudgetDeferred } from './budget'
 import { githubAppJwt } from '../../suggestions/github-redelivery'
 import { githubRepository } from '../run-pull-request'
 import type { Check, CommitStatus, RequiredCheck, Snapshot, WorkflowRun } from './snapshot'
@@ -26,7 +27,7 @@ export async function readCi(binding: Binding, env: Record<string, string | unde
     let response: Response
     const remaining = options.deadline === undefined ? 8_000 : Math.min(8_000, options.deadline - Date.now())
     if (remaining <= 0) throw new CiReadError('unavailable')
-    try { response = await fetcher(`https://api.github.com${pathname}`, { method: body ? 'POST' : 'GET', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(remaining), headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${token}`, 'content-type': 'application/json', 'x-github-api-version': '2022-11-28' }, ...(body ? { body: JSON.stringify(body) } : {}) }) } catch { throw new CiReadError('unavailable') }
+    try { response = await fetcher(`https://api.github.com${pathname}`, { method: body ? 'POST' : 'GET', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(remaining), headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${token}`, 'content-type': 'application/json', 'x-github-api-version': '2022-11-28' }, ...(body ? { body: JSON.stringify(body) } : {}) }) } catch (error) { if(error instanceof CiBudgetDeferred)throw error; throw new CiReadError('unavailable') }
     if (response.status === 401 || response.status === 403 || response.status === 404) throw new CiReadError(response.status === 403 && (response.headers.has('retry-after') || response.headers.get('x-ratelimit-remaining') === '0') ? 'unavailable' : 'permission')
     if (response.status === 422 && body) throw new CiReadError('permission')
     if (!response.ok) throw new CiReadError('unavailable')
@@ -140,7 +141,7 @@ export async function readPendingCiAttempts(binding: Binding, head: string, atte
     let response: Response
     try {
       response = await fetcher(`https://api.github.com${pathname}`, { method: body ? 'POST' : 'GET', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(remaining), headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${token}`, 'content-type': 'application/json', 'x-github-api-version': '2022-11-28' }, ...(body ? { body: JSON.stringify(body) } : {}) })
-    } catch { throw new CiReadError('unavailable') }
+    } catch (error) { if(error instanceof CiBudgetDeferred)throw error; throw new CiReadError('unavailable') }
     if (response.status === 401 || response.status === 403 || response.status === 404) throw new CiReadError(response.status === 403 && (response.headers.has('retry-after') || response.headers.get('x-ratelimit-remaining') === '0') ? 'unavailable' : 'permission')
     if (response.status === 422 && body) throw new CiReadError('permission')
     if (!response.ok) throw new CiReadError('unavailable')

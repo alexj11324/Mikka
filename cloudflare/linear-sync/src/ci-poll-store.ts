@@ -24,14 +24,24 @@ export function postgresCiPollAdapter(pool: Pool, read: (lease:CiPollLease,signa
     read, readFresh, authorize,
     async lease(limit, now) {
       return transaction(async tx => {
-        const rows=await tx.query(`SELECT o.*,gi."installationId",gi."repositoryId",gi."githubAccountId",p.branch,i."userId" AS "issueOwner",i.scope AS "issueScope" FROM github_ci_observations o
+        const rows=await tx.query(`WITH ranked AS (
+          SELECT c."watchId", row_number() OVER (PARTITION BY c."userId" ORDER BY c."nextCheckAt",c."watchId") AS turn
+          FROM github_ci_observations c
+          JOIN github_repository_installations g ON g."userId"=c."userId" AND g."remoteKey"=c."remoteKey"
+          JOIN LATERAL (SELECT a."accountId" FROM account a WHERE a."userId"=c."userId" AND a."providerId"='github' ORDER BY a."createdAt" LIMIT 1) linked ON linked."accountId"=g."githubAccountId"
+          JOIN run_publications pub ON pub."runId"=c."originRunId" AND pub."userId"=c."userId" AND pub."issueId"=c."issueId" AND pub."remoteKey"=c."remoteKey" AND pub.status='published'
+          JOIN issues issue ON issue.id=c."issueId" AND issue."scopeVersion"=c."scopeVersion" AND (issue."userId"=c."userId" OR issue.scope='workspace')
+          WHERE c."nextCheckAt"<=to_timestamp($1/1000.0) AND c."expiresAt">now() AND (c."pollLeaseUntil" IS NULL OR c."pollLeaseUntil"<=now()) AND coalesce(issue.content #>> '{attrs,mikka,deletedAt}',issue.content #>> '{attrs,orvilo,deletedAt}','')=''
+
+        ) SELECT o.*,gi."installationId",gi."repositoryId",gi."githubAccountId",p.branch,i."userId" AS "issueOwner",i.scope AS "issueScope" FROM github_ci_observations o
+          JOIN ranked ON ranked."watchId"=o."watchId"
           JOIN github_repository_installations gi ON gi."userId"=o."userId" AND gi."remoteKey"=o."remoteKey"
           JOIN LATERAL (SELECT a."accountId" FROM account a WHERE a."userId"=o."userId" AND a."providerId"='github' ORDER BY a."createdAt" LIMIT 1) linked ON linked."accountId"=gi."githubAccountId"
           JOIN run_publications p ON p."runId"=o."originRunId" AND p."userId"=o."userId" AND p."issueId"=o."issueId" AND p."remoteKey"=o."remoteKey" AND p.status='published'
           JOIN issues i ON i.id=o."issueId" AND i."scopeVersion"=o."scopeVersion" AND (i."userId"=o."userId" OR i.scope='workspace')
           WHERE o."nextCheckAt"<=to_timestamp($1/1000.0) AND o."expiresAt">now() AND (o."pollLeaseUntil" IS NULL OR o."pollLeaseUntil"<=now())
             AND coalesce(i.content #>> '{attrs,mikka,deletedAt}',i.content #>> '{attrs,orvilo,deletedAt}','')=''
-          ORDER BY o."nextCheckAt",o."watchId" FOR UPDATE OF o SKIP LOCKED LIMIT $2`,[now,limit])
+          ORDER BY ranked.turn,o."nextCheckAt",o."watchId" FOR UPDATE OF o SKIP LOCKED LIMIT $2`,[now,limit])
         const leases:CiPollLease[]=[]
         for (const r of rows.rows) {
           const token=randomUUID()
@@ -48,6 +58,12 @@ export function postgresCiPollAdapter(pool: Pool, read: (lease:CiPollLease,signa
     },
     async close(lease) {
       await update(lease,`UPDATE github_ci_observations SET "expiresAt"=now(),"pollLeaseId"=NULL,"pollLeaseUntil"=NULL`)
+    },
+    async release(lease) {
+      await update(lease,`UPDATE github_ci_observations SET "pollLeaseId"=NULL,"pollLeaseUntil"=NULL`)
+    },
+    async defer(lease,nextAt) {
+      await update(lease,`UPDATE github_ci_observations SET "nextCheckAt"=to_timestamp($8/1000.0),"pollLeaseId"=NULL,"pollLeaseUntil"=NULL`,[nextAt])
     },
     async retry(lease,nextAt,code) {
       await update(lease,`UPDATE github_ci_observations SET "nextCheckAt"=to_timestamp($8/1000.0),"pollAttempt"=least("pollAttempt"+1,8),"lastError"=$9,"pendingReasonSince"=CASE WHEN "pendingReason"=$9 THEN coalesce("pendingReasonSince",now()) ELSE now() END,"pendingReason"=$9,"pollLeaseId"=NULL,"pollLeaseUntil"=NULL`,[nextAt,code])
@@ -66,7 +82,7 @@ export function postgresCiPollAdapter(pool: Pool, read: (lease:CiPollLease,signa
         const prior=await tx.query(`SELECT "deliveredAt" FROM github_ci_poll_outbox WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4 AND head=$5`,[...p.slice(0,4),result.head])
         // Enqueue is not delivery. The outbox records delivery only after the
         // application has revalidated and accepted the final result.
-        await tx.query(`UPDATE github_ci_observations SET "pollObservation"=$8::jsonb,"nextCheckAt"=now()+interval '15 minutes',"pollAttempt"=0,"pollLeaseId"=NULL,"pollLeaseUntil"=NULL WHERE ${predicate}`,[...p,JSON.stringify(prior.rows[0]?.deliveredAt ? {...state,deliveredFingerprint:result.fingerprint} : state)])
+        await tx.query(`UPDATE github_ci_observations SET "pollObservation"=$8::jsonb,"nextCheckAt"=now()+interval '15 minutes',"pollAttempt"=0,"lastError"=NULL,"pendingReason"=NULL,"pendingReasonSince"=NULL,"pollLeaseId"=NULL,"pollLeaseUntil"=NULL WHERE ${predicate}`,[...p,JSON.stringify(prior.rows[0]?.deliveredAt ? {...state,deliveredFingerprint:result.fingerprint} : state)])
       })
     },
   }

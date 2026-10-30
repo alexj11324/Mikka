@@ -1,4 +1,5 @@
 import { Pool } from 'pg'
+import { budgetedCiFetch, checkCiBudget, CiBudgetDeferred } from '../../../lib/github/ci/budget'
 import { readCi, readCiHead } from '../../../lib/github/ci/read'
 import { pollActiveCi } from './ci-poller'
 import { postgresCiPollAdapter } from './ci-poll-store'
@@ -23,9 +24,11 @@ export async function runCiScheduled(env:{HYPERDRIVE?:{connectionString:string};
     const read=async (lease:import('./ci-poller').CiPollLease,signal:AbortSignal,fresh:boolean)=>{
       if (!lease.binding) throw new Error('CI binding unavailable')
       const {remoteKey,installationId,repositoryId,prNumber,branch}=lease.binding
-      const fetcher:typeof fetch=(input,init)=>fetch(input,{...init,signal:init?.signal ? AbortSignal.any([signal,init.signal]) : signal})
+      const fetcher=budgetedCiFetch(pool,(input,init)=>fetch(input,{...init,signal:init?.signal ? AbortSignal.any([signal,init.signal]) : signal}))
       const token=await scopedCiToken(pool,lease,env.CRON_SECRET!,async current=>{
+        await checkCiBudget(pool)
         const response=await fetch(`${env.MIKKA_URL!.replace(/\/+$/,'')}/api/cron/ci-token`,{method:'POST',redirect:'error',headers:{authorization:`Bearer ${env.CRON_SECRET}`,'content-type':'application/json'},body:JSON.stringify({watchId:current.id,leaseId:current.token,generation:current.generation}),signal})
+        if(response.status===429)throw new CiBudgetDeferred()
         if(!response.ok)throw new Error('CI token unavailable')
         return await response.json() as {token:string;expiresAt:string}
       })
@@ -38,12 +41,12 @@ export async function runCiScheduled(env:{HYPERDRIVE?:{connectionString:string};
     }
     const base=postgresCiPollAdapter(pool,(lease,signal)=>read(lease,signal,false),async lease=>{if(!lease.binding)throw new Error('CI binding unavailable');return authorize(lease.binding)},(lease,signal)=>read(lease,signal,true))
     const adapter=base
-    const polled=await pollActiveCi(adapter,{deadline,limit:2})
+    const polled=await pollActiveCi(adapter,{deadline:deadline-15_000,limit:12})
     if (polled.failed) console.error('CI polling watch failures', {failed:polled.failed,scanned:polled.scanned})
     const delivered=await deliverCiOutbox(pool,async(item,signal)=>{
       const response=await fetch(`${env.MIKKA_URL!.replace(/\/+$/,'')}/api/cron/ci-final`,{method:'POST',redirect:'error',headers:{authorization:`Bearer ${env.CRON_SECRET}`,'content-type':'application/json'},body:JSON.stringify(item),signal})
       await response.body?.cancel()
-      return response.ok
+      return response.status===429 ? 'deferred' as const : response.ok
     },{deadline,limit:4,authorize})
     if (delivered.failed) console.error('CI polling delivery failures', {failed:delivered.failed})
   } finally { await pool.end(); await workspace.end() }

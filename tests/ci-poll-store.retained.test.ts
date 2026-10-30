@@ -48,9 +48,20 @@ test('durable CI polling leases, fencing and outbox survive overlapping workers'
   assert.equal(cached.pollTokenEnvelope.includes(Buffer.from('synthetic-repository-token')),false)
   const state={head:'a'.repeat(40),fingerprint:'synthetic-fingerprint',firstSeenAt:1,deliveredFingerprint:null}
   await one.complete(lease,state,{head:state.head,fingerprint:state.fingerprint,outcome:'success',failed:[]})
+  const cleared=(await db.query('SELECT "lastError","pendingReason","pendingReasonSince" FROM github_ci_observations WHERE "watchId"=$1',[watch])).rows[0]
+  assert.deepEqual(cleared,{lastError:null,pendingReason:null,pendingReasonSince:null})
   await assert.rejects(two.complete(lease,state,{head:state.head,fingerprint:state.fingerprint,outcome:'success',failed:[]}))
   assert.equal((await db.query('SELECT count(*)::int AS n FROM github_ci_poll_outbox')).rows[0].n,1)
   let calls=0
+  const timedOut=await deliverCiOutbox(db,async()=>{calls++;return true},{limit:1,deadline:Date.now()-1,authorize:authority})
+  assert.equal(timedOut.failed,0);assert.equal(calls,0)
+  assert.equal((await db.query('SELECT attempts FROM github_ci_poll_outbox')).rows[0].attempts,0)
+  await db.query(`UPDATE github_ci_poll_outbox SET "nextAttemptAt"=now()`)
+  const deferred=await deliverCiOutbox(db,async()=>{calls++;return 'deferred'},{limit:1,deadline:Date.now()+30000,authorize:authority})
+  assert.equal(deferred.failed,0)
+  assert.equal((await db.query('SELECT attempts FROM github_ci_poll_outbox')).rows[0].attempts,0)
+  await db.query(`UPDATE github_ci_poll_outbox SET "nextAttemptAt"=now()`)
+  calls=0
   const failed=await deliverCiOutbox(db,async()=>{calls++;return false},{limit:1,deadline:Date.now()+30000,authorize:authority})
   assert.equal(failed.failed,1); assert.equal(calls,1)
   assert.equal((await db.query('SELECT "pollObservation" FROM github_ci_observations')).rows[0].pollObservation.deliveredFingerprint,null)
@@ -73,6 +84,21 @@ test('durable CI polling leases, fencing and outbox survive overlapping workers'
   clock+=120_000; assert.equal((await poll()).completed,1)
   assert.equal((await deliverCiOutbox(db,async()=>{callbacks++;return true},{limit:4,deadline:Date.now()+30000,authorize:authority})).sent,1)
   clock+=120_000; await poll(); await deliverCiOutbox(db,async()=>{callbacks++;return true},{limit:4,deadline:Date.now()+30000,authorize:authority}); assert.equal(callbacks,1)
+  // A busy user cannot monopolize a batch while another user is due.
+  await db.query(`UPDATE github_ci_observations SET "nextCheckAt"=now()+interval '1 hour'`)
+  for (const [user,n] of [['hot',3],['cold',1]] as const) {
+    const repo=`v2/github.com/${user}/repo`
+    await db.query(`INSERT INTO github_repository_installations VALUES ($1,$2,4,5,$1)`,[user,repo])
+    await db.query(`INSERT INTO account VALUES ($1,'github',$1,now())`,[user])
+    for(let i=0;i<n;i++) {
+      const iid=randomUUID(),rid=randomUUID(),wid=randomUUID()
+      await db.query(`INSERT INTO issues VALUES ($1,$2,1,'{}'::jsonb,'personal')`,[iid,user])
+      await db.query(`INSERT INTO github_ci_observations ("userId","issueId","remoteKey","prNumber","originRunId","watchId",generation,"nextCheckAt","expiresAt","scopeVersion") VALUES ($1,$2,$3,$4,$5,$6,0,now()-interval '1 minute',now()+interval '1 hour',1)`,[user,iid,repo,i+1,rid,wid])
+      await db.query(`INSERT INTO run_publications VALUES ($1,$2,$3,$4,'published','feature')`,[rid,user,iid,repo])
+    }
+  }
+  const fair=await one.lease(2,Date.now());assert.deepEqual(new Set(fair.map(x=>x.binding?.userId)),new Set(['hot','cold']))
+  await Promise.all(fair.map(x=>one.release(x)))
   console.log(`Retained CI polling schema: ${schema}`)
   await db.end(); await admin.end()
 })

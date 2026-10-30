@@ -1,3 +1,4 @@
+import { budgetedCiFetch } from '@/lib/github/ci/budget'
 import 'server-only'
 import { createHash } from 'node:crypto'
 import type { PoolClient } from 'pg'
@@ -76,9 +77,10 @@ export async function preflightCiClaim(userId: string, c: CiContinuation): Promi
   const generation = binding.generation === null ? null : String(binding.generation)
   try {
     const signal = AbortSignal.timeout(20_000)
-    const access = await verifyGitHubRepositoryAccess({ remoteKey: c.remoteKey, githubAccountId: await linkedGitHubAccountId(userId), fetcher: (url, init) => fetch(url, { ...init, signal: init?.signal ? AbortSignal.any([signal, init.signal]) : signal }) })
+    const githubFetch=budgetedCiFetch(pool,(url,init)=>fetch(url,{...init,signal:init?.signal ? AbortSignal.any([signal,init.signal]) : signal}))
+    const access = await verifyGitHubRepositoryAccess({ remoteKey: c.remoteKey, githubAccountId: await linkedGitHubAccountId(userId), fetcher: githubFetch })
     if (access.installationId !== Number(binding.installationId) || access.repositoryId !== Number(binding.repositoryId)) return { kind: 'unavailable' }
-    const result = await readCi({ remoteKey: c.remoteKey, installationId: Number(binding.installationId), repositoryId: Number(binding.repositoryId), prNumber: c.prNumber, branch: binding.branch }, process.env, fetch, { deadline: Date.now() + 20_000 })
+    const result = await readCi({ remoteKey: c.remoteKey, installationId: Number(binding.installationId), repositoryId: Number(binding.repositoryId), prNumber: c.prNumber, branch: binding.branch }, process.env, githubFetch, { deadline: Date.now() + 20_000 })
     const attempts = process.env.MIKKA_CI_EXTERNAL_POLLING === '1' ? [] : await listCiWorkflowAttempts(pool, { userId, issueId: c.issueId, remoteKey: c.remoteKey, prNumber: c.prNumber, head: c.head })
     const summary = summarize(result.snapshot, attempts)
     if (!result.open || result.head !== c.head) return { kind: 'stale', generation }

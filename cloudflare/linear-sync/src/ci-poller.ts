@@ -1,3 +1,4 @@
+import { CiBudgetDeferred } from '../../../lib/github/ci/budget'
 import { CiReadError } from '../../../lib/github/ci/read'
 import { summarize, type Snapshot } from '../../../lib/github/ci/snapshot'
 import { observe, type Observation } from '../../../lib/github/ci/observation'
@@ -16,6 +17,9 @@ export interface CiPollAdapter {
   /** Persist state and next due time only if the lease/generation is current. */
   pending(lease: CiPollLease, state: Observation | null, nextAt: number): Promise<void>
   close(lease: CiPollLease): Promise<void>
+  /** A batch deadline is not a provider error; make an unvisited lease due again. */
+  release(lease: CiPollLease): Promise<void>
+  defer(lease: CiPollLease, nextAt: number): Promise<void>
   /** Atomically fence current head and generation and enqueue an idempotent
    * final result; never call this for intermediate workflow events. */
   complete(lease: CiPollLease, state: Observation, result: CiPollResult): Promise<void>
@@ -36,13 +40,17 @@ export async function pollActiveCi(adapter: CiPollAdapter, options: { now?: () =
   if (leases.length > limit) throw new Error('CI lease limit exceeded')
   const counts = {scanned:0,completed:0,pending:0,failed:0}
   for (const lease of leases) {
+    if (options.deadline - now() < 3_000) {
+      await adapter.release(lease).catch(() => undefined)
+      continue
+    }
     counts.scanned++
     let authority: Awaited<ReturnType<CiPollAdapter['authorize']>> | undefined
     try {
       authority=await adapter.authorize(lease)
       await authority.check()
       const remaining = options.deadline - now()
-      if (remaining <= 0) throw new Error('CI poll deadline exceeded')
+      if (remaining < 3_000) { await adapter.release(lease); continue }
       const current = await adapter.read(lease, AbortSignal.timeout(Math.min(remaining, 30_000)))
       if (!/^[a-f0-9]{40}$/i.test(current.head)) throw new Error('Invalid CI head')
       if (!current.open) { await adapter.close(lease); continue }
@@ -56,7 +64,7 @@ export async function pollActiveCi(adapter: CiPollAdapter, options: { now?: () =
       const decision = observe(lease.observation,head,summary,now(),QUIET_MS)
       if (decision.deliver && summary.kind === 'complete' && decision.state) {
         await authority.check()
-        const left=options.deadline-now();if(left<=0)throw new Error('CI poll deadline exceeded')
+        const left=options.deadline-now();if(left<3000){await adapter.release(lease);continue}
         const fresh=await adapter.readFresh(lease,AbortSignal.timeout(Math.min(left,30_000)))
         if(!fresh.open){await adapter.close(lease);continue}
         if(!/^[a-f0-9]{40}$/i.test(fresh.head))throw new Error('Invalid CI head')
@@ -77,6 +85,7 @@ export async function pollActiveCi(adapter: CiPollAdapter, options: { now?: () =
         counts.pending++
       }
     } catch (error) {
+      if (error instanceof CiBudgetDeferred) { await adapter.defer(lease,now()+BASE_MS).catch(()=>undefined); continue }
       const code = error instanceof CiReadError ? error.code : 'unavailable'
       const attempt = Math.max(0, Math.min(8, lease.attempt))
       const cap = Math.min(MAX_BACKOFF_MS,BASE_MS * 2 ** attempt)

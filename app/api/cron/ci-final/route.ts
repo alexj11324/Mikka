@@ -1,3 +1,5 @@
+import { budgetedCiFetch, CiBudgetDeferred } from '@/lib/github/ci/budget'
+import { readCi } from '@/lib/github/ci/read'
 import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { verifyBearer } from '@/lib/linear-sync/webhook'
@@ -30,7 +32,7 @@ export async function POST(request:Request) {
   const updated=await pool.query(`UPDATE github_ci_observations o SET "nextCheckAt"=least(o."nextCheckAt",now()),head=$2,fingerprint=$3,"firstSeenAt"=to_timestamp((o."pollObservation"->>'firstSeenAt')::double precision/1000),"deliveredFingerprint"=CASE WHEN o.head=$2 THEN o."deliveredFingerprint" ELSE NULL END,"updatedAt"=now() FROM github_ci_poll_outbox q WHERE o."watchId"=$1 AND o."expiresAt">now() AND o."pollObservation"->>'head'=$2 AND o."pollObservation"->>'fingerprint'=$3 AND q."userId"=o."userId" AND q."issueId"=o."issueId" AND q."remoteKey"=o."remoteKey" AND q."prNumber"=o."prNumber" AND q.head=$2 AND q.payload->>'fingerprint'=$3 AND q."originRunId"=o."originRunId" AND q."scopeVersion"=o."scopeVersion" AND q.generation=o.generation RETURNING o."watchId"`,[watchId,head,fingerprint])
   if (!updated.rowCount) return new Response(null,{status:409})
   try {
-    const result=await (await import('@/lib/github/ci/reconcile')).reconcileCi({pool,deadline:Date.now()+30_000,limit:1,watchId})
+    const result=await (await import('@/lib/github/ci/reconcile')).reconcileCi({pool,deadline:Date.now()+30_000,limit:1,watchId,read:(binding,env,_fetcher,options)=>readCi(binding,env,budgetedCiFetch(pool),options)})
     if (result.failed) return new Response(null,{status:503,headers:{'cache-control':'no-store'}})
     if (!result.queued && !result.escalated && !result.closed) {
       // Lost HTTP responses may cause a retry after a durable queue/claim.
@@ -38,5 +40,5 @@ export async function POST(request:Request) {
       if (!accepted.rowCount) return new Response(null,{status:503,headers:{'cache-control':'no-store'}})
     }
     return new Response(null,{status:202,headers:{'cache-control':'no-store'}})
-  } catch { return new Response(null,{status:503,headers:{'cache-control':'no-store'}}) }
+  } catch (error) { return new Response(null,{status:error instanceof CiBudgetDeferred ? 429 : 503,headers:{'cache-control':'no-store'}}) }
 }

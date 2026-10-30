@@ -1,4 +1,5 @@
 import 'server-only'
+import { CiBudgetDeferred } from './budget'
 import type { Pool, PoolClient } from 'pg'
 import { createHash, randomUUID } from 'node:crypto'
 import { CiContinuationUnsupported } from '@/lib/ci-continuation-contract'
@@ -113,6 +114,7 @@ export async function reconcileCi(options: { pool: Pool; deadline: number; limit
         if (attempts.some(attempt => attempt.state !== 'completed')) recovered = await (options.recoverAttempts ?? readPendingCiAttempts)(binding, current.head, attempts, process.env, undefined, { deadline: providerDeadline })
       }
     } catch (error) {
+      if(error instanceof CiBudgetDeferred)throw error
       const code = error instanceof CiReadError ? error.code : 'unavailable'
       await postpone(code, true).catch(() => {})
       // A deterministic provider/configuration refusal is not a CI failure or

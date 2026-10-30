@@ -22,7 +22,12 @@ async function handleGET(request: Request) {
     (async () => {
       // Enable only after the external poller is healthy and the CI webhook
       // subscription has been switched off. Briefings remain unchanged.
-      if (process.env.MIKKA_CI_EXTERNAL_POLLING === '1') return { failed: 0 }
+      if (process.env.MIKKA_CI_EXTERNAL_POLLING === '1') {
+        try {
+          const [{ pool }, { notifyPollFailures }] = await Promise.all([import('@/lib/db'),import('@/lib/github/ci/poll-attention')])
+          return await notifyPollFailures(pool,deadline,wakeCoordinator)
+        } catch { return {failed:1} }
+      }
       try {
         const [{ pool }, { reconcileCi }, { retryPendingCiEscalations }] = await Promise.all([import('@/lib/db'), import('@/lib/github/ci/reconcile'), import('@/lib/github/ci/escalation-recovery')])
         const [observations, escalations] = await Promise.all([reconcileCi({ pool, deadline, limit: 4 }), retryPendingCiEscalations({ pool, deadline })])

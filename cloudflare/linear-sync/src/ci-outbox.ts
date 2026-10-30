@@ -3,7 +3,7 @@ import type { Pool } from 'pg'
 
 /** A bounded delivery batch. A crash or non-2xx response leaves the same
  * durable result retryable; the app must deduplicate the watch/head pair. */
-export async function deliverCiOutbox(pool:Pool, send:(item:{watchId:string;head:string;fingerprint:string},signal:AbortSignal)=>Promise<boolean>, options:{limit:number;deadline:number;now?:()=>number;random?:()=>number;authorize:(item:{userId:string;issueId:string;issueOwner:string;issueScope:string})=>Promise<{check():Promise<void>;close():Promise<void>}>}):Promise<{sent:number;failed:number}> {
+export async function deliverCiOutbox(pool:Pool, send:(item:{watchId:string;head:string;fingerprint:string},signal:AbortSignal)=>Promise<boolean | 'deferred'>, options:{limit:number;deadline:number;now?:()=>number;random?:()=>number;authorize:(item:{userId:string;issueId:string;issueOwner:string;issueScope:string})=>Promise<{check():Promise<void>;close():Promise<void>}>}):Promise<{sent:number;failed:number}> {
   const now=options.now ?? Date.now, random=options.random ?? Math.random, limit=Math.max(1,Math.min(20,Math.floor(options.limit)))
   const tx=await pool.connect()
   const leased:Array<{userId:string;issueId:string;issueOwner:string;issueScope:string;remoteKey:string;prNumber:number;head:string;watchId:string;fingerprint:string;leaseId:string;attempts:number}>=[]
@@ -19,14 +19,14 @@ export async function deliverCiOutbox(pool:Pool, send:(item:{watchId:string;head
   } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
   const result={sent:0,failed:0}
   for (const item of leased) {
-    let ok=false
+    let ok:boolean|'deferred'=false
     let authority:Awaited<ReturnType<typeof options.authorize>>|undefined
-    try { authority=await options.authorize(item); await authority.check(); const remaining=options.deadline-now(); if (remaining>0) ok=await send({watchId:item.watchId,head:item.head,fingerprint:item.fingerprint},AbortSignal.timeout(Math.min(remaining,30_000))); await authority.check() } catch { ok=false } finally { await authority?.close() }
+    try { authority=await options.authorize(item); await authority.check(); const remaining=options.deadline-now(); if (remaining>0) ok=await send({watchId:item.watchId,head:item.head,fingerprint:item.fingerprint},AbortSignal.timeout(Math.min(remaining,30_000))); else ok='deferred'; await authority.check() } catch { ok=false } finally { await authority?.close() }
     const args=[item.userId,item.issueId,item.remoteKey,item.prNumber,item.head,item.leaseId]
-    const sql=ok
+    const sql=ok===true
       ? `UPDATE github_ci_poll_outbox SET "deliveredAt"=now(),"leaseId"=NULL,"leaseUntil"=NULL WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4 AND head=$5 AND "leaseId"=$6 AND "deliveredAt" IS NULL`
       : `UPDATE github_ci_poll_outbox SET attempts=least(attempts+1,8),"nextAttemptAt"=to_timestamp($7/1000.0),"leaseId"=NULL,"leaseUntil"=NULL WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4 AND head=$5 AND "leaseId"=$6 AND "deliveredAt" IS NULL`
-    if (ok) {
+    if (ok===true) {
       const client=await pool.connect()
       try {
         await client.query('BEGIN')
@@ -37,6 +37,8 @@ export async function deliverCiOutbox(pool:Pool, send:(item:{watchId:string;head
         }
         await client.query('COMMIT')
       } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+    } else if (ok==='deferred') {
+      await pool.query(`UPDATE github_ci_poll_outbox SET "nextAttemptAt"=now()+interval '15 minutes',"leaseId"=NULL,"leaseUntil"=NULL WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4 AND head=$5 AND "leaseId"=$6 AND "deliveredAt" IS NULL`,args)
     } else {
       const delay=Math.min(3_600_000,60_000*2**Math.max(0,Math.min(6,item.attempts))) * (0.8+0.2*Math.max(0,Math.min(1,random())))
       const updated=await pool.query(sql,[...args,now()+Math.floor(delay)])

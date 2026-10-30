@@ -1,3 +1,4 @@
+import { budgetedCiFetch, CiBudgetDeferred } from '@/lib/github/ci/budget'
 import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { verifyBearer } from '@/lib/linear-sync/webhook'
@@ -22,15 +23,18 @@ export async function POST(request:Request) {
   const parsed=input.safeParse(value);if(!parsed.success)return new Response(null,{status:400,headers})
   const args=[parsed.data.watchId,parsed.data.leaseId,parsed.data.generation]
   let membership:Awaited<ReturnType<typeof acquireCiMembership>>|undefined
+  let budgetDeferred=false
   try {
     const hints=await pool.query(query,args);if(hints.rowCount!==1)throw Error()
     const h=hints.rows[0]
     membership=await acquireCiMembership(h.issueId,h.userId,h.issueOwner,undefined,h.scope==='workspace')
     if(!ciIssueAuthorized({userId:h.issueOwner,scope:h.scope,scopeVersion:h.currentScopeVersion,content:h.content},h.userId,h.scopeVersion,membership.held,v=>Boolean(readIssueMetadata(v as never).deletedAt)))throw Error()
-    const access=await verifyGitHubRepositoryAccess({remoteKey:h.remoteKey,githubAccountId:h.githubAccountId})
+    const limited=budgetedCiFetch(pool)
+    const githubFetch:typeof fetch=async(input,init)=>{try{return await limited(input,init)}catch(error){if(error instanceof CiBudgetDeferred)budgetDeferred=true;throw error}}
+    const access=await verifyGitHubRepositoryAccess({remoteKey:h.remoteKey,githubAccountId:h.githubAccountId,fetcher:githubFetch})
     if(access.installationId!==Number(h.installationId)||access.repositoryId!==Number(h.repositoryId))throw Error()
     const jwt=githubAppJwt(process.env.GITHUB_APP_ID!,process.env.GITHUB_APP_PRIVATE_KEY!)
-    const response=await fetch(`https://api.github.com/app/installations/${access.installationId}/access_tokens`,{method:'POST',redirect:'error',headers:{authorization:`Bearer ${jwt}`,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28'},body:JSON.stringify({repository_ids:[access.repositoryId],permissions:{metadata:'read',pull_requests:'read',checks:'read',statuses:'read',contents:'read',actions:'read'}}),signal:AbortSignal.timeout(8000)})
+    const response=await githubFetch(`https://api.github.com/app/installations/${access.installationId}/access_tokens`,{method:'POST',redirect:'error',headers:{authorization:`Bearer ${jwt}`,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28'},body:JSON.stringify({repository_ids:[access.repositoryId],permissions:{metadata:'read',pull_requests:'read',checks:'read',statuses:'read',contents:'read',actions:'read'}}),signal:AbortSignal.timeout(8000)})
     if(!response.ok)throw Error()
     const token=z.object({token:z.string().min(1).max(4096),expires_at:z.iso.datetime()}).parse(await response.json())
     const expiry=Date.parse(token.expires_at);if(expiry<=Date.now()+300000||expiry>Date.now()+65*60000)throw Error()
@@ -45,5 +49,5 @@ export async function POST(request:Request) {
       await membership.check();await client.query('COMMIT');await membership.check()
       return Response.json({token:token.token,expiresAt:token.expires_at},{headers})
     } catch(error){await client.query('ROLLBACK');throw error}finally{client.release()}
-  } catch {return Response.json({error:'ci_token_unavailable'},{status:409,headers})} finally {await membership?.close()}
+  } catch (error) {if(budgetDeferred || error instanceof CiBudgetDeferred)return new Response(null,{status:429,headers});return Response.json({error:'ci_token_unavailable'},{status:409,headers})} finally {await membership?.close()}
 }

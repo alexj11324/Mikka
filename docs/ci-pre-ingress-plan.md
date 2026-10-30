@@ -64,9 +64,8 @@ per active watch. Pagination, retries and interrupted leases add more. At a
 64 polling calls plus up to nine for the final fresh read, 12 issuance calls,
 two authentication requests and one final result request. This is an estimate,
 not a reduction of GitHub traffic.
-The batch limit is two watches per invocation, with backoff and jitter;
-backlog delays later watches. A global rate budget remains to be implemented
-and latency and cost must be measured before deployment.
+The batch limit is twelve watches per invocation, with backoff and jitter;
+backlog delays later watches. The external polling path shares a 600-request fixed-hour budget in the application database across Worker polls, token issuance, final reconciliation and claim preflight. A fixed window can permit nearly 1,200 requests across a window boundary; GitHub 429 and rate-limit responses close the shared circuit through the indicated retry/reset time. The limit does not include unrelated application GitHub traffic or legacy webhook briefing/reconciliation reads; claim preflight is budgeted in both modes. The global circuit can pause all watches when any installation reports a rate limit. Deadline or budget deferrals do not count as provider failures. The batch limit is a ceiling, not a latency guarantee: the 35-second polling budget may leave some watches for later batches. The 48-watch no-latency simulation is not an observed production throughput benchmark; measure backlog age and real request cost before deployment.
 
 The parent reports that CI event subscriptions have already been disabled;
 the active poller is not deployed, leaving a temporary CI detection gap.
@@ -78,4 +77,4 @@ the future. Missing required contexts remain pending, and a quiet window bounds
 but does not eliminate that uncertainty. Same-commit reruns after a claimed
 result intentionally do not generate another automatic wake.
 
-Poll read errors are stored as bounded categories and retried. Token, access and workspace errors currently collapse to unavailable; delivery errors retain only retry counts. Durable user-facing notification for persistent or unrecoverable errors remains required before cutover.
+Poll read errors are stored as bounded categories and retried. Persistent poll or delivery failures can create one generic, deduplicated attention event via the already scheduled briefing request; authorization and current watch state are rechecked under locks. The Coordinator may be woken for an attention event, separately from the original task Agent's CI continuation. Token, access and workspace errors currently collapse to unavailable, so the generic event does not assert that reauthentication is required.
