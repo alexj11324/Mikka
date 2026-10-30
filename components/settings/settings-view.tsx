@@ -92,6 +92,8 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
     case 'bots': return workspaceId && !preview ? <BotAgentsSettings key={workspaceId} /> : waiting
+    // DevicesSettings renders above with its own title and 添加设备 button.
+    case 'computers': return null
     case 'permissions': return workspaceId && !preview ? <ComputerPolicySettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return <p className="py-8 text-sm text-muted-foreground">{t('sectionUnavailable')}</p>
   }
