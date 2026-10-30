@@ -93,6 +93,13 @@ test('real-driver offline exclusions require the actual source guard and the exp
   assert.throws(()=>inventory(tree,{...commands,[entry.script]:`node --test ${entry.file}`},[],REQUIRED_SUITES,[],[entry]),/source guard/)
   assert.throws(()=>inventory(tree,commands,[],REQUIRED_SUITES,[],[{...entry,reason:''}]),/source guard/)
 })
+test('offline guard import is resolved relative to the suite file',()=>{
+  const entry={file:'lib/nested/offline.test.ts',script:'test:offline',guard:'scripts/guard.mjs',reason:'reviewed zero-transport test'}
+  const tree={...files,[entry.file]:"import '../../scripts/guard.mjs'\nimport pg from 'pg'",[entry.guard]:'deny native transport'}
+  const commands={...scripts,[entry.script]:`node --import ./${entry.guard} --test ${entry.file}`}
+  assert.deepEqual(inventory(tree,commands,[],REQUIRED_SUITES,[],[entry]).offlineGuarded,[entry.file])
+  assert.throws(()=>inventory({...tree,[entry.file]:"import './guard.mjs'\nimport pg from 'pg'"},commands,[],REQUIRED_SUITES,[],[entry]),/source guard/)
+})
 test('this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')).scripts
   const tree = readTree()

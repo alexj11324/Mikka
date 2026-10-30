@@ -1,12 +1,9 @@
+// Not a DB suite: it asserts zero Postgres touches. Registered in OFFLINE_GUARDED
+// (scripts/run-db-tests.mjs), and the guard denies every socket and destructive fs call.
+import '../scripts/credential-diagnostics-offline.mjs'
 import assert from 'node:assert/strict'
-import { createRequire } from 'node:module'
 import { mock, test } from 'node:test'
-import type PgModule from 'pg'
-
-// Not a DB suite: it asserts zero Postgres touches. The pg driver is loaded only to spy on
-// its prototypes (same CommonJS instance the app imports), so the DB runner's import marker
-// does not classify this pure gate as database-backed.
-const pg = createRequire(import.meta.url)('pg') as typeof PgModule
+import pg from 'pg'
 
 // #438 (2): with the personal mailbox flag off the worker entry answers 503 before any
 // database work, including the run lookup and the secret-set read behind masking.
