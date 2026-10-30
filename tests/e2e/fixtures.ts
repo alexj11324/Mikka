@@ -162,12 +162,17 @@ export async function captureAuthenticationCookies(context: BrowserContext) {
 }
 
 /**
- * A new account opens on the first-run guide. Tests about other flows mark it
- * done and reload past it; tests/e2e/onboarding.spec.ts covers the guide.
+ * A new account opens on the first-run guide, which only the workspace root
+ * shows. Tests about other flows mark it done and skip it in place, without a
+ * reload that would refetch the page's data; tests/e2e/onboarding.spec.ts
+ * covers the guide.
  */
 export async function skipOnboarding(page: Page, email: string) {
   await database().query('insert into user_onboarding ("userId") select id from "user" where email = $1 on conflict do nothing', [email])
-  if (await page.getByRole('dialog', { name: '创建你的第一个 Bot', exact: true }).count()) await page.reload()
+  if (new URL(page.url()).pathname.replace(/\/$/, '') !== app('/').replace(/\/$/, '')) return
+  const guide = page.getByRole('dialog', { name: '创建你的第一个 Bot', exact: true })
+  await guide.getByRole('button', { name: '跳过引导', exact: true }).click()
+  await expect(guide).toHaveCount(0)
 }
 
 export async function register(page: Page, next = '/', email = `e2e-${randomUUID()}@example.com`, { onboarding = false } = {}) {
