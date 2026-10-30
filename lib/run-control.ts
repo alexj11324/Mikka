@@ -51,7 +51,12 @@ export async function stopOwnedRun(database: RunControlDatabase, userId: string,
       .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1).for('update')
     if (!run || !UNFINISHED_RUN_STATUSES.some(status => status === run.status)) throw new ActionFailureError('runNotFound')
     const now = new Date()
-    if (run.status === 'queued') {
+    // A queued cloud run with a thread_machines binding may already hold (or be acquiring) a
+    // sandbox. Ending it here would skip machine release, so it keeps the stop-request path
+    // and the machine lifecycle acknowledges it. (Follow-up: release the binding directly.)
+    const machineBound = run.status === 'queued'
+      && (await tx.execute(sql`SELECT 1 FROM thread_machines WHERE "runId"=${runId} LIMIT 1`)).rows.length > 0
+    if (run.status === 'queued' && !machineBound) {
       await tx.update(agentRuns).set({ status: 'stopped', stopRequestedAt: run.stopRequestedAt ?? now, finishedAt: now, updatedAt: now })
         .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
       return true
