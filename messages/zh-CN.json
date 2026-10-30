@@ -65,7 +65,7 @@
       "discardAction": "放弃",
       "createFailed": "创建失败，草稿已保留。",
       "createdNotice": "任务已创建，可以继续添加下一项。",
-      "createError": "暂时无法创建，草稿已保留，请稍后重试。",
+      "createError": "暂时无法创建，草稿已保留。",
       "collapse": "收起创建卡片",
       "expand": "展开创建卡片",
       "close": "关闭新建任务",
@@ -169,7 +169,7 @@
     "results": "搜索结果",
     "loading": "正在加载技能目录…",
     "loadFailed": "暂时无法加载 skills.sh 技能目录。",
-    "loadFailedDescription": "请重试，或直接打开 skills.sh 浏览技能。",
+    "loadFailedDescription": "目录内容未显示，不代表没有匹配的技能。",
     "retry": "重试",
     "browseSkills": "打开 skills.sh",
     "noResults": "没有找到匹配的技能。",
@@ -211,7 +211,7 @@
     "passwordPlaceholder": "至少 8 位字符",
     "submitCreate": "创建账号并进入",
     "submitSignIn": "登录工作台",
-    "oauthFailed": "OAuth 登录未完成，可能已取消或授权已过期。请重新尝试。",
+    "oauthFailed": "OAuth 登录未完成，可能已取消或授权已过期。重新尝试。",
     "googleAccountNotLinked": "此 Google 账号尚未关联 Mikka。请先用已有方式登录，再到「设置 → 账户」关联 Google。",
     "githubAccountNotLinked": "此 GitHub 账号尚未关联 Mikka。请使用已关联的方式登录，或先创建 Mikka 账号。",
     "continueNotice": "请点击下方对应的登录按钮，在此标签页完成授权。",
@@ -220,15 +220,15 @@
     "browserFailed": "无法打开浏览器，请重试。",
     "browserUpdateRequired": "请更新 Mikka 后再使用 Google 或 GitHub 登录。",
     "tabBlocked": "浏览器阻止了新标签页，请允许弹出窗口后重试。",
-    "githubStartFailed": "暂时无法开始 GitHub 登录，请稍后重试。",
-    "googleStartFailed": "暂时无法开始 Google 登录，请稍后重试。",
+    "githubStartFailed": "暂时无法开始 GitHub 登录。",
+    "googleStartFailed": "暂时无法开始 Google 登录。",
     "submitFailed": "操作未成功，请检查填写的信息或稍后重试。",
     "sessionNotKept": "登录已响应，但浏览器未能保持会话。请允许此预览的第三方 Cookie，或在独立标签页打开后登录。",
-    "connectionFailed": "暂时无法连接，请稍后重试。",
+    "connectionFailed": "暂时无法连接。",
     "testWorkspaceCta": "跳过登录，进入测试工作台",
     "testWorkspaceHint": "仅开发预览可用 · 专用测试账号",
     "testWorkspaceSessionFailed": "浏览器未能保持测试会话。请允许第三方 Cookie，或在独立标签页打开预览后再试。",
-    "testWorkspaceFailed": "暂时无法进入测试工作台，请稍后重试。",
+    "testWorkspaceFailed": "暂时无法进入测试工作台。",
     "testIssueLayoutTitle": "【测试】Issue 详情页布局与阅读体验",
     "testIssueLayoutDescription": "这是一条独立测试任务。可验证标题编辑、正文排版、属性修改与自动保存，不会影响其他账号的数据。",
     "testIssueSwitchTitle": "【测试】任务切换与会话复用",
@@ -251,7 +251,7 @@
     "requestNewLink": "重新获取链接",
     "verifyTitle": "验证邮箱",
     "sendVerification": "发送验证链接",
-    "recoveryUnavailable": "此功能暂不可用，请稍后再试。",
+    "recoveryUnavailable": "密码恢复暂不可用，请稍后重试。",
     "requestProcessed": "请求已处理。如账号符合条件，请检查邮箱；此提示不代表邮件已送达。",
     "retryIn": "{seconds} 秒后可重试",
     "verifyDescription": "输入注册邮箱，我们会发送新的验证链接，链接 15 分钟内有效。",
@@ -896,12 +896,12 @@
       "history": "版本历史",
       "manageMembers": "管理协作成员",
       "closeDetail": "关闭任务详情",
-      "titleRequired": "请填写任务标题，修改尚未保存。",
-      "documentNotConnected": "文档尚未连接，修改已保留，请稍后重试。",
+      "titleRequired": "任务标题不能为空，修改未保存。",
+      "documentNotConnected": "文档尚未连接，修改已保留。",
       "saveFailedShort": "保存未成功。",
-      "autosaveFailed": "自动保存失败，修改已保留，请重试。",
+      "autosaveFailed": "自动保存失败，修改已保留。",
       "retryAutosave": "重试自动保存",
-      "editorCrashedTitle": "任务的这一部分出错了",
+      "editorCrashedTitle": "任务内容无法加载",
       "editorCrashedDescription": "页面的其他部分仍可使用。重新载入后可以继续。",
       "editorCrashedRetry": "重新载入",
       "titleLabel": "任务标题",
@@ -940,21 +940,21 @@
   },
   "Errors": {
     "generic": "操作未成功，请稍后重试。",
-    "authRequired": "请先登录。",
+    "authRequired": "需要先登录",
     "validationGeneric": "请检查填写内容。",
     "issueToolsDisabled": "暂时无法创建任务。",
-    "validationTitleRequired": "请填写任务标题。",
-    "validationNameRequired": "请填写名称。",
+    "validationTitleRequired": "任务标题不能为空",
+    "validationNameRequired": "名称不能为空",
     "teamIdentifierInvalid": "标识须为 2–12 位大写字母或数字，并以字母开头。",
     "validationDocument": "文档格式不正确或超过大小限制。",
     "issueNotFound": "任务不存在或没有访问权限。",
-    "issueRevisionInvalid": "任务版本不正确，请重新打开。",
+    "issueRevisionInvalid": "任务版本已过期，请重新打开。",
     "issueStale": "任务已被其他成员更新，已恢复最新状态，请重试。",
     "issueSaveFailed": "保存未成功，请保留当前页面后重试。",
     "issueMoveInvalid": "任务移动信息不正确。",
     "issuePriorityInvalid": "任务优先级信息不正确。",
     "memberOwnerOnly": "只有任务所有者可以管理成员。",
-    "memberInvalidEmail": "请填写有效邮箱。",
+    "memberInvalidEmail": "邮箱格式无效",
     "memberNotRegistered": "无法添加该账号，请确认对方已注册且不是你自己。",
     "memberAlreadyAdded": "该成员已拥有此任务的访问权限，无需重复添加。",
     "deviceNameTooLong": "设备名称过长。",
@@ -992,7 +992,7 @@
     "issueRelationLimit": "每种任务关系最多支持 100 项。",
     "issueRelationSaveFailed": "关系保存失败，请稍后重试。",
     "issueTitleInvalid": "请检查新任务标题。",
-    "issueChildTitleRequired": "请填写子任务标题。",
+    "issueChildTitleRequired": "子任务标题不能为空",
     "issueCreateFailed": "创建失败，请稍后重试。",
     "issueOperationInvalid": "操作格式不正确。",
     "issueUnavailable": "任务已不可用。",
@@ -1008,8 +1008,8 @@
     "issueMetadataSaveFailed": "属性保存失败，请稍后重试。",
     "memberNotFound": "成员不存在。",
     "memberNotJoined": "请先邀请该成员加入此任务。",
-    "validationProjectNameRequired": "请填写项目名称。",
-    "validationProjectMilestoneName": "请填写里程碑名称。",
+    "validationProjectNameRequired": "项目名称不能为空",
+    "validationProjectMilestoneName": "里程碑名称不能为空",
     "validationProjectDuplicate": "项目属性不能重复。",
     "validationProjectMilestoneDuplicate": "里程碑不能重复。",
     "validationProjectDateOrder": "目标日期不能早于开始日期。",
@@ -1047,12 +1047,49 @@
     "teamIssueAccessDenied": "你不能在这个团队中创建或共享任务。",
     "teamIssueRequestConflict": "这次请求与之前的内容不一致，请重新操作。",
     "teamIssueChanged": "团队或任务已发生变化，请刷新后重试。",
-    "teamIssueRetry": "暂时没能完成，请用相同内容重试。",
+    "teamIssueRetry": "暂时无法完成，请用相同内容重试。",
     "teamIssueOutcomeUnknown": "不确定操作是否已完成。请重试同一次请求，不要重新提交新请求。",
     "runAlreadyActive": "此任务已有正在执行的线程。",
     "runDispatchKeyConflict": "此请求标识已用于不同的运行参数。",
     "runNotActive": "此运行已结束，且没有可回答的问题。",
-    "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。"
+    "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。",
+    "savedLoginNotFound": "此登录信息不存在或已删除。",
+    "deviceHasActiveRuns": "此设备上有正在运行的线程，停止后才能移除。",
+    "workspaceSlugTaken": "这个链接地址已被使用，换一个。",
+    "workspaceIconInvalid": "图标须为不超过 200 KB 的 PNG、JPEG、WebP 或 GIF 图片。",
+    "workspaceDeleteNameMismatch": "输入的名称与工作区名称不一致。",
+    "workspaceHasActiveSubscription": "工作区仍有生效中的订阅，在计费中取消后才能删除。",
+    "workspaceCannotRemoveSelf": "不能移除自己；要退出，使用「离开工作区」。",
+    "workspaceTransferTargetInvalid": "接手人须为此工作区中其他启用中的成员。",
+    "botTransferBusy": "该成员的 Bot 仍有运行中的线程或后台任务，结束后才能转交。",
+    "botTransferNameConflict": "接手人已有同名 Bot，为其中一个改名后再转交。",
+    "teamNotFound": "团队不存在。",
+    "teamDeleteNameMismatch": "输入的名称与团队名称不一致。",
+    "botDefaultRepositoryUnavailable": "这个仓库不在工作区成员已安装的 GitHub App 仓库中。",
+    "usageLimitReached": "已达到用量上限，新任务已暂停，运行中的任务会继续完成。",
+    "usageCreditsExhausted": "点数已用完，新任务已暂停，运行中的任务会继续完成。",
+    "billingNotConfigured": "计费尚未开通。",
+    "billingNoSubscription": "工作区还没有订阅。",
+    "billingPlanInvalid": "无法选择这个方案。",
+    "billingProviderFailed": "支付服务暂时无法完成请求。",
+    "timeZoneInvalid": "时区名称无效。",
+    "personalInstructionsTooLong": "个人指令不能超过 2000 字。",
+    "dailySuggestionsNeedMemory": "每日建议需要先打开记忆。",
+    "suggestionSourceInvalid": "不支持该数据来源。",
+    "avatarInvalidType": "头像只支持 PNG、JPEG 或 WebP 图片。",
+    "avatarTooLarge": "头像图片不能超过 200 KB。",
+    "passwordIncorrect": "当前密码不正确。",
+    "passwordTooShort": "新密码至少需要 8 个字符。",
+    "passwordTooLong": "新密码不能超过 128 个字符。",
+    "passwordNotSet": "此账户还没有密码，可以先设置密码。",
+    "passwordAlreadySet": "此账户已有密码，可以直接修改密码。",
+    "sessionNotFound": "这台设备已退出登录。",
+    "sessionIsCurrent": "当前设备需要通过「退出登录」退出。",
+    "emailUnavailable": "邮件服务暂不可用。",
+    "emailDeliveryFailed": "邮件没有发送成功。",
+    "dataExportRateLimited": "每小时只能导出一次，{minutes} 分钟后可再次导出。",
+    "accountEmailMismatch": "输入的邮箱与当前账户不一致。",
+    "accountSoleAdmin": "你是工作区「{workspaces}」唯一的管理员。先把管理员身份转给其他成员，再删除账户。"
   },
   "Overview": {
     "sections": {
@@ -1092,7 +1129,7 @@
     "restoreTask": "恢复任务",
     "reload": "重新读取",
     "taskRestored": "任务已恢复",
-    "restoreFailed": "恢复失败，请重试。",
+    "restoreFailed": "恢复失败。",
     "backToWorkspace": "返回工作台",
     "descriptionRestored": "描述已恢复并保存为新版本",
     "membersDialogDescription": "管理此任务的成员，共享访问与编辑权限。",
@@ -1189,8 +1226,8 @@
       "confirmTitle": "恢复此描述？",
       "confirmDescription": "当前描述将被所选版本替换，并保存为新版本。标题、状态、任务属性及现有评论会保留。",
       "confirmAction": "确认恢复描述",
-      "restoreIncomplete": "恢复未完成，当前描述未被丢弃，请重试。",
-      "restoreFailed": "恢复失败，请重试。"
+      "restoreIncomplete": "恢复未完成，当前描述未被丢弃。",
+      "restoreFailed": "恢复失败。"
     }
   },
   "Members": {
@@ -1198,8 +1235,8 @@
     "membersCount": "{count} 位成员",
     "accessDescription": "仅所有者与已添加的成员可以访问此任务。",
     "listUpdateFailed": "成员列表更新失败",
-    "keptPrevious": "已保留上次结果，请重试以获取最新权限。",
-    "readFailed": "暂时无法读取成员，请稍后重试。",
+    "keptPrevious": "已保留上次结果，权限可能不是最新。",
+    "readFailed": "暂时无法读取成员。",
     "reload": "重新加载",
     "loading": "正在加载成员",
     "addMember": "添加成员",
@@ -1207,8 +1244,8 @@
     "emailHint": "对方需先注册账号。添加后即可编辑正文、评论及保存版本，不会发送邀请邮件。",
     "adding": "正在添加…",
     "addedMessage": "成员已添加，对方登录后可在「协作任务」中访问此任务。",
-    "addFailed": "添加失败，请稍后重试。",
-    "removeFailed": "移除失败，请稍后重试。",
+    "addFailed": "添加失败。",
+    "removeFailed": "移除失败。",
     "removed": "已移除 {name} 的访问权限。",
     "successTitle": "操作成功",
     "searchMembers": "搜索成员",
@@ -1329,7 +1366,7 @@
     "allStatuses": "全部状态",
     "loading": "正在加载项目",
     "loadErrorTitle": "项目读取失败",
-    "loadErrorDescription": "未使用示例数据替代，请重试连接。",
+    "loadErrorDescription": "未使用示例数据替代。",
     "reload": "重新读取",
     "savingProperties": "正在保存属性…",
     "noMatchTitle": "没有匹配的项目",
@@ -1449,7 +1486,7 @@
       "namePlaceholder": "项目名称",
       "descriptionLabel": "项目描述",
       "descriptionPlaceholder": "添加描述…",
-      "nameRequired": "项目名称不能为空。",
+      "nameRequired": "项目名称不能为空",
       "tooLong": "内容超过长度限制，请精简后再保存。",
       "autosaveFailed": "自动保存失败，输入已保留；点击其他位置或按 ⌘ / Ctrl + Enter 重试。",
       "saving": "正在保存…",
@@ -1520,40 +1557,68 @@
     },
     "sections": {
       "members": {
-        "title": "成员",
-        "description": "管理工作区成员、角色与邀请。"
+        "title": "成员"
       },
       "preferences": {
-        "title": "偏好设置",
-        "description": "让 Mikka 更符合你的工作习惯。"
-      },
-      "profile": {
-        "title": "个人资料",
-        "description": "查看你在工作区中的账户信息。"
+        "title": "偏好设置"
       },
       "memory": {
-        "title": "记忆"
+        "title": "记忆与建议"
       },
       "account": {
-        "title": "账户",
-        "description": "管理登录 Mikka 的方式。"
-      },
-      "integrations": {
-        "title": "集成",
-        "description": "管理已连接的应用与消息平台。",
-        "keywords": "模型订阅 订阅 额度 用量"
-      },
-      "devices": {
-        "title": "设备",
-        "description": "你自己接入的机器。"
-      },
-      "workspace": {
-        "title": "工作区",
-        "description": "当前工作区的基本信息。"
+        "title": "账户"
       },
       "teams": {
-        "title": "团队",
-        "description": "组织团队与共同负责的工作。"
+        "title": "团队"
+      },
+      "notifications": {
+        "title": "通知"
+      },
+      "security": {
+        "title": "安全"
+      },
+      "connections": {
+        "title": "连接"
+      },
+      "models": {
+        "title": "模型与额度",
+        "keywords": "模型订阅 订阅 额度 用量"
+      },
+      "logins": {
+        "title": "登录与密钥"
+      },
+      "privacy": {
+        "title": "数据与隐私"
+      },
+      "activity": {
+        "title": "活动"
+      },
+      "computers": {
+        "title": "我的电脑"
+      },
+      "developer": {
+        "title": "开发者"
+      },
+      "general": {
+        "title": "常规"
+      },
+      "bots": {
+        "title": "Bot"
+      },
+      "permissions": {
+        "title": "权限与审批"
+      },
+      "secrets": {
+        "title": "密钥与环境"
+      },
+      "audit": {
+        "title": "审计日志"
+      },
+      "usage": {
+        "title": "用量"
+      },
+      "billing": {
+        "title": "计费"
       }
     },
     "appearance": {
@@ -1567,7 +1632,9 @@
       "systemLabel": "跟随系统",
       "language": "界面语言",
       "languageDescription": "当前版本的显示语言。",
-      "languageName": "简体中文"
+      "languageName": "简体中文",
+      "languageZh": "简体中文",
+      "languageEn": "English"
     },
     "profile": {
       "heading": "账户信息",
@@ -1576,7 +1643,23 @@
       "name": "名称",
       "email": "电子邮箱",
       "notSet": "未设置",
-      "readOnly": "账户信息为只读，当前版本暂不支持在此修改。"
+      "readOnly": "账户信息为只读，当前版本暂不支持在此修改。",
+      "save": "保存",
+      "saved": "已保存",
+      "changeAvatar": "更换",
+      "uploading": "上传中…",
+      "sessionHeading": "会话",
+      "signOut": "退出登录",
+      "signOutDescription": "这台设备立即退出，其他设备不受影响。",
+      "signingOut": "正在退出…",
+      "deleteAccount": "删除账户",
+      "deleteAccountDescription": "账户、Bot、线程和记忆都会删除，无法恢复。",
+      "deleteTitle": "删除账户",
+      "deleteBody": "删除后无法恢复。其他成员不会受到影响，但你自己创建的 Bot 和线程会一并删除。",
+      "deleteConfirmLabel": "输入 {email} 确认",
+      "deleting": "正在删除…",
+      "confirmDelete": "删除账户",
+      "cancel": "取消"
     },
     "memory": {
       "enabled": "使用记忆",
@@ -1816,7 +1899,125 @@
     },
     "preview": {
       "userName": "预览用户"
-    }
+    },
+    "notifications": {
+      "heading": "通知",
+      "proactive": "主动消息",
+      "pushDecide": "需要你决策",
+      "pushReview": "待审阅",
+      "pushFinished": "线程完成",
+      "pushBriefing": "每日简报",
+      "pushWhen": "推送时机",
+      "always": "立即",
+      "away": "电脑不在用时",
+      "loadError": "通知设置加载失败",
+      "loading": "正在加载通知设置",
+      "notSaved": "这项设置没有保存，已恢复为原来的值。",
+      "retry": "重试"
+    },
+    "security": {
+      "signInMethods": "登录方式",
+      "password": "密码",
+      "passwordSet": "用邮箱和密码登录这个账户。",
+      "passwordNotSet": "这个账户还没有密码，目前只能用第三方登录。",
+      "changePassword": "修改密码",
+      "setPassword": "设置密码",
+      "changePasswordDescription": "修改后，当前设备保持登录。",
+      "setPasswordDescription": "设置后可以用邮箱和密码登录。",
+      "currentPassword": "当前密码",
+      "newPassword": "新密码",
+      "confirmPassword": "再输入一次",
+      "passwordMismatch": "两次输入的密码不一致。",
+      "revokeOthers": "同时退出其他设备",
+      "save": "保存",
+      "saving": "正在保存…",
+      "cancel": "取消",
+      "devices": "登录设备",
+      "devicesDescription": "撤销后，该设备需要重新登录。",
+      "devicesError": "无法读取登录设备。",
+      "devicesLoading": "正在读取登录设备…",
+      "unknownDevice": "未知设备",
+      "lastActive": "最近活跃 {when}",
+      "currentDevice": "当前设备",
+      "signOut": "退出",
+      "signingOut": "正在退出…",
+      "signOutOthers": "全部退出",
+      "signOutOthersDescription": "除这台设备外，其他设备全部退出登录。"
+    },
+    "privacy": {
+      "data": "数据",
+      "export": "导出我的数据",
+      "exportDescription": "包含资料、Bot、线程、任务和记忆，不含密码和密钥。",
+      "exportButton": "导出",
+      "exporting": "正在准备…",
+      "exportSent": "已发送到 {email}，24 小时内可以下载。",
+      "exportWait": "刚导出过，{minutes} 分钟后再试。",
+      "sharing": "共享",
+      "sharedLinks": "已共享的链接",
+      "sharedLinksCount": "{count} 个 Artifact 仍可公开访问",
+      "sharedLinksNone": "没有公开访问的链接。",
+      "sharedLinksDescription": "停止分享后，已经发出去的链接立即失效。",
+      "manage": "管理",
+      "stopSharing": "停止分享",
+      "stopping": "正在停止…",
+      "links": "{count} 个链接",
+      "linksLoading": "正在读取共享链接…"
+    },
+    "activity": {
+      "filtersLabel": "筛选活动",
+      "filters": {
+        "all": "全部",
+        "accounts": "用了我的账户",
+        "reminders": "提醒"
+      },
+      "loading": "正在读取活动…",
+      "empty": "还没有活动记录。",
+      "loadError": "活动记录没有读出来。",
+      "loadMore": "加载更早的活动",
+      "loadingMore": "正在加载…",
+      "view": "查看",
+      "credentialUse": "{bot} 用了 {site} 的登录",
+      "someBot": "某个 Bot",
+      "approved": "你批准了：{action}",
+      "declined": "你拒绝了：{action}",
+      "reminder": "提醒：{title}",
+      "result": {
+        "input_inserted_guarded": "已填入，未提交",
+        "password_submitted": "已提交密码",
+        "otp_submitted": "已提交验证码",
+        "session_applied": "恢复了登录会话",
+        "denied_or_failed": "被拒绝或失败"
+      }
+    },
+    "logins": {
+      "heading": "网站登录",
+      "description": "Bot 只在你批准的操作里使用这些登录。密码和验证码不会显示。",
+      "loading": "正在读取网站登录…",
+      "loadError": "网站登录没有读出来。",
+      "empty": "还没有保存的网站登录。",
+      "never": "从未使用",
+      "lastUsedBy": "{when} · {bot}",
+      "unknownBot": "未知 Bot",
+      "usage": "使用记录",
+      "usageTitle": "{site} 的使用记录",
+      "usageDescription": "每次使用都记录是谁、什么时候用的。",
+      "usageLoading": "正在读取使用记录…",
+      "usageError": "使用记录没有读出来。",
+      "usageEmpty": "还没有使用记录。",
+      "delete": "删除",
+      "deleting": "正在删除…",
+      "deleteTitle": "删除 {site} 的登录？",
+      "deleteBody": "删除后，Bot 不能再自动填入这个网站。你已经登录的浏览器不受影响。",
+      "cancel": "取消",
+      "result": {
+        "input_inserted_guarded": "已填入，未提交",
+        "password_submitted": "已提交密码",
+        "otp_submitted": "已提交验证码",
+        "session_applied": "恢复了登录会话",
+        "denied_or_failed": "被拒绝或失败"
+      }
+    },
+    "sectionUnavailable": "这个分区还在设计中，暂时没有可用的操作。"
   },
   "TelegramBot": {
     "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
@@ -1904,7 +2105,7 @@
       "fileTooLarge": "CSV 文件不能超过 1 MB。",
       "readFailed": "文件读取失败，请使用 UTF-8 编码的 CSV 文件。",
       "checkEmails": "请检查邮箱地址。",
-      "createFailed": "邀请未完成，请稍后重试。",
+      "createFailed": "邀请未完成。",
       "emailRequired": "请至少填写一个邮箱地址。",
       "tooManyEmails": "一次最多邀请 {max} 人；当前有 {count} 个邮箱，请分批导入。",
       "invalidEmails": "邮箱格式不正确：{emails}。请修正后再邀请。",
@@ -1925,8 +2126,8 @@
     "signInToAccept": "登录并接受邀请",
     "createAccount": "创建账号",
     "backToWorkspace": "返回工作台",
-    "acceptFailed": "暂时无法接受邀请，请稍后重试。",
-    "signOutFailed": "退出失败，请重试。"
+    "acceptFailed": "暂时无法接受邀请。",
+    "signOutFailed": "退出失败。"
   },
   "Acceptance": {
     "recovering": "正在恢复验收会话…",
@@ -1971,8 +2172,8 @@
     "c_8503b651": "保存团队关联",
     "c_d1394c98": "保存团队归属",
     "c_052ebc86": "保存失败。",
-    "c_85f5c4d3": "保存失败，输入已保留，请重试。",
-    "c_281364f7": "保存失败，选择已保留，请重试。",
+    "c_85f5c4d3": "保存失败，输入已保留。",
+    "c_281364f7": "保存失败，选择已保留。",
     "c_cd5cd93c": "保存更改",
     "c_bd2c65c3": "全部团队",
     "c_e1b94a93": "全部项目 ·",
@@ -1990,7 +2191,7 @@
     "c_4eec1ff7": "创建新团队",
     "c_4598f1cb": "创建新的 Mikka 工作区，设置名称与专属网址，邀请团队协作。",
     "c_0155bce8": "创建新的工作区",
-    "c_3f765954": "创建未完成，请稍后重试。",
+    "c_3f765954": "创建未完成。",
     "c_e5305647": "创建第一个团队",
     "c_23926d61": "前往",
     "c_8c9b2d51": "前往创建团队",
@@ -2221,7 +2422,7 @@
       "approveSave": "保存到日历",
       "sent": "邮件已发送",
       "saved": "日历已更新",
-      "failed": "没做成：{error}",
+      "failed": "操作失败：{error}",
       "site": "网站",
       "approveClear": "清空登录字段",
       "approveSubmit": "提交登录",
@@ -2229,7 +2430,7 @@
     },
     "working": "Coordinator 正在处理…",
     "loadError": "对话加载失败，正在重试。",
-    "failedTitle": "上一次回复失败了",
+    "failedTitle": "回复失败",
     "input": "给 Coordinator 发消息",
     "inputTo": "给 {name} 发消息",
     "placeholder": "让 Coordinator 开始处理一个 issue…",
@@ -2254,7 +2455,8 @@
       },
       "sources": "{count} 个来源"
     },
-    "sendUncertain": "未能确认消息是否送达。在这个输入框里原样重发不会产生重复；关闭或切换输入框、刷新页面或更换账号后再发，则可能重复。"
+    "sendUncertain": "未能确认消息是否送达。在这个输入框里原样重发不会产生重复；关闭或切换输入框、刷新页面或更换账号后再发，则可能重复。",
+    "lengthCount": "{count} / {max}"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "请先登录。",
@@ -2270,8 +2472,8 @@
     "theConnectionWasInterruptedRefreshToSee": "回复或保存连接中断，请刷新后查看已保存内容。",
     "opencodeGoAuthenticationOrModelAccessFailed": "OpenCode Go 身份验证或模型权限检查失败，请检查服务端配置。",
     "opencodeGoIsRateLimitedOrOut": "OpenCode Go 当前限流或额度不足，请稍后重试并检查订阅额度。",
-    "theModelTimedOutReceivedContentIs": "模型响应超时，已收到的内容已保留，请在此重试。",
-    "opencodeGoConnectionFailedReceivedContentIs": "OpenCode Go 连接失败，已有内容已保留，请在此重试。",
+    "theModelTimedOutReceivedContentIs": "模型响应超时，已收到的内容已保留。",
+    "opencodeGoConnectionFailedReceivedContentIs": "OpenCode Go 连接失败，已有内容已保留。",
     "crosssiteRequestsAreNotAllowed": "不允许跨站调用。",
     "signInBeforeUsingAgent": "请先登录后再与 Bot 对话。",
     "sendAJSONRequest": "请发送 JSON 格式的请求。",
@@ -2284,9 +2486,9 @@
     "imageKeywordsMustBe2160CharactersAnd": "图片关键词需要 2–160 字，不能是 URL。",
     "imageSourcesAreTemporarilyUnavailableTheResponse": "图片来源暂时不可用，正文不受影响。",
     "imageSourcesAreTemporarilyUnavailablePleaseTry": "图片来源暂时不可用，请稍后重试。",
-    "theModelReachedItsOutputLimitAnd": "模型达到单次回复的输出上限，最后一部分被截断。已收到的内容已保留，请重试此回复。",
-    "theModelReturnedNoResponseContentPlease": "模型未返回正文，请在此重试。",
-    "theResponseEndedEarlyReceivedContentIs": "回复连接提前结束，已有内容已保留，请在此重试。",
+    "theModelReachedItsOutputLimitAnd": "模型达到单次回复的输出上限，最后一部分被截断。已收到的内容已保留。",
+    "theModelReturnedNoResponseContentPlease": "模型未返回正文。",
+    "theResponseEndedEarlyReceivedContentIs": "回复连接提前结束，已有内容已保留。",
     "requestStopped": "请求已停止",
     "retry": "重试",
     "loadingMembers": "正在加载成员",
@@ -2350,7 +2552,7 @@
     "yourInputHasBeenPreserved": "你的输入已保留。",
     "retryThisResponse": "重试此回复",
     "unableToDisplayResponse": "回复显示出错",
-    "aCardOrTableInThisResponse": "这条回复中的卡片或表格在显示时发生错误。请重试此回复。",
+    "aCardOrTableInThisResponse": "这条回复中的卡片或表格无法显示。",
     "loadingDiagram": "正在加载图表…",
     "image": "图片",
     "useTheIllustrationComponentForImages": "（图片请使用资料配图组件）",
@@ -2366,7 +2568,7 @@
     "learnMore": "继续了解",
     "theQuestionIsEmptyOrTooLong2": "提问内容为空或过长，请调整后在此重新提交。",
     "unableToContinueYourChoicesAndAnswers": "本次继续未完成，选择和回答已保留，可以在此重试。",
-    "submissionFailedYourChoicesAndAnswersAre": "提交失败，选择和回答已保留，请在此重试。",
+    "submissionFailedYourChoicesAndAnswersAre": "提交失败，选择和回答已保留。",
     "taskContext": "任务背景：",
     "proposal": "\n待确认建议：",
     "description": "\n方案说明：",
@@ -2394,7 +2596,7 @@
     "question": "第",
     "of": "题，共",
     "questions": "题",
-    "reviewThisProposal": "请确认建议方案",
+    "reviewThisProposal": "确认建议方案",
     "approve": "同意",
     "answer": "填写回答",
     "close": "关闭",
@@ -2463,7 +2665,7 @@
     "noDisplayableContent": "回复没有可显示的内容",
     "theModelReturnedNoDisplayableTextOr": "模型没有返回可显示的正文或卡片。",
     "generatingResponse": "回复生成中",
-    "pleaseWait": "请稍候",
+    "pleaseWait": "处理中",
     "loading": "加载中",
     "askAgent": "向 Bot 提问",
     "askAgent2": "向 Bot 提问…",
@@ -2477,7 +2679,7 @@
     "loadingProjectDetails": "正在加载项目详情",
     "unableToSwitchPleaseTryAgain": "切换失败，请重试。",
     "workspaceCreatedAndOpened": "工作区已创建，已自动进入。",
-    "unableToCreateWorkspacePleaseTryAgain": "创建失败，请重试。",
+    "unableToCreateWorkspacePleaseTryAgain": "创建失败。",
     "workspaceMenu": "工作区菜单",
     "switching": "正在切换…",
     "workspaceFailedToLoad": "工作区加载失败",
@@ -2504,18 +2706,19 @@
     "close": "关闭线程",
     "conversation": "线程对话",
     "loading": "正在打开线程",
-    "loadFailed": "线程没加载出来",
+    "loadFailed": "线程加载失败",
     "retry": "重试",
     "started": "开始于 {time}",
     "steps": "交给 {harness} · 执行了 {count} 步",
     "composer": "告诉 {agent} 下一步做什么…",
-    "sendFailed": "没发出去，草稿还在",
+    "sendFailed": "发送失败，草稿已保留",
     "stopping": "正在停止…",
-    "stopFailed": "没停下来，再试一次",
+    "stopFailed": "停止未确认",
     "pullRequest": "PR #{number}",
     "moreOutputs": "+{count}",
     "moreOutputsAria": "还有 {count} 个输出",
-    "send": "发送"
+    "send": "发送",
+    "retryStop": "重试停止"
   },
   "Computer": {
     "status": {
@@ -2538,7 +2741,7 @@
     "sleeping": "电脑正在休眠",
     "wake": "唤醒",
     "waking": "唤醒中",
-    "machineError": "电脑没能启动",
+    "machineError": "电脑启动失败",
     "retry": "重试",
     "wakeFailed": "唤醒失败，请重试。",
     "viewer": {
@@ -2551,8 +2754,8 @@
       "takeover": "取得控制权",
       "handback": "交还给 Bot",
       "takenByOther": "别人正在操作这台电脑。",
-      "takeoverFailed": "没能取得控制权，请重试。",
-      "handbackFailed": "没能交还，请重试。"
+      "takeoverFailed": "无法取得控制权，请重试。",
+      "handbackFailed": "无法交还控制权，请重试。"
     },
     "approval": {
       "action": {
@@ -2565,7 +2768,7 @@
       "allowRun": "本任务内都允许",
       "deny": "拒绝",
       "allow": "允许",
-      "failed": "没有送达，请重试。"
+      "failed": "未送达，请重试。"
     }
   },
   "Shell": {
@@ -2715,7 +2918,7 @@
       "prompt": "帮我新建一个任务：{text}",
       "create": "创建任务",
       "sending": "正在发送…",
-      "failed": "没发出去，请重试。"
+      "failed": "发送失败"
     },
     "board": {
       "toolbar": "看板工具栏",
@@ -2876,7 +3079,7 @@
     "copied": "已复制",
     "removeQuote": "移除引用",
     "quoteLabel": "引用：{text}",
-    "loadError": "这个成果打不开了。",
+    "loadError": "成果无法打开",
     "retry": "重试",
     "showChat": "对话",
     "showContent": "内容",
@@ -2892,7 +3095,7 @@
     "shareStopped": "已停止分享",
     "shareLink": "分享链接",
     "sharedNotFoundHint": "分享已停止，或者链接不完整。",
-    "notFoundTitle": "这个链接已经失效了",
+    "notFoundTitle": "链接已失效",
     "roles": {
       "image": "图片",
       "button": "按钮",
@@ -2906,7 +3109,16 @@
       "field": "输入框",
       "card": "卡片",
       "block": "区块"
-    }
+    },
+    "createFailed": "创建失败",
+    "copyFailed": "复制失败",
+    "copyFailedHint": "选中链接后手动复制",
+    "selectLink": "选择链接",
+    "retryCopy": "重新复制",
+    "stopUnconfirmed": "停止分享未确认",
+    "shareStateUnknown": "当前共享状态未知",
+    "recheck": "重新检查",
+    "retryStop": "重试停止"
   },
   "Unread": {
     "divider": "以下是新消息",
@@ -2969,7 +3181,7 @@
     "returnToTerminal": "回到终端启动 daemon",
     "done": "完成",
     "invalid": "验证码无效或已过期",
-    "failed": "连接失败，请重试",
+    "failed": "连接失败",
     "enterAgain": "重新输入",
     "retry": "重试"
   },
@@ -3049,11 +3261,15 @@
     "production": "生产",
     "expires": "有效至 {time}",
     "internalSkill": "内置技能",
-    "error": "操作未完成，请重试。",
+    "error": "操作未完成。",
     "decisionUnavailable": "批准暂不可用：尚未配置发布决策。",
     "publicationUnavailable": "发布暂不可用：尚未配置发布目标。",
     "attestationRequired": "生产发布需要签名证明。",
     "artifactError": "证据打开失败。",
     "closeEvidence": "关闭证据"
+  },
+  "AccountEmail": {
+    "exportSubject": "你的 Mikka 数据导出",
+    "exportBody": "你的 Mikka 数据导出已生成。\n\n{url}\n\n以 {email} 登录 Mikka 后打开上面的链接即可下载，链接 {hours} 小时内有效。如果不是你本人操作，忽略此邮件即可。"
   }
 }

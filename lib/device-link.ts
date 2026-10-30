@@ -79,13 +79,32 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
   return { userId: row.userId, tokenId: row.id, ...(row.boundDeviceId && row.boundWorkspaceId ? { scopeDeviceId: row.boundDeviceId, scopeWorkspaceId: row.boundWorkspaceId } : {}) }
 }
 
+/** A removed device (a tombstone kept for run history) is no longer owned. */
 export async function ownedDevice(deviceId: string, userId: string) {
   const [row] = await db
     .select()
     .from(devices)
-    .where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId)))
+    .where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt)))
     .limit(1)
   return row ?? null
+}
+
+/**
+ * Whether the caller owns this (not removed) device; if so, records that this
+ * credential acts as it, so removing the device revokes the credential
+ * (lib/device-removal.ts). The device row is read FOR SHARE: a concurrent
+ * removal commits first and the device then counts as unknown.
+ */
+export async function linkDeviceToken(caller: Pick<DeviceCaller, 'userId' | 'tokenId'>, deviceId: string): Promise<boolean> {
+  if (!z.uuid().safeParse(deviceId).success) return false
+  const { rows } = await pool.query(`WITH d AS (
+      SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2 AND "removedAt" IS NULL FOR SHARE
+    ), linked AS (
+      INSERT INTO device_token_devices ("tokenId","deviceId","userId")
+      SELECT $3, id, $2 FROM d
+      ON CONFLICT DO NOTHING
+    ) SELECT id FROM d`, [deviceId, caller.userId, caller.tokenId])
+  return rows.length > 0
 }
 
 export function sleep(ms: number): Promise<void> {

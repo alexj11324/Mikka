@@ -78,6 +78,12 @@ export interface Preferences {
   pushBriefing: boolean
   pushWhen: 'always' | 'away'
   memoryEnabled: boolean
+  /** The web composer's send key; mobile keeps its own keyboard behaviour. */
+  sendKey: 'enter' | 'modEnter'
+  /** The person's own instructions for the Coordinator and their Bots, at most 2000 characters. */
+  personalInstructions: string
+  /** 每日建议; always false while memoryEnabled is false. */
+  dailySuggestions: boolean
 }
 
 export interface Settings {

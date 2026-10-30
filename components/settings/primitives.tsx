@@ -1,4 +1,26 @@
 import type { ReactNode } from 'react'
+import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+
+/** S-Q: a section that is still loading keeps its shape instead of rendering nothing. */
+export function SettingsLoading({ label, rows = 3 }: { label: string; rows?: number }) {
+  return <div role="status" aria-label={label} className="flex flex-col gap-1">
+    <span className="sr-only">{label}</span>
+    <Skeleton className="mx-1 h-4 w-24" />
+    <div className="flex flex-col divide-y divide-border overflow-hidden rounded-2xl border bg-card">
+      {Array.from({ length: rows }, (_, i) => <div key={i} className="flex items-center justify-between gap-3 px-5 py-4"><Skeleton className="h-4 w-40" /><Skeleton className="h-6 w-12" /></div>)}
+    </div>
+  </div>
+}
+
+/** S-O: a save that failed. The value is already restored; the button retries the same change. */
+export function SettingsSaveError({ message, retryLabel, onRetry }: { message: string; retryLabel: string; onRetry: () => void }) {
+  return <Alert variant="destructive" role="alert">
+    <AlertDescription>{message}</AlertDescription>
+    <AlertAction><Button variant="outline" size="sm" onClick={onRetry}>{retryLabel}</Button></AlertAction>
+  </Alert>
+}
 
 /**
  * Settings section: a titled group of rows.

@@ -51,7 +51,7 @@ export function AppSidebar({ user, section, teamId, onTeamNavigate, onNavigate, 
         <SidebarMenuItem><SidebarMenuButton tooltip={i18nText("Nav.coordinator")} isActive={section === 'coordinator'} onClick={() => navigate('coordinator')}><Workflow /><span>{i18nText("Nav.coordinator")}</span></SidebarMenuButton></SidebarMenuItem>
       </SidebarMenu></SidebarGroup>
       <Collapsible defaultOpen className="group/workspace"><SidebarGroup>
-        <SidebarGroupLabel render={<CollapsibleTrigger />} className="mb-1 cursor-pointer">{i18nText("Settings.sections.workspace.title")}<ChevronDown className="ml-1 transition-transform group-data-closed/workspace:-rotate-90" /></SidebarGroupLabel>
+        <SidebarGroupLabel render={<CollapsibleTrigger />} className="mb-1 cursor-pointer">{i18nText("Settings.groups.workspace")}<ChevronDown className="ml-1 transition-transform group-data-closed/workspace:-rotate-90" /></SidebarGroupLabel>
         <CollapsibleContent><SidebarMenu>
           <SidebarMenuItem><SidebarMenuButton isActive={section === 'projects'} onClick={() => navigate('projects')}><Box /><span>{i18nText("Projects.title")}</span></SidebarMenuButton></SidebarMenuItem>
           <SidebarMenuItem><SidebarMenuButton isActive={section === 'all-issues'} onClick={() => navigate('all-issues')}><Layers /><span>{i18nText("Projects.detail.issues")}</span></SidebarMenuButton></SidebarMenuItem>

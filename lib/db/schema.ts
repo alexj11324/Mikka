@@ -1,4 +1,5 @@
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
+import type { SendKey } from '../send-key'
 import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
@@ -89,6 +90,12 @@ export const bots = pgTable('bots', {
   /** A bloub colour id, see components/nav/bot-avatar.tsx. */
   color: text('color').notNull().default('encre'),
   shape: text('shape').notNull().default('cercle'),
+  /** Model family a new bot starts with ('mikka' | 'codex' | 'claude'); copied from workspace_settings. */
+  model: text('model').$type<WorkspaceBotModel | null>(),
+  /** GitHub repository (owner/repo remote key) a new bot starts with; copied from workspace_settings. */
+  repository: text('repository'),
+  /** Monthly credit cap for this bot; null uses workspace_settings.botMonthlyCreditLimit. */
+  monthlyCreditLimit: integer('monthlyCreditLimit'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
@@ -209,6 +216,10 @@ export const devices = pgTable('devices', {
   computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),
   /** Off: the device stays registered but the orchestrator gives it no runs. */
   enabled: boolean('enabled').notNull().default(true),
+  /** The person renamed it; a daemon re-register keeps this name. */
+  nameLocked: boolean('nameLocked').notNull().default(false),
+  /** Removed from settings: a tombstone that keeps run history (lib/device-removal.ts). */
+  removedAt: timestamp('removedAt', { withTimezone: true }),
   maxConcurrentRuns: integer('maxConcurrentRuns').notNull().default(3),
   lastSeenAt: timestamp('lastSeenAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
@@ -237,6 +248,14 @@ export const deviceTokens = pgTable('device_tokens', {
   revokedAt: timestamp('revokedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('device_tokens_hash_key').on(table.tokenHash), index('device_tokens_user_idx').on(table.userId)])
+
+/** Which daemon credential has acted as which device; removing the device revokes these. */
+export const deviceTokenDevices = pgTable('device_token_devices', {
+  tokenId: uuid('tokenId').notNull().references(() => deviceTokens.id, { onDelete: 'cascade' }),
+  deviceId: uuid('deviceId').notNull().references(() => devices.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.tokenId, table.deviceId] }), index('device_token_devices_device_idx').on(table.deviceId)])
 
 /** A git repo on a device that agents may work in. */
 export const deviceRepos = pgTable('device_repos', {
@@ -640,9 +659,16 @@ export const composioAccounts = pgTable('composio_accounts', {
  * suggestions list loads, replaces any earlier value; the connect callbacks'
  * IP-derived zone only fills a gap.
  */
+export const TIME_ZONE_SOURCES = ['auto', 'manual'] as const
+export type TimeZoneSource = (typeof TIME_ZONE_SOURCES)[number]
+
 export const userTimeZones = pgTable('user_time_zones', {
   userId: text('userId').primaryKey(),
   timeZone: text('timeZone').notNull(),
+  /** 'manual' once the person picked the zone in Settings; reports then only update detectedTimeZone. */
+  source: text('source').$type<TimeZoneSource>().notNull().default('auto'),
+  /** The zone the browser or IP last reported. */
+  detectedTimeZone: text('detectedTimeZone'),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('user_time_zones_zone_idx').on(table.timeZone)])
 
@@ -927,6 +953,7 @@ export const mobilePushTokens = pgTable('mobile_push_tokens', {
 
 export const PUSH_WHEN = ['always', 'away'] as const
 export type PushWhen = (typeof PUSH_WHEN)[number]
+export { SEND_KEYS, type SendKey } from '../send-key'
 
 /**
  * The app's 通知 and 记忆 settings (docs/design/mobile.md). The push flags pick
@@ -941,5 +968,86 @@ export const userPreferences = pgTable('user_preferences', {
   pushBriefing: boolean('pushBriefing').notNull().default(true),
   pushWhen: text('pushWhen').$type<PushWhen>().notNull().default('always'),
   memoryEnabled: boolean('memoryEnabled').notNull().default(true),
+  /** The chat composer's send key: Enter (Shift+Enter breaks the line) or ⌘/Ctrl+Enter (Enter breaks the line). */
+  sendKey: text('sendKey').$type<SendKey>().notNull().default('enter'),
+  /** The person's own instructions for the Coordinator and their Bots, at most 2000 characters. */
+  personalInstructions: text('personalInstructions').notNull().default(''),
+  /** 每日建议: the 08:00 briefing. Needs memoryEnabled. */
+  dailySuggestions: boolean('dailySuggestions').notNull().default(true),
+  /** Composio app id -> false for each app turned off as a suggestions source; a missing app is on. */
+  suggestionSources: jsonb('suggestionSources').$type<Record<string, boolean>>().notNull().default({}),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * A picture the person uploaded for their profile (lib/account/avatar.ts).
+ * `user.image` points at /api/avatars/<userId>/<sha256>; the bytes live in R2
+ * under `storageKey`, or in `inlineContent` where no bucket is configured.
+ */
+export const userAvatars = pgTable('user_avatars', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  sha256: text('sha256').notNull(),
+  contentType: text('contentType').$type<'image/png' | 'image/jpeg' | 'image/webp'>().notNull(),
+  size: integer('size').notNull(),
+  storageKey: text('storageKey'),
+  inlineContent: bytea('inlineContent'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * 「导出我的数据」: one emailed download link. Only the token's hash is kept;
+ * the file is built when its owner opens the link (lib/account/export.ts).
+ */
+export const accountDataExports = pgTable('account_data_exports', {
+  id: uuid('id').primaryKey(),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('tokenHash').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  downloadedAt: timestamp('downloadedAt', { withTimezone: true }),
+}, table => [uniqueIndex('account_data_exports_token_key').on(table.tokenHash), index('account_data_exports_user_created_idx').on(table.userId, table.createdAt)])
+export const WORKSPACE_BOT_MODELS = ['mikka', 'codex', 'claude'] as const
+export type WorkspaceBotModel = (typeof WORKSPACE_BOT_MODELS)[number]
+
+/** Workspace-level defaults and usage limits (settings › Bots, Usage). Null means unset / unlimited. */
+export const workspaceSettings = pgTable('workspace_settings', {
+  workspaceId: uuid('workspaceId').primaryKey(),
+  defaultModel: text('defaultModel').$type<WorkspaceBotModel | null>(),
+  defaultRepository: text('defaultRepository'),
+  monthlyCreditLimit: integer('monthlyCreditLimit'),
+  botMonthlyCreditLimit: integer('botMonthlyCreditLimit'),
+  backgroundDailyCreditLimit: integer('backgroundDailyCreditLimit'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Stripe subscription state for a workspace, written by the billing webhook. */
+export const workspaceBilling = pgTable('workspace_billing', {
+  workspaceId: uuid('workspaceId').primaryKey(),
+  stripeCustomerId: text('stripeCustomerId').unique(),
+  stripeSubscriptionId: text('stripeSubscriptionId').unique(),
+  plan: text('plan'),
+  status: text('status'),
+  seats: integer('seats').notNull().default(0),
+  currentPeriodEnd: timestamp('currentPeriodEnd', { withTimezone: true }),
+  autoRechargeEnabled: boolean('autoRechargeEnabled').notNull().default(false),
+  autoRechargeThreshold: integer('autoRechargeThreshold'),
+  autoRechargePacks: integer('autoRechargePacks'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Credit grants: 'plan' per paid invoice (replaces the previous period's), 'purchased' never expires. */
+export const workspaceCreditGrants = pgTable('workspace_credit_grants', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspaceId').notNull(),
+  bucket: text('bucket').$type<'plan' | 'purchased'>().notNull(),
+  points: integer('points').notNull(),
+  reason: text('reason').notNull(),
+  externalId: text('externalId').notNull().unique(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('workspace_credit_grants_workspace_idx').on(table.workspaceId, table.createdAt)])
+
+export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
+  id: text('id').primaryKey(),
+  type: text('type').notNull(),
+  processedAt: timestamp('processedAt', { withTimezone: true }).notNull().defaultNow(),
 })

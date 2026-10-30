@@ -1,7 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
@@ -12,6 +12,7 @@ import {
   type SupportedHarness,
 } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS, issueDeviceToken } from '@/lib/device-link'
+import { removeOwnedDevice, renameOwnedDevice } from '@/lib/device-removal'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
 import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
@@ -63,7 +64,7 @@ export interface AgentView {
 /** Every local device this person owns, with its repository history. */
 export async function listDevices(): Promise<DeviceView[]> {
   const userId = await getUserId()
-  const rows = await db.select().from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'))).orderBy(desc(devices.lastSeenAt))
+  const rows = await db.select().from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'), isNull(devices.removedAt))).orderBy(desc(devices.lastSeenAt))
   const repos = rows.length
     ? await db.select().from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []
@@ -105,9 +106,23 @@ export async function setDeviceEnabled(input: { deviceId: string; enabled: boole
     if (!parsed.success) return { error: 'deviceNotFound' }
     await db.update(devices)
       .set({ enabled: parsed.data.enabled, updatedAt: new Date() })
-      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId)))
+      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt)))
     return { success: true }
   })
+}
+
+/** Renames one of the person's devices (1–60 characters); the daemon keeps the new name. */
+export async function renameDevice(id: string, name: string): Promise<ActionResult<{ id: string; name: string }>> {
+  return runAction(async () => renameOwnedDevice(await getUserId(), id, name))
+}
+
+/**
+ * Removes one of the person's devices. Refused with `deviceHasActiveRuns`
+ * while a thread is live on it. Its daemon credentials are revoked at once;
+ * past threads keep their device (lib/device-removal.ts).
+ */
+export async function removeDevice(id: string): Promise<ActionResult<{ id: string; revokedTokens: number }>> {
+  return runAction(async () => removeOwnedDevice(await getUserId(), id))
 }
 
 /** The hosts in this server's `~/.ssh/config`, offered as one-click targets. */

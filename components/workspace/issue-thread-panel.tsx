@@ -138,7 +138,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
       <ChatComposer ref={inputRef} label={t('composer', { agent: detail.agentName })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
         sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested} running onStop={data.thread.ownedByCurrentUser && !sending && !stopPending ? () => { void stop() } : undefined} />
       {sendFailed && <p role="alert" className="px-3 text-xs text-destructive">{t('sendFailed')}</p>}
-      {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="xs" onClick={() => { void stop() }}>{t('retry')}</Button></div>}
+      {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
   </section>
 }

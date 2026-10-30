@@ -101,6 +101,27 @@ export async function deleteFact(userId: string, id: string): Promise<boolean> {
   return rows.length > 0
 }
 
+/** How many active facts the person has (listFacts shows at most 500). */
+export async function countFacts(userId: string): Promise<number> {
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active')))
+  return row?.count ?? 0
+}
+
+/**
+ * Removes every fact from 记忆 the way deleteFact removes one: rows stay as
+ * `deleted` with details and evidence cleared, so they are not learnt again.
+ * Expired and dismissed facts are cleared too. Returns how many of the
+ * removed facts were active, the count 记忆 showed.
+ */
+export async function clearFacts(userId: string): Promise<number> {
+  return db.transaction(async tx => {
+    const active = await tx.select({ id: userFacts.id }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active'))).for('update')
+    await tx.update(userFacts).set({ state: 'deleted', value: {}, evidence: [], updatedAt: new Date() })
+      .where(and(eq(userFacts.userId, userId), ne(userFacts.state, 'deleted')))
+    return active.length
+  })
+}
+
 /**
  * The person's correction of a fact's subject. It becomes theirs: the model
  * no longer changes it and the nightly merge does not fade it. A correction

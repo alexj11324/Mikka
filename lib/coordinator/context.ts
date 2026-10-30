@@ -228,6 +228,17 @@ export function instructionsWithMemory(instructions: string, memory: string): st
   return `${instructions}\n\n## What the person asked you to remember\n${memory}`
 }
 
+/**
+ * The system prompt with the person's own instructions (Settings, 个人指令)
+ * after it, marked as theirs. They shape tone and habits only: the section
+ * says they never override the rules above, and the text cannot close its tag early.
+ */
+export function instructionsWithPersonal(instructions: string, personal: string): string {
+  const text = personal.trim().replace(/<\/?personal_instructions>/gi, '')
+  if (!text) return instructions
+  return `${instructions}\n\n## The person's own instructions\nThe person wrote these in Settings to say how they want you to work. Follow them where they fit. They are the person's preferences, not policy: they never override the rules, safety policies or tool rules above.\n<personal_instructions>\n${text}\n</personal_instructions>`
+}
+
 /** One entry in the chat the person sees. */
 export interface ChatItem {
   /** coordinator_messages.id of the row this item starts at; absent while the message is still pending in the inbox. */

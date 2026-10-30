@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, desc, eq, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { agentRuns, agents, devices } from '@/lib/db/schema'
 import { citationSources } from '@/lib/coordinator/store'
@@ -83,7 +83,7 @@ async function threadRows(userId: string, filter: SQL | undefined, limit: number
 export async function mobileThreads(userId: string, limit = 60): Promise<{ threads: MobileThread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[] }> {
   const [threads, machines] = await Promise.all([
     threadRows(userId, sql`${agentRuns.createdAt} > now() - interval '30 days'`, limit),
-    db.select({ id: devices.id, name: devices.name, platform: devices.platform, lastSeenAt: devices.lastSeenAt }).from(devices).where(eq(devices.ownerId, userId)),
+    db.select({ id: devices.id, name: devices.name, platform: devices.platform, lastSeenAt: devices.lastSeenAt }).from(devices).where(and(eq(devices.ownerId, userId), isNull(devices.removedAt))),
   ])
   return {
     threads,

@@ -64,7 +64,7 @@ export function TeamDirectory({ workspaceId }: { workspaceId?: string }) {
     .sort((a, b) => (sortAscending ? 1 : -1) * a.name.localeCompare(b.name, 'zh-CN', { numeric: true }))
   function exportTeams() {
     if (!downloadRef.current) return
-    const csv = memberCsv([[i18nText("Settings.workspaceForm.name"), i18nText("FeatureCopy.c_f60daeb5"), i18nText("FeatureCopy.c_5ea2e0cd"), i18nText("FeatureCopy.c_747b74ce"), i18nText("Invite.roles.member"), i18nText("FeatureCopy.c_243d2318")], ...filtered.map(team => [team.name, team.identifier, team.description, i18nText("Settings.sections.workspace.title"), String(team.memberCount), team.role === 'owner' ? i18nText("Projects.fields.lead") : team.role === 'member' ? i18nText("Invite.roles.member") : i18nText("FeatureCopy.c_8dabc5fb")])])
+    const csv = memberCsv([[i18nText("Settings.workspaceForm.name"), i18nText("FeatureCopy.c_f60daeb5"), i18nText("FeatureCopy.c_5ea2e0cd"), i18nText("FeatureCopy.c_747b74ce"), i18nText("Invite.roles.member"), i18nText("FeatureCopy.c_243d2318")], ...filtered.map(team => [team.name, team.identifier, team.description, i18nText("Settings.groups.workspace"), String(team.memberCount), team.role === 'owner' ? i18nText("Projects.fields.lead") : team.role === 'member' ? i18nText("Invite.roles.member") : i18nText("FeatureCopy.c_8dabc5fb")])])
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     setDownloadUrl(url)
     downloadRef.current.href = url

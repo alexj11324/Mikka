@@ -45,7 +45,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
   const { data, error, mutate } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
   const [menuOpen, setMenuOpen] = useState(false)
   const [pending, setPending] = useState(false)
-  const workspaceName = data?.workspace.name ?? i18nText("Settings.sections.workspace.title")
+  const workspaceName = data?.workspace.name ?? i18nText("Settings.groups.workspace")
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
       if (event.isComposing || event.keyCode === 229 || event.repeat || pending || signingOut || event.altKey || event.shiftKey) return
