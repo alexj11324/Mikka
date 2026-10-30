@@ -1308,7 +1308,7 @@ test(
             },
           );
           await t.test(
-            "revoked/expired/stale grants cannot inspect or complete an operation",
+            "revoked/stale grants cannot inspect or complete an operation; an expired one still reconciles",
             async () => {
               const f = await vercelProtocolFixture();
               try {
@@ -1343,12 +1343,22 @@ test(
                   const ledger = await provider.ledger(actor, s.task.id),
                     id = ledger.publications[0].id,
                     before = f.requests.length;
-                  if (invalid === "expired")
+                  if (invalid === "expired") {
+                    // Expiry gates only a new reservation: reconcile still reads the provider, never POSTs.
                     await pool.query(
                       "UPDATE factory_approvals SET \"expiresAt\"=now()-interval '1 minute' WHERE id=$1",
                       [a.approvalId],
                     );
-                  else if (invalid === "revoked")
+                    await assert.rejects(
+                      () =>
+                        provider.reconcile(actor, { ...p, publicationId: id }),
+                      (e) => e instanceof PublicationDeferred,
+                    );
+                    assert.ok(f.requests.length > before);
+                    assert.equal(f.posts(), 1);
+                    continue;
+                  }
+                  if (invalid === "revoked")
                     await provider.revoke(actor, {
                       binding: p.binding,
                       eventId: randomUUID(),
@@ -1367,10 +1377,7 @@ test(
                       : "factoryApprovalInvalid",
                   );
                   assert.equal(f.requests.length, before);
-                  assert.equal(
-                    f.posts(),
-                    invalid === "expired" ? 1 : invalid === "revoked" ? 2 : 3,
-                  );
+                  assert.equal(f.posts(), invalid === "revoked" ? 2 : 3);
                 }
               } finally {
                 await f.close();

@@ -81,7 +81,7 @@ test('explicit Preview migration never connects to the global application target
 })
 
 
-test('default production build never dispatches migration even with MIGRATE=1', () => {
+test('the build runs migrations last, after next build succeeds', () => {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
   assert.equal(manifest.scripts.migrate, 'node scripts/migrate.mjs')
   assert.equal(manifest.scripts.prebuild, undefined)
@@ -93,7 +93,7 @@ test('default production build never dispatches migration even with MIGRATE=1', 
       const executable = join(dir, name)
       writeFileSync(executable, `#!/bin/sh
 case "${name} $*" in
-  "node scripts/build-subscription-worker.mjs"|"pnpm generate:agent-ui"|"pnpm lint"|"next build") printf '%s\n' "${name} $*" >> "$BUILD_TEST_TRACE" ;;
+  "node scripts/build-subscription-worker.mjs"|"pnpm generate:agent-ui"|"pnpm lint"|"next build"|"node scripts/migrate.mjs") printf '%s\n' "${name} $*" >> "$BUILD_TEST_TRACE" ;;
   *) echo UNEXPECTED_BUILD_SIDE_EFFECT >&2; exit 91 ;;
 esac
 `)
@@ -103,7 +103,7 @@ esac
       cwd: dir, env: { PATH: dir, VERCEL_ENV: 'production', MIGRATE: '1', BUILD_TEST_TRACE: trace }, encoding: 'utf8',
     })
     assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'pnpm lint', 'next build'])
+    assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'pnpm lint', 'next build', 'node scripts/migrate.mjs'])
   } finally { console.error(`Retained test fixture: ${dir}`) }
 })
 

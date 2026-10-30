@@ -13,7 +13,7 @@
     "test:computer-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts lib/computer/local-reviews.db.test.ts tests/device-computer-migration.test.mjs",
     "generate:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs",
     "check:agent-ui": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
-    "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && pnpm lint && next build",
+    "build": "node scripts/build-subscription-worker.mjs && pnpm generate:agent-ui && pnpm lint && next build && node scripts/migrate.mjs",
     "migrate": "node scripts/migrate.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
     "check:factory": "node scripts/check-factory.mjs",

@@ -95,16 +95,12 @@ for (const scheme of ['light', 'dark'] as const) {
   })
 }
 
-// 动效审查 recording: the collapsed-location menu entering and leaving, then dragging the width
-// across the @2xl/header breakpoint so the ellipsis and the full breadcrumb swap.
-test('面包屑动效录屏：菜单进出与宽度拖动', async ({ browser }, testInfo) => {
+// 动效审查: the collapsed-location menu entering and leaving, then dragging the width across the
+// @2xl/header breakpoint so the ellipsis and the full breadcrumb swap. No video: a recording keeps the
+// typed sign-up credentials, and the evidence scan rejects recordings (playwright.config.ts).
+test('面包屑动效：菜单进出与宽度拖动', async ({ page }) => {
   test.setTimeout(300_000)
-  const { baseURL, extraHTTPHeaders, locale } = testInfo.project.use
-  // The video is design evidence: recorded only with E2E_EVIDENCE_DIR. CI's evidence gate refuses
-  // .webm files in test-results, so a normal run asserts the same steps without recording.
-  const record = !!process.env.E2E_EVIDENCE_DIR
-  const context = await browser.newContext({ baseURL, extraHTTPHeaders, locale, ...(record ? { recordVideo: { dir: testInfo.outputPath('video'), size: { width: 1280, height: 800 } } } : {}), viewport: { width: 1280, height: 800 } })
-  const page = await context.newPage()
+  await page.setViewportSize({ width: 1280, height: 800 })
   const title = `面包屑动效 ${randomUUID().slice(0, 6)} 一个足够长的任务标题用于观察截断`
   await register(page)
   await seedTask(page, title)
@@ -125,7 +121,4 @@ test('面包屑动效录屏：菜单进出与宽度拖动', async ({ browser }, 
     await page.setViewportSize({ width, height: 800 })
     await page.waitForTimeout(250)
   }
-  const video = record ? page.video() : null
-  await context.close()
-  if (video) await video.saveAs(testInfo.outputPath('shots/fe6-motion.webm'))
 })
