@@ -2,7 +2,8 @@
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { createContext, use, useRef, useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, ChevronRight } from 'lucide-react'
+import { Link } from '@/i18n/navigation'
 import { useIsStreaming } from '@openuidev/react-lang'
 import { ApprovalCard, type ApprovalCardStatus } from '@/components/agents/approval-card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -117,7 +118,10 @@ export const ReplyAnswer = createContext<string | null>(null)
  * rows lettered A, B, C…; a click is the reply. The picked row turns dark with
  * a check and the others dim. Anything else goes through the composer.
  */
-function ChoiceCard({ title, options, task }: { title: string; options: { value: string; label: string }[]; task?: string }) {
+/** Where the user stores their own E2B key (the cloud computer runs on it). */
+export const CLOUD_KEY_SETTINGS = '/settings?section=integrations'
+
+function ChoiceCard({ title, options, task }: { title: string; options: { value: string; label: string; action?: 'cloudKeySettings' }[]; task?: string }) {
   const agentCopy = useAgentCopy()
   const bubbles = use(ReplyBubbles)
   const answer = use(ReplyAnswer)
@@ -135,11 +139,14 @@ function ChoiceCard({ title, options, task }: { title: string; options: { value:
         const look = 'h-auto min-h-10 w-full justify-start gap-3 rounded-xl px-3 py-2 text-left font-normal whitespace-normal transition-[background-color,color,opacity] duration-150 motion-reduce:duration-100'
         const body = <>
           <span aria-hidden="true" className={cn('flex size-6 shrink-0 items-center justify-center rounded-md text-xs', selected && !pending ? 'bg-primary-foreground/15' : 'bg-background text-muted-foreground')}>{String.fromCharCode(65 + index)}</span>
-          <span className="min-w-0 flex-1">{option.label}</span>
+          <span className="min-w-0 flex-1">{option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup : option.label}</span>
           {selected && (pending ? <Spinner data-icon="inline-end" aria-label={agentCopy.sendingChoice} /> : <Check data-icon="inline-end" aria-hidden="true" />)}
         </>
         // Answered: the rows are a record, not controls — the pick stays dark, the rest dim.
         if (answered && !pending) return <div key={option.value} role="listitem" aria-current={selected || undefined} className={cn(buttonVariants({ variant: selected ? 'default' : 'secondary' }), look, 'pointer-events-none', !selected && 'opacity-50')}>{body}</div>
+        // No E2B key yet: this option opens the settings where the key is set instead of answering.
+        if (option.action === 'cloudKeySettings') return <Button key={option.value} variant="secondary" className={look} nativeButton={false}
+          render={<Link href={CLOUD_KEY_SETTINGS} />}>{body}<ChevronRight data-icon="inline-end" aria-hidden="true" /></Button>
         return <Button key={option.value} type="button" variant={selected && !pending ? 'default' : 'secondary'} aria-pressed={selected} className={look}
           disabled={status !== 'pending'} onClick={() => { setPicked(option.value); void send(option.label) }}>{body}</Button>
       })}

@@ -2491,7 +2491,8 @@
     "cancel": "取消",
     "creating": "正在创建…",
     "createWorkspace": "创建工作区",
-    "sendingChoice": "发送中"
+    "sendingChoice": "发送中",
+    "cloudKeySetup": "去设置 E2B 密钥"
   },
   "IssueThreads": {
     "title": "线程",

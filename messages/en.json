@@ -2491,7 +2491,8 @@
     "cancel": "Cancel",
     "creating": "Creating…",
     "createWorkspace": "Create workspace",
-    "sendingChoice": "Sending"
+    "sendingChoice": "Sending",
+    "cloudKeySetup": "Set up your E2B key"
   },
   "IssueThreads": {
     "title": "Threads",

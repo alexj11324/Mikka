@@ -452,6 +452,9 @@ test('单选 BeQuestions 可带真实任务 id，用于 Factory 派发前澄清�
   assert.equal(BeQuestions.props.safeParse({ context: '官网首页提速', questions: [question], task: '0b7d5a3e-1c2f-4e5a-9b8c-7d6e5f4a3b2c' }).success, true)
   assert.equal(BeQuestions.props.safeParse({ context: '官网首页提速', questions: [question], task: 'MIK-48' }).success, false)
   const parser = createParser(library.toJSONSchema(), library.root)
-  const result = parser.parse('root = Stack([q])\nq = BeQuestions("派发失败", [{id:"route", title:"等它上线，还是换到 Mikka Cloud？", options:[{value:"wait", label:"等它上线"}, {value:"cloud", label:"换到 Mikka Cloud"}]}], "0b7d5a3e-1c2f-4e5a-9b8c-7d6e5f4a3b2c")')
+  const result = parser.parse('root = Stack([q])\nq = BeQuestions("派发失败", [{id:"route", title:"等它上线，还是用你的 E2B 密钥在云电脑上运行？", options:[{value:"wait", label:"等它上线"}, {value:"cloud", label:"用你的 E2B 密钥在云电脑上运行", action:"cloudKeySettings"}]}], "0b7d5a3e-1c2f-4e5a-9b8c-7d6e5f4a3b2c")')
   assert.deepEqual(result.meta.errors, [])
+  const noKey = { ...question, options: [{ value: 'wait', label: '等它上线' }, { value: 'cloud', label: '云电脑', action: 'cloudKeySettings' }] }
+  assert.equal(BeQuestions.props.safeParse({ context: '派发失败', questions: [noKey] }).success, true)
+  assert.equal(BeQuestions.props.safeParse({ context: '派发失败', questions: [{ ...noKey, options: [{ value: 'cloud', label: '云电脑', action: 'https://evil.example' }] }] }).success, false)
 })
