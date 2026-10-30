@@ -49,6 +49,8 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const [transferring, setTransferring] = useState(false)
   const [transferredTo, setTransferredTo] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  // One save at a time: Enter followed by the blur from disabling the field must not send it twice.
+  const inFlight = useRef(false)
   const host = typeof window === 'undefined' ? '' : `${window.location.host}${withBasePath('/w/')}`
 
   if (!general.data && !general.error) return <SettingsLoading label={t('loading')} rows={3} />
@@ -64,6 +66,8 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   }
 
   async function save(field: Field, value: string | null) {
+    if (inFlight.current) return
+    inFlight.current = true
     setSaving(field)
     setFailed(null)
     try {
@@ -76,6 +80,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
     } finally {
       clearDraft(field)
       setSaving(null)
+      inFlight.current = false
     }
   }
 

@@ -17,6 +17,7 @@ test('审计日志按天列出地址修改，可筛选安全并导出 CSV', asyn
     await address.fill(slug)
     await address.press('Enter')
     await expect(address).toHaveValue(slug)
+    await expect(address).toBeEnabled()
   }
 
   await page.goto(page.url().replace('section=general', 'section=audit'))
