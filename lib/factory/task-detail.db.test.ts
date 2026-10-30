@@ -17,7 +17,7 @@ function guarded(url: string) {
   return u;
 }
 
-test('task detail GET exposes criteria, independence and the B11 header without writing', { skip: !base, timeout: 120_000 }, async () => {
+test('task detail GET exposes criteria and delivery without unused fields or writes', { skip: !base, timeout: 120_000 }, async () => {
   const admin = guarded(base!);
   const name = `fac_x_${randomUUID().replaceAll('-', '')}_e2e`;
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 });
@@ -58,8 +58,8 @@ test('task detail GET exposes criteria, independence and the B11 header without 
     const before = await snapshot();
     const detail = await store.read('owner', taskId);
     assert.deepEqual(await snapshot(), before, 'GET wrote nothing');
-    assert.deepEqual(calls, [reviewRun], 'independence asked only for attempts with a run');
-    assert.deepEqual(detail.checks?.map(x => [x.attemptId, x.stage, x.independent]), [[reviewAttempt, 'review', true], [verifyAttempt, 'verify', null]]);
+    assert.deepEqual(calls, [], 'detail reads do not recheck execution ancestry');
+    assert.deepEqual(detail.checks?.map(x => [x.attemptId, x.stage]), [[reviewAttempt, 'review'], [verifyAttempt, 'verify']]);
     assert.deepEqual(detail.checks?.map(x => [x.status, x.candidateId, x.candidateSha]), [['passed', candidateId, sha], ['running', null, null]], 'each check names its candidate');
     const [review] = detail.checks!;
     assert.equal(review.criteria.length, 2, 'malformed criterion dropped');
@@ -68,7 +68,7 @@ test('task detail GET exposes criteria, independence and the B11 header without 
     assert.doesNotMatch(review.criteria[1].text!, /xyz/);
     assert.equal(review.criteria[1].criterionId, null);
     assert.deepEqual(review.verify, { status: 'passed', command: 'pnpm test', exitCode: 0 });
-    assert.deepEqual(detail.delivery, { candidateSha: sha, repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, databaseBranch: null, deploymentEnvironment: null }, 'no receipt: deploymentEnvironment null');
+    assert.deepEqual(detail.delivery, { candidateSha: sha, repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, deploymentEnvironment: null }, 'no receipt: deploymentEnvironment null');
 
     await pool.query(`INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,'owner','session:s','s',$5,'{}','{}','deploy_preview','preview','d','[]',1,$4,1,now()+interval '1 hour')`, [approvalId, taskId, candidateId, verifyAttempt, randomUUID()]);
     await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,'deploy_preview','preview',$5,'{}','succeeded',$6,now())`, [randomUUID(), approvalId, taskId, candidateId, randomUUID(), JSON.stringify({ verifiedTarget: { environment: 'preview', reference: 'https://mikka-git-x.vercel.app', provider: { name: 'vercel', environment: 'preview' } } })]);

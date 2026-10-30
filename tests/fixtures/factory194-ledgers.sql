@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS factory_approvals (
   "humanSessionId" text, "decisionCredentialId" text, "decisionScope" jsonb, "decisionEvidence" jsonb,
   "eventId" uuid NOT NULL, request jsonb NOT NULL,
   candidate jsonb NOT NULL, action text NOT NULL, target text NOT NULL,
-  "evidenceDigest" text NOT NULL, evidence jsonb NOT NULL,
+  "evidenceDigest" text, evidence jsonb NOT NULL,
   "approvedRevision" integer NOT NULL, "publishAttemptId" uuid NOT NULL,
   "publishRevision" integer NOT NULL,
   "expiresAt" timestamptz NOT NULL, "revokedAt" timestamptz,

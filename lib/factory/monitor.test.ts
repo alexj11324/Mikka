@@ -623,7 +623,6 @@ test(
         targetEnvironment: selectedEnvironment,
         expiresAt: new Date(Date.now() + 600000).toISOString(),
         evidenceDigest: inventory.evidenceDigest,
-        evidenceReadId: inventory.evidenceReadId,
       }, inventory));
       await service.publish(actor, {
         ...approved,
