@@ -277,9 +277,31 @@ dbTest('a workspace Bot Telegram reply locks members before the issue, so team p
   const workspaceId = randomUUID(), botId = randomUUID(), issueId = randomUUID()
   const telegramUserId = `synthetic-${randomUUID()}`
   const threadId = `telegram:synthetic-${randomUUID()}`
+  // Remove this test's synthetic rows (children first); report them only if any are left behind.
   t.after(async () => {
-    t.diagnostic(JSON.stringify({event:'coordinator_db_fixture_retained',fixtureOwnerId:userId,botId,workspaceId,issueId,database:'mikka_e2e'}))
-    await scope.close()
+    try {
+      await scope.run(async () => {
+        const database = (await pool.query<{ name: string }>('select current_database() as name')).rows[0].name
+        try {
+          for (const [statement, key] of [
+            ['delete from coordinator_messages where "userId"=$1', userId],
+            ['delete from coordinator_sessions where "userId"=$1', userId],
+            ['delete from coordinator_events where "userId"=$1', userId],
+            ['delete from issues where id=$1', issueId],
+            ['delete from bots where id=$1', botId],
+            ['delete from mikka_workspace_members where "workspaceId"=$1', workspaceId],
+            ['delete from mikka_workspaces where id=$1', workspaceId],
+            ['delete from telegram_links where "userId"=$1', userId],
+            ['delete from "user" where id=$1', userId],
+          ] as const) await pool.query(statement, [key])
+        } catch (error) {
+          t.diagnostic(JSON.stringify({event:'coordinator_db_fixture_retained',fixtureOwnerId:userId,botId,workspaceId,issueId,database,error:String(error)}))
+          throw error
+        }
+      })
+    } finally {
+      await scope.close()
+    }
   })
   await scope.run(async () => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${userId}, 'Synthetic lock-order owner', ${`${userId}@example.invalid`}, false, now(), now())`)
