@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
-import { ChevronDown, MoreHorizontal, Plus, RotateCw } from 'lucide-react'
+import { Check, ChevronDown, MoreHorizontal, Plus, RotateCw } from 'lucide-react'
 import { listBots, type BotView } from '@/app/actions/bots'
 import { createExecutionRule, deleteExecutionRule, getBotModel, listBotModels, listExecutionPlaces, listExecutionRules, redetectDevice, setBotModel, updateExecutionRule } from '@/app/actions/execution-settings'
 import { Badge } from '@/components/reui/badge'
@@ -16,9 +16,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { AutoLabel, DeviceLabel, HarnessLabel, ModelLabel, ProviderMark, harnessName } from '@/components/labels/entity-labels'
 import { SettingsLoading, SettingsSaveError } from '@/components/settings/primitives'
+import { LabelDot } from '@/components/workspace/issue-metadata-controls'
 import type { ExecutionRule } from '@/lib/execution-rules'
 import { groupBotModels, harnessOptions, modelOptions, modelProvider, placeKind, redetectTargets, retarget, selectedBotModel, type BotModelRow, type ExecutionPlace } from '@/lib/execution-settings-view'
 import { cn } from '@/lib/utils'
+import { findLabel, listWorkspaceLabels, matchLabels } from '@/lib/workspace-labels'
 
 type RuleValue = { label: string; place: string; harness: string; model: string }
 /** The server validates the harness; the screen only offers ones it accepts. */
@@ -315,19 +317,29 @@ function PickerHeading({ t, title, onRefresh }: { t: T; title: ReactNode; onRefr
 }
 
 
-/** 添加规则 and the label cell: one field for the issue label the rule matches. */
+const LABELS_KEY = 'workspace-labels'
+
+/**
+ * 添加规则 and the label cell: one field for the issue label the rule matches.
+ * The cell also lists the workspace's labels to pick from, and its chip takes the label's colour (#539).
+ */
 function LabelPicker({ t, mode, label = '', disabled, onSubmit }: { t: T; mode: 'add' | 'edit'; label?: string; disabled?: boolean; onSubmit: (label: string) => void }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(label)
+  const labels = useSWR(mode === 'edit' ? LABELS_KEY : null, listWorkspaceLabels).data ?? []
   const trimmed = draft.trim()
+  const current = findLabel(labels, label)
+  // The saved name lists everything; typing narrows it.
+  const options = matchLabels(labels, draft === label ? '' : trimmed)
+  const submit = (next: string) => { setOpen(false); onSubmit(next) }
   return <Popover open={open} onOpenChange={next => { setOpen(next); if (next) setDraft(label) }}>
     {mode === 'add'
       ? <PopoverTrigger render={<Button variant="ghost" size="sm" />}><Plus data-icon="inline-start" />{t('addRule')}</PopoverTrigger>
       : <PopoverTrigger disabled={disabled} render={<Button variant="ghost" size="sm" aria-label={t('cell', { row: label, column: t('columns.label'), value: label })} className="-ml-2.5 max-w-full justify-start" />}>
-        <Badge variant="secondary" size="lg" className="max-w-full font-medium"><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current text-muted-foreground" /><span className="truncate">{label}</span></Badge>
+        <Badge variant="secondary" size="lg" className="max-w-full font-medium">{current ? <LabelDot color={current.color} /> : <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current text-muted-foreground" />}<span className="truncate">{label}</span></Badge>
       </PopoverTrigger>}
     <PopoverContent align={mode === 'add' ? 'end' : 'start'} className="w-64 p-1.5">
-      <form onSubmit={event => { event.preventDefault(); if (!trimmed) return; setOpen(false); onSubmit(trimmed) }}>
+      <form onSubmit={event => { event.preventDefault(); if (trimmed) submit(trimmed) }}>
         <InputGroup>
           <InputGroupInput autoFocus value={draft} maxLength={200} placeholder={t('columns.label')} aria-label={t('columns.label')} onChange={event => setDraft(event.target.value)} />
           <InputGroupAddon align="inline-end">
@@ -335,6 +347,9 @@ function LabelPicker({ t, mode, label = '', disabled, onSubmit }: { t: T; mode: 
           </InputGroupAddon>
         </InputGroup>
       </form>
+      {options.length > 0 && <div role="group" aria-label={t('columns.label')} className="mt-1 flex max-h-60 flex-col overflow-y-auto">
+        {options.map(item => <Button key={item.name} type="button" variant="ghost" size="sm" aria-pressed={item.name === current?.name} className="justify-start font-normal" onClick={() => submit(item.name)}><LabelDot color={item.color} /><span className="truncate">{item.name}</span>{item.name === current?.name && <Check data-icon="inline-end" className="ml-auto" />}</Button>)}
+      </div>}
     </PopoverContent>
   </Popover>
 }

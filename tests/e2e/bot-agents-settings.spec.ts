@@ -83,3 +83,29 @@ test('Bot 与 Agents：添加规则，改运行位置、Harness 和模型，默�
   await expect(page.locator('[data-rule="前端"]')).toHaveCount(0)
   await expect(fallback).toBeVisible()
 })
+
+test('Bot 与 Agents：规则标签从工作区已有标签中选，标签带颜色', async ({ page }) => {
+  await register(page, '/settings?section=bots')
+  await expect(page.getByRole('button', { name: '添加规则', exact: true })).toBeVisible()
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie!.value).split('.')[0]])
+  const content = { type: 'doc', attrs: { mikka: { labels: [{ name: '前端', color: 'blue' }, { name: '后端', color: 'green' }] } }, content: [] }
+  await db().query('INSERT INTO issues (id, "userId", title, content, status, priority) VALUES ($1, $2, $3, $4, $5, $6)', [randomUUID(), session.userId, 'Labelled issue', JSON.stringify(content), 'todo', 'normal'])
+  await page.reload()
+
+  await page.getByRole('button', { name: '添加规则', exact: true }).click()
+  await page.getByRole('textbox', { name: '标签', exact: true }).fill('前端')
+  await page.getByRole('button', { name: '添加', exact: true }).click()
+  const cell = page.locator('[data-rule="前端"]').getByRole('button', { name: '前端 标签：前端', exact: true })
+  await expect(cell.locator('svg.text-label-blue')).toBeVisible()
+
+  await cell.click()
+  const options = page.getByRole('group', { name: '标签', exact: true })
+  await expect(options.getByRole('button', { name: '前端', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await options.getByRole('button', { name: '后端', exact: true }).click()
+  const picked = page.locator('[data-rule="后端"]').getByRole('button', { name: '后端 标签：后端', exact: true })
+  await expect(picked.locator('svg.text-success-foreground')).toBeVisible()
+  await page.reload()
+  await expect(picked).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: '未保存' })).toHaveCount(0)
+})
