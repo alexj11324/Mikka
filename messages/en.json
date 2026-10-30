@@ -1710,8 +1710,7 @@
       "threadMeta": "{status} · {time}",
       "privateThread": "Private thread",
       "noThreads": "No threads yet",
-      "loadMore": "Load more",
-      "adminOnly": "Only admins can change this"
+      "loadMore": "Load more"
     },
     "computerPolicy": {
       "heading": "Cloud computers",

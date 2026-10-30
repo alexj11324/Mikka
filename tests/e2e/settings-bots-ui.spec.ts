@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * 设置 › Bot against the dev-only harness (mocked data, see lib/settings/bots-mock.ts).
+ * 设置 › Bot against the dev-only harness (mocked data, see lib/settings/bots-mock-data.ts).
  * Playwright's own webServer enables the harness; against an external E2E_BASE_URL
  * it runs only when that server was started with MIKKA_SETTINGS_HARNESS=1.
  */
@@ -38,13 +38,12 @@ test('admin: defaults, bot list and thread drawer', async ({ page }) => {
   await expect(drawer).toBeHidden()
 })
 
-test('member: defaults are disabled', async ({ page }) => {
+test('member: defaults are shown as values, not controls', async ({ page }) => {
   await open(page, 'member')
-  await expect(page.getByRole('combobox', { name: '模型' })).toBeDisabled()
-  await expect(page.getByRole('combobox', { name: '代码仓库' })).toBeDisabled()
-  await expect(page.getByRole('combobox', { name: '模型' })).toHaveAccessibleDescription('仅管理员可操作')
-  await page.getByRole('combobox', { name: '模型' }).hover({ force: true })
-  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('仅管理员可操作')
+  const defaults = page.getByRole('region', { name: '新 Bot 默认值' })
+  await expect(defaults.getByText('Mikka 默认')).toBeVisible()
+  await expect(defaults.getByText('alexj11324/mikka')).toBeVisible()
+  await expect(defaults.getByRole('combobox')).toHaveCount(0)
 })
 
 test('overlapping saves: a slow failure never undoes a newer choice', async ({ page }) => {
@@ -58,6 +57,8 @@ test('overlapping saves: a slow failure never undoes a newer choice', async ({ p
   await page.waitForTimeout(1500)
   await expect(model).toHaveText(/Claude/)
   await expect(page.getByRole('alert').filter({ hasText: '操作未成功' })).toHaveCount(0)
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '操作未成功' })).toHaveCount(0)
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '已保存' })).toHaveCount(1)
 })
 
 test('thread drawer pages with a cursor; a failed next page can be retried', async ({ page }) => {
@@ -89,5 +90,6 @@ test('loading, empty, load error and save error states', async ({ page }) => {
   await page.getByRole('combobox', { name: '模型' }).click()
   await page.getByRole('option', { name: 'Claude' }).click()
   await expect(page.getByRole('alert').filter({ hasText: '操作未成功' })).toBeVisible()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '操作未成功' })).toBeVisible()
   await expect(page.getByRole('combobox', { name: '模型' })).toHaveText(/Mikka 默认/)
 })

@@ -11,18 +11,17 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { relativeTime } from '@/lib/relative-time'
 import { settingsHref } from '@/lib/settings-sections'
+import { createBotDefaultsSaver, type BotDefaultsChange } from '@/lib/settings/bot-defaults-saver'
 import { effectiveModel, type BotDefaultsView, type BotModelId, type BotThreadPage, type BotsSettingsApi, type WorkspaceBotRow } from '@/lib/settings/bots-api'
 
 const CONNECT_REPOSITORY = '__connect-repository__'
 
-type BotDefaultsChange = { defaultModel?: BotModelId | null; defaultRepository?: string | null }
 
 /** 设置 › 工作区 › Bot (V13, WS-05, WS-06, WS-07). Data comes through `api` so the page does not care whether it is mocked. */
 export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; workspaceId?: string }) {
@@ -38,44 +37,22 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
     setLoadFailed(false)
     const [nextDefaults, nextBots] = await Promise.all([api.getDefaults(), api.listBots()])
     if (nextDefaults.error || nextBots.error) { setLoadFailed(true); return }
+    saver.current?.confirm({ defaultModel: nextDefaults.defaultModel, defaultRepository: nextDefaults.defaultRepository })
     setDefaults(nextDefaults)
     setBots(nextBots.bots)
   }, [api])
   useEffect(() => { void load() }, [load])
 
-  const saveSeq = useRef(0)
-  /**
-   * Optimistic save. Saves can overlap, so each one only touches the fields it
-   * changed, and only while they still hold the value it wrote: a slow failure
-   * never undoes a newer choice.
-   */
-  async function save(change: BotDefaultsChange) {
-    if (!defaults) return
-    const id = ++saveSeq.current
-    const keys = Object.keys(change) as (keyof BotDefaultsChange)[]
-    const prior: BotDefaultsChange = {}
-    for (const key of keys) Object.assign(prior, { [key]: defaults[key] })
+  const saver = useRef<ReturnType<typeof createBotDefaultsSaver> | null>(null)
+  saver.current ??= createBotDefaultsSaver({
+    update: change => api.updateDefaults(change),
+    apply: patch => setDefaults(current => current && { ...current, ...patch }),
+    onSaved: () => toast(t('saved')),
+    onFailed: change => { setSaveFailed(change); toast.error(errorsT('generic')) },
+  })
+  function save(change: BotDefaultsChange) {
     setSaveFailed(null)
-    setDefaults(current => current && { ...current, ...change })
-    const result = await api.updateDefaults(change)
-    const stillMine = (current: BotDefaultsView, key: keyof BotDefaultsChange) => current[key] === change[key]
-    if (result.error) {
-      setDefaults(current => {
-        if (!current) return current
-        const next = { ...current }
-        for (const key of keys) if (stillMine(current, key)) Object.assign(next, { [key]: prior[key] })
-        return next
-      })
-      if (id === saveSeq.current) setSaveFailed(change)
-      return
-    }
-    setDefaults(current => {
-      if (!current) return current
-      const next = { ...current }
-      for (const key of keys) if (stillMine(current, key)) Object.assign(next, { [key]: result[key] })
-      return next
-    })
-    toast(t('saved'))
+    return saver.current?.save(change)
   }
 
   if (loadFailed) return <SettingsSaveError message={errorsT('generic')} retryLabel={commonT('retry')} onRetry={() => void load()} />
@@ -85,10 +62,10 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
     {saveFailed && <SettingsSaveError message={errorsT('generic')} retryLabel={commonT('retry')} onRetry={() => void save(saveFailed)} />}
     <SettingsSection id="bot-defaults-heading" title={t('defaultsTitle')}>
       <SettingRow title={t('model')}>
-        <AdminOnly locked={!api.isAdmin} id="bot-default-model-admin-only"><ModelSelect defaults={defaults} disabled={!api.isAdmin} describedBy={api.isAdmin ? undefined : 'bot-default-model-admin-only'} onChange={model => void save({ defaultModel: model })} /></AdminOnly>
+        {api.isAdmin ? <ModelSelect defaults={defaults} onChange={model => void save({ defaultModel: model })} /> : <ModelLabel defaults={defaults} />}
       </SettingRow>
       <SettingRow title={t('repository')} description={t('repositorySource')}>
-        <AdminOnly locked={!api.isAdmin} id="bot-default-repository-admin-only"><RepositorySelect defaults={defaults} disabled={!api.isAdmin} describedBy={api.isAdmin ? undefined : 'bot-default-repository-admin-only'} workspaceId={workspaceId} onChange={repository => void save({ defaultRepository: repository })} /></AdminOnly>
+        {api.isAdmin ? <RepositorySelect defaults={defaults} workspaceId={workspaceId} onChange={repository => void save({ defaultRepository: repository })} /> : (defaults.defaultRepository ?? t('noRepository'))}
       </SettingRow>
     </SettingsSection>
     <SettingsSection id="bot-list-heading" title={t('allBotsTitle')}>
@@ -99,24 +76,31 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
   </div>
 }
 
-function ModelSelect({ defaults, disabled, describedBy, onChange }: { defaults: BotDefaultsView; disabled: boolean; describedBy?: string; onChange: (model: BotModelId) => void }) {
+/** Members cannot change defaults, so they see the value instead of a control. */
+function ModelLabel({ defaults }: { defaults: BotDefaultsView }) {
+  const t = useTranslations()
+  const group = defaults.modelGroups.find(item => item.id === effectiveModel(defaults))
+  return group ? t(group.labelKey) : null
+}
+
+function ModelSelect({ defaults, onChange }: { defaults: BotDefaultsView; onChange: (model: BotModelId) => void }) {
   const t = useTranslations()
   const items = defaults.modelGroups.map(group => ({ value: group.id, label: t(group.labelKey) }))
-  return <Select items={items} value={effectiveModel(defaults)} disabled={disabled} onValueChange={value => { if (value) onChange(value as BotModelId) }}>
-    <SelectTrigger size="sm" aria-label={t('Settings.botSettings.model')} aria-describedby={describedBy}><SelectValue /></SelectTrigger>
+  return <Select items={items} value={effectiveModel(defaults)} onValueChange={value => { if (value) onChange(value as BotModelId) }}>
+    <SelectTrigger size="sm" aria-label={t('Settings.botSettings.model')}><SelectValue /></SelectTrigger>
     <SelectContent align="end"><SelectGroup>{items.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
   </Select>
 }
 
-function RepositorySelect({ defaults, disabled, describedBy, workspaceId, onChange }: { defaults: BotDefaultsView; disabled: boolean; describedBy?: string; workspaceId?: string; onChange: (repository: string) => void }) {
+function RepositorySelect({ defaults, workspaceId, onChange }: { defaults: BotDefaultsView; workspaceId?: string; onChange: (repository: string) => void }) {
   const t = useTranslations('Settings.botSettings')
   const router = useRouter()
   const items = [...defaults.repositories.map(value => ({ value, label: value })), { value: CONNECT_REPOSITORY, label: t('connectRepository') }]
-  return <Select items={items} value={defaults.defaultRepository} disabled={disabled} onValueChange={value => {
+  return <Select items={items} value={defaults.defaultRepository} onValueChange={value => {
     if (value === CONNECT_REPOSITORY) { router.push(settingsHref('connections', workspaceId)); return }
     if (typeof value === 'string') onChange(value)
   }}>
-    <SelectTrigger size="sm" aria-label={t('repository')} aria-describedby={describedBy}><SelectValue placeholder={t('noRepository')} /></SelectTrigger>
+    <SelectTrigger size="sm" aria-label={t('repository')}><SelectValue placeholder={t('noRepository')} /></SelectTrigger>
     <SelectContent align="end">
       <SelectGroup>{defaults.repositories.map(repository => <SelectItem key={repository} value={repository}>{repository}</SelectItem>)}</SelectGroup>
       <SelectSeparator />
@@ -125,16 +109,6 @@ function RepositorySelect({ defaults, disabled, describedBy, workspaceId, onChan
   </Select>
 }
 
-
-/** Members see the disabled control; hovering it explains why (team pattern: no extra visible text). */
-function AdminOnly({ locked, id, children }: { locked: boolean; id: string; children: React.ReactNode }) {
-  const t = useTranslations('Settings.botSettings')
-  if (!locked) return children
-  return <Tooltip>
-    <TooltipTrigger render={<span />}>{children}<span id={id} className="sr-only">{t('adminOnly')}</span></TooltipTrigger>
-    <TooltipContent>{t('adminOnly')}</TooltipContent>
-  </Tooltip>
-}
 
 function botStatus(t: ReturnType<typeof useTranslations<'Settings.botSettings'>>, bot: WorkspaceBotRow) {
   return bot.status === 'running' ? t('running', { count: bot.runningThreads }) : t('idle')
