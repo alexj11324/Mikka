@@ -167,6 +167,9 @@ test('metadata is a per-action allowlist; every allowlisted key passes the black
 test('key suffix: a trailing `key` word is secret, words merely ending in "key" are not', () => {
   for (const key of ['monkey', 'turkey', 'hockey', 'jockey', 'whiskey', 'Monkey', 'monkeyCount']) assert.equal(isSecretBearingKey(key), false, key)
   for (const key of ['key', 'KEY', 'Key']) assert.equal(isSecretBearingKey(key), true, `bare ${key}`)
+  // Plural follows the same rule: bare keys/KEYS and a trailing `keys` word are secret; monkeys/hockeys are not.
+  for (const key of ['keys', 'KEYS', 'Keys', 'apiKeys', 'api_keys', 'SIGNING_KEYS']) assert.equal(isSecretBearingKey(key), true, `plural ${key}`)
+  for (const key of ['monkeys', 'hockeys', 'turkeys', 'Monkeys', 'monkeys_count']) assert.equal(isSecretBearingKey(key), false, key)
   for (const key of ['apiKey', 'api_key', 'API_KEY', 'apikey', 'secretKey', 'secret_key', 'privateKey', 'private-key', 'privatekey', 'accessKey', 'signingKey', 'signing_key', 'SIGNING_KEY', 'encryptionKey', 'masterKey'])
     assert.equal(isSecretBearingKey(key), true, key)
   // passes the secret scan; only the per-action allowlist rejects it

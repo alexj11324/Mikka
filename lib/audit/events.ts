@@ -178,9 +178,9 @@ export function isSecretBearingKey(key: string): boolean {
   if (FORBIDDEN_KEY_EXACT.has(k)) return true
   if (FORBIDDEN_KEY_PARTS.some(part => k.includes(part))) return true
   if (words.some(word => FORBIDDEN_KEY_WORDS.has(word))) return true
-  // `key` must be its own word (signingKey, signing_key, SIGNING_KEY); monkey/turkey pass.
-  if (k.toLowerCase() === 'key') return true
-  if (words.length > 1 && words.at(-1) === 'key' && !BENIGN_KEY_SUFFIXED.has(k)) return true
+  // `key` / `keys` must be its own word (signingKey, signing_key, SIGNING_KEYS); monkey/monkeys/hockey pass.
+  if (['key', 'keys'].includes(k.toLowerCase())) return true
+  if (words.length > 1 && ['key', 'keys'].includes(words.at(-1)!) && !BENIGN_KEY_SUFFIXED.has(k)) return true
   return FORBIDDEN_AUTH.test(k)
 }
 
