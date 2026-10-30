@@ -31,7 +31,7 @@ import { actingContext, activityActor } from '@/lib/activity-actor'
 import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
 
 type IssueRow = typeof issues.$inferSelect
-type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null; linearTargetVerified: boolean }
+export type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null; linearTargetVerified: boolean }
 
 async function getUserId() {
   const user = await currentUser()
@@ -76,7 +76,12 @@ export async function listIssues() {
   return liveRows.map(({ content, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: issueChecklist(content) }))
 }
 
-export async function getIssue(id: string) {
+/** A missing, deleted or inaccessible task is an expected answer, not a server error. */
+export async function getIssue(id: string): Promise<ActionResult<{ issue: IssueView }>> {
+  return runAction(async () => ({ issue: await readIssue(id) }))
+}
+
+async function readIssue(id: string) {
   let { issue, user } = await requireIssueAccess(id)
   // Reading another owner's legacy task must not initiate maintenance writes:
   // that entry ACL may be retired while the numbering transaction waits.
@@ -163,7 +168,7 @@ export async function moveIssue(input: { id: string; status: string; revision: n
   return runAction(async () => {
     const parsed = z.object({ id: z.uuid(), status: inputSchema.shape.status, revision: z.number().int().positive() }).safeParse(input)
     if (!parsed.success) return { error: 'issueMoveInvalid' }
-    const issue = await getIssue(parsed.data.id)
+    const issue = await readIssue(parsed.data.id)
     if (issue.revision !== parsed.data.revision) return { error: 'issueStale' }
     if (issue.status === parsed.data.status) return { issue }
     return saveIssue({ ...issue, status: parsed.data.status })
@@ -174,7 +179,7 @@ export async function changeIssuePriority(input: { id: string; priority: string;
   return runAction(async () => {
     const parsed = z.object({ id: z.uuid(), priority: inputSchema.shape.priority, revision: z.number().int().positive() }).safeParse(input)
     if (!parsed.success) return { error: 'issuePriorityInvalid' }
-    const issue = await getIssue(parsed.data.id)
+    const issue = await readIssue(parsed.data.id)
     if (issue.revision !== parsed.data.revision) return { error: 'issueStale' }
     if (issue.priority === parsed.data.priority) return { issue }
     return saveIssue({ ...issue, priority: parsed.data.priority })

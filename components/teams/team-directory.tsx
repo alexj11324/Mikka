@@ -83,7 +83,7 @@ export function TeamDirectory({ workspaceId }: { workspaceId?: string }) {
       <h1 className="text-2xl font-semibold tracking-tight">{i18nText("Settings.sections.teams.title")}</h1>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex w-full items-center gap-2 sm:w-auto">
-          <div className="min-w-0 flex-1 sm:w-80"><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput aria-label={i18nText("FeatureCopy.c_997ba91d")} placeholder={t('filterPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /></InputGroup></div>
+          <div className="min-w-0 flex-1 sm:w-80"><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput aria-label={t('searchTeams')} placeholder={t('filterPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /></InputGroup></div>
           <Select value={view} items={[{ value: 'all', label: t('active') }, { value: 'mine', label: t('joined') }]} onValueChange={value => { if (value) setView(value) }}><SelectTrigger aria-label={i18nText("FeatureCopy.c_ab3ddf8b")}><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">{t('active')}</SelectItem><SelectItem value="mine">{t('joined')}</SelectItem></SelectGroup></SelectContent></Select>
         </div>
         <div className="ml-auto flex items-center gap-2"><Button type="button" variant="outline" className="rounded-full" aria-label={i18nText("FeatureCopy.c_3aea5cc4")} onClick={exportTeams}>{t('exportCsv')}</Button><Button type="button" className="rounded-full" aria-label={i18nText("FeatureCopy.c_929d5670")} onClick={createTeam}>{t('createTeam')}</Button></div>

@@ -31,6 +31,8 @@ test('新建 Bot 进入左侧列表，打开它自己的对话，消息不进 Co
   await composer.press('Enter')
   const botChat = page.getByRole('region', { name: '与 写作助手 的对话', exact: true })
   await expect(botChat.getByText('帮我起草一份周报', { exact: true })).toBeVisible()
+  // With no Coordinator to answer, the unanswered message reads as a failed turn, not silence.
+  await expect(page.getByRole('alert').filter({ hasText: '写作助手 暂时不可用' })).toBeVisible()
   await page.screenshot({ path: test.info().outputPath('bot-chat.png'), fullPage: false })
 
   await page.reload()

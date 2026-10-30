@@ -104,7 +104,7 @@ Before publishing the draft:
   `ipcRenderer`, `require` or file paths.
 - Main accepts IPC only from the app's main frame and validates every payload
   with the protocol schemas.
-- Navigation: only the app origin stays in the window; every other HTTPS or
+- Navigation: only the app origin stays in the window; every other HTTP(S) or
   mailto link, including Google and GitHub sign-in, opens in the system
   browser; everything else is denied.
 - Permissions are denied except clipboard writes; system notifications come

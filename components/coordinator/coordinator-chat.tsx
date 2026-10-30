@@ -112,6 +112,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     if (input) { input.focus(); input.setSelectionRange(prefill.text.length, prefill.text.length) }
   }, [prefill])
   const items = useMemo(() => data?.items ?? [], [data])
+  // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
+  const unanswered = data?.enabled === false && items.findLast(item => item.from !== 'event')?.from === 'person'
   // No empty chats: the Coordinator, like every bot, writes its welcome first.
   const welcomed = useRef(false)
   useEffect(() => {
@@ -224,6 +226,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
       {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
+      {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />
