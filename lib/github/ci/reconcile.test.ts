@@ -7,7 +7,7 @@ import { publicationPrNumber } from './register'
 
 const snapshot = { checks: [{ id: '1', name: 'build', status: 'completed', conclusion: 'success' }], statuses: [] }
 const fingerprint = (() => { const r = summarize(snapshot); if (r.kind !== 'complete') throw Error('fixture'); return r.fingerprint })()
-const base = { userId: 'owner', issueId: 'issue', remoteKey: 'v2/github.com/acme/repo', prNumber: 3, originRunId: 'run', scopeVersion: 1, head: 'a'.repeat(40), fingerprint, firstSeenAt: new Date(1), deliveredFingerprint: null, installationId: 4, repositoryId: 5, branch: 'mikka/test-1', pullRequest: { url: 'https://github.com/acme/repo/pull/3', state: 'open' }, content: {}, currentScopeVersion: 1, chainDepth: 0, botId: null, agentId: 'agent', generation: 0, watchId: 'watch' }
+const base = { userId: 'owner', issueId: 'issue', remoteKey: 'v2/github.com/acme/repo', prNumber: 3, originRunId: 'run', scopeVersion: 1, head: 'a'.repeat(40), fingerprint, firstSeenAt: new Date(1), installationId: 4, repositoryId: 5, branch: 'mikka/test-1', pullRequest: { url: 'https://github.com/acme/repo/pull/3', state: 'open' }, content: {}, currentScopeVersion: 1, botId: null, agentId: 'agent', generation: 0, watchId: 'watch' }
 function harness(rows: typeof base[]) {
   const events: string[] = []
   const pool = { async query(sql: string, args: unknown[] = []) {
@@ -20,8 +20,12 @@ function harness(rows: typeof base[]) {
     if (sql.startsWith('SELECT id FROM issues')) return { rows: [{ id: args[0] }], rowCount: 1 }
     if (sql.includes('FOR UPDATE OF o SKIP LOCKED')) { const row = rows.shift(); return { rows: row ? [row] : [], rowCount: row ? 1 : 0 } }
     if (sql.startsWith('SELECT 1 FROM agent_runs')) return { rows: [], rowCount: 0 }
-    if (sql.includes('github_ci_resumes')) { events.push(sql.startsWith('UPDATE') ? `bind:${String(args[6])}` : 'reserve'); return { rows: [{}], rowCount: 1 } }
-    if (sql.includes('UPDATE github_ci_observations')) { events.push(sql.includes("'delivery_unavailable'") ? 'backoff' : `observation:${String(args[7])}`); return { rows: [], rowCount: 1 } }
+    if (sql.includes('github_ci_resumes')) {
+      if (sql.startsWith('UPDATE')) { events.push(`bind:${String(args[5])}`); return { rows: [], rowCount: 1 } }
+      if (sql.startsWith('SELECT')) return { rows: [], rowCount: 0 }
+      events.push('reserve'); return { rows: [{}], rowCount: 1 }
+    }
+    if (sql.includes('UPDATE github_ci_observations')) { events.push(sql.includes("'delivery_unavailable'") ? 'backoff' : `observation:${String(args[5])}:${String(args[8])}`); return { rows: [], rowCount: 1 } }
     throw Error(`unexpected SQL: ${sql}`)
   }, release() {} } } } as unknown as Pool
   return { pool, events }
@@ -35,7 +39,7 @@ test('complete stable snapshot queues within transaction once; failure is backed
   assert.equal(result.failed, 1)
   assert.equal(result.queued, 1)
   assert.ok(events.indexOf('ROLLBACK') < events.indexOf('backoff'))
-  assert.ok(events.includes(`observation:${fingerprint}`))
+  assert.ok(events.includes(`observation:${fingerprint}:null`))
 })
 
 test('pending never queues and changed head requires a new stability observation', async () => {
@@ -60,7 +64,7 @@ test('publication receipts cannot watch another repository or noncanonical URL',
   for (const url of ['https://github.com/acme/other/pull/3', 'https://github.com/acme/repo/pull/3?x=1', 'https://evil.example/acme/repo/pull/3']) assert.equal(publicationPrNumber(base.remoteKey, url), null)
 })
 
-test('budget: a reserved resume is bound to its queued run; duplicate and capped results never queue and are not retried', async () => {
+test('budget: a reserved resume is bound to its queued run; a resumed head or a capped task never queues', async () => {
   {
     const { pool, events } = harness([{ ...base }])
     const result = await reconcileCi({ pool, deadline: Date.now() + 30_000, lockPolicy: (async () => ({})) as never, listAttempts: async () => [], retire: async () => 0, now: () => 200_000, read: async () => ({ head: base.head, open: true, snapshot }), deliver: async () => ({ runId: 'queued-run' }) })
@@ -72,11 +76,10 @@ test('budget: a reserved resume is bound to its queued run; duplicate and capped
     const reserved: unknown[] = []
     const result = await reconcileCi({ pool, deadline: Date.now() + 30_000, lockPolicy: (async () => ({})) as never, listAttempts: async () => [], retire: async () => 0, now: () => 200_000, read: async () => ({ head: base.head, open: true, snapshot }),
       reserve: async (_tx, key) => { reserved.push(key); return outcome }, deliver: async () => { throw Error('must not queue') } })
-    assert.deepEqual(reserved, [{ userId: 'owner', issueId: 'issue', remoteKey: base.remoteKey, prNumber: 3, head: base.head, fingerprint }])
+    assert.deepEqual(reserved, [{ userId: 'owner', issueId: 'issue', remoteKey: base.remoteKey, prNumber: 3, head: base.head }])
     assert.equal(result.queued, 0)
     assert.equal(result[outcome === 'duplicate' ? 'deduped' : 'capped'], 1)
-    // Marked delivered (so it is not retried every pass) and committed.
-    assert.ok(events.includes(`observation:${fingerprint}`))
+    assert.ok(events.includes(`observation:${fingerprint}:${outcome === 'capped' ? 'resume_cap_reached' : 'null'}`))
     assert.ok(events.includes('COMMIT'))
   }
 })

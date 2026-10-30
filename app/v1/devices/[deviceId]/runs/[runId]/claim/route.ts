@@ -86,7 +86,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       if (retired) await afterRunEnded(caller.userId, runId)
       return NextResponse.json({ error: retired ? 'CI result is no longer current.' : 'CI status changed; retry.' }, { status: retired ? 409 : 503 })
     }
-    if (ciStatus.kind === 'unavailable') return NextResponse.json({ error: 'CI status is temporarily unavailable.' }, { status: 503 })
     ciGeneration = ciStatus.generation
   }
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'

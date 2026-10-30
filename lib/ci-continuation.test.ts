@@ -4,10 +4,9 @@ import assert from 'node:assert/strict'
 const head = 'a'.repeat(40), fingerprint = 'b'.repeat(64)
 const c = { originRunId: 'origin', originSessionId: 'session', issueId: 'issue', remoteKey: 'v2/github.com/owner/repo', prNumber: 12, scopeVersion: 1, head, fingerprint, followUp: 'CI finished.', requireSessionResume: true as const }
 let observation: Record<string, unknown> | null = { generation: '4', head, fingerprint, originRunId: 'origin' }
-let provider: 'matching' | 'changed' | 'offline' = 'matching'
 let retired = 0
 const pool = {
-  query: async () => ({ rows: [{ installationId: 1, repositoryId: 2, branch: 'mikka/issue-1', ...(observation ?? { generation: null }) }] }),
+  query: async () => ({ rows: observation ? [observation] : [] }),
   connect: async () => ({
     query: async (sql: string) => {
       if (sql.startsWith('SELECT generation')) return { rows: observation ? [observation] : [] }
@@ -18,23 +17,20 @@ const pool = {
 }
 mock.module('@/lib/db', { namedExports: { pool } })
 mock.module('@/lib/agent-runs', { namedExports: { queueFactoryRun: async () => ({ runId: 'child', status: 'queued', replayed: false }) } })
-mock.module('@/lib/github/repository-installation', { namedExports: { linkedGitHubAccountId: async () => '3' } })
-mock.module('@/lib/github/run-pull-request', { namedExports: { verifyGitHubRepositoryAccess: async () => ({ installationId: 1, repositoryId: 2 }) } })
-mock.module('@/lib/github/ci/read', { namedExports: { readCi: async () => { if (provider === 'offline') throw Error('offline'); return { open: true, head: provider === 'matching' ? head : 'c'.repeat(40), snapshot: {} } } } })
-mock.module('@/lib/github/ci/attempts', { namedExports: { listCiWorkflowAttempts: async () => [] } })
-mock.module('@/lib/github/ci/snapshot', { namedExports: { summarize: () => ({ kind: 'complete', fingerprint, outcome: 'success', failed: [] }) } })
 const modulePromise = import('./ci-continuation')
 
-test('live read, revoked observation and unavailable provider fail closed', async () => {
+test('claim preflight reads only the watch row: current head, result and origin are valid; anything else is stale', async () => {
   const { preflightCiClaim } = await modulePromise
-  provider = 'matching'; observation = { generation: '4', head, fingerprint, originRunId: 'origin' }
+  observation = { generation: '4', head, fingerprint, originRunId: 'origin', active: true }
   assert.deepEqual(await preflightCiClaim('user', c), { kind: 'valid', generation: '4' })
+  for (const changed of [{ head: 'c'.repeat(40) }, { fingerprint: null }, { fingerprint: 'd'.repeat(64) }, { originRunId: 'other' }, { active: false }]) {
+    observation = { generation: '5', head, fingerprint, originRunId: 'origin', active: true, ...changed }
+    assert.deepEqual(await preflightCiClaim('user', c), { kind: 'stale', generation: '5' })
+  }
   observation = null
   assert.deepEqual(await preflightCiClaim('user', c), { kind: 'stale', generation: null })
-  provider = 'offline'
-  assert.deepEqual(await preflightCiClaim('user', c), { kind: 'unavailable' })
-  provider = 'changed'
-  assert.deepEqual(await preflightCiClaim('user', c), { kind: 'stale', generation: null })
+  observation = { generation: '4', head, fingerprint, originRunId: 'origin', active: true }
+  assert.deepEqual(await preflightCiClaim('user', { ...c, requireSessionResume: false as never }), { kind: 'stale', generation: '4' })
 })
 
 test('stale retirement checks observation generation before stopping the queued run', async () => {

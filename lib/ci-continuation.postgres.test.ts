@@ -13,24 +13,20 @@ await admin.query(`CREATE SCHEMA "${schema}"`)
 const pool = new pg.Pool({ connectionString: fixtureUrl, options: `-c search_path=${schema}` })
 mock.module('@/lib/db', { namedExports: { pool } })
 mock.module('@/lib/agent-runs', { namedExports: { queueFactoryRun: async () => { throw Error('not used') } } })
-mock.module('@/lib/github/repository-installation', { namedExports: { linkedGitHubAccountId: async () => null } })
-mock.module('@/lib/github/run-pull-request', { namedExports: { verifyGitHubRepositoryAccess: async () => { throw Error('not used') } } })
-mock.module('@/lib/github/ci/read', { namedExports: { readCi: async () => { throw Error('not used') } } })
-mock.module('@/lib/github/ci/snapshot', { namedExports: { summarize: () => { throw Error('not used') } } })
 const { guardCiClaim, retireStaleCiRun, retryUnsentCiClaim, retireSupersededCiRuns, retireDisabledCiRun } = await import('./ci-continuation')
 const c = { originRunId: 'origin', originSessionId: 'session', issueId: 'issue', remoteKey: 'v2/github.com/owner/repo', prNumber: 12, scopeVersion: 1, head: 'a'.repeat(40), fingerprint: 'b'.repeat(64), followUp: 'CI finished.', requireSessionResume: true as const }
 try {
   await pool.query(`CREATE TABLE issues (id text PRIMARY KEY,"scopeVersion" integer NOT NULL);
     CREATE TABLE agent_runs (id text PRIMARY KEY,"userId" text,"issueId" text,"ciContinuation" jsonb,"agentId" text,"deviceRepoId" text,"botId" text,"deviceId" text,status text,"stopRequestedAt" timestamptz,"agentDefinition" jsonb,"sessionId" text,"stopReason" text,error text,"finishedAt" timestamptz,"updatedAt" timestamptz,"leaseExpiresAt" timestamptz);
     CREATE TABLE run_tokens ("runId" text,"userId" text,"revokedAt" timestamptz);
-    CREATE TABLE github_ci_observations ("userId" text,"issueId" text,"remoteKey" text,"prNumber" integer,"originRunId" text,"scopeVersion" integer,head text,fingerprint text,"expiresAt" timestamptz,generation bigint,"deliveredFingerprint" text,"nextCheckAt" timestamptz,"updatedAt" timestamptz, PRIMARY KEY ("userId","issueId","remoteKey","prNumber"));
-    CREATE TABLE github_ci_resumes ("userId" text,"issueId" text,"remoteKey" text,"prNumber" integer,head text,fingerprint text,"runId" text,"createdAt" timestamptz DEFAULT now());`)
+    CREATE TABLE github_ci_observations ("userId" text,"issueId" text,"remoteKey" text,"prNumber" integer,"originRunId" text,"scopeVersion" integer,head text,fingerprint text,"expiresAt" timestamptz,generation bigint,"nextCheckAt" timestamptz,"updatedAt" timestamptz, PRIMARY KEY ("userId","issueId","remoteKey","prNumber"));
+    CREATE TABLE github_ci_resumes ("userId" text,"issueId" text,"remoteKey" text,"prNumber" integer,head text,"runId" text,"createdAt" timestamptz DEFAULT now());`)
   await pool.query(`INSERT INTO issues VALUES ('issue',1);
     INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceRepoId","deviceId",status,"agentDefinition","sessionId") VALUES ('origin','owner','issue','agent','repo','device','succeeded','{"definitionDigest":"same"}','session');
     INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceRepoId","deviceId",status,"agentDefinition") VALUES ('child','owner','issue','agent','repo','device','queued','{"definitionDigest":"same"}');`)
   await pool.query('UPDATE agent_runs SET "ciContinuation"=$1 WHERE id=$2', [JSON.stringify(c), 'child'])
-  await pool.query(`INSERT INTO github_ci_observations ("userId","issueId","remoteKey","prNumber","originRunId","scopeVersion",head,fingerprint,"expiresAt",generation,"deliveredFingerprint") VALUES ('owner','issue',$1,12,'origin',1,$2,$3,now()+interval '1 hour',4,$3)`, [c.remoteKey, c.head, c.fingerprint])
-  await pool.query(`INSERT INTO github_ci_resumes VALUES ('owner','issue',$1,12,$2,$3,'child',now()),('owner','issue',$1,12,$2,'other-result','unrelated',now())`, [c.remoteKey, c.head, c.fingerprint])
+  await pool.query(`INSERT INTO github_ci_observations ("userId","issueId","remoteKey","prNumber","originRunId","scopeVersion",head,fingerprint,"expiresAt",generation) VALUES ('owner','issue',$1,12,'origin',1,$2,$3,now()+interval '1 hour',4)`, [c.remoteKey, c.head, c.fingerprint])
+  await pool.query(`INSERT INTO github_ci_resumes VALUES ('owner','issue',$1,12,$2,'child',now()),('owner','issue',$1,12,$3,'unrelated',now())`, [c.remoteKey, c.head, 'c'.repeat(40)])
   const budgetRows = async () => (await pool.query('SELECT "runId" FROM github_ci_resumes ORDER BY "runId"')).rows.map(row => row.runId)
   await t.test('an unsent claim is requeued with provisional token revoked', async () => {
     const lease = new Date(Date.now() + 120_000).toISOString()
@@ -83,9 +79,9 @@ try {
       assert.equal(await retireStaleCiRun('owner', 'child', c, '5'), true)
       assert.deepEqual(await budgetRows(), ['unrelated'])
       assert.equal((await pool.query("SELECT status FROM agent_runs WHERE id='child'")).rows[0].status, 'stopped')
-      const observed = (await pool.query('SELECT generation,"deliveredFingerprint" FROM github_ci_observations')).rows[0]
+      const observed = (await pool.query('SELECT generation,"nextCheckAt"<=now() AS due FROM github_ci_observations')).rows[0]
       assert.equal(observed.generation, '6')
-      assert.equal(observed.deliveredFingerprint, null)
+      assert.equal(observed.due, true)
     } finally { tx.release() }
   })
   await t.test('kill switch at claim stops only a queued CI follow-up, once', async () => {

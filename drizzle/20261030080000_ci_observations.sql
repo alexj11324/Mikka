@@ -11,13 +11,11 @@ CREATE TABLE IF NOT EXISTS github_ci_observations (
   head text,
   fingerprint text,
   "firstSeenAt" timestamptz,
-  "deliveredFingerprint" text,
   "nextCheckAt" timestamptz NOT NULL DEFAULT now(),
   "expiresAt" timestamptz NOT NULL,
   "lastError" text,
   "watchId" uuid NOT NULL DEFAULT gen_random_uuid(),
   generation bigint NOT NULL DEFAULT 0,
-  "chainDepth" integer NOT NULL DEFAULT 0 CHECK ("chainDepth" >= 0),
   "updatedAt" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("userId", "issueId", "remoteKey", "prNumber")
 );
@@ -36,8 +34,8 @@ CREATE TABLE IF NOT EXISTS github_ci_workflow_attempts (
   PRIMARY KEY ("userId","issueId","remoteKey","prNumber","runId"),
   FOREIGN KEY ("userId","issueId","remoteKey","prNumber") REFERENCES github_ci_observations ("userId","issueId","remoteKey","prNumber") ON DELETE CASCADE
 );
--- Cost bound: one row per automatic resume, keyed by (task, PR, head SHA,
--- check-set fingerprint) so a CI result resumes a session at most once; the
+-- The only resume dedupe and the only cap: one row per automatic resume, keyed
+-- by (task, PR, head SHA), so a head resumes a session at most once; the
 -- per-task rolling-24h cap counts these rows. A follow-up retired before any
 -- claim deletes its row. Survives observation deletion so a reset watch cannot
 -- reset the cap.
@@ -47,10 +45,9 @@ CREATE TABLE IF NOT EXISTS github_ci_resumes (
   "remoteKey" text NOT NULL,
   "prNumber" integer NOT NULL CHECK ("prNumber" > 0),
   head text NOT NULL,
-  fingerprint text NOT NULL,
   "runId" uuid,
   "createdAt" timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY ("userId","issueId","remoteKey","prNumber",head,fingerprint)
+  PRIMARY KEY ("userId","issueId","remoteKey","prNumber",head)
 );
 CREATE INDEX IF NOT EXISTS github_ci_resumes_task_idx ON github_ci_resumes ("userId","issueId","createdAt");
 CREATE INDEX IF NOT EXISTS github_ci_resumes_run_idx ON github_ci_resumes ("runId");

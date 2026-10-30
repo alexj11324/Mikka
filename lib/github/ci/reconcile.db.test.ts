@@ -5,7 +5,6 @@ import { strict as assert } from 'node:assert'
 import { Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { registerCiPublication } from './register'
-import { retryPendingCiEscalations } from './escalation-recovery'
 import { reconcileCi } from './reconcile'
 import { summarize } from './snapshot'
 import { bindCiResume, CI_RESUMES_PER_TASK_PER_DAY, reserveCiResume } from './budget'
@@ -18,7 +17,7 @@ const snapshot = { checks: [{ id: '1', name: 'build', status: 'completed', concl
 const summary = summarize(snapshot)
 if (summary.kind !== 'complete') throw Error('fixture')
 
-test('PG17: concurrent workers lock one observation; failure and capped escalation are durable', { skip: !target }, async () => {
+test('PG17: concurrent workers lock one observation; one resume per head; failures roll back', { skip: !target }, async () => {
   const schema = `ci_obs_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: target })
   await admin.query(`CREATE SCHEMA "${schema}"`)
@@ -31,7 +30,6 @@ test('PG17: concurrent workers lock one observation; failure and capped escalati
       CREATE TABLE agent_runs (id uuid primary key, "userId" text, "agentId" uuid, "botId" uuid, "createdAt" timestamptz default now());
       CREATE TABLE github_repository_installations ("userId" text, "remoteKey" text, "installationId" bigint, "repositoryId" bigint);
       CREATE TABLE run_publications ("runId" uuid, "userId" text, "issueId" uuid, "remoteKey" text, branch text, "pullRequest" jsonb, status text);
-      CREATE TABLE coordinator_events (id uuid primary key, "userId" text, "botId" uuid, kind text, "dedupeKey" text unique, "issueId" uuid, "runId" uuid, payload jsonb, tier text, "deliveredAt" timestamptz, "lastTriageAttemptAt" timestamptz, "createdAt" timestamptz default now());
       CREATE TABLE deliveries ("issueId" uuid, fingerprint text, UNIQUE("issueId",fingerprint));`)
     await pool.query(await readFile('drizzle/20261030080000_ci_observations.sql', 'utf8'))
     await pool.query('INSERT INTO "user" VALUES ($1)', ['owner'])
@@ -59,49 +57,28 @@ test('PG17: concurrent workers lock one observation; failure and capped escalati
     assert.equal(outcomes.reduce((n,o)=>n+o.queued,0),1)
     assert.equal(delivered,1); assert.equal(reads,3)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM deliveries')).rows[0].n,1)
-    const first = (await pool.query('SELECT "deliveredFingerprint" FROM github_ci_observations')).rows[0]
-    assert.equal(first.deliveredFingerprint,summary.fingerprint)
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM github_ci_resumes')).rows[0].n,1)
-    // Even if the observation forgets it delivered, the resume ledger dedupes the
-    // same (task, PR, head, result): no second follow-up, and it is marked delivered.
-    await pool.query(`UPDATE github_ci_observations SET "nextCheckAt"=now(), "deliveredFingerprint"=NULL`)
-    const dedupe = await reconcileCi(options)
+    assert.deepEqual((await pool.query('SELECT head FROM github_ci_resumes')).rows,[{head:'a'.repeat(40)}])
+    // One resume per (task, PR, head): a later, different result for the same
+    // head (a rerun) is stable but never resumes the session again.
+    const rerun = { checks: [{ id: '2', name: 'build', status: 'completed', conclusion: 'success' }], statuses: [] }
+    const rerunOptions = { ...options, read: async () => ({ head: 'a'.repeat(40), open: true, snapshot: rerun }) }
+    await pool.query(`UPDATE github_ci_observations SET "nextCheckAt"=now()`)
+    assert.equal((await reconcileCi(rerunOptions)).pending,1)
+    await pool.query(`UPDATE github_ci_observations SET "nextCheckAt"=now(),"firstSeenAt"=now()-interval '3 minutes'`)
+    const dedupe = await reconcileCi(rerunOptions)
     assert.equal(dedupe.deduped,1); assert.equal(dedupe.queued,0); assert.equal(delivered,1)
-    assert.equal((await pool.query('SELECT "deliveredFingerprint" FROM github_ci_observations')).rows[0].deliveredFingerprint,summary.fingerprint)
-    // A failed enqueue rolls back; it is backed off without losing the observation.
+    // A failed enqueue rolls back, including its budget reservation; it is
+    // backed off without losing the observation.
     await pool.query('DELETE FROM github_ci_resumes')
-    await pool.query(`UPDATE github_ci_observations SET "nextCheckAt"=now(), "deliveredFingerprint"=NULL`)
+    await pool.query(`UPDATE github_ci_observations SET "nextCheckAt"=now(),fingerprint=$1,"firstSeenAt"=now()-interval '3 minutes'`,[summary.fingerprint])
     const fail = await reconcileCi({ ...options, deliver: async () => { throw Error('synthetic delivery failure') } })
     assert.equal(fail.failed,1)
-    const retry = (await pool.query('SELECT "lastError", "deliveredFingerprint", "nextCheckAt">now() AS deferred FROM github_ci_observations')).rows[0]
-    assert.deepEqual(retry,{lastError:'delivery_unavailable',deliveredFingerprint:null,deferred:true})
-    // The failed enqueue also rolled back its budget reservation.
+    const retry = (await pool.query('SELECT "lastError", "nextCheckAt">now() AS deferred FROM github_ci_observations')).rows[0]
+    assert.deepEqual(retry,{lastError:'delivery_unavailable',deferred:true})
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM github_ci_resumes')).rows[0].n,0)
-    // Capped follow-up stores failure for the person, without dispatching again.
-    await pool.query(`UPDATE github_ci_observations SET "nextCheckAt"=now(), "chainDepth"=2, "lastError"=NULL`)
-    let wakes = 0
-    const capped = await reconcileCi({ ...options, wake: async () => { wakes++; throw Error('synthetic wake failure') } })
-    assert.equal(capped.escalated,1); assert.equal(wakes,1); assert.equal(delivered,1)
-    const event = (await pool.query('SELECT tier,payload FROM coordinator_events')).rows[0]
-    assert.equal(event.tier,'attention'); assert.match(event.payload.text,/"result":"failure"/); assert.match(event.payload.text,/build/)
-    await pool.query(`UPDATE github_ci_observations SET "nextCheckAt"=now()`)
-    const retryWake = await reconcileCi({ ...options, wake: async () => { wakes++ } })
-    assert.equal(retryWake.escalated,0); assert.equal(wakes,2)
-    await pool.query(`UPDATE coordinator_events SET "deliveredAt"=now()`)
-    await pool.query(`UPDATE github_ci_observations SET "nextCheckAt"=now()`)
-    await reconcileCi({ ...options, wake: async () => { wakes++ } })
-    assert.equal(wakes,2)
-    // A pending event survives head changes and monitoring expiry.
-    await pool.query(`UPDATE coordinator_events SET "deliveredAt"=NULL, "lastTriageAttemptAt"=NULL`)
-    await pool.query(`UPDATE github_ci_observations SET head=$1,"expiresAt"=now()-interval '1 minute'`, ['b'.repeat(40)])
-    const recovered = await retryPendingCiEscalations({pool,deadline:Date.now()+30000,wake:async () => { wakes++ }})
-    assert.equal(recovered.attempted,1); assert.equal(wakes,3)
-    const throttled = await retryPendingCiEscalations({pool,deadline:Date.now()+30000,wake:async () => { wakes++ }})
-    assert.equal(throttled.attempted,0); assert.equal(wakes,3)
-    await pool.query(`UPDATE coordinator_events SET "deliveredAt"=now()`)
 
     // Out-of-order receipt must not replace the newer bound execution. CI
-    // continuations only advance their own current origin, once per run.
+    // continuations only advance their own current origin.
     const later = randomUUID(), oldRun = randomUUID(), alternate = randomUUID()
     await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","createdAt") VALUES ($1,'owner',$4,now()+interval '1 minute'),($2,'owner',$4,now()-interval '1 day'),($3,'owner',$4,now()+interval '2 minutes')`, [later, oldRun, alternate, agent])
     const db = drizzle(pool)
@@ -110,11 +87,10 @@ test('PG17: concurrent workers lock one observation; failure and capped escalati
     await registerCiPublication(db, {...receipt, runId: later, ciOriginRunId: run})
     await registerCiPublication(db, {...receipt, runId: oldRun})
     await registerCiPublication(db, {...receipt, runId: alternate, ciOriginRunId: run})
-    const bound = (await pool.query('SELECT "originRunId","chainDepth" FROM github_ci_observations')).rows[0]
-    assert.deepEqual(bound,{originRunId:later,chainDepth:3})
+    assert.equal((await pool.query('SELECT "originRunId" FROM github_ci_observations')).rows[0].originRunId,later)
     // A missing workflow completed webhook is reconciled from the specific run;
     // its changed attempt participates in a fresh snapshot before delivery.
-    await pool.query(`UPDATE github_ci_observations SET "originRunId"=$1,"chainDepth"=0,head=$2,fingerprint=$3,"firstSeenAt"=now()-interval '3 minutes',"deliveredFingerprint"=$3,"nextCheckAt"=now(),"expiresAt"=now()+interval '1 hour'`, [run,'a'.repeat(40),summary.fingerprint])
+    await pool.query(`UPDATE github_ci_observations SET "originRunId"=$1,head=$2,fingerprint=$3,"firstSeenAt"=now()-interval '3 minutes',"nextCheckAt"=now(),"expiresAt"=now()+interval '1 hour'`, [run,'a'.repeat(40),summary.fingerprint])
     await pool.query(`INSERT INTO github_ci_workflow_attempts ("userId","issueId","remoteKey","prNumber","runId",head,attempt,state) VALUES ('owner',$1,'v2/github.com/acme/repo',3,'456',$2,2,'in_progress')`, [issue,'a'.repeat(40)])
     const recoveryOptions = { pool,deadline:Date.now()+30000,lockPolicy:(async () => ({})) as never,retire:async () => 0,read,deliver,
       recoverAttempts:async () => [{runId:'456',attempt:2,state:'completed' as const}] }
@@ -132,7 +108,7 @@ test('PG17: concurrent workers lock one observation; failure and capped escalati
   } finally { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() }
 })
 
-test('real PG: resume budget dedupes per (task, PR, head, result) and caps resumes per task per rolling day', { skip: !target }, async () => {
+test('real PG: resume budget dedupes per (task, PR, head) and caps resumes per task per rolling day', { skip: !target }, async () => {
   const schema = `ci_budget_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: target })
   await admin.query(`CREATE SCHEMA "${schema}"`)
@@ -145,30 +121,32 @@ test('real PG: resume budget dedupes per (task, PR, head, result) and caps resum
     await pool.query(await readFile('drizzle/20261030080000_ci_observations.sql', 'utf8'))
     await pool.query('INSERT INTO "user" VALUES ($1)', ['owner'])
     await pool.query('INSERT INTO issues VALUES ($1,$3,1),($2,$3,1)', [issue, other, JSON.stringify({})])
-    const key = (fingerprint: string, issueId = issue, head = 'a'.repeat(40)) => ({ userId: 'owner', issueId, remoteKey: 'v2/github.com/acme/repo', prNumber: 3, head, fingerprint })
-    assert.equal(await reserveCiResume(pool, key('f1')), 'reserved')
-    assert.equal(await reserveCiResume(pool, key('f1')), 'duplicate')
-    assert.equal(await reserveCiResume(pool, key('f1', issue, 'b'.repeat(40))), 'reserved')
-    assert.equal(await reserveCiResume(pool, key('f2')), 'reserved')
+    const key = (head: string, issueId = issue, prNumber = 3) => ({ userId: 'owner', issueId, remoteKey: 'v2/github.com/acme/repo', prNumber, head })
+    const [h1, h2, h3, h4] = ['1', '2', '3', '4'].map(c => c.repeat(40))
+    assert.equal(await reserveCiResume(pool, key(h1)), 'reserved')
+    assert.equal(await reserveCiResume(pool, key(h1)), 'duplicate')
+    assert.equal(await reserveCiResume(pool, key(h1, issue, 4)), 'reserved')
+    assert.equal(await reserveCiResume(pool, key(h2)), 'reserved')
     assert.equal(CI_RESUMES_PER_TASK_PER_DAY, 3)
-    assert.equal(await reserveCiResume(pool, key('f3')), 'capped')
-    assert.equal(await reserveCiResume(pool, key('f1')), 'duplicate')
+    assert.equal(await reserveCiResume(pool, key(h3)), 'capped')
+    // An already-resumed head stays a duplicate, not capped.
+    assert.equal(await reserveCiResume(pool, key(h1)), 'duplicate')
     // The cap is per task.
-    assert.equal(await reserveCiResume(pool, key('f3', other)), 'reserved')
+    assert.equal(await reserveCiResume(pool, key(h3, other)), 'reserved')
     // A run id binds the reservation; rows older than 24 hours leave the window.
     const run = randomUUID()
-    await bindCiResume(pool, key('f2'), run)
-    assert.equal((await pool.query('SELECT "runId" FROM github_ci_resumes WHERE fingerprint=$1', ['f2'])).rows[0].runId, run)
-    await pool.query(`UPDATE github_ci_resumes SET "createdAt"=now()-interval '25 hours' WHERE "issueId"=$1 AND fingerprint='f1' AND head=$2`, [issue, 'a'.repeat(40)])
-    assert.equal(await reserveCiResume(pool, key('f3')), 'reserved')
-    assert.equal(await reserveCiResume(pool, key('f4')), 'capped')
+    await bindCiResume(pool, key(h2), run)
+    assert.equal((await pool.query('SELECT "runId" FROM github_ci_resumes WHERE head=$1', [h2])).rows[0].runId, run)
+    await pool.query(`UPDATE github_ci_resumes SET "createdAt"=now()-interval '25 hours' WHERE "issueId"=$1 AND head=$2 AND "prNumber"=3`, [issue, h1])
+    assert.equal(await reserveCiResume(pool, key(h3)), 'reserved')
+    assert.equal(await reserveCiResume(pool, key(h4)), 'capped')
     // Deleting the task removes its ledger.
     await pool.query('DELETE FROM issues WHERE id=$1', [other])
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM github_ci_resumes WHERE "issueId"=$1', [other])).rows[0].n, 0)
   } finally { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() }
 })
 
-test('real PG: reconcile does not resume once the per-task cap is reached; the result is not retried', { skip: !target }, async () => {
+test('real PG: reconcile does not resume once the per-task cap is reached, and resumes when the window frees a slot', { skip: !target }, async () => {
   const schema = `ci_cap_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: target })
   await admin.query(`CREATE SCHEMA "${schema}"`)
@@ -187,17 +165,20 @@ test('real PG: reconcile does not resume once the per-task cap is reached; the r
     await pool.query('INSERT INTO github_repository_installations VALUES ($1,$2,4,5)', ['owner', 'v2/github.com/acme/repo'])
     await pool.query('INSERT INTO run_publications VALUES ($1,$2,$3,$4,$5,$6,$7)', [run, 'owner', issue, 'v2/github.com/acme/repo', 'mikka/test-1', JSON.stringify({url:'https://github.com/acme/repo/pull/3',state:'open'}), 'published'])
     await pool.query(`INSERT INTO github_ci_observations ("userId","issueId","remoteKey","prNumber","originRunId","scopeVersion",head,fingerprint,"firstSeenAt","expiresAt") VALUES ($1,$2,$3,3,$4,1,$5,$6,now()-interval '3 minutes',now()+interval '1 hour')`, ['owner', issue, 'v2/github.com/acme/repo', run, 'a'.repeat(40), summary.fingerprint])
-    for (const fingerprint of ['x1', 'x2', 'x3']) await pool.query(`INSERT INTO github_ci_resumes ("userId","issueId","remoteKey","prNumber",head,fingerprint) VALUES ('owner',$1,'v2/github.com/acme/repo',3,$2,$3)`, [issue, 'c'.repeat(40), fingerprint])
+    for (const head of ['1', '2', '3']) await pool.query(`INSERT INTO github_ci_resumes ("userId","issueId","remoteKey","prNumber",head) VALUES ('owner',$1,'v2/github.com/acme/repo',3,$2)`, [issue, head.repeat(40)])
     let delivered = 0
     const options = { pool, deadline: Date.now()+30_000, lockPolicy: (async () => ({})) as never, listAttempts: async () => [], retire: async () => 0,
       read: async () => ({ head: 'a'.repeat(40), open: true, snapshot }), deliver: async () => { delivered++ } }
     const capped = await reconcileCi(options)
     assert.equal(capped.capped, 1); assert.equal(capped.queued, 0); assert.equal(delivered, 0)
-    const row = (await pool.query('SELECT "deliveredFingerprint","lastError" FROM github_ci_observations')).rows[0]
-    assert.deepEqual(row, { deliveredFingerprint: summary.fingerprint, lastError: 'resume_cap_reached' })
+    assert.equal((await pool.query('SELECT "lastError" FROM github_ci_observations')).rows[0].lastError, 'resume_cap_reached')
     await pool.query('UPDATE github_ci_observations SET "nextCheckAt"=now()')
-    const again = await reconcileCi(options)
-    assert.equal(again.capped, 0); assert.equal(again.queued, 0); assert.equal(delivered, 0)
+    assert.equal((await reconcileCi(options)).capped, 1); assert.equal(delivered, 0)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM github_ci_resumes')).rows[0].n, 3)
+    // Once the rolling window frees a slot, the still-current head resumes once.
+    await pool.query(`UPDATE github_ci_resumes SET "createdAt"=now()-interval '25 hours' WHERE head=$1`, ['1'.repeat(40)])
+    await pool.query('UPDATE github_ci_observations SET "nextCheckAt"=now()')
+    assert.equal((await reconcileCi(options)).queued, 1); assert.equal(delivered, 1)
+    assert.equal((await pool.query('SELECT "lastError" FROM github_ci_observations')).rows[0].lastError, null)
   } finally { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() }
 })

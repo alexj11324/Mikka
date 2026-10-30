@@ -371,12 +371,11 @@ export const githubCiObservations = pgTable('github_ci_observations', {
   remoteKey: text('remoteKey').notNull(), prNumber: integer('prNumber').notNull(),
   originRunId: uuid('originRunId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
   scopeVersion: integer('scopeVersion').notNull(), head: text('head'), fingerprint: text('fingerprint'),
-  firstSeenAt: timestamp('firstSeenAt', { withTimezone: true }), deliveredFingerprint: text('deliveredFingerprint'),
+  firstSeenAt: timestamp('firstSeenAt', { withTimezone: true }),
   nextCheckAt: timestamp('nextCheckAt', { withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(), lastError: text('lastError'),
   watchId: uuid('watchId').notNull().defaultRandom(),
   generation: bigint('generation', { mode: 'number' }).notNull().default(0),
-  chainDepth: integer('chainDepth').notNull().default(0),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.userId, table.issueId, table.remoteKey, table.prNumber] }), index('github_ci_observations_due_idx').on(table.nextCheckAt)])
 
@@ -388,14 +387,14 @@ export const githubCiWorkflowAttempts = pgTable('github_ci_workflow_attempts', {
 }, table => [primaryKey({ columns: [table.userId, table.issueId, table.remoteKey, table.prNumber, table.runId] }),
   foreignKey({ columns: [table.userId, table.issueId, table.remoteKey, table.prNumber], foreignColumns: [githubCiObservations.userId, githubCiObservations.issueId, githubCiObservations.remoteKey, githubCiObservations.prNumber] }).onDelete('cascade')])
 
-/** One row per automatic CI resume: dedupes by (task, PR, head, fingerprint) and backs the per-task daily cap (lib/github/ci/budget.ts). */
+/** One row per automatic CI resume: dedupes by (task, PR, head) and backs the per-task daily cap (lib/github/ci/budget.ts). */
 export const githubCiResumes = pgTable('github_ci_resumes', {
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
   issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   remoteKey: text('remoteKey').notNull(), prNumber: integer('prNumber').notNull(),
-  head: text('head').notNull(), fingerprint: text('fingerprint').notNull(), runId: uuid('runId'),
+  head: text('head').notNull(), runId: uuid('runId'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [primaryKey({ columns: [table.userId, table.issueId, table.remoteKey, table.prNumber, table.head, table.fingerprint] }),
+}, table => [primaryKey({ columns: [table.userId, table.issueId, table.remoteKey, table.prNumber, table.head] }),
   index('github_ci_resumes_task_idx').on(table.userId, table.issueId, table.createdAt), index('github_ci_resumes_run_idx').on(table.runId)])
 
 /** The run's event stream, one row per chunk; `seq` dedupes re-sent batches. */

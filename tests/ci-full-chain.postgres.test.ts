@@ -61,7 +61,7 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     let providerHead = sha
     let providerOpen = true
     let providerConclusion = 'failure'
-    let checkRunId = 101
+    const checkRunId = 101
     let providerStatus = 'in_progress'
     // Exercise webhook recovery for publications that predate this feature.
     await fixture.query('DELETE FROM github_ci_observations')
@@ -112,9 +112,14 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     assert.ok(child)
     assert.match(child.ciContinuation.followUp, /build/)
     assert.equal(child.ciContinuation.originSessionId, 'synthetic-original-session')
-    // The resume holds one budget row for this exact (task, PR, head, result).
-    assert.deepEqual((await fixture.query('SELECT "runId",head,fingerprint FROM github_ci_resumes')).rows, [{ runId: child.id, head: sha, fingerprint: child.ciContinuation.fingerprint }])
-    const { preflightCiClaim, guardCiClaim, retryUnsentCiClaim, retireStaleCiRun } = await import('../lib/ci-continuation')
+    // The resume holds the one budget row for this (task, PR, head).
+    assert.deepEqual((await fixture.query('SELECT "runId",head FROM github_ci_resumes')).rows, [{ runId: child.id, head: sha }])
+    const { preflightCiClaim, guardCiClaim, retryUnsentCiClaim } = await import('../lib/ci-continuation')
+    // Claim reads only the database: no GitHub call happens from here on unless
+    // reconcile runs.
+    let providerCalls = 0
+    const providerFetch = globalThis.fetch
+    globalThis.fetch = async (input, init) => { providerCalls++; return providerFetch(input, init) }
     const preflight = await preflightCiClaim(owner, child.ciContinuation)
     assert.equal(preflight.kind, 'valid')
     if (preflight.kind !== 'valid') throw Error('preflight did not succeed')
@@ -127,6 +132,8 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
       assert.equal(assignment?.requireSessionResume, true)
       await client.query('COMMIT')
     } finally { client.release() }
+    assert.equal(providerCalls, 0)
+    globalThis.fetch = providerFetch
     // A duplicate delivery arriving after provisional claim must prevent old
     // assignment bytes from escaping, but the unchanged result is retryable.
     const lease = new Date(Date.now() + 120_000).toISOString()
@@ -140,39 +147,34 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     const recovered = (await fixture.query('SELECT status FROM agent_runs WHERE id=$1', [child.id])).rows[0]
     assert.equal(recovered.status, 'queued')
     assert.equal((await fixture.query('SELECT count(*)::int AS n FROM run_tokens WHERE "runId"=$1 AND "revokedAt" IS NULL', [child.id])).rows[0].n, 0)
-    const unchanged = await preflightCiClaim(owner, child.ciContinuation)
-    assert.equal(unchanged.kind, 'valid')
-    providerStatus = 'in_progress'
-    assert.equal((await preflightCiClaim(owner, child.ciContinuation)).kind, 'unavailable')
-    assert.equal((await fixture.query('SELECT status FROM agent_runs WHERE id=$1', [child.id])).rows[0].status, 'queued')
-    providerStatus = 'completed'
     assert.equal((await preflightCiClaim(owner, child.ciContinuation)).kind, 'valid')
-    // A new attempt on the same SHA, even if the check-run ID and result
-    // are unchanged, supersedes the queued previous attempt.
+    // A new attempt on the same SHA changes the stable result: reconcile retires
+    // the unclaimed follow-up, releases its budget, and queues the newer result.
     assert.equal((await POST(signed(2))).status, 202)
     assert.equal((await POST(signed(1))).status, 202) // late duplicate cannot rewind attempt 2
     assert.equal((await fixture.query('SELECT attempt FROM github_ci_workflow_attempts')).rows[0].attempt, 2)
-    const rerunStale = await preflightCiClaim(owner, child.ciContinuation)
-    assert.equal(rerunStale.kind, 'stale')
-    if (rerunStale.kind !== 'stale') throw Error('rerun was not rejected')
-    assert.equal(await retireStaleCiRun(owner, child.id, child.ciContinuation, rerunStale.generation), true)
-    // Retired before any claim: no model call was spent, so its budget is released.
-    assert.equal((await fixture.query('SELECT count(*)::int n FROM github_ci_resumes WHERE "runId"=$1', [child.id])).rows[0].n, 0)
     await fixture.query('UPDATE github_ci_observations SET "nextCheckAt"=now()')
     assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).pending, 1)
+    assert.equal((await fixture.query('SELECT status FROM agent_runs WHERE id=$1', [child.id])).rows[0].status, 'stopped')
+    assert.equal((await fixture.query('SELECT count(*)::int n FROM github_ci_resumes')).rows[0].n, 0)
+    assert.equal((await preflightCiClaim(owner, child.ciContinuation)).kind, 'stale')
     await fixture.query(`UPDATE github_ci_observations SET "firstSeenAt"=now()-interval '5 minutes',"nextCheckAt"=now()`)
     assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).queued, 1)
     const { rows: [rerunChild] } = await fixture.query(`SELECT id,"ciContinuation" FROM agent_runs WHERE "ciContinuation" IS NOT NULL AND status='queued'`)
     assert.notEqual(rerunChild.id, child.id)
     assert.notEqual(rerunChild.ciContinuation.fingerprint, child.ciContinuation.fingerprint)
-    // A new head invalidates the queued follow-up before it can be claimed.
+    assert.equal((await preflightCiClaim(owner, rerunChild.ciContinuation)).kind, 'valid')
+    // Once a follow-up for this head has been claimed, a later result for the
+    // same head never resumes the session again (one resume per head).
+    await fixture.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now() WHERE id=$1`, [rerunChild.id])
+    assert.equal((await POST(signed(3))).status, 202)
+    await fixture.query('UPDATE github_ci_observations SET "nextCheckAt"=now()')
+    assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).pending, 1)
+    await fixture.query(`UPDATE github_ci_observations SET "firstSeenAt"=now()-interval '5 minutes',"nextCheckAt"=now()`)
+    assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).deduped, 1)
+    assert.equal((await fixture.query(`SELECT count(*)::int n FROM agent_runs WHERE "ciContinuation" IS NOT NULL AND status='queued'`)).rows[0].n, 0)
+    // A new head with passing checks resumes once, after the same quiet window.
     providerHead = 'b'.repeat(40)
-    const stale = await preflightCiClaim(owner, rerunChild.ciContinuation)
-    assert.equal(stale.kind, 'stale')
-    if (stale.kind !== 'stale') throw Error('stale result was not rejected')
-    assert.equal(await retireStaleCiRun(owner, rerunChild.id, rerunChild.ciContinuation, stale.generation), true)
-    assert.equal((await fixture.query('SELECT status FROM agent_runs WHERE id=$1', [rerunChild.id])).rows[0].status, 'stopped')
-    // New head with passing checks also queues, after the same quiet window.
     providerConclusion = 'success'
     await fixture.query('UPDATE github_ci_observations SET "nextCheckAt"=now()')
     assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).pending, 1)
@@ -181,13 +183,17 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     const { rows: [successChild] } = await fixture.query(`SELECT id,"ciContinuation" FROM agent_runs WHERE "ciContinuation" IS NOT NULL AND status='queued'`)
     assert.ok(successChild)
     assert.match(successChild.ciContinuation.followUp, /"result":"success"/)
-    // A closed PR invalidates that queued execution, and reopening reactivates
-    // the persisted watch without inventing a new binding.
+    // A newer head seen by reconcile retires the unclaimed follow-up; claim then
+    // finds it stale from the database alone.
+    providerHead = 'c'.repeat(40)
+    await fixture.query('UPDATE github_ci_observations SET "nextCheckAt"=now()')
+    assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).pending, 1)
+    assert.equal((await fixture.query('SELECT status FROM agent_runs WHERE id=$1', [successChild.id])).rows[0].status, 'stopped')
+    assert.equal((await preflightCiClaim(owner, successChild.ciContinuation)).kind, 'stale')
+    assert.deepEqual((await fixture.query('SELECT head FROM github_ci_resumes')).rows, [{ head: sha }])
+    // A closed PR closes the watch, and reopening reactivates it without
+    // inventing a new binding.
     providerOpen = false
-    const closed = await preflightCiClaim(owner, successChild.ciContinuation)
-    assert.equal(closed.kind, 'stale')
-    if (closed.kind !== 'stale') throw Error('closed PR did not invalidate queued result')
-    assert.equal(await retireStaleCiRun(owner, successChild.id, successChild.ciContinuation, closed.generation), true)
     await fixture.query('UPDATE github_ci_observations SET "nextCheckAt"=now()')
     assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).closed, 1)
     providerOpen = true
@@ -195,30 +201,6 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     const reopened = new Request('http://localhost/api/webhooks/github', { method: 'POST', body: reopenedBody, headers: { 'x-github-event': 'pull_request', 'x-hub-signature-256': `sha256=${createHmac('sha256', process.env.GITHUB_WEBHOOK_SECRET!).update(reopenedBody).digest('hex')}` } })
     assert.equal((await POST(reopened)).status, 202)
     assert.equal((await fixture.query('SELECT "expiresAt">now() AS active FROM github_ci_observations')).rows[0].active, true)
-    // Once the automatic continuation budget is exhausted, each changed
-    // complete result is retained for the human rather than spawning a loop.
-    await fixture.query('UPDATE github_ci_observations SET "chainDepth"=2,"nextCheckAt"=now()')
-    providerConclusion = 'failure'
-    checkRunId = 103
-    assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).pending, 1)
-    await fixture.query(`UPDATE github_ci_observations SET "firstSeenAt"=now()-interval '5 minutes',"nextCheckAt"=now()`)
-    assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).escalated, 1)
-    const { rows: [escalated] } = await fixture.query(`SELECT payload,tier FROM coordinator_events WHERE "dedupeKey" LIKE 'ci_escalation:%'`)
-    assert.equal(escalated.tier, 'attention')
-    assert.match(escalated.payload.text, /"result":"failure"/)
-    assert.match(escalated.payload.text, /build/)
-    await fixture.query('UPDATE github_ci_observations SET "nextCheckAt"=now()')
-    assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).escalated, 0)
-    assert.equal((await fixture.query(`SELECT count(*)::int n FROM coordinator_events WHERE "dedupeKey" LIKE 'ci_escalation:%'`)).rows[0].n, 1)
-    providerConclusion = 'success'
-    checkRunId = 104
-    await fixture.query('UPDATE github_ci_observations SET "nextCheckAt"=now()')
-    assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).pending, 1)
-    await fixture.query(`UPDATE github_ci_observations SET "firstSeenAt"=now()-interval '5 minutes',"nextCheckAt"=now()`)
-    assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).escalated, 1)
-    const { rows: escalations } = await fixture.query(`SELECT payload FROM coordinator_events WHERE "dedupeKey" LIKE 'ci_escalation:%' ORDER BY "createdAt"`)
-    assert.equal(escalations.length, 2)
-    assert.match(escalations[1].payload.text, /"result":"success"/)
     // Failure isolation on real PG: a broken CI table never fails the webhook
     // (202 for the other handlers) and the CI transaction leaves no partial write.
     const before = (await fixture.query('SELECT generation FROM github_ci_observations')).rows[0].generation

@@ -4,11 +4,6 @@ import type { PoolClient } from 'pg'
 import { pool } from '@/lib/db'
 import { queueFactoryRun } from '@/lib/agent-runs'
 import type { CiContinuation } from '@/lib/ci-continuation-contract'
-import { readCi } from '@/lib/github/ci/read'
-import { summarize } from '@/lib/github/ci/snapshot'
-import { listCiWorkflowAttempts } from '@/lib/github/ci/attempts'
-import { verifyGitHubRepositoryAccess } from '@/lib/github/run-pull-request'
-import { linkedGitHubAccountId } from '@/lib/github/repository-installation'
 
 export type CiFollowUp = Omit<CiContinuation, 'originSessionId' | 'requireSessionResume'>
 class ContinuationUnavailable extends Error { constructor() { super('CI original-session continuation unavailable') } }
@@ -38,26 +33,17 @@ export async function queueCiContinuation(tx: PoolClient, userId: string, input:
   return queued
 }
 
-/** Fresh provider check before claiming; no model is invoked. */
-export type CiPreflight = { kind: 'valid'; generation: string } | { kind: 'stale'; generation: string | null } | { kind: 'unavailable' }
+/** Claim-time check against this watch's database state only; there is no
+ * second GitHub read. Reconcile already read GitHub (with the person's access)
+ * before queueing, and every later webhook or poll that changes the head or the
+ * stable result either retires this run or changes the watch, which makes it
+ * stale here. A run that is stale is retired; no model is invoked. */
+export type CiPreflight = { kind: 'valid'; generation: string } | { kind: 'stale'; generation: string | null }
 export async function preflightCiClaim(userId: string, c: CiContinuation): Promise<CiPreflight> {
-  if (!valid(c) || !c.originSessionId || c.requireSessionResume !== true) return { kind: 'unavailable' }
-  const { rows: [binding] } = await pool.query(`SELECT g."installationId",g."repositoryId",p.branch,o.generation,o.head,o.fingerprint,o."originRunId",o."expiresAt" FROM github_repository_installations g JOIN run_publications p ON p."userId"=g."userId" AND p."remoteKey"=g."remoteKey" LEFT JOIN github_ci_observations o ON o."userId"=p."userId" AND o."issueId"=p."issueId" AND o."remoteKey"=p."remoteKey" AND o."prNumber"=$5 WHERE g."userId"=$1 AND g."remoteKey"=$2 AND p."runId"=$3 AND p."issueId"=$4`, [userId, c.remoteKey, c.originRunId, c.issueId, c.prNumber])
-  if (!binding?.branch || (binding.generation !== null && !/^\d+$/.test(String(binding.generation)))) return { kind: 'unavailable' }
-  const generation = binding.generation === null ? null : String(binding.generation)
-  try {
-    const signal = AbortSignal.timeout(20_000)
-    const access = await verifyGitHubRepositoryAccess({ remoteKey: c.remoteKey, githubAccountId: await linkedGitHubAccountId(userId), fetcher: (url, init) => fetch(url, { ...init, signal: init?.signal ? AbortSignal.any([signal, init.signal]) : signal }) })
-    if (access.installationId !== Number(binding.installationId) || access.repositoryId !== Number(binding.repositoryId)) return { kind: 'unavailable' }
-    const result = await readCi({ remoteKey: c.remoteKey, installationId: Number(binding.installationId), repositoryId: Number(binding.repositoryId), prNumber: c.prNumber, branch: binding.branch }, process.env, fetch, { deadline: Date.now() + 20_000 })
-    const attempts = await listCiWorkflowAttempts(pool, { userId, issueId: c.issueId, remoteKey: c.remoteKey, prNumber: c.prNumber, head: c.head })
-    const summary = summarize(result.snapshot, attempts)
-    if (!result.open || result.head !== c.head) return { kind: 'stale', generation }
-    if (summary.kind !== 'complete') return { kind: 'unavailable' }
-    if (summary.fingerprint !== c.fingerprint) return { kind: 'stale', generation }
-    if (generation === null || binding.originRunId !== c.originRunId || (binding.expiresAt instanceof Date && binding.expiresAt.getTime() <= Date.now()) || (binding.head && binding.head !== c.head) || (binding.fingerprint && binding.fingerprint !== c.fingerprint)) return { kind: 'stale', generation }
-    return binding.head === c.head && binding.fingerprint === c.fingerprint ? { kind: 'valid', generation } : { kind: 'unavailable' }
-  } catch { return { kind: 'unavailable' } }
+  const { rows: [o] } = await pool.query(`SELECT generation,head,fingerprint,"originRunId","expiresAt">now() AS active FROM github_ci_observations WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4`, [userId, c.issueId, c.remoteKey, c.prNumber])
+  const generation = o ? String(o.generation) : null
+  if (!o || !valid(c) || !c.originSessionId || c.requireSessionResume !== true || !o.active || o.originRunId !== c.originRunId || o.head !== c.head || o.fingerprint !== c.fingerprint) return { kind: 'stale', generation }
+  return { kind: 'valid', generation: String(o.generation) }
 }
 
 /** Retry only database deadlocks/serialization failures, after rollback. */
@@ -85,7 +71,7 @@ export async function retireStaleCiRun(userId: string, runId: string, expected: 
     if ((observation ? String(observation.generation) : null) !== generation) return false
     const result = await tx.query(`UPDATE agent_runs SET status='stopped',"stopReason"='superseded',error='CI result changed before the follow-up started.',"finishedAt"=now(),"updatedAt"=now() WHERE id=$1 AND "userId"=$2 AND status='queued' AND "stopRequestedAt" IS NULL AND "ciContinuation"=$3::jsonb RETURNING id`, [runId, userId, JSON.stringify(expected)])
     if (result.rowCount) await releaseCiResumes(tx, [runId])
-    if (result.rowCount && observation) await tx.query(`UPDATE github_ci_observations SET "deliveredFingerprint"=CASE WHEN "deliveredFingerprint"=$5 THEN NULL ELSE "deliveredFingerprint" END, "nextCheckAt"=now(),generation=generation+1,"updatedAt"=now() WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4`, [userId, expected.issueId, expected.remoteKey, expected.prNumber, expected.fingerprint])
+    if (result.rowCount && observation) await tx.query(`UPDATE github_ci_observations SET "nextCheckAt"=now(),generation=generation+1,"updatedAt"=now() WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4`, [userId, expected.issueId, expected.remoteKey, expected.prNumber])
     return Boolean(result.rowCount)
   })
 }
