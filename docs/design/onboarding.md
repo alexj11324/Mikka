@@ -32,11 +32,11 @@
 | --- | --- | --- | --- | --- |
 | 0 | 开场 | 屏幕暗下来，铺一层光。中间出现一滴颜色（Figma 01） | — | — |
 | 1 | 孵化你的第一个 Bot（Figma 01） | 那滴颜色长成 bloub，眼睛跟着鼠标转。「你好，我是你的第一个 Bot。」下面是 16 种形状（`bot-shapes.ts`）、12 种颜色和一个名字输入框；挑形状和颜色时，bloub 当场变形、变色 | 「就叫这个」→ 气泡「就叫你小满」 | 不能跳过：这一步就是建 Bot。不改的话用默认的形状、颜色和名字 |
-| 2a | 要不要云电脑 | bloub 缩成头像，移到对话顶部。「我是小满。要不要给我一台云电脑？有了它，我能自己开浏览器、跑代码。」下面两个按钮：**要** / **先不用** | 「要」或「先不用」 | 「先不用」→「好。以后想用，在设置 › 云电脑里填上你的 E2B Key 就行。」直接进第 3 步 |
-| 2b | 填 E2B Key（只在选了「要」时） | 一张卡片：一个 Key 输入框（密码样式）、「去 E2B 拿 Key」的外链、**连接** 按钮。连接时先用这个 Key 向 E2B 校验一次 | 「已连接 E2B」（不回显 Key） | 「先不用」→ 同 2a 的跳过；Key 校验失败 → 卡片里就地报错，可以重填或跳过 |
+| 2a | 要不要云电脑 | bloub 缩成头像，移到对话顶部。「我是小满。我可以有一台自己的云电脑，用它开浏览器、跑代码。要开一台吗？」下面两个按钮，跟 Bot 的话左对齐，主选项在前：**好，开一台** / **先不用** | 「好，开一台」或「先不用」 | 「先不用」→「好。以后想用，在设置 › 云电脑里填上你的 E2B Key 就行。」直接进第 3 步 |
+| 2b | 填 E2B Key（只在选了「好，开一台」时） | 一张卡片：一个 Key 输入框（密码样式）、「去 E2B 拿 Key」的外链、**连接** 按钮。连接时先用这个 Key 向 E2B 校验一次 | 「已连接 E2B」（不回显 Key） | 「先不用」→ 同 2a 的跳过；Key 校验失败 → 卡片里就地报错，可以重填或跳过 |
 | 2c | 它的电脑亮起来（Figma 02，只在 Key 连上后） | 「等我一下，我去把电脑打开。」下面一块屏幕，用户自己的 E2B 账号真的在开机（「● 正在开机」→ 桌面）；屏幕下方写「小满 的屏幕」 | — | 用户可以不等开机直接往下走；电脑在后台继续开 |
-| 3 | 给它「喂」工具（Figma 03） | 「把常用的应用给我，我帮你盯着。」下面是 Gmail、Google 日历、Google Drive、Notion、Slack 的卡片（Composio 官方彩色图标，复用现有的连接流程），每张有 连接 / 连接中… / 已连接 三种状态 | 「好了」→ 气泡「已连接 Gmail、Google 日历」；承接一句：「好，以后这些我帮你盯着。」 | 「跳过」→「没关系，之后随时可以在设置里连接。」 |
-| 4 | 先交给它一件事（Figma 04） | 「都连好了。先交给我一件事吧。」A–D 选择卡（R-12），标题「你想先让我做哪件事？」，四个选项按已连接的应用出，每项右边带来源应用的图标；下面一个输入框「或者直接说想让它帮你做什么…」 | 选中的那项或者打的字，作为一个气泡发出 | 「先不用」→ 直接进入第 6 步 |
+| 3 | 给它「喂」工具（Figma 03） | 「想让我帮你看看邮件和日程吗？连上你常用的应用就行。」下面是 Gmail、Google 日历、Google Drive、Notion、Slack 的卡片（Composio 官方彩色图标，复用现有的连接流程），每张有 连接 / 连接中… / 已连接 三种状态 | 「好了」→ 气泡「已连接 Gmail、Google 日历」；承接一句：「好，有需要你留意的，我会告诉你。」 | 「跳过」→「没关系，之后随时可以在设置里连接。」 |
+| 4 | 先交给它一件事（Figma 04） | 「都连好了。有什么想先让我做的吗？」A–D 选择卡（R-12），标题「你想先让我做哪件事？」，四个选项按已连接的应用出，每项右边带来源应用的图标；下面一个输入框「或者直接说想让它帮你做什么…」 | 选中的那项或者打的字，作为一个气泡发出 | 「先不用」→ 直接进入第 6 步 |
 | 5 | 活已经在干了（Figma 05） | Bot 接一句（「好。这周有 23 封没回，我先把要你回的挑出来。」），这件事作为卡片滑进去，显示实时进度（「小满 在读 Gmail · 已看 9 / 23」） | — | — |
 | 6 | 收尾 | 只在有项目被跳过时，先提醒一句：「还没开的：云电脑、连接应用。随时都能开。」然后出现 **进入 Mikka** | 点「进入 Mikka」 | — |
 
@@ -61,8 +61,8 @@
 | 孵化 | 你好，我是你的第一个 Bot。 | Hi, I'm your first Bot. |
 | 名字输入框占位 | 给它起个名字 | Give it a name |
 | 起名按钮 | 就叫这个 | That's the one |
-| 问云电脑 | 我是{name}。要不要给我一台云电脑？有了它，我能自己开浏览器、跑代码。 | I'm {name}. Want to give me a cloud computer? With one, I can open a browser and run code myself. |
-| 按钮 | 要 / 先不用 | Yes / Not now |
+| 问云电脑 | 我是{name}。我可以有一台自己的云电脑，用它开浏览器、跑代码。要开一台吗？ | I'm {name}. I can have my own cloud computer to open a browser and run code. Want me to set one up? |
+| 按钮 | 好，开一台 / 先不用 | Yes, set one up / Not now |
 | 跳过云电脑 | 好。以后想用，在设置 › 云电脑里填上你的 E2B Key 就行。 | OK. If you want one later, add your E2B key in Settings › Cloud computer. |
 | Key 输入框标签 | E2B Key | E2B key |
 | Key 外链 | 去 E2B 拿 Key | Get a key from E2B |
@@ -73,10 +73,10 @@
 | 电脑状态 | 正在开机 | Starting up |
 | 开机失败 | 电脑稍后再开 | Computer will start later |
 | 屏幕标签 | {name} 的屏幕 | {name}'s screen |
-| 应用 | 把常用的应用给我，我帮你盯着。 | Hand me the apps you use, and I'll keep an eye on them. |
-| 应用承接 | 好，以后这些我帮你盯着。 | Got it. I'll keep an eye on these from now on. |
+| 应用 | 想让我帮你看看邮件和日程吗？连上你常用的应用就行。 | Want me to help with your email and calendar? Just connect the apps you use. |
+| 应用承接 | 好，有需要你留意的，我会告诉你。 | Got it. I'll let you know when something needs you. |
 | 应用跳过承接 | 没关系，之后随时可以在设置里连接。 | No problem. Connect them anytime in Settings. |
-| 第一件事 | 都连好了。先交给我一件事吧。 | All set. Give me something to do first. |
+| 第一件事 | 都连好了。有什么想先让我做的吗？ | All set. Anything you'd like me to start with? |
 | 选择卡标题 | 你想先让我做哪件事？ | What should I do first? |
 | 输入框占位 | 或者直接说想让它帮你做什么… | Or just say what you'd like it to do… |
 | 提醒 | 还没开的：{missing}。随时都能开。 | Still off: {missing}. Turn them on anytime. |
