@@ -1,6 +1,7 @@
 # Settings surface
 
-The settings page is one continuous column of rows, not a stack of cards.
+Each section is a small grey heading over one bordered card of rows, as in
+Comma's 「模型与 API」 (decision 2026-10-30).
 `components/settings/primitives.tsx` owns the shapes; product code only
 supplies content.
 
@@ -11,14 +12,16 @@ supplies content.
 2. **No surface on a row.** A row never carries `bg-*`, `rounded-*`, `border`,
    `shadow-*` or `ring-*`. `SettingsSection` already separates rows with
    `divide-y`; that is the only separator.
-3. **Sections are surface-free.** `SettingsSection` renders a heading and a
-   hairline-separated list. Do not wrap it in `Card`, `Frame`, or a
-   `rounded-xl border bg-muted/30` div.
-4. **Cards only at the "repeated subject" level.** When a category repeats a
+3. **One card per section.** `SettingsSection` renders the heading and one
+   bordered card of hairline-separated rows. Do not nest more cards or tinted
+   boxes inside it.
+4. **Selects are bordered.** A choice on the right is a bordered, fixed-width
+   select button: icon (R-74) and value, then a chevron.
+5. **Cards only at the "repeated subject" level.** When a category repeats a
    subject — one device, one member — one card per subject is
    allowed. The card contains rows, not a grid of tinted boxes, and the card
    itself must not have a background colour.
-5. **Navigation and search stay in the sidebar.** Do not build a second list,
+6. **Navigation and search stay in the sidebar.** Do not build a second list,
    selection region or scroll container inside the panel.
 
 ## Sections
@@ -45,4 +48,4 @@ radius in the same `className`. The subject card itself is allowed as long as
 it has no background colour.
 
 The rule is a floor, not the whole contract: it catches the tinted-box pattern,
-not every way to weaken the layout. Review still checks rules 3–5.
+not every way to weaken the layout. Review still checks rules 3–6.

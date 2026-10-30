@@ -5,7 +5,6 @@ import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, MoreHorizontal, Plus, RotateCw } from 'lucide-react'
 import { listBots, type BotView } from '@/app/actions/bots'
-import { createExecutionRule, deleteExecutionRule, getBotModel, listBotModels, listExecutionPlaces, listExecutionRules, redetectDevice, setBotModel, updateExecutionRule } from '@/app/actions/execution-settings'
 import { Badge } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
@@ -14,205 +13,234 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
-import { AutoLabel, DeviceLabel, HarnessLabel, ModelLabel, ProviderMark, harnessName } from '@/components/labels/entity-labels'
+import { DeviceLabel, HarnessLabel, ModelLabel, ProviderMark, harnessName } from '@/components/labels/entity-labels'
 import { SettingsLoading, SettingsSaveError } from '@/components/settings/primitives'
+import {
+  addRule, executionSettingsView, listAccountModels, listPlaces, readBotModel, readExecutionSettings, redetect, removeRule, saveBotModel, saveDefaults, saveWhenQuotaExhausted, updateRule,
+  type LabelRule, type StoredExecutionSettings, type TaskDefaults, type WhenDeviceOffline, type WhenQuotaExhausted,
+} from '@/lib/execution-settings-client'
 import type { ExecutionRule } from '@/lib/execution-rules'
-import { groupBotModels, harnessOptions, modelOptions, modelProvider, placeKind, redetectTargets, retarget, selectedBotModel, type BotModelRow, type ExecutionPlace } from '@/lib/execution-settings-view'
+import { botModelChoice, groupBotModels, harnessOptions, modelName, modelOptions, modelProvider, placeKind, redetectTargets, retarget, type BotModelRow, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
 import { cn } from '@/lib/utils'
 
-type RuleValue = { label: string; place: string; harness: string; model: string }
-/** The server validates the harness; the screen only offers ones it accepts. */
-const ruleInput = (value: RuleValue) => value as Parameters<typeof updateExecutionRule>[1]
 type T = ReturnType<typeof useTranslations<'Settings.botAgents'>>
 
-const KEYS = { rules: 'execution-rules', places: 'execution-places', bots: 'bot-agents-bots', botModels: 'bot-models' } as const
-const DEFAULT_ID = 'default'
+const KEYS = { settings: 'execution-settings', places: 'execution-places', bots: 'bot-agents-bots', accounts: 'bot-models' } as const
 
 /*
- * 设置 › Bot 与 Agents (Figma 设置 v4, WS-34…WS-37). Both sections share one
- * column grid so the model column lines up: label | place | harness | model | ⋯.
- * Bots always run on Mikka, so their row spans the place and harness columns.
+ * 设置 › Bot 与 Agents, laid out like Comma's 模型与 API: one bordered card per
+ * section, one setting per row, a bordered select on the right. Every place,
+ * harness and model is a concrete value the person can see (no 自动, #537).
  */
-function Columns() {
-  return <colgroup>
-    <col className="w-28" />
-    <col className="w-52" />
-    <col className="w-36" />
-    <col />
-    <col className="w-10" />
-  </colgroup>
-}
-
-const ROW = 'hover:bg-transparent has-aria-expanded:bg-transparent'
-/** One framed list per section, like the device list: rules and bots are repeated subjects (docs/settings.md §4). */
-const FRAME = 'overflow-hidden rounded-xl border bg-card [&_td:first-child]:pl-3.5 [&_th:first-child]:pl-3.5 [&_td:last-child]:pr-2 [&_th:last-child]:pr-2'
-const CELL = 'py-3 pl-0'
-
 export function BotAgentsSettings() {
   const t = useTranslations('Settings.botAgents')
-  const rules = useSWR(KEYS.rules, listExecutionRules)
-  const places = useSWR(KEYS.places, async () => (await listExecutionPlaces()) as ExecutionPlace[], { refreshInterval: 15_000 })
+  const stored = useSWR(KEYS.settings, readExecutionSettings)
+  const places = useSWR(KEYS.places, listPlaces, { refreshInterval: 15_000 })
   const bots = useSWR(KEYS.bots, listBots)
-  const botModels = useSWR(KEYS.botModels, async () => (await listBotModels()) as BotModelRow[])
+  const accounts = useSWR(KEYS.accounts, listAccountModels)
   const [failed, setFailed] = useState<(() => Promise<void>) | null>(null)
+  /** A choice the server refused stays on screen, marked 未保存, until a retry saves it. */
+  const [unsaved, setUnsaved] = useState<{ defaults?: TaskDefaults; whenQuotaExhausted?: WhenQuotaExhausted }>({})
 
-  /** Every change saves at once: the screen moves first, and a refused save puts it back. */
   async function save(change: () => Promise<void>) {
     setFailed(null)
     try { await change() } catch { setFailed(() => change) }
   }
 
-  if (rules.error || places.error || bots.error || botModels.error) return <p role="alert" className="text-sm text-destructive">{t('loadFailed')}</p>
-  if (!rules.data || !places.data || !bots.data || !botModels.data) return <SettingsLoading label={t('loading')} rows={4} />
+  if (stored.error || places.error || bots.error || accounts.error) return <p role="alert" className="text-sm text-destructive">{t('loadFailed')}</p>
+  if (!stored.data || !places.data || !bots.data || !accounts.data) return <SettingsLoading label={t('loading')} rows={4} />
 
   const placeList = places.data
-  const modelRows = botModels.data
-  const ruleList = rules.data
-  const mutateRules = (next: ExecutionRule[], request: () => Promise<ExecutionRule[]>) => save(async () => {
-    await rules.mutate(request, { optimisticData: next, rollbackOnError: true, populateCache: true, revalidate: false })
-  })
-  const updateRule = (rule: ExecutionRule, value: RuleValue) => mutateRules(
-    ruleList.map(item => item.id === rule.id ? { ...item, ...value } : item),
-    async () => updateExecutionRule(rule.id, ruleInput(value)),
-  )
-  const addRule = (label: string) => {
-    const value = { label, place: 'auto', harness: 'auto', model: 'auto' }
-    const editable = ruleList.filter(item => item.id !== DEFAULT_ID)
-    return mutateRules(
-      [...editable, { id: `pending-${editable.length}`, position: editable.length, ...value }, ...ruleList.filter(item => item.id === DEFAULT_ID)],
-      async () => createExecutionRule(ruleInput(value)),
-    )
+  const accountRows = accounts.data
+  const view = executionSettingsView(stored.data, placeList, accountRows)
+  const defaults = unsaved.defaults ?? view.defaults
+  const quota = unsaved.whenQuotaExhausted ?? view.whenQuotaExhausted
+  const current = stored.data
+
+  const changeDefaults = (next: TaskDefaults) => {
+    setUnsaved(state => ({ ...state, defaults: next }))
+    void save(async () => {
+      await saveDefaults(next)
+      setUnsaved(({ defaults: _saved, ...rest }) => rest)
+      await stored.mutate()
+    })
   }
-  const deleteRule = (rule: ExecutionRule) => mutateRules(ruleList.filter(item => item.id !== rule.id), async () => deleteExecutionRule(rule.id))
-  const redetect = async (ids: string[]) => {
-    await Promise.all(ids.map(id => redetectDevice(id)))
+  const changeQuota = (next: WhenQuotaExhausted) => {
+    setUnsaved(state => ({ ...state, whenQuotaExhausted: next }))
+    void save(async () => {
+      await saveWhenQuotaExhausted(next)
+      setUnsaved(({ whenQuotaExhausted: _saved, ...rest }) => rest)
+      await stored.mutate()
+    })
+  }
+  /** Rules save at once: the table moves first, and a refused save puts it back. */
+  const mutateRules = (next: ExecutionRule[], request: () => Promise<void>) => save(async () => {
+    await stored.mutate(async (): Promise<StoredExecutionSettings> => { await request(); return readExecutionSettings() },
+      { optimisticData: { ...current, rules: next }, rollbackOnError: true, populateCache: true, revalidate: false })
+  })
+  const changeRule = (rule: LabelRule, label: string, value: ExecutionChoice) => mutateRules(
+    current.rules.map(item => item.id === rule.id ? { ...item, label, ...value } : item),
+    () => updateRule(rule.id, label, value),
+  )
+  const createRule = (label: string) => {
+    // A new rule starts from the task defaults.
+    const value: ExecutionChoice = { place: defaults.place, harness: defaults.harness, model: defaults.model }
+    return mutateRules([...current.rules, { id: `pending-${current.rules.length}`, position: current.rules.length, label, ...value }], () => addRule(label, value))
+  }
+  const deleteRule = (rule: LabelRule) => mutateRules(current.rules.filter(item => item.id !== rule.id), () => removeRule(rule.id))
+  const refreshDevices = async (ids: string[]) => {
+    await redetect(ids)
     await places.mutate()
   }
+  const refreshAccounts = async () => { await accounts.mutate() }
+  const defaultPickers = executionPickers({ t, row: t('default'), value: defaults, places: placeList, wide: true, onChange: value => changeDefaults({ ...defaults, ...value }), onRedetect: refreshDevices })
+  const offline = { wait: t('offlineWait'), cloud: t('offlineCloud') } satisfies Record<WhenDeviceOffline, string>
+  const quotaNames = { stop: t('quotaStop'), switchAccount: t('quotaSwitch') } satisfies Record<WhenQuotaExhausted, string>
 
-  return <div className="flex flex-col gap-10">
-    <section aria-labelledby="bot-agents-bots" className="flex flex-col gap-2">
-      <h2 id="bot-agents-bots" className="text-sm font-medium text-muted-foreground">{t('bots')}</h2>
-      <div className={FRAME}>
-        <Table className="table-fixed">
-          <Columns />
-          <TableBody className="divide-y">
-            <BotRow t={t} botId={null} name={null} rows={modelRows} onSave={save} onRefresh={async () => { await botModels.mutate() }} />
-            {bots.data.map(bot => <BotRow key={bot.id} t={t} botId={bot.id} name={bot} rows={modelRows} onSave={save} onRefresh={async () => { await botModels.mutate() }} />)}
-          </TableBody>
-        </Table>
-      </div>
-    </section>
+  return <div className="flex flex-col gap-8">
+    <Group id="bot-agents-bots" title={t('bots')}>
+      <BotRow t={t} botId={null} bot={null} rows={accountRows} onSave={save} onRefresh={refreshAccounts} />
+      {bots.data.map(bot => <BotRow key={bot.id} t={t} botId={bot.id} bot={bot} rows={accountRows} onSave={save} onRefresh={refreshAccounts} />)}
+      <Line title={t('whenQuotaExhausted')} hint={t('whenQuotaExhaustedHint')}>
+        <ChoicePicker ariaLabel={t('setting', { name: t('whenQuotaExhausted'), value: quotaNames[quota] })} value={quota} names={quotaNames} onChange={changeQuota} />
+      </Line>
+    </Group>
 
-    <section aria-labelledby="bot-agents-agents" className="flex flex-col gap-2">
-      <header className="flex items-center justify-between gap-3">
-        <h2 id="bot-agents-agents" className="text-sm font-medium text-muted-foreground">{t('agents')}</h2>
-        <LabelPicker t={t} mode="add" onSubmit={label => { void addRule(label) }} />
-      </header>
-      <div className={FRAME}>
-        <Table className="table-fixed">
-          <Columns />
+    <Group id="bot-agents-defaults" title={t('defaults')} footnote={t('defaultsNote')} data-rule="default">
+      <Line title={t('columns.place')} hint={t('placeHint')}>{defaultPickers.place}</Line>
+      <Line title={t('columns.harness')} hint={t('harnessHint')}>{defaultPickers.harness}</Line>
+      <Line title={t('columns.model')} hint={t('modelHint')}>{defaultPickers.model}</Line>
+      <Line title={t('whenDeviceOffline')} hint={t('whenDeviceOfflineHint')}>
+        <ChoicePicker ariaLabel={t('cell', { row: t('default'), column: t('whenDeviceOffline'), value: offline[defaults.whenDeviceOffline] })} value={defaults.whenDeviceOffline} names={offline} onChange={whenDeviceOffline => changeDefaults({ ...defaults, whenDeviceOffline })} />
+      </Line>
+    </Group>
+
+    <Group id="bot-agents-labels" title={t('labels')} footnote={t('labelsNote')}>
+      {view.rules.length > 0 && <div className="overflow-x-auto">
+        <Table className="min-w-[40rem] table-fixed">
+          <colgroup>
+            <col className="w-28" />
+            <col className="w-[27%]" />
+            <col className="w-[25%]" />
+            <col />
+            <col className="w-11" />
+          </colgroup>
           <TableHeader>
-            <TableRow className={cn(ROW, 'border-b')}>
-              <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.label')}</TableHead>
-              <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.place')}</TableHead>
-              <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.harness')}</TableHead>
-              <TableHead className="h-8 pl-0 text-xs font-normal text-muted-foreground">{t('columns.model')}</TableHead>
-              <TableHead className="h-8 pl-0"><span className="sr-only">{t('columns.actions')}</span></TableHead>
+            <TableRow className="border-b hover:bg-transparent">
+              {(['label', 'place', 'harness', 'model'] as const).map((column, index) => <TableHead key={column} className={cn('h-9 text-xs font-normal text-muted-foreground', index === 0 ? 'pl-4' : 'pl-0')}>{t(`columns.${column}`)}</TableHead>)}
+              <TableHead className="h-9"><span className="sr-only">{t('columns.actions')}</span></TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody className="divide-y">
-            {ruleList.map(rule => rule.id === DEFAULT_ID
-              ? <DefaultRow key={rule.id} t={t} />
-              : <RuleRow key={rule.id} t={t} rule={rule} places={placeList} onChange={value => { void updateRule(rule, value) }} onDelete={() => { void deleteRule(rule) }} onRedetect={redetect} />)}
+          <TableBody>
+            {view.rules.map(rule => <RuleRow key={rule.id} t={t} rule={rule} places={placeList} onChange={(label, value) => { void changeRule(rule, label, value) }} onDelete={() => { void deleteRule(rule) }} onRedetect={refreshDevices} />)}
           </TableBody>
         </Table>
+      </div>}
+      <div className="px-2 py-2">
+        <LabelPicker t={t} mode="add" onSubmit={label => { void createRule(label) }} />
       </div>
-    </section>
+    </Group>
     {failed && <SettingsSaveError message={t('notSaved')} retryLabel={t('retry')} onRetry={() => { void save(failed) }} />}
   </div>
 }
 
-/** The fixed fallback: every column 自动. It cannot be changed or deleted, so it has no controls. */
-function DefaultRow({ t }: { t: T }) {
-  return <TableRow className={ROW} data-rule="default">
-    <TableCell className={CELL}>
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate text-sm">{t('default')}</span>
-        <span className="text-xs text-muted-foreground">{t('defaultHint')}</span>
+/** A section: a small grey heading, one bordered card of rows, an optional footnote. */
+function Group({ id, title, footnote, children, ...props }: { id: string; title: string; footnote?: string; children: ReactNode; 'data-rule'?: string }) {
+  return <section aria-labelledby={id} className="flex flex-col gap-2">
+    <h2 id={id} className="px-1 text-xs text-muted-foreground">{title}</h2>
+    <div data-settings-card className="flex flex-col divide-y divide-border overflow-hidden rounded-2xl border bg-card" {...props}>{children}</div>
+    {footnote && <p className="px-1 text-xs text-muted-foreground">{footnote}</p>}
+  </section>
+}
+
+/** One setting per row: its name and a one-line description on the left, a bordered select on the right. */
+function Line({ title, hint, leading, children, ...props }: { title: ReactNode; hint: ReactNode; leading?: ReactNode; children: ReactNode; 'data-bot'?: string }) {
+  return <div className="flex flex-col gap-2.5 px-4 py-3.5 sm:min-h-16 sm:flex-row sm:items-center sm:gap-4" {...props}>
+    <span className="flex min-w-0 flex-1 items-center gap-3">
+      {leading}
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate text-sm">{title}</span>
+        <span className="truncate text-xs text-muted-foreground">{hint}</span>
       </span>
-    </TableCell>
-    <TableCell className={CELL}><AutoLabel /></TableCell>
-    <TableCell className={CELL}><AutoLabel /></TableCell>
-    <TableCell className={CELL}><AutoLabel /></TableCell>
-    <TableCell className={CELL} />
-  </TableRow>
+    </span>
+    <span className="flex w-full shrink-0 sm:w-60">{children}</span>
+  </div>
+}
+
+/**
+ * The place, harness and model pickers for one rule. The defaults show them a
+ * row each; a label rule shows them as table cells.
+ */
+function executionPickers({ t, row, value, places, wide, disabled, onChange, onRedetect }: {
+  t: T
+  row: string
+  value: ExecutionChoice
+  places: ExecutionPlace[]
+  wide?: boolean
+  disabled?: boolean
+  onChange: (value: ExecutionChoice) => void
+  onRedetect: (ids: string[]) => Promise<void>
+}) {
+  const devices = places.filter(place => placeKind(place) !== 'cloud')
+  const device = places.find(item => item.id === value.place)
+  const placeName = value.place === 'cloud' ? t('cloud') : device?.name ?? t('removedDevice')
+  const harnesses = harnessOptions(places, value.place)
+  const harnessList = harnesses.includes(value.harness) ? harnesses : [...harnesses, value.harness]
+  const models = modelOptions(places, value.place, value.harness)
+  const modelList = models.some(option => option.value === value.model) ? models : [...models, { value: value.model, name: value.model }]
+  const shownModel = modelName(places, value.place, value.harness, value.model)
+  const cell = (column: string, name: string) => t('cell', { row, column, value: name })
+  const refresh = () => onRedetect(redetectTargets(places, value.place))
+  const move = (place: string) => onChange(retarget(places, { ...value, place }))
+
+  return {
+    place: <Picker t={t} wide={wide} disabled={disabled} ariaLabel={cell(t('columns.place'), placeName)} heading={t('columns.place')} onRefresh={() => onRedetect(redetectTargets(places, 'cloud'))}
+      value={<DeviceLabel kind={value.place === 'cloud' ? 'cloud' : device ? placeKind(device) : 'unknown'} name={placeName} online={value.place === 'cloud' || Boolean(device?.online)} />}>
+      {close => <CommandGroup>
+        {devices.map(item => <CommandItem key={item.id} value={item.id} keywords={[item.name ?? item.id]} data-checked={value.place === item.id} onSelect={() => { close(); move(item.id) }}>
+          <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+            <DeviceLabel kind={placeKind(item)} name={item.name ?? item.id} online={item.online} />
+            {!item.online && <span className="shrink-0 text-xs text-muted-foreground">{t('offline')}</span>}
+          </span>
+        </CommandItem>)}
+        <CommandItem value="cloud" keywords={[t('cloud')]} data-checked={value.place === 'cloud'} onSelect={() => { close(); move('cloud') }}><DeviceLabel kind="cloud" name={t('cloud')} online /></CommandItem>
+      </CommandGroup>}
+    </Picker>,
+    harness: <Picker t={t} wide={wide} disabled={disabled} ariaLabel={cell(t('columns.harness'), harnessName(value.harness))} heading={t('columns.harness')} onRefresh={refresh} value={<HarnessLabel harness={value.harness} />}>
+      {close => <CommandGroup>
+        {harnessList.map(harness => <CommandItem key={harness} value={harness} keywords={[harnessName(harness)]} data-checked={value.harness === harness} onSelect={() => { close(); onChange(retarget(places, { ...value, harness })) }}><HarnessLabel harness={harness} /></CommandItem>)}
+      </CommandGroup>}
+    </Picker>,
+    model: <Picker t={t} wide={wide} disabled={disabled} ariaLabel={cell(t('columns.model'), shownModel)} heading={t('columns.model')} onRefresh={refresh} search={t('searchModels')} value={<ModelLabel model={shownModel} source={value.harness} />}>
+      {close => <CommandGroup>
+        {modelList.map(option => <CommandItem key={option.value} value={option.value} keywords={[option.name]} data-checked={value.model === option.value} onSelect={() => { close(); onChange({ ...value, model: option.value }) }}><ModelLabel model={option.name} source={value.harness} /></CommandItem>)}
+      </CommandGroup>}
+    </Picker>,
+  }
 }
 
 function RuleRow({ t, rule, places, onChange, onDelete, onRedetect }: {
   t: T
-  rule: ExecutionRule
+  rule: LabelRule
   places: ExecutionPlace[]
-  onChange: (value: RuleValue) => void
+  onChange: (label: string, value: ExecutionChoice) => void
   onDelete: () => void
   onRedetect: (ids: string[]) => Promise<void>
 }) {
-  const label = rule.label ?? ''
-  const value: RuleValue = { label, place: rule.place, harness: rule.harness, model: rule.model }
   const pending = rule.id.startsWith('pending-')
-  const devices = places.filter(place => placeKind(place) !== 'cloud')
-  const placeName = (id: string) => id === 'cloud' ? t('cloud') : places.find(place => place.id === id)?.name ?? t('removedDevice')
-  const placeLabel = (id: string) => {
-    if (id === 'auto') return <AutoLabel />
-    const place = places.find(item => item.id === id)
-    return <DeviceLabel kind={id === 'cloud' ? 'cloud' : place ? placeKind(place) : 'unknown'} name={placeName(id)} online={id === 'cloud' || Boolean(place?.online)} />
-  }
-  const harnesses = harnessOptions(places, rule.place)
-  const harnessList = rule.harness === 'auto' || harnesses.some(item => item === rule.harness) ? harnesses : [...harnesses, rule.harness]
-  const models = modelOptions(places, rule.place, rule.harness)
-  const modelList = rule.model === 'auto' || models.includes(rule.model) ? models : [...models, rule.model]
-  const cell = (column: string, name: string) => t('cell', { row: label, column, value: name })
-  const refresh = () => onRedetect(redetectTargets(places, rule.place))
-
-  return <TableRow className={ROW} data-rule={label}>
-    <TableCell className={CELL}>
-      <LabelPicker t={t} mode="edit" label={label} disabled={pending} onSubmit={next => { if (next !== label) onChange({ ...value, label: next }) }} />
+  const value: ExecutionChoice = { place: rule.place, harness: rule.harness, model: rule.model }
+  const cells = executionPickers({ t, row: rule.label, value, places, disabled: pending, onChange: next => onChange(rule.label, next), onRedetect })
+  const cell = 'py-2.5 pl-0 pr-2'
+  return <TableRow className="hover:bg-transparent has-aria-expanded:bg-transparent" data-rule={rule.label}>
+    <TableCell className={cn(cell, 'pl-4')}>
+      <LabelPicker t={t} mode="edit" label={rule.label} disabled={pending} onSubmit={next => { if (next !== rule.label) onChange(next, value) }} />
     </TableCell>
-    <TableCell className={CELL}>
-      <CellPicker t={t} ariaLabel={cell(t('columns.place'), rule.place === 'auto' ? t('auto') : placeName(rule.place))} heading={t('columns.place')} onRefresh={() => onRedetect(redetectTargets(places, 'auto'))} disabled={pending} value={placeLabel(rule.place)}>
-        {close => <CommandGroup>
-          <CommandItem value="auto" keywords={[t('auto')]} data-checked={rule.place === 'auto'} onSelect={() => { close(); onChange(retarget(places, { ...value, place: 'auto' })) }}><AutoLabel /></CommandItem>
-          {devices.map(device => <CommandItem key={device.id} value={device.id} keywords={[device.name ?? device.id]} data-checked={rule.place === device.id} onSelect={() => { close(); onChange(retarget(places, { ...value, place: device.id })) }}>
-            <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-              <DeviceLabel kind={placeKind(device)} name={device.name ?? device.id} online={device.online} />
-              {!device.online && <span className="shrink-0 text-xs text-muted-foreground">{t('offline')}</span>}
-            </span>
-          </CommandItem>)}
-          <CommandItem value="cloud" keywords={[t('cloud')]} data-checked={rule.place === 'cloud'} onSelect={() => { close(); onChange(retarget(places, { ...value, place: 'cloud' })) }}><DeviceLabel kind="cloud" name={t('cloud')} online /></CommandItem>
-        </CommandGroup>}
-      </CellPicker>
-    </TableCell>
-    <TableCell className={CELL}>
-      <CellPicker t={t} ariaLabel={cell(t('columns.harness'), rule.harness === 'auto' ? t('auto') : harnessName(rule.harness))} heading={t('columns.harness')} onRefresh={rule.place === 'cloud' ? undefined : refresh} disabled={pending} value={rule.harness === 'auto' ? <AutoLabel /> : <HarnessLabel harness={rule.harness} />}>
-        {close => <CommandGroup>
-          <CommandItem value="auto" keywords={[t('auto')]} data-checked={rule.harness === 'auto'} onSelect={() => { close(); onChange({ ...value, harness: 'auto', model: 'auto' }) }}><AutoLabel /></CommandItem>
-          {harnessList.map(harness => <CommandItem key={harness} value={harness} keywords={[harnessName(harness)]} data-checked={rule.harness === harness} onSelect={() => {
-            close()
-            onChange({ ...value, harness, model: modelOptions(places, rule.place, harness).includes(rule.model) ? rule.model : 'auto' })
-          }}><HarnessLabel harness={harness} /></CommandItem>)}
-        </CommandGroup>}
-      </CellPicker>
-    </TableCell>
-    <TableCell className={CELL}>
-      <CellPicker t={t} ariaLabel={cell(t('columns.model'), rule.model === 'auto' ? t('auto') : rule.model)} heading={t('columns.model')} onRefresh={rule.place === 'cloud' ? undefined : refresh} search={t('searchModels')} disabled={pending} value={rule.model === 'auto' ? <AutoLabel /> : <ModelLabel model={rule.model} source={rule.harness} />}>
-        {close => <CommandGroup>
-          <CommandItem value="auto" keywords={[t('auto')]} data-checked={rule.model === 'auto'} onSelect={() => { close(); onChange({ ...value, model: 'auto' }) }}><AutoLabel /></CommandItem>
-          {modelList.map(model => <CommandItem key={model} value={model} keywords={[model]} data-checked={rule.model === model} onSelect={() => { close(); onChange({ ...value, model }) }}><ModelLabel model={model} source={rule.harness} /></CommandItem>)}
-        </CommandGroup>}
-      </CellPicker>
-    </TableCell>
-    <TableCell className={cn(CELL, 'pr-0 text-right')}>
+    <TableCell className={cell}>{cells.place}</TableCell>
+    <TableCell className={cell}>{cells.harness}</TableCell>
+    <TableCell className={cell}>{cells.model}</TableCell>
+    <TableCell className={cn(cell, 'pr-3 text-right')}>
       <DropdownMenu>
-        <DropdownMenuTrigger disabled={pending} render={<Button variant="ghost" size="icon-sm" aria-label={t('rowMenu', { label })} />}><MoreHorizontal /></DropdownMenuTrigger>
+        <DropdownMenuTrigger disabled={pending} render={<Button variant="ghost" size="icon-sm" aria-label={t('rowMenu', { label: rule.label })} />}><MoreHorizontal /></DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuGroup>
             <DropdownMenuItem variant="destructive" onClick={onDelete}>{t('delete')}</DropdownMenuItem>
@@ -224,58 +252,63 @@ function RuleRow({ t, rule, places, onChange, onDelete, onRedetect }: {
 }
 
 /** A Bot's own model. Bots always run on Mikka, so the row has no place or harness. */
-function BotRow({ t, botId, name, rows, onSave, onRefresh }: {
+function BotRow({ t, botId, bot, rows, onSave, onRefresh }: {
   t: T
   botId: string | null
-  name: BotView | null
+  bot: BotView | null
   rows: BotModelRow[]
   onSave: (change: () => Promise<void>) => Promise<void>
   onRefresh: () => Promise<void>
 }) {
   const tCoordinator = useTranslations('Coordinator')
   const { mutate: mutateKey } = useSWRConfig()
-  const choice = useSWR(['bot-model', botId ?? 'coordinator'], async () => (await getBotModel(botId)) ?? null)
-  const title = name?.name ?? tCoordinator('label')
-  const selected = selectedBotModel(rows, choice.data)
+  const choice = useSWR(['bot-model', botId ?? 'coordinator'], () => readBotModel(botId))
+  const title = bot?.name ?? tCoordinator('label')
+  const selected = botModelChoice(rows, choice.data)
   const accounts = groupBotModels(rows)
-  const choose = (bindingId: string | null) => onSave(async () => {
-    await choice.mutate(async () => { await setBotModel(botId, bindingId); return (await getBotModel(botId)) ?? null }, { optimisticData: bindingId, rollbackOnError: true, revalidate: false })
+  const choose = (bindingId: string) => onSave(async () => {
+    await choice.mutate(async () => { await saveBotModel(botId, bindingId); return readBotModel(botId) }, { optimisticData: bindingId, rollbackOnError: true, revalidate: false })
     // Choosing another Bot's model copies its binding to this Bot; list the copy too.
-    await mutateKey(KEYS.botModels)
+    await mutateKey(KEYS.accounts)
   })
-  return <TableRow className={ROW} data-bot={title}>
-    <TableCell className={CELL} colSpan={3}>
-      <span className="flex min-w-0 items-center gap-2.5">
-        {name ? <BotAvatar color={name.color} shape={name.shape} size="row" label={name.name} /> : <CoordinatorAvatar size="row" />}
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate text-sm">{title}</span>
-          {!name && <span className="truncate text-xs text-muted-foreground">{t('coordinatorHint')}</span>}
-        </span>
-      </span>
-    </TableCell>
-    <TableCell className={CELL}>
-      <CellPicker t={t} ariaLabel={t('cell', { row: title, column: t('columns.model'), value: selected?.modelId ?? t('auto') })} disabled={choice.data === undefined} value={selected ? <ModelLabel model={selected.modelId} source={selected.provider} /> : <AutoLabel />}>
-        {close => <>
-          <CommandGroup>
-            <CommandItem value="auto" keywords={[t('auto')]} data-checked={!selected} onSelect={() => { close(); void choose(null) }}>
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <AutoLabel />
-                <span className="pl-5.5 text-xs text-muted-foreground">{t('autoBotHint')}</span>
-              </span>
-            </CommandItem>
-          </CommandGroup>
-          {accounts.map(account => <CommandGroup key={account.connectionId} className="border-t" heading={<PickerHeading t={t} title={<span className="flex items-center gap-1.5"><ProviderMark provider={modelProvider('', account.provider)} small />{account.provider === 'claude' ? t('claudeAccount') : t('openaiAccount')}</span>} onRefresh={onRefresh} />}>
-            {account.models.map(model => <CommandItem key={model.key} value={model.key} keywords={[model.modelId]} data-checked={selected?.key === model.key} onSelect={() => { close(); void choose(model.bindingId) }}><ModelLabel model={model.modelId} source={account.provider} /></CommandItem>)}
-          </CommandGroup>)}
-        </>}
-      </CellPicker>
-    </TableCell>
-    <TableCell className={CELL} />
-  </TableRow>
+  return <Line data-bot={title} title={title} hint={t('botHint')}
+    leading={bot ? <BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} /> : <CoordinatorAvatar size="row" />}>
+    <Picker t={t} wide ariaLabel={t('cell', { row: title, column: t('columns.model'), value: selected?.modelId ?? t('noAccount') })} disabled={choice.data === undefined || rows.length === 0}
+      value={selected ? <ModelLabel model={selected.modelId} source={selected.provider} /> : <span className="truncate text-muted-foreground">{t('noAccount')}</span>}>
+      {close => accounts.map((account, index) => <CommandGroup key={account.connectionId} className={cn(index > 0 && 'border-t')} heading={<PickerHeading t={t} title={<span className="flex items-center gap-1.5"><ProviderMark provider={modelProvider('', account.provider)} small />{account.provider === 'claude' ? t('claudeAccount') : t('openaiAccount')}</span>} onRefresh={onRefresh} />}>
+        {account.models.map(model => <CommandItem key={model.key} value={model.key} keywords={[model.modelId]} data-checked={selected?.key === model.key} onSelect={() => { close(); void choose(model.bindingId) }}><ModelLabel model={model.modelId} source={account.provider} /></CommandItem>)}
+      </CommandGroup>)}
+    </Picker>
+  </Line>
 }
 
-/** A ghost trigger (text and chevron, hover fill only) opening a checkmark list. */
-function CellPicker({ t, ariaLabel, value, heading, onRefresh, search, disabled, children }: {
+/**
+ * Bordered like the select field (Comma's 模型与 API), not R-31's grey fill:
+ * as wide as its slot, icon and value on the left, chevron on the right.
+ */
+const TRIGGER = 'h-9 w-full min-w-0 justify-between gap-2 border-input bg-transparent px-3 font-normal hover:bg-muted/60 aria-expanded:bg-muted/60'
+
+/** A fallback: a fixed list of named choices. They are not devices, harnesses or models, so no icons. */
+function ChoicePicker<V extends string>({ ariaLabel, value, names, onChange }: { ariaLabel: string; value: V; names: Record<V, string>; onChange: (value: V) => void }) {
+  const [open, setOpen] = useState(false)
+  return <Popover open={open} onOpenChange={setOpen}>
+    <PopoverTrigger render={<Button variant="ghost" aria-label={ariaLabel} className={TRIGGER} />}>
+      <span className="min-w-0 flex-1 truncate text-left">{names[value]}</span><ChevronDown data-icon="inline-end" className="text-muted-foreground" />
+    </PopoverTrigger>
+    <PopoverContent align="end" className="w-60 gap-0 p-0">
+      <Command loop>
+        <CommandList>
+          <CommandGroup>
+            {(Object.keys(names) as V[]).map(key => <CommandItem key={key} value={key} keywords={[names[key]]} data-checked={key === value} onSelect={() => { setOpen(false); if (key !== value) onChange(key) }}>{names[key]}</CommandItem>)}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+    </PopoverContent>
+  </Popover>
+}
+
+/** A bordered select opening a checkmark list. */
+function Picker({ t, ariaLabel, value, heading, onRefresh, search, disabled, wide, children }: {
   t: T
   ariaLabel: string
   value: ReactNode
@@ -283,14 +316,16 @@ function CellPicker({ t, ariaLabel, value, heading, onRefresh, search, disabled,
   onRefresh?: () => Promise<void>
   search?: string
   disabled?: boolean
+  /** On a setting row the list opens under the right edge; in a table cell, under the left. */
+  wide?: boolean
   children: (close: () => void) => ReactNode
 }) {
   const [open, setOpen] = useState(false)
   return <Popover open={open} onOpenChange={setOpen}>
-    <PopoverTrigger disabled={disabled} render={<Button variant="ghost" size="sm" aria-label={ariaLabel} className="-ml-2.5 max-w-full justify-start font-normal" />}>
-      {value}<ChevronDown data-icon="inline-end" className="text-muted-foreground" />
+    <PopoverTrigger disabled={disabled} render={<Button variant="ghost" aria-label={ariaLabel} className={TRIGGER} />}>
+      <span className="flex min-w-0 flex-1 text-left">{value}</span><ChevronDown data-icon="inline-end" className="text-muted-foreground" />
     </PopoverTrigger>
-    <PopoverContent align="start" className="w-64 gap-0 p-0">
+    <PopoverContent align={wide ? 'end' : 'start'} className="w-64 gap-0 p-0">
       <Command loop>
         {heading && <PickerHeading t={t} title={heading} onRefresh={onRefresh} />}
         {search && <CommandInput placeholder={search} aria-label={search} />}
@@ -314,7 +349,6 @@ function PickerHeading({ t, title, onRefresh }: { t: T; title: ReactNode; onRefr
   </span>
 }
 
-
 /** 添加规则 and the label cell: one field for the issue label the rule matches. */
 function LabelPicker({ t, mode, label = '', disabled, onSubmit }: { t: T; mode: 'add' | 'edit'; label?: string; disabled?: boolean; onSubmit: (label: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -323,10 +357,10 @@ function LabelPicker({ t, mode, label = '', disabled, onSubmit }: { t: T; mode: 
   return <Popover open={open} onOpenChange={next => { setOpen(next); if (next) setDraft(label) }}>
     {mode === 'add'
       ? <PopoverTrigger render={<Button variant="ghost" size="sm" />}><Plus data-icon="inline-start" />{t('addRule')}</PopoverTrigger>
-      : <PopoverTrigger disabled={disabled} render={<Button variant="ghost" size="sm" aria-label={t('cell', { row: label, column: t('columns.label'), value: label })} className="-ml-2.5 max-w-full justify-start" />}>
+      : <PopoverTrigger disabled={disabled} render={<Button variant="ghost" size="sm" aria-label={t('cell', { row: label, column: t('columns.label'), value: label })} className="-ml-2 max-w-full justify-start" />}>
         <Badge variant="secondary" size="lg" className="max-w-full font-medium"><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current text-muted-foreground" /><span className="truncate">{label}</span></Badge>
       </PopoverTrigger>}
-    <PopoverContent align={mode === 'add' ? 'end' : 'start'} className="w-64 p-1.5">
+    <PopoverContent align="start" className="w-64 p-1.5">
       <form onSubmit={event => { event.preventDefault(); if (!trimmed) return; setOpen(false); onSubmit(trimmed) }}>
         <InputGroup>
           <InputGroupInput autoFocus value={draft} maxLength={200} placeholder={t('columns.label')} aria-label={t('columns.label')} onChange={event => setDraft(event.target.value)} />
