@@ -1078,7 +1078,6 @@
     "teamNotFound": "This team does not exist.",
     "teamDeleteNameMismatch": "The name you entered does not match the team name.",
     "botDefaultRepositoryUnavailable": "This repository is not in any workspace member’s GitHub App installation.",
-    "botDefaultsConflict": "Someone else changed these defaults. Showing the latest values.",
     "usageLimitReached": "The usage limit has been reached. New tasks are paused; running tasks will finish.",
     "usageCreditsExhausted": "Credits have run out. New tasks are paused; running tasks will finish.",
     "billingNotConfigured": "Billing is not set up.",
@@ -1138,6 +1137,7 @@
   },
   "IssueDetail": {
     "breadcrumbBoard": "Board",
+    "breadcrumbMore": "More locations",
     "connecting": "Connecting…",
     "deletedTitle": "This task was deleted",
     "unavailableTitle": "Task unavailable",
@@ -1715,7 +1715,7 @@
       "deleteConfirmLabel": "Type {name} to confirm"
     },
     "computerPolicy": {
-      "heading": "Cloud computers",
+      "heading": "Computer use",
       "description": "Control whether Bots may operate computers in this workspace.",
       "label": "Bot computer use",
       "help": "Denying stops computer tasks and revokes their approvals. People can still take control.",
@@ -2976,7 +2976,8 @@
     "moreOutputs": "+{count}",
     "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}",
     "send": "Send",
-    "retryStop": "Try stopping again"
+    "retryStop": "Try stopping again",
+    "waiting": "Waiting for you"
   },
   "Computer": {
     "status": {
@@ -2991,7 +2992,7 @@
     },
     "screenOf": "{name}'s screen",
     "computerOf": "{name}'s computer",
-    "cloud": "Mikka Cloud",
+    "cloud": "E2B",
     "card": "Computer task",
     "cardTitle": "Computer",
     "openScreen": "Open {name}'s screen full window",
@@ -3170,7 +3171,7 @@
       "noDevice": "No machine connected",
       "offline": "Offline",
       "online": "Online",
-      "cloud": "Mikka Cloud",
+      "cloud": "E2B",
       "contextProject": "project: {project}",
       "contextSeparator": ", ",
       "prompt": "Create a task for me: {text}",

@@ -11,9 +11,7 @@ import { issueVisibility } from '@/lib/issue-visibility'
 import { BOT_MODEL_GROUPS, botThreadsInput, botThreadHref, botThreadTitle, decodeBotThreadCursor, encodeBotThreadCursor, type BotModelGroup } from '@/lib/workspace-admin/bot-threads'
 
 export interface BotDefaults { defaultModel: WorkspaceBotModel | null; defaultRepository: string | null }
-/** BotDefaults plus the optimistic-lock version a save must echo back as expectedVersion. */
-export interface VersionedBotDefaults extends BotDefaults { version: number }
-export interface BotDefaultOptions extends VersionedBotDefaults {
+export interface BotDefaultOptions extends BotDefaults {
   /** 'mikka' is Mikka's hosted model; 'codex' / 'claude' use the bot owner's connected subscription. */
   models: readonly WorkspaceBotModel[]
   /** The 模型 menu: Mikka 默认 / Codex / Claude, in order (WS-05). */
@@ -25,14 +23,7 @@ export interface BotDefaultOptions extends VersionedBotDefaults {
 export const botDefaultsInput = z.object({
   defaultModel: z.enum(WORKSPACE_BOT_MODELS).nullable().optional(),
   defaultRepository: z.string().trim().min(1).max(300).nullable().optional(),
-  /** Version the client last read; omitted = last write wins (old clients). */
-  expectedVersion: z.number().int().min(0).optional(),
 }).strict()
-
-/** expectedVersion no longer matches: someone else saved first. Carries the current value. */
-export class BotDefaultsConflictError extends WorkspaceError {
-  constructor(readonly current: VersionedBotDefaults) { super('botDefaultsConflict') }
-}
 
 async function activeMemberIds(workspaceId: string) {
   const rows = await workspaceDb.select({ userId: workspaceMembers.userId }).from(workspaceMembers)
@@ -55,44 +46,29 @@ export async function repositoryAvailable(workspaceId: string, repository: strin
 
 /** The stored defaults; createBot falls back to these. */
 export async function workspaceBotDefaults(workspaceId: string): Promise<BotDefaults> {
-  const { version: _version, ...defaults } = await versionedBotDefaults(workspaceId)
-  return defaults
-}
-
-async function versionedBotDefaults(workspaceId: string): Promise<VersionedBotDefaults> {
-  const [row] = await db.select({ defaultModel: workspaceSettings.defaultModel, defaultRepository: workspaceSettings.defaultRepository, version: workspaceSettings.botDefaultsVersion })
+  const [row] = await db.select({ defaultModel: workspaceSettings.defaultModel, defaultRepository: workspaceSettings.defaultRepository })
     .from(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId)).limit(1)
-  return { defaultModel: row?.defaultModel ?? null, defaultRepository: row?.defaultRepository ?? null, version: row?.version ?? 0 }
+  return { defaultModel: row?.defaultModel ?? null, defaultRepository: row?.defaultRepository ?? null }
 }
 
 /** 新 Bot 默认值 and what can be chosen. Any active member may read them. */
 export async function botDefaultOptions(workspaceId: string): Promise<BotDefaultOptions> {
-  const [defaults, repositories] = await Promise.all([versionedBotDefaults(workspaceId), installedRepositories(workspaceId)])
+  const [defaults, repositories] = await Promise.all([workspaceBotDefaults(workspaceId), installedRepositories(workspaceId)])
   return { ...defaults, models: WORKSPACE_BOT_MODELS, modelGroups: BOT_MODEL_GROUPS, repositories }
 }
 
-/**
- * Admins only. A repository must be installed by an active member; null clears a default.
- * With expectedVersion the write is a compare-and-set on botDefaultsVersion (one UPDATE ... WHERE,
- * atomic under concurrency); a stale version throws BotDefaultsConflictError with the current value.
- */
-export async function saveBotDefaults(actorId: string, workspaceId: string, input: z.input<typeof botDefaultsInput>): Promise<VersionedBotDefaults> {
-  const { expectedVersion, ...values } = botDefaultsInput.parse(input)
+/** Admins only. A repository must be installed by an active member; null clears a default. */
+export async function saveBotDefaults(actorId: string, workspaceId: string, input: z.input<typeof botDefaultsInput>): Promise<BotDefaults> {
+  const values = botDefaultsInput.parse(input)
   return workspaceDb.transaction(async tx => {
     await requireWorkspace(tx, workspaceId, actorId, true)
     if (values.defaultRepository && !(await repositoryAvailable(workspaceId, values.defaultRepository))) {
       throw new WorkspaceError('botDefaultRepositoryUnavailable')
     }
-    // Make sure the row exists (version 0), then compare-and-set in a single statement.
-    await db.insert(workspaceSettings).values({ workspaceId }).onConflictDoNothing({ target: workspaceSettings.workspaceId })
-    const match = expectedVersion === undefined
-      ? eq(workspaceSettings.workspaceId, workspaceId)
-      : and(eq(workspaceSettings.workspaceId, workspaceId), eq(workspaceSettings.botDefaultsVersion, expectedVersion))
-    const [row] = await db.update(workspaceSettings)
-      .set({ ...values, botDefaultsVersion: sql`${workspaceSettings.botDefaultsVersion} + 1`, updatedAt: new Date() })
-      .where(match)
-      .returning({ defaultModel: workspaceSettings.defaultModel, defaultRepository: workspaceSettings.defaultRepository, version: workspaceSettings.botDefaultsVersion })
-    if (!row) throw new BotDefaultsConflictError(await versionedBotDefaults(workspaceId))
+    const changes = { ...values, updatedAt: new Date() }
+    const [row] = await db.insert(workspaceSettings).values({ workspaceId, ...changes })
+      .onConflictDoUpdate({ target: workspaceSettings.workspaceId, set: changes })
+      .returning({ defaultModel: workspaceSettings.defaultModel, defaultRepository: workspaceSettings.defaultRepository })
     return row
   })
 }

@@ -1,0 +1,54 @@
+name: Production smoke
+# Signs in the tagged smoke account on production and reads (docs/production-smoke.md).
+on:
+  schedule:
+    - cron: '17 14 * * *'
+  deployment_status:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+jobs:
+  smoke:
+    # Only finished production deployments, plus the schedule and manual runs.
+    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Read the smoke account through Infisical workload identity
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          # The prod root holds only the smoke account; app secrets live in /vercel and /neon.
+          secret-path: /
+          recursive: false
+          include-imports: false
+      - run: pnpm test:smoke
+        env:
+          SMOKE_BASE_URL: https://app.aspectlylabs.com
+          SMOKE_EXPECT_ON: credentialVault,cloudComputer
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-smoke-report
+          path: playwright-report-smoke
+          retention-days: 7
