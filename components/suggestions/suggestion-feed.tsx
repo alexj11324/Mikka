@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { RotateCw } from 'lucide-react'
+import { toast } from 'sonner'
 import { sendSuggestion } from '@/app/actions/coordinator'
 import { coordinatorChatKey } from '@/components/coordinator/coordinator-chat'
 import { ConversationPill } from '@/components/nav/conversation-pill'
@@ -75,7 +76,7 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
     <section aria-labelledby="suggestions-title" className="flex min-h-0 flex-1 flex-col md:basis-1/2">
       <header className="flex items-center justify-between gap-3 px-6 pt-6 pb-4">
         <h1 id="suggestions-title" className="text-2xl font-semibold">{t('title')}</h1>
-        <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('refresh')} disabled={isValidating} onClick={() => { void mutate() }} />}><RotateCw data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('refresh')}</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('refresh')} disabled={isValidating} onClick={() => { void mutate().then(() => toast.success(t('refreshed')), () => toast.error(t('refreshFailed'))) }} />}><RotateCw data-icon="inline-start" className={cn(isValidating && 'animate-spin')} /></TooltipTrigger><TooltipContent>{t('refresh')}</TooltipContent></Tooltip>
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-6 pb-6">
         {error && <div role="alert" className="flex items-center gap-2 text-xs"><span className="text-destructive">{t('loadError')}</span><Button variant="ghost" size="xs" onClick={() => { void mutate() }}>{t('retry')}</Button></div>}

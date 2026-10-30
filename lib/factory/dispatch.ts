@@ -5,6 +5,7 @@ import type { DispatchInput, DispatchResult } from '../run-dispatch';
 import { z } from 'zod';
 import { bindingSchema, FactoryError, type FactoryBinding, type FactoryStage } from './contract';
 import { factoryEventId } from './event-id';
+import { maskFactoryNote } from './note-mask';
 import type { createFactoryStore, FactoryTask, FactorySnapshot } from './store';
 
 export const factoryDispatchSchema = z.object({
@@ -55,7 +56,10 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
   return async (userId: string, raw: FactoryDispatchInput, existing?: PoolClient): Promise<FactoryDispatchResult> => {
     const parsed = factoryDispatchSchema.safeParse(raw);
     if (!parsed.success) fail('factoryInvalid');
-    const input = parsed.data, { binding } = input;
+    // The note is human text that reaches factory_events.request (the idempotency
+    // receipt) and, through the queue, the run prompt: mask it once, before either.
+    const input = parsed.data.note === undefined ? parsed.data : { ...parsed.data, note: maskFactoryNote(parsed.data.note) };
+    const { binding } = input;
     const tx = existing ?? await pool.connect();
     try {
       if (!existing) await tx.query('BEGIN');

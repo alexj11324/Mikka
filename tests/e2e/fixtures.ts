@@ -1,6 +1,6 @@
 import { randomBytes, randomInt, randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
-import { test as base, expect, type BrowserContext, type Page } from '@playwright/test'
+import { test as base, expect, type BrowserContext, type Locator, type Page } from '@playwright/test'
 import { Pool } from 'pg'
 import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 
@@ -13,7 +13,7 @@ export function app(path: string) {
 }
 
 /** Buttons on the left icon rail (主页 / 建议 / 看板 / 插件 / Artifact). Phones have no rail. */
-export function rail(page: Page, name: '主页' | '建议' | '看板' | '插件' | 'Artifact') {
+export function rail(page: Page, name: '主页' | '建议' | '看板' | '插件' | '产物') {
   return page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name, exact: true })
 }
 
@@ -79,10 +79,28 @@ export async function seedSuggestion(page: Page, { source = 'gmail', action = 'r
   return id
 }
 
+/** A bot chat whose last turn failed with `error` (coordinator_sessions."lastError"), as the workflow's failTurn leaves it. */
+export async function seedTurnError(page: Page, botId: string, error: string) {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('seedTurnError 需要已登录的页面。')
+  const db = database()
+  const { rows: [session] } = await db.query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  if (!session) throw new Error('找不到当前登录会话。')
+  await db.query(`INSERT INTO coordinator_sessions ("userId", "botId", "lastError", "lastErrorAt") VALUES ($1, $2, $3, now())
+    ON CONFLICT ("userId", "botId") DO UPDATE SET "lastError" = excluded."lastError", "lastErrorAt" = now(), "leaseHolder" = null, "leaseUntil" = null`, [session.userId, botId, error])
+}
+
 /** The current conversation's title pill over the chat (desktop). */
 export function conversationPill(page: Page) {
   // Conversations opened earlier stay mounted but hidden; only the current one is visible.
   return page.locator('[data-slot="conversation-pill"]:visible [data-slot="conversation-pill-title"]')
+}
+
+// The composer is server-rendered. Text typed before React hydrates it can be
+// reset to the controlled (empty) value, which no person could do in practice
+// and made the composer tests flaky. Type only once React owns the field.
+export async function hydrated(field: Locator) {
+  await expect.poll(() => field.evaluate(element => Object.keys(element).some(key => key.startsWith('__reactProps$')))).toBe(true)
 }
 
 type ExpectedConsoleError = { path: string; message: string }

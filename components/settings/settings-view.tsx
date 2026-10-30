@@ -8,7 +8,6 @@ import { AppShellContent } from '@/components/app-shell'
 import { SettingsContent } from '@/components/ui/settings-layout'
 import { SettingsSidebar } from './settings-sidebar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { WorkspaceSettings } from '@/components/settings/workspace-settings'
 import { MembersPanel } from '@/components/settings/members-panel'
 import { LinearSettings } from '@/components/settings/linear-settings'
@@ -16,36 +15,101 @@ import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings
 import { IntegrationsSettings } from '@/components/settings/integrations-settings'
 import { ComputerPolicySettings } from '@/components/settings/computer-policy-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
+import { BotsSettings } from '@/components/settings/bots-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
+import { AccountSettings } from '@/components/settings/account-settings'
+import { SecuritySettings } from '@/components/settings/security-settings'
+import { PrivacySettings } from '@/components/settings/privacy-settings'
+import { ActivitySettings } from '@/components/settings/activity-settings'
+import { SavedLoginsSettings } from '@/components/settings/saved-logins-settings'
 import { TelegramSettings } from '@/components/settings/telegram-settings'
 import { DevicesSettings } from '@/components/devices/devices-settings'
 import { MemorySettings } from '@/components/settings/memory-settings'
-import { SettingRow, SettingsSection as SettingsSectionComponent } from '@/components/settings/primitives'
+import { LocaleSetting } from '@/components/settings/locale-setting'
+import { NotificationSettings } from '@/components/settings/notifications-settings'
+import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { useWorkspace } from '@/hooks/use-workspace'
+import type { SettingsSectionId } from '@/lib/settings-sections'
 
-export type SettingsSection = 'preferences' | 'profile' | 'memory' | 'account' | 'integrations' | 'devices' | 'workspace' | 'teams' | 'members'
+export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
 
-export function SettingsView({ user, userKey, googleEnabled = false, onBack, onSignOut, signingOut, accountError, activeSection, initialSection, inviteInitially = false, workspaceId, selectedTeamId, children, linearNotice = null, preview = false }: { user: { name: string; email: string; image?: string | null }; userKey?: string; googleEnabled?: boolean; onBack: () => void; onSignOut: () => void; signingOut: boolean; accountError: string; activeSection?: SettingsSection; initialSection?: SettingsSection; inviteInitially?: boolean; workspaceId?: string; selectedTeamId?: string; children?: ReactNode; linearNotice?: 'connected' | 'error' | null; preview?: boolean }) {
+interface SettingsViewProps {
+  user: { name: string; email: string; image?: string | null }
+  userKey?: string
+  googleEnabled?: boolean
+  onBack: () => void
+  onSignOut: () => void
+  signingOut: boolean
+  accountError: string
+  activeSection?: SettingsSectionId
+  initialSection?: SettingsSectionId
+  inviteInitially?: boolean
+  workspaceId?: string
+  selectedTeamId?: string
+  children?: ReactNode
+  linearNotice?: 'connected' | 'error' | null
+  preview?: boolean
+}
+
+export function SettingsView({ user, userKey, googleEnabled = false, onBack, onSignOut, signingOut, accountError, activeSection, initialSection, inviteInitially = false, workspaceId, selectedTeamId, children, linearNotice = null, preview = false }: SettingsViewProps) {
   const t = useTranslations('Settings')
-  const [localSection, setSection] = useState<SettingsSection>(activeSection ?? initialSection ?? 'preferences')
+  const [localSection, setSection] = useState<SettingsSectionId>(activeSection ?? initialSection ?? 'preferences')
   const section = activeSection ?? localSection
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
+  const { data: workspace, error: workspaceError } = useWorkspace(userKey ?? user.email, workspaceId)
+  const admin = workspace?.role === 'admin'
+  // Settings opened without ?workspace= still has one: the default the API resolved.
+  const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id
   const title = t(`sections.${section}.title`)
+  const routedBody = section === 'members' || section === 'teams'
 
   return <>
-    <SettingsSidebar user={user} section={section} activeSection={activeSection} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onBack={onBack} onSignOut={onSignOut} signingOut={signingOut} />
+    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onBack={onBack} onSignOut={onSignOut} signingOut={signingOut} />
     <AppShellContent parent={t('title')} title={title} variant="settings">
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
-      {section === 'members' || section === 'teams' ? children ?? (section === 'members' ? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} /> : null) : <SettingsContent className="gap-6">
-        {section === 'devices' ? <DevicesSettings /> : <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
-        {section === 'preferences' && <SettingsSectionComponent id="appearance-heading" title={t('appearance.title')}><SettingRow title={t('appearance.theme')} description={t('appearance.themeDescription')}><ToggleGroup aria-label={t('appearance.themeLabel')} variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}><ToggleGroupItem value="light" aria-label={t('appearance.light')}><Sun />{t('appearance.light')}</ToggleGroupItem><ToggleGroupItem value="dark" aria-label={t('appearance.dark')}><Moon />{t('appearance.dark')}</ToggleGroupItem><ToggleGroupItem value="system" aria-label={t('appearance.systemLabel')}><Monitor />{t('appearance.system')}</ToggleGroupItem></ToggleGroup></SettingRow><SettingRow title={t('appearance.language')} description={t('appearance.languageDescription')}><span className="text-muted-foreground">{t('appearance.languageName')}</span></SettingRow></SettingsSectionComponent>}
-        {section === 'profile' && <div className="flex flex-col gap-3"><SettingsSectionComponent id="profile-heading" title={t('profile.heading')}><SettingRow title={t('profile.avatar')} description={t('profile.avatarDescription')}><Avatar className="size-10"><AvatarFallback>{(user.name || user.email).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar></SettingRow><SettingRow title={t('profile.name')}><span>{user.name || t('profile.notSet')}</span></SettingRow><SettingRow title={t('profile.email')}><span className="break-all">{user.email}</span></SettingRow></SettingsSectionComponent></div>}
-        {section === 'memory' && <MemorySettings />}
-        {section === 'account' && <GoogleSignInSettings googleEnabled={googleEnabled} />}
-        {section === 'integrations' && <><IntegrationsSettings />{workspaceId && !preview && <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} />}<LinearSettings notice={linearNotice} /><IssuePrefixSettings /><TelegramSettings preview={preview} /></>}
-        {section === 'workspace' && <><WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />{workspaceId && !preview && <ComputerPolicySettings key={workspaceId} workspaceId={workspaceId} />}</>}
+      {routedBody ? section === 'members' ? <SettingsContent className="gap-6">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent className="gap-6">
+        {section === 'computers' ? <DevicesSettings /> : <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
+        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} admin={admin} />
       </SettingsContent>}
     </AppShellContent>
   </>
+}
+
+function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, workspaceError = false, linearNotice, preview, onSignOut, signingOut, admin }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; workspaceError?: boolean; admin: boolean }) {
+  // Workspace sections wait for the workspace instead of rendering nothing.
+  const waiting = preview || !workspaceId
+    ? preview || workspaceError ? <p role="alert" className="text-sm text-destructive">{t('workspaceUnavailable')}</p> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
+    : null
+  switch (section) {
+    case 'account': return <AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />
+    case 'security': return <><SecuritySettings /><GoogleSignInSettings googleEnabled={googleEnabled} /></>
+    case 'privacy': return <PrivacySettings />
+    case 'activity': return <ActivitySettings />
+    case 'logins': return <SavedLoginsSettings />
+    case 'preferences': return <><AppearanceSection /><IssuePrefixSettings /></>
+    case 'notifications': return <NotificationSettings />
+    case 'memory': return <MemorySettings />
+    case 'connections': return <><IntegrationsSettings /><LinearSettings notice={linearNotice ?? null} /><TelegramSettings preview={preview} /></>
+    case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
+    case 'bots': return workspaceId && !preview ? <BotsSettings key={workspaceId} admin={admin} workspaceId={workspaceId} /> : waiting
+    case 'permissions': return workspaceId && !preview ? <ComputerPolicySettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    default: return <p className="py-8 text-sm text-muted-foreground">{t('sectionUnavailable')}</p>
+  }
+}
+
+function AppearanceSection() {
+  const t = useTranslations('Settings.appearance')
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  return <SettingsSection id="appearance-heading" title={t('title')}>
+    <SettingRow title={t('theme')} description={t('themeDescription')}>
+      <ToggleGroup aria-label={t('themeLabel')} variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}>
+        <ToggleGroupItem value="light" aria-label={t('light')}><Sun />{t('light')}</ToggleGroupItem>
+        <ToggleGroupItem value="dark" aria-label={t('dark')}><Moon />{t('dark')}</ToggleGroupItem>
+        <ToggleGroupItem value="system" aria-label={t('systemLabel')}><Monitor />{t('system')}</ToggleGroupItem>
+      </ToggleGroup>
+    </SettingRow>
+    <SettingRow title={t('language')} description={t('languageDescription')}><LocaleSetting /></SettingRow>
+  </SettingsSection>
 }

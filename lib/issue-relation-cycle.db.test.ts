@@ -5,13 +5,12 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 
 let hasDb = false
 try {
   const target = new URL(process.env.E2E_DATABASE_URL ?? '')
-  hasDb = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true'
-    && target.hostname === '127.0.0.1' && target.port === '5432' && target.pathname === '/mikka_e2e'
-    && !target.search && !target.hash && ['postgres:', 'postgresql:'].includes(target.protocol)
+  hasDb = isE2eTarget(target.href)
     && process.env.MIKKA_DATABASE_URL === process.env.E2E_DATABASE_URL
     && process.env.DATABASE_URL === process.env.E2E_DATABASE_URL
     && (!process.env.ORVILO_DATABASE_URL || process.env.ORVILO_DATABASE_URL === process.env.E2E_DATABASE_URL)

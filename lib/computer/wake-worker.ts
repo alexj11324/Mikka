@@ -14,7 +14,7 @@ export async function ensureCloudBotWorker(pool: Pool, actor: { userId: string; 
     WHERE m."workspaceId"=$1 AND m."ownerId"=$2 AND d."botId"=$3 AND m.state='running'`,
   [actor.workspaceId, actor.userId, botId])).rows[0]
   if (!machine?.sandboxId) throw new Error('Cloud computer unavailable')
-  const sandbox = await connectComputer(machine.sandboxId)
+  const sandbox = await connectComputer(actor.workspaceId, machine.sandboxId)
   const worker = await startCloudWorker(pool, actor, sandbox, origin, sha)
   return ensureBotRuntime(pool, actor, botId, sandbox, worker.deviceId)
 }

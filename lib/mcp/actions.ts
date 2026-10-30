@@ -178,7 +178,7 @@ export async function sendToRun(userId: string, input: { runId: string; text: st
 export async function stopRun(userId: string, runId: string) {
   const [run] = await db.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1)
   if (!run) return { error: 'runNotFound' }
-  return attempt(async () => { await requestRunStop(userId, runId); return { stopRequested: true } })
+  return attempt(async () => ({ stopRequested: true, ...(await requestRunStop(userId, runId)) }))
 }
 
 /** A page of the run's event stream, by sequence number. */

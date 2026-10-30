@@ -38,6 +38,7 @@ async function routeFixture(unavailable=false,stopped=false) {
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},
     '@/lib/mcp/worker':{issueRunToken:async()=>{calls.push('token');return {token:'synthetic-test-token'}}},
     '@/lib/run-leases':{},'@/lib/run-retry':{},
+    '@/lib/run-completion-effects':{afterRunEnded:async()=>{calls.push('runEnded');return 0}},
     '@/lib/factory/checks':{isFactoryCheckRun:async()=>false},
     '@/lib/factory/runtime':{guardFactoryClaim:async()=>{calls.push('guard');if(stopped)throw new FactoryError('stopped');return {preserveQuestionWorktree:true}}},
     '@mikka/protocol/agent-policy':{defaultRunPolicy},
@@ -45,6 +46,8 @@ async function routeFixture(unavailable=false,stopped=false) {
     '@/lib/computer/claim':{claimLocalRun:async(_pool:unknown,_runId:string,_deviceId:string,_lease:Date,_subscription:unknown,guard:(tx:object)=>Promise<boolean>,after:(tx:object)=>Promise<void>)=>{if(!await guard({}))return 'unavailable';calls.push('claim');run.status='preparing';await after({});return 'claimed'}},
     '@/lib/subscription-runtime':{},
     '@/lib/computer/native-run-binding':{},
+    '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
+    '@/lib/secrets/runtime':{taskSecretEnv:async()=>({}),remoteRepositoryRef:()=>null},
     '@/lib/personal-mailbox-config':{personalMailboxEnabled:()=>false},
     '@/lib/factory/questions/retry':{},'@mikka/protocol/skill':{SKILL_ARTIFACT_HEADER:'x-mikka-skill-artifacts'},
     '@/lib/self-improvement/contract':{ImprovementError},'@/lib/factory/contract':{FactoryError},
@@ -82,7 +85,7 @@ test('actual claim route withholds all assignment bytes when frozen configuratio
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
   assert.deepEqual(await response.json(),{error:'runUnavailable'})
-  assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark','block'])
+  assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark','block','runEnded'])
   assert.equal(run.status,'failed')
 })
 

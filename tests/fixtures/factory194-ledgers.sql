@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS factory_publications (
   "taskId" uuid NOT NULL REFERENCES factory_tasks(id) ON DELETE CASCADE,
   "candidateId" uuid NOT NULL, action text NOT NULL, target text NOT NULL,
   "eventId" uuid NOT NULL, request jsonb NOT NULL,
-  status text NOT NULL CHECK (status IN ('reserved','succeeded','uncertain')),
+  status text NOT NULL CHECK (status IN ('reserved','succeeded','uncertain','failed')),
   receipt jsonb, result jsonb, "createdAt" timestamptz NOT NULL DEFAULT now(), "finishedAt" timestamptz,
   -- Fresh approvals cannot repeat a possibly performed logical action.
   UNIQUE ("taskId","candidateId",action,target), UNIQUE ("taskId","eventId")

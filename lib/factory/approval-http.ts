@@ -49,7 +49,7 @@ export async function handleFactoryApproval(
     }
     const parsed = z
       .object({
-        operation: z.enum(["approve", "revoke", "publish", "reconcile"]),
+        operation: z.enum(["approve", "reject", "revoke", "publish", "reconcile"]),
         input: z
           .object({ binding: z.object({ taskId: z.uuid() }).passthrough() })
           .passthrough(),
@@ -68,7 +68,7 @@ export async function handleFactoryApproval(
           error: error.code,
           publicationId: error.publicationId,
           status: error.state,
-          nextOperation: "reconcile",
+          nextOperation: error.state === "failed" ? null : "reconcile",
         },
       };
     // #192's store may throw its own Error class; consume its public error code,

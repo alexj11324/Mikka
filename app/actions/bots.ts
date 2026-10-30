@@ -4,11 +4,18 @@ import { headers } from 'next/headers'
 import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
+import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { db } from '@/lib/db'
-import { bots } from '@/lib/db/schema'
+import { bots, WORKSPACE_BOT_MODELS } from '@/lib/db/schema'
 import { BOT_COLORS, BOT_SHAPES } from '@/lib/bot-shapes'
+import { workspaceAction } from '@/lib/workspace-admin/action'
+import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
+import { ensureBotSubscriptionBinding } from '@/lib/bot-subscription-binding'
+import { subscriptionModelsRunnable } from '@/lib/bot-runtime-model'
+import { selectableModels } from '@/lib/workspace-admin/bot-model-policy'
+import { botSettingsFor, inAppTransaction, listBotThreadsFor, modelAllowed, modelPolicy, newBotModel, repositoryAvailable, saveBotSettings, saveModelPolicy, workspaceBots, type BotSettingsView, type BotThreadPage, type ModelPolicy, type WorkspaceBotView } from '@/lib/workspace-admin/bots'
 
 /** A bot in the left column. Its instructions grow inside its chat, so they are not here. */
 export interface BotView {
@@ -33,18 +40,82 @@ export async function listBots(): Promise<BotView[]> {
     .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId))).orderBy(asc(bots.createdAt))
 }
 
-/** 新建 Bot: a name, a colour and a shape. Bots run on Mikka's own harness, so there is no machine to pick. */
-export async function createBot(input: { name: string; color: string; shape: string }): Promise<BotView> {
+/**
+ * 新建 Bot: a name, a colour and a shape. Bots run on Mikka's own harness, so there is no machine to pick.
+ * `model` starts as the workspace's starting model when it can run for this owner (newBotModel) and `repository` as none;
+ * the owner changes both in the bot's own settings. Explicit values must be allowed and installed.
+ */
+export async function createBot(input: { name: string; color: string; shape: string; model?: string | null; repository?: string | null }): Promise<BotView> {
   const owner = await getOwner()
-  const parsed = z.object({ name: z.string().trim().min(1).max(60), color: z.enum(BOT_COLORS), shape: z.enum(BOT_SHAPES) }).safeParse(input)
+  const parsed = z.object({
+    name: z.string().trim().min(1).max(60), color: z.enum(BOT_COLORS), shape: z.enum(BOT_SHAPES),
+    model: z.enum(WORKSPACE_BOT_MODELS).nullable().optional(), repository: z.string().trim().min(1).max(300).nullable().optional(),
+  }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError(parsed.error.issues[0]?.path[0] === 'name' ? 'validationNameRequired' : 'validationGeneric')
-  const bot = { id: crypto.randomUUID(), ...parsed.data }
+  const { model, repository, ...look } = parsed.data
+  // Never trust the client's choice: a model must be in 可用模型, a repository installed for the workspace.
+  if (model && !(await modelAllowed(owner.workspaceId, model))) throw new ActionFailureError('botModelNotAllowed')
+  if (repository && !(await repositoryAvailable(owner.workspaceId, repository))) throw new ActionFailureError('botRepositoryUnavailable')
+  const bot = { id: crypto.randomUUID(), ...look }
+  const chosen = model === undefined ? await newBotModel(owner.workspaceId, owner.ownerId) : model
   try {
-    await db.insert(bots).values({ ...bot, ...owner })
+    // A Codex / Claude bot is bound to its owner's connected account in the same transaction.
+    await inAppTransaction(async client => {
+      await db.insert(bots).values({ ...bot, ...owner, model: chosen, repository: repository ?? null })
+      if (chosen && selectableModels([chosen], subscriptionModelsRunnable()).length) await ensureBotSubscriptionBinding(client, { ownerId: owner.ownerId, workspaceId: owner.workspaceId, botId: bot.id, model: chosen })
+    })
   } catch (error) {
     // 23505 is the per-person, per-workspace name index.
     if ((error as { code?: string }).code === '23505') throw new ActionFailureError('botDuplicateName')
     throw new ActionFailureError('validationGeneric')
   }
   return bot
+}
+
+/** 设置 › 工作区 › Bot › 可用模型 and the starting model. Any member may read; their bots' menus come from it. */
+export async function getWorkspaceModelPolicy(): Promise<ActionResult<ModelPolicy>> {
+  return workspaceAction(async () => modelPolicy((await currentWorkspaceActor()).workspaceId))
+}
+
+/**
+ * Admins only: which model families members' bots may use, and the model a new bot starts with.
+ * Last write wins.
+ */
+export async function updateWorkspaceModelPolicy(input: { allowedModels: string[]; startingModel: string | null }): Promise<ActionResult<ModelPolicy>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor()
+    return saveModelPolicy(actor.userId, actor.workspaceId, input as Parameters<typeof saveModelPolicy>[2])
+  })
+}
+
+/** A bot's own model and repository, with the choices the workspace allows. Any member may read; `canEdit` only for the owner. */
+export async function getBotSettings(input: { botId: string }): Promise<ActionResult<BotSettingsView>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor()
+    return botSettingsFor(actor.userId, actor.workspaceId, input.botId)
+  })
+}
+
+/** The bot's owner only. Omitted fields stay; null clears. The model must be allowed, the repository installed. */
+export async function updateBotSettings(input: { botId: string; model?: string | null; repository?: string | null }): Promise<ActionResult<BotSettingsView>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor()
+    return saveBotSettings(actor.userId, actor.workspaceId, input as Parameters<typeof saveBotSettings>[2])
+  })
+}
+
+/** Every bot in the current workspace: owner, 空闲 or 运行中 · N 个线程. Any member may read; nobody edits another person's bot here. */
+export async function listWorkspaceBots(): Promise<ActionResult<{ bots: WorkspaceBotView[] }>> {
+  return workspaceAction(async () => ({ bots: await workspaceBots((await currentWorkspaceActor()).workspaceId) }))
+}
+
+/**
+ * WS-07 线程列表 for one bot in the current workspace, newest first. Any member may read;
+ * titles of tasks the viewer cannot see, and chat threads someone else started, come back null.
+ */
+export async function listBotThreads(input: { botId: string; limit?: number; cursor?: string | null }): Promise<ActionResult<BotThreadPage>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor()
+    return listBotThreadsFor(actor.userId, actor.workspaceId, input)
+  })
 }

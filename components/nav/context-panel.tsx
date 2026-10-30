@@ -15,7 +15,8 @@ import { cn } from '@/lib/utils'
 import { LetterAvatar } from './letter-avatar'
 import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
-import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
+import { BotAvatar, COORDINATOR_AVATAR } from './bot-avatar'
+import { BotSettings } from './bot-settings'
 import { GroupHeader } from './group-header'
 import { ThreadList } from './thread-list'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
@@ -82,13 +83,17 @@ export type PanelConversation = { id?: string | null; name: string; color?: stri
  * 详情 / 线程 / PR / 电脑; 全部线程 lists every bot's threads. ⤢ widens just
  * this column. Picking another bot switches its threads, PRs and computer.
  */
-export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSearch, onClose }: {
+export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSearch, onClose, sheet = false, tabRequest }: {
   issues: Issue[]
   threads: Thread[]
   conversation: PanelConversation
   onOpenIssue: (id: string) => void
   onSearch: () => void
   onClose: () => void
+  /** Shown in a Sheet below xl, where the column has no room. */
+  sheet?: boolean
+  /** Open this tab of 概览 (a failed turn's 更换模型 asks for 详情); `at` makes a repeat request count. */
+  tabRequest?: { tab: PanelTab; at: number } | null
 }) {
   const t = useTranslations('Shell.panel')
   const [view, setView] = useState<PanelView>('overview')
@@ -105,12 +110,13 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
   const computer = cloudComputer ? botId ?? registered?.botId : undefined
   // A conversation whose bot works on its computer opens on its screen (Figma 103:64).
   useEffect(() => { if (registered?.runId) { setView('overview'); setTab('computer') } }, [registered?.runId])
+  useEffect(() => { if (tabRequest) { setView('overview'); setTab(tabRequest.tab) } }, [tabRequest])
   // No computer here (cloud computers off, or the Coordinator): no 电脑 tab.
   const tabs = computer ? TABS : TABS.filter(item => item !== 'computer')
   const shown = tabs.includes(tab) ? tab : 'threads'
 
   const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
-  return <aside aria-label={t('label')} className={cn('hidden min-h-0 shrink-0 flex-col border-l transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90')}>
+  return <aside aria-label={t('label')} className={cn('min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : cn('hidden border-l transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90'))}>
     <Tabs value={view} onValueChange={value => setView(value as PanelView)} className="min-h-0 flex-1 gap-0">
       <div className="flex h-11 shrink-0 items-center gap-1 px-3">
         <TabsList aria-label={t('views')} className="gap-1 bg-transparent p-0">
@@ -119,20 +125,21 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
         </TabsList>
         <div className="ml-auto flex items-center">
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('search')} onClick={onSearch} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('search')}</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={wide ? t('narrow') : t('widen')} aria-pressed={wide} onClick={() => setWide(value => !value)} />}>{wide ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</TooltipTrigger><TooltipContent>{wide ? t('narrow') : t('widen')}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={wide ? t('narrow') : t('widen')} aria-pressed={wide} className={cn(sheet && 'hidden')} onClick={() => setWide(value => !value)} />}>{wide ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</TooltipTrigger><TooltipContent>{wide ? t('narrow') : t('widen')}</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
         </div>
       </div>
       <TabsContent value="overview" className="flex min-h-0 flex-col">
         <Tabs value={shown} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
           <div className="flex shrink-0 flex-col items-center gap-3 px-4 pt-9 pb-4">
-            {coordinator ? <CoordinatorAvatar size="profile" /> : conversation.kind === 'bot' ? <BotAvatar color={conversation.color} shape={conversation.shape} size="profile" /> : <LetterAvatar name={conversation.name} size="profile" />}
+            {coordinator || conversation.kind === 'bot' ? <BotAvatar {...(coordinator ? COORDINATOR_AVATAR : { color: conversation.color, shape: conversation.shape })} size="profile" /> : <LetterAvatar name={conversation.name} size="profile" />}
             <h2 className="max-w-full truncate text-xl font-semibold">{conversation.name}</h2>
             <TabsList aria-label={t('tabs')} className="mt-2 gap-1 bg-transparent p-0">
               {tabs.map(item => <TabsTrigger key={item} value={item} className={pill}>{t(item)}</TabsTrigger>)}
             </TabsList>
           </div>
           <TabsContent value="details" className="flex min-h-0 flex-col gap-4 overflow-y-auto px-4 pb-4">
+            {botId && <BotSettings key={botId} botId={botId} />}
             <DetailList title={t('routines')} empty={t('noRoutines')} items={NO_ITEMS} icon={Clock} />
             <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />
           </TabsContent>

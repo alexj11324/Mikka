@@ -51,7 +51,7 @@ function useHistoryButtons() {
 export function WindowBar({ center, trailing }: { center: ReactNode; trailing?: ReactNode }) {
   const t = useTranslations('Shell')
   const history = useHistoryButtons()
-  return <div data-slot="window-bar" className="hidden h-11 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center gap-3 pr-2 pl-3 md:grid">
+  return <div data-slot="window-bar" className="hidden h-11 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center gap-3 pr-2 pl-3 md:grid in-data-[desktop-platform=darwin]:pl-20 in-data-[desktop-platform=darwin]:[-webkit-app-region:drag] [&_:is(button,a,input,select,textarea,[role=button],[role=combobox],[role=tab],[role=menuitem],[role=switch])]:[-webkit-app-region:no-drag]">
     <div className="flex items-center gap-0.5">
       <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t('back')} disabled={!history.back} onClick={() => window.history.back()} />}><ArrowLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('back')}</TooltipContent></Tooltip>
       <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t('forward')} disabled={!history.forward} onClick={() => window.history.forward()} />}><ArrowRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('forward')}</TooltipContent></Tooltip>

@@ -11,6 +11,9 @@ const surfaces: { name: string; scope?: 'dialog' | 'menu'; prepare: (page: Page)
   { name: '成员管理', prepare: async page => {
     await page.goto(app('/settings/members'))
     await expect(page.getByRole('button', { name: '邀请成员', exact: true })).toBeEnabled()
+    // Admin-only sections join the sidebar once the role is known (S-P); freeze the list after that.
+    // 团队权限 is the only built admin-only section (计费 and the rest are unbuilt and hidden).
+    await expect(page.locator('[data-slot="sidebar-container"]').getByRole('link', { name: '团队权限', exact: true })).toBeVisible()
   } },
   { name: '邀请弹窗', scope: 'dialog', prepare: async page => {
     await page.goto(app('/settings/members'))

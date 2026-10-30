@@ -64,7 +64,7 @@ export class ComputerStore {
       const sync = async () => {
         for (const machine of machines) {
           if (!machine.sandboxId || !machine.runtimeReady) continue
-          const sandbox = await this.runtime.connectComputer(machine.sandboxId)
+          const sandbox = await this.runtime.connectComputer(workspaceId, machine.sandboxId)
           for (const desktop of desktops.filter(d => d.ownerId === machine.ownerId)) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
         }
         // Dedicated threads have their own driver lease. Updating only the
@@ -73,7 +73,7 @@ export class ComputerStore {
           JOIN bots b ON b.id=t."botId" AND b."workspaceId"=t."workspaceId" AND b."ownerId"=t."ownerId"
           WHERE t."workspaceId"=$1 AND t."sandboxId" IS NOT NULL AND t.state IN ('starting','running') ORDER BY t."runId"`, [workspaceId])).rows
         for (const thread of threads) {
-          const sandbox = await this.runtime.connectComputer(thread.sandboxId)
+          const sandbox = await this.runtime.connectComputer(workspaceId, thread.sandboxId)
           await this.runtime.syncDesktopLease(sandbox, { botId: thread.botId, ownerId: thread.ownerId, display: 1, epoch: thread.epoch, controlledBy: null, controlUntil: 0, computerAllowed: permission !== 'deny', policyVersion: policy.version })
         }
       }
@@ -99,7 +99,7 @@ export class ComputerStore {
     const { rows } = await this.pool.query('SELECT m.state AS machine,m."sandboxId",d.control,d."controlledBy",d."controlUntil",d."lastAction" FROM bot_desktops d JOIN cloud_machines m ON m."workspaceId"=d."workspaceId" AND m."ownerId"=d."ownerId" WHERE d."botId"=$1 AND d."ownerId"=$2', [botId, actor.userId])
     const row = rows[0]
     if (!row) return { machine: 'sleeping', control: 'idle' }
-    if (row.sandboxId && row.machine !== 'error') row.machine = await this.runtime.computerState(row.sandboxId)
+    if (row.sandboxId && row.machine !== 'error') row.machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId)
     const held = row.control === 'user' && new Date(row.controlUntil).getTime() > Date.now()
     const review = (await this.pool.query(`SELECT v.id,v.digest,v."runId",v.call,v."expiresAt"
       FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" AND r."userId"=v."userId" AND r."deviceId"=v."deviceId"

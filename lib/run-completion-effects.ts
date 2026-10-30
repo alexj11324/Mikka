@@ -76,3 +76,59 @@ export async function settleRunCompletionEffects(client: PoolClient, run: RunIde
   await optionalFactoryEffect(client, 'completion_question_settle', () => questions.settle(run.userId, run.id, client))
   if (stopReason === 'asked_human' || stopReason === 'blocked') await optionalFactoryEffect(client, 'completion_question_record', () => questions.record(run.userId, run.id, client))
 }
+
+type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> }
+export type FactoryReconcileFor = (botId: string | null) => (userId: string, runId: string) => Promise<unknown>
+
+const defaultReconcileFor: FactoryReconcileFor = botId => async (userId, runId) => {
+  const { factoryRuntimeForBot } = await import('./factory/runtime')
+  return factoryRuntimeForBot(botId).reconcile.run(userId, runId)
+}
+
+/** BE-9: like a GitHub check_suite "completed" event, a committed run
+ * completion immediately drives the Factory reconciler for the tasks bound to
+ * this run, so execute → review no longer waits for a Coordinator turn.
+ * Runs after the completion transaction commits (the reconciler takes its own
+ * task/issue/run locks). It is idempotent: each transition is keyed by
+ * factoryEventId("run-completion", runId), so replays and the preparePrompt
+ * fallback (workflows/coordinator/steps.ts) never advance a task twice.
+ * Default-off: returns before any SQL unless both Factory flags are on.
+ * Best effort: a failure is logged without payload and left to the fallback. */
+export async function reconcileFactoryAfterCompletion(db: Queryable, userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
+  if (process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return 0
+  let reconciled = 0
+  try {
+    const { rows } = await db.query(`SELECT DISTINCT t."botId" FROM factory_tasks t WHERE t."userId"=$2 AND (
+      EXISTS (SELECT 1 FROM factory_attempts a WHERE a."taskId"=t.id AND a."runId"=$1)
+      OR EXISTS (SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND q."userId"=$2
+        AND (q."originRunId"=$1 OR q."continuationRunId"=$1)))`, [runId, userId])
+    for (const row of rows) {
+      await reconcileFor((row.botId as string | null) ?? null)(userId, runId)
+      reconciled++
+    }
+  } catch (error) {
+    const code = error instanceof FactoryError ? error.code : (error as { code?: unknown } | null)?.code
+    const cause = (error as { cause?: { code?: unknown } } | null)?.cause?.code
+    console.warn('factory completion reconcile deferred to Coordinator fallback', {
+      runId,
+      error: error instanceof Error ? error.constructor.name : typeof error,
+      code: typeof code === 'string' ? code : 'unknown',
+      causeCode: typeof cause === 'string' ? cause : undefined,
+    })
+  }
+  return reconciled
+}
+
+/** Shared after-commit hook for every path that ends a run outside the daemon
+ * completion transaction (claim rejection, lease loss/retry, stop request).
+ * Call only after the ending write committed. Default-off and never throws. */
+export async function afterRunEnded(userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
+  if (process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return 0
+  try {
+    const { pool } = await import('./db')
+    return await reconcileFactoryAfterCompletion(pool, userId, runId, reconcileFor)
+  } catch (error) {
+    console.warn('factory run-end reconcile deferred to Coordinator fallback', { runId, error: error instanceof Error ? error.constructor.name : typeof error })
+    return 0
+  }
+}

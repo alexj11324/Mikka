@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, desc, eq, gte, inArray, isNull, lt, ne, or } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { continuedLevel } from '@/lib/attention/judgment'
 import { scoreNotification } from '@/lib/attention/score'
@@ -8,11 +8,12 @@ import { briefingEvent } from '@/lib/coordinator-events'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { db } from '@/lib/db'
 import { extractFacts } from '@/lib/profile/extract'
-import { briefings, suggestions, users, userTimeZones } from '@/lib/db/schema'
+import { briefings, suggestions, userPreferences, users, userTimeZones } from '@/lib/db/schema'
 import { displayTitle, type ActionTitleInput } from './action-title'
 import { writeActionTitles } from './action-title-server'
 import { BRIEFING_HOUR, BRIEFING_WINDOW_MS, briefingContent, dueBriefingZones, localClock, localDate, localInstant, safeTimeZone } from './briefing'
 import type { ExternalNotification } from './notification'
+import { keepEnabledSources } from './source-settings'
 
 /** How far back the list reaches; older suggestions drop off. */
 const LIST_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
@@ -26,10 +27,13 @@ const LIST_LIMIT = 100
  * the person has not answered never rates below it. Each stored item is then
  * read once for facts about the person (lib/profile). `route: false` does not
  * hand anything over, for what was already there when an app was connected.
+ * Notifications from a Composio app the person turned off as a source are dropped first.
  */
-export async function ingestNotifications(notifications: readonly ExternalNotification[], { route = true } = {}) {
+export async function ingestNotifications(incoming: readonly ExternalNotification[], { route = true } = {}) {
   const woken = new Set<string>()
   const actionItems = new Map<string, ActionTitleInput[]>()
+  // Apps the person turned off as a source in Settings are not read at all.
+  const notifications = await keepEnabledSources(incoming)
   await Promise.all(notifications.map(async notification => {
     const [seen] = await db.select({ id: suggestions.id }).from(suggestions)
       .where(and(eq(suggestions.userId, notification.userId), eq(suggestions.source, notification.source), eq(suggestions.externalId, notification.externalId))).limit(1)
@@ -132,6 +136,15 @@ async function writeDailyBriefing(userId: string, timeZone: string, dueAt: Date,
   return { saved: saved ?? null, pushed: saved ? await pushBriefing(saved) : false }
 }
 
+/** 每日建议 is on: no user_preferences row, or both dailySuggestions and memoryEnabled (it needs 记忆). */
+const dailySuggestionsAllowed = sql<boolean>`coalesce(${userPreferences.dailySuggestions} and ${userPreferences.memoryEnabled}, true)`
+
+/** Whether the person's daily briefing (每日建议) may be written: the cron, the lazy read and the first briefing all skip them when off. */
+export async function dailySuggestionsOn(userId: string): Promise<boolean> {
+  const [row] = await db.select({ on: dailySuggestionsAllowed }).from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1)
+  return row?.on ?? true
+}
+
 /**
  * The person's current briefing. The briefings cron writes the daily one at
  * 08:00 their time; this is the fallback when it has not run yet. Before
@@ -151,7 +164,7 @@ export async function todaysBriefing(userId: string, timeZoneName: string | null
   const todays = async () => (await db.select().from(briefings).where(and(eq(briefings.userId, userId), eq(briefings.localDate, today))).limit(1))[0]
   const existing = await todays()
   const dueAt = localInstant(timeZone, today, BRIEFING_HOUR)
-  if (!pending(existing, dueAt)) return shown(existing)
+  if (!pending(existing, dueAt) || !await dailySuggestionsOn(userId)) return shown(existing)
   const { saved, pushed } = await writeDailyBriefing(userId, timeZone, dueAt, now)
   if (pushed) onPushed?.()
   return shown(saved ?? await todays())
@@ -160,15 +173,23 @@ export async function todaysBriefing(userId: string, timeZoneName: string | null
 /**
  * Remembers the person's time zone for the briefings cron. An invalid name is
  * ignored. With `replace: false` it only fills a gap, so an IP-derived guess
- * never overrides the zone the person's browser reported.
+ * never overrides the zone the person's browser reported. A zone the person
+ * picked in Settings (source 'manual') is never replaced; a report then only
+ * updates detectedTimeZone, which 自动 switches back to.
  */
 export async function recordTimeZone(userId: string, timeZoneName: string | null, { replace = true } = {}) {
   if (!timeZoneName || safeTimeZone(timeZoneName) !== timeZoneName) return
   const now = new Date()
-  const insert = db.insert(userTimeZones).values({ userId, timeZone: timeZoneName, updatedAt: now })
+  const insert = db.insert(userTimeZones).values({ userId, timeZone: timeZoneName, source: 'auto', detectedTimeZone: timeZoneName, updatedAt: now })
+  const manual = eq(userTimeZones.source, 'manual')
   await (replace
-    ? insert.onConflictDoUpdate({ target: userTimeZones.userId, set: { timeZone: timeZoneName, updatedAt: now }, setWhere: ne(userTimeZones.timeZone, timeZoneName) })
-    : insert.onConflictDoNothing())
+    ? insert.onConflictDoUpdate({
+      target: userTimeZones.userId,
+      set: { timeZone: sql`case when ${manual} then ${userTimeZones.timeZone} else excluded."timeZone" end`, detectedTimeZone: timeZoneName, updatedAt: now },
+      setWhere: or(sql`${userTimeZones.detectedTimeZone} is distinct from ${timeZoneName}`, and(ne(userTimeZones.source, 'manual'), ne(userTimeZones.timeZone, timeZoneName))),
+    })
+    // An IP guess still fills a manual row's missing detected zone, so 自动 has something to go back to.
+    : insert.onConflictDoUpdate({ target: userTimeZones.userId, set: { detectedTimeZone: timeZoneName }, setWhere: and(manual, isNull(userTimeZones.detectedTimeZone)) }))
 }
 
 /** How many briefings the cron writes at once. */
@@ -189,7 +210,8 @@ export async function writeDueBriefings({ now = new Date(), limit = 500, deadlin
     if (people.length > limit) break
     const rows = await db.select({ userId: userTimeZones.userId }).from(userTimeZones)
       .leftJoin(briefings, and(eq(briefings.userId, userTimeZones.userId), eq(briefings.localDate, zone.localDate)))
-      .where(and(eq(userTimeZones.timeZone, zone.timeZone), or(isNull(briefings.userId), and(eq(briefings.kind, 'first'), lt(briefings.createdAt, zone.dueAt)))))
+      .leftJoin(userPreferences, eq(userPreferences.userId, userTimeZones.userId))
+      .where(and(eq(userTimeZones.timeZone, zone.timeZone), dailySuggestionsAllowed, or(isNull(briefings.userId), and(eq(briefings.kind, 'first'), lt(briefings.createdAt, zone.dueAt)))))
       .limit(limit + 1 - people.length)
     people.push(...rows.map(row => ({ userId: row.userId, timeZone: zone.timeZone, dueAt: zone.dueAt })))
   }
@@ -219,6 +241,7 @@ export async function writeDueBriefings({ now = new Date(), limit = 500, deadlin
  * today's, and queues it for the Coordinator. True when it was queued.
  */
 export async function writeFirstBriefing(userId: string, timeZoneName: string | null) {
+  if (!await dailySuggestionsOn(userId)) return false
   const row = await briefingRow(userId, safeTimeZone(timeZoneName), 'first', new Date())
   const [saved] = await db.insert(briefings).values(row).onConflictDoUpdate({ target: [briefings.userId, briefings.localDate], set: { kind: row.kind, timeZone: row.timeZone, highlights: row.highlights, counts: row.counts, total: row.total, createdAt: new Date() } }).returning()
   return saved ? pushBriefing(saved) : false

@@ -136,7 +136,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     checkpoint('daemon-registered', 'Real daemon logged in, registered and exposed its mock harness')
     const dialog = await openCreateIssue(page)
     const machine = dialog.getByRole('combobox', { name: '运行的机器', exact: true })
-    await expect(machine).toContainText('Mikka Cloud')
+    await expect(machine).toContainText('E2B')
     await machine.click()
     await page.getByRole('option').filter({ hasText: device!.name }).click()
     await expect(machine).toContainText(device!.name)
@@ -171,7 +171,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     expect(repo).toEqual({ repoPath: REPOSITORY_KEY, remoteUrl: REPOSITORY, baseBranch: null })
     checkpoint('run-dispatched', 'Coordinator created exactly one task and dispatched to the selected device')
     const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
-    const threadTitle = `# ${title}`
+    const threadTitle = title
     const card = chat.getByRole('button', { name: `打开线程 ${threadTitle}`, exact: true })
     await expect(card).toBeVisible()
     await card.click()

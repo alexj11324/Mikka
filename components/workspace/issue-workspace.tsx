@@ -20,7 +20,10 @@ import { IssueList } from './issue-list'
 import { BoardPage } from './board-page'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { GlobalSearch, SearchPill } from '@/components/nav/global-search'
-import { ContextPanel } from '@/components/nav/context-panel'
+import { ContextPanel, type PanelTab } from '@/components/nav/context-panel'
+import { OPEN_BOT_DETAILS_EVENT } from '@/components/coordinator/turn-error'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { cn } from '@/lib/utils'
 import { BrowserPane } from '@/components/browser/browser-pane'
 import { BrowserNotesProvider } from '@/components/browser/browser-notes'
 import { BrowserToggle, useBrowserFits } from '@/components/browser/browser-toggle'
@@ -32,7 +35,7 @@ import { sessionPreview } from '@/lib/agent-history'
 import { PanelRight } from 'lucide-react'
 import { ISSUE_STATUSES, issueIdentifier, type IssueStatus, type IssueView } from './issue-properties'
 import { listIssues } from '@/app/actions/issues'
-import { authClient } from '@/lib/auth-client'
+import { endSession } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ShortcutKeys } from '@/components/shortcut-keys'
@@ -50,6 +53,7 @@ import { SuggestionFeed } from '@/components/suggestions/suggestion-feed'
 import { ArtifactLibrary } from '@/components/artifacts/artifact-library'
 import type { WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
+import { resolveSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
 import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
@@ -106,14 +110,14 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const [settingsOpen, setSettingsOpen] = useState(Boolean(initialSettingsSection))
-  const [settingsTarget, setSettingsTarget] = useState<{ section: 'preferences' | 'members' | 'integrations' | 'account'; invite: boolean }>({ section: initialSettingsSection ?? 'preferences', invite: false })
+  const [settingsTarget, setSettingsTarget] = useState<{ section: SettingsSectionId; invite: boolean }>({ section: initialSettingsSection ? resolveSettingsSection('/settings', initialSettingsSection) : 'preferences', invite: false })
   const [linearNotice, setLinearNotice] = useState<'connected' | 'error' | null>(null)
   useEffect(() => {
     const url = new URL(window.location.href)
     const result = url.searchParams.get('linear')
     if (result !== 'connected' && result !== 'error') return
     setSettingsOpen(true)
-    setSettingsTarget({ section: 'integrations', invite: false })
+    setSettingsTarget({ section: 'connections', invite: false })
     setLinearNotice(result)
     url.searchParams.delete('linear')
     window.history.replaceState(null, '', url)
@@ -138,6 +142,35 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const { data: coordinatorChat } = useSWR<CoordinatorChatView>('coordinator-chat', () => getCoordinatorChat(), { revalidateOnFocus: false })
   const [panelOpen, setPanelOpen] = useState(true)
   useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])
+  // Below xl the column has no room, so 打开右栏 shows it in a Sheet instead.
+  const [panelSheet, setPanelSheet] = useState(false)
+  useEffect(() => {
+    const wide = window.matchMedia('(min-width: 80rem)')
+    const close = () => { if (wide.matches) setPanelSheet(false) }
+    wide.addEventListener('change', close)
+    return () => wide.removeEventListener('change', close)
+  }, [])
+  function openPanel() { showPanel(true); if (!window.matchMedia('(min-width: 80rem)').matches) setPanelSheet(true) }
+  // A refused turn's 更换模型 opens the bot's 详情 (components/coordinator/turn-error.tsx): here when its
+  // chat is the one shown, otherwise the alert navigates to that chat with ?panel=details.
+  const [panelTabRequest, setPanelTabRequest] = useState<{ tab: PanelTab; at: number } | null>(null)
+  const shownBotId = useRef<string | null>(null)
+  useEffect(() => {
+    const openDetails = (event: Event) => {
+      const botId = (event as CustomEvent<{ botId?: string | null }>).detail?.botId
+      if (!botId || botId !== shownBotId.current) return
+      event.preventDefault()
+      openPanel(); setPanelTabRequest({ tab: 'details', at: Date.now() })
+    }
+    window.addEventListener(OPEN_BOT_DETAILS_EVENT, openDetails)
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('panel') === 'details') {
+      url.searchParams.delete('panel')
+      window.history.replaceState(window.history.state, '', url)
+      openPanel(); setPanelTabRequest({ tab: 'details', at: Date.now() })
+    }
+    return () => window.removeEventListener(OPEN_BOT_DETAILS_EVENT, openDetails)
+  }, [])
   function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem('mikka:context-panel', next ? '1' : '0') } catch { /* storage unavailable */ } }
   // The app-wide browser (top bar 🌐): while open it takes the right panel's place.
   const [browserOpen, setBrowserOpen] = useState(false)
@@ -298,7 +331,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     void leave(async () => {
       setSigningOut(true); setAccountError('')
       try {
-        const result = await authClient.signOut()
+        const result = await endSession()
         if (result.error) throw new Error('sign out failed')
         await clearCache(() => true, undefined, { revalidate: false }); router.replace('/sign-in?login=1'); router.refresh()
       } catch { setAccountError(i18nText("Workspace.signOutFailed")); setSigningOut(false) }
@@ -362,6 +395,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const pagerIndex = pagerId ? filtered.findIndex(task => task.id === pagerId) : -1
   if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onBack={() => { const href = teamId ? `/?team=${encodeURIComponent(teamId)}` : '/'; if (!pushSettingsHistory(href)) router.push(href) }} />
   const isConversation = !selected && section === 'coordinator'
+  shownBotId.current = isConversation ? activeBot?.id ?? null : null
   const savedSessions = new Map((agentHistory?.sessions ?? []).map(session => [session.id, session]))
   for (const session of liveSessions) savedSessions.set(session.id, { ...session, preview: session.preview ?? savedSessions.get(session.id)?.preview })
   const conversationSessions = [...savedSessions.values()]
@@ -378,13 +412,14 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     {dialogs}
   </AppShell></SignOutBoundary>
   return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider><AppFrame
-    bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={<>{isConversation && !panelOpen && !browserShown && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground xl:inline-flex" aria-label={i18nText('Shell.panel.open')} onClick={() => showPanel(true)} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}<BrowserToggle open={browserShown} onToggle={() => showBrowser(!browserShown)} /></>} />}
+    bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={<>{isConversation && !browserShown && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}<BrowserToggle open={browserShown} onToggle={() => showBrowser(!browserShown)} /></>} />}
     rail={<IconRail active={rail} onNavigate={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}>
     {/* The board keeps only the rail on its left (MIK-45). */}
     {!fullPage && <BotList bots={bots} threads={threads} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}
-    <AppShellContent listToggle={!fullPage} hideHeader={!!selected || section === 'agent' || section === 'group'} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : workspaceContext?.workspace.name ?? i18nText("Settings.sections.workspace.title")} title={sectionTitles[section]} actions={section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? undefined : <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} aria-keyshortcuts="Control+k Meta+k" disabled={boardBusy} onClick={() => setSearchOpen(true)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText("Workspace.search.title")}<ShortcutKeys keys={['mod', 'K']} /></TooltipContent></Tooltip>}>
+    {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it. */}
+    <AppShellContent listToggle={!fullPage && !selected} hideHeader={!!selected || section === 'agent' || section === 'group'} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : workspaceContext?.workspace.name ?? i18nText("Settings.groups.workspace")} title={sectionTitles[section]} actions={section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? undefined : <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} aria-keyshortcuts="Control+k Meta+k" disabled={boardBusy} onClick={() => setSearchOpen(true)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText("Workspace.search.title")}<ShortcutKeys keys={['mod', 'K']} /></TooltipContent></Tooltip>}>
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
-      {selected ? <TaskDetail key={draftKey} id={selected} workspaceName={workspaceContext?.workspace.name ?? i18nText('Settings.sections.workspace.title')} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create()} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null, 'replace'); changeSection('team-projects'); setProjectId(id) }) }} /> : section === 'group' && groupRequest ? <GroupChatView key={groupRequest.id} group={groupRequest} userId={user.id} people={groupPeople} /> : isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} agentRequest={agentRequest} onAgentActive={setActiveAgentId} onAgentSessions={setLiveSessions} bot={activeBot} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsSkillsView key={pluginsVisit} googleEnabled={googleEnabled} /> : section === 'suggestions' ? <SuggestionFeed onOpenIssue={id => { open(id) }} onConnect={() => openRail('plugins')} onSent={() => { if (window.matchMedia('(max-width: 767px)').matches) openChat({ kind: 'coordinator' }) }} /> : section === 'artifacts' ? <ArtifactLibrary onOpenIssue={id => { open(id) }} /> : tasksLoading ? <DetailLoading /> : layout === 'board' ? <BoardPage issues={filtered} userId={user.id} onOpen={open} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <>
+      {selected ? <TaskDetail key={draftKey} id={selected} workspaceName={workspaceContext?.workspace.name ?? i18nText('Settings.groups.workspace')} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create()} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null, 'replace'); changeSection('team-projects'); setProjectId(id) }) }} /> : section === 'group' && groupRequest ? <GroupChatView key={groupRequest.id} group={groupRequest} userId={user.id} people={groupPeople} /> : isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} agentRequest={agentRequest} onAgentActive={setActiveAgentId} onAgentSessions={setLiveSessions} bot={activeBot} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsSkillsView key={pluginsVisit} googleEnabled={googleEnabled} /> : section === 'suggestions' ? <SuggestionFeed onOpenIssue={id => { open(id) }} onConnect={() => openRail('plugins')} onSent={() => { if (window.matchMedia('(max-width: 767px)').matches) openChat({ kind: 'coordinator' }) }} /> : section === 'artifacts' ? <ArtifactLibrary onOpenIssue={id => { open(id) }} /> : tasksLoading ? <DetailLoading /> : layout === 'board' ? <BoardPage issues={filtered} userId={user.id} onOpen={open} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <>
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div className="flex flex-wrap items-center gap-2"><h1 className="text-sm font-semibold">{section === 'my-issues' ? i18nText("Workspace.myCreatedTasks") : viewTitle}</h1><Badge variant="secondary">{filtered.length}</Badge>{section !== 'my-issues' && <NativeSelect aria-label={i18nText("Workspace.filterStatus")} value={view} disabled={boardBusy} onChange={event => navigate(event.target.value as IssueView)}><NativeSelectOption value="all">{i18nText("Projects.allStatuses")}</NativeSelectOption><NativeSelectOption value="favorites">{i18nText("Overview.favorites")}</NativeSelectOption><NativeSelectOption value="following">{i18nText("Overview.following")}</NativeSelectOption>{ISSUE_STATUSES.map(status => <NativeSelectOption key={status.value} value={status.value}>{statusLabel(status.value)}</NativeSelectOption>)}</NativeSelect>}</div>
           <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto"><div className="flex min-w-0 items-center gap-2 sm:w-48"><span className="inline-flex shrink-0 text-muted-foreground"><Search className="size-3.5" aria-hidden="true" /></span><Input aria-label={i18nText("Workspace.search.title")} placeholder={i18nText("Projects.issuePicker.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} disabled={boardBusy} /></div><ToggleGroup aria-label={i18nText("Workspace.taskView")} size="sm" variant="outline" spacing={0} disabled={boardBusy} value={[layout]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') setLayout(next) }}><ToggleGroupItem value="list" aria-label={i18nText("Workspace.listView")}><List /></ToggleGroupItem><ToggleGroupItem value="board" aria-label={i18nText("Workspace.boardView")}><Columns3 /></ToggleGroupItem></ToggleGroup><Button size="sm" disabled={boardBusy} onClick={() => create()}><Plus data-icon="inline-start" />{i18nText("Nav.newTask")}</Button></div>
@@ -393,8 +428,15 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       </>}
     </AppShellContent>
     {browserShown && <BrowserPane onClose={() => showBrowser(false)} />}
-    {isConversation && panelOpen && !browserShown && <ContextPanel issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
+    {isConversation && panelOpen && !browserShown && <ContextPanel tabRequest={panelTabRequest} issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}
+    {isConversation && !browserShown && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
+      <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
+        <SheetHeader className="sr-only"><SheetTitle>{i18nText('Shell.panel.label')}</SheetTitle></SheetHeader>
+        <ContextPanel sheet tabRequest={panelTabRequest} issues={tasks} threads={threads} onOpenIssue={id => { setPanelSheet(false); open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => setPanelSheet(false)}
+      conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />
+      </SheetContent>
+    </Sheet>}
     {dialogs}
   </AppFrame></BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
 }

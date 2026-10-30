@@ -76,6 +76,9 @@ const pool = {
 }
 mock.module(new URL('./db/index.ts', import.meta.url).href, { exports: { pool } })
 mock.module(new URL('./device-link.ts', import.meta.url).href, { exports: { WORKSPACE_ID: '28700000-0000-4000-8000-000000000099' } })
+// #438: the run's secret masker is covered by tests/secret-masking.db.test.ts; here it is identity so the
+// mailbox fixture does not load the secrets store (device tokens, DB).
+mock.module(new URL('./secrets/runtime.ts', import.meta.url).href, { exports: { maskForRun: async (_runId: string, text: string) => text, maskForWorkspace: async (_ws: string, value: unknown) => value, workspaceSecretMasker: async () => (text: string) => text } })
 let memberConnections = 0
 mock.module(new URL('./workspace-db.ts', import.meta.url).href, { exports: { workspacePool: {
   async connect() {

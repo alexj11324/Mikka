@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { botViewSchema, computerStateSchema, viewerGrantSchema, computerEventSchema } from '@mikka/protocol/computer'
 import { withBasePath } from '@/lib/base-path'
+import { listenComputerStream } from '@/lib/computer/event-stream'
 import { MOCK_HOSTS, mockComputer, mockSetup } from './mock'
 import type { ApprovalDecision, ApprovalView, ComputerEvent, ComputerState, KnownHost, SetupStep, SetupStepState, ViewerGrant, ViewerMode } from './types'
 
@@ -47,14 +48,11 @@ export const computerApi = {
  */
 export function subscribeComputerEvents(listener: (event: ComputerEvent) => void, mocked = computerMock): () => void {
   if (mocked) return mockComputer.subscribe(listener)
-  if (typeof EventSource === 'undefined') return () => {}
-  const source = new EventSource(withBasePath('/api/computer/events'), { withCredentials: true })
   const types: ComputerEvent['type'][] = ['computer.machine', 'computer.control', 'computer.action', 'computer.approval']
-  for (const type of types) source.addEventListener(type, message => {
-    try { listener(computerEventSchema.parse({ ...JSON.parse((message as MessageEvent<string>).data), type })) } catch { /* a malformed push; the next poll corrects it */ }
-  })
-  source.onerror = () => { if (source.readyState === EventSource.CLOSED) source.close() }
-  return () => source.close()
+  const stops = types.map(type => listenComputerStream(type, data => {
+    try { listener(computerEventSchema.parse({ ...JSON.parse(data), type })) } catch { /* a malformed push; the next poll corrects it */ }
+  }))
+  return () => { for (const stop of stops) stop() }
 }
 
 /**

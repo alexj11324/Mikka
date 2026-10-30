@@ -26,6 +26,12 @@ supplies content.
 - **Personal:** Preferences, Profile, Memory (记忆), Account (账户), Integrations, Devices (设备).
 - **Administration:** Workspace, Teams, Members.
 
+Bots: personal 模型订阅 (`models`) connects the person's own provider
+accounts; workspace Bot 管理 (`bots`) holds the admin-only 可用模型 and the
+read-only 全部 Bot list; 额度 lives in 用量 (`usage`). A bot's own model and
+repository are in its 详情, not in settings. See
+[`design/bot-settings.md`](design/bot-settings.md).
+
 Account holds how the person signs in: linking Google to the Mikka account.
 Integrations holds connected apps (Gmail, Calendar, Notion, Slack, Linear,
 Telegram), even when the app is a Google one.

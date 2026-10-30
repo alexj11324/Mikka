@@ -1,4 +1,5 @@
 import { freezeHostedModelSelection } from '@/lib/subscription-model-snapshot'
+import { botRunModelSource } from '@/lib/bot-runtime-model'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
 import type { CoordinatorRuntime } from '@mikka/protocol/coordinator'
 import { agentKitEnabled, agentKitStore, agentScope, agentKitDefaults } from '@/lib/agent-kit/service'
@@ -15,11 +16,21 @@ import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
 
 export async function beginAgentExecution(userId: string, botId: string | null, holder: string, round: number, runtime: CoordinatorRuntime): Promise<AgentExecution | null> {
   'use step'
-  if (!agentKitEnabled()) return null
+  // A bot runs on its owner's model (设置 › Bot, docs/design/bot-settings.md): Mikka's hosted model,
+  // or the owner's own subscription. Without the agent kit only the hosted model can run, so any
+  // other choice refuses the turn instead of silently running on Mikka.
+  const hosted = runtime.harness === 'ai_sdk'
+  if (!agentKitEnabled()) {
+    if (botId && hosted) await botRunModelSource(userId,botId,undefined)
+    return null
+  }
   const scope = await agentScope(userId,botId)
-  const instructions = await botInstructions(userId,botId,runtime.harness === 'ai_sdk' ? COORDINATOR_INSTRUCTIONS : personalCoordinatorInstructions())
-  const configured = { harness:runtime.harness,model:runtime.harness === 'ai_sdk' ? COORDINATOR_MODEL : ('model' in runtime ? runtime.model ?? null : null) }
-  return agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,definition => freezeHostedModelSelection(scope,runtimeForWritePlanning(configured,definition.tools,personalWritesEnabled(),Boolean(definition.modelSelection)),definition.modelSelection,{ service:() => subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace }),agentKitDefaults())
+  const instructions = await botInstructions(userId,botId,hosted ? COORDINATOR_INSTRUCTIONS : personalCoordinatorInstructions())
+  const configured = { harness:runtime.harness,model:hosted ? COORDINATOR_MODEL : ('model' in runtime ? runtime.model ?? null : null) }
+  return agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,async definition => {
+    const selection = botId && hosted ? await botRunModelSource(userId,botId,definition.modelSelection) : definition.modelSelection
+    return freezeHostedModelSelection(scope,runtimeForWritePlanning(configured,definition.tools,personalWritesEnabled(),Boolean(selection)),selection,{ service:() => subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace })
+  },agentKitDefaults())
 }
 export async function beforeAgentTool(userId: string, botId: string | null, executionId: string, callId: string, name: string, nativeScope?: NativeToolScope) {
   'use step'
