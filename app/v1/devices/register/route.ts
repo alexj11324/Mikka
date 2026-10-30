@@ -23,6 +23,7 @@ export async function POST(request: Request) {
   const info = parsed.data
   const now = new Date()
   const fields = {
+    deviceType: info.deviceType ?? 'laptop',
     hostname: info.hostname ?? null, platform: info.platform, arch: info.arch,
     daemonVersion: info.daemonVersion, protocolVersion: info.protocolVersion,
     computerUse: info.computerUse ?? { installed: false, version: null },

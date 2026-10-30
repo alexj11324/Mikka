@@ -42,7 +42,7 @@ const exports = Object.fromEntries(Object.entries(source.exports).map(([key]) =>
 await writeFile(resolve(out, 'package.json'), `${JSON.stringify({
   name: packageName, version: source.version, description: source.description,
   type: 'module', private: false, license: source.license,
-  engines: { node: '>=24' }, bin: { mikka: './mikka.js' }, exports,
+  engines: source.engines, bin: { mikka: './mikka.js' }, exports,
   repository: { type: 'git', url: 'git+https://github.com/alexj11324/Mikka.git', directory: 'packages/daemon' },
   publishConfig: { access: 'public', provenance: true }, dependencies,
 }, null, 2)}\n`)

@@ -7,7 +7,8 @@ import type { Flavor } from "@mikka/protocol"
 import { readJson, writeJsonAtomic } from "./fs-util"
 import { DaemonAlreadyRunningError } from "./lock"
 import { createLogger } from "./log"
-import { deviceLogin } from "./login"
+import { installService } from "./service"
+import { deviceLogin, registrationLogin } from "./login"
 import { startDaemon } from "./main"
 import { DAEMON_VERSION, daemonPaths, defaultDataDir } from "./paths"
 import { connectDaemonInDataDir, isNoDaemon } from "./rpc/client"
@@ -57,6 +58,8 @@ export async function runCli(
       "e2b-container-runtime": { type: "boolean", default: false },
       "e2b-computer": { type: "boolean", default: false },
       token: { type: "string" },
+      "registration-token-stdin": { type: "boolean" },
+      "device-type": { type: "string" },
       workspace: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -68,6 +71,12 @@ export async function runCli(
   }
   const flavor: Flavor = values.dev ? "dev" : "prod"
   const dataDir = values["data-dir"] ?? defaultDataDir(flavor)
+
+  if (sub === 'service' && positionals[2] === 'install') {
+    await installService(values.server ?? SERVER_URLS[flavor], values['device-type'])
+    io.out('Service installed.')
+    return 0
+  }
 
   if (sub === "status") {
     try {
@@ -88,6 +97,14 @@ export async function runCli(
     // Better Auth device authorization (RFC 8628), like `gh auth login`.
     // `--token` takes an existing device token (manual setup or tests).
     let credential = values.token
+    if (values["registration-token-stdin"]) {
+      let input = ''
+      for await (const chunk of process.stdin) {
+        input += chunk
+        if (input.length > 256) throw new Error('Invalid registration token')
+      }
+      credential = await registrationLogin({ serverUrl: values.server ?? SERVER_URLS[flavor], token: input.trim() })
+    }
     if (!credential) {
       const serverUrl =
         values.server ?? process.env.MIKKA_PUBLIC_URL ?? SERVER_URLS[flavor]
@@ -184,6 +201,7 @@ export async function runCli(
     const shutdown = () => {
       void daemon.stop().then(() => process.exit(0))
     }
+    process.once('SIGUSR2', () => { void daemon.stop().then(() => process.exit(1)) })
     process.once("SIGINT", shutdown)
     process.once("SIGTERM", shutdown)
     return null
