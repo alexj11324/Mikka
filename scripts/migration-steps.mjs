@@ -45,11 +45,17 @@ export function stripComments(sql) {
   return sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, '')
 }
 
-const CONCURRENT_INDEX = /^create\s+(?:unique\s+)?index\s+concurrently\s+(?:if\s+not\s+exists\s+)?(?:"([^"]+)"|([A-Za-z_][\w]*))\s+on\b/i
+const IDENT = String.raw`(?:"([^"]+)"|([A-Za-z_][\w]*))`
+const CONCURRENT_INDEX = new RegExp(String.raw`^create\s+(?:unique\s+)?index\s+concurrently\s+(?:if\s+not\s+exists\s+)?${IDENT}\s+on\s+(?:only\s+)?(?:${IDENT}\s*\.\s*)?${IDENT}`, 'i')
 
 /** The name Postgres stores: unquoted identifiers fold to lower case, quoted ones are kept. */
-export function indexName(match) {
-  return match[1] !== undefined ? match[1] : match[2].toLowerCase()
+export function indexName(match, at = 1) {
+  return match[at] !== undefined ? match[at] : match[at + 1].toLowerCase()
+}
+
+/** The table an index is built on: { schema (null = current_schema()), table }. */
+export function indexTable(match) {
+  return { schema: match[3] !== undefined || match[4] !== undefined ? indexName(match, 3) : null, table: indexName(match, 5) }
 }
 
 /**
@@ -66,7 +72,7 @@ export function planMigration(name, sql) {
   if (!body) throw new Error(`migrate: ${name} has no statements`)
   if (!noTransaction) {
     if (/\bconcurrently\b/i.test(body)) throw new Error(`migrate: ${name} uses CONCURRENTLY; put it alone in a file marked "-- migrate: no-transaction"`)
-    return { target, noTransaction, sql, concurrentIndex: null }
+    return { target, noTransaction, sql, concurrentIndex: null, concurrentIndexTable: null }
   }
   // Comments may hide a `;` (e.g. `-- a; b`), and a `;` inside a string literal may follow
   // `--` and be stripped with it. Require the count to survive stripping, so nothing the
@@ -81,7 +87,7 @@ export function planMigration(name, sql) {
   const concurrent = /\bconcurrently\b/i.test(statement)
   const index = CONCURRENT_INDEX.exec(statement)
   if (concurrent && !index) throw new Error(`migrate: ${name}: only CREATE [UNIQUE] INDEX CONCURRENTLY <name> ON ... is supported`)
-  return { target, noTransaction, sql, concurrentIndex: index ? indexName(index) : null }
+  return { target, noTransaction, sql, concurrentIndex: index ? indexName(index) : null, concurrentIndexTable: index ? indexTable(index) : null }
 }
 
 /** Throws unless the index exists and is valid. `query` is pg's client.query. */
@@ -91,12 +97,21 @@ export async function assertIndexValid(query, name, file) {
   if (rows.length !== 1 || !rows[0].indisvalid) throw new Error(`migrate: ${file}: index ${name} is INVALID (a concurrent build failed). Run "DROP INDEX CONCURRENTLY IF EXISTS ${name};" and deploy again. The migration was not recorded.`)
 }
 
-/** Drops `name` only when it exists and is INVALID (pg_index.indisvalid = false). A valid index is kept. */
-export async function dropInvalidIndex(query, name, file, log = console.error) {
-  const { rows } = await query('select i.indisvalid from pg_index i join pg_class c on c.oid = i.indexrelid where c.relname = $1 and pg_catalog.pg_table_is_visible(c.oid)', [name])
+/**
+ * Drops `name` only when it exists, is INVALID (pg_index.indisvalid = false) AND belongs to the file's
+ * own table: the index's table must be `on.table` in `on.schema` (or current_schema() when the file
+ * does not qualify it), with the index in that same schema. A valid index, or an INVALID index of the
+ * same name on any other table or schema, is never touched. The drop is schema-qualified.
+ */
+export async function dropInvalidIndex(query, name, file, log = console.error, on) {
+  if (!on?.table) return false
+  const { rows } = await query(`select i.indisvalid, n.nspname from pg_index i
+    join pg_class c on c.oid = i.indexrelid join pg_class r on r.oid = i.indrelid join pg_namespace n on n.oid = r.relnamespace
+    where c.relname = $1 and c.relnamespace = r.relnamespace and r.relname = $2 and n.nspname = coalesce($3, current_schema())`, [name, on.table, on.schema ?? null])
   if (rows.length !== 1 || rows[0].indisvalid) return false
-  log(`migrate: ${file}: index ${name} is INVALID from a failed concurrent build; dropping and rebuilding`)
-  await query(`DROP INDEX CONCURRENTLY IF EXISTS "${name.replace(/"/g, '""')}"`)
+  const quote = (id) => `"${id.replace(/"/g, '""')}"`
+  log(`migrate: ${file}: index ${name} on ${rows[0].nspname}.${on.table} is INVALID from a failed concurrent build; dropping and rebuilding`)
+  await query(`DROP INDEX CONCURRENTLY IF EXISTS ${quote(rows[0].nspname)}.${quote(name)}`)
   return true
 }
 
@@ -108,7 +123,7 @@ export async function applyMigration(client, name, plan, log = console.error) {
   const query = (text, values) => client.query(text, values)
   // A previous concurrent build of this unrecorded file left an INVALID index: IF NOT EXISTS
   // would skip it, so drop it (concurrently, outside any transaction) and build again.
-  if (plan.concurrentIndex) await dropInvalidIndex(query, plan.concurrentIndex, name, log)
+  if (plan.concurrentIndex) await dropInvalidIndex(query, plan.concurrentIndex, name, log, plan.concurrentIndexTable)
   try {
     await client.query(plan.sql)
   } catch (error) {

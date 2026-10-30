@@ -8,7 +8,7 @@ const rejects = (sql, pattern) => assert.throws(() => plan(sql), pattern)
 
 test('a normal file is sent whole, in one transaction', () => {
   const sql = 'create table a (id int);\ncreate table b (id int);\n'
-  assert.deepEqual(plan(sql), { target: 'MIKKA_DATABASE_URL', noTransaction: false, sql, concurrentIndex: null })
+  assert.deepEqual(plan(sql), { target: 'MIKKA_DATABASE_URL', noTransaction: false, sql, concurrentIndex: null, concurrentIndexTable: null })
 })
 
 test('directives count only in the header (leading comment / blank lines)', () => {
@@ -22,7 +22,7 @@ test('directives count only in the header (leading comment / blank lines)', () =
 
 test('no-transaction: exactly one statement, trailing semicolon optional, comments ignored', () => {
   const sql = `-- Trigram index.\n${NOTX}-- built without blocking writes, see MIK-16\ncreate index concurrently if not exists issues_title_trgm_idx\n  on issues using gin (title gin_trgm_ops); -- trailing note\n`
-  assert.deepEqual(plan(sql), { target: 'MIKKA_DATABASE_URL', noTransaction: true, sql, concurrentIndex: 'issues_title_trgm_idx' })
+  assert.deepEqual(plan(sql), { target: 'MIKKA_DATABASE_URL', noTransaction: true, sql, concurrentIndex: 'issues_title_trgm_idx', concurrentIndexTable: { schema: null, table: 'issues' } })
   assert.equal(plan(`${NOTX}/* block comment */ create index concurrently "q_idx" on t (a)`).concurrentIndex, 'q_idx')
   assert.equal(plan(`${NOTX}create unique index concurrently u_idx on t (a);`).concurrentIndex, 'u_idx')
   assert.equal(plan(`${NOTX}alter type s add value if not exists 'x';`).concurrentIndex, null)
@@ -100,12 +100,25 @@ test('all tracked SQL preflights without altering historical migration bytes', a
   }
 })
 
-test('dropInvalidIndex drops only an INVALID index, concurrently; valid or missing is left alone', async () => {
+test('concurrent index plans carry their table and schema', () => {
+  const on = (sql) => plan(`${NOTX}${sql}`).concurrentIndexTable
+  assert.deepEqual(on('create index concurrently i on pending_actions (a)'), { schema: null, table: 'pending_actions' })
+  assert.deepEqual(on('create index concurrently i on only Public.Pending_Actions (a)'), { schema: 'public', table: 'pending_actions' })
+  assert.deepEqual(on('create index concurrently "I" on "S"."T" using gin (a)'), { schema: 'S', table: 'T' })
+  assert.deepEqual(on('create unique index concurrently if not exists i on s . t(a)'), { schema: 's', table: 't' })
+})
+
+test('dropInvalidIndex drops only an INVALID index on the expected table, concurrently and schema-qualified', async () => {
   const calls = []
-  const fake = (rows) => async (text, _values) => { calls.push(text); return { rows: text.startsWith('select') ? rows : [] } }
-  assert.equal(await dropInvalidIndex(fake([{ indisvalid: true }]), 'i', 'x.sql', () => {}), false)
-  assert.equal(await dropInvalidIndex(fake([]), 'i', 'x.sql', () => {}), false)
-  assert.equal(calls.some(c => /drop/i.test(c)), false)
-  assert.equal(await dropInvalidIndex(fake([{ indisvalid: false }]), 'i', 'x.sql', () => {}), true)
-  assert.equal(calls.at(-1), 'DROP INDEX CONCURRENTLY IF EXISTS "i"')
+  const fake = (rows) => async (text, values) => { calls.push({ text, values }); return { rows: text.startsWith('select') ? rows : [] } }
+  const on = { schema: null, table: 'pending_actions' }
+  assert.equal(await dropInvalidIndex(fake([{ indisvalid: true, nspname: 'public' }]), 'i', 'x.sql', () => {}, on), false)
+  assert.equal(await dropInvalidIndex(fake([]), 'i', 'x.sql', () => {}, on), false)
+  assert.equal(await dropInvalidIndex(fake([{ indisvalid: false, nspname: 'public' }]), 'i', 'x.sql', () => {}), false, 'no table: never drop')
+  assert.equal(calls.some(c => /drop/i.test(c.text)), false)
+  assert.equal(await dropInvalidIndex(fake([{ indisvalid: false, nspname: 'public' }]), 'i', 'x.sql', () => {}, on), true)
+  assert.deepEqual(calls.at(-2).values, ['i', 'pending_actions', null], 'lookup is bound to the table and schema')
+  assert.match(calls.at(-2).text, /r\.relname = \$2/)
+  assert.match(calls.at(-2).text, /n\.nspname = coalesce\(\$3, current_schema\(\)\)/)
+  assert.equal(calls.at(-1).text, 'DROP INDEX CONCURRENTLY IF EXISTS "public"."i"')
 })
