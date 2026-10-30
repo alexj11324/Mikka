@@ -401,7 +401,7 @@ test(
       );
 
       await t.test(
-        "missing/uncertain/revoked/changed receipt and malformed publish evidence fail before queue",
+        "missing/uncertain/revoked receipts block queue; historical metadata is not reauthorized",
         async () => {
           for (const tamper of [
             "missing",
@@ -442,11 +442,14 @@ test(
                 `UPDATE factory_attempts SET output='{}' WHERE "taskId"=$1 AND stage='publish'`,
                 [f.task.id],
               );
-            await assert.rejects(
-              () => dispatch("owner", input(f.task)),
-              (e) => e instanceof FactoryError,
-            );
-            assert.equal(await queued(f.task), 0);
+            if (["missing", "uncertain", "revoked"].includes(tamper)) {
+              await assert.rejects(() => dispatch("owner", input(f.task)), (e) => e instanceof FactoryError);
+              assert.equal(await queued(f.task), 0);
+            } else {
+              // Historical reads no longer repeat write-time validation.
+              await dispatch("owner", input(f.task));
+              assert.equal(await queued(f.task), 1);
+            }
           }
         },
       );

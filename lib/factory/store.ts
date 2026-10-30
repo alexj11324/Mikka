@@ -340,7 +340,7 @@ export function createFactoryStore(
         const task = await owned(tx, userId, taskId, false);
         return {
           ...(await snapshot(tx, task)),
-          ...(await factoryTaskDetail(tx, task, lifecycle?.independent as never)),
+          ...(await factoryTaskDetail(tx, task)),
         };
       });
     },

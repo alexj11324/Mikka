@@ -20,8 +20,6 @@ export interface FactoryCheckResult {
   /** That candidate's commit sha; null when candidateId is null. */
   candidateSha: string | null;
   runId: string | null;
-  /** true/false = ancestry predicate result; null = no run yet. */
-  independent: boolean | null;
   criteria: FactoryCheckCriterion[];
   /** null when the run has no report, or report.verify.status is not one of VERIFY_STATUSES. command is null when the report has none. */
   verify: { status: VerifyStatus; command: string | null; exitCode: number | null } | null;
@@ -43,8 +41,6 @@ export interface FactoryDelivery {
    * Frontend already reads it.
    */
   previewUrl: string | null;
-  /** Neon branch of the run. Mikka does not record one anywhere yet, so this is always null. */
-  databaseBranch: { name: string; url: string } | null;
   /**
    * Vercel's deployment target as recorded in receipt.verifiedTarget.provider.environment (provider
    * name "vercel") of the same row as previewUrl: the newest succeeded publication of the current candidate. Any other value, a
@@ -54,7 +50,6 @@ export interface FactoryDelivery {
 }
 export interface FactoryTaskDetail { checks: FactoryCheckResult[]; delivery: FactoryDelivery }
 type Task = { id: string; issueId: string; candidateId: string | null; userId: string };
-type Independent = (tx: PoolClient, task: never, runId: string) => Promise<boolean>;
 
 const text = (v: unknown) => (typeof v === "string" && v.trim() ? redactFactoryCheckText(v) : null);
 
@@ -87,7 +82,6 @@ function verifyOf(report: unknown): FactoryCheckResult["verify"] {
 export async function factoryTaskDetail(
   tx: PoolClient,
   task: Task,
-  independent?: Independent,
 ): Promise<FactoryTaskDetail> {
   const { rows } = await tx.query<{ id: string; stage: FactoryCheckResult["stage"]; status: string; candidateId: string | null; candidateSha: string | null; runId: string | null; report: unknown }>(
     `SELECT a.id,a.stage,a.status,a."candidateId",c.sha AS "candidateSha",a."runId",r.report FROM factory_attempts a
@@ -106,7 +100,6 @@ export async function factoryTaskDetail(
       candidateId: row.candidateId,
       candidateSha: row.candidateId ? row.candidateSha : null,
       runId: row.runId,
-      independent: row.runId && independent ? await independent(tx, task as never, row.runId) : null,
       criteria: factoryCriteria(row.report),
       verify: verifyOf(row.report),
     });
@@ -133,7 +126,6 @@ export async function factoryTaskDetail(
       environment: d?.environment ?? null,
       pullRequest: d?.pullRequest ?? null,
       previewUrl: url,
-      databaseBranch: null,
       deploymentEnvironment: d?.deploymentEnvironment === "preview" || d?.deploymentEnvironment === "production" ? d.deploymentEnvironment : null,
     },
   };

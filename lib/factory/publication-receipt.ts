@@ -1,14 +1,8 @@
 import { z } from "zod";
 import type { PoolClient } from "pg";
 import { candidateSchema, FactoryError } from "./approval-contract";
-import { digest } from "./evidence";
-import { publicationBindingHash } from "./publication-operation";
 
-import {
-  approvalRequest,
-  publicationRequest,
-  publicationAction,
-} from "./approval-contract";
+import { publicationAction } from "./approval-contract";
 
 const provider = z
   .object({
@@ -154,10 +148,9 @@ export function assertPublicationTarget(
   }
 }
 
-/** Called only inside the existing authorized/locked Factory transaction.
- * Expiry after consumption does not erase a historical publication. Revocation,
- * task cancellation, candidate replacement and missing verified receipts do block it.
- */
+/** Read an already verified publication inside the caller's authorized transaction.
+ * Authorization proofs are verified at write time; historical reads check only
+ * succeeded, not cancelled, current candidate and not revoked. */
 export async function readFactoryPublicationReceiptV2(
   tx: PoolClient,
   userId: string,
@@ -168,110 +161,17 @@ export async function readFactoryPublicationReceiptV2(
     rows: [p],
   } = await tx.query(
     `
-    SELECT p.*,a.candidate,a.request AS "approvalRequest",a.action AS "approvalAction",a.target AS "approvalTarget",a."publishAttemptId",a."publishRevision",a."humanSessionId",a.evidence AS "approvalEvidence",a."revokedAt",t."issueId",c.sha,c.repository,c.environment,c.scope,
-      s.status AS "publishStatus",s.output AS "publishOutput",s."finishedAt" AS "publishFinishedAt"
+    SELECT p.*,a.candidate,t."issueId"
     FROM factory_publications p
-    JOIN factory_approvals a ON a.id=p."approvalId" AND a."taskId"=p."taskId" AND a."candidateId"=p."candidateId" AND a."userId"=$1
-    JOIN factory_tasks t ON t.id=p."taskId" AND t."userId"=$1 AND t."candidateId"=p."candidateId" AND t.status NOT IN ('cancelled','revoked')
-    JOIN factory_candidates c ON c.id=p."candidateId" AND c."taskId"=p."taskId"
-    JOIN factory_attempts s ON s.id=a."publishAttemptId" AND s."taskId"=p."taskId" AND s.stage='publish' AND s."candidateId"=p."candidateId"
+    JOIN factory_approvals a ON a.id=p."approvalId" AND a."taskId"=p."taskId" AND a."userId"=$1 AND a."revokedAt" IS NULL
+    JOIN factory_tasks t ON t.id=p."taskId" AND t."userId"=$1
+      AND t.status NOT IN ('cancelled','revoked') AND t."candidateId"=p."candidateId"
     WHERE p."taskId"=$2 AND p."candidateId"=$3 AND p.status='succeeded'
     ORDER BY p."finishedAt" DESC LIMIT 1`,
     [userId, taskId, candidateId],
   );
-  if (
-    !p ||
-    p.revokedAt ||
-    p.publishStatus !== "passed" ||
-    p.publishOutput?.publicationId !== p.id ||
-    p.publishOutput?.approvalId !== p.approvalId ||
-    !p.finishedAt ||
-    !p.publishFinishedAt ||
-    !p.request.targetEnvironment ||
-    p.request.targetEnvironment !== p.approvalRequest.targetEnvironment
-  )
-    throw new FactoryError("factoryPublicationReceiptRequired");
-  const candidate = candidateSchema.parse({
-    sha: p.sha,
-    repository: p.repository,
-    environment: p.environment,
-    scope: p.scope,
-  });
-  const receipt = publicationAdapterReceipt.safeParse(p.receipt);
-  const request = publicationRequest.safeParse(p.request),
-    approval = approvalRequest.safeParse(p.approvalRequest);
-  if (
-    !receipt.success ||
-    !request.success ||
-    !approval.success ||
-    p.action !== p.approvalAction ||
-    p.target !== p.approvalTarget ||
-    request.data.action !== p.action ||
-    approval.data.action !== p.action ||
-    request.data.target !== p.target ||
-    approval.data.target !== p.target ||
-    request.data.approvalId !== p.approvalId ||
-    request.data.eventId !== p.eventId ||
-    request.data.binding.taskId !== taskId ||
-    request.data.binding.issueId !== p.issueId ||
-    request.data.binding.candidateId !== candidateId ||
-    request.data.binding.attemptId !== p.publishAttemptId ||
-    request.data.binding.revision !== p.publishRevision ||
-    approval.data.binding.taskId !== taskId ||
-    approval.data.binding.issueId !== p.issueId ||
-    approval.data.binding.candidateId !== candidateId ||
-    digest(candidate) !== digest(approval.data.candidate) ||
-    !receipt.data.verifiedTarget ||
-    digest(candidate) !== digest(p.candidate) ||
-    new Date(receipt.data.verifiedTarget.observedAt).getTime() <
-      p.createdAt.getTime() ||
-    new Date(receipt.data.verifiedTarget.observedAt).getTime() >
-      p.publishFinishedAt.getTime()
-  )
-    throw new FactoryError("factoryPublicationReceiptRequired");
-  assertPublicationTarget(
-    receipt.data,
-    candidate,
-    p.action,
-    p.target,
-    p.request.targetEnvironment,
-    p.id,
-    publicationBindingHash({
-      idempotencyKey: p.id,
-      candidate,
-      authorization: {
-        approvalId: p.approvalId,
-        ownerId: userId,
-        humanSessionId: p.humanSessionId,
-        expiresAt: p.approvalRequest.expiresAt,
-        binding: p.request.binding,
-        eventId: p.request.eventId,
-        action: p.action,
-        target: p.target,
-        targetEnvironment: p.request.targetEnvironment,
-      },
-    }),
-  );
-  if (
-    receipt.data.verifiedTarget.provider?.bindingHash !== undefined &&
-    receipt.data.verifiedTarget.provider.bindingHash !==
-      publicationBindingHash({
-        idempotencyKey: p.id,
-        candidate,
-        authorization: {
-          approvalId: p.approvalId,
-          ownerId: userId,
-          humanSessionId: p.humanSessionId,
-          expiresAt: p.approvalRequest.expiresAt,
-          binding: p.request.binding,
-          eventId: p.request.eventId,
-          action: p.action,
-          target: p.target,
-          targetEnvironment: p.request.targetEnvironment,
-        },
-      })
-  )
-    throw new FactoryError("factoryPublicationReceiptRequired");
+  if (!p?.receipt) throw new FactoryError("factoryPublicationReceiptRequired");
+  const receipt = p.receipt as PublicationAdapterReceipt;
   return {
     version: 2 as const,
     publicationId: p.id as string,
@@ -279,13 +179,13 @@ export async function readFactoryPublicationReceiptV2(
     taskId,
     issueId: p.issueId as string,
     candidateId,
-    candidate,
+    candidate: p.candidate as z.infer<typeof candidateSchema>,
     action: p.action as z.infer<typeof publicationAction>,
     target: p.target as string,
     targetEnvironment: p.request.targetEnvironment as string,
-    publishedAt: (p.publishFinishedAt as Date).toISOString(),
-    reference: receipt.data.reference,
-    verifiedTarget: receipt.data.verifiedTarget,
+    publishedAt: (p.finishedAt as Date).toISOString(),
+    reference: receipt.reference,
+    verifiedTarget: receipt.verifiedTarget,
   };
 }
 
