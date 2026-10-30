@@ -50,7 +50,7 @@ import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
 import { PluginsSkillsView } from '@/components/plugins/plugins-skills-view'
 import { SuggestionFeed } from '@/components/suggestions/suggestion-feed'
 import { ArtifactLibrary } from '@/components/artifacts/artifact-library'
-import type { WorkspaceSection } from './workspace-navigation'
+import { writeSectionQuery, type WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { resolveSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
@@ -169,8 +169,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     directDetail.current = false
     setSection(next)
     const url = new URL(window.location.href)
-    if (next === 'agent' || next === 'coordinator' || next === 'plugins' || next === 'suggestions' || next === 'artifacts') url.searchParams.set('section', next)
-    else url.searchParams.delete('section')
+    writeSectionQuery(url.searchParams, next)
     // An app's page (?app=) belongs to the plugins page; choosing a section opens its top.
     url.searchParams.delete('app')
     if (next === 'plugins') setPluginsVisit(visit => visit + 1)

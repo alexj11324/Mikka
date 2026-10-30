@@ -9,7 +9,7 @@ const translate = (key: string) => key
 const u = (path: string) => new URL(path, import.meta.url).href
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useLocale: () => 'zh-CN', useFormatter: () => ({}) } })
 mock.module(u('../app/actions/issues.ts'), { namedExports: {
-  getIssue: async (id: string) => ({ id, title: 'Invalid body', content: invalid, status: 'todo', priority: 'normal', identifier: 'MIK-1', userId: 'u1', updatedAt: new Date(), createdAt: new Date() }),
+  getIssue: async (id: string) => ({ issue: { id, title: 'Invalid body', content: invalid, status: 'todo', priority: 'normal', identifier: 'MIK-1', userId: 'u1', updatedAt: new Date(), createdAt: new Date() } }),
   saveIssue: async () => { throw new Error('read-only must not save') },
   listIssueVersions: async () => [],
 } })

@@ -8,6 +8,7 @@ import { Box, CircleUserRound, Columns3, Flag, List, ListFilter, PanelRightClose
 import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
 import { listTaskRuns } from '@/app/actions/task-runs'
+import { getLinearBoardSync } from '@/app/actions/linear-sync'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { ConversationPill } from '@/components/nav/conversation-pill'
@@ -119,6 +120,9 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
   const [newTask, setNewTask] = useState(false)
   const { data: agents } = useSWR('agents', () => listAgents(), { revalidateOnFocus: false })
+  const { data: linear } = useSWR('linear-board-sync', () => getLinearBoardSync(), { revalidateOnFocus: false })
+  // Without a connected Linear team, the button only reloads the board.
+  const linearSynced = !!linear && !linear.error && linear.synced
   const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
   const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
   const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run.status); return state ? [[run.issueId, state] as const] : [] })), [runs])
@@ -200,7 +204,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
           <Button variant="outline" size="icon-xs" aria-label={t('removeFilter', { field: t(`filterField.${field}`) })} onClick={() => update({ filters: { ...filters, [field]: [] } })}><X data-icon="inline-start" /></Button>
         </ButtonGroup>)}
         <div className="ml-auto flex items-center gap-1">
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('synced')} className="text-success-foreground" onClick={() => { void onUpdated() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{t('synced')}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>
           <ToggleGroup aria-label={t('viewLabel')} size="sm" spacing={0} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') update({ view: next }) }}>
             <ToggleGroupItem value="board" aria-label={t('viewBoard')}><Columns3 /></ToggleGroupItem>
             <ToggleGroupItem value="list" aria-label={t('viewList')}><List /></ToggleGroupItem>

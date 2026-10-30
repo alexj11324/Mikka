@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
-import { createIssueForTeam, promoteIssueToTeam, previewIssuePersonalScope, confirmIssuePersonalScope } from '../app/actions/issues'
+import { createIssueForTeam, getIssue, promoteIssueToTeam, previewIssuePersonalScope, confirmIssuePersonalScope } from '../app/actions/issues'
 import { runAction } from '../lib/action-error'
 import { actAs } from '../lib/acting-user'
 import { agentActor } from '../lib/activity-actor'
@@ -15,6 +15,8 @@ test('team creation and personal preview/confirmation serialize missing authenti
     promoteIssueToTeam({ requestId:randomUUID(), issueId:id, revision:1, teamId:randomUUID(), expectedTeamId:null }),
     previewIssuePersonalScope(id),
     confirmIssuePersonalScope({ id, revision:1, confirmation:'a'.repeat(64) }),
+    // Reading a task is an action result too: an unreadable link must not become an HTTP 500.
+    getIssue(id),
   ])
   for(const result of results) assert.deepEqual(result,{error:'authRequired',params:undefined})
 })
