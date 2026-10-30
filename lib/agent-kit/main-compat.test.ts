@@ -40,7 +40,7 @@ const db={select:()=>({from:()=>({where:()=>({limit:async()=>{
 }})})}),transaction:async<T>(run:(value:typeof tx)=>Promise<T>)=>run(tx)}
 let cloud=false,localCapable=false
 let protocolVersion=3
-stub('../db/index.ts',{db,pool:{}})
+stub('../db/index.ts',{db,pool:{connect:async()=>({release(){}})},withDatabaseClient:async(_client:unknown,run:()=>Promise<unknown>)=>run()})
 const cliPolicy: ReturnType<typeof defaultRunPolicy>={...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,network:'deny',install_dependency:'deny',git_push:'deny'},networkAllow:['cli-policy.invalid']}
 let cliReadOnly=false
 stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})

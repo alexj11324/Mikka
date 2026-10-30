@@ -10,7 +10,7 @@ import { scopedCiToken } from '../cloudflare/linear-sync/src/ci-token-cache'
 
 test('durable CI polling leases, fencing and outbox survive overlapping workers', async () => {
   const url=process.env.CI_NATIVE_RETAINED_DATABASE_URL
-  if (!url || new URL(url).hostname!=='127.0.0.1' || new URL(url).pathname!=='/mikka_ci_native') throw Error('isolated retained fixture required')
+  if (!url || new URL(url).hostname!=='127.0.0.1' || !['/mikka_ci_native',...(process.env.CI==='true'&&process.env.GITHUB_ACTIONS==='true'?['/mikka_e2e']:[])].includes(new URL(url).pathname)) throw Error('isolated retained fixture required')
   const admin=new Pool({connectionString:url})
   const schema=`ci_poll_${randomUUID().replaceAll('-','')}`
   await admin.query(`CREATE SCHEMA "${schema}"`)

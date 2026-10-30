@@ -10,7 +10,7 @@ import { acquireCiCombined, acquireCiMembership } from '../lib/github/ci/authori
 // deliberately retained for inspection; no cleanup is performed.
 test('native snapshot is encrypted, scoped, and fenced against revocation', async () => {
   const url = process.env.CI_NATIVE_RETAINED_DATABASE_URL
-  if (!url || new URL(url).hostname !== '127.0.0.1' || new URL(url).pathname !== '/mikka_ci_native') throw new Error('isolated retained fixture required')
+  if (!url || new URL(url).hostname !== '127.0.0.1' || !['/mikka_ci_native',...(process.env.CI==='true'&&process.env.GITHUB_ACTIONS==='true'?['/mikka_e2e']:[])].includes(new URL(url).pathname)) throw new Error('isolated retained fixture required')
   const db = new Pool({ connectionString: url })
   const [origin, child, device, issue, agent, binding, connection] = Array.from({length: 7}, () => crypto.randomUUID())
   const owner = `synthetic-${crypto.randomUUID()}`, workspace = crypto.randomUUID()
@@ -67,7 +67,7 @@ test('native snapshot is encrypted, scoped, and fenced against revocation', asyn
 
 test('shared task and owner workspace membership remain locked until snapshot or delivery completes',async()=>{
   const url=process.env.CI_NATIVE_RETAINED_DATABASE_URL
-  if(!url||new URL(url).hostname!=='127.0.0.1'||new URL(url).pathname!=='/mikka_ci_native')throw Error('isolated retained fixture required')
+  if(!url||new URL(url).hostname!=='127.0.0.1'||!['/mikka_ci_native',...(process.env.CI==='true'&&process.env.GITHUB_ACTIONS==='true'?['/mikka_e2e']:[])].includes(new URL(url).pathname))throw Error('isolated retained fixture required')
   const db=new Pool({connectionString:url})
   const workspace=crypto.randomUUID(),team=crypto.randomUUID(),issue=crypto.randomUUID(),member=`member-${crypto.randomUUID()}`
   await db.query('INSERT INTO mikka_workspaces VALUES ($1)',[workspace])
@@ -87,7 +87,7 @@ test('shared task and owner workspace membership remain locked until snapshot or
 
 test('competing CI claims for one commit select one run and allow its retry', async () => {
   const url = process.env.CI_NATIVE_RETAINED_DATABASE_URL
-  if (!url || new URL(url).hostname !== '127.0.0.1' || new URL(url).pathname !== '/mikka_ci_native') throw new Error('isolated retained fixture required')
+  if (!url || new URL(url).hostname !== '127.0.0.1' || !['/mikka_ci_native',...(process.env.CI==='true'&&process.env.GITHUB_ACTIONS==='true'?['/mikka_e2e']:[])].includes(new URL(url).pathname)) throw new Error('isolated retained fixture required')
   const db = new Pool({ connectionString:url })
   const first = await db.connect(), second = await db.connect()
   const input = {userId:`synthetic-${crypto.randomUUID()}`,issueId:crypto.randomUUID(),remoteKey:'v2/github.com/example/repo',prNumber:1,head:'a'.repeat(40),runId:crypto.randomUUID()}

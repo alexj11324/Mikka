@@ -5,7 +5,7 @@ import { Pool } from 'pg'
 mock.module(new URL('../lib/github/ci/authority.ts',import.meta.url).href,{namedExports:{acquireCiMembership:async(_i:unknown,user:unknown)=>{if(user==='revoked')throw Error('revoked');return {held:false,async check(){},async close(){}}},ciIssueAuthorized:()=>true}})
 mock.module(new URL('../lib/credentials/chat-guard.ts',import.meta.url).href,{namedExports:{assertCredentialSafeChat:async()=>{}}})
 test('retained PG: stale poll failures never create notices and undelivered notices can be rewoken',async()=>{
- const url=process.env.CI_NATIVE_RETAINED_DATABASE_URL;if(!url||new URL(url).hostname!=='127.0.0.1'||new URL(url).pathname!=='/mikka_ci_native')throw Error('isolated retained fixture required')
+ const url=process.env.CI_NATIVE_RETAINED_DATABASE_URL;if(!url||new URL(url).hostname!=='127.0.0.1'||!['/mikka_ci_native',...(process.env.CI==='true'&&process.env.GITHUB_ACTIONS==='true'?['/mikka_e2e']:[])].includes(new URL(url).pathname))throw Error('isolated retained fixture required')
  const {recordCiAttention}=await import('../lib/github/ci/notice')
  const admin=new Pool({connectionString:url}),schema=`ci_alert_${randomUUID().replaceAll('-','')}`;await admin.query(`CREATE SCHEMA "${schema}"`)
  const scoped=new URL(url);scoped.searchParams.set('options',`-c search_path=${schema}`);const db=new Pool({connectionString:scoped.toString()})
