@@ -30,6 +30,7 @@ import { AccessTokensSettings } from '@/components/settings/access-tokens-settin
 import { SecretsSettings } from '@/components/settings/secrets-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
+import { BillingSettings } from '@/components/settings/billing-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { SettingsSectionId } from '@/lib/settings-sections'
@@ -97,6 +98,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'usage': return workspaceId && !preview ? <UsageSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'billing': return workspaceId && !preview ? <BillingSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
     case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return <p className="py-8 text-sm text-muted-foreground">{t('sectionUnavailable')}</p>

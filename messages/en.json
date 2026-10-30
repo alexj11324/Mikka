@@ -2242,6 +2242,35 @@
       "empty": "No threads this month.",
       "minutes": "{count} min",
       "hours": "{count} h"
+    },
+    "billing": {
+      "loading": "Loading billing",
+      "plan": "Plan",
+      "team": "Team",
+      "free": "Free",
+      "noPlan": "No subscription",
+      "renews": "Next charge {date}",
+      "changePlan": "Change plan",
+      "subscribe": "Subscribe to Team",
+      "seats": "Seats",
+      "seatsUsed": "{used} of {total} used",
+      "points": "Points",
+      "planPoints": "Plan points this period",
+      "purchasedPoints": "Purchased points",
+      "neverExpires": "Never expire",
+      "pointsValue": "{points} points",
+      "payment": "Payment",
+      "paymentMethod": "Payment method",
+      "managePayment": "Manage payment method",
+      "invoices": "Invoices",
+      "viewInvoices": "View invoices",
+      "status": {
+        "active": "Active",
+        "trialing": "Trial",
+        "past_due": "Payment failed",
+        "unpaid": "Unpaid",
+        "incomplete": "Payment pending"
+      }
     }
   },
   "TelegramBot": {

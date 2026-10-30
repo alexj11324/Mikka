@@ -2242,6 +2242,35 @@
       "empty": "这个月没有线程。",
       "minutes": "{count} 分钟",
       "hours": "{count} 小时"
+    },
+    "billing": {
+      "loading": "正在加载计费",
+      "plan": "方案",
+      "team": "Team",
+      "free": "免费",
+      "noPlan": "未订阅",
+      "renews": "下次扣款 {date}",
+      "changePlan": "更改方案",
+      "subscribe": "订阅 Team",
+      "seats": "席位",
+      "seatsUsed": "已用 {used} / {total}",
+      "points": "点数",
+      "planPoints": "本期方案点数",
+      "purchasedPoints": "另购点数",
+      "neverExpires": "不过期",
+      "pointsValue": "{points} 点",
+      "payment": "付款",
+      "paymentMethod": "付款方式",
+      "managePayment": "管理付款方式",
+      "invoices": "发票",
+      "viewInvoices": "查看发票",
+      "status": {
+        "active": "生效中",
+        "trialing": "试用中",
+        "past_due": "付款失败",
+        "unpaid": "未付款",
+        "incomplete": "待完成付款"
+      }
     }
   },
   "TelegramBot": {
