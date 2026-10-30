@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import test from 'node:test'
 import { openSecret, sealSecret, secretAad, secretsKey, SecretsKeyMissingError } from './crypto'
-import { checkEgressDomains, createSecretInput, updateEgressInput } from './format'
+import { checkEgressDomains, createSecretInput, isReservedEnvName, updateEgressInput } from './format'
 
 const env = { WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') }
 const row = { workspaceId: '00000000-0000-4000-8000-000000000001', kind: 'secret', scopeType: 'workspace', scopeRef: '', environment: 'all', name: 'API_TOKEN' }
@@ -55,4 +55,10 @@ test('repository scope: no . / .. segments; stored lowercase', () => {
   assert.deepEqual(repo('AlexJ11324/Mikka'), { type: 'repository', repository: 'alexj11324/mikka' })
   assert.deepEqual(repo('o/.github'), { type: 'repository', repository: 'o/.github' })
   for (const bad of ['./x', '../x', 'o/.', 'o/..', '../..', './.']) assert.throws(() => repo(bad), bad)
+})
+
+test('reserved env names: interpreter / package-manager hooks, any case; look-alikes pass', () => {
+  for (const name of ['BASH_ENV', 'bash_env', 'ENV', 'env', 'PROMPT_COMMAND', 'PERL5OPT', 'RUBYOPT', 'JAVA_TOOL_OPTIONS', 'NPM_CONFIG_REGISTRY', 'npm_config_userconfig', 'PIP_INDEX_URL', 'PYTHONSTARTUP', 'GLOBAL_AGENT_HTTP_PROXY'])
+    assert.equal(isReservedEnvName(name), true, name)
+  for (const name of ['ENVIRONMENT', 'MY_ENV', 'NPM_TOKEN', 'PIP_EXTRA', 'RUBYOPTS', 'PATHFINDER']) assert.equal(isReservedEnvName(name), false, name)
 })
