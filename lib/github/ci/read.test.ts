@@ -13,22 +13,25 @@ test('reads scoped PR head and all checks; never follows arbitrary URLs', async 
   const fetcher: typeof fetch = async (url, init) => {
     calls.push({ url: String(url), init })
     if (String(url).includes('access_tokens')) return Response.json({ token: 'fixture-token' })
-    if (String(url).includes('/pulls/')) return Response.json({ state: 'open', head: { sha, ref: 'mikka/issue-9', repo: { id: 7 } }, base: { repo: { id: 7 } } })
+    if (String(url).includes('/pulls/')) return Response.json({ state: 'open', head: { sha, ref: 'mikka/issue-9', repo: { id: 7 } }, base: { ref: 'main', repo: { id: 7 } } })
     if (String(url).includes('check-runs')) return Response.json({ total_count: 1, check_runs: [{ id: 4, name: 'build', status: 'completed', conclusion: 'success' }] })
+    if (String(url).includes('/rules/branches/')) return Response.json([])
+    if (String(url).includes('/branches/')) return Response.json({ protected: false, protection: { enabled: false } })
+    if (String(url).includes('/actions/runs?')) return Response.json({ total_count: 0, workflow_runs: [] })
     return Response.json({ total_count: 1, statuses: [{ id: 8, context: 'deploy', state: 'failure' }] })
   }
   const result = await readCi(binding, env, fetcher)
   assert.equal(result.head, sha)
   assert.equal(result.snapshot.statuses[0].state, 'failure')
   assert.ok(calls.every(call => call.url.startsWith('https://api.github.com/') && call.init?.redirect === 'error'))
-  assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { repository_ids: [7], permissions: { metadata: 'read', pull_requests: 'read', checks: 'read', statuses: 'read' } })
+  assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { repository_ids: [7], permissions: { metadata: 'read', pull_requests: 'read', checks: 'read', statuses: 'read', contents: 'read', actions: 'read' } })
 })
 
 test('permission failures and truncated data never become successful results', async () => {
   await assert.rejects(readCi(binding, env, async () => new Response(null, { status: 403 })), (e: unknown) => e instanceof CiReadError && e.code === 'permission')
   const fetcher: typeof fetch = async url => {
     if (String(url).includes('access_tokens')) return Response.json({ token: 'fixture-token' })
-    if (String(url).includes('/pulls/')) return Response.json({ state: 'open', head: { sha, ref: 'mikka/issue-9', repo: { id: 7 } }, base: { repo: { id: 7 } } })
+    if (String(url).includes('/pulls/')) return Response.json({ state: 'open', head: { sha, ref: 'mikka/issue-9', repo: { id: 7 } }, base: { ref: 'main', repo: { id: 7 } } })
     return Response.json({ total_count: 2, check_runs: [{ id: 4, name: 'build', status: 'completed', conclusion: 'success' }] })
   }
   await assert.rejects(readCi(binding, env, fetcher), (e: unknown) => e instanceof CiReadError && e.code === 'invalid_response')
@@ -62,4 +65,45 @@ test('attempt recovery fails closed on permission errors, stale or mismatched re
     await assert.rejects(readPendingCiAttempts(binding, sha, pending, env, fetcher), (e: unknown) => e instanceof CiReadError && e.code === 'invalid_response')
   }
   await assert.rejects(readPendingCiAttempts(binding, sha, pending, env, async () => { throw Error('not reached') }, { deadline: Date.now() - 1 }), (e: unknown) => e instanceof CiReadError && e.code === 'unavailable')
+})
+
+test('protects against queued workflows and a required check that has not registered', async () => {
+  const { summarize } = await import('./snapshot')
+  let queued = true, registered = false
+  const fetcher: typeof fetch = async url => {
+    const path = String(url)
+    if (path.includes('access_tokens')) return Response.json({ token: 'fixture-token' })
+    if (path.includes('/pulls/')) return Response.json({ state: 'open', head: { sha, ref: binding.branch, repo: { id: 7 } }, base: { ref: 'main', repo: { id: 7 } } })
+    if (path.includes('check-runs')) {
+      const check_runs = [{ id: 1, name: 'A', status: 'completed', conclusion: 'success', app: { id: 10 } }, ...(registered ? [{ id: 2, name: 'B', status: 'completed', conclusion: 'success', app: { id: 10 } }] : [])]
+      return Response.json({ total_count: check_runs.length, check_runs })
+    }
+    if (path.includes('/status?')) return Response.json({ total_count: 0, statuses: [] })
+    if (path.includes('/rules/branches/')) return Response.json([{ type: 'required_status_checks', parameters: { required_status_checks: [{ context: 'B', integration_id: 10 }] } }])
+    if (path.includes('/branches/')) return Response.json({ protected: true, protection: { enabled: true, required_status_checks: { checks: [{ context: 'B', app_id: 10 }], contexts: ['B'] } } })
+    if (path.includes('/actions/runs?')) return Response.json({ total_count: 1, workflow_runs: [{ id: 8, workflow_id: 3, event: 'pull_request', created_at: '2026-10-30T00:00:00Z', run_attempt: 1, head_sha: sha, head_branch: binding.branch, name: 'B', status: queued ? 'queued' : 'completed', conclusion: queued ? null : 'success' }] })
+    throw Error('unexpected provider request')
+  }
+  assert.equal(summarize((await readCi(binding, env, fetcher)).snapshot).kind, 'pending')
+  queued = false
+  assert.equal(summarize((await readCi(binding, env, fetcher)).snapshot).kind, 'pending')
+  registered = true
+  assert.equal(summarize((await readCi(binding, env, fetcher)).snapshot).kind, 'complete')
+})
+
+test('missing branch protection detail and unsupported reusable workflow rules fail closed', async () => {
+  let unsupported = false
+  const fetcher: typeof fetch = async url => {
+    const path = String(url)
+    if (path.includes('access_tokens')) return Response.json({ token: 'fixture-token' })
+    if (path.includes('/pulls/')) return Response.json({ state: 'open', head: { sha, ref: binding.branch, repo: { id: 7 } }, base: { ref: 'main', repo: { id: 7 } } })
+    if (path.includes('check-runs')) return Response.json({ total_count: 1, check_runs: [{ id: 4, name: 'A', status: 'completed', conclusion: 'success' }] })
+    if (path.includes('/status?')) return Response.json({ total_count: 0, statuses: [] })
+    if (path.includes('/rules/branches/')) return Response.json([{ type: 'workflows' }])
+    if (path.includes('/branches/')) return Response.json(unsupported ? { protected: true, protection: { enabled: false } } : { protected: true })
+    throw Error('unexpected provider request')
+  }
+  await assert.rejects(readCi(binding, env, fetcher), (e: unknown) => e instanceof CiReadError && e.code === 'invalid_response')
+  unsupported = true
+  await assert.rejects(readCi(binding, env, fetcher), (e: unknown) => e instanceof CiReadError && e.code === 'unsupported_required_workflow')
 })

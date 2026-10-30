@@ -17,7 +17,8 @@ export function ciWakeup(event: string, payload: Json): Wakeup | null {
     return { repositoryId: repo.id, installationId, branch: run.head_branch, prNumber: null, refresh: true, attempt }
   }
   if (event === 'pull_request') {
-    if (!['opened', 'synchronize', 'reopened', 'closed'].includes(String(payload.action)) || !positive(payload.number)) return null
+    const baseChanged = payload.action === 'edited' && typeof object(object(payload.changes).base).ref === 'object'
+    if ((!['opened', 'synchronize', 'reopened', 'closed'].includes(String(payload.action)) && !baseChanged) || !positive(payload.number)) return null
     return { repositoryId: repo.id, installationId, branch: null, prNumber: payload.number, refresh: payload.action !== 'closed', attempt: null }
   }
   return null

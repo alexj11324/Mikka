@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS github_ci_observations (
   head text,
   fingerprint text,
   "firstSeenAt" timestamptz,
+  "pendingReason" text,
+  "pendingReasonSince" timestamptz,
   "deliveredFingerprint" text,
   "nextCheckAt" timestamptz NOT NULL DEFAULT now(),
   "expiresAt" timestamptz NOT NULL,

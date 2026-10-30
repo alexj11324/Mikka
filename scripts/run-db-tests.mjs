@@ -11,7 +11,10 @@ import { pathToFileURL } from 'node:url'
 export const REQUIRED_SUITES = [
   { marker: 'lib/run-publications.ts', file: 'tests/run-publications.db.test.ts', script: 'test:run-publication-db' },
   { marker: 'lib/ci-continuation.ts', file: 'lib/ci-continuation.postgres.test.ts', script: 'test:ci-subscription-db' },
+  { marker: 'lib/ci-mailbox-continuation.ts', file: 'tests/ci-mailbox-continuation.postgres.test.ts', script: 'test:ci-subscription-db' },
+  { marker: 'lib/ci-continuation.ts', file: 'tests/ci-skill-continuation.postgres.test.ts', script: 'test:ci-subscription-db' },
   { marker: 'lib/github/ci/reconcile.ts', file: 'lib/github/ci/reconcile.db.test.ts', script: 'test:ci-subscription-db' },
+  { marker: 'lib/github/ci/authority.ts', file: 'lib/github/ci/authority.retained.test.ts', script: 'test:ci-subscription-db' },
   { marker: 'lib/github/ci/reconcile.ts', file: 'tests/ci-full-chain.postgres.test.ts', script: 'test:ci-subscription-db' },
   { marker: 'lib/cloud-computer/browser-authority.ts', file: 'lib/cloud-computer/unattended.db.test.ts', script: 'test:cloud-backend-db' },
   { marker: 'lib/credentials/store.ts', file: 'lib/credentials/store.db.test.ts', script: 'test:credentials-db' },

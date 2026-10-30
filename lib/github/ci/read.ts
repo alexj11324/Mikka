@@ -1,10 +1,10 @@
 import { githubAppJwt } from '../../suggestions/github-redelivery'
 import { githubRepository } from '../run-pull-request'
-import type { Check, CommitStatus, Snapshot } from './snapshot'
+import type { Check, CommitStatus, RequiredCheck, Snapshot, WorkflowRun } from './snapshot'
 
 type Binding = { remoteKey: string; installationId: number; repositoryId: number; prNumber: number; branch: string }
 export class CiReadError extends Error {
-  constructor(readonly code: 'configuration' | 'permission' | 'unavailable' | 'invalid_response') { super(code) }
+  constructor(readonly code: 'configuration' | 'permission' | 'unavailable' | 'invalid_response' | 'unsupported_required_workflow') { super(code) }
 }
 
 /** Read only, fixed origin, installation- and repository-scoped. No token is retained. */
@@ -23,11 +23,11 @@ export async function readCi(binding: Binding, env: Record<string, string | unde
     if (!response.ok) throw new CiReadError('unavailable')
     try { return await response.json() } catch { throw new CiReadError('invalid_response') }
   }
-  const tokenResponse = await request(`/app/installations/${binding.installationId}/access_tokens`, jwt, { repository_ids: [binding.repositoryId], permissions: { metadata: 'read', pull_requests: 'read', checks: 'read', statuses: 'read' } }) as { token?: unknown }
+  const tokenResponse = await request(`/app/installations/${binding.installationId}/access_tokens`, jwt, { repository_ids: [binding.repositoryId], permissions: { metadata: 'read', pull_requests: 'read', checks: 'read', statuses: 'read', contents: 'read', actions: 'read' } }) as { token?: unknown }
   if (typeof tokenResponse?.token !== 'string' || !tokenResponse.token) throw new CiReadError('invalid_response')
   const token = tokenResponse.token
-  const pr = await request(`${path}/pulls/${binding.prNumber}`, token) as { state?: unknown; head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } }; base?: { repo?: { id?: unknown } } }
-  if (!['open', 'closed'].includes(String(pr?.state)) || typeof pr.head?.sha !== 'string' || !/^[a-f0-9]{40}$/i.test(pr.head.sha) || pr.base?.repo?.id !== binding.repositoryId || pr.head.ref !== binding.branch || pr.head.repo?.id !== binding.repositoryId) throw new CiReadError('invalid_response')
+  const pr = await request(`${path}/pulls/${binding.prNumber}`, token) as { state?: unknown; head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } }; base?: { ref?: unknown; repo?: { id?: unknown } } }
+  if (!['open', 'closed'].includes(String(pr?.state)) || typeof pr.head?.sha !== 'string' || !/^[a-f0-9]{40}$/i.test(pr.head.sha) || pr.base?.repo?.id !== binding.repositoryId || pr.head.ref !== binding.branch || pr.head.repo?.id !== binding.repositoryId || typeof pr.base?.ref !== 'string' || !pr.base.ref || pr.base.ref.length > 255) throw new CiReadError('invalid_response')
   if (pr.state === 'closed') return { head: pr.head.sha, open: false, snapshot: { checks: [], statuses: [] } }
   const checks: Check[] = []
   let total: number | undefined
@@ -38,7 +38,7 @@ export async function readCi(binding: Binding, env: Record<string, string | unde
     total = data.total_count
     for (const c of data.check_runs) {
       if (!c || !Number.isSafeInteger(c.id) || typeof c.name !== 'string' || typeof c.status !== 'string' || !(c.conclusion === null || typeof c.conclusion === 'string')) throw new CiReadError('invalid_response')
-      checks.push({ id: String(c.id), name: c.name, status: c.status, conclusion: c.conclusion })
+      checks.push({ id: String(c.id), name: c.name, status: c.status, conclusion: c.conclusion, appId: Number.isSafeInteger(c.app?.id) ? c.app.id : null, suiteId: Number.isSafeInteger(c.check_suite?.id) ? String(c.check_suite.id) : null })
     }
     if (data.check_runs.length < 100) {
       if (checks.length !== total) throw new CiReadError('invalid_response')
@@ -52,7 +52,57 @@ export async function readCi(binding: Binding, env: Record<string, string | unde
     if (!s || !Number.isSafeInteger(s.id) || typeof s.context !== 'string' || typeof s.state !== 'string') throw new CiReadError('invalid_response')
     return { id: String(s.id), context: s.context, state: s.state }
   })
-  return { head: pr.head.sha, open: true, snapshot: { checks, statuses } }
+  // Check the protected target branch and active rulesets, not just the checks
+  // that have already registered on the head. The branch endpoint exposes
+  // legacy protection with Contents read; missing details are not an empty set.
+  const base = encodeURIComponent(pr.base.ref)
+  const branch = await request(`${path}/branches/${base}`, token) as { protected?: unknown; protection?: { enabled?: unknown; required_status_checks?: { contexts?: unknown; checks?: unknown } } }
+  if (typeof branch?.protected !== 'boolean' || !branch.protection || typeof branch.protection.enabled !== 'boolean') throw new CiReadError('invalid_response')
+  const requiredChecks: RequiredCheck[] = []
+  const add = (context: unknown, appId: unknown) => {
+    if (typeof context !== 'string' || !context.trim() || context.length > 255 || !(appId == null || Number.isSafeInteger(appId))) throw new CiReadError('invalid_response')
+    requiredChecks.push({ context, appId: typeof appId === 'number' && appId > 0 ? appId : null })
+  }
+  if (branch.protection.enabled) {
+    const required = branch.protection.required_status_checks
+    if (!required || !Array.isArray(required.contexts) || !Array.isArray(required.checks)) throw new CiReadError('invalid_response')
+    for (const check of required.checks) { if (!check || typeof check !== 'object') throw new CiReadError('invalid_response'); add(check.context, check.app_id) }
+    for (const context of required.contexts) {
+      if (typeof context !== 'string') throw new CiReadError('invalid_response')
+      if (!requiredChecks.some(check => check.context === context)) add(context, null)
+    }
+  }
+  for (let page = 1; page <= 5; page++) {
+    const rules = await request(`${path}/rules/branches/${base}?per_page=100&page=${page}`, token)
+    if (!Array.isArray(rules)) throw new CiReadError('invalid_response')
+    for (const rule of rules) {
+      if (!rule || typeof rule.type !== 'string') throw new CiReadError('invalid_response')
+      if (rule.type === 'required_status_checks') {
+        if (!Array.isArray(rule.parameters?.required_status_checks)) throw new CiReadError('invalid_response')
+        for (const check of rule.parameters.required_status_checks) { if (!check || typeof check !== 'object') throw new CiReadError('invalid_response'); add(check.context, check.integration_id) }
+      }
+      // Ruleset-required reusable workflows may run in a different repository.
+      // Their absence cannot be established from this repository's runs.
+      if (rule.type === 'workflows') throw new CiReadError('unsupported_required_workflow')
+    }
+    if (rules.length < 100) break
+    if (page === 5) throw new CiReadError('invalid_response')
+  }
+  // GitHub Actions knows runs that have not yet registered any check run.
+  const workflows: WorkflowRun[] = []
+  let workflowTotal: number | undefined
+  for (let page = 1; page <= 10; page++) {
+    const data = await request(`${path}/actions/runs?head_sha=${pr.head.sha}&branch=${encodeURIComponent(binding.branch)}&per_page=100&page=${page}`, token) as { total_count?: unknown; workflow_runs?: unknown }
+    if (typeof data?.total_count !== 'number' || !Number.isSafeInteger(data.total_count) || !Array.isArray(data.workflow_runs) || (workflowTotal !== undefined && workflowTotal !== data.total_count)) throw new CiReadError('invalid_response')
+    workflowTotal = data.total_count
+    for (const run of data.workflow_runs) {
+      if (!run || !Number.isSafeInteger(run.id) || !Number.isSafeInteger(run.run_attempt) || run.run_attempt < 1 || !Number.isSafeInteger(run.workflow_id) || typeof run.event !== 'string' || !run.event || typeof run.created_at !== 'string' || Number.isNaN(Date.parse(run.created_at)) || run.head_sha?.toLowerCase() !== pr.head.sha.toLowerCase() || run.head_branch !== binding.branch || typeof run.name !== 'string' || !run.name || typeof run.status !== 'string' || !(run.conclusion === null || typeof run.conclusion === 'string')) throw new CiReadError('invalid_response')
+      workflows.push({ id: String(run.id), attempt: run.run_attempt, name: run.name, status: run.status, conclusion: run.conclusion, workflowId: String(run.workflow_id), event: run.event, createdAt: run.created_at, suiteId: Number.isSafeInteger(run.check_suite_id) ? String(run.check_suite_id) : null })
+    }
+    if (data.workflow_runs.length < 100) { if (workflows.length !== workflowTotal) throw new CiReadError('invalid_response'); break }
+    if (page === 10) throw new CiReadError('invalid_response')
+  }
+  return { head: pr.head.sha, open: true, snapshot: { checks, statuses, workflows, requiredChecks } }
 }
 
 /** At most ten pending GitHub Actions runs are refreshed in one reconciliation.

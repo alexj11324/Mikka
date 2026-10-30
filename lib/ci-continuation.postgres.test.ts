@@ -23,6 +23,7 @@ try {
   await pool.query(`CREATE TABLE issues (id text PRIMARY KEY,"scopeVersion" integer NOT NULL);
     CREATE TABLE agent_runs (id text PRIMARY KEY,"userId" text,"issueId" text,"ciContinuation" jsonb,"agentId" text,"deviceRepoId" text,"botId" text,"deviceId" text,status text,"stopRequestedAt" timestamptz,"agentDefinition" jsonb,"sessionId" text,"stopReason" text,error text,"finishedAt" timestamptz,"updatedAt" timestamptz,"leaseExpiresAt" timestamptz);
     CREATE TABLE run_tokens ("runId" text,"userId" text,"revokedAt" timestamptz);
+    CREATE TABLE improvement_skill_receipts (id uuid,"runId" text,"userId" text);
     CREATE TABLE github_ci_observations ("userId" text,"issueId" text,"remoteKey" text,"prNumber" integer,"originRunId" text,"scopeVersion" integer,head text,fingerprint text,"expiresAt" timestamptz,generation bigint,"deliveredFingerprint" text,"nextCheckAt" timestamptz,"updatedAt" timestamptz, PRIMARY KEY ("userId","issueId","remoteKey","prNumber"));`)
   await pool.query(`INSERT INTO issues VALUES ('issue',1);
     INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceRepoId","deviceId",status,"agentDefinition","sessionId") VALUES ('origin','owner','issue','agent','repo','device','succeeded','{"definitionDigest":"same"}','session');
@@ -83,7 +84,8 @@ try {
   })
 } finally {
   await pool.end()
-  await admin.query(`DROP SCHEMA "${schema}" CASCADE`)
+  if (process.env.MIKKA_PRESERVE_CI_FIXTURES) console.log(`Retained synthetic CI continuation schema: ${schema}`)
+  else await admin.query(`DROP SCHEMA "${schema}" CASCADE`)
   await admin.end()
 }
 

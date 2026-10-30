@@ -338,6 +338,7 @@ export const githubCiObservations = pgTable('github_ci_observations', {
   originRunId: uuid('originRunId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
   scopeVersion: integer('scopeVersion').notNull(), head: text('head'), fingerprint: text('fingerprint'),
   firstSeenAt: timestamp('firstSeenAt', { withTimezone: true }), deliveredFingerprint: text('deliveredFingerprint'),
+  pendingReason: text('pendingReason'), pendingReasonSince: timestamp('pendingReasonSince', { withTimezone: true }),
   nextCheckAt: timestamp('nextCheckAt', { withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(), lastError: text('lastError'),
   watchId: uuid('watchId').notNull().defaultRandom(),

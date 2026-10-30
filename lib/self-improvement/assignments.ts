@@ -49,10 +49,9 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
     return version
   }
   async function select(tx: PoolClient, userId: string, run: Awaited<ReturnType<typeof owned>>, versionId: string,
-    purpose?: EvaluationPurpose | ActivePurpose) {
-    // CI resumes the original session and cannot acquire a new skill grant.
-    // Skill-bearing origin runs are excluded until their provenance is carried.
-    if (run.ciContinuation) throw new ImprovementError('runUnavailable')
+    purpose?: EvaluationPurpose | ActivePurpose, authorizedCiContinuation = false) {
+    // Only the internal, provenance-checked CI continuation may retain a skill.
+    if (run.ciContinuation && !authorizedCiContinuation) throw new ImprovementError('runUnavailable')
     const { rows:[prior] } = await tx.query('SELECT * FROM improvement_skill_selections WHERE "runId"=$1',[run.id])
     if (!prior && (run.status !== 'queued' || run.startedAt)) throw new ImprovementError('runUnavailable')
     if (versionId === BASELINE_ARTIFACT.versionId) await baseline(tx)
@@ -148,13 +147,84 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
     }
     throw new ImprovementError('sourceRequired')
   }
+  /** CI creates a new run for the same session. The original selected artifact
+   * must have an immutable, matching receipt and actual session-mount evidence;
+   * a live eligibility check is repeated before a child selection is created. */
+  async function ciOrigin(userId: string, run: Awaited<ReturnType<typeof owned>>, tx: PoolClient) {
+    const link = run.ciContinuation
+    if (!link || link.requireSessionResume !== true ||
+      !z.uuid().safeParse(link.originRunId).success || link.originRunId === run.id) throw new ImprovementError('sourceMismatch')
+    const { rows: [watch] } = await tx.query(`SELECT 1 FROM github_ci_observations WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4
+      AND "originRunId"=$5 AND "scopeVersion"=$6 AND head=$7 AND fingerprint=$8 AND "expiresAt">now() FOR SHARE`,
+    [userId,run.issueId,link.remoteKey,link.prNumber,link.originRunId,link.scopeVersion,link.head,link.fingerprint])
+    if (!watch || link.issueId !== run.issueId) throw new ImprovementError('sourceMismatch')
+    const origin = await owned(tx, userId, link.originRunId)
+    if (!['succeeded','stopped'].includes(origin.status) || origin.stopReason !== 'submitted' || origin.sessionId !== link.originSessionId ||
+      origin.issueId !== run.issueId || origin.agentId !== run.agentId || origin.deviceRepoId !== run.deviceRepoId || origin.deviceId !== run.deviceId || origin.botId !== run.botId)
+      throw new ImprovementError('sourceMismatch')
+    const { rows: [selection] } = await tx.query('SELECT * FROM improvement_skill_selections WHERE "runId"=$1', [origin.id])
+    if (!selection) throw new ImprovementError('sourceRequired')
+    await selected(tx, userId, origin, selection)
+    const assigned = await assignedSkillForRun(tx, userId, origin)
+    if (assigned.skillUsage !== 'assigned' || assigned.skillReceipt.runId !== origin.id || assigned.skillReceipt.artifact.versionId !== selection.versionId)
+      throw new ImprovementError('sourceMismatch')
+    const { rows: [mount] } = await tx.query(`SELECT * FROM improvement_skill_mounts WHERE "runId"=$1 AND "userId"=$2 AND "deviceId"=$3`, [origin.id,userId,origin.deviceId])
+    if (!mount || mount.receiptId !== assigned.skillReceipt.id || mount.versionId !== assigned.skillArtifact.versionId ||
+      mount.sha256 !== assigned.skillArtifact.sha256 || mount.sessionId !== origin.sessionId || !(mount.mountedAt instanceof Date) ||
+      !origin.startedAt || mount.mountedAt < origin.startedAt || mount.mountedAt.getTime() < Date.parse(assigned.skillReceipt.assignedAt))
+      throw new ImprovementError('sourceMismatch')
+    const { rows: [purpose] } = await tx.query('SELECT * FROM improvement_skill_run_purposes WHERE "runId"=$1', [origin.id])
+    // A fixed benchmark arm can never authorize a replacement run.
+    if (purpose && (purpose.purpose !== 'active' || purpose.evaluationId !== null || purpose.userId !== userId || purpose.versionId !== selection.versionId))
+      throw new ImprovementError('sourceRequired')
+    return { selection, purpose, assigned }
+  }
+  async function continueCi(userId: string, runId: string, tx: PoolClient) {
+    const run = await owned(tx, userId, runId, true)
+    if (run.status !== 'queued' || run.startedAt) throw new ImprovementError('runUnavailable')
+    const { selection, purpose } = await ciOrigin(userId, run, tx)
+    await select(tx, userId, run, selection.versionId, purpose ? { purpose: 'active', evaluationId: null } : undefined, true)
+  }
+  /** Reconciliation can check an offline queued run without starting it. */
+  async function ciSelectionCurrent(tx: PoolClient, userId: string, runId: string): Promise<boolean> {
+    try {
+      const run = await owned(tx, userId, runId)
+      if (run.status !== 'queued' || !run.ciContinuation) throw new ImprovementError('runUnavailable')
+      const { rows: [selection] } = await tx.query('SELECT * FROM improvement_skill_selections WHERE "runId"=$1', [runId])
+      if (!selection) throw new ImprovementError('sourceRequired')
+      const origin = await ciOrigin(userId, run, tx)
+      const version = await selected(tx, userId, run, selection)
+      return digest(version.artifact) === digest(origin.assigned.skillArtifact)
+    } catch (error) {
+      if (error instanceof ImprovementError) return false
+      throw error
+    }
+  }
+  /** Last server-owned check before an assignment is handed to the daemon. */
+  async function validateCiClaim(tx: PoolClient, userId: string, runId: string, leaseExpiresAt: string) {
+    const run = await owned(tx, userId, runId)
+    if (!run.ciContinuation) return
+    const { rows: [selection] } = await tx.query('SELECT * FROM improvement_skill_selections WHERE "runId"=$1', [runId])
+    if (!selection) {
+      const { rows: [sourceSelection] } = await tx.query('SELECT 1 FROM improvement_skill_selections WHERE "runId"=$1 AND "userId"=$2', [run.ciContinuation.originRunId, userId])
+      if (sourceSelection) throw new ImprovementError('sourceRequired')
+      return
+    }
+    if (run.status !== 'preparing' || !run.leaseExpiresAt || run.leaseExpiresAt.toISOString() !== leaseExpiresAt || run.leaseExpiresAt.getTime() <= Date.now()) throw new ImprovementError('runUnavailable')
+    const origin = await ciOrigin(userId, run, tx)
+    const version = await selected(tx, userId, run, selection)
+    const child = await assignedSkillForRun(tx, userId, run)
+    if (child.skillUsage !== 'assigned' || child.skillReceipt.runId !== runId || child.skillReceipt.leaseExpiresAt !== leaseExpiresAt ||
+      digest(child.skillArtifact) !== digest(origin.assigned.skillArtifact) || digest(version.artifact) !== digest(origin.assigned.skillArtifact))
+      throw new ImprovementError('sourceMismatch')
+  }
   async function preflight(userId: string, runId: string, supportsArtifacts: boolean) {
     const { rows: [selection] } = await pool.query('SELECT * FROM improvement_skill_selections WHERE "runId"=$1', [runId])
     if (!selection) {
       const { rows:[ancestor] }=await pool.query(`WITH RECURSIVE lineage AS (
-        SELECT id,"retryOf","questionContinuation","userId",0 AS depth FROM agent_runs WHERE id=$1 AND "userId"=$2
-        UNION ALL SELECT r.id,r."retryOf",r."questionContinuation",r."userId",l.depth+1 FROM agent_runs r JOIN lineage l
-          ON r.id::text IN (l."retryOf"::text,l."questionContinuation"->>'originRunId') WHERE r."userId"=$2 AND l.depth<10
+        SELECT id,"retryOf","questionContinuation","ciContinuation","userId",0 AS depth FROM agent_runs WHERE id=$1 AND "userId"=$2
+        UNION ALL SELECT r.id,r."retryOf",r."questionContinuation",r."ciContinuation",r."userId",l.depth+1 FROM agent_runs r JOIN lineage l
+          ON r.id::text IN (l."retryOf"::text,l."questionContinuation"->>'originRunId',l."ciContinuation"->>'originRunId') WHERE r."userId"=$2 AND l.depth<10
       ) SELECT 1 FROM lineage l LEFT JOIN improvement_skill_selections s ON s."runId"=l.id AND s."userId"=$2
         WHERE s."runId" IS NOT NULL OR l.depth=10 LIMIT 1`,[runId,userId])
       if (ancestor) throw new ImprovementError('sourceRequired')
@@ -231,7 +301,7 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
     const protectedIds=new Set(rows.map(row=>row.runId))
     return {legacy:runIds.filter(id=>!protectedIds.has(id)),leases,revoked}
   }
-  return { selectBaseline, selectVersion, selectActive, lockQuestion, continueQuestion, preflight, recordClaim, revalidate, renewHeartbeat }
+  return { selectBaseline, selectVersion, selectActive, lockQuestion, continueQuestion, continueCi, ciSelectionCurrent, validateCiClaim, preflight, recordClaim, revalidate, renewHeartbeat }
 }
 
 /** Historical provenance stays readable after source withdrawal or task revocation. */

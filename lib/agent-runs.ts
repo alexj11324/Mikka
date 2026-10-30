@@ -1,6 +1,7 @@
 import 'server-only'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
-import { freezeWorkerDefinition } from '@/lib/agent-kit/worker'
+import { freezeWorkerDefinition, type WorkerDefinitionSnapshot } from '@/lib/agent-kit/worker'
+import { continuationMailboxParent } from '@/lib/ci-mailbox-continuation'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
@@ -67,15 +68,16 @@ export async function queueRun(userId: string, input: LocalDispatchInput, botId:
 /** Only the Factory/Skill host calls this with an already-open transaction.
  * Repository ids identify prior scheduling metadata; they confer no authority. */
 export async function queueFactoryRun(tx: import('pg').PoolClient, userId: string, input: DispatchInput,
-  botId: string | null = null, context?: { sourceEventId: string; attemptId: string }, sourceRunId?: string): Promise<DispatchResult> {
+  botId: string | null = null, context?: { sourceEventId: string; attemptId: string }, sourceRunId?: string, ciMailboxContinuation = false): Promise<DispatchResult> {
   const parsed = dispatchInput.safeParse(input)
-  if (!parsed.success || Boolean(context) === Boolean(sourceRunId)) throw new ActionFailureError('runInvalid')
+  if (!parsed.success || Boolean(context) === Boolean(sourceRunId) || (ciMailboxContinuation && !sourceRunId)) throw new ActionFailureError('runInvalid')
   const { factoryDispatchDatabase } = await import('./factory/transaction')
   const executor = factoryDispatchDatabase(tx)
   return withDatabaseClient(tx, async () => {
     const [repo] = await executor.select().from(deviceRepos).where(and(eq(deviceRepos.id, parsed.data.deviceRepoId), eq(deviceRepos.userId, userId))).limit(1)
     if (!repo?.remoteUrl) throw new ActionFailureError('agentRepoMissing')
     let requestEventId: string | undefined
+    let sourceDefinition: WorkerDefinitionSnapshot | null | undefined
     if (context) {
       const { rows: [event] } = await tx.query(`SELECT e.payload FROM coordinator_events e
         JOIN factory_tasks t ON t."sourceEventId"=e.id AND t."userId"=e."userId" AND t."botId" IS NOT DISTINCT FROM e."botId"
@@ -92,9 +94,10 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
       const [source] = await executor.select().from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId), eq(agentRuns.issueId, parsed.data.issueId), eq(agentRuns.agentId, parsed.data.agentId), eq(agentRuns.deviceRepoId, parsed.data.deviceRepoId))).limit(1)
       if (!source) throw new ActionFailureError('runInvalid')
       botId = source.botId
+      if (ciMailboxContinuation) sourceDefinition = source.agentDefinition
       requestEventId = source.agentDefinition?.repositoryAdmission?.requestEventId
     }
-    const result = await queueAdmittedRun(userId, { ...parsed.data, repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, undefined, requestEventId, null, undefined, { executor, repo, client: tx, sourceRunId })
+    const result = await queueAdmittedRun(userId, { ...parsed.data, repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, undefined, requestEventId, null, undefined, { executor, repo, client: tx, sourceRunId, sourceDefinition, ciMailboxContinuation })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
     return { runId: result.runId, status: run.status, replayed: result.replayed ?? false }
@@ -103,7 +106,7 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
 
 async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId: string | null, execution?: AgentExecution,
   requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string,
-  internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string }) {
+  internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string; sourceDefinition?: WorkerDefinitionSnapshot | null; ciMailboxContinuation?: boolean }) {
   const executor = internal?.executor ?? db
   const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional() }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
@@ -123,18 +126,21 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   const captureDefinition = true
   const subscription = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
   const mailboxEnabled = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1'
+  const continuationExecution = internal?.sourceRunId && internal.sourceDefinition?.mailbox
+    ? await continuationMailboxParent(internal.client, userId, internal.sourceDefinition, mailboxEnabled) : undefined
+  const parentExecution = execution ?? continuationExecution
   let mailboxScope: { botId: string | null; workspaceId: string } | undefined
-  if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
+  if (captureDefinition && mailboxEnabled && snapshotMailboxTools(parentExecution?.snapshot).length) {
     const [bot] = botId ? await executor.select({ workspaceId: bots.workspaceId }).from(bots)
       .where(and(eq(bots.id, botId), eq(bots.ownerId, userId))).limit(1) : []
     if (botId && !bot) throw new ActionFailureError('runInvalid')
     mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
   }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, mailboxEnabled, mailboxScope })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: parentExecution?.snapshot ?? null, executionId: parentExecution?.id ?? null,subscription, mailboxEnabled, mailboxScope })
     : null
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId, ...(internal.ciMailboxContinuation ? { ciMailboxContinuation: true as const } : {}) } : {}) }, internal?.client)
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,

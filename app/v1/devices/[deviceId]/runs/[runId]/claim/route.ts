@@ -28,6 +28,7 @@ import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { PublicationError } from '@/lib/run-publication-result'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
+import { CiContinuationUnsupported } from '@/lib/ci-continuation-contract'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,6 +108,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   let factoryClaim: Record<string, unknown> = {}
   let ciClaim: Record<string, unknown> = {}
   let ciFenceChanged = false
+  let ciMailboxRevoked = false
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
   const beforeClaim = async (tx: import('pg').PoolClient) => {
     if (process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1') {
@@ -116,11 +118,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     }
     if (run.ciContinuation) {
       const { guardCiClaim } = await import('@/lib/ci-continuation')
-      const guarded = ciGeneration ? await guardCiClaim(tx, caller.userId, deviceId, runId, run.ciContinuation, ciGeneration) : null
+      let guarded: Awaited<ReturnType<typeof guardCiClaim>> = null
+      try { guarded = ciGeneration ? await guardCiClaim(tx, caller.userId, deviceId, runId, run.ciContinuation, ciGeneration) : null }
+      catch (error) { if (error instanceof CiContinuationUnsupported && error.reason === 'mailbox') { ciMailboxRevoked = true; return false } throw error }
       if (!guarded || Object.keys(factoryClaim).length) { ciFenceChanged = true; return false }
       ciClaim = guarded
     }
     return true
+  }
+  const retireMailbox = async () => {
+    if (!run.ciContinuation || !ciGeneration) return false
+    const { retireRevokedMailboxCiRun } = await import('@/lib/ci-continuation')
+    const retired = await retireRevokedMailboxCiRun(caller.userId, runId, run.ciContinuation, ciGeneration)
+    if (retired) after(async () => {
+      try { await (await import('@/lib/github/ci/reconcile')).reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 }) }
+      catch { console.error('GitHub CI reconciliation failed') }
+    })
+    return retired
   }
   const afterClaim = async (tx: import('pg').PoolClient) => {
     if (factoryClaim.preserveQuestionWorktree === true) {
@@ -134,7 +148,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (device.kind === 'cloud') {
     if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id, beforeClaim, afterClaim)
-    if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: ciFenceChanged ? 503 : 409 })
+    if (!computer) {
+      if (ciMailboxRevoked && await retireMailbox()) return NextResponse.json({ error: 'CI follow-up mailbox authorization was revoked.' }, { status: 409 })
+      return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: ciFenceChanged || ciMailboxRevoked ? 503 : 409 })
+    }
   } else {
     const { prepareRunPublication, persistRunCompletion } = await import('@/lib/run-publications')
     try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
@@ -145,7 +162,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       return NextResponse.json({ error: error.message, code: error.code }, { status: 409 })
     }
     const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim)
-    if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: ciFenceChanged ? 503 : 409 })
+    if (claim !== 'claimed') {
+      if (ciMailboxRevoked && await retireMailbox()) return NextResponse.json({ error: 'CI follow-up mailbox authorization was revoked.' }, { status: 409 })
+      return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: ciFenceChanged || ciMailboxRevoked ? 503 : 409 })
+    }
   }
   if (device.kind !== 'cloud' && device.computerUse?.installed) {
     const current = await localComputerAuthority(pool, caller.userId, deviceId, runId)
@@ -225,7 +245,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   }), ciGeneration)
   if (!response && run.ciContinuation) {
     const { retryUnsentCiClaim } = await import('@/lib/ci-continuation')
-    if (await retryUnsentCiClaim(caller.userId, runId, run.ciContinuation, leaseExpiresAt)) return NextResponse.json({ error: 'CI status changed; retry.' }, { status: 503 })
+    if (await retryUnsentCiClaim(caller.userId, runId, run.ciContinuation, leaseExpiresAt)) {
+      if (await retireMailbox()) return NextResponse.json({ error: 'CI follow-up mailbox authorization was revoked.' }, { status: 409 })
+      return NextResponse.json({ error: 'CI status changed; retry.' }, { status: 503 })
+    }
   }
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
 }

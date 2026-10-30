@@ -9,14 +9,15 @@ function query(columns){
   return q
 }
 export const db={select:query,transaction:async fn=>{const p=globalThis.claimResponseProbe;p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
-export const pool={}
+export const pool={async query(){return {rows:[]}},async connect(){return {release(){}}}}
+export const withDatabaseClient=async(_client,fn)=>fn()
 `
 const sources = new Map([
   ['/lib/db/index.ts', dbSource],
   ['/lib/device-link.ts', 'export async function authenticateDevice(){return {userId:"member"}};export async function ownedDevice(){return globalThis.claimResponseProbe.device}'],
   ['/lib/device-repositories.ts', 'export async function readRepositorySettings(){globalThis.claimResponseProbe.preparation.push("settings");return null}'],
   ['/lib/agent-tool-approval/policy-store.ts', 'export async function readCliRunPolicy(){const p=globalThis.claimResponseProbe;p.preparation.push("policy");return structuredClone(p.cliPolicy)}'],
-  ['/lib/self-improvement/server.ts', 'export const skillAssignments={async preflight(){globalThis.claimResponseProbe.preparation.push("skill-preflight")},async recordClaim(){globalThis.claimResponseProbe.preparation.push("skill-claim")}};export async function claimBenchmarkAssignment(){globalThis.claimResponseProbe.preparation.push("benchmark-claim")}'],
+  ['/lib/self-improvement/server.ts', 'export const skillAssignments={async validateCiClaim(){globalThis.claimResponseProbe.preparation.push("skill-fence")},async preflight(){globalThis.claimResponseProbe.preparation.push("skill-preflight")},async recordClaim(){globalThis.claimResponseProbe.preparation.push("skill-claim")}};export async function claimBenchmarkAssignment(){globalThis.claimResponseProbe.preparation.push("benchmark-claim")}'],
   ['/lib/factory/runtime.ts', 'export async function guardFactoryClaim(){return {}}'],
   ['/lib/factory/questions/retry.ts', 'export async function blockQuestionRetry(){const p=globalThis.claimResponseProbe;p.preparation.push("question-retry");if(p.questionRetryBlocked){p.run.status="failed";p.run.stopReason="blocked"};return p.questionRetryBlocked}'],
   ['/lib/run-publications.ts', 'export async function prepareRunPublication(){const p=globalThis.claimResponseProbe;p.preparation.push("publication");return structuredClone(p.publication)};export async function persistRunCompletion(){throw new Error("unexpected publication failure")}'],

@@ -11,3 +11,8 @@ export interface CiContinuation {
   followUp: string
   requireSessionResume: true
 }
+
+/** A known unsupported original session; safe to expose as a generic reason. */
+export class CiContinuationUnsupported extends Error {
+  constructor(readonly reason: 'subscription' | 'skill' | 'session_missing' | 'definition_missing' | 'definition_changed' | 'mailbox') { super('CI original-session continuation is not supported') }
+}

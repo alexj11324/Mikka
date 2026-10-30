@@ -16,12 +16,13 @@ import { lockCliAgentPolicy } from './agent-tool-approval/policy-store'
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
 import { dispatchFingerprint, type DispatchInput } from './run-dispatch'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
+import { authorizeContinuationMailbox } from './ci-mailbox-continuation'
 
 /** Existing rows and JSON only: admission, run and publication commit together. */
 export async function acceptLocalRun(input: {
   id: string; userId: string; issueId: string; agentId: string; deviceId: string; deviceRepoId: string
   source?: 'mcp' | null; botId: string | null; prompt: string; definition: WorkerDefinitionSnapshot; requestEventId?: string; approvedRepositoryKey?: string
-  dispatch?: DispatchInput; continuation?: boolean; sourceRunId?: string
+  dispatch?: DispatchInput; continuation?: boolean; sourceRunId?: string; ciMailboxContinuation?: true
 }, existing?: PoolClient): Promise<{ runId: string; status?: typeof agentRuns.$inferSelect.status; replayed?: boolean }> {
   const client = existing ?? await pool.connect()
   try {
@@ -72,6 +73,10 @@ export async function acceptLocalRun(input: {
     if (input.sourceRunId) {
       const [origin] = await tx.select().from(agentRuns).where(and(eq(agentRuns.id, input.sourceRunId), eq(agentRuns.userId, input.userId))).limit(1).for('share')
       if (!origin || origin.stopRequestedAt || origin.status === 'cancelled' || !await replayMatches(origin)) throw invalid()
+      if (input.ciMailboxContinuation) {
+        const workspaceId = bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID
+        await authorizeContinuationMailbox(client, input.userId, input.botId, workspaceId, origin.agentDefinition, input.definition, process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1')
+      }
     }
     if (input.dispatch?.requestKey) {
       const [prior] = await tx.select().from(agentRuns).where(and(eq(agentRuns.userId, input.userId), eq(agentRuns.dispatchKey, input.dispatch.requestKey))).limit(1)

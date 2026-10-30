@@ -48,7 +48,7 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     await fixture.query(`INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)`, [owner, remoteKey, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: owner, approvedAt: new Date().toISOString() })])
     await fixture.query(`INSERT INTO github_repository_installations ("userId","remoteKey","githubAccountId","installationId","repositoryId") VALUES ($1,$2,'1234',55,77)`, [owner, remoteKey])
     const { queueRun } = await import('../lib/agent-runs')
-    const { db, pool } = await import('../lib/db')
+    const { pool } = await import('../lib/db')
     const ws = await import('../lib/workspace-db')
     scopedPool = pool
     workspacePool = ws.workspacePool
@@ -57,15 +57,12 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     assert.ok(original.rows[0].agentDefinition.repositoryAdmission)
     await fixture.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='synthetic-original-session',"finishedAt"=now() WHERE id=$1`, [runId])
     await fixture.query(`UPDATE run_publications SET status='published',"pullRequest"=$2 WHERE "runId"=$1`, [runId, JSON.stringify({ url: prUrl, state: 'open' })])
-    const { registerCiPublication } = await import('../lib/github/ci/register')
-    await db.transaction(tx => registerCiPublication(tx, { userId: owner, issueId, remoteKey, runId, scopeVersion: 1, url: prUrl, state: 'open' }))
     let providerHead = sha
     let providerOpen = true
     let providerConclusion = 'failure'
     let checkRunId = 101
     let providerStatus = 'in_progress'
     // Exercise webhook recovery for publications that predate this feature.
-    await fixture.query('DELETE FROM github_ci_observations')
     globalThis.fetch = async (input) => {
       const path = new URL(String(input)).pathname
       if (path === '/repos/acme/repo/installation') return Response.json({ id: 55, suspended_at: null, permissions: { pull_requests: 'write', contents: 'read' } })
@@ -73,7 +70,10 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
       if (path === '/user/1234') return Response.json({ id: 1234, login: 'fixture' })
       if (path === '/repos/acme/repo/collaborators/fixture/permission') return Response.json({ permission: 'write', user: { id: 1234, login: 'fixture' } })
       if (path === '/repos/acme/repo') return Response.json({ id: 77, full_name: 'acme/repo', default_branch: 'main' })
-      if (path === '/repos/acme/repo/pulls/7') return Response.json({ state: providerOpen ? 'open' : 'closed', head: { sha: providerHead, ref: branch, repo: { id: 77 } }, base: { repo: { id: 77 } } })
+      if (path === '/repos/acme/repo/pulls/7') return Response.json({ state: providerOpen ? 'open' : 'closed', head: { sha: providerHead, ref: branch, repo: { id: 77 } }, base: { ref: 'main', repo: { id: 77 } } })
+      if (path === '/repos/acme/repo/branches/main') return Response.json({ protected: false, protection: { enabled: false } })
+      if (path === '/repos/acme/repo/rules/branches/main') return Response.json([])
+      if (path === '/repos/acme/repo/actions/runs') return Response.json({ total_count: 0, workflow_runs: [] })
       if (path.endsWith('/check-runs')) return Response.json({ total_count: 1, check_runs: [{ id: checkRunId, name: 'build', status: providerStatus, conclusion: providerStatus === 'completed' ? providerConclusion : null }] })
       if (path.endsWith('/status')) return Response.json({ total_count: 0, statuses: [] })
       throw Error(`unexpected fixture API path ${path}`)
@@ -215,7 +215,8 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     await scopedPool?.end().catch(() => {})
     await workspacePool?.end().catch(() => {})
     await fixture.end()
-    await admin.query(`DROP SCHEMA "${schema}" CASCADE`)
+    if (process.env.MIKKA_PRESERVE_CI_FIXTURES === '1') console.log(`Retained CI fixture schema: ${schema}`)
+    else await admin.query(`DROP SCHEMA "${schema}" CASCADE`)
     await admin.end()
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key]
