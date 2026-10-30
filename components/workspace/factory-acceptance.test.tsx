@@ -10,17 +10,19 @@ const lookup = (key: string, args?: Record<string, string>) => {
   return (value as string).replace(/\{(\w+)\}/g, (_, name) => args?.[name] ?? '')
 }
 let swr: { data?: unknown; error?: unknown; isLoading: boolean; mutate: () => void }
-mock.module('swr', { defaultExport: () => swr })
+let ledger: unknown
+mock.module('swr', { defaultExport: (key: string) => String(key).includes('view=ledger') ? { data: ledger, mutate: () => {} } : swr })
 mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module(new URL('./issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 
 let FactoryAcceptance: typeof import('./factory-acceptance')['FactoryAcceptance']
+let FactoryListError: typeof import('./factory-acceptance')['FactoryListError']
 let ApprovalBar: typeof import('./factory-approval-bar')['ApprovalBar']
 before(async () => {
-  ({ FactoryAcceptance } = await import('./factory-acceptance'))
+  ({ FactoryAcceptance, FactoryListError } = await import('./factory-acceptance'))
   ;({ ApprovalBar } = await import('./factory-approval-bar'))
 })
-beforeEach(() => { swr = { isLoading: false, mutate: () => {} } })
+beforeEach(() => { swr = { isLoading: false, mutate: () => {} }; ledger = { approvals: [], publications: [] } })
 const list = () => renderToStaticMarkup(<FactoryAcceptance issueId="issue-1" />)
 const task = (patch: Record<string, unknown> = {}) => ({ id: 't1', issueId: 'issue-1', stage: 'approval', status: 'pending', reason: '独立检查通过', candidateId: 'c1', candidateRunId: null, isSkillCandidate: false, ...patch })
 
@@ -28,7 +30,7 @@ test('loading reserves the row height with a skeleton', () => {
   swr.isLoading = true
   const html = list()
   assert.match(html, /data-slot="skeleton"/)
-  assert.match(html, /h-16/)
+  assert.match(html, /h-16[^"]*rounded-xl"><div data-slot="skeleton" class="[^"]*size-full/)
   assert.match(html, /aria-busy="true"/)
 })
 
@@ -41,6 +43,28 @@ test('a failed list shows the default alert with retry', () => {
   assert.match(html, />无法加载验收</)
   assert.match(html, />重试</)
   assert.equal(retried, 0)
+  assert.match(html, /min-h-16/)
+})
+
+test('retry is disabled with a spinner while refetching', () => {
+  const idle = renderToStaticMarkup(<FactoryListError retrying={false} onRetry={() => {}} />)
+  assert.doesNotMatch(idle, /disabled=""|role="status"|animate-spin/)
+  const busy = renderToStaticMarkup(<FactoryListError retrying onRetry={() => {}} />)
+  assert.match(busy, /disabled=""/)
+  assert.match(busy, /aria-busy="true"/)
+  assert.match(busy, /role="status"|data-slot="spinner"|animate-spin/)
+})
+
+test('list rows use the same ledger state as the window', () => {
+  const approval = { id: 'a1', candidateId: 'c1', expiresAt: new Date(Date.now() + 3600000).toISOString(), revokedAt: null }
+  swr.data = { tasks: [task({ stage: 'publish', status: 'running' })] }
+  ledger = { approvals: [approval], publications: [{ approvalId: 'a1', status: 'failed' }] }
+  assert.match(list(), />发布失败</)
+  swr.data = { tasks: [task({ stage: 'publish', status: 'running', candidateId: 'c2' })] }
+  ledger = { approvals: [approval], publications: [] }
+  assert.match(list(), />已失效</)
+  ledger = { approvals: [{ ...approval, expiresAt: new Date(Date.now() - 1000).toISOString(), candidateId: 'c2' }], publications: [] }
+  assert.match(list(), />已过期</)
 })
 
 test('an empty list renders nothing', () => {
@@ -69,4 +93,14 @@ test('approval bar uses component defaults and the Figma copy for each state', (
   assert.match(bar('invalidated'), />已失效</)
   assert.doesNotMatch(bar('invalidated'), /<button/)
   assert.match(bar('checking'), />发布待核对</)
+  assert.doesNotMatch(bar('invalidated'), />发布</)
+})
+
+test('pending without a decision source hides 批准; busy actions show a spinner and stay disabled', () => {
+  const hidden = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} details={[]} canApprove={false} />)
+  assert.doesNotMatch(hidden, /批准/)
+  assert.doesNotMatch(hidden, /<button/)
+  const busy = renderToStaticMarkup(<ApprovalBar state="approved" isSkill={false} details={[]} busy />)
+  assert.match(busy, /aria-busy="true"[^>]*>[^<]*<svg[^>]*role="status"|aria-busy="true"/)
+  assert.match(busy, /data-icon="inline-start"/)
 })

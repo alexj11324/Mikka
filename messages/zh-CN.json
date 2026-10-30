@@ -3032,7 +3032,7 @@
       "checking": "发布待核对",
       "live": "已上线",
       "revoked": "已撤销",
-      "expired": "已失效",
+      "expired": "已过期",
       "unavailable": "不可批准",
       "failed": "发布失败",
       "invalidated": "已失效"

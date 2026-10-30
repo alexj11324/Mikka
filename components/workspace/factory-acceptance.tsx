@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ChevronRight, ClipboardCheck, FileText, Image as ImageIcon, LoaderCircle, Play, X } from 'lucide-react'
@@ -8,8 +8,9 @@ import { Alert, AlertAction, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { Item, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item'
+import { Item, ItemContent, ItemDescription } from '@/components/ui/item'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Spinner } from '@/components/ui/spinner'
 import { withBasePath } from '@/lib/base-path'
 import { MIKKA_VERCEL, publicationActionFor, vercelTarget, type PublicationEnvironment } from '@/lib/factory/vercel-target'
 import { acceptanceState, acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
@@ -48,11 +49,38 @@ const ERROR_KEYS: Record<string, ErrorKey> = {
   factoryPolicyAttestationRequired: 'attestationRequired',
 }
 
-const taskState = (task: FactoryTask): AcceptanceState => task.stage === 'approval'
-  ? 'pending'
-  : task.status === 'failed' ? 'checking' : task.status === 'passed' ? 'live' : task.status === 'running' || task.status === 'waiting' ? 'publishing' : 'approved'
-
 const tone = (state: AcceptanceState) => state === 'live' ? 'success' : state === 'pending' ? 'warning' : state === 'failed' ? 'destructive' : state === 'revoked' || state === 'expired' || state === 'invalidated' ? 'neutral' : 'info'
+
+/** List and window read the same ledger and the same state machine, so they always agree. */
+function useAcceptance(task: FactoryTask) {
+  const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(`/api/factory/tasks/${task.id}/approval?view=ledger`, request, { refreshInterval: 5000 })
+  const derived = ledger ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals: ledger.approvals, publications: ledger.publications, now: Date.now() }) : undefined
+  return { ledger, reload, ledgerError, derived }
+}
+
+/** The list's load failure. Retry is busy while refetching and cannot fire twice. */
+export function FactoryListError({ retrying, onRetry }: { retrying: boolean; onRetry: () => void }) {
+  const t = useTranslations('FactoryAcceptance')
+  return <Alert>
+    <AlertTitle>{t('listError')}</AlertTitle>
+    <AlertAction><Button size="sm" disabled={retrying} aria-busy={retrying} onClick={onRetry}>{retrying && <Spinner data-icon="inline-start" />}{t('retry')}</Button></AlertAction>
+  </Alert>
+}
+
+function FactoryAcceptanceRow({ task, onOpen }: { task: FactoryTask; onOpen: () => void }) {
+  const t = useTranslations('FactoryAcceptance')
+  const state = useAcceptance(task).derived?.state
+  return <Button variant="ghost" onClick={onOpen}
+    className="h-16 w-full max-w-[26.25rem] justify-start gap-3 rounded-xl bg-muted/60 px-3 text-left font-normal hover:bg-muted">
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background"><ClipboardCheck aria-hidden="true" data-icon="inline-start" className="size-5" /></span>
+    <span className="flex min-w-0 flex-1 flex-col">
+      <span className="truncate text-sm font-medium text-foreground">{task.isSkillCandidate ? t('skillTitle') : t('title')}</span>
+      <span className="truncate text-xs text-muted-foreground">{task.reason}</span>
+    </span>
+    {state && <Badge variant="outline" tone={tone(state)}>{t(acceptanceStateKey(state, task.isSkillCandidate))}</Badge>}
+    <ChevronRight aria-hidden="true" data-icon="inline-end" className="text-muted-foreground" />
+  </Button>
+}
 
 /** Acceptance for a Factory task (R-56): evidence on the left, the thread that
  * produced the candidate on the right, and the publication decision on top. */
@@ -60,34 +88,36 @@ export function FactoryAcceptance({ issueId, identifier }: { issueId: string; id
   const t = useTranslations('FactoryAcceptance')
   const { data, error, isLoading, mutate } = useSWR<{ tasks: FactoryTask[] }>(`/api/factory/tasks?issueId=${encodeURIComponent(issueId)}`, request, { refreshInterval: 15000 })
   const [open, setOpen] = useState<FactoryTask | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const retryingRef = useRef(false)
+  const focusAfterRetry = useRef(false)
+  const headingRef = useRef<HTMLHeadingElement>(null)
   const tasks = data?.tasks.filter(task => (task.stage === 'approval' && ['pending', 'waiting'].includes(task.status)) || task.stage === 'publish') ?? []
-  if (error && !data) return <section className="flex flex-col gap-2">
-    <h3 className="text-sm font-medium">{t('title')}</h3>
-    <Alert className="max-w-[26.25rem]">
-      <AlertTitle>{t('listError')}</AlertTitle>
-      <AlertAction><Button size="sm" variant="outline" onClick={() => { void mutate() }}>{t('retry')}</Button></AlertAction>
-    </Alert>
+  const failed = Boolean(error && !data)
+  useEffect(() => {
+    if (!focusAfterRetry.current || failed || isLoading) return
+    focusAfterRetry.current = false
+    headingRef.current?.focus()
+  }, [failed, isLoading, data])
+  async function retry() {
+    if (retryingRef.current) return
+    retryingRef.current = true; setRetrying(true)
+    try { const next = await mutate(); focusAfterRetry.current = Boolean(next) } catch { /* the alert stays */ }
+    finally { retryingRef.current = false; setRetrying(false) }
+  }
+  const heading = <h3 ref={headingRef} tabIndex={-1} className="text-sm font-medium outline-none">{t('title')}</h3>
+  if (failed) return <section className="flex flex-col gap-2">
+    {heading}
+    <div className="min-h-16 w-full max-w-[26.25rem]"><FactoryListError retrying={retrying} onRetry={() => { void retry() }} /></div>
   </section>
   if (isLoading) return <section aria-busy="true" className="flex flex-col gap-2">
-    <h3 className="text-sm font-medium">{t('title')}</h3>
-    <Skeleton data-testid="factory-acceptance-loading" className="h-16 w-full max-w-[26.25rem]" />
+    {heading}
+    <div className="h-16 w-full max-w-[26.25rem] overflow-hidden rounded-xl"><Skeleton data-testid="factory-acceptance-loading" className="size-full" /></div>
   </section>
   if (!tasks.length) return null
   return <section className="flex flex-col gap-2">
-    <h3 className="text-sm font-medium">{t('title')}</h3>
-    {tasks.map(task => {
-      const state = taskState(task)
-      return <Button key={task.id} variant="ghost" onClick={() => setOpen(task)}
-        className="h-16 w-full max-w-[26.25rem] justify-start gap-3 rounded-xl bg-muted/60 px-3 text-left font-normal hover:bg-muted">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background"><ClipboardCheck aria-hidden="true" data-icon="inline-start" className="size-5" /></span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-medium text-foreground">{task.isSkillCandidate ? t('skillTitle') : t('title')}</span>
-          <span className="truncate text-xs text-muted-foreground">{task.reason}</span>
-        </span>
-        <Badge variant="outline" tone={tone(state)}>{t(acceptanceStateKey(state, task.isSkillCandidate))}</Badge>
-        <ChevronRight aria-hidden="true" data-icon="inline-end" className="text-muted-foreground" />
-      </Button>
-    })}
+    {heading}
+    {tasks.map(task => <FactoryAcceptanceRow key={task.id} task={task} onOpen={() => setOpen(task)} />)}
     {open && <FactoryAcceptanceWindow task={open} identifier={identifier} onClose={() => setOpen(null)} />}
   </section>
 }
@@ -95,7 +125,7 @@ export function FactoryAcceptance({ issueId, identifier }: { issueId: string; id
 function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryTask; identifier?: string | null; onClose: () => void }) {
   const t = useTranslations('FactoryAcceptance')
   const format = useFormatter()
-  const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(`/api/factory/tasks/${task.id}/approval?view=ledger`, request, { refreshInterval: 5000 })
+  const { ledger, reload, ledgerError, derived: acceptance } = useAcceptance(task)
   const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' ? `/api/factory/tasks/${task.id}/approval` : null, request)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -104,7 +134,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
 
   const approvals = ledger?.approvals ?? []
   const latest = approvals[approvals.length - 1]
-  const derived = acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals, publications: ledger?.publications ?? [], now: Date.now() })
+  const derived = acceptance ?? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals, publications: [], now: Date.now() })
   const state = derived.state
   const active = derived.active as Approval | undefined
   const publication = derived.publication as Publication | undefined
@@ -179,7 +209,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                   <h4 className="text-xs font-medium text-muted-foreground">{t('candidate')}</h4>
                   <Item variant="muted">
                     <ItemContent>
-                      <ItemTitle className="font-mono">{candidate?.sha}</ItemTitle>
+                      <ItemDescription><code>{candidate?.sha}</code></ItemDescription>
                       <ItemDescription>{candidate?.repository}</ItemDescription>
                       <ItemDescription>{task.isSkillCandidate ? t('internalSkill') : environment ? t(environment) : t('state.unavailable')}</ItemDescription>
                     </ItemContent>
@@ -187,7 +217,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                 </section>
                 {task.isSkillCandidate && <section className="flex flex-col gap-2">
                   <h4 className="text-xs font-medium text-muted-foreground">{t('target')}</h4>
-                  <Item variant="muted"><ItemContent><ItemTitle className="font-mono">mikka-builtin:run-report</ItemTitle></ItemContent></Item>
+                  <Item variant="muted"><ItemContent><ItemDescription><code>mikka-builtin:run-report</code></ItemDescription></ItemContent></Item>
                 </section>}
                 {evidence && <section className="flex flex-col gap-2">
                   <h4 className="text-xs font-medium text-muted-foreground">{t('evidence')}</h4>

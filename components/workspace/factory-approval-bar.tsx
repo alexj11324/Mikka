@@ -41,14 +41,14 @@ export function ApprovalBar({ state, isSkill, details, busy = false, canApprove 
       {details.length > 0 && <div className="flex flex-wrap gap-1">{details.map(detail => <Badge key={detail} variant="outline">{detail}</Badge>)}</div>}
     </ItemContent>
     <ItemActions>
-      {state === 'pending' && <Button size="sm" disabled={busy || !canApprove} onClick={onApprove}>{isSkill ? t('enable') : t('approve')}</Button>}
+      {state === 'pending' && canApprove && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onApprove}>{busy && <Spinner data-icon="inline-start" />}{isSkill ? t('enable') : t('approve')}</Button>}
       {state === 'approved' && <>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
-        <Button size="sm" disabled={busy} onClick={onPublish}>{t('publish')}</Button>
+        <Button size="sm" disabled={busy} aria-busy={busy} onClick={onPublish}>{busy && <Spinner data-icon="inline-start" />}{t('publish')}</Button>
       </>}
       {(state === 'publishing' || state === 'checking' || state === 'failed') && <>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
-        <Button size="sm" disabled={busy} onClick={onReconcile}>{t('reconcile')}</Button>
+        <Button size="sm" disabled={busy} aria-busy={busy} onClick={onReconcile}>{busy && <Spinner data-icon="inline-start" />}{t('reconcile')}</Button>
       </>}
       {state === 'live' && reference && <Button size="sm" variant="outline" render={<a href={reference.href} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-end" />{reference.label}</Button>}
     </ItemActions>

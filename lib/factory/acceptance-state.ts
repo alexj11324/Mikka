@@ -16,10 +16,18 @@ export function acceptanceState(input: {
   publications: AcceptancePublication[]
   now: number
 }): { state: AcceptanceState; active?: AcceptanceApproval; publication?: AcceptancePublication } {
-  const { approvals, now } = input
+  // Precedence (R-56):
+  // 1. Only approvals on the current candidate count; the latest of them decides
+  //    (a newer revoke beats an older valid approval, a newer approval beats an older revoke).
+  // 2. An approval is active only while now < expiresAt (expiresAt == now is expired).
+  // 3. Approvals on an older candidate never count: with no current approval the task is
+  //    back to pending review at the approval stage, otherwise it reads invalidated.
+  const { now } = input
+  const isCurrent = (approval: AcceptanceApproval) => !input.candidateId || approval.candidateId === input.candidateId
+  const approvals = input.approvals.filter(isCurrent)
+  const stale = input.approvals.length > approvals.length
   const latest = approvals[approvals.length - 1]
-  const current = (approval: AcceptanceApproval) => !input.candidateId || approval.candidateId === input.candidateId
-  const active = [...approvals].reverse().find(item => !item.revokedAt && Date.parse(item.expiresAt) > now)
+  const active = latest && !latest.revokedAt && Date.parse(latest.expiresAt) > now ? latest : undefined
   const publication = active ? [...input.publications].reverse().find(item => item.approvalId === active.id) : undefined
   const state: AcceptanceState = publication?.status === 'succeeded' ? 'live'
     : publication?.status === 'failed' ? 'failed'
@@ -27,8 +35,8 @@ export function acceptanceState(input: {
         : publication ? 'publishing'
           : active ? 'approved'
             : latest?.revokedAt ? 'revoked'
-              : latest && !current(latest) ? 'invalidated'
-                : latest ? 'expired'
-                  : input.stage === 'approval' ? 'pending' : 'unavailable'
+              : latest ? 'expired'
+                : input.stage === 'approval' ? 'pending'
+                  : stale ? 'invalidated' : 'unavailable'
   return { state, active, publication }
 }
