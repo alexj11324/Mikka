@@ -9,10 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { cn } from '@/lib/utils'
 import { useActionError } from '@/lib/use-action-error'
-import { BOT_COLORS, BOT_SHAPES, BotAvatar, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } from './bot-avatar'
+import { BotAvatar, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } from './bot-avatar'
+import { BotLookPicker } from './bot-look-picker'
 
 /**
  * 新建 Bot (Figma 195:3226, Grok's avatar editor): a big live preview, the
@@ -54,20 +53,6 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
         <DialogDescription className="sr-only">{t('description')}</DialogDescription>
       </DialogHeader>
       <form id="new-bot" className="flex flex-col gap-5 px-5" onSubmit={event => { event.preventDefault(); void submit() }}>
-        {/* The picked shape gets a ring that follows its own outline, a small gap away. */}
-        <svg aria-hidden="true" className="absolute size-0">
-          <filter id="bot-shape-ring" x="-25%" y="-25%" width="150%" height="150%" colorInterpolationFilters="sRGB">
-            {/* Blur then threshold grows the outline evenly; a morphology dilate would square off the curves. */}
-            <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
-            <feComponentTransfer result="gap"><feFuncA type="linear" slope="40" intercept="-3" /></feComponentTransfer>
-            <feGaussianBlur in="SourceAlpha" stdDeviation="5" />
-            <feComponentTransfer result="outer"><feFuncA type="linear" slope="40" intercept="-3" /></feComponentTransfer>
-            <feComposite in="outer" in2="gap" operator="out" result="ring" />
-            <feFlood className="[flood-color:var(--muted-foreground)]" />
-            <feComposite in2="ring" operator="in" result="line" />
-            <feMerge><feMergeNode in="line" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </svg>
         {/* One live blob: picking a shape or colour morphs it. */}
         <div className="flex h-48 items-center justify-center rounded-2xl bg-muted"><BotAvatar color={color} shape={shape} size="hero" /></div>
         <FieldGroup className="gap-5">
@@ -75,24 +60,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
             <Input id="new-bot-name" aria-label={t('name')} autoFocus value={name} maxLength={60} disabled={saving} placeholder={t('namePlaceholder')}
               className="h-11 rounded-xl border-transparent bg-muted text-center focus-visible:border-transparent focus-visible:ring-0" onChange={event => setName(event.target.value)} />
           </Field>
-          <Field>
-            <ToggleGroup aria-label={t('shape')} spacing={2} className="grid grid-cols-4 justify-items-center sm:grid-cols-8" value={[shape]} disabled={saving} onValueChange={values => { const next = values[0] as BotShape | undefined; if (next) setShape(next) }}>
-              {BOT_SHAPES.map(id => <ToggleGroupItem key={id} value={id} aria-label={t(`shapes.${id}`)} className="size-14 min-w-0 rounded-2xl p-0 hover:bg-transparent data-pressed:bg-transparent data-pressed:[&_svg]:[filter:url(#bot-shape-ring)]">
-                <BotAvatar color={color} shape={id} size="cell" still />
-              </ToggleGroupItem>)}
-            </ToggleGroup>
-          </Field>
-          <Field>
-            <ToggleGroup aria-label={t('color')} spacing={2} className="grid grid-cols-6 justify-items-center gap-y-3 px-6" value={[color]} disabled={saving} onValueChange={values => { const next = values[0] as BotColor | undefined; if (next) setColor(next) }}>
-              {BOT_COLORS.map(id => <ToggleGroupItem key={id} value={id} aria-label={t(`colors.${id}`)} className="size-10 min-w-0 rounded-full p-0 data-pressed:bg-transparent">
-                <span aria-hidden="true" className={cn('size-7.5 rounded-full',
-                  id === 'encre' && 'bg-bot-encre', id === 'brun' && 'bg-bot-brun', id === 'rouge' && 'bg-bot-rouge', id === 'orange' && 'bg-bot-orange', id === 'ambre' && 'bg-bot-ambre', id === 'vert' && 'bg-bot-vert', id === 'turquoise' && 'bg-bot-turquoise', id === 'bleu' && 'bg-bot-bleu', id === 'violet' && 'bg-bot-violet', id === 'rose' && 'bg-bot-rose', id === 'gris' && 'bg-bot-gris', id === 'creme' && 'bg-bot-creme',
-                  // Ink on the dark page and cream on the light one need an edge to be seen at all.
-                  (id === 'encre' || id === 'creme') && 'ring-1 ring-foreground/15 ring-inset',
-                  color === id && 'outline-2 outline-offset-3 outline-muted-foreground')} />
-              </ToggleGroupItem>)}
-            </ToggleGroup>
-          </Field>
+          <BotLookPicker color={color} shape={shape} disabled={saving} onColor={setColor} onShape={setShape} />
         </FieldGroup>
       </form>
       <DialogFooter className="m-0 rounded-b-2xl bg-transparent px-4 pt-1 pb-4">
