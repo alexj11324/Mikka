@@ -1204,7 +1204,7 @@ export class RunSupervisor {
     run.toolApproval = toolApproval
     if (mailbox && toolApproval) {
       const original = mailbox
-      mailbox = { ...original, request: async (body, signal) => {
+      mailbox = { tools: original.tools, close: () => original.close(), request: async (body, signal) => {
         if (!await toolApproval.checkLive()) throw new Error('Run tool approval unavailable')
         return original.request(body, signal)
       } }
