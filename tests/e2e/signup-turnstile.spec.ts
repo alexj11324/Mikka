@@ -50,6 +50,7 @@ test.describe('带站点密钥的构建', () => {
   // Turnstile's own script is replaced by a stand-in that issues a token, so the
   // header can be checked without Cloudflare. Skipped when the build has no key.
   test.skip(!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY, 'build has no NEXT_PUBLIC_TURNSTILE_SITE_KEY')
+  test.use({ expectedConsoleErrors: [refusedLog('/api/auth/sign-up/email', 400)] })
   test('注册请求带上 Turnstile 令牌', async ({ page }) => {
     await page.route('https://challenges.cloudflare.com/**', route => route.fulfill({ contentType: 'application/javascript', body: `window.turnstile = { render: function (el, o) { el.textContent = 'turnstile'; setTimeout(function () { o.callback('fixture-token') }, 0); return 'w1' }, reset: function () {}, remove: function () {} }` }))
     let header: string | undefined
