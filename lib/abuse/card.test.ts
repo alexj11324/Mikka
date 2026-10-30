@@ -136,3 +136,32 @@ test('webhook uses locally stored intent/customer, ignores foreign bindings, tak
   )
   assert.deepEqual(verified, [['workspace', 'cus_fixture', 'fixture_card']])
 })
+
+test('Link email prefill and Link-saved cards use the normal card fingerprint claim', async () => {
+  const result = await createCardSetup(
+    'actor',
+    'workspace',
+    fake,
+    'owner@example.com',
+  )
+  assert.equal(requests[0].body.get('email'), 'owner@example.com')
+  assert.deepEqual(result.paymentElementOptions, {
+    defaultValues: { billingDetails: { email: 'owner@example.com' } },
+  })
+  const linkFetch = (async () =>
+    Response.json({
+      type: 'card',
+      customer: 'cus_fixture',
+      card: { fingerprint: 'fixture_card', wallet: { type: 'link' } },
+    })) as typeof fetch
+  await applyCardSetup(
+    {
+      id: 'seti_fixture',
+      status: 'succeeded',
+      customer: 'cus_fixture',
+      payment_method: 'pm_link_card',
+    },
+    linkFetch,
+  )
+  assert.deepEqual(verified, [['workspace', 'cus_fixture', 'fixture_card']])
+})

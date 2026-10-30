@@ -4,7 +4,10 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { HostedUsageStore } from './store'
-import { signupRateLimit } from './signup'
+import { signupRateLimit as configuredSignupRateLimit } from './signup'
+const signupRateLimit = (
+  ...args: Parameters<typeof configuredSignupRateLimit>
+) => configuredSignupRateLimit(args[0], args[1], args[2], args[3], args[4], {})
 const url = process.env.E2E_DATABASE_URL
 if (!url && process.env.REQUIRE_DB === '1')
   throw Error('E2E_DATABASE_URL required')

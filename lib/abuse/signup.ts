@@ -72,6 +72,20 @@ export async function verifyTurnstile(
     failure('SERVICE_UNAVAILABLE', 'SIGNUP_VERIFICATION_UNAVAILABLE')
   }
 }
+export function signupLimits(
+  env: Record<string, string | undefined> = process.env,
+) {
+  const positive = (value: string | undefined, fallback: number) => {
+    const n = Number(value)
+    return Number.isSafeInteger(n) && n > 0 ? n : fallback
+  }
+  return {
+    signupIp: positive(env.MIKKA_SIGNUP_IP_HOURLY, 5),
+    signupGlobal: positive(env.MIKKA_SIGNUP_GLOBAL_HOURLY, 100),
+    verificationIp: positive(env.MIKKA_VERIFICATION_IP_HOURLY, 15),
+    verificationGlobal: positive(env.MIKKA_VERIFICATION_GLOBAL_HOURLY, 300),
+  }
+}
 /** Atomic fixed-hour counters in Better Auth's rateLimit storage. */
 export async function signupRateLimit(
   pool: Pool,
@@ -79,6 +93,7 @@ export async function signupRateLimit(
   ip: string,
   email: string,
   now = Date.now(),
+  env: Record<string, string | undefined> = process.env,
 ) {
   const tx = await pool.connect()
   try {
@@ -86,10 +101,15 @@ export async function signupRateLimit(
     const window = Math.floor(now / 3_600_000)
     const hash = (value: string) =>
       createHash('sha256').update(value).digest('hex')
+    const limits = signupLimits(env)
     // Same order on every request, so the global quota serializes admissions.
     for (const [scope, value, max] of [
-      ['global', 'all', kind === 'signup' ? 100 : 300],
-      ['ip', ip, kind === 'signup' ? 5 : 15],
+      [
+        'global',
+        'all',
+        kind === 'signup' ? limits.signupGlobal : limits.verificationGlobal,
+      ],
+      ['ip', ip, kind === 'signup' ? limits.signupIp : limits.verificationIp],
       ['email', normalizedEmail(email), 3],
     ] as const) {
       const key = `abuse:${kind}:${scope}:${hash(value)}:${window}`

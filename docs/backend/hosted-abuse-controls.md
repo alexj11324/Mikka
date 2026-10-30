@@ -7,7 +7,8 @@ verification grants exactly USD 1 once, not a periodically renewed credit.
 ## Backend contract for the frontend
 
 - `startCardVerification(workspaceId?)` is admin-only and returns a Stripe
-  SetupIntent `clientSecret`. Use Stripe.js to confirm the setup. There is no
+  SetupIntent `clientSecret` and `paymentElementOptions` with the authenticated
+  user’s email prefilled for Link. Use Stripe.js to confirm the setup. There is no
   amount, charge, subscription, or automatic top-up. Bank authorization holds
   can still appear. The existing signature-checked webhook handles
   `setup_intent.succeeded`; the frontend must not grant credit itself.
@@ -108,7 +109,11 @@ Signup and verification-mail fixed-hour limits reuse Better Auth's database
 `rateLimit` table. Signup: 5/IP and 100 globally; mail: 15/IP and 300 globally;
 normalized address: 3/hour for each operation. Global counters are locked before
 IP/address counters. Vercel's overwritten forwarding header supplies the IP;
-local requests share a local bucket. The disposable-domain list is vendored
+local requests share a local bucket. Finite quota overrides are
+`MIKKA_SIGNUP_IP_HOURLY`, `MIKKA_SIGNUP_GLOBAL_HOURLY`,
+`MIKKA_VERIFICATION_IP_HOURLY`, `MIKKA_VERIFICATION_GLOBAL_HOURLY`; invalid
+values fall back to the defaults. Ephemeral CI sets higher finite quotas
+because all automatic test identities share loopback. The disposable-domain list is vendored
 with its CC0 license and update instructions. Optional GitHub account-age
 rejection is deliberately omitted: OAuth's existing verified-email path stays
 unchanged.
@@ -122,3 +127,40 @@ uniqueness/rate limits. It is registered in the required DB inventory.
 Tests never use a production database, create a live Stripe charge or start an
 E2B sandbox. Required PR CI supplies the production build, full functionality
 and integration-branch performance acceptance.
+
+## Link
+
+Mikka’s live account was checked read-only through the Stripe plugin: Link is
+available and enabled in both its direct default and app-associated default
+payment-method configurations. No merchant settings were changed and no live
+SetupIntent or charge was created for this check.
+
+This integration intentionally uses [Link within a card integration](https://docs.stripe.com/payments/link/link-payment-integrations?link-integrations=link-card-integrations):
+`allowed_payment_method_types: ['card']`. Do not add `'link'` to that list;
+Stripe then represents Link as a separate opaque payment method instead of
+returning the underlying card details. A Link-saved card comes back as
+`PaymentMethod.type=card`, `card.wallet.type=link`; its `card.fingerprint` uses
+the same database claim as manual card entry. It grants no second allowance.
+
+For Claude’s Payment Element screen:
+
+```ts
+const { clientSecret, paymentElementOptions } = result.data
+const elements = stripe.elements({ clientSecret })
+const payment = elements.create('payment', paymentElementOptions)
+payment.mount(container)
+// On submit: await elements.submit(); then stripe.confirmSetup({
+//   elements, confirmParams: { return_url: sameOriginReturnUrl },
+//   redirect: 'if_required',
+// })
+```
+
+Link uses the email prefill to offer authentication and saved payment details.
+Stripe handles SMS/email authentication and any bank-required authentication;
+Mikka never reads the code. Display depends on Stripe eligibility and the
+customer’s browser/session. A successful Link login alone never grants credit:
+the verified SetupIntent webhook remains the only grant path. These are backend
+contracts and integration examples; the React screen remains with Claude.
+
+References: [Link setup and reuse](https://docs.stripe.com/payments/link/save-and-reuse),
+[Link integration types](https://docs.stripe.com/payments/link/link-payment-integrations).

@@ -10,6 +10,7 @@ export async function createCardSetup(
   actorId: string,
   workspaceId: string,
   fetchImpl: typeof fetch = fetch,
+  email?: string,
 ) {
   await workspaceDb.transaction((tx) =>
     requireWorkspace(tx, workspaceId, actorId, true),
@@ -28,7 +29,7 @@ export async function createCardSetup(
     (await stripePost<{ id: string }>(
       config,
       'customers',
-      { metadata: { workspaceId } },
+      { metadata: { workspaceId }, ...(email ? { email } : {}) },
       fetchImpl,
       `card-customer:${workspaceId}`,
     ))
@@ -39,6 +40,8 @@ export async function createCardSetup(
       customer: customer.id,
       usage: 'on_session',
       metadata: { workspaceId },
+      // Link's card integration returns type=card and card.wallet.type=link.
+      // Adding 'link' here hides the underlying card details needed by #523.
       allowed_payment_method_types: ['card'],
     },
     fetchImpl,
@@ -48,7 +51,18 @@ export async function createCardSetup(
     'INSERT INTO hosted_setup_intents (id,"workspaceId","customerId") VALUES ($1,$2,$3)',
     [intent.id, workspaceId, customer.id],
   )
-  return { clientSecret: intent.client_secret }
+  return {
+    clientSecret: intent.client_secret,
+    // Link authenticates the returning customer when Payment Element receives
+    // their email. No SMS code or Link credential passes through our server.
+    ...(email
+      ? {
+          paymentElementOptions: {
+            defaultValues: { billingDetails: { email } },
+          },
+        }
+      : {}),
+  }
 }
 /** Only invoked AFTER signature verification. Trust the locally recorded intent binding. */
 export async function applyCardSetup(
@@ -72,7 +86,7 @@ export async function applyCardSetup(
   const method = await stripeGet<{
     type: string
     customer: string
-    card?: { fingerprint?: string }
+    card?: { fingerprint?: string; wallet?: { type?: string } }
   }>(
     config,
     `payment_methods/${encodeURIComponent(object.payment_method)}`,
@@ -84,6 +98,7 @@ export async function applyCardSetup(
     !method.card?.fingerprint
   )
     return
+  // Regular cards and Link-saved cards deliberately share the same claim key.
   await hostedUsage.verify(
     binding.workspaceId,
     binding.customerId,

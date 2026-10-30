@@ -5,6 +5,7 @@ import { checkAbuseAlerts } from './alerts'
 import { canUseMikkaPaid, hostedUsage } from './runtime'
 import {
   gatewayCost,
+  gatewayGenerationId,
   HOSTED_CALL_TIMEOUT_MS,
   PaidResourceError,
 } from './policy'
@@ -64,6 +65,10 @@ export async function hostedModel(
   }
   const options = (value: Parameters<Model['doGenerate']>[0]) => ({
     ...value,
+    providerOptions: {
+      ...value.providerOptions,
+      gateway: { ...value.providerOptions?.gateway, user: workspaceId },
+    },
     maxOutputTokens: Math.min(value.maxOutputTokens ?? 4096, 4096),
     abortSignal: AbortSignal.any([
       AbortSignal.timeout(HOSTED_CALL_TIMEOUT_MS),
@@ -84,6 +89,7 @@ export async function hostedModel(
               cost,
               result.usage.inputTokens.total ?? 0,
               result.usage.outputTokens.total ?? 0,
+              gatewayGenerationId(result.providerMetadata),
             )
             await checkAbuseAlerts()
             if (cost === null)
@@ -114,6 +120,7 @@ export async function hostedModel(
                         cost,
                         chunk.usage.inputTokens.total ?? 0,
                         chunk.usage.outputTokens.total ?? 0,
+                        gatewayGenerationId(chunk.providerMetadata),
                       )
                       await checkAbuseAlerts()
                       if (cost === null)

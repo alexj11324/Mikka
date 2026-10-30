@@ -33,7 +33,7 @@ export async function startPlanCheckout(returnUrl: string, workspaceId?: string)
 export async function startCardVerification(workspaceId?: string) {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
-    return (await import('@/lib/abuse/card')).createCardSetup(actor.userId,actor.workspaceId)
+    return (await import('@/lib/abuse/card')).createCardSetup(actor.userId,actor.workspaceId,undefined,actor.email)
   })
 }
 export async function getHostedUsage(workspaceId?: string) {

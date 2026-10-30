@@ -1,4 +1,4 @@
-import { gatewayCost } from '@/lib/abuse/policy'
+import { gatewayCost,gatewayGenerationId } from '@/lib/abuse/policy'
 import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
 import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_URL, type DecisionInput, type DecisionQuestion } from './decision'
@@ -48,7 +48,7 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
     const payload: unknown = await response.json()
     if (usage) {
       const receipt = payload as {provider_metadata?:unknown}
-      await usage.hostedUsage.settle(callId,gatewayCost(receipt.provider_metadata))
+      await usage.hostedUsage.settle(callId,gatewayCost(receipt.provider_metadata),0,0,gatewayGenerationId(receipt.provider_metadata))
       await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
     }
     const answers = validatedAnswers(payload, requestedQuestions)

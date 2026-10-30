@@ -18,7 +18,9 @@ export class PaidResourceError extends Error {
 }
 const positive = (value: string | undefined, fallback: number) => {
   const n = Number(value)
-  return Number.isInteger(n) && Number.isSafeInteger(n * 10_000) && n > 0 ? n : fallback
+  return Number.isInteger(n) && Number.isSafeInteger(n * 10_000) && n > 0
+    ? n
+    : fallback
 }
 export function abuseLimits(
   env: Record<string, string | undefined> = process.env,
@@ -52,4 +54,10 @@ export function abuseAlertKinds(
     ...(spent >= limits.dailyMicroUsd ? ['full'] : []),
     ...(firstUses > limits.firstUseHourly ? ['signup_spike'] : []),
   ]
+}
+
+export function gatewayGenerationId(metadata: unknown): string | undefined {
+  const id = (metadata as { gateway?: { generationId?: unknown } } | undefined)
+    ?.gateway?.generationId
+  return typeof id === 'string' && id.length <= 200 ? id : undefined
 }

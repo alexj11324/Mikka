@@ -171,9 +171,10 @@ export class HostedUsageStore {
       // Unknown cost never means free. Retain the reservation and block further
       // workspace calls until the receipt is reconciled using this same method.
       if (cost === null) {
-        await tx.query("UPDATE hosted_usage SET state='unknown' WHERE id=$1", [
-          id,
-        ])
+        await tx.query(
+          'UPDATE hosted_usage SET state=\'unknown\',"generationId"=COALESCE($2,"generationId") WHERE id=$1',
+          [id, generationId ?? null],
+        )
         return
       }
       if (!Number.isSafeInteger(cost) || cost < 0)
