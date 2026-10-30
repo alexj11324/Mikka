@@ -27,7 +27,8 @@ test('issue numbering: no deadlock with FK KEY SHARE; concurrent numbers unique 
     await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [id, `${id}@example.invalid`])
     return id
   }
-  const content = (number?: number) => withIssueMetadata({ type: 'doc', content: [] }, number ? { number } : {})
+  const base = { type: 'doc', content: [] }
+  const content = (number?: number) => withIssueMetadata(base, { ...readIssueMetadata(base), ...(number ? { number } : {}) })
   try {
     await t.test('holder of an issue lock can take KEY SHARE on the owner during a backfill', async () => {
       const owner = await user()
