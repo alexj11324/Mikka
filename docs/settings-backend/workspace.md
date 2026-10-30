@@ -103,37 +103,41 @@ deleteTeam(teamId: string, confirmName: string): Promise<ActionResult<{ deleted:
 - `confirmName` 必须和团队名称完全一致（`teamDeleteNameMismatch`）。会先在应用库里删任务和建任务 / 提升任务的请求记录，再在工作区库里删回执、关联、项目及事件、团队成员和团队本身；整个过程持有 `lockTeamRelations` 锁。
 - 错误码：`teamNotFound`、`workspaceAccessDenied`、`teamDeleteNameMismatch`、`validationGeneric`。
 
-## Bot（工作区级）— `app/actions/bots.ts`
+## Bot — `app/actions/bots.ts`
 
-### `getWorkspaceBotDefaults()`
+设计见 `docs/design/bot-settings.md`：Bot 属于创建者，管理员只管「允许什么」。原来的 `getWorkspaceBotDefaults` / `updateWorkspaceBotDefaults`（管理员给全工作区设默认模型和默认仓库，#442/#466）已删除。
+
+### `getWorkspaceModelPolicy()`
 
 ```ts
-getWorkspaceBotDefaults(): Promise<ActionResult<{
-  defaultModel: 'mikka' | 'codex' | 'claude' | null
-  defaultRepository: string | null
-  models: ['mikka', 'codex', 'claude']
-  repositories: string[]
+getWorkspaceModelPolicy(): Promise<ActionResult<{
+  allowedModels: Array<'mikka' | 'codex' | 'claude'> // 可用模型，菜单顺序；从未保存过 = 全部
+  startingModel: 'mikka' | 'codex' | 'claude' | null // 新 Bot 的初始模型
   version: number // 乐观锁版本，保存时作为 expectedVersion 传回
+  modelGroups: BotModelGroup[]
 }>>
 ```
 
-- 权限：任何启用中的成员都能读。
-- 模型可选值：Bot 本身原来没有模型字段，模型是通过订阅绑定来选的（`byos_bindings.route`，provider 是 codex 或 claude）。所以可选值定义成：`mikka`（Mikka 托管的默认模型）、`codex`、`claude`（用 Bot 主人自己连接的对应订阅）。
-- 仓库可选值：本工作区启用成员在 `github_repository_installations` 里的 `remoteKey`（owner/repo），去重后排序。
+- 权限：任何启用中的成员都能读（成员的 Bot 菜单来自这里）。
 
-### `updateWorkspaceBotDefaults(input)`
+### `updateWorkspaceModelPolicy(input)`
 
 ```ts
-updateWorkspaceBotDefaults(input: { defaultModel?: 'mikka' | 'codex' | 'claude' | null; defaultRepository?: string | null }): Promise<ActionResult<{ defaultModel; defaultRepository }>>
+updateWorkspaceModelPolicy(input: { allowedModels: string[]; startingModel: string | null; expectedVersion?: number }): Promise<ActionResult<ModelPolicy> | ModelPolicyConflict>
 ```
 
-- 权限：管理员。传 `null` 表示清除，不传的字段保持原值。仓库必须在上面的可选列表里，否则返回 `botDefaultRepositoryUnavailable`。值存在 `workspace_settings` 里。
-- 乐观锁（BE-15）：入参可带 `expectedVersion`（取自 `getWorkspaceBotDefaults().version` 或上次保存返回的 `version`）。成功返回 `{ defaultModel, defaultRepository, version }`（version +1）。版本不一致时不写入，返回 `{ error: 'botDefaultsConflict', status: 409, current: { defaultModel, defaultRepository, version } }`。不传 `expectedVersion` 时保持原来的“后写覆盖”。这是 server action，没有 HTTP 路由，所以不支持 If-Match 头。
-- 错误码：`workspaceAccessDenied`、`botDefaultRepositoryUnavailable`、`botDefaultsConflict`、`validationGeneric`。
+- 权限：管理员（`requireWorkspace(..., true)` 锁工作区行，串行化）。`allowedModels` 至少一个、不重复；`startingModel` 必须在其中，否则 `botModelNotAllowed`。存在 `workspace_settings."allowedModels"` 和 `"defaultModel"`，数据库 CHECK 同样约束。
+- 乐观锁：带 `expectedVersion` 时是对 `"modelPolicyVersion"` 的 compare-and-set；版本过期不写入，返回 `{ error: 'modelPolicyConflict', status: 409, current }`。
+- 移出可用模型的模型：不改写任何 Bot 的 `bots.model`；Bot 按 `resolveBotModel` 回落到初始模型，否则第一个允许的模型。
 
-### `createBot(input)`（已有，做了扩展）
+### `getBotSettings({ botId })` / `updateBotSettings({ botId, model?, repository? })`
 
-新增可选参数 `model`、`repository`。不传时用工作区的默认值，显式传 `null` 就保存为 null。值写进 `bots.model` 和 `bots.repository`。注意：运行时现在还没有读取 `bots.model`，模型仍然由订阅绑定决定。
+- 读：工作区任何启用中的成员；返回存储值、实际生效值（`effectiveModel`、`effectiveRepository`）、`modelUnavailable`、`repositoryUnavailable`、可选项（`allowedModels`、`repositories`）、`canEdit`（只有创建者为 true）、`connectedProviders`（创建者在本工作区已连接的 Codex/Claude 订阅；对其他人恒为空）。
+- 写：只有 Bot 的创建者，管理员也不行（`botOwnerOnly`）。模型必须在可用模型中（`botModelNotAllowed`），仓库必须被工作区成员安装的 GitHub App 覆盖（`botRepositoryUnavailable`）。写入时对 `workspace_settings` 行加 `FOR SHARE`，与管理员保存可用模型互斥。不传的字段不变，`null` 清除。
+
+### `createBot(input)`
+
+不传 `model` 时用新 Bot 的初始模型（否则第一个允许的模型），`repository` 默认为空。显式传入的值同样校验可用模型和已安装仓库。注意：运行时现在还没有读取 `bots.model`，模型仍然由订阅绑定决定。
 
 ### `listWorkspaceBots()`
 
@@ -148,7 +152,7 @@ listWorkspaceBots(): Promise<ActionResult<{ bots: Array<{
 
 ## 新增错误码（`lib/action-result.ts`，`messages/*.json` 的 `Errors` 下）
 
-`workspaceSlugTaken`、`workspaceIconInvalid`、`workspaceDeleteNameMismatch`、`workspaceHasActiveSubscription`、`workspaceCannotRemoveSelf`、`workspaceTransferTargetInvalid`、`botTransferBusy`、`botTransferNameConflict`、`teamNotFound`、`teamDeleteNameMismatch`、`botDefaultRepositoryUnavailable`。以下几个已经加好错误码和文案，但对应功能没有交付：`usageLimitReached`、`usageCreditsExhausted`、`billingNotConfigured`、`billingNoSubscription`、`billingPlanInvalid`、`billingProviderFailed`。
+`workspaceSlugTaken`、`workspaceIconInvalid`、`workspaceDeleteNameMismatch`、`workspaceHasActiveSubscription`、`workspaceCannotRemoveSelf`、`workspaceTransferTargetInvalid`、`botTransferBusy`、`botTransferNameConflict`、`teamNotFound`、`teamDeleteNameMismatch`、`botRepositoryUnavailable`、`botModelNotAllowed`、`botOwnerOnly`、`modelPolicyConflict`。以下几个已经加好错误码和文案，但对应功能没有交付：`usageLimitReached`、`usageCreditsExhausted`、`billingNotConfigured`、`billingNoSubscription`、`billingPlanInvalid`、`billingProviderFailed`。
 
 ## 测试
 

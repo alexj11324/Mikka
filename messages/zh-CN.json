@@ -1077,8 +1077,10 @@
     "botTransferNameConflict": "接手人已有同名 Bot，为其中一个改名后再转交。",
     "teamNotFound": "团队不存在。",
     "teamDeleteNameMismatch": "输入的名称与团队名称不一致。",
-    "botDefaultRepositoryUnavailable": "这个仓库不在工作区成员已安装的 GitHub App 仓库中。",
-    "botDefaultsConflict": "其他人刚修改了这些默认值，已显示最新值。",
+    "botRepositoryUnavailable": "这个仓库不在工作区已安装的 GitHub App 仓库中。",
+    "botModelNotAllowed": "工作区不允许使用这个模型。",
+    "botOwnerOnly": "只有 Bot 的创建者可以修改它的设置。",
+    "modelPolicyConflict": "其他管理员刚修改了可用模型，已显示最新设置。",
     "usageLimitReached": "已达到用量上限，新任务已暂停，运行中的任务会继续完成。",
     "usageCreditsExhausted": "点数已用完，新任务已暂停，运行中的任务会继续完成。",
     "billingNotConfigured": "计费尚未开通。",
@@ -1598,8 +1600,8 @@
         "title": "连接"
       },
       "models": {
-        "title": "模型与额度",
-        "keywords": "模型订阅 订阅 额度 用量"
+        "title": "模型订阅",
+        "keywords": "订阅 ChatGPT Codex Claude 账户"
       },
       "logins": {
         "title": "登录与密钥"
@@ -1620,7 +1622,8 @@
         "title": "常规"
       },
       "bots": {
-        "title": "Bot 管理"
+        "title": "Bot 管理",
+        "keywords": "可用模型 模型 允许"
       },
       "permissions": {
         "title": "权限与审批"
@@ -1632,7 +1635,8 @@
         "title": "审计日志"
       },
       "usage": {
-        "title": "用量"
+        "title": "用量",
+        "keywords": "额度 用量"
       },
       "billing": {
         "title": "计费"
@@ -2055,6 +2059,28 @@
         "codex": "Codex",
         "claude": "Claude"
       }
+    },
+    "botSettings": {
+      "modelsTitle": "可用模型",
+      "startingModel": "新 Bot 的初始模型",
+      "allBotsTitle": "全部 Bot",
+      "noBots": "还没有 Bot",
+      "idle": "空闲",
+      "running": "运行中 · {count} 个线程",
+      "ownerStatus": "{owner} · {status}",
+      "model": "模型",
+      "repository": "仓库",
+      "noRepository": "无",
+      "modelUnavailable": "{model} 已不在可用模型中",
+      "repositoryUnavailable": "{repository} 未安装 GitHub App",
+      "threadsTitle": "线程",
+      "noThreads": "还没有线程",
+      "privateThread": "私有线程",
+      "threadMeta": "{status} · {time}",
+      "threadRunning": "运行中",
+      "threadDone": "已完成",
+      "loadMore": "加载更多",
+      "subscriptionMissing": "未连接 {model} 订阅"
     }
   },
   "TelegramBot": {
@@ -2915,7 +2941,8 @@
       "widen": "加宽右栏",
       "narrow": "恢复右栏宽度",
       "close": "关闭右栏",
-      "open": "打开右栏"
+      "open": "打开右栏",
+      "botSettings": "Bot 设置"
     },
     "suggestions": {
       "title": "建议",

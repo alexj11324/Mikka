@@ -18,7 +18,8 @@ let actions: typeof import('../app/actions/workspace-settings')
 let teamActions: typeof import('../app/actions/teams')
 let botActions: typeof import('../app/actions/bots')
 const inserted: Record<string, unknown>[] = []
-let defaults = { defaultModel: 'codex' as string | null, defaultRepository: 'acme/app' as string | null }
+let startingModel: string | null = 'codex'
+const allowed = new Set(['mikka', 'codex'])
 
 before(async () => {
   mock.module('next/headers', { namedExports: {
@@ -40,11 +41,15 @@ before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor.userId, email: actor.email, name: actor.name } }) } } } })
   mock.module('@/lib/db', { namedExports: { db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }) } } })
   mock.module('@/lib/workspace-admin/bots', { namedExports: {
-    workspaceBotDefaults: async (workspaceId: string) => { calls.push(['workspaceBotDefaults', workspaceId]); return defaults },
-    botDefaultOptions: respond('botDefaultOptions', { defaultModel: 'codex', defaultRepository: null, models: ['mikka', 'codex', 'claude'], repositories: ['acme/app'] }),
-    saveBotDefaults: respond('saveBotDefaults', { defaultModel: 'claude', defaultRepository: null }),
+    newBotModel: async (workspaceId: string) => { calls.push(['newBotModel', workspaceId]); return startingModel },
+    modelAllowed: async (workspaceId: string, model: string) => { calls.push(['modelAllowed', workspaceId, model]); return allowed.has(model) },
+    modelPolicy: respond('modelPolicy', { allowedModels: ['mikka', 'codex'], startingModel: 'codex', version: 3, modelGroups: [] }),
+    saveModelPolicy: respond('saveModelPolicy', { allowedModels: ['claude'], startingModel: null, version: 4, modelGroups: [] }),
+    botSettingsFor: respond('botSettingsFor', { canEdit: true }),
+    saveBotSettings: respond('saveBotSettings', { canEdit: true, model: 'codex' }),
     repositoryAvailable: async (workspaceId: string, repository: string) => { calls.push(['repositoryAvailable', workspaceId, repository]); return repository === 'acme/app' },
     workspaceBots: respond('workspaceBots', [{ id: 'b', name: 'Bot', status: 'running', runningThreads: 2 }]),
+    listBotThreadsFor: respond('listBotThreadsFor', { threads: [] }),
   } })
   actions = await import('../app/actions/workspace-settings')
   botActions = await import('../app/actions/bots')
@@ -103,40 +108,48 @@ test('getTeamDeletionImpact and deleteTeam', async () => {
   assert.equal((await teamActions.deleteTeam('t', 'x')).error, 'teamDeleteNameMismatch')
 })
 
-test('createBot uses the workspace defaults only for omitted fields', async () => {
-  reset(); inserted.length = 0
+test('createBot starts at the starting model and no repository; explicit choices must be allowed', async () => {
+  reset(); inserted.length = 0; startingModel = 'codex'
   await botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle' })
   assert.equal(inserted[0].model, 'codex')
-  assert.equal(inserted[0].repository, 'acme/app')
+  assert.equal(inserted[0].repository, null, 'no admin default repository')
   assert.equal(inserted[0].workspaceId, actor.workspaceId)
   await botActions.createBot({ name: 'Scout 2', color: 'encre', shape: 'cercle', model: 'mikka', repository: null })
   assert.equal(inserted[1].model, 'mikka')
-  assert.equal(inserted[1].repository, null)
-  assert.equal(calls.filter(call => call[0] === 'workspaceBotDefaults').length, 1, 'explicit values skip the defaults read')
-  defaults = { defaultModel: null, defaultRepository: null }
-  await botActions.createBot({ name: 'Scout 3', color: 'encre', shape: 'cercle' })
-  assert.equal(inserted[2].model, null)
+  assert.equal(calls.filter(call => call[0] === 'newBotModel').length, 1, 'an explicit model skips the starting-model read')
+  await assert.rejects(botActions.createBot({ name: 'Claude bot', color: 'encre', shape: 'cercle', model: 'claude' }), /botModelNotAllowed/)
   await assert.rejects(botActions.createBot({ name: 'Bad', color: 'encre', shape: 'cercle', model: 'gpt-x' }), /validationGeneric/)
+  assert.equal(inserted.length, 2)
 })
 
 test('createBot refuses a repository the workspace has not installed', async () => {
   reset(); inserted.length = 0
   await botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle', repository: 'acme/app' })
   assert.equal(inserted[0].repository, 'acme/app')
-  await assert.rejects(botActions.createBot({ name: 'Elsewhere', color: 'encre', shape: 'cercle', repository: 'other/secret' }), /botDefaultRepositoryUnavailable/)
+  await assert.rejects(botActions.createBot({ name: 'Elsewhere', color: 'encre', shape: 'cercle', repository: 'other/secret' }), /botRepositoryUnavailable/)
   assert.equal(inserted.length, 1)
   assert.deepEqual(calls.filter(call => call[0] === 'repositoryAvailable').map(call => call[2]), ['acme/app', 'other/secret'])
 })
 
-test('bot defaults and workspace bot list actions', async () => {
+test('model policy, bot settings and workspace bot list actions act as the signed-in user in the current workspace', async () => {
   reset()
-  assert.deepEqual((await botActions.getWorkspaceBotDefaults()).error, undefined)
-  assert.deepEqual(await botActions.updateWorkspaceBotDefaults({ defaultModel: 'claude' }), { defaultModel: 'claude', defaultRepository: null })
+  assert.equal((await botActions.getWorkspaceModelPolicy()).error, undefined)
+  assert.equal((await botActions.updateWorkspaceModelPolicy({ allowedModels: ['claude'], startingModel: null, expectedVersion: 3 })).error, undefined)
+  assert.equal((await botActions.getBotSettings({ botId: 'b' })).error, undefined)
+  assert.equal((await botActions.updateBotSettings({ botId: 'b', model: 'codex' })).error, undefined)
   assert.deepEqual(await botActions.listWorkspaceBots(), { bots: [{ id: 'b', name: 'Bot', status: 'running', runningThreads: 2 }] })
-  assert.deepEqual(calls, [['botDefaultOptions', actor.workspaceId], ['saveBotDefaults', actor.userId, actor.workspaceId, { defaultModel: 'claude' }], ['workspaceBots', actor.workspaceId]])
-  failure = new WorkspaceError('botDefaultRepositoryUnavailable')
-  assert.equal((await botActions.updateWorkspaceBotDefaults({ defaultRepository: 'x/y' })).error, 'botDefaultRepositoryUnavailable')
-  const current = { defaultModel: 'codex', defaultRepository: null, version: 7 }
-  failure = Object.assign(new WorkspaceError('botDefaultsConflict'), { current })
-  assert.deepEqual(await botActions.updateWorkspaceBotDefaults({ defaultModel: 'claude', expectedVersion: 6 }), { error: 'botDefaultsConflict', status: 409, current })
+  assert.deepEqual(calls, [
+    ['modelPolicy', actor.workspaceId],
+    ['saveModelPolicy', actor.userId, actor.workspaceId, { allowedModels: ['claude'], startingModel: null, expectedVersion: 3 }],
+    ['botSettingsFor', actor.userId, actor.workspaceId, 'b'],
+    ['saveBotSettings', actor.userId, actor.workspaceId, { botId: 'b', model: 'codex' }],
+    ['workspaceBots', actor.workspaceId],
+  ])
+  failure = new WorkspaceError('botOwnerOnly')
+  assert.equal((await botActions.updateBotSettings({ botId: 'b', model: 'codex' })).error, 'botOwnerOnly')
+  failure = new WorkspaceError('botModelNotAllowed')
+  assert.equal((await botActions.updateWorkspaceModelPolicy({ allowedModels: ['mikka'], startingModel: 'claude' })).error, 'botModelNotAllowed')
+  const current = { allowedModels: ['mikka'], startingModel: null, version: 7, modelGroups: [] }
+  failure = Object.assign(new WorkspaceError('modelPolicyConflict'), { current })
+  assert.deepEqual(await botActions.updateWorkspaceModelPolicy({ allowedModels: ['claude'], startingModel: null, expectedVersion: 6 }), { error: 'modelPolicyConflict', status: 409, current })
 })

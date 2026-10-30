@@ -1077,8 +1077,10 @@
     "botTransferNameConflict": "The new owner already has a bot with the same name. Rename one of them, then hand it over.",
     "teamNotFound": "This team does not exist.",
     "teamDeleteNameMismatch": "The name you entered does not match the team name.",
-    "botDefaultRepositoryUnavailable": "This repository is not in any workspace member’s GitHub App installation.",
-    "botDefaultsConflict": "Someone else changed these defaults. Showing the latest values.",
+    "botRepositoryUnavailable": "This repository isn't covered by the workspace's GitHub App installations.",
+    "botModelNotAllowed": "This workspace doesn't allow that model.",
+    "botOwnerOnly": "Only the bot's owner can change its settings.",
+    "modelPolicyConflict": "Another admin just changed the available models. Showing the latest.",
     "usageLimitReached": "The usage limit has been reached. New tasks are paused; running tasks will finish.",
     "usageCreditsExhausted": "Credits have run out. New tasks are paused; running tasks will finish.",
     "billingNotConfigured": "Billing is not set up.",
@@ -1598,8 +1600,8 @@
         "title": "Connections"
       },
       "models": {
-        "title": "Models and quota",
-        "keywords": "model subscriptions subscription quota usage"
+        "title": "Model subscriptions",
+        "keywords": "subscription ChatGPT Codex Claude account"
       },
       "logins": {
         "title": "Logins and keys"
@@ -1620,7 +1622,8 @@
         "title": "General"
       },
       "bots": {
-        "title": "Bots"
+        "title": "Bots",
+        "keywords": "available models model allowlist"
       },
       "permissions": {
         "title": "Permissions and approvals"
@@ -1632,7 +1635,8 @@
         "title": "Audit log"
       },
       "usage": {
-        "title": "Usage"
+        "title": "Usage",
+        "keywords": "quota usage limits"
       },
       "billing": {
         "title": "Billing"
@@ -2055,6 +2059,28 @@
         "codex": "Codex",
         "claude": "Claude"
       }
+    },
+    "botSettings": {
+      "modelsTitle": "Available models",
+      "startingModel": "Starting model for new bots",
+      "allBotsTitle": "All bots",
+      "noBots": "No bots yet",
+      "idle": "Idle",
+      "running": "Running · {count, plural, one {# thread} other {# threads}}",
+      "ownerStatus": "{owner} · {status}",
+      "model": "Model",
+      "repository": "Repository",
+      "noRepository": "None",
+      "modelUnavailable": "{model} is no longer allowed",
+      "repositoryUnavailable": "{repository} has no GitHub App installation",
+      "threadsTitle": "Threads",
+      "noThreads": "No threads yet",
+      "privateThread": "Private thread",
+      "threadMeta": "{status} · {time}",
+      "threadRunning": "Running",
+      "threadDone": "Done",
+      "loadMore": "Load more",
+      "subscriptionMissing": "{model} subscription not connected"
     }
   },
   "TelegramBot": {
@@ -2915,7 +2941,8 @@
       "widen": "Widen panel",
       "narrow": "Restore panel width",
       "close": "Close panel",
-      "open": "Open panel"
+      "open": "Open panel",
+      "botSettings": "Bot settings"
     },
     "suggestions": {
       "title": "Suggestions",

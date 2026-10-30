@@ -26,7 +26,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'notifications', group: 'personal', title: 'Notifications' },
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },
-  { id: 'models', group: 'personal', title: 'Models' },
+  // 模型订阅: connecting the person's own provider accounts. 可用模型 (admin allowlist) is under Bots; 额度 is Usage.
+  { id: 'models', group: 'personal', title: 'Model subscriptions' },
   { id: 'logins', group: 'personal', title: 'Logins and keys' },
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
   { id: 'activity', group: 'personal', title: 'Activity' },

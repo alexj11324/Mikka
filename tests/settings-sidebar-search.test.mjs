@@ -23,9 +23,14 @@ test('团队、成员仅在路由设置页显示，搜索不改变该规则', ()
   assert.equal(settingsItemVisible({ ...workspace, routed: false }), true)
 })
 
-test('模型订阅在集成页：额度、quota、ChatGPT、Claude、Codex、订阅都能搜到', () => {
-  const integrations = { groupTitle: 'Workspace', groupLabel: 'x', itemTitle: 'Models', label: zh.sections.models.title, keywords: zh.sections.models.keywords, section: 'models', routed: false }
-  for (const query of ['额度', 'quota', 'ChatGPT', 'chatgpt', 'Claude', 'Codex', '订阅', '模型订阅']) assert.equal(settingsItemVisible({ ...integrations, query }), true, query)
-  const other = { ...integrations, itemTitle: 'General', label: zh.sections.general.title, keywords: '', section: 'general' }
+test('模型订阅 finds subscriptions; 额度 and 可用模型 find their workspace sections instead', () => {
+  const subscriptions = { groupTitle: 'Personal', groupLabel: 'x', itemTitle: 'Model subscriptions', label: zh.sections.models.title, keywords: zh.sections.models.keywords, section: 'models', routed: false }
+  for (const query of ['ChatGPT', 'chatgpt', 'Claude', 'Codex', '订阅', '模型订阅']) assert.equal(settingsItemVisible({ ...subscriptions, query }), true, query)
+  for (const query of ['额度', 'quota']) assert.equal(settingsItemVisible({ ...subscriptions, query }), false, query)
+  const usage = { ...subscriptions, groupTitle: 'Workspace', itemTitle: 'Usage', label: zh.sections.usage.title, keywords: zh.sections.usage.keywords, section: 'usage' }
+  for (const query of ['额度', 'quota']) assert.equal(settingsItemVisible({ ...usage, query }), true, query)
+  const bots = { ...subscriptions, groupTitle: 'Workspace', itemTitle: 'Bots', label: zh.sections.bots.title, keywords: zh.sections.bots.keywords, section: 'bots' }
+  assert.equal(settingsItemVisible({ ...bots, query: '可用模型' }), true)
+  const other = { ...subscriptions, itemTitle: 'General', label: zh.sections.general.title, keywords: '', section: 'general' }
   for (const query of ['额度', 'quota', 'Claude']) assert.equal(settingsItemVisible({ ...other, query }), false, query)
 })

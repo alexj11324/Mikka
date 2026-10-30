@@ -95,9 +95,9 @@ export const bots = pgTable('bots', {
   /** A bloub colour id, see components/nav/bot-avatar.tsx. */
   color: text('color').notNull().default('encre'),
   shape: text('shape').notNull().default('cercle'),
-  /** Model family a new bot starts with ('mikka' | 'codex' | 'claude'); copied from workspace_settings. */
+  /** The owner's model family ('mikka' | 'codex' | 'claude'), chosen from the workspace's 可用模型. Starts as workspace_settings.defaultModel. */
   model: text('model').$type<WorkspaceBotModel | null>(),
-  /** GitHub repository (owner/repo remote key) a new bot starts with; copied from workspace_settings. */
+  /** The owner's default repository (owner/repo remote key), chosen from the workspace's GitHub App installations. */
   repository: text('repository'),
   /** Monthly credit cap for this bot; null uses workspace_settings.botMonthlyCreditLimit. */
   monthlyCreditLimit: integer('monthlyCreditLimit'),
@@ -1018,16 +1018,20 @@ export const accountDataExports = pgTable('account_data_exports', {
 export const WORKSPACE_BOT_MODELS = ['mikka', 'codex', 'claude'] as const
 export type WorkspaceBotModel = (typeof WORKSPACE_BOT_MODELS)[number]
 
-/** Workspace-level defaults and usage limits (settings › Bots, Usage). Null means unset / unlimited. */
+/** What admins allow bots to use, and usage limits (settings › Bots, Usage). Null means unset / unlimited. */
 export const workspaceSettings = pgTable('workspace_settings', {
   workspaceId: uuid('workspaceId').primaryKey(),
+  /** The model a new bot starts with (its owner can change it). Must be in allowedModels. */
   defaultModel: text('defaultModel').$type<WorkspaceBotModel | null>(),
+  /** No longer read or written: a bot's repository is its owner's choice (docs/design/bot-settings.md). */
   defaultRepository: text('defaultRepository'),
+  /** 可用模型: families members' bots may use, admin-set. Null (never saved) allows every family. */
+  allowedModels: text('allowedModels').array().$type<WorkspaceBotModel[] | null>(),
+  /** Optimistic-lock version of allowedModels/defaultModel; bumped by every 可用模型 save. */
+  modelPolicyVersion: integer('modelPolicyVersion').notNull().default(0),
   monthlyCreditLimit: integer('monthlyCreditLimit'),
   botMonthlyCreditLimit: integer('botMonthlyCreditLimit'),
   backgroundDailyCreditLimit: integer('backgroundDailyCreditLimit'),
-  /** Optimistic-lock version of defaultModel/defaultRepository; bumped by every bot-defaults save. */
-  botDefaultsVersion: integer('botDefaultsVersion').notNull().default(0),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 

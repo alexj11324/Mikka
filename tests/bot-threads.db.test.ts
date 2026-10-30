@@ -113,9 +113,9 @@ test('bot thread list', { skip: !dbUrl }, async t => {
     await assert.rejects(botAdmin.listBotThreadsFor(owner, ws.id, { botId: bot, limit: 500 }))
   })
 
-  await t.test('defaults expose the three model groups', async () => {
-    const options = await botAdmin.botDefaultOptions(ws.id)
-    assert.deepEqual(options.modelGroups.map(group => group.id), ['mikka', 'codex', 'claude'])
-    assert.deepEqual(options.models, ['mikka', 'codex', 'claude'])
+  await t.test('the model policy exposes the three model groups', async () => {
+    const policy = await botAdmin.modelPolicy(ws.id)
+    assert.deepEqual(policy.modelGroups.map(group => group.id), ['mikka', 'codex', 'claude'])
+    assert.deepEqual(policy.allowedModels, ['mikka', 'codex', 'claude'])
   })
 })

@@ -16,6 +16,7 @@ import { LetterAvatar } from './letter-avatar'
 import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
 import { BotAvatar, COORDINATOR_AVATAR } from './bot-avatar'
+import { BotSettings } from './bot-settings'
 import { GroupHeader } from './group-header'
 import { ThreadList } from './thread-list'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
@@ -135,6 +136,7 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
             </TabsList>
           </div>
           <TabsContent value="details" className="flex min-h-0 flex-col gap-4 overflow-y-auto px-4 pb-4">
+            {botId && <BotSettings key={botId} botId={botId} />}
             <DetailList title={t('routines')} empty={t('noRoutines')} items={NO_ITEMS} icon={Clock} />
             <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />
           </TabsContent>

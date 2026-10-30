@@ -2,36 +2,29 @@ import 'server-only'
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { agentRuns, bots, issues, users, githubRepositoryInstallations, WORKSPACE_BOT_MODELS, workspaceSettings, type WorkspaceBotModel } from '@/lib/db/schema'
+import { agentRuns, bots, issues, users, githubRepositoryInstallations, workspaceSettings, type WorkspaceBotModel } from '@/lib/db/schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { issueVisibility } from '@/lib/issue-visibility'
+import { allowedModelsOf, botSettingsInput, modelPolicyInput, resolveBotModel, resolveBotRepository } from '@/lib/workspace-admin/bot-model-policy'
 import { BOT_MODEL_GROUPS, botThreadsInput, botThreadHref, botThreadTitle, decodeBotThreadCursor, encodeBotThreadCursor, type BotModelGroup } from '@/lib/workspace-admin/bot-threads'
 
-export interface BotDefaults { defaultModel: WorkspaceBotModel | null; defaultRepository: string | null }
-/** BotDefaults plus the optimistic-lock version a save must echo back as expectedVersion. */
-export interface VersionedBotDefaults extends BotDefaults { version: number }
-export interface BotDefaultOptions extends VersionedBotDefaults {
-  /** 'mikka' is Mikka's hosted model; 'codex' / 'claude' use the bot owner's connected subscription. */
-  models: readonly WorkspaceBotModel[]
+export interface ModelPolicy {
+  /** 可用模型 in menu order; every family until an admin saves. */
+  allowedModels: WorkspaceBotModel[]
+  /** The model a new bot starts with; null = the first allowed family. */
+  startingModel: WorkspaceBotModel | null
+  /** Optimistic-lock version; send it back as expectedVersion. */
+  version: number
   /** The 模型 menu: Mikka 默认 / Codex / Claude, in order (WS-05). */
   modelGroups: readonly BotModelGroup[]
-  /** owner/repo remote keys from the GitHub App installations of the workspace's active members. */
-  repositories: string[]
 }
 
-export const botDefaultsInput = z.object({
-  defaultModel: z.enum(WORKSPACE_BOT_MODELS).nullable().optional(),
-  defaultRepository: z.string().trim().min(1).max(300).nullable().optional(),
-  /** Version the client last read; omitted = last write wins (old clients). */
-  expectedVersion: z.number().int().min(0).optional(),
-}).strict()
-
-/** expectedVersion no longer matches: someone else saved first. Carries the current value. */
-export class BotDefaultsConflictError extends WorkspaceError {
-  constructor(readonly current: VersionedBotDefaults) { super('botDefaultsConflict') }
+/** expectedVersion no longer matches: another admin saved first. Carries the current policy. */
+export class ModelPolicyConflictError extends WorkspaceError {
+  constructor(readonly current: ModelPolicy) { super('modelPolicyConflict') }
 }
 
 async function activeMemberIds(workspaceId: string) {
@@ -40,7 +33,8 @@ async function activeMemberIds(workspaceId: string) {
   return rows.map(row => row.userId)
 }
 
-async function installedRepositories(workspaceId: string) {
+/** owner/repo keys the GitHub App installations of the workspace's active members cover. */
+export async function installedRepositories(workspaceId: string) {
   const members = await activeMemberIds(workspaceId)
   if (!members.length) return []
   const rows = await db.selectDistinct({ remoteKey: githubRepositoryInstallations.remoteKey }).from(githubRepositoryInstallations)
@@ -53,48 +47,138 @@ export async function repositoryAvailable(workspaceId: string, repository: strin
   return (await installedRepositories(workspaceId)).includes(repository)
 }
 
-/** The stored defaults; createBot falls back to these. */
-export async function workspaceBotDefaults(workspaceId: string): Promise<BotDefaults> {
-  const { version: _version, ...defaults } = await versionedBotDefaults(workspaceId)
-  return defaults
-}
+type Reader = Pick<typeof db, 'select'>
 
-async function versionedBotDefaults(workspaceId: string): Promise<VersionedBotDefaults> {
-  const [row] = await db.select({ defaultModel: workspaceSettings.defaultModel, defaultRepository: workspaceSettings.defaultRepository, version: workspaceSettings.botDefaultsVersion })
+/** 可用模型 and the starting model. Any active member may read it (their bots' menus come from it). */
+export async function modelPolicy(workspaceId: string, reader: Reader = db): Promise<ModelPolicy> {
+  const [row] = await reader.select({ allowedModels: workspaceSettings.allowedModels, startingModel: workspaceSettings.defaultModel, version: workspaceSettings.modelPolicyVersion })
     .from(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId)).limit(1)
-  return { defaultModel: row?.defaultModel ?? null, defaultRepository: row?.defaultRepository ?? null, version: row?.version ?? 0 }
+  const allowedModels = allowedModelsOf(row?.allowedModels)
+  const startingModel = row?.startingModel && allowedModels.includes(row.startingModel) ? row.startingModel : null
+  return { allowedModels, startingModel, version: row?.version ?? 0, modelGroups: BOT_MODEL_GROUPS }
 }
 
-/** 新 Bot 默认值 and what can be chosen. Any active member may read them. */
-export async function botDefaultOptions(workspaceId: string): Promise<BotDefaultOptions> {
-  const [defaults, repositories] = await Promise.all([versionedBotDefaults(workspaceId), installedRepositories(workspaceId)])
-  return { ...defaults, models: WORKSPACE_BOT_MODELS, modelGroups: BOT_MODEL_GROUPS, repositories }
+/** What createBot writes when the caller does not choose: the starting model, or the first allowed family. */
+export async function newBotModel(workspaceId: string): Promise<WorkspaceBotModel | null> {
+  const policy = await modelPolicy(workspaceId)
+  return policy.startingModel ?? policy.allowedModels[0] ?? null
+}
+
+/** True when `model` is in the workspace's 可用模型. */
+export async function modelAllowed(workspaceId: string, model: WorkspaceBotModel): Promise<boolean> {
+  return (await modelPolicy(workspaceId)).allowedModels.includes(model)
 }
 
 /**
- * Admins only. A repository must be installed by an active member; null clears a default.
- * With expectedVersion the write is a compare-and-set on botDefaultsVersion (one UPDATE ... WHERE,
- * atomic under concurrency); a stale version throws BotDefaultsConflictError with the current value.
+ * Admins only. Saves 可用模型 (at least one family) and the starting model, which
+ * must be one of them. The workspace row lock (requireWorkspace(..., true))
+ * serialises admins; with expectedVersion the write is also a compare-and-set
+ * on modelPolicyVersion, and a stale version throws ModelPolicyConflictError.
+ * Bots whose model is no longer allowed keep their stored choice and run on the
+ * fallback (resolveBotModel) until their owner picks again.
  */
-export async function saveBotDefaults(actorId: string, workspaceId: string, input: z.input<typeof botDefaultsInput>): Promise<VersionedBotDefaults> {
-  const { expectedVersion, ...values } = botDefaultsInput.parse(input)
+export async function saveModelPolicy(actorId: string, workspaceId: string, input: z.input<typeof modelPolicyInput>): Promise<ModelPolicy> {
+  const { expectedVersion, allowedModels, startingModel } = modelPolicyInput.parse(input)
+  if (startingModel && !allowedModels.includes(startingModel)) throw new WorkspaceError('botModelNotAllowed')
+  const ordered = allowedModelsOf(allowedModels)
   return workspaceDb.transaction(async tx => {
     await requireWorkspace(tx, workspaceId, actorId, true)
-    if (values.defaultRepository && !(await repositoryAvailable(workspaceId, values.defaultRepository))) {
-      throw new WorkspaceError('botDefaultRepositoryUnavailable')
-    }
-    // Make sure the row exists (version 0), then compare-and-set in a single statement.
     await db.insert(workspaceSettings).values({ workspaceId }).onConflictDoNothing({ target: workspaceSettings.workspaceId })
     const match = expectedVersion === undefined
       ? eq(workspaceSettings.workspaceId, workspaceId)
-      : and(eq(workspaceSettings.workspaceId, workspaceId), eq(workspaceSettings.botDefaultsVersion, expectedVersion))
+      : and(eq(workspaceSettings.workspaceId, workspaceId), eq(workspaceSettings.modelPolicyVersion, expectedVersion))
     const [row] = await db.update(workspaceSettings)
-      .set({ ...values, botDefaultsVersion: sql`${workspaceSettings.botDefaultsVersion} + 1`, updatedAt: new Date() })
-      .where(match)
-      .returning({ defaultModel: workspaceSettings.defaultModel, defaultRepository: workspaceSettings.defaultRepository, version: workspaceSettings.botDefaultsVersion })
-    if (!row) throw new BotDefaultsConflictError(await versionedBotDefaults(workspaceId))
+      .set({ allowedModels: ordered, defaultModel: startingModel, modelPolicyVersion: sql`${workspaceSettings.modelPolicyVersion} + 1`, updatedAt: new Date() })
+      .where(match).returning({ version: workspaceSettings.modelPolicyVersion })
+    if (!row) throw new ModelPolicyConflictError(await modelPolicy(workspaceId))
+    return { allowedModels: ordered, startingModel, version: row.version, modelGroups: BOT_MODEL_GROUPS }
+  })
+}
+
+export interface BotSettingsView {
+  bot: { id: string; name: string; ownerId: string }
+  /** Only the bot's owner may change its settings; everyone else reads them. */
+  canEdit: boolean
+  /** The owner's stored choices. */
+  model: WorkspaceBotModel | null
+  repository: string | null
+  /** What the bot runs on now (resolveBotModel / resolveBotRepository). */
+  effectiveModel: WorkspaceBotModel | null
+  effectiveRepository: string | null
+  /** The stored model is no longer in 可用模型. */
+  modelUnavailable: boolean
+  /** The stored repository is no longer covered by the workspace's GitHub App installations. */
+  repositoryUnavailable: boolean
+  /** The choices: 可用模型 and the installed repositories. */
+  allowedModels: WorkspaceBotModel[]
+  repositories: string[]
+  modelGroups: readonly BotModelGroup[]
+  /**
+   * Codex / Claude run on the owner's own subscription (设置 › 模型订阅). The providers the
+   * owner has connected in this workspace; empty for anyone but the owner (never another person's accounts).
+   */
+  connectedProviders: Array<'codex' | 'claude'>
+}
+
+/** Providers the person has a live connection for in this workspace (byos_connections). */
+async function connectedProviders(ownerId: string, workspaceId: string): Promise<Array<'codex' | 'claude'>> {
+  const { rows } = await db.execute<{ provider: 'codex' | 'claude' }>(sql`select distinct provider from byos_connections where "ownerId" = ${ownerId} and "workspaceId" = ${workspaceId} and state = 'connected' and "removedAt" is null order by provider`)
+  return rows.map(row => row.provider)
+}
+
+async function botIn(workspaceId: string, botId: string, reader: Reader = db) {
+  const [bot] = await reader.select({ id: bots.id, name: bots.name, ownerId: bots.ownerId, model: bots.model, repository: bots.repository })
+    .from(bots).where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId))).limit(1)
+  if (!bot) throw new WorkspaceError('botNotFound')
+  return bot
+}
+
+function settingsView(viewerId: string, bot: Awaited<ReturnType<typeof botIn>>, policy: ModelPolicy, repositories: string[], providers: Array<'codex' | 'claude'>): BotSettingsView {
+  const model = resolveBotModel({ model: bot.model, allowedModels: policy.allowedModels, startingModel: policy.startingModel })
+  const repository = resolveBotRepository(bot.repository, repositories)
+  return {
+    bot: { id: bot.id, name: bot.name, ownerId: bot.ownerId }, canEdit: bot.ownerId === viewerId,
+    model: bot.model, repository: bot.repository,
+    effectiveModel: model.model, effectiveRepository: repository.repository,
+    modelUnavailable: model.unavailable, repositoryUnavailable: repository.unavailable,
+    allowedModels: policy.allowedModels, repositories, modelGroups: policy.modelGroups,
+    connectedProviders: bot.ownerId === viewerId ? providers : [],
+  }
+}
+
+/** One bot's model and repository. Any active member of its workspace may read them. */
+export async function botSettingsFor(viewerId: string, workspaceId: string, botId: string): Promise<BotSettingsView> {
+  z.string().uuid().parse(botId)
+  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, viewerId))
+  const [bot, policy, repositories, providers] = await Promise.all([botIn(workspaceId, botId), modelPolicy(workspaceId), installedRepositories(workspaceId), connectedProviders(viewerId, workspaceId)])
+  return settingsView(viewerId, bot, policy, repositories, providers)
+}
+
+/**
+ * The bot's owner only (admins included: an admin cannot change someone else's bot).
+ * The model must be in 可用模型 and the repository covered by the workspace's GitHub
+ * App installations. The settings row is held FOR SHARE while the bot is written, so an
+ * admin's 可用模型 save cannot slip between the check and the write.
+ */
+export async function saveBotSettings(actorId: string, workspaceId: string, input: z.input<typeof botSettingsInput>): Promise<BotSettingsView> {
+  const { botId, ...values } = botSettingsInput.parse(input)
+  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId))
+  if (values.repository && !(await repositoryAvailable(workspaceId, values.repository))) throw new WorkspaceError('botRepositoryUnavailable')
+  await db.insert(workspaceSettings).values({ workspaceId }).onConflictDoNothing({ target: workspaceSettings.workspaceId })
+  const bot = await db.transaction(async tx => {
+    await tx.select({ id: workspaceSettings.workspaceId }).from(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId)).for('share')
+    const current = await botIn(workspaceId, botId, tx)
+    if (current.ownerId !== actorId) throw new WorkspaceError('botOwnerOnly')
+    if (values.model && !(await modelPolicy(workspaceId, tx)).allowedModels.includes(values.model)) throw new WorkspaceError('botModelNotAllowed')
+    if (values.model === undefined && values.repository === undefined) return current
+    const [row] = await tx.update(bots).set({ ...values, updatedAt: new Date() })
+      .where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId), eq(bots.ownerId, actorId)))
+      .returning({ id: bots.id, name: bots.name, ownerId: bots.ownerId, model: bots.model, repository: bots.repository })
+    if (!row) throw new WorkspaceError('botOwnerOnly')
     return row
   })
+  const [policy, repositories, providers] = await Promise.all([modelPolicy(workspaceId), installedRepositories(workspaceId), connectedProviders(actorId, workspaceId)])
+  return settingsView(actorId, bot, policy, repositories, providers)
 }
 
 export interface WorkspaceBotView {

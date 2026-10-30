@@ -15,6 +15,7 @@ import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings
 import { IntegrationsSettings } from '@/components/settings/integrations-settings'
 import { ComputerPolicySettings } from '@/components/settings/computer-policy-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
+import { BotsSettings } from '@/components/settings/bots-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
 import { SecuritySettings } from '@/components/settings/security-settings'
@@ -67,13 +68,13 @@ export function SettingsView({ user, userKey, googleEnabled = false, onBack, onS
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent className="gap-6">
         {section === 'computers' ? <DevicesSettings /> : <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
-        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} />
+        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} admin={admin} />
       </SettingsContent>}
     </AppShellContent>
   </>
 }
 
-function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, workspaceError = false, linearNotice, preview, onSignOut, signingOut }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; workspaceError?: boolean }) {
+function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, workspaceError = false, linearNotice, preview, onSignOut, signingOut, admin }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; workspaceError?: boolean; admin: boolean }) {
   // Workspace sections wait for the workspace instead of rendering nothing.
   const waiting = preview || !workspaceId
     ? preview || workspaceError ? <p role="alert" className="text-sm text-destructive">{t('workspaceUnavailable')}</p> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
@@ -90,6 +91,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'connections': return <><IntegrationsSettings /><LinearSettings notice={linearNotice ?? null} /><TelegramSettings preview={preview} /></>
     case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
+    case 'bots': return workspaceId && !preview ? <BotsSettings key={workspaceId} admin={admin} workspaceId={workspaceId} /> : waiting
     case 'permissions': return workspaceId && !preview ? <ComputerPolicySettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return <p className="py-8 text-sm text-muted-foreground">{t('sectionUnavailable')}</p>
   }
