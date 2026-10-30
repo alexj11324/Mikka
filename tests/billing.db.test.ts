@@ -41,7 +41,7 @@ test('workspace billing', { skip: !dbUrl }, async t => {
   })
 
   await t.test('webhook events record the subscription once; the portal then opens', async () => {
-    const event = { id: `evt_${randomUUID()}`, type: 'customer.subscription.created', data: { object: { id: 'sub_1', customer: `cus_${randomUUID()}`, status: 'active', metadata: { workspaceId: ws.id }, items: { data: [{ quantity: 3, current_period_end: 1_793_491_200, price: { nickname: 'Team' } }] } } } }
+    const event = { id: `evt_${randomUUID()}`, type: 'customer.subscription.created', data: { object: { id: `sub_${randomUUID()}`, customer: `cus_${randomUUID()}`, status: 'active', metadata: { workspaceId: ws.id }, items: { data: [{ quantity: 3, current_period_end: 1_793_491_200, price: { nickname: 'Team' } }] } } } }
     assert.equal(await billing.applyStripeEvent(event), true)
     assert.equal(await billing.applyStripeEvent(event), false, 'a replayed event is ignored')
     const view = await billing.workspaceBillingView(admin, ws.id, env)
@@ -52,6 +52,6 @@ test('workspace billing', { skip: !dbUrl }, async t => {
     assert.equal(new URLSearchParams(requests[0].body).get('customer'), event.data.object.customer)
     await billing.applyStripeEvent({ ...event, id: `evt_${randomUUID()}`, type: 'customer.subscription.deleted' })
     assert.equal((await billing.workspaceBillingView(admin, ws.id, env)).live, false)
-    await assert.rejects(billing.applyStripeEvent({ id: `evt_${randomUUID()}`, type: 'customer.subscription.updated', data: { object: { id: 'sub_1' } } }))
+    await assert.rejects(billing.applyStripeEvent({ id: `evt_${randomUUID()}`, type: 'customer.subscription.updated', data: { object: { id: 'sub_x' } } }))
   })
 })

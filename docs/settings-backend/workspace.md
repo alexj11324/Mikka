@@ -157,5 +157,6 @@ listWorkspaceBots(): Promise<ActionResult<{ bots: Array<{
 
 ## 未完成
 
+- 设置 v4 其余页面（PR #482）：`lib/usage/read.ts`（用量：按 Bot / 成员 / 天统计线程数和运行时长，没有点数）、`lib/billing/service.ts`（计费：Stripe Checkout、Customer Portal、`/api/billing/stripe` webhook 写 `workspace_billing`）、`lib/audit/query.ts`（审计日志读取与 CSV）、`lib/app-policy/store.ts`（团队权限 › 允许使用的应用，表 `workspace_app_policies`）。下面两条是这之前的状态。
 - 5 用量：调研和代码草稿已经写了一部分，没有测试，所以没有提交。可以计量的真实数据有这些：Bot 线程的时长（agent_runs.startedAt / finishedAt，按 botId 归到工作区）、云电脑运行（computer_run_bindings）、后台任务次数（bot_subagents）。模型 token 用量方面，只有 `proactive_usage` 按个人和天记录了 token，没有工作区维度，单次运行也没有 token 数，所以点数口径只能按时长和次数定。派发入口有四处需要加检查：`lib/run-dispatch.ts`（insertRunOnce）、`lib/run-admission-store.ts`、`lib/computer/queue-run.ts`、`lib/cloud-computer/subagents.ts`（create）。
 - 6 计费（Stripe）：只建了表，没有实现。
