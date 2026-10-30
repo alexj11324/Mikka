@@ -9,7 +9,6 @@ import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
 import { useActionError } from '@/lib/use-action-error'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from '@/components/ui/message-scroller'
@@ -24,6 +23,7 @@ import { ChatComposer } from './chat-composer'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { ThreadCard } from './thread-card'
 import { PendingActions } from './pending-actions'
+import { TurnError } from './turn-error'
 import { SubagentLoginNeeds } from './subagent-login-needs'
 import { UnreadDivider } from '@/components/chat/unread-divider'
 import { UnreadPill } from '@/components/chat/unread-pill'
@@ -223,7 +223,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
-      {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
+      {data?.error && !data.working && <TurnError error={data.error} />}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />

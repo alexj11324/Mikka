@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { allowedModelsOf, bindingProvider, botSettingsInput, chooseBotModelSource, modelPolicyInput, resolveBotModel, resolveBotRepository, selectableModels } from './bot-model-policy'
+import { allowedModelsOf, bindingProvider, botModelRefusalText, parseBotModelRefusal, botSettingsInput, chooseBotModelSource, modelPolicyInput, resolveBotModel, resolveBotRepository, selectableModels } from './bot-model-policy'
 
 test('allowlist: null allows every family; stored lists come back in menu order without unknown values', () => {
   assert.deepEqual(allowedModelsOf(null), ['mikka', 'codex', 'claude'])
@@ -57,4 +57,10 @@ test('routes map to providers; the menu offers only what can run here', () => {
   assert.deepEqual(['codex_cpa', 'openai_siwc', 'claude_cpa'].map(bindingProvider), ['codex', 'codex', 'claude'])
   assert.deepEqual(selectableModels(['mikka', 'codex', 'claude'], false), ['mikka'])
   assert.deepEqual(selectableModels(['codex', 'claude'], true), ['codex', 'claude'])
+})
+
+test('a refused turn round-trips through the stored error; other errors are not refusals', () => {
+  assert.deepEqual(parseBotModelRefusal(botModelRefusalText('binding_required', 'codex')), { reason: 'binding_required', family: 'codex' })
+  assert.deepEqual(parseBotModelRefusal(botModelRefusalText('backend_unavailable', null)), { reason: 'backend_unavailable', family: null })
+  for (const other of [null, '', 'binding_required', 'botModel:other:codex', 'replyEmpty: the model returned no text']) assert.equal(parseBotModelRefusal(other), null, String(other))
 })

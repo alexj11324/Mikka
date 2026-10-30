@@ -95,3 +95,19 @@ export function chooseBotModelSource(input: {
 export function selectableModels(allowedModels: readonly WorkspaceBotModel[], subscriptionsRunnable: boolean): WorkspaceBotModel[] {
   return allowedModels.filter(model => model === 'mikka' || subscriptionsRunnable)
 }
+
+export type BotModelRefusalReason = 'binding_required' | 'backend_unavailable'
+const REFUSAL_MARK = 'botModel'
+
+/**
+ * A refused turn's reason as stored in coordinator_sessions."lastError" (the chat's
+ * failed-turn error), so the chat can name it and link to the fix.
+ */
+export function botModelRefusalText(reason: BotModelRefusalReason, family: WorkspaceBotModel | null): string {
+  return `${REFUSAL_MARK}:${reason}:${family ?? ''}`
+}
+
+export function parseBotModelRefusal(error: string | null | undefined): { reason: BotModelRefusalReason; family: WorkspaceBotModel | null } | null {
+  const match = /^botModel:(binding_required|backend_unavailable):(mikka|codex|claude)?$/.exec(error ?? '')
+  return match ? { reason: match[1] as BotModelRefusalReason, family: (match[2] as WorkspaceBotModel | undefined) ?? null } : null
+}

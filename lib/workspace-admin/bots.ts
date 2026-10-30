@@ -60,10 +60,18 @@ export async function modelPolicy(workspaceId: string, reader: Reader = db): Pro
   return { allowedModels, startingModel, version: row?.version ?? 0, modelGroups: BOT_MODEL_GROUPS }
 }
 
-/** What createBot writes when the caller does not choose: the starting model, or the first allowed family. */
-export async function newBotModel(workspaceId: string): Promise<WorkspaceBotModel | null> {
-  const policy = await modelPolicy(workspaceId)
-  return policy.startingModel ?? policy.allowedModels[0] ?? null
+/**
+ * What createBot writes when the caller does not choose: the starting model (else the first
+ * allowed family) when it can run for this owner here, otherwise the first allowed family that
+ * can, otherwise null. Codex / Claude can run only with the subscription backend on and the
+ * owner's own connected account for that provider in this workspace.
+ */
+export async function newBotModel(workspaceId: string, ownerId: string): Promise<WorkspaceBotModel | null> {
+  const [policy, providers] = await Promise.all([modelPolicy(workspaceId), connectedProviders(ownerId, workspaceId)])
+  const runnable = selectableModels(policy.allowedModels, subscriptionModelsRunnable())
+    .filter(model => model === 'mikka' || providers.includes(model))
+  const preferred = policy.startingModel ?? policy.allowedModels[0] ?? null
+  return preferred && runnable.includes(preferred) ? preferred : runnable[0] ?? null
 }
 
 /** True when `model` is in the workspace's 可用模型. */

@@ -1,4 +1,4 @@
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, app, seedTurnError } from './fixtures'
 import type { Locator, Page, TestInfo } from '@playwright/test'
 
 /** Design review evidence: the same state in light and dark. */
@@ -64,6 +64,23 @@ test('管理员设置可用模型，Bot 创建者只能在允许范围内选择�
   await page.reload()
   await panel.getByRole('tab', { name: '详情', exact: true }).click()
   await expect(model).toHaveText('Mikka 默认')
+
+  // A turn refused for the bot's model shows in the chat with its fix (failTurn's lastError, as the workflow stores it).
+  const botId = new URL(page.url()).searchParams.get('bot')!
+  await seedTurnError(page, botId, 'botModel:binding_required:codex')
+  await page.reload()
+  const refusal = page.getByTestId('bot-model-refusal')
+  await expect(refusal).toContainText('回复失败')
+  await expect(refusal).toContainText('未连接 Codex 订阅')
+  await expect(refusal.getByRole('link', { name: '模型订阅', exact: true })).toHaveAttribute('href', /section=models/)
+  await shots(page, testInfo, 'turn-refused-subscription', refusal)
+  await seedTurnError(page, botId, 'botModel:backend_unavailable:claude')
+  await page.reload()
+  await expect(refusal).toContainText('Claude 在此无法运行')
+  await shots(page, testInfo, 'turn-refused-model', refusal)
+  await panel.getByRole('tab', { name: '线程', exact: true }).click()
+  await refusal.getByRole('button', { name: '更换模型', exact: true }).click()
+  await expect(panel.getByTestId('bot-settings')).toBeVisible()
 
   // 全部 Bot shows it read-only with its owner's choice.
   await page.goto(app('/settings?section=bots'))

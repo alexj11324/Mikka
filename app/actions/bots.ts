@@ -39,7 +39,7 @@ export async function listBots(): Promise<BotView[]> {
 
 /**
  * 新建 Bot: a name, a colour and a shape. Bots run on Mikka's own harness, so there is no machine to pick.
- * `model` starts as the workspace's starting model (or the first of 可用模型) and `repository` as none;
+ * `model` starts as the workspace's starting model when it can run for this owner (newBotModel) and `repository` as none;
  * the owner changes both in the bot's own settings. Explicit values must be allowed and installed.
  */
 export async function createBot(input: { name: string; color: string; shape: string; model?: string | null; repository?: string | null }): Promise<BotView> {
@@ -55,7 +55,7 @@ export async function createBot(input: { name: string; color: string; shape: str
   if (repository && !(await repositoryAvailable(owner.workspaceId, repository))) throw new ActionFailureError('botRepositoryUnavailable')
   const bot = { id: crypto.randomUUID(), ...look }
   try {
-    await db.insert(bots).values({ ...bot, ...owner, model: model === undefined ? await newBotModel(owner.workspaceId) : model, repository: repository ?? null })
+    await db.insert(bots).values({ ...bot, ...owner, model: model === undefined ? await newBotModel(owner.workspaceId, owner.ownerId) : model, repository: repository ?? null })
   } catch (error) {
     // 23505 is the per-person, per-workspace name index.
     if ((error as { code?: string }).code === '23505') throw new ActionFailureError('botDuplicateName')

@@ -79,6 +79,17 @@ export async function seedSuggestion(page: Page, { source = 'gmail', action = 'r
   return id
 }
 
+/** A bot chat whose last turn failed with `error` (coordinator_sessions."lastError"), as the workflow's failTurn leaves it. */
+export async function seedTurnError(page: Page, botId: string, error: string) {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('seedTurnError 需要已登录的页面。')
+  const db = database()
+  const { rows: [session] } = await db.query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  if (!session) throw new Error('找不到当前登录会话。')
+  await db.query(`INSERT INTO coordinator_sessions ("userId", "botId", "lastError", "lastErrorAt") VALUES ($1, $2, $3, now())
+    ON CONFLICT ("userId", "botId") DO UPDATE SET "lastError" = excluded."lastError", "lastErrorAt" = now(), "leaseHolder" = null, "leaseUntil" = null`, [session.userId, botId, error])
+}
+
 /** The current conversation's title pill over the chat (desktop). */
 export function conversationPill(page: Page) {
   // Conversations opened earlier stay mounted but hidden; only the current one is visible.

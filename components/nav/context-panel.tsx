@@ -83,7 +83,7 @@ export type PanelConversation = { id?: string | null; name: string; color?: stri
  * 详情 / 线程 / PR / 电脑; 全部线程 lists every bot's threads. ⤢ widens just
  * this column. Picking another bot switches its threads, PRs and computer.
  */
-export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSearch, onClose, sheet = false }: {
+export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSearch, onClose, sheet = false, tabRequest }: {
   issues: Issue[]
   threads: Thread[]
   conversation: PanelConversation
@@ -92,6 +92,8 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
   onClose: () => void
   /** Shown in a Sheet below xl, where the column has no room. */
   sheet?: boolean
+  /** Open this tab of 概览 (a failed turn's 更换模型 asks for 详情); `at` makes a repeat request count. */
+  tabRequest?: { tab: PanelTab; at: number } | null
 }) {
   const t = useTranslations('Shell.panel')
   const [view, setView] = useState<PanelView>('overview')
@@ -108,6 +110,7 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
   const computer = cloudComputer ? botId ?? registered?.botId : undefined
   // A conversation whose bot works on its computer opens on its screen (Figma 103:64).
   useEffect(() => { if (registered?.runId) { setView('overview'); setTab('computer') } }, [registered?.runId])
+  useEffect(() => { if (tabRequest) { setView('overview'); setTab(tabRequest.tab) } }, [tabRequest])
   // No computer here (cloud computers off, or the Coordinator): no 电脑 tab.
   const tabs = computer ? TABS : TABS.filter(item => item !== 'computer')
   const shown = tabs.includes(tab) ? tab : 'threads'

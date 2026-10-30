@@ -41,7 +41,7 @@ before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor.userId, email: actor.email, name: actor.name } }) } } } })
   mock.module('@/lib/db', { namedExports: { db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }) } } })
   mock.module('@/lib/workspace-admin/bots', { namedExports: {
-    newBotModel: async (workspaceId: string) => { calls.push(['newBotModel', workspaceId]); return startingModel },
+    newBotModel: async (workspaceId: string, ownerId: string) => { calls.push(['newBotModel', workspaceId, ownerId]); return startingModel },
     modelAllowed: async (workspaceId: string, model: string) => { calls.push(['modelAllowed', workspaceId, model]); return allowed.has(model) },
     modelPolicy: respond('modelPolicy', { allowedModels: ['mikka', 'codex'], startingModel: 'codex', version: 3, modelGroups: [] }),
     saveModelPolicy: respond('saveModelPolicy', { allowedModels: ['claude'], startingModel: null, version: 4, modelGroups: [] }),
@@ -117,6 +117,7 @@ test('createBot starts at the starting model and no repository; explicit choices
   await botActions.createBot({ name: 'Scout 2', color: 'encre', shape: 'cercle', model: 'mikka', repository: null })
   assert.equal(inserted[1].model, 'mikka')
   assert.equal(calls.filter(call => call[0] === 'newBotModel').length, 1, 'an explicit model skips the starting-model read')
+  assert.deepEqual(calls.find(call => call[0] === 'newBotModel'), ['newBotModel', actor.workspaceId, actor.userId], 'for this owner')
   await assert.rejects(botActions.createBot({ name: 'Claude bot', color: 'encre', shape: 'cercle', model: 'claude' }), /botModelNotAllowed/)
   await assert.rejects(botActions.createBot({ name: 'Bad', color: 'encre', shape: 'cercle', model: 'gpt-x' }), /validationGeneric/)
   assert.equal(inserted.length, 2)

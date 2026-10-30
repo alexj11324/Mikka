@@ -2521,7 +2521,9 @@
       "sources": "{count} 个来源"
     },
     "sendUncertain": "未能确认消息是否送达。在这个输入框里原样重发不会产生重复；关闭或切换输入框、刷新页面或更换账号后再发，则可能重复。",
-    "lengthCount": "{count} / {max}"
+    "lengthCount": "{count} / {max}",
+    "modelUnavailableHere": "{model} 在此无法运行",
+    "changeModel": "更换模型"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "请先登录。",

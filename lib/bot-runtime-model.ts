@@ -1,10 +1,17 @@
 import 'server-only'
 import { and, eq, sql } from 'drizzle-orm'
 import { SubscriptionRefusal } from '@mikka/protocol/subscription'
-import { db } from '@/lib/db'
-import { bots, workspaceSettings } from '@/lib/db/schema'
 import type { AgentModelSource } from '@/lib/agent-model'
-import { allowedModelsOf, bindingProvider, chooseBotModelSource, type SubscriptionProvider } from '@/lib/workspace-admin/bot-model-policy'
+import { allowedModelsOf, bindingProvider, botModelRefusalText, chooseBotModelSource, type BotModelRefusalReason, type SubscriptionProvider } from '@/lib/workspace-admin/bot-model-policy'
+import type { WorkspaceBotModel } from '@/lib/db/schema'
+
+/** A refused bot turn. Its message is what the chat's failed-turn alert parses (parseBotModelRefusal). */
+export class BotModelRefusal extends SubscriptionRefusal {
+  constructor(readonly reason: BotModelRefusalReason, readonly family: WorkspaceBotModel | null) {
+    super(reason)
+    this.message = botModelRefusalText(reason, family)
+  }
+}
 
 /** Codex / Claude bots need both the subscription backend and the agent kit (the run's frozen model selection). */
 export function subscriptionModelsRunnable(): boolean {
@@ -18,6 +25,8 @@ export function subscriptionModelsRunnable(): boolean {
  * SubscriptionRefusal instead of switching provider when that binding is missing.
  */
 export async function botRunModelSource(ownerId: string, botId: string, definitionSelection: AgentModelSource | undefined): Promise<AgentModelSource | undefined> {
+  // Loaded on use: the workflow step module imports this file, and its tests stub the database module.
+  const [{ db }, { bots, workspaceSettings }] = await Promise.all([import('@/lib/db'), import('@/lib/db/schema')])
   const [bot] = await db.select({ model: bots.model, workspaceId: bots.workspaceId }).from(bots).where(and(eq(bots.id, botId), eq(bots.ownerId, ownerId))).limit(1)
   if (!bot) throw new SubscriptionRefusal('binding_mismatch')
   const [policy] = await db.select({ allowedModels: workspaceSettings.allowedModels, startingModel: workspaceSettings.defaultModel })
@@ -42,6 +51,6 @@ export async function botRunModelSource(ownerId: string, botId: string, definiti
     storedModel: bot.model, allowedModels, startingModel: policy?.startingModel ?? null,
     definitionBinding, latestBindings, subscriptionsRunnable: subscriptionModelsRunnable(),
   })
-  if ('refused' in choice) throw new SubscriptionRefusal(choice.refused)
+  if ('refused' in choice) throw new BotModelRefusal(choice.refused, choice.family)
   return choice.source
 }

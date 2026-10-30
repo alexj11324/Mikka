@@ -49,7 +49,10 @@ The `models` id stays, so old links keep working. Search: 额度 / quota find
   (`workspace.models_changed`, category 权限) with the families and starting
   model before and after. It commits in the same transaction as the change.
 - A new bot's model is 新 Bot 的初始模型 if set, else the first allowed
-  family. Its repository starts empty.
+  family, as long as it can run for its owner here (Codex / Claude need the
+  subscription backend and the owner's connected account). Otherwise it is the
+  first allowed family that can run, in menu order, and NULL when none can.
+  Its repository starts empty.
 - A bot's model must be in 可用模型 and its repository must be covered by the
   workspace's GitHub App installations; the server refuses anything else
   (`botModelNotAllowed`, `botRepositoryUnavailable`, `botOwnerOnly`).
@@ -90,13 +93,17 @@ called from `workflows/coordinator/agent-kit-steps.ts`), which applies
 - Mikka 默认 runs on Mikka's hosted model, even when the definition selects a
   subscription.
 - Codex or Claude runs on the owner's newest live binding for that bot and
-  provider. Without one, the turn is refused (`binding_required`) and 详情 shows
-  「未连接 Codex 订阅」. A bot never moves to another provider because a
-  subscription is missing.
+  provider. Without one, the turn is refused (`binding_required`). A bot never
+  moves to another provider because a subscription is missing.
 - Codex and Claude need the subscription backend and the agent kit
   (`MIKKA_BYOS_ENABLED`, `MIKKA_AGENT_KIT`). Where those are off, the 模型 menu does
   not offer them, saves refuse them, and a stale choice refuses the turn
   (`backend_unavailable`) instead of running on Mikka.
+- A refused turn shows in the bot's chat as the existing failed-turn alert
+  (回复失败, from `coordinator_sessions."lastError"`): 「未连接 Codex 订阅」 with a
+  模型订阅 button, or 「Claude 在此无法运行」 with 更换模型, which opens the
+  bot's 详情 (`components/coordinator/turn-error.tsx`). 详情 shows the same
+  「未连接 … 订阅」 under 模型.
 
 ## Data
 
@@ -134,7 +141,8 @@ R-43, `docs/settings.md` rules 1–5. Components are shadcn defaults: `Switch`,
 全部 Bot / All bots · 模型 / Model · 仓库 / Repository · 无 / None ·
 {model} 已不在可用模型中 / {model} is no longer allowed ·
 {repository} 未安装 GitHub App / {repository} has no GitHub App installation ·
-未连接 {model} 订阅 / {model} subscription not connected · 模型订阅 / Model subscriptions.
+未连接 {model} 订阅 / {model} subscription not connected · 模型订阅 / Model subscriptions ·
+{model} 在此无法运行 / {model} can't run here · 更换模型 / Change model.
 
 ## Out of scope
 

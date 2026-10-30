@@ -20,7 +20,8 @@ import { IssueList } from './issue-list'
 import { BoardPage } from './board-page'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { GlobalSearch, SearchPill } from '@/components/nav/global-search'
-import { ContextPanel } from '@/components/nav/context-panel'
+import { ContextPanel, type PanelTab } from '@/components/nav/context-panel'
+import { OPEN_BOT_DETAILS_EVENT } from '@/components/coordinator/turn-error'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { BrowserPane } from '@/components/browser/browser-pane'
@@ -150,6 +151,13 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     return () => wide.removeEventListener('change', close)
   }, [])
   function openPanel() { showPanel(true); if (!window.matchMedia('(min-width: 80rem)').matches) setPanelSheet(true) }
+  // A refused turn's 更换模型 opens this bot's 详情 (components/coordinator/turn-error.tsx).
+  const [panelTabRequest, setPanelTabRequest] = useState<{ tab: PanelTab; at: number } | null>(null)
+  useEffect(() => {
+    const openDetails = () => { openPanel(); setPanelTabRequest({ tab: 'details', at: Date.now() }) }
+    window.addEventListener(OPEN_BOT_DETAILS_EVENT, openDetails)
+    return () => window.removeEventListener(OPEN_BOT_DETAILS_EVENT, openDetails)
+  }, [])
   function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem('mikka:context-panel', next ? '1' : '0') } catch { /* storage unavailable */ } }
   // The app-wide browser (top bar 🌐): while open it takes the right panel's place.
   const [browserOpen, setBrowserOpen] = useState(false)
@@ -406,12 +414,12 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       </>}
     </AppShellContent>
     {browserShown && <BrowserPane onClose={() => showBrowser(false)} />}
-    {isConversation && panelOpen && !browserShown && <ContextPanel issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
+    {isConversation && panelOpen && !browserShown && <ContextPanel tabRequest={panelTabRequest} issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}
     {isConversation && !browserShown && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
       <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{i18nText('Shell.panel.label')}</SheetTitle></SheetHeader>
-        <ContextPanel sheet issues={tasks} threads={threads} onOpenIssue={id => { setPanelSheet(false); open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => setPanelSheet(false)}
+        <ContextPanel sheet tabRequest={panelTabRequest} issues={tasks} threads={threads} onOpenIssue={id => { setPanelSheet(false); open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => setPanelSheet(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />
       </SheetContent>
     </Sheet>}

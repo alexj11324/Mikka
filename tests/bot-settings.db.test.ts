@@ -33,7 +33,7 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
 
   await t.test('a workspace that never saved allows every family and has no starting model', async () => {
     assert.deepEqual(await botAdmin.modelPolicy(ws.id), { allowedModels: ['mikka', 'codex', 'claude'], startingModel: null, version: 0, modelGroups: (await botAdmin.modelPolicy(ws.id)).modelGroups })
-    assert.equal(await botAdmin.newBotModel(ws.id), 'mikka')
+    assert.equal(await botAdmin.newBotModel(ws.id, member), 'mikka')
   })
 
   await t.test('可用模型 is admin-only, needs one family, and the starting model must be allowed', async () => {
@@ -44,7 +44,8 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
     await rejects(botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['mikka'], startingModel: 'claude' }), 'botModelNotAllowed')
     const saved = await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['claude', 'codex'], startingModel: 'codex', expectedVersion: 0 })
     assert.deepEqual([saved.allowedModels, saved.startingModel, saved.version], [['codex', 'claude'], 'codex', 1], 'stored in menu order')
-    assert.equal(await botAdmin.newBotModel(ws.id), 'codex')
+    // The member has no Codex or Claude account connected, so a new bot could not run on either: legacy null.
+    assert.equal(await botAdmin.newBotModel(ws.id, member), null)
     // 审计日志: who changed 可用模型, from what to what.
     const audit = (await pool.query('select "actorId", action, category, metadata from workspace_audit_events where "workspaceId"=$1 order by "createdAt"', [ws.id])).rows
     assert.deepEqual(audit, [{ actorId: admin, action: 'workspace.models_changed', category: 'permission', metadata: { fromModels: 'mikka,codex,claude', toModels: 'codex,claude', fromStarting: null, toStarting: 'codex' } }])
@@ -210,5 +211,32 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
     } finally {
       process.env.MIKKA_BYOS_ENABLED = '1'
     }
+  })
+
+  await t.test('a new bot starts on the first model that can run for its owner here, else null', async () => {
+    const owner = await seedUser(pool, 'starter')
+    await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [ws.id, owner, `${owner}@example.invalid`])
+    await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['mikka', 'codex', 'claude'], startingModel: 'claude' })
+    // No Claude account: the starting model cannot run, Mikka (first runnable in menu order) is stored.
+    assert.equal(await botAdmin.newBotModel(ws.id, owner), 'mikka')
+    await pool.query(`insert into byos_connections (id,"ownerId","workspaceId",provider,state,"secretName","secretDigest","providerSubject") values ($1,$2,$3,'claude','connected',$4,repeat('d',64),'p')`, [randomUUID(), owner, ws.id, `s-${randomUUID()}`])
+    assert.equal(await botAdmin.newBotModel(ws.id, owner), 'claude', 'connected: the starting model stands')
+    await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['codex', 'claude'], startingModel: 'codex' })
+    assert.equal(await botAdmin.newBotModel(ws.id, owner), 'claude', 'Codex is not connected: the first runnable allowed family')
+    process.env.MIKKA_BYOS_ENABLED = '0'
+    try {
+      assert.equal(await botAdmin.newBotModel(ws.id, owner), null, 'nothing can run: legacy null')
+    } finally {
+      process.env.MIKKA_BYOS_ENABLED = '1'
+    }
+  })
+
+  await t.test("a refused bot turn's error is what the chat's failed-turn alert reads", async () => {
+    const { parseBotModelRefusal } = await import('../lib/workspace-admin/bot-model-policy')
+    await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['codex'], startingModel: null })
+    await pool.query('update bots set model=$2 where id=$1', [adminBot, 'codex'])
+    const error = await botRunModelSource(admin, adminBot, undefined).then(() => null, (reason: unknown) => reason as Error & { code?: string })
+    assert.equal(error?.code, 'binding_required')
+    assert.deepEqual(parseBotModelRefusal(error?.message), { reason: 'binding_required', family: 'codex' })
   })
 })
