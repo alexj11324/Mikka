@@ -1877,7 +1877,8 @@
       "madeDefault": "{account} 已设为默认",
       "openInSettings": "在设置中管理",
       "linkInBrowser": "请在刚打开的浏览器窗口中完成关联，完成后回到这里。",
-      "browserUpdateRequired": "请更新 Mikka 后再从桌面端关联账号。"
+      "browserUpdateRequired": "请更新 Mikka 后再从桌面端关联账号。",
+      "githubRefreshed": "已刷新 GitHub 状态"
     },
     "telegram": {
       "heading": "消息平台",
@@ -3052,7 +3053,9 @@
       "handle": "处理",
       "read": "查看"
     },
-    "original": "原文：「{title}」"
+    "original": "原文：「{title}」",
+    "refreshed": "建议已刷新",
+    "refreshFailed": "建议没有刷新成功，请稍后再试"
   },
   "ArtifactsPage": {
     "title": "产物",

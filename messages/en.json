@@ -1877,7 +1877,8 @@
       "madeDefault": "{account} is now the default",
       "openInSettings": "Manage in Settings",
       "linkInBrowser": "Continue in the browser window to finish linking. Return here when you’re done.",
-      "browserUpdateRequired": "Update Mikka before linking accounts from the desktop app."
+      "browserUpdateRequired": "Update Mikka before linking accounts from the desktop app.",
+      "githubRefreshed": "GitHub status refreshed"
     },
     "telegram": {
       "heading": "Messaging",
@@ -3052,7 +3053,9 @@
       "handle": "Handle",
       "read": "Read"
     },
-    "original": "Original: “{title}”"
+    "original": "Original: “{title}”",
+    "refreshed": "Suggestions refreshed",
+    "refreshFailed": "Couldn’t refresh suggestions. Try again later."
   },
   "ArtifactsPage": {
     "title": "Artifact",
