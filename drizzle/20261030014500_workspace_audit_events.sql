@@ -4,6 +4,7 @@
 -- name and the target's label are snapshotted at write time ("actorName",
 -- "targetLabel") and never joined later. metadata must never hold secret values;
 -- lib/audit/record.ts rejects known secret-bearing keys before insert.
+-- ip is stored for admins/forensics but never returned by the query API.
 -- Writer: lib/audit/record.ts. Query API (later PR) pages on
 -- ("workspaceId", "createdAt" DESC, id DESC), optionally filtered by category.
 -- Rollback: DROP TABLE IF EXISTS workspace_audit_events;
@@ -25,6 +26,8 @@ CREATE TABLE IF NOT EXISTS workspace_audit_events (
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(metadata) = 'object' AND pg_column_size(metadata) <= 8192),
   ip inet,
   "geoCity" text CHECK (length("geoCity") BETWEEN 1 AND 120),
+  "geoCountry" text CHECK ("geoCountry" ~ '^[A-Z]{2}$'),
+  "geoRegion" text CHECK ("geoRegion" ~ '^[A-Z0-9]{1,3}$'),
   "createdAt" timestamptz NOT NULL DEFAULT now(),
   CHECK ("actorType" = 'system' OR "actorId" IS NOT NULL)
 );

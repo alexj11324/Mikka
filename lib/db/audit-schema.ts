@@ -17,6 +17,8 @@ export const workspaceAuditEvents = pgTable('workspace_audit_events', {
   metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
   ip: inet('ip'),
   geoCity: text('geoCity'),
+  geoCountry: text('geoCountry'),
+  geoRegion: text('geoRegion'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [
   index('workspace_audit_events_ws_created_idx').on(table.workspaceId, table.createdAt.desc(), table.id.desc()),

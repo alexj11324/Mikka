@@ -13,13 +13,13 @@ test('workspace audit writer', { skip: !dbUrl }, async t => {
 
   await t.test('stores snapshot names, derived category, ip and city', async () => {
     const ws = randomUUID()
-    const saved = await recordAudit(db, { workspaceId: ws, actor: { type: 'user', id: 'u-alex', name: 'Alex' }, action: 'member.role_changed', target: { type: 'member', id: 'u-mia', label: 'Mia' }, metadata: { from: 'member', to: 'admin' }, ip: '203.0.113.4', geoCity: 'San Francisco' })
+    const saved = await recordAudit(db, { workspaceId: ws, actor: { type: 'user', id: 'u-alex', name: 'Alex' }, action: 'member.role_changed', target: { type: 'member', id: 'u-mia', label: 'Mia' }, metadata: { oldRole: 'member', newRole: 'admin' }, ip: '203.0.113.4', geoCity: 'San Francisco', geoCountry: 'US', geoRegion: 'CA' })
     assert.match(saved.id, /^[0-9a-f-]{36}$/)
     assert.ok(saved.createdAt instanceof Date)
     const [row] = await rows(ws)
     assert.equal(row.id, saved.id)
-    assert.deepEqual([row.actorType, row.actorId, row.actorName, row.action, row.category, row.targetType, row.targetId, row.targetLabel, row.ip, row.geoCity], ['user', 'u-alex', 'Alex', 'member.role_changed', 'permission', 'member', 'u-mia', 'Mia', '203.0.113.4', 'San Francisco'])
-    assert.deepEqual(row.metadata, { from: 'member', to: 'admin' })
+    assert.deepEqual([row.actorType, row.actorId, row.actorName, row.action, row.category, row.targetType, row.targetId, row.targetLabel, row.ip, row.geoCity, row.geoCountry, row.geoRegion], ['user', 'u-alex', 'Alex', 'member.role_changed', 'member', 'member', 'u-mia', 'Mia', '203.0.113.4', 'San Francisco', 'US', 'CA'])
+    assert.deepEqual(row.metadata, { oldRole: 'member', newRole: 'admin' })
   })
 
   await t.test('commits and rolls back with the business transaction', async () => {
@@ -62,7 +62,7 @@ test('workspace audit writer', { skip: !dbUrl }, async t => {
   await t.test('failed writes never log query params (aborted tx and a DB-rejected row)', async () => {
     const ws = randomUUID()
     const marks = { label: 'LEAK-LABEL-7f3a', meta: 'LEAK-META-91c2', ip: '198.51.100.77', name: 'LEAK-ACTOR-55e1' }
-    const leaky = { workspaceId: ws, actor: { type: 'user' as const, id: 'u', name: marks.name }, action: 'member.invited' as const, target: { type: 'member', id: 'm', label: marks.label }, metadata: { note: marks.meta }, ip: marks.ip }
+    const leaky = { workspaceId: ws, actor: { type: 'user' as const, id: 'u', name: marks.name }, action: 'team.access_changed' as const, target: { type: 'team', id: 'm', label: marks.label }, metadata: { team: marks.meta }, ip: marks.ip }
     const leaks = (text: string) => Object.values(marks).filter(mark => text.includes(mark))
     // 1. A transaction already in aborted state: the driver error message carries the params.
     let captured: unknown
@@ -91,14 +91,14 @@ test('workspace audit writer', { skip: !dbUrl }, async t => {
     }
     assert.equal(logged.length, 1)
     assert.deepEqual(leaks(JSON.stringify(logged)), [])
-    assert.deepEqual(logged[0][1], { action: 'member.invited', workspaceId: ws, name: 'DrizzleQueryError', code: '23514', constraint: 'audit_test_reject' })
+    assert.deepEqual(logged[0][1], { action: 'team.access_changed', workspaceId: ws, name: 'DrizzleQueryError', code: '23514', constraint: 'audit_test_reject' })
     assert.equal((await rows(ws)).length, 0)
   })
 
   await t.test('category filter and keyset order use the indexes', async () => {
     const ws = randomUUID()
     for (const action of ['member.invited', 'token.created', 'secret.created', 'auth.signed_in'] as const)
-      await recordAudit(db, { workspaceId: ws, actor: { type: 'user', id: 'u', name: 'A' }, action })
+      await recordAudit(db, { workspaceId: ws, actor: { type: 'user', id: 'u', name: 'A' }, action, ...(action === 'auth.signed_in' ? { metadata: { newDevice: true, method: 'password' as const } } : {}) })
     const security = await pool.query(`select action from workspace_audit_events where "workspaceId"=$1 and category='security' order by "createdAt" desc, id desc`, [ws])
     assert.deepEqual(security.rows.map(r => r.action), ['auth.signed_in', 'token.created'])
     const client = await pool.connect()

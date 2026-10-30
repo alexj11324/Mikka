@@ -1,6 +1,7 @@
 // Pure audit-event contract: action catalogue, category mapping, validation.
 // No DB or server-only imports so it can be shared with UI code and unit tests.
 import { isIP } from 'node:net'
+import { z } from 'zod'
 
 export const AUDIT_CATEGORIES = ['security', 'secret', 'permission', 'member', 'billing'] as const
 export type AuditCategory = (typeof AUDIT_CATEGORIES)[number]
@@ -10,17 +11,18 @@ export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number]
 
 /** Every auditable action and the category it is filed under (UI label + 「安全」 filter). */
 export const AUDIT_ACTIONS = {
-  // 成员
+  // 成员（role_changed is a member event: design badge 「成员」）
   'member.invited': 'member',
   'member.invitation_revoked': 'member',
   'member.joined': 'member',
   'member.removed': 'member',
   'member.suspended': 'member',
   'member.reactivated': 'member',
+  'member.role_changed': 'member',
   // 权限
-  'member.role_changed': 'permission',
   'team.access_changed': 'permission',
   'bot.permissions_changed': 'permission',
+  'integration.permission_changed': 'permission',
   // 密钥与环境
   'secret.created': 'secret',
   'secret.replaced': 'secret',
@@ -45,19 +47,71 @@ export const AUDIT_ACTIONS = {
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS
 
+// Per-action metadata allowlist. Every key an action may store is listed here
+// (and nothing else is accepted), so UI ICU templates can use them as named
+// params. Values are flat scalars. Key names must stay clear of the secret-key
+// rules below (no *key suffix, no token/secret/auth wording); a unit test checks.
+const label = z.string().trim().min(1).max(120)
+const role = z.enum(['owner', 'admin', 'member', 'guest'])
+const access = z.enum(['allow', 'ask', 'deny', 'read', 'write', 'none'])
+const scope = z.enum(['workspace', 'project', 'repo', 'bot', 'user'])
+const cents = z.number().int().min(0).max(100_000_000)
+const currency = z.string().regex(/^[A-Z]{3}$/)
+const none = z.object({}).strict()
+export const AUDIT_METADATA = {
+  'member.invited': z.object({ role }).partial().strict(),
+  'member.invitation_revoked': none,
+  'member.joined': z.object({ role }).partial().strict(),
+  'member.removed': none,
+  'member.suspended': none,
+  'member.reactivated': none,
+  'member.role_changed': z.object({ oldRole: role, newRole: role }).strict(),
+  'team.access_changed': z.object({ team: label, from: access, to: access }).partial().strict(),
+  'bot.permissions_changed': z.object({ capability: label, from: access, to: access }).partial().strict(),
+  'integration.permission_changed': z.object({ integration: label, capability: label, from: access, to: access }).strict(),
+  'secret.created': z.object({ scope }).partial().strict(),
+  'secret.replaced': z.object({ scope }).partial().strict(),
+  'secret.deleted': z.object({ scope }).partial().strict(),
+  'env.created': z.object({ scope, environment: label }).partial().strict(),
+  'env.updated': z.object({ scope, environment: label }).partial().strict(),
+  'env.deleted': z.object({ scope, environment: label }).partial().strict(),
+  'network_policy.updated': z.object({ mode: z.enum(['open', 'allowlist', 'blocked']), addedHosts: z.number().int().min(0), removedHosts: z.number().int().min(0) }).partial().strict(),
+  'token.created': z.object({ expiresAt: z.string().datetime({ offset: true }).nullable() }).partial().strict(),
+  'token.revoked': none,
+  'auth.signed_in': z.object({ newDevice: z.boolean(), method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']) }).strict(),
+  'auth.sign_in_failed': z.object({ method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']), reason: z.enum(['invalid', 'locked', 'expired', 'denied']) }).partial().strict(),
+  'workspace.slug_changed': z.object({ from: label, to: label }).strict(),
+  'workspace.deleted': none,
+  'billing.checkout_started': z.object({ amountCents: cents, currency }).partial().strict(),
+  'billing.credits_purchased': z.object({ amountCents: cents, currency, credits: z.number().int().min(0) }).partial().strict(),
+  'billing.auto_recharge_changed': z.object({ enabled: z.boolean(), thresholdCents: cents.nullable(), amountCents: cents.nullable() }).partial().strict(),
+  'billing.limits_changed': z.object({ fromCents: cents.nullable(), toCents: cents.nullable() }).partial().strict(),
+} as const satisfies Record<AuditAction, z.ZodType>
+
+/** Allowlisted metadata for one action (named params for that action's ICU template). */
+export type AuditMetadata<A extends AuditAction> = z.infer<(typeof AUDIT_METADATA)[A]>
+export type AuditMetadataMap = { [A in AuditAction]: AuditMetadata<A> }
+
 export type AuditActor =
   | { type: 'user' | 'bot' | 'token'; id: string; name: string }
   | { type: 'system'; id?: string | null; name?: string }
 
-export type AuditEvent = {
+/**
+ * actor.name is a display snapshot taken at write time: the member's name for
+ * users, the token's name for token actors, the bot's name for bots, "Mikka"
+ * by default for system.
+ */
+export type AuditEvent<A extends AuditAction = AuditAction> = {
   workspaceId: string
   actor: AuditActor
-  action: AuditAction
+  action: A
   target?: { type: string; id?: string | null; label?: string | null } | null
-  /** Non-secret context only. Keys that look like secret values are rejected. */
-  metadata?: Record<string, unknown>
+  /** Only the keys allowlisted for this action (AUDIT_METADATA); never secrets. */
+  metadata?: AuditMetadata<A> | Record<string, unknown>
   ip?: string | null
   geoCity?: string | null
+  geoCountry?: string | null
+  geoRegion?: string | null
 }
 
 export type AuditRow = {
@@ -73,6 +127,8 @@ export type AuditRow = {
   metadata: Record<string, unknown>
   ip: string | null
   geoCity: string | null
+  geoCountry: string | null
+  geoRegion: string | null
 }
 
 export class AuditEventError extends Error {
@@ -80,31 +136,62 @@ export class AuditEventError extends Error {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-// Lower-cased, separator-free key names that must never carry a value into the audit log.
-// Key names are normalised (separators stripped, lowercased) and then matched:
-// exact words, substrings, a `key` suffix, and auth-style names. `author` and
-// similar stay allowed. Values are also scanned for well-known credential prefixes.
-const FORBIDDEN_KEY_EXACT = new Set(['value', 'plaintext', 'cardnumber', 'pan', 'cvc', 'cvv'])
-const FORBIDDEN_KEY_PARTS = ['token', 'secret', 'passw', 'pwd', 'apikey', 'credential', 'jwt', 'bearer', 'cookie', 'dsn', 'connectionstring', 'privatekey', 'accesskey', 'otp']
-// 'auth' only as authorization / auth header-token style names, never 'author…'.
-const FORBIDDEN_AUTH = /authoriz|auth(?:header|code|z)?$/
-const SECRET_VALUE_PREFIXES = ['sk_', 'rk_', 'ghp_', 'gho_', 'github_pat_', 'xox', 'eyj', '-----begin', 'whsec_']
+// The per-action allowlist (AUDIT_METADATA) is the real gate; this blacklist is a
+// backstop for keys that could carry a secret. Keys are split into words
+// (camelCase / separators) and also normalised (lowercased, separators removed).
+// - Allowed first: names ending in Name/Id/Label/Count/Prefix/Changed/Enabled
+//   describe a secret, they do not hold one (secretName, tokenId, otpEnabled).
+// - Blocked: exact value/plaintext/cardnumber/cvc/cvv; substrings token, secret,
+//   passw, pwd, apikey, credential, jwt, bearer, cookie, connectionstring,
+//   privatekey, accesskey; whole words otp and dsn; a `key` suffix except
+//   benign ones (idempotencyKey, primaryKey, …); authorization / auth header-style
+//   names. oauth, author, footprint and pan pass.
+const SAFE_KEY_SUFFIXES = ['name', 'id', 'label', 'count', 'prefix', 'changed', 'enabled']
+const FORBIDDEN_KEY_EXACT = new Set(['value', 'plaintext', 'cardnumber', 'cvc', 'cvv'])
+const FORBIDDEN_KEY_PARTS = ['token', 'secret', 'passw', 'pwd', 'apikey', 'credential', 'jwt', 'bearer', 'cookie', 'connectionstring', 'privatekey', 'accesskey']
+const FORBIDDEN_KEY_WORDS = new Set(['otp', 'dsn'])
+const BENIGN_KEY_SUFFIXED = new Set(['idempotencykey', 'primarykey', 'foreignkey', 'sortkey', 'cachekey', 'partitionkey', 'lookupkey', 'groupkey'])
+const FORBIDDEN_AUTH = /authoriz|^(?:x|basic|proxy|http)?auth(?:header|code|z)?$/
 
 export const normaliseAuditKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, '')
+const keyWords = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
 
 /** True when a metadata key name could carry a secret. */
 export function isSecretBearingKey(key: string): boolean {
   const k = normaliseAuditKey(key)
   if (!k) return false
-  if (FORBIDDEN_KEY_EXACT.has(k) || k.endsWith('key')) return true
+  const words = keyWords(key)
+  if (words.length > 1 && SAFE_KEY_SUFFIXES.includes(words.at(-1)!)) return false
+  if (FORBIDDEN_KEY_EXACT.has(k)) return true
   if (FORBIDDEN_KEY_PARTS.some(part => k.includes(part))) return true
+  if (words.some(word => FORBIDDEN_KEY_WORDS.has(word))) return true
+  if (k.endsWith('key') && !BENIGN_KEY_SUFFIXED.has(k)) return true
   return FORBIDDEN_AUTH.test(k)
 }
 
-/** True when a string value looks like a credential (case-insensitive prefix, after trimming). */
+// Credential shapes, matched anywhere in a string (e.g. "token=sk_live_…").
+const NOT_WORD = '(?<![A-Za-z0-9])'
+const SECRET_VALUE_PATTERNS: RegExp[] = [
+  new RegExp(`${NOT_WORD}eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}`), // JWT, three segments
+  new RegExp(`${NOT_WORD}[sr]k_(?:live_|test_)?[A-Za-z0-9]{16,}`), // Stripe
+  new RegExp(`${NOT_WORD}sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}`), // OpenAI / Anthropic style
+  new RegExp(`${NOT_WORD}(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}`),
+  new RegExp(`${NOT_WORD}github_pat_[A-Za-z0-9_]{20,}`),
+  new RegExp(`${NOT_WORD}glpat-[A-Za-z0-9_-]{20,}`),
+  new RegExp(`${NOT_WORD}xox[abposr]-[A-Za-z0-9-]{10,}`), // Slack
+  new RegExp(`${NOT_WORD}xapp-[0-9]-[A-Za-z0-9-]{10,}`),
+  new RegExp(`${NOT_WORD}whsec_[A-Za-z0-9+/=]{16,}`),
+  new RegExp(`${NOT_WORD}(?:AKIA|ASIA)[0-9A-Z]{16}(?![A-Za-z0-9])`), // AWS access key id
+  new RegExp(`${NOT_WORD}AIza[0-9A-Za-z_-]{35}`), // Google API key
+  new RegExp(`${NOT_WORD}npm_[A-Za-z0-9]{36}`),
+  /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)-----/,
+  /\bbearer\s+[A-Za-z0-9._~+/-]{16,}=*/i,
+  /[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:[^\s/@]+@/i, // URL with user:password@
+]
+
+/** True when a string value contains something shaped like a credential. */
 export function looksLikeSecretValue(value: string): boolean {
-  const v = value.trimStart().toLowerCase()
-  return SECRET_VALUE_PREFIXES.some(prefix => v.startsWith(prefix))
+  return SECRET_VALUE_PATTERNS.some(pattern => pattern.test(value))
 }
 
 // Intentionally below the DB CHECK (8 KB): the JS cap fails fast with a clear
@@ -146,6 +233,8 @@ export function toAuditRow(event: AuditEvent): AuditRow {
   if (typeof metadata !== 'object' || Array.isArray(metadata)) throw new AuditEventError('audit metadata must be an object')
   assertNoSecrets(metadata, 'metadata')
   if (Buffer.byteLength(JSON.stringify(metadata)) > MAX_METADATA_BYTES) throw new AuditEventError('audit metadata is too large')
+  const allowed = AUDIT_METADATA[event.action].safeParse(metadata)
+  if (!allowed.success) throw new AuditEventError(`audit metadata does not match the allowlist for ${event.action}: ${allowed.error.issues.map(issue => issue.code === 'unrecognized_keys' ? `unexpected ${issue.keys.join(',')}` : `${issue.path.join('.')} ${issue.code}`).join('; ')}`)
   const ip = clip(event.ip, 64)
   return {
     workspaceId: event.workspaceId.toLowerCase(),
@@ -159,16 +248,21 @@ export function toAuditRow(event: AuditEvent): AuditRow {
     // actorName/targetLabel are display snapshots and are NOT scanned: callers
     // must never put a secret value in targetLabel (use the secret's name).
     targetLabel: target ? clip(target.label, 200) : null,
-    metadata,
+    metadata: allowed.data as Record<string, unknown>,
     ip: ip && isIP(ip) ? ip : null,
     geoCity: clip(event.geoCity, 120),
+    geoCountry: countryCode(event.geoCountry),
+    geoRegion: regionCode(event.geoRegion),
   }
 }
 
-/** Client IP and Vercel city (English, as sent; localise on display) from request headers. */
-export function auditRequestContext(headers: Pick<Headers, 'get'>): { ip: string | null; geoCity: string | null } {
+const countryCode = (value: string | null | undefined) => { const v = value?.trim().toUpperCase(); return v && /^[A-Z]{2}$/.test(v) ? v : null }
+const regionCode = (value: string | null | undefined) => { const v = value?.trim().toUpperCase(); return v && /^[A-Z0-9]{1,3}$/.test(v) ? v : null }
+
+/** Client IP and Vercel geo (city in English as sent; ISO country; ISO 3166-2 region suffix). */
+export function auditRequestContext(headers: Pick<Headers, 'get'>): { ip: string | null; geoCity: string | null; geoCountry: string | null; geoRegion: string | null } {
   const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim() || headers.get('x-real-ip')?.trim() || null
   let city = headers.get('x-vercel-ip-city')
   if (city) { try { city = decodeURIComponent(city) } catch { /* keep raw */ } }
-  return { ip: forwarded && isIP(forwarded) ? forwarded : null, geoCity: clip(city, 120) }
+  return { ip: forwarded && isIP(forwarded) ? forwarded : null, geoCity: clip(city, 120), geoCountry: countryCode(headers.get('x-vercel-ip-country')), geoRegion: regionCode(headers.get('x-vercel-ip-country-region')) }
 }
