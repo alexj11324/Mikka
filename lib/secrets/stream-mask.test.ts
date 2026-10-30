@@ -53,3 +53,22 @@ test('tool input held across batches is flushed as a tool-input-delta on run end
   assert.equal([...a, ...b].filter(c => c.type === 'tool-input-delta').map(c => c.inputTextDelta).join(''), '{"k":"sk_live_0')
   assert.equal(pending.size, 0)
 })
+
+test('S7: an end chunk that itself carries a secret is masked (text-end metadata, tool-input-available input, tool-input-error)', () => {
+  for (const endChunk of [
+    { type: 'text-end', id: 'p1', providerMetadata: { note: `raw ${SECRET}` } },
+    { type: 'reasoning-end', id: 'p1', providerMetadata: { note: SECRET } },
+    { type: 'tool-input-available', toolCallId: 'p1', toolName: 'bash', input: { command: `curl -H ${SECRET}` } },
+    { type: 'tool-input-error', toolCallId: 'p1', toolName: 'bash', input: `curl ${SECRET}`, errorText: `bad ${SECRET}` },
+  ] as Chunk[]) {
+    const type = String(endChunk.type)
+    const kind = type === 'reasoning-end' ? 'reasoning' : type.startsWith('tool') ? 'tool' : 'text'
+    const delta: Chunk = kind === 'tool' ? { type: 'tool-input-delta', toolCallId: 'p1', inputTextDelta: 'x' } : { type: `${kind}-delta`, id: 'p1', delta: 'x' }
+    for (const batches of [[[delta, endChunk]], [[delta], [endChunk]]]) {
+      const pending = new Map<string, string>()
+      const out = JSON.stringify(batches.flatMap(batch => maskStreamedChunks(batch, mask, pending)))
+      assert.ok(!out.includes(SECRET) && !out.includes(SECRET.slice(0, 10)), `${String(endChunk.type)}: end chunk leaked`)
+      assert.match(out, /\[secret:A\]/, String(endChunk.type))
+    }
+  }
+})

@@ -70,7 +70,6 @@ export async function maskWorkerMailboxInput(runId: string, rawInput: unknown): 
 export async function personalWorkerMailbox(userId: string, runId: string, rawInput: unknown, verifiedToken: string, signal?: AbortSignal) {
   // 4e2 item 4: a run's outgoing peer message text is stored; mask it with the run's secret set (MCP and HTTP paths).
   if (!personalMailboxEnabled()) return { status: 503, body: { error: 'personal_mailbox_unavailable' } }
-  const input = await maskWorkerMailboxInput(runId, rawInput)
   // Resolve the existing private Bot namespace from trusted records, never a
   // body field. Unbound runs retain main's existing device namespace.
   const run = await workerRecord(userId, runId)
@@ -78,6 +77,8 @@ export async function personalWorkerMailbox(userId: string, runId: string, rawIn
   if (!personalWorkerMailboxSupported(run.harness, run.agentDefinition)) return { status: 409, body: { error: 'Worker mailbox capability is not frozen for this runtime' } }
   const namespace = run.workspaceId ?? WORKSPACE_ID
   if (!personalWorkerMailboxScopeMatches(run.harness, run.agentDefinition, { botId: run.botId, workspaceId: namespace })) return { status: 403, body: { error: 'Worker mailbox scope changed' } }
+  // Mask only after the owner/namespace/scope checks: a foreign or stale run never reaches the secret set.
+  const input = await maskWorkerMailboxInput(runId, rawInput)
   const tokenHash = createHash('sha256').update(verifiedToken).digest('hex')
   const parsed = personalMailboxRequest.safeParse(input)
   if (!parsed.success) return { status: 400, body: { error: 'Invalid mailbox request' } }
