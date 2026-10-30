@@ -151,11 +151,24 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     return () => wide.removeEventListener('change', close)
   }, [])
   function openPanel() { showPanel(true); if (!window.matchMedia('(min-width: 80rem)').matches) setPanelSheet(true) }
-  // A refused turn's 更换模型 opens this bot's 详情 (components/coordinator/turn-error.tsx).
+  // A refused turn's 更换模型 opens the bot's 详情 (components/coordinator/turn-error.tsx): here when its
+  // chat is the one shown, otherwise the alert navigates to that chat with ?panel=details.
   const [panelTabRequest, setPanelTabRequest] = useState<{ tab: PanelTab; at: number } | null>(null)
+  const shownBotId = useRef<string | null>(null)
   useEffect(() => {
-    const openDetails = () => { openPanel(); setPanelTabRequest({ tab: 'details', at: Date.now() }) }
+    const openDetails = (event: Event) => {
+      const botId = (event as CustomEvent<{ botId?: string | null }>).detail?.botId
+      if (!botId || botId !== shownBotId.current) return
+      event.preventDefault()
+      openPanel(); setPanelTabRequest({ tab: 'details', at: Date.now() })
+    }
     window.addEventListener(OPEN_BOT_DETAILS_EVENT, openDetails)
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('panel') === 'details') {
+      url.searchParams.delete('panel')
+      window.history.replaceState(window.history.state, '', url)
+      openPanel(); setPanelTabRequest({ tab: 'details', at: Date.now() })
+    }
     return () => window.removeEventListener(OPEN_BOT_DETAILS_EVENT, openDetails)
   }, [])
   function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem('mikka:context-panel', next ? '1' : '0') } catch { /* storage unavailable */ } }
@@ -382,6 +395,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const pagerIndex = pagerId ? filtered.findIndex(task => task.id === pagerId) : -1
   if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onBack={() => { const href = teamId ? `/?team=${encodeURIComponent(teamId)}` : '/'; if (!pushSettingsHistory(href)) router.push(href) }} />
   const isConversation = !selected && section === 'coordinator'
+  shownBotId.current = isConversation ? activeBot?.id ?? null : null
   const savedSessions = new Map((agentHistory?.sessions ?? []).map(session => [session.id, session]))
   for (const session of liveSessions) savedSessions.set(session.id, { ...session, preview: session.preview ?? savedSessions.get(session.id)?.preview })
   const conversationSessions = [...savedSessions.values()]

@@ -12,7 +12,10 @@ import { bots, WORKSPACE_BOT_MODELS } from '@/lib/db/schema'
 import { BOT_COLORS, BOT_SHAPES } from '@/lib/bot-shapes'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
-import { botSettingsFor, listBotThreadsFor, modelAllowed, modelPolicy, newBotModel, repositoryAvailable, saveBotSettings, saveModelPolicy, workspaceBots, type BotSettingsView, type BotThreadPage, type ModelPolicy, type WorkspaceBotView } from '@/lib/workspace-admin/bots'
+import { ensureBotSubscriptionBinding } from '@/lib/bot-subscription-binding'
+import { subscriptionModelsRunnable } from '@/lib/bot-runtime-model'
+import { selectableModels } from '@/lib/workspace-admin/bot-model-policy'
+import { botSettingsFor, inAppTransaction, listBotThreadsFor, modelAllowed, modelPolicy, newBotModel, repositoryAvailable, saveBotSettings, saveModelPolicy, workspaceBots, type BotSettingsView, type BotThreadPage, type ModelPolicy, type WorkspaceBotView } from '@/lib/workspace-admin/bots'
 
 /** A bot in the left column. Its instructions grow inside its chat, so they are not here. */
 export interface BotView {
@@ -54,8 +57,13 @@ export async function createBot(input: { name: string; color: string; shape: str
   if (model && !(await modelAllowed(owner.workspaceId, model))) throw new ActionFailureError('botModelNotAllowed')
   if (repository && !(await repositoryAvailable(owner.workspaceId, repository))) throw new ActionFailureError('botRepositoryUnavailable')
   const bot = { id: crypto.randomUUID(), ...look }
+  const chosen = model === undefined ? await newBotModel(owner.workspaceId, owner.ownerId) : model
   try {
-    await db.insert(bots).values({ ...bot, ...owner, model: model === undefined ? await newBotModel(owner.workspaceId, owner.ownerId) : model, repository: repository ?? null })
+    // A Codex / Claude bot is bound to its owner's connected account in the same transaction.
+    await inAppTransaction(async client => {
+      await db.insert(bots).values({ ...bot, ...owner, model: chosen, repository: repository ?? null })
+      if (chosen && selectableModels([chosen], subscriptionModelsRunnable()).length) await ensureBotSubscriptionBinding(client, { ownerId: owner.ownerId, workspaceId: owner.workspaceId, botId: bot.id, model: chosen })
+    })
   } catch (error) {
     // 23505 is the per-person, per-workspace name index.
     if ((error as { code?: string }).code === '23505') throw new ActionFailureError('botDuplicateName')

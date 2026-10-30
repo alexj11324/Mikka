@@ -11,7 +11,8 @@ mock.module('next-intl', { namedExports: { useTranslations: (namespace?: string)
   const text = messages[namespace ? `${namespace}.${key}` : key] ?? key
   return text.replace(/\{(\w+)\}/g, (_, name: string) => args?.[name] ?? '')
 } } })
-mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: ({ href, ...props }: { href: string }) => <a href={href} {...props} /> } })
+const pushed: string[] = []
+mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: ({ href, ...props }: { href: string }) => <a href={href} {...props} />, useRouter: () => ({ push: (href: string) => pushed.push(href) }) } })
 let TurnError: typeof import('./turn-error')['TurnError']
 let refusalText: typeof import('../../lib/workspace-admin/bot-model-policy')['botModelRefusalText']
 before(async () => {
@@ -39,4 +40,9 @@ test('any other failure keeps the existing alert with its error', () => {
   assert.match(html, /回复失败/)
   assert.match(html, /replyEmpty: the model returned no text/)
   assert.doesNotMatch(html, /data-testid="bot-model-refusal"/)
+})
+
+test('更换模型 outside that bot\'s chat opens its chat with 详情', async () => {
+  const { botDetailsHref } = await import('./turn-error')
+  assert.equal(botDetailsHref('00000000-0000-4000-8000-000000000001'), '/?section=coordinator&bot=00000000-0000-4000-8000-000000000001&panel=details')
 })

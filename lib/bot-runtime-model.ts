@@ -51,6 +51,16 @@ export async function botRunModelSource(ownerId: string, botId: string, definiti
     storedModel: bot.model, allowedModels, startingModel: policy?.startingModel ?? null,
     definitionBinding, latestBindings, subscriptionsRunnable: subscriptionModelsRunnable(),
   })
-  if ('refused' in choice) throw new BotModelRefusal(choice.refused, choice.family)
+  if ('refused' in choice) {
+    // Connecting an account once is enough: a missing or stale binding (account connected
+    // later, or reconnected at a new revision) is created from the owner's live connection.
+    if (choice.refused === 'binding_required' && (choice.family === 'codex' || choice.family === 'claude')) {
+      const { pool } = await import('@/lib/db')
+      const { ensureBotSubscriptionBinding } = await import('@/lib/bot-subscription-binding')
+      const bindingId = await ensureBotSubscriptionBinding(pool, { ownerId, workspaceId: bot.workspaceId, botId, model: choice.family })
+      if (bindingId) return { type: 'subscription', bindingId }
+    }
+    throw new BotModelRefusal(choice.refused, choice.family)
+  }
   return choice.source
 }

@@ -1,7 +1,9 @@
 import 'server-only'
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import type { PoolClient } from 'pg'
+import { db, pool, withDatabaseClient } from '@/lib/db'
+import { ensureBotSubscriptionBinding } from '@/lib/bot-subscription-binding'
 import { agentRuns, bots, issues, users, githubRepositoryInstallations, workspaceSettings, type WorkspaceBotModel } from '@/lib/db/schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
@@ -187,22 +189,43 @@ export async function saveBotSettings(actorId: string, workspaceId: string, inpu
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId))
   if (values.repository && !(await repositoryAvailable(workspaceId, values.repository))) throw new WorkspaceError('botRepositoryUnavailable')
   await db.insert(workspaceSettings).values({ workspaceId }).onConflictDoNothing({ target: workspaceSettings.workspaceId })
-  const bot = await db.transaction(async tx => {
-    await tx.select({ id: workspaceSettings.workspaceId }).from(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId)).for('share')
-    const current = await botIn(workspaceId, botId, tx)
+  const bot = await inAppTransaction(async client => {
+    await db.select({ id: workspaceSettings.workspaceId }).from(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId)).for('share')
+    const current = await botIn(workspaceId, botId)
     if (current.ownerId !== actorId) throw new WorkspaceError('botOwnerOnly')
-    if (values.model && !(await modelPolicy(workspaceId, tx)).allowedModels.includes(values.model)) throw new WorkspaceError('botModelNotAllowed')
+    if (values.model && !(await modelPolicy(workspaceId)).allowedModels.includes(values.model)) throw new WorkspaceError('botModelNotAllowed')
     // A choice that cannot run in this deployment is not offered, and not accepted either.
     if (values.model && !selectableModels([values.model], subscriptionModelsRunnable()).length) throw new WorkspaceError('validationGeneric')
     if (values.model === undefined && values.repository === undefined) return current
-    const [row] = await tx.update(bots).set({ ...values, updatedAt: new Date() })
+    const [row] = await db.update(bots).set({ ...values, updatedAt: new Date() })
       .where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId), eq(bots.ownerId, actorId)))
       .returning({ id: bots.id, name: bots.name, ownerId: bots.ownerId, model: bots.model, repository: bots.repository })
     if (!row) throw new WorkspaceError('botOwnerOnly')
+    // Codex / Claude: bind the owner's connected account to this bot in the same transaction.
+    if (values.model) await ensureBotSubscriptionBinding(client, { ownerId: actorId, workspaceId, botId, model: values.model })
     return row
   })
   const [policy, repositories, providers] = await Promise.all([modelPolicy(workspaceId), installedRepositories(workspaceId), connectedProviders(actorId, workspaceId)])
   return settingsView(actorId, bot, policy, repositories, providers)
+}
+
+/**
+ * One MIKKA-database transaction on a held client: `db` and `pool` inside `run` use it
+ * (withDatabaseClient), so drizzle writes and SubscriptionRepository.bind commit together.
+ */
+export async function inAppTransaction<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect()
+  try {
+    await client.query('begin')
+    const result = await withDatabaseClient(client, () => run(client))
+    await client.query('commit')
+    return result
+  } catch (error) {
+    await client.query('rollback').catch(() => undefined)
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 export interface WorkspaceBotView {

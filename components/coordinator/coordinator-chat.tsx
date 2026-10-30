@@ -223,7 +223,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
-      {data?.error && !data.working && <TurnError error={data.error} />}
+      {data?.error && !data.working && <TurnError error={data.error} botId={botId} />}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />

@@ -81,6 +81,10 @@ test('管理员设置可用模型，Bot 创建者只能在允许范围内选择�
   await panel.getByRole('tab', { name: '线程', exact: true }).click()
   await refusal.getByRole('button', { name: '更换模型', exact: true }).click()
   await expect(panel.getByTestId('bot-settings')).toBeVisible()
+  // From anywhere else, 更换模型 opens this bot's chat with 详情 (the same URL the alert navigates to).
+  await page.goto(app(`/?section=coordinator&bot=${botId}&panel=details`))
+  await expect(panel.getByTestId('bot-settings')).toBeVisible()
+  await expect(page).not.toHaveURL(/panel=details/)
 
   // 全部 Bot shows it read-only with its owner's choice.
   await page.goto(app('/settings?section=bots'))

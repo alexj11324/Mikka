@@ -161,53 +161,77 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
     assert.deepEqual(listed.map(bot => bot.model), ['claude', 'codex'])
   })
 
-  await t.test("a bot's run uses its owner's model: hosted Mikka, the owner's binding, or a refusal, never another provider", async () => {
+  await t.test("a bot's run uses its owner's model; connecting an account once binds it; never another provider", async () => {
     const refused = (promise: Promise<unknown>, code: string) => assert.rejects(promise, (error: unknown) => error instanceof SubscriptionRefusal && error.code === code)
-    const connection = async (provider: string) => {
+    const rider = await seedUser(pool, 'rider')
+    await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [ws.id, rider, `${rider}@example.invalid`])
+    const bot = await seedBot(pool, ws.id, rider, 'Rider bot')
+    const connect = async (provider: string) => {
       const id = randomUUID()
-      await pool.query(`insert into byos_connections (id,"ownerId","workspaceId",provider,state,"secretName","secretDigest","providerSubject") values ($1,$2,$3,$4,'connected',$5,repeat('c',64),'p')`, [id, member, ws.id, provider, `s-${id}`])
+      await pool.query(`insert into byos_connections (id,"ownerId","workspaceId",provider,state,"secretName","secretDigest","providerSubject") values ($1,$2,$3,$4,'connected',$5,repeat('c',64),'p')`, [id, rider, ws.id, provider, `s-${id}`])
       return id
     }
-    const bind = async (connectionId: string, route: string) => {
-      const id = randomUUID()
-      await pool.query(`insert into byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") values ($1,$2,$3,$4,$5,1,$6,'m')`, [id, member, ws.id, memberBot, connectionId, route])
-      return id
-    }
-    await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['mikka', 'codex', 'claude'], startingModel: 'codex' })
-    await pool.query('update bots set model=$2 where id=$1', [memberBot, 'claude'])
-    // No Claude binding for this bot yet: refused, not moved to Mikka or Codex.
-    await refused(botRunModelSource(member, memberBot, undefined), 'binding_required')
-    const claudeBinding = await bind(await connection('claude'), 'claude_cpa')
-    await bind(await connection('claude'), 'claude_code_cli') // a native CLI route is never a hosted run's model
-    assert.deepEqual(await botRunModelSource(member, memberBot, undefined), { type: 'subscription', bindingId: claudeBinding })
-    // The owner picks Mikka: hosted, even with a subscription definition selected.
-    await botAdmin.saveBotSettings(member, ws.id, { botId: memberBot, model: 'mikka' })
-    assert.equal(await botRunModelSource(member, memberBot, { type: 'subscription', bindingId: claudeBinding }), undefined)
+    const bindings = async () => (await pool.query<{ id: string; route: string; modelId: string; connectionId: string }>('select id, route, "modelId", "connectionId" from byos_bindings where "consumerId"=$1 order by "createdAt"', [bot])).rows
+    await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['mikka', 'codex', 'claude'], startingModel: null })
+
+    // Claude chosen with no account: saved, nothing bound, the run is refused (the chat and 详情 say 未连接).
+    await botAdmin.saveBotSettings(rider, ws.id, { botId: bot, model: 'claude' })
+    assert.deepEqual(await bindings(), [])
+    assert.deepEqual((await botAdmin.botSettingsFor(rider, ws.id, bot)).connectedProviders, [])
+    await refused(botRunModelSource(rider, bot, undefined), 'binding_required')
+
+    // Connecting the account once is enough: the next run binds it and runs with Claude.
+    const claudeConnection = await connect('claude')
+    const first = await botRunModelSource(rider, bot, undefined)
+    const [claudeBinding] = await bindings()
+    assert.deepEqual(first, { type: 'subscription', bindingId: claudeBinding.id })
+    assert.deepEqual([claudeBinding.route, claudeBinding.modelId, claudeBinding.connectionId], ['claude_cpa', 'claude-sonnet-4-5', claudeConnection])
+    assert.deepEqual(await botRunModelSource(rider, bot, undefined), first, 'the live binding is reused')
+
+    // Choosing Codex with a connected account binds it in the same save.
+    const codexConnection = await connect('codex')
+    await botAdmin.saveBotSettings(rider, ws.id, { botId: bot, model: 'codex' })
+    const codexBinding = (await bindings()).find(row => row.route === 'codex_cpa')!
+    assert.equal(codexBinding.connectionId, codexConnection)
+    assert.deepEqual(await botRunModelSource(rider, bot, undefined), { type: 'subscription', bindingId: codexBinding.id })
+    await botAdmin.saveBotSettings(rider, ws.id, { botId: bot, model: 'codex' })
+    assert.equal((await bindings()).length, 2, 'saving again creates no second binding')
+    // A native CLI route is never a hosted run's model.
+    await pool.query(`insert into byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") values ($1,$2,$3,$4,$5,1,'claude_code_cli','m')`, [randomUUID(), rider, ws.id, bot, claudeConnection])
+
+    // Mikka chosen: hosted, even with a subscription selected in the definition.
+    await botAdmin.saveBotSettings(rider, ws.id, { botId: bot, model: 'mikka' })
+    assert.equal(await botRunModelSource(rider, bot, { type: 'subscription', bindingId: claudeBinding.id }), undefined)
     // Never chosen (legacy bot): the definition's existing subscription keeps running.
-    await pool.query('update bots set model=null where id=$1', [memberBot])
-    assert.deepEqual(await botRunModelSource(member, memberBot, { type: 'subscription', bindingId: claudeBinding }), { type: 'subscription', bindingId: claudeBinding })
-    // Claude removed from 可用模型: falls back to the starting model (Codex), which needs its own binding.
-    await pool.query('update bots set model=$2 where id=$1', [memberBot, 'claude'])
+    await pool.query('update bots set model=null where id=$1', [bot])
+    assert.deepEqual(await botRunModelSource(rider, bot, { type: 'subscription', bindingId: claudeBinding.id }), { type: 'subscription', bindingId: claudeBinding.id })
+    // Claude removed from 可用模型: falls back to the starting model, Codex, on its own binding.
+    await pool.query('update bots set model=$2 where id=$1', [bot, 'claude'])
     await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['mikka', 'codex'], startingModel: 'codex' })
-    await refused(botRunModelSource(member, memberBot, { type: 'subscription', bindingId: claudeBinding }), 'binding_required')
-    const codexBinding = await bind(await connection('codex'), 'codex_cpa')
-    assert.deepEqual(await botRunModelSource(member, memberBot, undefined), { type: 'subscription', bindingId: codexBinding })
-    // A disconnected connection does not count.
-    await pool.query(`update byos_connections set state='disconnected', "secretName"=null, "secretDigest"=null where id=(select "connectionId" from byos_bindings where id=$1)`, [codexBinding])
-    await refused(botRunModelSource(member, memberBot, undefined), 'binding_required')
-    // Mikka disallowed and only subscriptions allowed: hosted never runs.
-    await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['claude'], startingModel: null })
-    assert.deepEqual(await botRunModelSource(member, memberBot, undefined), { type: 'subscription', bindingId: claudeBinding })
-    await pool.query('update bots set model=$2 where id=$1', [memberBot, 'mikka'])
-    assert.deepEqual(await botRunModelSource(member, memberBot, undefined), { type: 'subscription', bindingId: claudeBinding }, 'a disallowed Mikka falls back to Claude')
+    assert.deepEqual(await botRunModelSource(rider, bot, { type: 'subscription', bindingId: claudeBinding.id }), { type: 'subscription', bindingId: codexBinding.id })
+
+    // Disconnecting the account: refused (shown in the chat), never moved to Mikka or another provider.
+    await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['mikka', 'codex', 'claude'], startingModel: null })
+    await pool.query(`update byos_connections set state='disconnected', "secretName"=null, "secretDigest"=null where id=$1`, [claudeConnection])
+    const error = await botRunModelSource(rider, bot, undefined).then(() => null, (reason: unknown) => reason as Error & { code?: string })
+    assert.equal(error?.code, 'binding_required')
+    const { parseBotModelRefusal } = await import('../lib/workspace-admin/bot-model-policy')
+    assert.deepEqual(parseBotModelRefusal(error?.message), { reason: 'binding_required', family: 'claude' })
+    assert.deepEqual((await botAdmin.botSettingsFor(rider, ws.id, bot)).connectedProviders, ['codex'])
+
+    // Mikka disallowed, only Codex allowed: the subscription runs, hosted never does.
+    await pool.query('update bots set model=$2 where id=$1', [bot, 'mikka'])
+    await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['codex'], startingModel: null })
+    assert.deepEqual(await botRunModelSource(rider, bot, undefined), { type: 'subscription', bindingId: codexBinding.id }, 'a disallowed Mikka falls back to Codex')
+
     // Without the subscription backend, Codex / Claude are not offered, not accepted, and refuse to run.
     process.env.MIKKA_BYOS_ENABLED = '0'
     try {
-      await refused(botRunModelSource(member, memberBot, undefined), 'backend_unavailable')
+      await refused(botRunModelSource(rider, bot, undefined), 'backend_unavailable')
       await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['mikka', 'codex', 'claude'], startingModel: null })
-      assert.deepEqual((await botAdmin.botSettingsFor(member, ws.id, memberBot)).selectableModels, ['mikka'])
-      await rejects(botAdmin.saveBotSettings(member, ws.id, { botId: memberBot, model: 'claude' }), 'validationGeneric')
-      assert.equal(await botRunModelSource(member, memberBot, undefined), undefined)
+      assert.deepEqual((await botAdmin.botSettingsFor(rider, ws.id, bot)).selectableModels, ['mikka'])
+      await rejects(botAdmin.saveBotSettings(rider, ws.id, { botId: bot, model: 'claude' }), 'validationGeneric')
+      assert.equal(await botRunModelSource(rider, bot, undefined), undefined)
     } finally {
       process.env.MIKKA_BYOS_ENABLED = '1'
     }
@@ -238,5 +262,25 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
     const error = await botRunModelSource(admin, adminBot, undefined).then(() => null, (reason: unknown) => reason as Error & { code?: string })
     assert.equal(error?.code, 'binding_required')
     assert.deepEqual(parseBotModelRefusal(error?.message), { reason: 'binding_required', family: 'codex' })
+  })
+
+  await t.test('createBot binds a Codex / Claude bot in the same transaction as the bot row', async () => {
+    const { ensureBotSubscriptionBinding } = await import('../lib/bot-subscription-binding')
+    const { db } = await import('../lib/db')
+    const { bots } = await import('../lib/db/schema')
+    const maker = await seedUser(pool, 'maker')
+    await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [ws.id, maker, `${maker}@example.invalid`])
+    await pool.query(`insert into byos_connections (id,"ownerId","workspaceId",provider,state,"secretName","secretDigest","providerSubject") values ($1,$2,$3,'claude','connected',$4,repeat('e',64),'p')`, [randomUUID(), maker, ws.id, `s-${randomUUID()}`])
+    const create = (id: string, fail: boolean) => botAdmin.inAppTransaction(async client => {
+      await db.insert(bots).values({ id, ownerId: maker, workspaceId: ws.id, name: `Made ${id.slice(0, 6)}`, model: 'claude' })
+      await ensureBotSubscriptionBinding(client, { ownerId: maker, workspaceId: ws.id, botId: id, model: 'claude' })
+      if (fail) throw new Error('later step failed')
+    })
+    const kept = randomUUID(), dropped = randomUUID()
+    await create(kept, false)
+    await assert.rejects(create(dropped, true), /later step failed/)
+    const rows = async (id: string) => Number((await pool.query('select (select count(*) from bots where id=$1) + (select count(*) from byos_bindings where "consumerId"=$1::text) as n', [id])).rows[0].n)
+    assert.equal(await rows(kept), 2, 'bot and its binding')
+    assert.equal(await rows(dropped), 0, 'both rolled back together')
   })
 })

@@ -92,9 +92,15 @@ called from `workflows/coordinator/agent-kit-steps.ts`), which applies
   definition already selected, if that provider is allowed.
 - Mikka 默认 runs on Mikka's hosted model, even when the definition selects a
   subscription.
-- Codex or Claude runs on the owner's newest live binding for that bot and
-  provider. Without one, the turn is refused (`binding_required`). A bot never
-  moves to another provider because a subscription is missing.
+- Codex or Claude runs on the owner's binding of their connected account to that
+  bot. Connecting the account once is enough: saving Codex / Claude in 详情, or
+  creating a bot that starts on one, binds it in the same transaction
+  (`ensureBotSubscriptionBinding`, through `SubscriptionRepository.bind` and its
+  checks), and a run that finds no live binding (connected later, or reconnected at
+  a new revision) binds it then. The provider model comes from
+  `MIKKA_BYOS_CODEX_MODEL` / `MIKKA_BYOS_CLAUDE_MODEL`. With no connected account the
+  turn is refused (`binding_required`). A bot never moves to another provider
+  because a subscription is missing.
 - Codex and Claude need the subscription backend and the agent kit
   (`MIKKA_BYOS_ENABLED`, `MIKKA_AGENT_KIT`). Where those are off, the 模型 menu does
   not offer them, saves refuse them, and a stale choice refuses the turn
@@ -102,7 +108,8 @@ called from `workflows/coordinator/agent-kit-steps.ts`), which applies
 - A refused turn shows in the bot's chat as the existing failed-turn alert
   (回复失败, from `coordinator_sessions."lastError"`): 「未连接 Codex 订阅」 with a
   模型订阅 button, or 「Claude 在此无法运行」 with 更换模型, which opens the
-  bot's 详情 (`components/coordinator/turn-error.tsx`). 详情 shows the same
+  bot's 详情 (`components/coordinator/turn-error.tsx`): in place when that bot's chat
+  is shown, otherwise by opening `/?section=coordinator&bot=<id>&panel=details`. 详情 shows the same
   「未连接 … 订阅」 under 模型.
 
 ## Data

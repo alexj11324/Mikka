@@ -1,13 +1,16 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Link } from '@/i18n/navigation'
+import { Link, useRouter } from '@/i18n/navigation'
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { settingsHref } from '@/lib/settings-sections'
 import { parseBotModelRefusal } from '@/lib/workspace-admin/bot-model-policy'
 
-/** Asks the conversation's right column to open the bot's 详情 (components/workspace/issue-workspace.tsx listens). */
+/**
+ * Asks the conversation's right column to open the bot's 详情. components/workspace/issue-workspace.tsx
+ * cancels it when that bot's chat is shown; otherwise the alert opens the chat with ?panel=details.
+ */
 export const OPEN_BOT_DETAILS_EVENT = 'mikka:open-bot-details'
 
 /**
@@ -16,8 +19,18 @@ export const OPEN_BOT_DETAILS_EVENT = 'mikka:open-bot-details'
  * 模型订阅 when the subscription is missing, the bot's 详情 when another model
  * has to be chosen. Any other failure shows its error as before.
  */
-export function TurnError({ error }: { error: string }) {
+/** The bot's chat with its 详情 open: the bot list's chat URL plus panel=details. */
+export function botDetailsHref(botId: string) {
+  return `/?section=coordinator&bot=${encodeURIComponent(botId)}&panel=details`
+}
+
+export function TurnError({ error, botId = null }: { error: string; botId?: string | null }) {
   const t = useTranslations('Coordinator')
+  const router = useRouter()
+  function changeModel() {
+    const handled = !window.dispatchEvent(new CustomEvent(OPEN_BOT_DETAILS_EVENT, { cancelable: true, detail: { botId } }))
+    if (!handled && botId) router.push(botDetailsHref(botId))
+  }
   const allT = useTranslations()
   const refusal = parseBotModelRefusal(error)
   if (!refusal) return <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>
@@ -27,7 +40,7 @@ export function TurnError({ error }: { error: string }) {
     <AlertDescription>{refusal.reason === 'binding_required' ? allT('Settings.botSettings.subscriptionMissing', { model }) : t('modelUnavailableHere', { model })}</AlertDescription>
     <AlertAction>{refusal.reason === 'binding_required'
       ? <Button variant="outline" size="sm" nativeButton={false} render={<Link href={settingsHref('models')} />}>{allT('Settings.sections.models.title')}</Button>
-      : <Button variant="outline" size="sm" onClick={() => window.dispatchEvent(new CustomEvent(OPEN_BOT_DETAILS_EVENT))}>{t('changeModel')}</Button>}
+      : <Button variant="outline" size="sm" onClick={changeModel}>{t('changeModel')}</Button>}
     </AlertAction>
   </Alert>
 }

@@ -50,7 +50,9 @@ before(async () => {
     repositoryAvailable: async (workspaceId: string, repository: string) => { calls.push(['repositoryAvailable', workspaceId, repository]); return repository === 'acme/app' },
     workspaceBots: respond('workspaceBots', [{ id: 'b', name: 'Bot', status: 'running', runningThreads: 2 }]),
     listBotThreadsFor: respond('listBotThreadsFor', { threads: [] }),
+    inAppTransaction: async (run: (client: unknown) => Promise<unknown>) => run({ held: true }),
   } })
+  mock.module('@/lib/bot-subscription-binding', { namedExports: { ensureBotSubscriptionBinding: async (_client: unknown, input: Record<string, unknown>) => { calls.push(['ensureBotSubscriptionBinding', input]); return null } } })
   actions = await import('../app/actions/workspace-settings')
   botActions = await import('../app/actions/bots')
   teamActions = await import('../app/actions/teams')
