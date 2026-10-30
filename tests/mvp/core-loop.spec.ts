@@ -15,6 +15,7 @@ import { assertMvpEnvironment, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from '
 import { RepositoryCache } from '../../packages/daemon/src/repositories'
 import { finishMvpResources, indexMvpResource } from './retention.mjs'
 import { seedMvpSubscription } from './subscription.mjs'
+import { HostedUsageStore } from '../../lib/abuse/store'
 
 const execute = promisify(execFile)
 type Device = { id: string; name: string; protocolVersion: number }
@@ -54,6 +55,9 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
   await page.goto(app('/'))
   checkpoint('home-open', 'Authenticated home loaded')
   const subscription=await seedMvpSubscription(pool,user.id)
+  // The subscription model remains BYO. Its scripted hosted event-classifier
+  // has a separate, explicitly verified fixture allowance; no gate is bypassed.
+  await new HostedUsageStore(pool).verify(subscription.workspaceId,`cus_mvp_${user.id}`,`card_mvp_${user.id}`)
   await indexMvpResource('owner-id', user.id)
   await indexMvpResource('scenario-id', marker)
   const githubAccountId = String(randomInt(1_000_000, 2_000_000_000))
