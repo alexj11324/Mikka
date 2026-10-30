@@ -13,7 +13,7 @@ from e2b import Template
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKER_PATHS = ('package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml',
-                'packages/daemon', 'packages/protocol', 'packages/config')
+                'packages/daemon', 'packages/protocol', 'packages/config', 'patches')
 
 def source_context(directory, ref):
     """Copy only selected files from an immutable Git commit, never the worktree."""
