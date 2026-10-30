@@ -87,3 +87,14 @@ test('alerts at 50%, 100% and strictly more than the first-use threshold', () =>
     'signup_spike',
   ])
 })
+
+test('signup IP uses the trusted Vercel header and finite overrides never mean unlimited', () => {
+  const headers = new Headers({
+    'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+    'x-vercel-forwarded-for': '198.51.100.3',
+  })
+  assert.equal(signupClientIP(headers, { VERCEL: '1' }), '203.0.113.7')
+  assert.equal(signupClientIP(headers, {}), 'local')
+  assert.equal(signupLimits({ MIKKA_SIGNUP_IP_HOURLY: '0' }).signupIp, 5)
+  assert.equal(signupLimits({ MIKKA_SIGNUP_IP_HOURLY: '1000' }).signupIp, 1000)
+})

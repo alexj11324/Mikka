@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { APIError } from 'better-auth'
+import { auditRequestContext } from '../audit/events'
 const domains = new Set(
   readFileSync(
     join(process.cwd(), 'lib/abuse/data/disposable-email-domains.txt'),
@@ -72,6 +73,13 @@ export async function verifyTurnstile(
     failure('SERVICE_UNAVAILABLE', 'SIGNUP_VERIFICATION_UNAVAILABLE')
   }
 }
+/** Reuse the existing trusted proxy/IP policy rather than client-chosen headers. */
+export function signupClientIP(
+  headers: Pick<Headers, 'get'>,
+  env: Record<string, string | undefined> = process.env,
+) {
+  return auditRequestContext(headers, env).ip ?? 'local'
+}
 export function signupLimits(
   env: Record<string, string | undefined> = process.env,
 ) {
@@ -139,11 +147,7 @@ export async function beforeSignup(
   const email = ctx.body?.email
   if (typeof email !== 'string') return
   const headers = ctx.request?.headers
-  // Vercel overwrites this header. Do not trust a client-chosen X-Forwarded-For.
-  const ip = process.env.VERCEL
-    ? (headers?.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() ??
-      'unknown')
-    : 'local'
+  const ip = signupClientIP(headers ?? new Headers())
   await verifyTurnstile(
     ctx.body?.turnstileToken ?? headers?.get('x-turnstile-token'),
   )
