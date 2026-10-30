@@ -34,6 +34,7 @@ import type { ComputerBroker } from "./computer/broker.mjs";
 import { decide, runDomains, runPolicy } from "./permissions";
 import { startPublicEgress, type PublicEgress } from "./agents/public-egress";
 import { matchesRunSandboxDomain } from "./agents/run-sandbox-launcher";
+import { GITHUB_CREDENTIAL_SCRIPT } from './agents/github-runtime';
 
 const exec = promisify(execFile);
 const image = HOSTED_NATIVE_IMAGE;
@@ -524,7 +525,10 @@ export async function createHostedBotRunner(host: {
         await live();
         // No Docker bridge or host networking: only a public-destination proxy
         // is mounted, and each connection rechecks this run's current policy.
-        const egressMaximum = runDomains(runPolicy(options.policy), options.networkAllow ?? []);
+        const githubCli = options.github ? (process.env.PATH ?? '').split(delimiter).map(dir => join(dir, 'gh')).find(file => existsSync(file)) : undefined;
+        if (options.github && !githubCli) throw new Error('Install GitHub CLI (gh) in the cloud worker image');
+        const githubDomains = options.github ? ['github.com', 'api.github.com', new URL(options.github.endpoint).host] : [];
+        const egressMaximum = runDomains(runPolicy(options.policy), [...(options.networkAllow ?? []), ...githubDomains]);
         if (egressMaximum.length) {
           egressStarting = startPublicEgress({
             signal: lifetime.signal,
@@ -587,6 +591,7 @@ export async function createHostedBotRunner(host: {
           ...(egress ? ["-v", `${egress.socketPath}:/run/mikka-egress.sock:ro`] : []),
           "-v",
           `${MCP_SERVER_SCRIPT}:${MCP_SERVER_SCRIPT}:ro`,
+          ...(githubCli ? ['-v', `${githubCli}:/usr/local/bin/mikka-gh:ro`, '-v', `${GITHUB_CREDENTIAL_SCRIPT}:${GITHUB_CREDENTIAL_SCRIPT}:ro`] : []),
           "-v",
           `${join(dirname(MCP_SERVER_SCRIPT), "capture-copy.mjs")}:${join(dirname(MCP_SERVER_SCRIPT), "capture-copy.mjs")}:ro`,
           "-v",
@@ -634,7 +639,7 @@ export async function createHostedBotRunner(host: {
           const env = {
             ...config.env,
             HOME: kind === "claude_code" ? (config.env.HOME ?? home) : home,
-            PATH: "/usr/local/bin:/usr/bin:/bin",
+            PATH: `${options.github ? join(runDir, 'github', 'bin') + ':' : ''}/usr/local/bin:/usr/bin:/bin`,
             GIT_DIR: join(shadow, ".git"),
             GIT_WORK_TREE: cwd,
             GIT_CONFIG_GLOBAL: "/dev/null",
@@ -656,7 +661,7 @@ export async function createHostedBotRunner(host: {
             signal: AbortSignal.any([lifetime.signal, ...(config.signal ? [config.signal] : [])]),
           });
           child.stdin.write(
-            JSON.stringify({ kind, args: config.args, cwd, env, publicEgress: Boolean(egress) }) + "\n",
+            JSON.stringify({ kind, args: config.args, cwd, env, publicEgress: Boolean(egress), ...(options.github ? { githubBin: join(runDir, 'github', 'bin') } : {}) }) + "\n",
           );
           return child;
         };
@@ -735,9 +740,10 @@ export async function createHostedBotRunner(host: {
                     },
                   },
                 });
+          const runtimeOptions = { ...options, ...(options.github ? { githubRuntime: { nodeBinary: '/usr/local/bin/node', ghBinary: '/usr/local/bin/mikka-gh' } } : {}) };
           const session = previous
-            ? await adapter.resume(previous.sessionId, options)
-            : await adapter.start(options);
+            ? await adapter.resume(previous.sessionId, runtimeOptions)
+            : await adapter.start(runtimeOptions);
           // A quick, successful adapter may already have ended and revoked its
           // gate here. Preserve its terminal events; sends/spawns/provider work
           // remain fenced by close, and do not install a new monitor after it.

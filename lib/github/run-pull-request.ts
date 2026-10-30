@@ -108,6 +108,30 @@ export async function verifyGitHubRepositoryAccess(options: Options): Promise<Gi
   return (await repositoryAccess(options)).binding
 }
 
+/** A worker receives one repository's installation token, never the App key. */
+export async function issueRunGitHubInstallationToken(options: Options) {
+  const access = await repositoryAccess(options)
+  const result = parse(z.object({ token: z.string().min(1), expires_at: z.iso.datetime() }),
+    await access.request(`/app/installations/${access.binding.installationId}/access_tokens`, access.jwt, {
+      method: 'POST', body: {
+        repository_ids: [access.binding.repositoryId],
+        permissions: { contents: 'write', pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read' },
+      },
+    }))
+  if (Date.parse(result.expires_at) <= Date.now()) throw new PublicationError('github_request_failed')
+  return { token: result.token, expiresAt: result.expires_at }
+}
+
+/** Discard a freshly minted token when run authority changed during GitHub IO. */
+export async function revokeRunGitHubInstallationToken(token: string, fetcher: typeof fetch = fetch) {
+  const response = await fetcher('https://api.github.com/installation/token', {
+    method: 'DELETE', redirect: 'error', cache: 'no-store',
+    headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
+    signal: AbortSignal.timeout(8_000),
+  })
+  if (!response.ok && response.status !== 401) throw new PublicationError('github_unavailable', true)
+}
+
 /**
  * One PR per task branch (ADR 0024). Replays and ambiguous POST responses
  * first find the issue-marked PR; a human's unrelated PR is never adopted.

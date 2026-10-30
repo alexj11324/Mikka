@@ -317,6 +317,9 @@ export class CodexAdapter implements AgentAdapter {
       !externalAuth
     )
     const ctx = new RunContext({
+      github: options.github,
+      githubRuntime: options.githubRuntime,
+      childPath: options.env.PATH,
       mailboxEnabled: Boolean(options.mailbox),
       harness: "codex",
       kind: options.kind,
@@ -500,6 +503,11 @@ export class CodexAdapter implements AgentAdapter {
       // host-bound run. Turn authority comes from our turn/start response.
       if (options.mailbox && (method.startsWith('item/') || method.startsWith('turn/') || method === 'thread/tokenUsage/updated') && (params as { threadId?: unknown } | null)?.threadId !== sessionId) return
       switch (method) {
+        case 'item/commandExecution/outputDelta': {
+          const progress = params as { threadId?: string; turnId?: string; delta?: string }
+          if (progress.threadId === sessionId && progress.turnId === activeTurn && typeof progress.delta === 'string' && progress.delta.length > 0) queue.progress()
+          return
+        }
         case "item/agentMessage/delta": {
           const { itemId, delta } = params as DeltaNotification
           if (!streamed.has(itemId)) {

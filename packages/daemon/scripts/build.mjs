@@ -35,6 +35,7 @@ for (const path of ['agents/native-container.mjs', 'agents/native-egress.mjs', '
 }
 // run-context is bundled into each root entry; its stdio helper is standalone.
 await copyFile(resolve(root, 'src/agents/mikka-mcp.mjs'), resolve(out, 'mikka-mcp.mjs'))
+await copyFile(resolve(root, 'src/agents/github-credentials.mjs'), resolve(out, 'github-credentials.mjs'))
 await cp(resolve(root, 'fixtures'), resolve(out, 'fixtures'), { recursive: true })
 await copyFile(resolve(root, '../../LICENSE'), resolve(out, 'LICENSE'))
 await copyFile(resolve(root, 'README.md'), resolve(out, 'README.md'))

@@ -44,7 +44,7 @@ export type AgentReport = Partial<
 >
 
 /** Adapter output: UI message chunks, then exactly one `exit`. */
-export type AgentEvent = { type: "chunk"; chunk: RunChunk } | ExitEvent
+export type AgentEvent = { type: "chunk"; chunk: RunChunk } | { type: 'progress' } | ExitEvent
 
 export interface AgentCapabilities {
   /** `send` can deliver a user message while a turn is running. */
@@ -57,6 +57,10 @@ export interface AgentCapabilities {
 }
 
 export interface SessionOptions {
+  /** Trusted server-issued delivery binding, never model-selected. */
+  github?: { endpoint: string; repository: string; branch: string; runToken: string; issueId: string }
+  /** Fixed container paths supplied by the hosted runner, never by the assignment. */
+  githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** Trusted, run-bound host gate. Never populated from model input. */
   toolApproval?: ToolApprovalGate
   /** Host-created run-bound control callbacks; no serialized token/URL/model input. */

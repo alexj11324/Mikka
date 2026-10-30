@@ -310,6 +310,11 @@ export const runAssignmentSchema = z.object({
    * one, and the run goes ahead without it.
    */
   mcp: z.object({ url: z.url(), token: z.string().min(1).max(200), mailbox: z.literal(true).optional() }).optional(),
+  /** Agent-owned GitHub delivery; the same run token exchanges short-lived credentials. */
+  github: z.object({
+    endpoint: z.url(), repository: z.string().regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/),
+    branch: z.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/),
+  }).strict().optional(),
   /** Question continuation must not silently open a different session. */
   /**
    * What the orchestrator dispatched this run for (ADR 0023). `plan` writes a

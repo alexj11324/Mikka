@@ -1172,6 +1172,8 @@ export class RunSupervisor {
       try { checkMailbox() } catch (error) { toolApproval.revoke(); throw error }
     }
     const options = {
+      github: assignment.github && assignment.mcp && (assignment.kind === 'implement' || assignment.kind === 'fix') && !runPolicy(assignment.policy).readOnly
+        ? { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId } : undefined,
       toolApproval,
       runId,
       requireSessionResume: assignment.requireSessionResume,
@@ -1350,6 +1352,7 @@ export class RunSupervisor {
                   error: "Session ended without an exit event",
                 }
               : next.value
+        if (event.type === 'progress') { run.lastProgressAt = Date.now(); continue }
         if (event.type === "chunk") {
           // Streamed text is not progress; tool calls, steps and files are.
           if (!event.chunk.type.endsWith("-delta"))
