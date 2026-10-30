@@ -13,6 +13,7 @@ import { createFactoryDispatch } from "../dispatch";
 import { factoryDispatchDatabase } from "../transaction";
 import { insertRunOnce } from "../../run-dispatch";
 import { createFactoryQuestions, questionReference } from "./store";
+import { threadContinuationRunIds, threadQuestionStates } from "../../issue-thread-questions";
 import { createFactoryReconciler } from "../reconcile";
 import { lostRunOutcome } from "../../run-retry";
 import { blockQuestionRetry } from "./retry";
@@ -228,6 +229,52 @@ test(
           )
         ).rows[0].n;
 
+      await t.test(
+        "issue thread reads: answering shows resuming and folds the resumed run, only for the question and task owner",
+        async () => {
+          await pool.query(
+            `INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('intruder','Intruder','intruder@example.invalid',true,now(),now()) ON CONFLICT DO NOTHING`,
+          );
+          const f = await fixture();
+          const states = (db: Pick<Pool, "query">, viewer = userId) =>
+            threadQuestionStates(db, [f.runId], viewer).then((m) => Object.fromEntries(m));
+          const resumed = (db: Pick<Pool, "query">, viewer = userId) =>
+            threadContinuationRunIds(db, f.issueId, viewer, f.runId, 20);
+          assert.deepEqual(await states(pool), { [f.runId]: "waiting" });
+          assert.deepEqual(await resumed(pool), []);
+          const { continuationRunId } = await questions.answer(orchestrator, facts(f));
+          assert.ok(continuationRunId);
+          assert.deepEqual(await states(pool), { [f.runId]: "resuming" });
+          assert.deepEqual(await resumed(pool), [continuationRunId]);
+          assert.deepEqual(await states(pool, "intruder"), {});
+          assert.deepEqual(await resumed(pool, "intruder"), []);
+          // Each fence alone must hide the row: rows are moved to another user inside a rolled-back transaction.
+          const isolated = async (change: string, values: unknown[], check: (tx: PoolClient) => Promise<void>) => {
+            const tx = await pool.connect();
+            try {
+              await tx.query("BEGIN");
+              await tx.query("SET LOCAL session_replication_role = replica");
+              await tx.query(change, values);
+              await check(tx);
+            } finally {
+              await tx.query("ROLLBACK");
+              tx.release();
+            }
+          };
+          await isolated(`UPDATE factory_questions SET "userId"='intruder' WHERE id=$1`, [f.questionId], async (tx) =>
+            assert.deepEqual(await states(tx), {}, "question owned by someone else"));
+          await isolated(`UPDATE factory_tasks SET "userId"='intruder' WHERE id=$1`, [f.task.id], async (tx) =>
+            assert.deepEqual(await states(tx), {}, "task owned by someone else"));
+          await isolated(`UPDATE factory_tasks SET status='cancelled' WHERE id=$1`, [f.task.id], async (tx) =>
+            assert.deepEqual(await states(tx), {}, "cancelled task"));
+          await isolated(`UPDATE agent_runs SET "userId"='intruder' WHERE id=$1`, [continuationRunId], async (tx) =>
+            assert.deepEqual(await resumed(tx), [], "resumed run owned by someone else"));
+          await isolated(`UPDATE agent_runs SET "questionContinuation"=NULL WHERE id=$1`, [continuationRunId], async (tx) =>
+            assert.deepEqual(await resumed(tx), [], "unlinked run"));
+          await isolated(`UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{originRunId}',to_jsonb($2::text)) WHERE id=$1`, [continuationRunId, randomUUID()], async (tx) =>
+            assert.deepEqual(await resumed(tx), [], "run resuming another origin"));
+        },
+      );
       await t.test(
         "ten hand-in replays persist one question and waiting instead of cancellation",
         async () => {

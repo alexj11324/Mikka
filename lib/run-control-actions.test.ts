@@ -86,7 +86,9 @@ before(async () => {
   } } } } })
   mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
   mock.module('@/lib/db', { namedExports: { db: database, withDatabaseClient: () => { throw Error('Factory dispatch is outside thread-control fixture') }, pool: { async query(sql: string, params: unknown[]) {
-    // Factory questions are the only pool read on the thread path (app/actions/agents.ts threadQuestions).
+    // Factory questions are the other pool read on the thread path (lib/issue-thread-questions.ts).
+    // The resumed-run lookup (lib/issue-thread-questions.ts) is covered against real PG in lib/factory/questions/postgres.test.ts.
+    if (/FROM agent_runs WHERE "issueId"=\$1 AND "userId"=\$2 AND "questionContinuation"/.test(sql)) return { rows: [] }
     if (!/FROM factory_questions/.test(sql)) throw new Error('Unexpected SQL pool access outside thread control')
     current.questionReads.push(params)
     const [runIds, viewerId] = params as [string[], string]

@@ -1,5 +1,6 @@
 'use server'
 
+import { threadContinuationRunIds, threadQuestionStates } from '@/lib/issue-thread-questions'
 import { headers } from 'next/headers'
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
@@ -187,15 +188,7 @@ export interface IssueThreadDetail {
 async function threadQuestions(threads: readonly IssueThread[], viewerId: string): Promise<IssueThread[]> {
   const asked = threads.filter(thread => thread.ownedByCurrentUser && !runIsActive(thread.status)).map(thread => thread.id)
   if (!asked.length || process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return [...threads]
-  const { rows } = await pool.query<{ runId: string; status: string }>(
-    `SELECT DISTINCT ON (q."originRunId") q."originRunId" AS "runId", q.status FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId"
-      WHERE q."originRunId"=ANY($1::uuid[]) AND q."userId"=$2 AND t."userId"=$2 AND t.status NOT IN ('cancelled','revoked')
-        AND t."candidateId" IS NOT DISTINCT FROM q."candidateId"
-        AND (q.status='resuming' OR (q.status IN ('open','waiting_user') AND (q."expiresAt" IS NULL OR q."expiresAt">now())))
-      ORDER BY q."originRunId", q."createdAt" DESC`,
-    [asked, viewerId],
-  )
-  const byRun = new Map(rows.map(row => [row.runId, row.status === 'resuming' ? 'resuming' as const : 'waiting' as const]))
+  const byRun = await threadQuestionStates(pool, asked, viewerId)
   return threads.map(thread => ({ ...thread, question: byRun.get(thread.id) ?? null }))
 }
 
@@ -208,8 +201,9 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
   // The run that resumes this one after an answered question is the same thread (see IssueThread.continuation).
-  const continuations = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
-    .where(and(eq(agentRuns.issueId, row.issueId ?? ''), eq(agentRuns.userId, user.id), sql`${agentRuns.questionContinuation}->>'originRunId' = ${row.id}`)).limit(ISSUE_THREAD_LIMIT)
+  const continuationIds = row.issueId ? await threadContinuationRunIds(pool, row.issueId, user.id, row.id, ISSUE_THREAD_LIMIT) : []
+  const continuations = continuationIds.length ? await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
+    .where(and(inArray(agentRuns.id, continuationIds), eq(agentRuns.userId, user.id))) : []
   const thread = (await threadQuestions(projectIssueThreads([row, ...continuations], row.issueId ?? '', user.id, new Set([user.id])), user.id)).find(item => item.id === row.id)
   if (!thread) throw new ActionFailureError('runNotFound')
   return {
