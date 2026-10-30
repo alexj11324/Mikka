@@ -79,7 +79,12 @@ export async function listWorkspaceSecrets(userId: string, workspaceId: string):
 }
 
 /** D6 新建. Errors: validationGeneric, secretNameTaken, secretLimitReached, secretsUnavailable, workspaceAccessDenied. */
-export async function createWorkspaceSecret(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit): Promise<WorkspaceSecretView> {
+/** Values shorter than this are not masked in runtime output (4e2), so saving one returns a warning. */
+export const MASK_MIN_LENGTH = 8
+export type SavedSecretView = WorkspaceSecretView & { warning: 'shortValueNotMasked' | null }
+const withWarning = (row: WorkspaceSecretView, value: string): SavedSecretView => ({ ...row, warning: value.length < MASK_MIN_LENGTH ? 'shortValueNotMasked' : null })
+
+export async function createWorkspaceSecret(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit): Promise<SavedSecretView> {
   const { name, kind, value, scope } = createSecretInput.parse(input)
   await requireAdmin(userId, workspaceId)
   const id = crypto.randomUUID()
@@ -94,7 +99,7 @@ export async function createWorkspaceSecret(userId: string, workspaceId: string,
       await audit(tx, { workspaceId, actorId: userId, action: kind === 'secret' ? 'secret.created' : 'env.created', target: { type: kind, id, label: name }, metadata: { scope: saved.scopeType, ...(saved.scopeRef ? { repository: saved.scopeRef } : {}) } })
       return saved
     })
-    return kind === 'env' ? view(row) : meta(row)
+    return withWarning(kind === 'env' ? view(row) : meta(row), value)
   } catch (error) {
     if (isUnique(error)) throw new WorkspaceError('secretNameTaken')
     throw error
@@ -102,7 +107,7 @@ export async function createWorkspaceSecret(userId: string, workspaceId: string,
 }
 
 /** SEC-15～17 编辑: replaces the value only (kind, name and scope are fixed). Returns metadata (env: with value). */
-export async function replaceWorkspaceSecret(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit, now = new Date()): Promise<WorkspaceSecretView> {
+export async function replaceWorkspaceSecret(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit, now = new Date()): Promise<SavedSecretView> {
   const { id, value } = replaceSecretInput.parse(input)
   await requireAdmin(userId, workspaceId)
   const row = await db.transaction(async tx => {
@@ -112,7 +117,7 @@ export async function replaceWorkspaceSecret(userId: string, workspaceId: string
     await audit(tx, { workspaceId, actorId: userId, action: current.kind === 'secret' ? 'secret.replaced' : 'env.updated', target: { type: current.kind, id, label: current.name } })
     return saved
   })
-  return row.kind === 'env' ? view(row) : meta(row)
+  return withWarning(row.kind === 'env' ? view(row) : meta(row), value)
 }
 
 /** Delete (no UI frame yet; kept for the API). Audit action secret.deleted / env.deleted. */

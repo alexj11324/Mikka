@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { byoE2BKeyEnabled, e2bErrorCode, resetVerifyAttempts, takeVerifyAttempt, verifyE2BKey } from './e2b'
+import { byoE2BKeyEnabled, e2bErrorCode, verifyE2BKey } from './e2b'
 
 test('BYO flag is off unless exactly "1"', () => {
   for (const value of [undefined, '', '0', 'true', 'yes']) assert.equal(byoE2BKeyEnabled({ MIKKA_BYO_E2B_KEY: value }), false)
@@ -21,10 +21,3 @@ test('verify maps E2B responses and sends the key only as X-API-Key', async () =
   assert.deepEqual([401, 403, 429, 404, 500].map(e2bErrorCode), ['e2b_key_invalid', 'e2b_key_invalid', 'e2b_limit_reached', 'e2b_template_unavailable', 'e2b_unavailable'])
 })
 
-test('verify attempts are limited per key hash and per workspace', () => {
-  resetVerifyAttempts()
-  for (let i = 0; i < 5; i++) assert.equal(takeVerifyAttempt(['key:a', 'ws:1'], 1000), true)
-  assert.equal(takeVerifyAttempt(['key:b', 'ws:1'], 1000), false)
-  assert.equal(takeVerifyAttempt(['key:a', 'ws:2'], 1000), false)
-  assert.equal(takeVerifyAttempt(['key:a', 'ws:2'], 1000 + 10 * 60_000), true)
-})

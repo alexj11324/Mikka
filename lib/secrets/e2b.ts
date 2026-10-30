@@ -2,10 +2,9 @@ import 'server-only'
 // Bring-your-own E2B API key (plan 1.3.1). One key per workspace, write-only: only last4 and
 // verification state are ever returned. Phase 1 supports E2B only, so there is no provider
 // abstraction: getWorkspaceE2BApiKey returns the E2B key itself.
-import { createHash } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { and, eq, lte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { workspaceE2bKeys, type E2B_KEY_ERROR_CODES } from '@/lib/db/secrets-schema'
+import { workspaceE2bKeys, workspaceE2bVerifyAttempts, type E2B_KEY_ERROR_CODES } from '@/lib/db/secrets-schema'
 import { WorkspaceError } from '@/lib/workspace-access'
 import { e2bKeyAad, openSecret, sealSecret, SecretsKeyMissingError } from './crypto'
 import { e2bKeyInput } from './format'
@@ -35,16 +34,22 @@ export async function verifyE2BKey(apiKey: string, fetchImpl: typeof fetch = fet
   } catch { return { ok: false, code: 'unavailable' } }
 }
 
-// Per-process limiter keyed by sha256(key) and by workspace, so this endpoint cannot be used to probe keys.
-const ATTEMPTS = 5, WINDOW_MS = 10 * 60_000
-const attempts = new Map<string, number[]>()
-export function takeVerifyAttempt(keys: string[], now = Date.now()): boolean {
-  const hits = keys.map(key => (attempts.get(key) ?? []).filter(at => now - at < WINDOW_MS))
-  if (hits.some(list => list.length >= ATTEMPTS)) return false
-  keys.forEach((key, i) => attempts.set(key, [...hits[i], now]))
-  return true
+// Postgres limiter: 5 verify attempts per workspace per sliding 10 minutes, shared by every
+// instance. One row per attempt in workspace_e2b_verify_attempts; a per-workspace advisory
+// transaction lock serialises count+insert, so N concurrent attempts admit exactly 5.
+// The attempt commits before E2B is called, so failed checks count too.
+export const VERIFY_ATTEMPTS = 5, VERIFY_WINDOW_MS = 10 * 60_000
+export async function takeVerifyAttempt(workspaceId: string, now = new Date()): Promise<boolean> {
+  return db.transaction(async tx => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`e2b-verify:${workspaceId}`}, 0))`)
+    const since = new Date(now.getTime() - VERIFY_WINDOW_MS)
+    await tx.delete(workspaceE2bVerifyAttempts).where(and(eq(workspaceE2bVerifyAttempts.workspaceId, workspaceId), lte(workspaceE2bVerifyAttempts.attemptedAt, since)))
+    const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(workspaceE2bVerifyAttempts).where(eq(workspaceE2bVerifyAttempts.workspaceId, workspaceId))
+    if (n >= VERIFY_ATTEMPTS) return false
+    await tx.insert(workspaceE2bVerifyAttempts).values({ workspaceId, attemptedAt: now })
+    return true
+  })
 }
-export const resetVerifyAttempts = () => attempts.clear()
 
 const masked = (last4: string) => `e2b_••••${last4}`
 const sealKey = (apiKey: string, workspaceId: string) => {
@@ -70,7 +75,7 @@ export async function setE2BKey(userId: string, workspaceId: string, input: unkn
   const { apiKey } = e2bKeyInput.parse(input)
   await requireAdmin(userId, workspaceId)
   const now = options.now ?? new Date()
-  if (!takeVerifyAttempt([`key:${createHash('sha256').update(apiKey).digest('hex')}`, `ws:${workspaceId}`], now.getTime())) throw new WorkspaceError('e2bKeyRateLimited')
+  if (!await takeVerifyAttempt(workspaceId, now)) throw new WorkspaceError('e2bKeyRateLimited')
   const sealed = sealKey(apiKey, workspaceId) // fail closed before calling E2B
   const result = await (options.verify ?? verifyE2BKey)(apiKey)
   if (!result.ok) throw new WorkspaceError(result.code === 'invalid' ? 'e2bKeyInvalid' : 'e2bKeyUnverifiable')
@@ -84,6 +89,11 @@ export async function setE2BKey(userId: string, workspaceId: string, input: unkn
   return getE2BKeyStatus(userId, workspaceId)
 }
 
+/**
+ * Admin-only delete (requireAdmin before any write). Afterwards getWorkspaceE2BApiKey treats
+ * the workspace as having no key (flag on: e2b_key_missing). TODO(audit): the hook runs inside
+ * this transaction; swap noAudit for a recordAudit-backed hook once #432 lands.
+ */
 export async function removeE2BKey(userId: string, workspaceId: string, audit: SecretAuditHook = noAudit): Promise<{ removed: boolean }> {
   await requireAdmin(userId, workspaceId)
   return db.transaction(async tx => {

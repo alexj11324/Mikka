@@ -3,7 +3,7 @@
 -- (plan 1.3.1). Values are AES-256-GCM ciphertext under WORKSPACE_SECRETS_KEY;
 -- plaintext is never stored. "workspaceId" has no FK: workspaces live in the
 -- workspace database (DATABASE_URL). Mirrors lib/db/secrets-schema.ts.
--- Rollback: drop table workspace_e2b_keys, workspace_network_policy, workspace_secrets;
+-- Rollback: drop table workspace_e2b_verify_attempts, workspace_e2b_keys, workspace_network_policy, workspace_secrets;
 
 create table workspace_secrets (
   id uuid primary key,
@@ -51,3 +51,11 @@ create table workspace_e2b_keys (
   "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now()
 );
+
+-- BYO key verify rate limit (5 per workspace per 10 min), strict across instances.
+create table workspace_e2b_verify_attempts (
+  id bigserial primary key,
+  "workspaceId" uuid not null,
+  "attemptedAt" timestamptz not null
+);
+create index workspace_e2b_verify_attempts_ws_idx on workspace_e2b_verify_attempts ("workspaceId", "attemptedAt");
