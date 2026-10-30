@@ -1,5 +1,5 @@
 import { after, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { coordinatorRuntimeSchema } from '@mikka/protocol/coordinator'
 import { nativeCoordinatorEnabled, nativeCoordinatorStore } from '@/lib/coordinator/native'
 import { NativeCoordinatorError } from '@/lib/coordinator/native-store'

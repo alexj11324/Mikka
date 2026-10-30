@@ -7,20 +7,23 @@ belong to #504. This change adds no frontend screen or feature flag.
 
 The existing trusted-origin preload exposes optional `window.mikka.ssh`:
 
-- `hosts(): Promise<string[]>`: explicit host aliases from the desktop user's
+- `hosts(): Promise<{ alias, user, hostName, port }[]>`: explicit host aliases from the desktop user's
   `~/.ssh/config`; wildcards and negated patterns are excluded. OpenSSH resolves
-  the selected alias's user, port, identity and other SSH configuration.
+  each alias with `ssh -G`; `user` and `hostName` are strings and `port` is a number. Identity and other SSH options remain internal.
 - `begin(target)`: accepts `alias` or `[user@]hostname[:port]`; returns the
   installation snapshot. Only one installation runs at a time.
 - `accept(id)`: accepts exactly the pending snapshot's host fingerprint,
   records that key in the desktop user's `~/.ssh/known_hosts`, then continues.
   Without this call, an unknown host receives no installation command or token.
+- `cancel(id)`: stops the active discovery or install child process and reports
+  `status: failed`, `reason: cancelled`, `retryable: true`. Completed remote steps
+  remain in place. A retry uses `begin` with a new id after cancellation settles.
 - `state()`: restores the latest snapshot after a view reload.
 - `onChange(listener)`: subscribes to snapshots; returns an unsubscribe function.
 
 Snapshots contain `id`, `target`, `step` (`login`, `check`, `install`, `service`,
 `connect`) and `status` (`fingerprint`, `running`, `online`, `failed`). A
-fingerprint snapshot contains `fingerprint`; a failed snapshot includes `reason`
+fingerprint snapshot contains `fingerprint` (SHA256 only) and `keyType` (e.g. ED25519); a failed snapshot includes `reason`
 and `retryable`. The online snapshot includes the registered `deviceId`. Retry calls `begin` again, obtaining a new registration grant.
 The event stream carries no credential. Only trusted app main frames may invoke
 IPC. Browser clients have no SSH bridge and keep the existing three commands.
@@ -142,3 +145,14 @@ Main's preload additionally marks the document's platform. The IPC fixture now
 provides that minimal document surface; the post-rebase SSH acceptance passed
 locally, including reinstallation. All 29 desktop unit tests passed after the
 rebase. PR #511 carries the Git-linked CI evidence for the final revision.
+
+### #540 verification — backend gaps batch
+
+Branch `codex/backend-gaps-538-541`, cloud Linux. Desktop tests pass 32/32;
+SSH parsing, key type, cancellation of actual child processes and retry are
+covered. Desktop typecheck/lint pass. Packaged SSH acceptance passes through
+real OpenSSH, systemd and daemon registration, redetect and restart; the built
+preload also exercises host details and fingerprint cancellation/retry.
+The disposable container uses the existing `MIKKA_SSH_TEST_NPM_CACHE` path
+because this environment does not allow its direct npm registry connection.
+No production host or user credential is involved.

@@ -83,6 +83,12 @@ test('real SSH key confirmation → tarball install → systemd → registration
       }),
     })
     assert.throws(() => handlers.get('mikka:ssh:begin')!({ senderFrame: { parent: null, url: 'https://evil.test' } }, 'fixture'), /untrusted/)
+    const hosts = await bridge.ssh!.hosts()
+    assert.deepEqual(hosts.map(host => ({ ...host })), [{ alias: 'fixture', user: 'root', hostName: '127.0.0.1', port: 22491 }])
+    const cancelled = await bridge.ssh!.begin('fixture')
+    assert.equal(cancelled?.keyType, 'ED25519')
+    assert.equal((await bridge.ssh!.cancel(cancelled!.id))?.reason, 'cancelled')
+    assert.equal(enrollments, 0)
     const initial = await bridge.ssh!.begin('fixture')
     assert.equal(initial?.status, 'fingerprint')
     assert.equal(enrollments, 0)

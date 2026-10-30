@@ -1,6 +1,6 @@
 import { after, NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
-import { getSession } from '@/lib/session'
+import { getApiSession } from '@/lib/api-auth'
 import type { SuggestionSource } from '@/lib/db/schema'
 import { ACTION_LOCALES, type ActionLocale } from '@/lib/suggestions/action-title'
 import { rememberLocale } from '@/lib/suggestions/action-title-server'
@@ -25,7 +25,7 @@ const headers = { 'Cache-Control': 'private, no-store' }
  * are written in it.
  */
 export async function GET(request: Request) {
-  const user = (await getSession())?.user
+  const user = (await getApiSession({ headers: request.headers }))?.user
   if (!user) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
   // Hobby cron runs once a day, so opening the list is when a missing trigger gets re-created.
   after(async () => {

@@ -1,3 +1,4 @@
+import { tokenWorkspace } from '@/lib/tokens/principal'
 import { getLocale } from 'next-intl/server'
 import 'server-only'
 import { cache } from 'react'
@@ -39,7 +40,10 @@ export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: st
 export async function loadWorkspaceContext(requestedId?: string, authenticatedUser?: AuthenticatedUser) {
   if (requestedId) z.uuid().parse(requestedId)
   const [user, locale] = await Promise.all([authenticatedUser ?? requireUser(), getLocale().then(workspaceLocale)])
-  return readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, requestedId ?? '', locale)
+  const patWorkspace = (user as typeof user & { [tokenWorkspace]?: string })[tokenWorkspace]
+  if (patWorkspace && requestedId && requestedId !== patWorkspace) throw new WorkspaceError('workspaceAccessDenied')
+  const context = await readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, patWorkspace ?? requestedId ?? '', locale)
+  return patWorkspace ? { ...context, choices: context.choices.filter(choice => choice.id === patWorkspace) } : context
 }
 
 // The pages, the switcher and the list actions all ask for the same context. React cache shares it

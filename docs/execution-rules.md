@@ -85,3 +85,48 @@ The shared device-management command channel from #491 delivers `redetect` by
 command id in the heartbeat response. The daemon reruns detection and sends an
 immediate follow-up heartbeat with its refreshed harness/model report and the
 completed command id. Normal heartbeats cannot consume an unacknowledged command.
+
+## Frontend handoff (#539)
+
+These additions are backend contracts; they do not implement #537's explicit
+initial choices or remove the existing automatic options.
+
+- `listWorkspaceIssueLabels(workspaceId?)` returns `{name, color}[]` for
+  nondeleted workspace issues visible through the current workspace's team
+  links. Personal issues have no workspace association and are excluded.
+  `color` uses the existing issue-label palette. Duplicate names are folded
+  case-insensitively; the newest visible issue supplies its spelling and color.
+- `listBotModels()` returns one row per `(connectionId, modelId)`, with
+  `bindingId`, `consumerId`, `modelId`, `route`, `connectionId`, `provider`,
+  `accountLabel`, and `plan`. Label and plan are nullable when the connection
+  has not reported them. The account label is the existing connection label;
+  the plan comes from its last quota snapshot. Saved Bot-specific binding ids
+  remain accepted even when another copy represents the model in the list.
+  `getBotModel()` returns the visible option id for an available saved model;
+  internal execution reads keep their original stored binding id.
+- `refreshBotModels(connectionId, workspaceId?)` asks that connected account's
+  provider for its current model list and returns matching model options in the
+  same shape. It creates idempotent catalogue bindings in the existing
+  `byos_bindings` table; choosing one still copies its binding for the target
+  Bot. A nullable `byos_connections.modelCatalog` snapshot records the last
+  successful catalogue and its revision; rereading the model list excludes
+  models removed by that provider, including when its current list is empty.
+  Existing bindings are retained for saved choices and run snapshots. The
+  idempotent `20261030233002_byos_model_catalog.sql` migration adds this column.
+  Discovery and storage both check the account owner, workspace and epoch;
+  a disconnect/reconnect during discovery rejects the refresh. Provider errors
+  become `executionAccountUnavailable` rather than exposing response bodies.
+- `getRedetectDeviceStatus(commandId, workspaceId?)` reads the existing receipt:
+  `{commandId, status: 'pending' | 'completed' | 'failed', completedAt, error}`.
+  Only the device owner can read a local, nonremoved device's redetect command.
+  Completion is the daemon's acknowledgement; polling does not complete it.
+
+`ExecutionSettings` now throws `ActionFailureError` for expected failures:
+`executionPlaceInvalid`, `executionHarnessUnavailable`, `executionModelUnknown`,
+`executionRuleNotFound`, `executionRuleOrderInvalid`,
+`executionCommandNotFound`, `executionAccountUnavailable`, and `botNotFound`.
+Malformed remaining rule fields use the existing `validationGeneric` code.
+Explicit device rules check installed harnesses and the device's reported
+model list. Cloud/automatic-place explicit models must belong to a connected
+account binding for the selected harness. Automatic model selection retains
+its current behavior until #537.

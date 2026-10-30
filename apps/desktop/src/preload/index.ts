@@ -46,6 +46,7 @@ if (appOrigin && window.location.origin === appOrigin) {
       },
       hosts: () => ipcRenderer.invoke(IPC.sshHosts),
       begin: (target: unknown) => ipcRenderer.invoke(IPC.sshBegin, target),
+      cancel: (id: unknown) => ipcRenderer.invoke(IPC.sshCancel, id),
       accept: (id: unknown) => ipcRenderer.invoke(IPC.sshAccept, id),
       state: () => ipcRenderer.invoke(IPC.sshState),
     },

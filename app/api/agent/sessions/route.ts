@@ -1,7 +1,7 @@
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { AgentStoreError, getAgentHistory } from '@/lib/agent-store'
 
 async function handleGET(request: Request) {

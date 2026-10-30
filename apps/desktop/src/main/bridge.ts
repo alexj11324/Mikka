@@ -46,6 +46,10 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
     if (typeof target !== 'string' || target.length > 300) throw new Error('Invalid SSH host')
     return installer.begin(target)
   })
+  handle(IPC.sshCancel, id => {
+    if (typeof id !== 'string') throw new Error('Invalid installation id')
+    return installer.cancel(id)
+  })
   handle(IPC.sshAccept, id => {
     if (typeof id !== 'string') throw new Error('Invalid installation id')
     return installer.accept(id)

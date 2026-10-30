@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { SearchInputError } from '@/lib/issue-search'
 import { parseInput, UnsupportedSourceError } from '@/lib/federated-search/input'
 import { readSearchPage, SearchAccessError } from '@/lib/federated-search/store'
@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true, disableRefresh: true } })
     if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
     const input = parseInput(new URL(request.url).searchParams, session.user.id)
+    if (input.workspaceId && !apiWorkspaceAllowed(session, input.workspaceId)) return NextResponse.json({ error: 'searchAccessDenied' }, { status: 403, headers })
     const read = await readSearchPage(session.user.id, input)
     const current = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true, disableRefresh: true } })
     if (!current?.user || current.user.id !== session.user.id || current.session.id !== session.session.id) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })

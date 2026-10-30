@@ -116,11 +116,14 @@ describe("mikka MCP server", () => {
         name: "submit",
         arguments: {
           summary: "Checked AC-1",
+          previewDatabaseBranch: "preview/ac-1",
           criteria: [
             {
               criterionId,
               passed: true,
               evidence: "curl -s localhost:4000 -> 200",
+              command: "curl -fsS localhost:4000",
+              exitCode: 0,
             },
           ],
         },
@@ -128,11 +131,14 @@ describe("mikka MCP server", () => {
       expect(ctx.readHandoff()).toMatchObject({
         stopReason: "submitted",
         report: {
+          previewDatabaseBranch: "preview/ac-1",
           criteria: [
             {
               criterionId,
               passed: true,
               evidence: "curl -s localhost:4000 -> 200",
+              command: "curl -fsS localhost:4000",
+              exitCode: 0,
             },
           ],
         },

@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { auditRequestContext } from '@/lib/audit/events'
 import { secretAuditHook } from '@/lib/secrets/audit'
 import type { SettingsActionResult } from '@/lib/workspace-admin/settings-action'
-import { getE2BKeyStatus, removeE2BKey, setE2BKey, type E2BKeyStatus } from '@/lib/secrets/e2b'
+import { getE2BKeyCapabilityForUser, getE2BKeyStatus, removeE2BKey, setE2BKey, type E2BKeyStatus } from '@/lib/secrets/e2b'
 import { createWorkspaceSecret, deleteWorkspaceSecret, listWorkspaceSecrets, replaceWorkspaceSecret, type SavedSecretView, type SecretAuditHook, type WorkspaceSecretView } from '@/lib/secrets/store'
 import { settingsWorkspaceAction } from '@/lib/workspace-admin/settings-action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
@@ -29,12 +29,20 @@ export async function replaceSecret(input: { id: string; value: string; scope?: 
 export async function deleteSecret(input: { id: string }, workspaceId?: string): Promise<SettingsActionResult<{ id: string }>> {
   return withActor((u, w, audit) => deleteWorkspaceSecret(u, w, input, audit), workspaceId)
 }
-export async function getE2BKey(): Promise<SettingsActionResult<E2BKeyStatus>> {
-  return withActor((u, w) => getE2BKeyStatus(u, w))
+export async function getE2BKey(workspaceId?: string): Promise<SettingsActionResult<E2BKeyStatus>> {
+  return withActor((u, w) => getE2BKeyStatus(u, w), workspaceId)
 }
-export async function saveE2BKey(input: { apiKey: string }): Promise<SettingsActionResult<E2BKeyStatus>> {
-  return withActor((u, w, audit) => setE2BKey(u, w, input, { audit }))
+export async function saveE2BKey(input: { apiKey: string }, workspaceId?: string): Promise<SettingsActionResult<E2BKeyStatus>> {
+  return withActor((u, w, audit) => setE2BKey(u, w, input, { audit }), workspaceId)
 }
-export async function deleteE2BKey(): Promise<SettingsActionResult<{ removed: boolean }>> {
-  return withActor((u, w, audit) => removeE2BKey(u, w, audit))
+export async function deleteE2BKey(workspaceId?: string): Promise<SettingsActionResult<{ removed: boolean }>> {
+  return withActor((u, w, audit) => removeE2BKey(u, w, audit), workspaceId)
+}
+
+/** Shared by settings and the first-run guide. */
+export async function getE2BKeyCapability(workspaceId?: string) {
+  return settingsWorkspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return getE2BKeyCapabilityForUser(actor.userId, actor.workspaceId)
+  })
 }

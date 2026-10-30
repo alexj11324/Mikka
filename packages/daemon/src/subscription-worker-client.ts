@@ -118,7 +118,7 @@ export class SubscriptionWorkerClient {
     })
     return { result, stop: abort, pause: () => child.stdout.pause(), resume: () => child.stdout.resume() }
   }
-  async call<T>(method: "status" | "oauthStart" | "oauthComplete" | "oauthPoll" | "oauthHandoff" | "refresh" | "recover" | "disconnect" | "nativeAuth" | "nativeContext" | "prepare" | "quota" | "usage" | "cleanup", input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
+  async call<T>(method: "status" | "oauthStart" | "oauthComplete" | "oauthPoll" | "oauthHandoff" | "refresh" | "recover" | "disconnect" | "nativeAuth" | "nativeContext" | "prepare" | "quota" | "usage" | "models" | "cleanup", input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
     return await this.start({ ...input, method }, signal).result as T
   }
   async nativeRequest(revision: number, payload: {path: string; headers: Record<string, string>; body: unknown}, signal?: AbortSignal): Promise<{contentType: string; body: ReadableStream<Uint8Array>}> {
