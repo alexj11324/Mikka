@@ -1,6 +1,6 @@
 /** Client view of a Factory acceptance (R-56). Pure so every state is testable without a server. */
 export type AcceptanceState = 'pending' | 'approved' | 'publishing' | 'checking' | 'failed' | 'live' | 'revoked' | 'expired' | 'invalidated' | 'unavailable'
-export type AcceptanceApproval = { id: string; candidateId: string; expiresAt: string; revokedAt: string | null }
+export type AcceptanceApproval = { id: string; candidateId: string; expiresAt: string; revokedAt: string | null; createdAt: string }
 export type AcceptancePublication = { approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed' }
 
 /** The copy key for a state. A skill is enabled, not published: 待启用 / 已启用 (Figma 588:56073). */
@@ -20,11 +20,17 @@ export function acceptanceState(input: {
   // 1. Only approvals on the current candidate count; the latest of them decides
   //    (a newer revoke beats an older valid approval, a newer approval beats an older revoke).
   // 2. An approval is active only while now < expiresAt (expiresAt == now is expired).
-  // 3. Approvals on an older candidate never count: with no current approval the task is
+  //    "Latest" is by createdAt, not by array order; ties keep the ledger's order.
+  // 3. With no current candidate (candidateId null) no approval counts.
+  // 4. Approvals on an older candidate never count: with no current approval the task is
   //    back to pending review at the approval stage, otherwise it reads invalidated.
   const { now } = input
-  const isCurrent = (approval: AcceptanceApproval) => !input.candidateId || approval.candidateId === input.candidateId
-  const approvals = input.approvals.filter(isCurrent)
+  const time = (approval: AcceptanceApproval) => { const value = Date.parse(approval.createdAt); return Number.isNaN(value) ? -Infinity : value }
+  const approvals = input.approvals
+    .map((approval, index) => ({ approval, index }))
+    .filter(({ approval }) => input.candidateId !== null && approval.candidateId === input.candidateId)
+    .sort((a, b) => time(a.approval) - time(b.approval) || a.index - b.index)
+    .map(({ approval }) => approval)
   const stale = input.approvals.length > approvals.length
   const latest = approvals[approvals.length - 1]
   const active = latest && !latest.revokedAt && Date.parse(latest.expiresAt) > now ? latest : undefined

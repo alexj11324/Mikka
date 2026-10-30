@@ -40,7 +40,7 @@ async function setup(page: Page, opts: { stage?: string; ledger: (ids: { candida
   return { dialog, calls, binding }
 }
 
-const approval = (candidateId: string, id = randomUUID()) => ({ id, candidateId, candidate: {}, action: 'deploy', target: 'web', targetEnvironment: 'preview', expiresAt: new Date(Date.now() + 3600000).toISOString(), revokedAt: null })
+const approval = (candidateId: string, id = randomUUID()) => ({ id, candidateId, candidate: { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'preview', scope: 'run report' }, action: 'deploy', target: 'web', targetEnvironment: 'preview', expiresAt: new Date(Date.now() + 3600000).toISOString(), revokedAt: null, createdAt: new Date().toISOString() })
 
 test('退回修改 hides without server support', async ({ page }) => {
   const { dialog } = await setup(page, { ledger: () => ({ approvals: [], publications: [] }) })
