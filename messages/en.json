@@ -1829,6 +1829,7 @@
       "callbackVerifierNotConfigured": "Connections stay disabled until COMPOSIO_CALLBACK_VERIFIER_URL matches the verifier URL set in Composio.",
       "loadFailed": "Could not load integration status.",
       "connectFailed": "Could not start the connection. Please try again.",
+      "connectUnavailable": "App connections aren't set up on this server yet. Ask an admin.",
       "disconnectFailed": "Could not disconnect this account.",
       "connectionCompleted": "The Composio connection was verified for this Mikka account.",
       "callbackVerificationFailed": "Composio could not verify this connection for the signed-in Mikka account. Sign in with the account that started it and try again.",

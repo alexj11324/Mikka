@@ -96,12 +96,12 @@ export function PluginsSkillsView({ googleEnabled }: { googleEnabled: boolean })
               <GoogleSignInSettings googleEnabled={googleEnabled} />
               <IntegrationsSettings showWebhookDetails={false} showConnectedApps={false} />
             </>}
+            <ConnectedAppsStatus apps={apps} />
             {app
               ? <ConnectedAppDetail apps={apps} app={app} rootLabel={t('pluginsTab')} rootHref={pluginHref(null)} onBack={() => openApp(null)} />
               : <ConnectedAppsList apps={apps} title={tApps('heading')} appHref={pluginHref} onOpen={openApp} action={
                 <Button variant="ghost" size="sm" nativeButton={false} role="link" render={<Link href="/settings?section=connections" />}>{tApps('openInSettings')}</Button>
               } />}
-            <ConnectedAppsStatus apps={apps} />
           </TabsContent>
           <TabsContent value="skills" className="flex flex-col gap-5 pt-4">
             <div className="flex flex-col gap-3">

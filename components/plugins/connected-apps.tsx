@@ -192,8 +192,10 @@ export function useConnectedApps(enabled = true) {
   }
 
   const canLink = enabled && Boolean(state?.configured && state.callbackVerifierConfigured)
+  // Shown on the disabled 连接 buttons, so they say why instead of doing nothing.
+  const unavailable = state && !canLink ? t('connectUnavailable') : undefined
   return {
-    state, pending, error, notice, canLink,
+    state, pending, error, notice, canLink, unavailable,
     accountsFor: (app: ComposioAppId) => state?.accounts.filter(account => account.toolkit === app) ?? [],
     connect: (app: ComposioAppId) => startLink(app, { toolkit: app }),
     reconnect: (accountId: string) => startLink(accountId, { accountId }),
@@ -202,6 +204,12 @@ export function useConnectedApps(enabled = true) {
 }
 
 export type ConnectedApps = ReturnType<typeof useConnectedApps>
+
+/** A disabled button takes no pointer events, so its reason sits on a wrapper. */
+function WhyDisabled({ reason, className, children }: { reason?: string; className?: string; children: ReactNode }) {
+  if (!reason) return children
+  return <span title={reason} className={cn('inline-flex', className)}>{children}</span>
+}
 
 /** Loading, setup and result lines under the list or the detail page. */
 export function ConnectedAppsStatus({ apps }: { apps: ConnectedApps }) {
@@ -265,7 +273,7 @@ export function ConnectedAppsList({ apps, title, appHref, onOpen, action }: { ap
               if (ok && !checked) toast.success(t('turnedOff', { name }), { description: t('takeoverNone', { name }) })
             })
           }} />
-          : <Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || Boolean(apps.pending)} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button>}
+          : <WhyDisabled reason={apps.unavailable}><Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || Boolean(apps.pending)} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button></WhyDisabled>}
         <Button variant="ghost" size="icon-sm" nativeButton={false} role="link" aria-label={t('openApp', { name })} render={<a href={appHref(app)} onClick={event => openInPlace(event, app)} />}><ChevronRight data-icon="inline-start" /></Button>
       </div>
     })}
@@ -309,7 +317,7 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
         <h2 className="text-xl font-semibold">{name}</h2>
         <p className="text-sm text-muted-foreground">{t(`${app}Description`)}</p>
       </div>
-      {!accounts.length && <Button type="button" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button>}
+      {!accounts.length && <WhyDisabled reason={apps.unavailable}><Button type="button" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button></WhyDisabled>}
     </header>
 
     {accounts.length > 0 && <SettingsSection id="connected-accounts-heading" title={t('accountsHeading')}>
@@ -359,10 +367,10 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
           </DropdownMenu>
         </div>
       })}
-      <Button type="button" variant="ghost" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)} className="h-auto w-full justify-start gap-3 rounded-none py-2 pr-3 pl-5 font-normal text-muted-foreground hover:bg-transparent hover:text-foreground">
+      <WhyDisabled reason={apps.unavailable} className="w-full"><Button type="button" variant="ghost" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)} className="h-auto w-full justify-start gap-3 rounded-none py-2 pr-3 pl-5 font-normal text-muted-foreground hover:bg-transparent hover:text-foreground">
         <span className="flex size-10 items-center justify-center"><Plus data-icon="inline-start" aria-hidden="true" /></span>
         {apps.pending === app ? t('working') : t('connectAnotherAccount')}
-      </Button>
+      </Button></WhyDisabled>
     </SettingsSection>}
 
     <SettingsSection id="app-about-heading" title={t('about')}>

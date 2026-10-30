@@ -1829,6 +1829,7 @@
       "callbackVerifierNotConfigured": "只有当 COMPOSIO_CALLBACK_VERIFIER_URL 与 Composio 项目中的验证地址一致时，才会启用连接。",
       "loadFailed": "无法读取集成状态。",
       "connectFailed": "无法开始连接，请重试。",
+      "connectUnavailable": "应用连接还没配置好，暂时不能连接。请联系管理员。",
       "disconnectFailed": "无法断开此账户。",
       "connectionCompleted": "已验证此 Mikka 账号拥有该 Composio 连接。",
       "callbackVerificationFailed": "Composio 无法确认此连接属于当前 Mikka 账号。请使用发起连接的账号登录后重试。",
