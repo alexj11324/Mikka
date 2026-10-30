@@ -18,10 +18,6 @@ import {
   approvalRequest,
 } from "../../lib/factory/approval-contract";
 import type { z } from "zod";
-import type {
-  FactoryDecisionAuthority,
-  FactoryVerifiedPolicyDecision,
-} from "../../lib/factory/policy-authorization";
 import { digest } from "../../lib/factory/evidence";
 import {
   createVercelPublicationAdapter,
@@ -99,57 +95,8 @@ export async function factory194Fixture(connectionString: string) {
         )
       ).rowCount,
     );
-  // Contract-only policy/model substitute. No signer, real review issuer or LLM.
-  const decisions = new Map<string, FactoryVerifiedPolicyDecision>();
-  const authority: FactoryDecisionAuthority = {
-    verify: async (_tx, id) => {
-      const d = decisions.get(id);
-      if (!d) throw Error("unknown fixture credential");
-      return d;
-    },
-  };
-  function issuePolicyDecision(input: z.infer<typeof approvalRequest>) {
-    const req = { ...input, decisionCredentialId: randomUUID() };
-    const scope = {
-      ownerId: actor.userId,
-      binding: req.binding,
-      candidate: req.candidate,
-      action: req.action,
-      target: req.target,
-      targetEnvironment: req.targetEnvironment,
-      evidenceDigest: req.evidenceDigest!,
-      visualEvidenceDigests: [],
-      expiresAt: req.expiresAt,
-    };
-    decisions.set(req.decisionCredentialId!, {
-      version: 1,
-      credentialId: req.decisionCredentialId!,
-      issuer: "synthetic-policy-authority",
-      policyId: "synthetic-policy",
-      policyRevision: "1",
-      permissionAction: req.action,
-      ownerId: actor.userId,
-      scopeDigest: digest(scope),
-      decision: "allow",
-      issuedAt: new Date(Date.now() - 1000).toISOString(),
-      expiresAt: req.expiresAt,
-      verification: {
-        receiptId: randomUUID(),
-        signatureDigest: "d".repeat(64),
-      },
-      judgment: {
-        receiptId: randomUUID(),
-        model: "synthetic-vision-model",
-        capability: "vision",
-        visualInputRequired: false,
-        scopeDigest: digest(scope),
-        evidenceDigest: req.evidenceDigest!,
-        imageDigests: [],
-      },
-    });
-    return req;
-  }
-  const gates = createFactoryApprovalGates(authority);
+  const approvalRequestForHuman = (input: z.infer<typeof approvalRequest>) => input;
+  const gates = createFactoryApprovalGates();
   function makeStore(installedGates = gates): FactoryApprovalStore {
     return {
       async lockTask(tx, userId, taskId) {
@@ -256,14 +203,12 @@ export async function factory194Fixture(connectionString: string) {
     );
   const service = (
     adapters: PublicationAdapter[] = [adapter],
-    configuredAuthority: FactoryDecisionAuthority | null = authority,
   ) =>
     createFactoryApprovals(
       pool,
       authorize,
       store,
       adapters,
-      configuredAuthority ?? undefined,
     );
   async function prepare(executionActor: FactoryActor = actor) {
     const task: FactoryTask = {
@@ -389,9 +334,8 @@ export async function factory194Fixture(connectionString: string) {
       targetEnvironment: "preview",
       expiresAt: new Date(Date.now() + 600000).toISOString(),
       evidenceDigest: e.evidenceDigest,
-      decisionCredentialId: randomUUID(),
     };
-    Object.assign(approval, issuePolicyDecision(approval));
+    Object.assign(approval, approvalRequestForHuman(approval));
     const approve = () => service().approve(executionActor, approval);
     const publication = async () => ({
       ...(await approve()),
@@ -408,9 +352,7 @@ export async function factory194Fixture(connectionString: string) {
     store,
     makeStore,
     authorize,
-    decisions,
-    authority,
-    issuePolicyDecision,
+    approvalRequestForHuman,
     pool,
     actor,
     provider,
