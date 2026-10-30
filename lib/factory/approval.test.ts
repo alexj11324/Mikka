@@ -570,25 +570,66 @@ test(
         },
       );
       await t.test(
+        "an approval's eventId reused by publish or revoke: publish has no effect, revoke is its own operation",
+        async () => {
+          const s = await prepare(),
+            req = await request(s),
+            a = await service.approve(actor, req),
+            p = publication(a),
+            publications = async () =>
+              (
+                await pool.query(
+                  'SELECT 1 FROM factory_publications WHERE "taskId"=$1',
+                  [s.task.id],
+                )
+              ).rowCount;
+          // factory_events already holds this eventId: rejected before the reservation and the effect.
+          await rejects(
+            () => local.publish(actor, { ...p, eventId: req.eventId }),
+            "factoryReplayMismatch",
+          );
+          assert.equal(await publications(), 0);
+          const revoke = {
+            binding: a.binding,
+            eventId: req.eventId,
+            approvalId: a.approvalId,
+          };
+          assert.deepEqual(await service.revoke(actor, revoke), {
+            approvalId: a.approvalId,
+            revoked: true,
+          });
+          const {
+            rows: [approval],
+          } = await pool.query(
+            'SELECT "revokedAt" IS NOT NULL AS revoked FROM factory_approvals WHERE id=$1',
+            [a.approvalId],
+          );
+          assert.equal(approval.revoked, true);
+          const controls = await pool.query(
+            'SELECT 1 FROM factory_approval_controls WHERE "taskId"=$1 AND "eventId"=$2',
+            [s.task.id, req.eventId],
+          );
+          assert.equal(controls.rowCount, 1);
+          // Each table replays its own row: the approve replay sees the revocation, the revoke replays itself.
+          await rejects(
+            () => service.approve(actor, req),
+            "factoryApprovalInvalid",
+          );
+          assert.deepEqual(await service.revoke(actor, revoke), {
+            approvalId: a.approvalId,
+            revoked: true,
+          });
+          await rejects(() => local.publish(actor, p), "factoryApprovalInvalid");
+          assert.equal(await publications(), 0);
+        },
+      );
+      await t.test(
         "no approval, wrong action/target, expiration, revocation and session sign-out cause no effect",
         async () => {
           const s = await prepare(),
             req = await request(s),
             a = await service.approve(actor, req),
             p = publication(a);
-          await rejects(
-            () =>
-              service.revoke(actor, {
-                binding: a.binding,
-                eventId: req.eventId,
-                approvalId: a.approvalId,
-              }),
-            "factoryReplayMismatch",
-          );
-          await rejects(
-            () => local.publish(actor, { ...p, eventId: req.eventId }),
-            "factoryReplayMismatch",
-          );
           await rejects(
             () => local.publish(actor, { ...p, approvalId: randomUUID() }),
             "factoryApprovalInvalid",
@@ -1308,7 +1349,7 @@ test(
             },
           );
           await t.test(
-            "revoked/expired/stale grants cannot inspect or complete an operation",
+            "revoked/stale grants cannot inspect or complete an operation; an expired one still reconciles",
             async () => {
               const f = await vercelProtocolFixture();
               try {
@@ -1343,12 +1384,22 @@ test(
                   const ledger = await provider.ledger(actor, s.task.id),
                     id = ledger.publications[0].id,
                     before = f.requests.length;
-                  if (invalid === "expired")
+                  if (invalid === "expired") {
+                    // Expiry gates only a new reservation: reconcile still reads the provider, never POSTs.
                     await pool.query(
                       "UPDATE factory_approvals SET \"expiresAt\"=now()-interval '1 minute' WHERE id=$1",
                       [a.approvalId],
                     );
-                  else if (invalid === "revoked")
+                    await assert.rejects(
+                      () =>
+                        provider.reconcile(actor, { ...p, publicationId: id }),
+                      (e) => e instanceof PublicationDeferred,
+                    );
+                    assert.ok(f.requests.length > before);
+                    assert.equal(f.posts(), 1);
+                    continue;
+                  }
+                  if (invalid === "revoked")
                     await provider.revoke(actor, {
                       binding: p.binding,
                       eventId: randomUUID(),
@@ -1367,10 +1418,7 @@ test(
                       : "factoryApprovalInvalid",
                   );
                   assert.equal(f.requests.length, before);
-                  assert.equal(
-                    f.posts(),
-                    invalid === "expired" ? 1 : invalid === "revoked" ? 2 : 3,
-                  );
+                  assert.equal(f.posts(), invalid === "revoked" ? 2 : 3);
                 }
               } finally {
                 await f.close();

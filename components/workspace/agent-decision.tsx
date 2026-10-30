@@ -1,13 +1,20 @@
 'use client'
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
-import { useRef, useState } from 'react'
+import { createContext, use, useRef, useState } from 'react'
+import { Check, ChevronRight } from 'lucide-react'
+import { Link } from '@/i18n/navigation'
 import { useIsStreaming } from '@openuidev/react-lang'
 import { ApprovalCard, type ApprovalCardStatus } from '@/components/agents/approval-card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
+import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item'
+import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
 import { useAgentInteraction } from './agent-interaction'
+import { CitationChip } from './agent-citations'
+import { ReplyBubbles } from './agent-text-bubble'
 import { type AgentComponentRenderers } from '@/lib/agent-ui-catalog'
 
 export function useAgentDecision() {
@@ -40,7 +47,7 @@ export function useAgentDecision() {
     }
   }
 
-  return { send, sent, error, status: (sent ? 'answered' : pending || busy || streaming ? 'submitting' : 'pending') as ApprovalCardStatus }
+  return { send, sent, pending, error, status: (sent ? 'answered' : pending || busy || streaming ? 'submitting' : 'pending') as ApprovalCardStatus }
 }
 
 export const AgentApproval: AgentComponentRenderers['BeApproval'] = ({ props }) => {
@@ -78,7 +85,7 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
 
   if (questions.length === 0) return null
   const [only] = questions
-  if (questions.length === 1 && !only.multiple && only.options?.length) return <ChoiceCard title={only.title} options={only.options} />
+  if (questions.length === 1 && !only.multiple && only.options?.length) return <ChoiceCard title={only.title} options={only.options} task={props.task} />
 
   return <div className="flex min-w-0 flex-col gap-2">
     <p className="text-xs text-muted-foreground">{agentCopy.answerHereAgentWillContinueBasedOn}</p>
@@ -102,19 +109,55 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
 }
 
 /**
- * One question with a few answers (Figma 208:4780, Grok style): a bordered
- * card, options lettered A, B, C…; a click is the reply. Anything else the
- * person wants to say goes through the composer.
+ * What the person said right after this reply, when the host knows it: a
+ * choice card shows that answer picked after a reload (Figma 379:5694).
  */
-function ChoiceCard({ title, options }: { title: string; options: { value: string; label: string }[] }) {
-  const { send, error, status } = useAgentDecision()
+export const ReplyAnswer = createContext<string | null>(null)
+
+/**
+ * One question with a few answers (Figma 379:5694, 395:24805, 395:24642): the
+ * question in the reply's bubble, an optional task chip ahead of it, then grey
+ * rows lettered A, B, C…; a click is the reply. The picked row turns dark with
+ * a check and the others dim. Anything else goes through the composer.
+ */
+/** Where the user stores their own E2B key (the cloud computer runs on it). */
+export const CLOUD_KEY_SETTINGS = '/settings?section=integrations'
+
+function ChoiceCard({ title, options, task }: { title: string; options: { value: string; label: string; action?: 'cloudKeySettings' }[]; task?: string }) {
+  const agentCopy = useAgentCopy()
+  const bubbles = use(ReplyBubbles)
+  const answer = use(ReplyAnswer)
+  const { send, sent, pending, error, status } = useAgentDecision()
   const [picked, setPicked] = useState<string | null>(null)
-  return <div className="flex w-full max-w-xl min-w-0 flex-col gap-2 rounded-2xl border p-4">
-    <p className="px-2 pb-1 font-medium">{title}</p>
-    {options.map((option, index) => <Button key={option.value} type="button" variant="ghost" className={cn('h-auto justify-start gap-3 px-2 py-2 text-left font-normal whitespace-normal', picked === option.value && 'bg-muted')}
-      disabled={status !== 'pending'} onClick={() => { setPicked(option.value); void send(option.label) }}>
-      <span className="flex size-6 shrink-0 items-center justify-center rounded-md border text-xs text-muted-foreground">{String.fromCharCode(65 + index)}</span>{option.label}
-    </Button>)}
-    {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+  const chosen = picked ?? options.find(option => [option.label, option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : null].includes(answer?.trim() ?? ''))?.value ?? null
+  const answered = sent || answer !== null
+  // Dispatch options are localized by value (BE-13 sends English labels); anything else shows as written.
+  const copy = (option: { value: string; label: string; action?: 'cloudKeySettings' }) => option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup
+    : option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : option.label
+  return <div role="group" aria-label={title} data-slot="choice-card" className="flex w-full max-w-xl min-w-0 flex-col gap-2">
+    <p className={cn('w-fit max-w-full min-w-0', bubbles ? 'rounded-2xl bg-muted px-4 py-2.5' : 'font-medium')}>
+      {task && <><CitationChip id={task.toLowerCase()} kind="issue" />{' '}</>}{title}
+    </p>
+    <div className="flex flex-col gap-1.5">
+      {options.map((option, index) => {
+        const selected = chosen === option.value
+        const label = copy(option)
+        const letter = String.fromCharCode(65 + index)
+        // No E2B key yet: this row opens the settings where the key is set instead of answering. It stays an Item
+        // once answered (dimmed, not a link) so the row never swaps component and jumps.
+        if (option.action === 'cloudKeySettings') return <Item key={option.value} size="sm" variant="muted" aria-disabled={answered || undefined} className={cn(answered && 'pointer-events-none opacity-50')} render={answered ? <div /> : <Link href={CLOUD_KEY_SETTINGS} />}>
+          <ItemMedia><Kbd>{letter}</Kbd></ItemMedia>
+          <ItemContent><ItemTitle>{label}</ItemTitle></ItemContent>
+          <ItemActions><ChevronRight aria-hidden="true" /></ItemActions>
+        </Item>
+        // Answered rows stay the same Button, disabled, so nothing changes height or colour.
+        return <Button key={option.value} type="button" variant={selected ? 'default' : 'secondary'} aria-pressed={selected}
+          disabled={answered || status !== 'pending'} onClick={() => { setPicked(option.value); void send(label) }}>
+          <Kbd data-icon="inline-start">{letter}</Kbd>{label}
+          {selected && (pending ? <Spinner data-icon="inline-end" aria-label={agentCopy.sendingChoice} /> : answered && <Check data-icon="inline-end" aria-hidden="true" />)}
+        </Button>
+      })}
+    </div>
+    {error && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert></div>}
   </div>
 }

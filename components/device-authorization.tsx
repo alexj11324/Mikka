@@ -92,7 +92,7 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
           </div>
         </>}
         {state === 'approved' && <p className="text-sm">{t('returnToTerminal')}</p>}
-        {(state === 'approved' || state === 'denied') && <Button size="sm" className={primary + ' self-start'} render={<Link href="/settings?section=devices" />}>{t('done')}</Button>}
+        {(state === 'approved' || state === 'denied') && <Button size="sm" className={primary + ' self-start'} render={<Link href="/settings?section=computers" />}>{t('done')}</Button>}
         {(state === 'invalid' || state === 'error') && <>
           <p role="alert" className="text-sm text-destructive">{state === 'invalid' ? t('invalid') : t('failed')}</p>
           <Button size="sm" variant="outline" className="self-start" onClick={() => {

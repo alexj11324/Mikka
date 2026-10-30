@@ -161,3 +161,8 @@ export async function sendSuggestion(suggestionId: string): Promise<ActionResult
     return { queued: true as const }
   })
 }
+
+/** Whether the new-task dialog can create a task; it explains itself when this is off. */
+export async function issueCreationAvailable(): Promise<boolean> {
+  return issueMutationsEnabled()
+}

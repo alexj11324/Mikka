@@ -275,7 +275,16 @@ export function auditSource(file, text, policy) {
         }
       }
       const icon = imports.get(raw)?.from === policy.iconLibrary
-      if (icon && parents.includes('Button') && !attr(node, 'data-icon')) add(node, 'icons/data-icon', 'Button 内图标必须设置 data-icon。')
+      // Icon-only buttons (size="icon*") have no text to sit beside, so inline-start/end would only add padding.
+      const iconOnlyButton = () => {
+        for (let up = node.parent; up; up = up.parent) {
+          if (!ts.isJsxElement(up) || up.openingElement.tagName.getText(source) !== 'Button') continue
+          const size = attr(up.openingElement, 'size')?.initializer
+          return !!size && ts.isStringLiteral(size) && size.text.startsWith('icon')
+        }
+        return false
+      }
+      if (icon && parents.includes('Button') && !attr(node, 'data-icon') && !iconOnlyButton()) add(node, 'icons/data-icon', 'Button 内图标必须设置 data-icon。')
       if (groupRules.has(name) && !parents.includes(groupRules.get(name))) add(node, 'composition/group', `${name} 必须位于 ${groupRules.get(name)} 内。`)
       if (['DialogContent', 'AlertDialogContent', 'SheetContent', 'DrawerContent'].includes(name) && !contains(node, name.replace('Content', 'Title'))) add(node, 'composition/title', `${name} 必须包含可访问的 Title（跨文件封装需人工核实）。`)
       if (name === 'Avatar' && !contains(node, 'AvatarFallback')) add(node, 'composition/avatar-fallback', 'Avatar 必须包含 AvatarFallback。')

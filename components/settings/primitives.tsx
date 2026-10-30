@@ -1,4 +1,26 @@
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
+import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+
+/** S-Q: a section that is still loading keeps its shape instead of rendering nothing. */
+export function SettingsLoading({ label, rows = 3 }: { label: string; rows?: number }) {
+  return <div role="status" aria-label={label} className="flex flex-col gap-1">
+    <span className="sr-only">{label}</span>
+    <Skeleton className="mx-1 h-4 w-24" />
+    <div className="flex flex-col divide-y divide-border overflow-hidden rounded-2xl border bg-card">
+      {Array.from({ length: rows }, (_, i) => <div key={i} className="flex items-center justify-between gap-3 px-5 py-4"><Skeleton className="h-4 w-40" /><Skeleton className="h-6 w-12" /></div>)}
+    </div>
+  </div>
+}
+
+/** S-O: a save that failed. The value is already restored; the button retries the same change. */
+export function SettingsSaveError({ message, retryLabel, onRetry }: { message: string; retryLabel: string; onRetry: () => void }) {
+  return <Alert variant="destructive" role="alert">
+    <AlertDescription>{message}</AlertDescription>
+    <AlertAction><Button variant="outline" size="sm" onClick={onRetry}>{retryLabel}</Button></AlertAction>
+  </Alert>
+}
 
 /**
  * Settings section: a titled group of rows.
@@ -23,14 +45,16 @@ export function SettingsSection({
 }) {
   return (
     <section className="flex flex-col gap-1" aria-labelledby={id}>
-      <header className="flex items-baseline justify-between gap-3 px-1">
-        <div className="flex flex-col gap-0.5">
+      {/* The title is inset like the row text; the action has no inset so its
+          right edge lines up with the card's right edge below it. */}
+      <header className="flex items-end justify-between gap-3 pl-1">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <h2 id={id} className="text-sm font-medium">
             {title}
           </h2>
           {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
-        {action}
+        {action && <div data-settings-section-action className="flex shrink-0 items-center gap-2">{action}</div>}
       </header>
       <div data-settings-card className="overflow-hidden rounded-2xl border bg-card">
         <div data-settings-rows className="divide-y divide-border">{children}</div>
@@ -65,3 +89,6 @@ export function SettingRow({
     </div>
   )
 }
+
+/** Spread on the Button in a section header (添加, 打开设置…): gray-filled secondary, small. */
+export const settingsSectionAction = { variant: 'secondary', size: 'sm' } as const satisfies Pick<ComponentProps<typeof Button>, 'variant' | 'size'>

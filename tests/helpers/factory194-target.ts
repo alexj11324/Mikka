@@ -1,4 +1,5 @@
 import type { PoolConfig } from "pg";
+import { isE2eTarget } from "./e2e-target.mjs";
 
 /** Validate at the fixture boundary BEFORE constructing any Pool. Never pass a
  * connectionString to pg: URL parameters can override options/search_path.
@@ -11,8 +12,9 @@ export function factory194Target(
   if (
     !["postgres:", "postgresql:"].includes(u.protocol) ||
     u.hostname !== "127.0.0.1" ||
-    u.port !== (ci ? "5432" : "55594") ||
-    u.pathname !== (ci ? "/mikka_e2e" : "/factory194_test") ||
+    // Any loopback *_e2e database on any port; the legacy local name stays accepted.
+    !(isE2eTarget(connectionString) ||
+      (!ci && u.port === "55594" && u.pathname === "/factory194_test")) ||
     u.search ||
     u.hash
   )

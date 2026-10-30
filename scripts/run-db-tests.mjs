@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
   { marker: 'lib/run-publications.ts', file: 'tests/run-publications.db.test.ts', script: 'test:run-publication-db' },
@@ -25,6 +26,7 @@ export const REQUIRED_SUITES = [
   { marker: 'scripts/migration-steps.mjs', file: 'tests/migration-steps.db.test.mjs', script: 'test:migration-steps-db' },
   { marker: 'lib/factory/store.ts', file: 'lib/factory/routing.db.test.ts', script: 'test:factory-routing-db' },
   { marker: 'lib/run-admission-store.ts', file: 'tests/factory-admission.db.test.ts', script: 'test:factory-routing-db' },
+  { marker: 'lib/run-chain.ts', file: 'tests/run-chain.db.test.ts', script: 'test:factory-routing-db' },
   { marker: 'lib/agent-kit/store.ts', file: 'lib/agent-kit/store.db.test.ts', script: 'test:agent-kit-db' },
   { marker: 'lib/computer/store.ts', file: 'lib/computer/store.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/captures/store.ts', file: 'lib/captures/store.db.test.ts', script: 'test:captures-db' },
@@ -32,6 +34,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/active-agents.ts', file: 'lib/active-agents.test.ts', script: 'test:active-agents' },
   { marker: 'lib/coordinator/group-turns.ts', file: 'lib/coordinator/group-turns.test.ts', script: 'test:group-turns' },
   { marker: 'lib/profile/store.ts', file: 'lib/profile/store.db.test.ts', script: 'test:user-facts-db' },
+  { marker: 'lib/suggestions/time-zone.ts', file: 'tests/settings-preferences.db.test.ts', script: 'test:settings-prefs-db' },
   { marker: 'lib/coordinator/bot-instructions.ts', file: 'lib/coordinator/bot-chats.db.test.ts', script: 'test:bot-chats-db' },
   { marker: 'lib/coordinator/store.ts', file: 'tests/coordinator-task-binding.db.ts', script: 'test:coordinator-task-binding-db' },
   { marker: 'lib/coordinator/native-store.ts', file: 'lib/coordinator/native-store.test.ts', script: 'test:coordinator-native' },
@@ -43,7 +46,9 @@ export const REQUIRED_SUITES = [
   { marker: 'tests/workspace-migration.test.mjs', file: 'tests/workspace-migration.test.mjs', script: 'test:workspace-migration-db' },
   { marker: 'tests/local-repository-migration.db.test.mjs', file: 'tests/local-repository-migration.db.test.mjs', script: 'test:local-repository-migration-db' },
   { marker: 'drizzle/20261027164500_artifact_legacy_compat.sql', file: 'tests/artifact-legacy-migration.test.mjs', script: 'test:artifact-migration-db' },
+  { marker: 'lib/workspace-admin/general.ts', file: 'tests/workspace-admin.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
+  { marker: 'lib/account/delete.ts', file: 'lib/account/store.db.test.ts', script: 'test:account-db' },
 ]
 // Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
 // Each entry names its dedicated runner; the runner must exist and still invoke the file.
@@ -85,10 +90,8 @@ export function checkSummary(script, status, totals) {
 }
 
 export function validateTarget(env) {
-  if (env.CI !== 'true' || env.GITHUB_ACTIONS !== 'true') throw new Error('DB gates require GitHub Actions ephemeral PG17')
-  let url
-  try { url = new URL(env.E2E_DATABASE_URL) } catch { throw new Error('Missing/invalid E2E_DATABASE_URL') }
-  if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.hostname !== '127.0.0.1' || url.port !== '5432' || url.pathname !== '/mikka_e2e' || url.search || url.hash) throw new Error('DB gates require the loopback mikka_e2e service without URL options')
+  if (!env.E2E_DATABASE_URL) throw new Error('Missing/invalid E2E_DATABASE_URL')
+  if (!isE2eTarget(env.E2E_DATABASE_URL)) throw new Error(E2E_DB_RULE)
   for (const name of ['MIKKA_DATABASE_URL', 'DATABASE_URL']) if (env[name] !== env.E2E_DATABASE_URL) throw new Error(`${name} must match the ephemeral E2E_DATABASE_URL`)
   if (env.ORVILO_DATABASE_URL && env.ORVILO_DATABASE_URL !== env.E2E_DATABASE_URL) throw new Error('Legacy database fallback must not point outside ephemeral service')
 }
@@ -173,7 +176,7 @@ export function main({ root = '.', env = process.env, run = spawnSync } = {}) {
     let failed = false
     for (const script of plan.scripts) {
       console.log(`::group::pnpm ${script}`)
-      const result = run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: { ...env, REQUIRE_DB: '1', CONVERSATION_READS_REQUIRE_DB: '1', MIKKA_TEST_DB_PORT: '5432' }, maxBuffer: 64 << 20 })
+      const result = run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: { ...env, REQUIRE_DB: '1', CONVERSATION_READS_REQUIRE_DB: '1', MIKKA_TEST_DB_PORT: new URL(env.E2E_DATABASE_URL).port || '5432' }, maxBuffer: 64 << 20 })
       process.stdout.write(result.stdout ?? ''); process.stderr.write(result.stderr ?? '')
       console.log('::endgroup::')
       const error = checkSummary(script, result.status, parseSummary(`${result.stdout}\n${result.stderr}`))

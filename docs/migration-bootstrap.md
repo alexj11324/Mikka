@@ -1,6 +1,6 @@
 # Migration bootstrap
 
-`MIGRATE=1 pnpm migrate` applies the tracked SQL files to the configured application (`MIKKA_DATABASE_URL`) and workspace (`DATABASE_URL`) databases. Do not run it against a developer or production database as a test. Plain `pnpm build` never runs migrations; Vercel Production runs them only when its Build Command is `pnpm migrate && pnpm build`.
+`MIGRATE=1 pnpm migrate` applies the tracked SQL files to the configured application (`MIKKA_DATABASE_URL`) and workspace (`DATABASE_URL`) databases. Do not run it against a developer or production database as a test. `pnpm build` runs `node scripts/migrate.mjs` last, after `next build` succeeds; the script only applies files in Vercel Production (or with `MIGRATE=1`), so every production deploy migrates itself and Preview/CI builds skip it. A failed migration fails the deploy and the previous deployment keeps serving, so migrations must stay backward-compatible with the code that is live.
 
 ## The pre-history baseline
 

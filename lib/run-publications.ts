@@ -20,7 +20,7 @@ import { linkedGitHubAccountId, saveRepositoryInstallation } from '@/lib/github/
 import { openRunPullRequest, PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/github/run-pull-request'
 import { matchesRepositoryAdmission } from './repository-admission'
 import { mayCompleteIssue } from './run-completion'
-import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, settleRunCompletionEffects } from './run-completion-effects'
+import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, reconcileFactoryAfterCompletion, settleRunCompletionEffects } from './run-completion-effects'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Run = typeof agentRuns.$inferSelect
@@ -123,7 +123,12 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
  */
 export async function persistRunCompletion(userId: string, runId: string, completion: RunCompleteRequest, scopeDeviceId?: string | null) {
   for (let attempt = 0; ; attempt++) {
-    try { return await completionTransaction(userId, runId, completion, scopeDeviceId) }
+    try {
+      const result = await completionTransaction(userId, runId, completion, scopeDeviceId)
+      // After commit: hand the completed run to Factory review (BE-9).
+      if (result) await reconcileFactoryAfterCompletion(pool, userId, runId)
+      return result
+    }
     catch (error) {
       const cause = error instanceof Error && error.cause ? error.cause : error
       const code = cause && typeof cause === 'object' && 'code' in cause ? cause.code : null

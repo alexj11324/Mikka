@@ -49,6 +49,6 @@ test('the issue page reviews Factory evidence, enables the skill and reconciles 
   await dialog.getByRole('button', { name: '核对发布' }).click()
   await expect.poll(() => calls.length).toBe(3)
   expect(calls[2]).toEqual({ operation: 'reconcile', input: { ...calls[1].input, publicationId } })
-  await expect(dialog.getByText('已上线', { exact: true }).first()).toBeVisible()
+  await expect(dialog.getByText('已启用', { exact: true }).first()).toBeVisible()
   await expect(dialog.getByRole('link', { name: /预览/ })).toHaveAttribute('href', reference)
 })

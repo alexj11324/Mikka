@@ -11,5 +11,5 @@ export function CardCreatedAt({ createdAt }: { createdAt: Date | string }) {
   const t = useTranslations('Issue')
   const format = useFormatter()
   const date = new Date(createdAt)
-  return <time className="text-xs text-muted-foreground" dateTime={date.toISOString()} title={date.toISOString()}>{t('createdAtDate', { date: format.dateTime(date, { month: 'long', day: 'numeric', timeZone: 'UTC' }) })}</time>
+  return <time suppressHydrationWarning className="text-xs text-muted-foreground" dateTime={date.toISOString()} title={date.toISOString()}>{t('createdAtDate', { date: format.dateTime(date, { month: 'long', day: 'numeric' }) })}</time>
 }

@@ -208,6 +208,8 @@ export interface MikkaBridge {
      * must not run in an embedded Electron window. Main rejects other origins.
      */
     openExternal(url: string): Promise<void>
+    /** Start a one-shot loopback listener and return its callback URL. */
+    prepareAuth(state: string): Promise<string>
   }
   /**
    * Login. The long-lived session token stays in the main process (macOS

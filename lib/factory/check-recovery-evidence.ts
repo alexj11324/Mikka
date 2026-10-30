@@ -129,14 +129,17 @@ export async function checkFactoryRecoveryBudget(
   );
   if (budget.count >= orchestratorSettings({}).maxFixAttempts)
     throw new FactoryError("factoryRecoveryBudgetExceeded");
-  if (choice === "repair_code") {
-    const {
-      rows: [count],
-    } = await tx.query(
-      `SELECT count(*)::int AS count FROM factory_attempts WHERE "taskId"=$1 AND stage='execute'`,
-      [task.id],
-    );
-    if (count.count > orchestratorSettings({}).maxFixAttempts)
-      throw new FactoryError("factoryRecoveryBudgetExceeded");
-  }
+  if (choice === "repair_code") await checkFactoryRepairBudget(tx, task);
+}
+/** The repair cap shared by check recovery and human reject: at most
+ * maxFixAttempts execute attempts beyond the first per task. */
+export async function checkFactoryRepairBudget(tx: PoolClient, task: Pick<FactoryTask, "id">) {
+  const {
+    rows: [count],
+  } = await tx.query(
+    `SELECT count(*)::int AS count FROM factory_attempts WHERE "taskId"=$1 AND stage='execute'`,
+    [task.id],
+  );
+  if (count.count > orchestratorSettings({}).maxFixAttempts)
+    throw new FactoryError("factoryRecoveryBudgetExceeded");
 }

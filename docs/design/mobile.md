@@ -55,7 +55,7 @@ screen; it gets no other special UI (R-06).
   spinner 进行中, hollow circle 等你回复, red alert 失败, green check 完成.
   A thread whose output is a PR shows the PR icon in GitHub's colours: open
   green (待审阅), draft grey, merged purple, closed red. Rows waiting on the person carry a blue unread dot on the right.
-- 设备 chips at the top (Mikka Cloud, Mac, …); an online machine has a green
+- 设备 chips at the top (E2B, Mac, …); an online machine has a green
   dot (R-24). Tapping one filters the list.
 - The filter button (top right) opens a menu: 全部 · 等你回复 · 待审阅 ·
   进行中 · 已完成 · 已归档.

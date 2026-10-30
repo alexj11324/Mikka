@@ -124,7 +124,8 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   }
 
   if (loadFailed) return <p role="alert" className="px-1 text-sm text-destructive">{t('loadFailed')}</p>
-  if (!state?.enabled) return null
+  if (!state) return <p role="status" className="px-1 text-sm text-muted-foreground">{t('loading')}</p>
+  if (!state.enabled) return <p role="status" className="px-1 text-sm text-muted-foreground">{t('serviceOff')}</p>
   return <div className="flex flex-col gap-3">
     <SettingsSection id="subscriptions-heading" title={t('heading')} description={t('description')}>
       {(['codex', 'claude'] as const).map(provider => {

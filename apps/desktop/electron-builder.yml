@@ -9,16 +9,18 @@ files:
   - package.json
 asar: true
 npmRebuild: false
+# Release builds must not be re-launchable as a plain Node process.
+electronFuses:
+  runAsNode: false
+  enableNodeCliInspectArguments: false
+  enableNodeOptionsEnvironmentVariable: false
+  onlyLoadAppFromAsar: true
 compression: normal
 publish:
   provider: github
   owner: alexj11324
   repo: Mikka
   releaseType: release
-
-protocols:
-  - name: Mikka desktop sign-in
-    schemes: [mikka-desktop]
 
 mac:
   category: public.app-category.productivity

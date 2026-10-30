@@ -46,12 +46,13 @@ export interface FactoryApprovalStore {
     change:
       | {
           action: "finish";
-          status: "passed";
+          status: "passed" | "failed";
           reason: string;
           evidence: z.infer<typeof evidenceSchema>[];
           output: Record<string, unknown>;
         }
-      | { action: "advance"; stage: "publish"; reason: string },
+      | { action: "advance"; stage: "publish"; reason: string }
+      | { action: "repair"; reason: string },
     tx: PoolClient,
   ): Promise<{ task: FactoryTask }>;
 }

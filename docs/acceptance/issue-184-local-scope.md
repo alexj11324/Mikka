@@ -53,7 +53,7 @@ The fresh three-database scope suite remains pending approval. Real PG upgrade a
 
 ## Real PG / loopback HTTP evidence
 
-On Mikka cloud Linux, Docker Postgres 17 `mikka-issue184-pg` listens only on loopback port 55484. The provisioning DB is `issue184_e2e`; the scope suite creates and retains a fresh database (its local name is frozen in the candidate manifest) initialized from **all tracked migrations**, including actual production constraints, foreign keys and triggers. It does not depend on the shared CI column-only setup or modify another suite's records.
+On the cloud Linux box, Docker Postgres 17 `mikka-issue184-pg` listens only on loopback port 55484. The provisioning DB is `issue184_e2e`; the scope suite creates and retains a fresh database (its local name is frozen in the candidate manifest) initialized from **all tracked migrations**, including actual production constraints, foreign keys and triggers. It does not depend on the shared CI column-only setup or modify another suite's records.
 
 Point `E2E_DATABASE_URL`, `MIKKA_DATABASE_URL`, and `DATABASE_URL` at the isolated provisioning DB and set `ISSUE184_LOCAL_TEST=1`, `NODE_ENV=development`, and a loopback `BETTER_AUTH_URL`:
 

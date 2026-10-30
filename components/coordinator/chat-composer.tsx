@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import { useTranslations } from 'next-intl'
 import { ArrowUp, Plus, Square } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,6 +11,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } fro
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { MESSAGE_MAX } from '@/lib/message-limits'
+import { sendsMessage, type SendKey } from '@/lib/send-key'
 
 const MAX_LENGTH = MESSAGE_MAX
 
@@ -19,7 +20,7 @@ const MAX_LENGTH = MESSAGE_MAX
  * bar, attach on the left, send on the right. No model picker: the model is
  * ours unless the person picks their own in settings.
  */
-export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, onStop, quote }: {
+export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, onStop, quote, sendKey = 'enter' }: {
   ref: Ref<HTMLTextAreaElement | null>
   value: string
   onChange: (value: string) => void
@@ -37,6 +38,8 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   onStop?: () => void
   /** Something quoted into the message (an artifact quote chip): it sits on top, the buttons move to a row below. */
   quote?: ReactNode
+  /** The person's send key (偏好设置); the caller reads it from their preferences. */
+  sendKey?: SendKey
 }) {
   const t = useTranslations('Coordinator')
   const tShell = useTranslations('Shell')
@@ -50,6 +53,20 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
     else if (ref) ref.current = node
   }
 
+  // Textarea already has `field-sizing-content`; browsers without it get the same
+  // one-line-to-max-h-48 growth from scrollHeight, so the draft never scrolls sideways.
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input) return
+    if (typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('field-sizing', 'content')) return
+    input.style.height = 'auto'
+    const max = Number.parseFloat(getComputedStyle(input).maxHeight)
+    const height = Number.isFinite(max) ? Math.min(input.scrollHeight, max) : input.scrollHeight
+    input.style.height = `${height}px`
+    input.style.overflowX = 'hidden'
+    input.style.overflowY = input.scrollHeight > height ? 'auto' : 'hidden'
+  }, [value])
+
   async function attach(files: File[]) {
     let next = value
     for (const file of files) {
@@ -61,19 +78,21 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
     inputRef.current?.focus()
   }
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+    const { key, shiftKey, metaKey, ctrlKey } = event
+    if (!sendsMessage({ key, shiftKey, metaKey, ctrlKey, isComposing: event.nativeEvent.isComposing }, sendKey)) return
     event.preventDefault()
     if (!sending && !submitDisabled && value.trim()) onSubmit()
   }
 
   return <form onSubmit={event => { event.preventDefault(); if (!sending && !submitDisabled && value.trim()) onSubmit() }}>
-    <FieldGroup className="sr-only"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
-    <InputGroup className={cn('min-h-12 rounded-3xl bg-background shadow-xs', quote && 'rounded-2xl')}>
+    <FieldGroup className="sr-only w-px"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
+    <InputGroup className={cn('min-h-12 rounded-3xl bg-background shadow-xs has-[[data-slot=input-group-control]:focus-visible]:ring-0', quote && 'rounded-2xl')}>
       {quote && <InputGroupAddon align="block-start" className="px-2 pt-2 pb-0">{quote}</InputGroupAddon>}
       {!quote && <InputGroupAddon align="inline-start" className="self-end pb-2">
         <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
       </InputGroupAddon>}
-      <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 py-3.5', quote ? 'min-h-10 pb-1' : 'min-h-12')} value={value} maxLength={MAX_LENGTH} rows={1} disabled={sending && !onStop && !editableWhileSending} onChange={event => onChange(event.target.value)} onKeyDown={onKeyDown} />
+      {/* readOnly, not disabled: a disabled field drops focus, so the next key went to page shortcuts. */}
+      <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 min-w-0 overflow-x-hidden py-3.5 wrap-break-word', quote ? 'min-h-10 pb-1' : 'min-h-12')} value={value} maxLength={MAX_LENGTH} rows={1} readOnly={sending && !onStop && !editableWhileSending} aria-busy={sending || undefined} onChange={event => onChange(event.target.value)} onKeyDown={onKeyDown} />
       <InputGroupAddon align={quote ? 'block-end' : 'inline-end'} className={cn(quote ? 'justify-between px-2 pt-0 pb-2' : 'self-end pb-2')}>
         {quote && <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>}
         {stoppable
@@ -81,5 +100,7 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
           : <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" aria-label={t('send')} disabled={sending || submitDisabled || !value.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>}
       </InputGroupAddon>
     </InputGroup>
+    {/* The limit is shown only when it is close enough to matter. */}
+    {value.length > MAX_LENGTH - 500 && <p role="status" aria-live="polite" className="px-3 pb-1 text-right text-xs text-muted-foreground">{t('lengthCount', { count: value.length, max: MAX_LENGTH })}</p>}
   </form>
 }
