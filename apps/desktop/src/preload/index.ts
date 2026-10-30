@@ -3,7 +3,7 @@
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
-import type { MikkaBridge } from '@mikka/protocol/bridge'
+import type { MikkaBridge, SshInstallState } from '@mikka/protocol/bridge'
 import { IPC } from '@mikka/protocol/ipc'
 
 const prefix = '--mikka-app-origin='
@@ -37,6 +37,17 @@ if (appOrigin && window.location.origin === appOrigin) {
       setBadge: (count: unknown) => ipcRenderer.invoke(IPC.notificationsSetBadge, count),
       onClick: onNotificationClick,
       consumePendingClick: () => ipcRenderer.invoke(IPC.notificationsConsumePendingClick),
+    },
+    ssh: {
+      onChange: (listener: (state: SshInstallState) => void) => {
+        const handler = (_event: IpcRendererEvent, state: SshInstallState) => listener(state)
+        ipcRenderer.on(IPC.sshChanged, handler)
+        return () => { ipcRenderer.removeListener(IPC.sshChanged, handler) }
+      },
+      hosts: () => ipcRenderer.invoke(IPC.sshHosts),
+      begin: (target: unknown) => ipcRenderer.invoke(IPC.sshBegin, target),
+      accept: (id: unknown) => ipcRenderer.invoke(IPC.sshAccept, id),
+      state: () => ipcRenderer.invoke(IPC.sshState),
     },
     device: {
       status: () => ipcRenderer.invoke(IPC.deviceStatus),

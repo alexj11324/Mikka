@@ -20,6 +20,11 @@ export const IPC = {
     "mikka:notifications:consume-pending-click",
   /** main -> renderer push of a click's in-app href. */
   notificationsClicked: "mikka:notifications:clicked",
+  sshChanged: "mikka:ssh:changed",
+  sshHosts: "mikka:ssh:hosts",
+  sshBegin: "mikka:ssh:begin",
+  sshAccept: "mikka:ssh:accept",
+  sshState: "mikka:ssh:state",
   deviceStatus: "mikka:device:status",
   deviceLink: "mikka:device:link",
   devicePickRepo: "mikka:device:pick-repo",

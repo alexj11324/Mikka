@@ -386,6 +386,15 @@ function start(): void {
   registerSession()
   registerBridge({
     appUrl: APP_URL,
+    mintEnrollment: async () => {
+      const url = `${APP_URL.replace(/\/$/, '')}/api/devices/enrollment`
+      const response = await session.fromPartition(PARTITION).fetch(url, {
+        method: 'POST', headers: { origin: APP_ORIGIN }, redirect: 'error',
+      })
+      if (!response.ok) throw new Error('Sign in to register a device')
+      const body = await response.json() as { token: string }
+      return body.token
+    },
     openExternal: url => {
       const target = appExternalUrl(url, APP_URL)
       if (!target) throw new Error('openExternal accepts only app-origin HTTP(S) URLs')
