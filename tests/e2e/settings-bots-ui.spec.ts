@@ -9,6 +9,7 @@ const open = (page: import('@playwright/test').Page, state = 'default') => page.
 
 test('admin: defaults, bot list and thread drawer', async ({ page }) => {
   await open(page)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bot')
   await expect(page.getByRole('heading', { name: '新 Bot 默认值' })).toBeVisible()
   const model = page.getByRole('combobox', { name: '模型' })
   await expect(model).toHaveText(/Mikka 默认/)
@@ -29,6 +30,7 @@ test('admin: defaults, bot list and thread drawer', async ({ page }) => {
   await expect(drawer.getByRole('link')).toHaveCount(3)
   const locked = drawer.locator('[data-thread-locked]')
   await expect(locked).toHaveText(/私有线程/)
+  await expect(locked).not.toHaveText(/已完成|运行中/)
   await expect(locked).not.toHaveAttribute('tabindex')
   expect(await locked.evaluate(node => getComputedStyle(node).cursor)).toBe('auto')
   await drawer.getByRole('button', { name: '关闭' }).click()

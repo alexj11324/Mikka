@@ -1604,7 +1604,8 @@
         "title": "General"
       },
       "bots": {
-        "title": "Bots"
+        "title": "Bots",
+        "heading": "Bots"
       },
       "permissions": {
         "title": "Permissions and approvals"

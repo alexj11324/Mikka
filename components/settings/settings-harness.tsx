@@ -13,6 +13,8 @@ import type { SettingsHarnessSection } from '@/lib/settings/harness-sections'
 export function SettingsHarness({ section, state }: { section: SettingsHarnessSection; state: string }) {
   const t = useTranslations('Settings')
   const title = t(`sections.${section}.title`)
+  // Figma page heading can be shorter than the sidebar label (Bot vs Bot 管理).
+  const heading = t.has(`sections.${section}.heading`) ? t(`sections.${section}.heading`) : title
   const body = useMemo(() => {
     switch (section) {
       case 'bots': return <BotsSettings api={createMockBotsApi(state as BotsMockScenario)} />
@@ -20,7 +22,7 @@ export function SettingsHarness({ section, state }: { section: SettingsHarnessSe
   }, [section, state])
   return <AppShell variant="settings">
     <AppShellContent parent={t('title')} title={title} variant="settings">
-      <SettingsContent className="gap-6"><h1 className="text-2xl font-semibold tracking-tight">{title}</h1>{body}</SettingsContent>
+      <SettingsContent className="gap-6"><h1 className="text-2xl font-semibold tracking-tight">{heading}</h1>{body}</SettingsContent>
     </AppShellContent>
   </AppShell>
 }

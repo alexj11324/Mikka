@@ -2,7 +2,7 @@ import type { ActionResult } from '@/lib/action-result'
 import { BOT_MODEL_GROUPS, type BotDefaultsView, type BotThreadPage, type BotThreadRow, type BotsSettingsApi, type WorkspaceBotRow } from '@/lib/settings/bots-api'
 
 /**
- * MOCK — waits on #434 (listBotThreads + modelGroups). Dev harness and tests only;
+ * MOCK — shapes copied from #434 (listBotThreads, getWorkspaceBotDefaults.modelGroups). Dev harness and tests only;
  * production code must pass the real server actions.
  */
 export type BotsMockScenario = 'default' | 'member' | 'empty' | 'error' | 'loading' | 'saveError'

@@ -155,7 +155,7 @@ function ThreadList({ bot, api }: { bot: WorkspaceBotRow; api: BotsSettingsApi }
       {page?.threads.map(thread => {
         const meta = <ItemDescription className="flex items-center gap-1.5">
           <Avatar size="xs" aria-hidden="true">{thread.initiator.avatarUrl && <AvatarImage src={thread.initiator.avatarUrl} alt="" />}<AvatarFallback>{(thread.initiator.name ?? '?').slice(0, 1).toUpperCase()}</AvatarFallback></Avatar>
-          <span>{t('threadMeta', { status: thread.status === 'running' ? t('threadRunning') : t('threadDone'), time: relativeTime(thread.lastActivityAt, locale) })}</span>
+          <span>{thread.title === null ? relativeTime(thread.lastActivityAt, locale) : t('threadMeta', { status: thread.status === 'running' ? t('threadRunning') : t('threadDone'), time: relativeTime(thread.lastActivityAt, locale) })}</span>
         </ItemDescription>
         const title = <ItemTitle className={cn(thread.title === null && 'text-muted-foreground')}>{thread.title ?? t('privateThread')}</ItemTitle>
         return thread.canOpen && thread.href
