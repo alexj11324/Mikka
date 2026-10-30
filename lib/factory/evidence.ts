@@ -7,6 +7,15 @@ import {
 } from "./approval-contract";
 import type { FactoryCandidate, FactoryTask } from "./approval-dependencies";
 
+/** What a screenshot or recording entry shown to the reviewer carries. */
+export interface FactoryCaptureEvidence {
+  captureId: string;
+  contentType: string;
+  title: string;
+  size: number;
+  durationMs: number | null;
+}
+
 export function digest(value: unknown): string {
   // JSONB canonical key ordering must survive DB round trips.
   function canonical(v: unknown): unknown {
@@ -82,6 +91,7 @@ export async function readFactoryArtifact(
     throw new FactoryError("factoryEvidenceMismatch");
   let raw: unknown;
   let sourceTime: Date = run.finishedAt;
+  let capture: FactoryCaptureEvidence | undefined;
   if (
     ref.kind === "report" &&
     ref.artifact === `run-report:${run.id}` &&
@@ -101,19 +111,80 @@ export async function readFactoryArtifact(
     if (!chunk) throw new FactoryError("factoryArtifactMissing");
     raw = chunk.chunk;
     sourceTime = chunk.createdAt;
+  } else if (
+    (ref.kind === "screenshot" || ref.kind === "video") &&
+    CAPTURE_ARTIFACT.test(ref.artifact)
+  ) {
+    // Screenshots and recordings are the run's own captures (run_captures),
+    // never a second copy and never a URL.
+    const {
+      rows: [row],
+    } = await tx.query(
+      `SELECT id,kind,"contentType",title,size,"durationMs","updatedAt" FROM run_captures
+        WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND status='ready' FOR SHARE`,
+      [ref.artifact.slice(CAPTURE_PREFIX.length), run.id, task.userId],
+    );
+    if (!row)
+      throw new FactoryError("factoryArtifactMissing");
+    if (row.kind !== (ref.kind === "screenshot" ? "image" : "video"))
+      throw new FactoryError("factoryEvidenceMismatch");
+    capture = {
+      captureId: row.id as string,
+      contentType: row.contentType as string,
+      title: row.title as string,
+      size: (row.size as number | null) ?? 0,
+      durationMs: (row.durationMs as number | null) ?? null,
+    };
+    raw = capture;
+    sourceTime = row.updatedAt;
   } else {
-    // No screenshot/video store exists in the frozen baseline. Do not accept
-    // arbitrary URLs as real artifacts; #193 can add a trusted reader later.
+    // Only existing, access controlled artifacts. Arbitrary URLs never count.
     throw new FactoryError("factoryArtifactMissing");
   }
   if (new Date(ref.recordedAt).getTime() < sourceTime.getTime())
     throw new FactoryError("factoryEvidenceMismatch");
   return {
     raw,
+    capture,
     sourceTime: sourceTime.toISOString(),
     startedAt: run.startedAt.toISOString(),
     finishedAt: run.finishedAt.toISOString(),
   };
+}
+
+const CAPTURE_PREFIX = "run-capture:";
+const CAPTURE_ARTIFACT = /^run-capture:[a-f0-9-]{36}$/;
+export const captureArtifact = (id: string) => `${CAPTURE_PREFIX}${id}`;
+export const captureIdOf = (artifact: string) =>
+  CAPTURE_ARTIFACT.test(artifact) ? artifact.slice(CAPTURE_PREFIX.length) : null;
+
+/** Evidence entries are capped per finish (contract.ts). */
+const MAX_EVIDENCE = 100;
+
+/**
+ * The run's ready screenshots and recordings as evidence references next to
+ * `base` (its report), oldest first. Trusted reconcilers call this; an agent
+ * cannot name a capture of another run.
+ */
+export async function runCaptureEvidence(
+  tx: PoolClient,
+  run: { id: string; userId: string },
+  base: FactoryEvidence,
+  room = MAX_EVIDENCE - 1,
+): Promise<FactoryEvidence[]> {
+  if (room <= 0) return [];
+  const { rows } = await tx.query(
+    `SELECT id,kind,"updatedAt" FROM run_captures WHERE "runId"=$1 AND "userId"=$2 AND status='ready' ORDER BY "createdAt",id LIMIT $3`,
+    [run.id, run.userId, room],
+  );
+  return rows.map((row) => ({
+    ...base,
+    artifact: captureArtifact(row.id),
+    kind: row.kind === "video" ? "video" : "screenshot",
+    recordedAt: new Date(
+      Math.max(new Date(base.recordedAt).getTime(), row.updatedAt.getTime()),
+    ).toISOString(),
+  }));
 }
 
 export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
@@ -140,6 +211,12 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
   )
     throw new FactoryError("factoryIndependentEvidenceRequired");
   const artifacts = [];
+  // Screenshots and recordings, shown to the reviewer. Approval binds the
+  // candidate commit (a new commit voids it); like Factory.ai, Warp, Devin
+  // and Codex, it does not bind capture files, so these stay out of the
+  // manifest the evidence digest covers.
+  const captures = [];
+  const shown = [];
   for (const attempt of latest) {
     if (!attempt.evidence.length)
       throw new FactoryError("factoryEvidenceRequired");
@@ -170,14 +247,24 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
         )
           throw new FactoryError("factoryEvidenceMismatch");
       }
-      const { raw, ...timestamps } = source;
-      artifacts.push({
+      const { raw, capture, ...timestamps } = source;
+      // `sha256` is the digest of the record read back, as for every entry;
+      // for a capture that is its metadata, never the file.
+      const entry = {
         stage: attempt.stage,
         attemptId: attempt.id,
         ...ref,
         ...timestamps,
         sha256: digest(raw),
-      });
+      };
+      if (capture) {
+        const shownCapture = { ...entry, ...capture };
+        captures.push(shownCapture);
+        shown.push(shownCapture);
+        continue;
+      }
+      artifacts.push(entry);
+      shown.push(entry);
     }
   }
   const manifest = {
@@ -188,6 +275,9 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
   return {
     manifest,
     evidenceDigest: digest(manifest),
+    /** What the reviewer sees: the manifest's entries plus the run-capture ones, in order. */
+    view: { ...manifest, artifacts: shown },
+    captures,
     evidence: artifacts.map(
       ({
         artifact,

@@ -735,9 +735,26 @@ test(
           }),
         "factoryArtifactMissing",
       );
+      const captureId = randomUUID();
+      await pool.query(`INSERT INTO run_captures (id,"userId","runId",kind,"contentType",source,status,title,size,sha256,"storageKey","createdAt","updatedAt") VALUES ($1,'owner',$2,'image','image/png','local','ready','Captured result',3,$3,$4,$5,$5)`,
+        [captureId, runId, "c".repeat(64), `owner/captures/${captureId}`, evidence.recordedAt]);
+      const capture = { ...evidence, artifact: `run-capture:${captureId}`, kind: "screenshot" as const };
+      const rejectCapture = () => rejects(() => store.apply("owner", binding(state.task), randomUUID(), { ...finish, evidence: [capture] }), "factoryArtifactMissing");
+      await rejects(() => store.apply("owner", binding(state.task), randomUUID(), { ...finish, evidence: [{ ...capture, artifact: `run-capture:${randomUUID()}` }] }), "factoryArtifactMissing");
+      await pool.query(`UPDATE run_captures SET kind='video' WHERE id=$1`, [captureId]);
+      await rejectCapture();
+      await pool.query(`UPDATE run_captures SET kind='image',status='failed' WHERE id=$1`, [captureId]);
+      await rejectCapture();
+      await pool.query(`UPDATE run_captures SET status='ready',"userId"='other' WHERE id=$1`, [captureId]);
+      await rejectCapture();
+      const otherRun = (await pool.query('SELECT id FROM agent_runs WHERE id<>$1 LIMIT 1', [runId])).rows[0];
+      assert.ok(otherRun);
+      await pool.query(`UPDATE run_captures SET "userId"='owner',"runId"=$2 WHERE id=$1`, [captureId, otherRun.id]);
+      await rejectCapture();
+      await pool.query('UPDATE run_captures SET "runId"=$2 WHERE id=$1', [captureId, runId]);
       state = await store.apply("owner", binding(state.task), randomUUID(), {
         ...finish,
-        evidence: [evidence],
+        evidence: [evidence, capture],
       });
       assert.equal(state.task.status, "passed");
       state = await store.apply("owner", binding(state.task), randomUUID(), {
