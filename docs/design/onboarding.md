@@ -35,7 +35,7 @@
 | 2a | 要不要云电脑 | bloub 缩成头像，移到对话顶部。「我是小满。我可以有一台自己的云电脑，用它开浏览器、跑代码。要开一台吗？」下面两个按钮，跟 Bot 的话左对齐，主选项在前：**好，开一台** / **先不用** | 「好，开一台」或「先不用」 | 「先不用」→「好。以后想用，在设置 › 云电脑里填上你的 E2B Key 就行。」直接进第 3 步 |
 | 2b | 填 E2B Key（只在选了「好，开一台」时） | 一张卡片：一个 Key 输入框（密码样式）、「去 E2B 拿 Key」的外链、**连接** 按钮。连接时先用这个 Key 向 E2B 校验一次 | 「已连接 E2B」（不回显 Key） | 「先不用」→ 同 2a 的跳过；Key 校验失败 → 卡片里就地报错，可以重填或跳过 |
 | 2c | 它的电脑亮起来（Figma 02，只在 Key 连上后） | 「等我一下，我去把电脑打开。」下面一块屏幕，用户自己的 E2B 账号真的在开机（「● 正在开机」→ 桌面）；屏幕下方写「小满 的屏幕」 | — | 用户可以不等开机直接往下走；电脑在后台继续开 |
-| 3 | 给它「喂」工具（Figma 03） | 「想让我帮你看看邮件和日程吗？连上你常用的应用就行。」下面是 Gmail、Google 日历、Google Drive、Notion、Slack 的卡片（Composio 官方彩色图标，复用现有的连接流程），每张有 连接 / 连接中… / 已连接 三种状态 | 「好了」→ 气泡「已连接 Gmail、Google 日历」；承接一句，按连上的应用说它以后每天看什么：「好。以后我每天帮你看要紧的邮件、这周的日程，第一份现在就去整理。」同时在后台开始整理第一份简报 | 「跳过」→「没关系，之后随时可以在设置里连接。」 |
+| 3 | 给它「喂」工具（Figma 03） | 「连上你常用的应用，里面的事我就能直接帮你做。」下面是 Gmail、Google 日历、Google Drive、Notion、Slack 的卡片（Composio 官方彩色图标，复用现有的连接流程），每张有 连接 / 连接中… / 已连接 三种状态 | 「好了」→ 气泡「已连接 Gmail、Google 日历」；承接一句：「好，Gmail、Google 日历 连上了。用得上的时候我直接用，今天的简报我先去整理。」同时在后台开始整理第一份简报 | 「跳过」→「没关系，之后随时可以在设置里连接。」 |
 | 4 | 收尾 | 只在有项目被跳过时，先提醒一句：「还没开的：云电脑、连接应用。随时都能开。」然后出现 **进入 Mikka** | 点「进入 Mikka」 | — |
 
 - 每完成一步，背景光就深一层；跳过的步骤不加深。
@@ -71,9 +71,8 @@
 | 电脑状态 | 正在开机 | Starting up |
 | 开机失败 | 电脑稍后再开 | Computer will start later |
 | 屏幕标签 | {name} 的屏幕 | {name}'s screen |
-| 应用 | 想让我帮你看看邮件和日程吗？连上你常用的应用就行。 | Want me to help with your email and calendar? Just connect the apps you use. |
-| 应用承接 | 好。以后我每天帮你看{uses}，第一份现在就去整理。 | Got it. Every day I'll look at {uses}. Starting on the first one now. |
-| {uses} | 要紧的邮件 / 这周的日程 / 最近改过的文件 / 快到期的待办 / 等你回的消息 | important email / this week's calendar / recently edited files / to-dos due soon / messages waiting on you |
+| 应用 | 连上你常用的应用，里面的事我就能直接帮你做。 | Connect the apps you use, and I can take care of things in them directly. |
+| 应用承接 | 好，{apps} 连上了。用得上的时候我直接用，今天的简报我先去整理。 | Got it, {apps} connected. I'll use them whenever they help. Starting on today's briefing now. |
 | 应用跳过承接 | 没关系，之后随时可以在设置里连接。 | No problem. Connect them anytime in Settings. |
 | 提醒 | 还没开的：{missing}。随时都能开。 | Still off: {missing}. Turn them on anytime. |
 | 收尾按钮 | 进入 Mikka | Enter Mikka |
