@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from 'pg'
 import { Sandbox } from 'e2b'
 import { z } from 'zod'
 import { ComputerError } from '@/lib/computer/store'
+import { computerPermission } from '@/lib/computer/permission'
 import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant, ensureHostedRunnerImage } from '@/lib/computer/e2b-provider'
 import { installSubagentRuntime, runtimeRequest } from './runtime'
 import { threadMachineLimits, threadMachineViolation, type ThreadMachineLimits } from './thread-machine-limits'
@@ -227,9 +228,9 @@ export async function openThreadDesktop(pool: Pool, actor: Actor, runId: string,
       FOR UPDATE OF t FOR SHARE OF d`, [runId, actor.userId, actor.workspaceId, run.deviceId])).rows[0]
     if (!machine) throw new ComputerError(404, 'Thread unavailable')
     const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
-    const permission = policy?.permission ?? 'ask', policyVersion = Number(policy?.version ?? 0)
+    const permission = computerPermission(policy?.permission), policyVersion = Number(policy?.version ?? 0)
     if (permission === 'deny') throw new ComputerError(403, 'Computer use is disabled')
-    if (!['ask','allow'].includes(permission) || !Number.isSafeInteger(policyVersion) || policyVersion < 0) throw new ComputerError(409, 'Computer policy unavailable')
+    if (permission !== 'allow' || !Number.isSafeInteger(policyVersion) || policyVersion < 0) throw new ComputerError(409, 'Computer policy unavailable')
     const sandbox = await runtime.connectComputer(machine.sandboxId)
     const lease = { botId: machine.botId, ownerId: actor.userId, display: 1, epoch: machine.epoch, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion }
     await runtime.startDesktop(sandbox, 1, true)

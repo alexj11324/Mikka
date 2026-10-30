@@ -3,22 +3,20 @@ import assert from 'node:assert/strict'
 import { browserPermission, browserMutationSchema, mutationFromStep } from './visual-contract'
 import { browserLoginContinuation } from './login-result'
 
-test('ordinary authorized browser work is not a per-click approval, and effects retain their own policy',()=>{
- for(const computer of ['ask','allow'] as const) {
-  assert.equal(browserPermission('browse',computer,{},{}),'allow')
-  assert.equal(browserPermission('edit_draft',computer,{},{}),'allow')
-  assert.equal(browserPermission('payment',computer,{},{}),'ask')
-  assert.equal(browserPermission('write_external',computer,{browser_write_external:'allow'},{}),'allow')
-  assert.equal(browserPermission('write_external',computer,{browser_write_external:'allow'},{browser_write_external:'deny'}),'deny')
+test('bots act without a human approval step: every effect, payment and sending included, is allowed by default',()=>{
+ for(const effect of ['browse','edit_draft','write_external','payment','sensitive_delete','security_change'] as const) {
+  assert.equal(browserPermission(effect,'allow',{},{}),'allow')
+  // A stored 'ask' (retired per-step approval) is never a human gate.
+  assert.equal(browserPermission(effect,'allow',{[`browser_${effect}`]:'ask'},{[`browser_${effect}`]:'ask'}),'allow')
  }
- for(const effect of ['browse','edit_draft','write_external','payment','sensitive_delete','security_change'] as const) assert.equal(browserPermission(effect,'deny',{browser_payment:'allow'},{}),'deny')
  assert.throws(()=>browserPermission('browse','allow',null,{}))
+ assert.throws(()=>browserPermission('browse','allow',{},{browser_browse:'maybe'}))
 })
-test('explicit scoped decisions narrow ordinary browsing even when computer use is allowed',()=>{
+test('deny stays enforced: a workspace computer deny, or an explicit deny for the effect on either layer',()=>{
+ for(const effect of ['browse','edit_draft','write_external','payment','sensitive_delete','security_change'] as const) assert.equal(browserPermission(effect,'deny',{[`browser_${effect}`]:'allow'},{}),'deny')
  assert.equal(browserPermission('browse','allow',{browser_browse:'deny'},{}),'deny')
- assert.equal(browserPermission('browse','allow',{}, {browser_browse:'ask'}),'ask')
- assert.equal(browserPermission('edit_draft','allow',{browser_edit_draft:'allow'},{browser_edit_draft:'deny'}),'deny')
- assert.equal(browserPermission('payment','allow',{}, {browser_payment:'allow'}),'ask')
+ assert.equal(browserPermission('payment','allow',{browser_payment:'allow'},{browser_payment:'deny'}),'deny')
+ assert.equal(browserPermission('write_external','allow',{browser_payment:'deny'},{}),'allow')
 })
 test('visual actions admit bounded coordinates but no JavaScript, selectors or authority',()=>{
  assert.deepEqual(mutationFromStep({action:'click',x:20,y:30,step:'Open',summary:'Open the item'}),{action:'click',x:20,y:30})

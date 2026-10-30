@@ -138,7 +138,7 @@ async function main() {
       await assert.rejects(probe())
       await store.operate(actor, bot.id, 'wake')
       await assert.rejects(probe(), 'waking must not bypass the workspace denial')
-      await store.setPolicy(actor.workspaceId, 'ask')
+      await store.setPolicy(actor.workspaceId, 'allow')
       await assert.rejects(probe(), 'a stale run stays blocked after re-enablement')
       await probe(2)
       stage = 'serialize takeover with an active operation'
