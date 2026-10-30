@@ -58,9 +58,9 @@ function validationCode(error: z.ZodError): ActionErrorCode {
   return 'validationGeneric'
 }
 
-export async function listIssues() {
+export async function listIssues(workspaceId?: string) {
   const userId = await getUserId()
-  const context = await loadWorkspaceContext()
+  const context = await loadWorkspaceContext(workspaceId)
   const teams = await accessibleTeams(userId, context.workspace.id)
   const visibility = await issueVisibility(userId)
   const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
@@ -69,7 +69,7 @@ export async function listIssues() {
   const ownersWithoutNumbers = [...new Set(visibleRows.filter(row => row.ownerId === userId && !readIssueMetadata(row.content).number).map(row => row.ownerId))]
   if (ownersWithoutNumbers.length) {
     for (const ownerId of ownersWithoutNumbers) await ensureIssueNumbers(ownerId)
-    return listIssues()
+    return listIssues(workspaceId)
   }
   const liveRows = visibleRows.filter(row => !readIssueMetadata(row.content).deletedAt)
   const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))

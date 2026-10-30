@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { runEvidence } from '@/lib/captures/store'
 import { withBasePath } from '@/lib/base-path'
 

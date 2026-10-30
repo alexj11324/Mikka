@@ -3,7 +3,7 @@ import { after, NextResponse } from 'next/server'
 import { processGroupTurn } from '@/lib/coordinator/group-turns'
 import { groupRuntime } from '@/lib/coordinator/group-runtime'
 import { and, eq, inArray } from 'drizzle-orm'
-import { auth } from '@/lib/auth'
+import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { db, pool } from '@/lib/db'
 import { agents } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -29,13 +29,14 @@ const directory = groupDirectory({
 export async function respondGroup(request: Request, resource: GroupRequest['resource'], id?: string) {
   const session = await auth.api.getSession({ headers: request.headers })
   const url = new URL(request.url)
-  const result = await handleGroup(pool, directory, {
+  const scopedDirectory: typeof directory = async (workspaceId, userId, members) => (!session || apiWorkspaceAllowed(session, workspaceId)) && directory(workspaceId, userId, members)
+  const result = await handleGroup(pool, scopedDirectory, {
     userId: session?.user?.id ?? null, method: request.method as GroupRequest['method'], resource, id,
     origin: request.headers.get('origin'),
     // Do not trust client-controlled x-forwarded-host to satisfy the Origin check.
     host: request.headers.get('host') ?? url.host,
     body: request.method !== 'GET' ? await request.text().catch(() => '') : undefined,
-    before: url.searchParams.get('before'), limit: url.searchParams.get('limit'), workspaceId: url.searchParams.get('workspaceId'),
+    before: url.searchParams.get('before'), limit: url.searchParams.get('limit'), workspaceId: url.searchParams.get('workspaceId') ?? session?.tokenWorkspaceId,
   }, true)
   if (resource === 'messages' && id && result.status < 300) {
     after(async () => {

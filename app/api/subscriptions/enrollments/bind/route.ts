@@ -1,4 +1,4 @@
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { authorizeSubscriptionWorkspace } from '@/lib/subscription-runtime'
 import { EnrollmentClient, enrollmentOperator } from '@/lib/subscription-enrollment'
@@ -14,7 +14,7 @@ export const POST = enrollmentBindHTTP({
   operator: async request => process.env.MIKKA_BYOS_ENROLLMENT_ENABLED === '1' ? enrollmentOperator(request, process.env.MIKKA_BYOS_ENROLLMENT_OPERATOR_TOKEN) : null,
   session: async request => {
     const session = await auth.api.getSession({ headers: request.headers })
-    return session ? { userId: session.user.id } : null
+    return session ? { userId: session.user.id, tokenWorkspaceId: session.tokenWorkspaceId } : null
   },
   handoff: async (request, ownerId, body) => {
     const operator = process.env.MIKKA_BYOS_ENROLLMENT_OPERATOR_TOKEN

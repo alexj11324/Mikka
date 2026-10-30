@@ -1540,6 +1540,8 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
   // The planning hand-in was already parsed and checked by the adapter's
   // `readHandoff`; it is copied whole or not at all (ADR ORV-205).
   if (agent.plan) picked.plan = agent.plan
+  if (typeof agent.previewDatabaseBranch === "string" && agent.previewDatabaseBranch.trim())
+    picked.previewDatabaseBranch = agent.previewDatabaseBranch.trim().slice(0, 500)
   // The check's per-criterion verdicts (ADR 0046). Kept only when the entry
   // is well formed and names a criterion by uuid: the run-complete route
   // validates the report, and one bad entry would throw the whole hand-in
@@ -1550,10 +1552,12 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
     for (const entry of agent.criteria) {
       if (criteria.length >= MAX_REPORTED_CRITERIA) break
       if (!entry || typeof entry !== "object") continue
-      const { criterionId, passed, evidence } = entry as {
+      const { criterionId, passed, evidence, command, exitCode } = entry as {
         criterionId?: unknown
         passed?: unknown
         evidence?: unknown
+        command?: unknown
+        exitCode?: unknown
       }
       if (typeof criterionId !== "string" || !UUID_RE.test(criterionId))
         continue
@@ -1561,6 +1565,7 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
       criteria.push({
         criterionId,
         passed,
+        ...(typeof command === "string" && command.trim() ? { command: command.trim().slice(0, 2_000), ...(exitCode === null || (typeof exitCode === "number" && Number.isSafeInteger(exitCode)) ? { exitCode } : {}) } : {}),
         ...(typeof evidence === "string"
           ? { evidence: evidence.slice(0, 10_000) }
           : {}),

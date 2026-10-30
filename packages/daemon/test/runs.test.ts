@@ -29,7 +29,8 @@ async function boot(
   server: MemoryServer,
   dataDir: string,
   speed = Number.POSITIVE_INFINITY,
-  stallMs?: number
+  stallMs?: number,
+  fixturesDir?: string
 ) {
   const daemon = await new Daemon({
     dataDir,
@@ -40,6 +41,7 @@ async function boot(
     mockSpeed: speed,
     heartbeatMs: 50,
     stallMs,
+    fixturesDir,
     quotaSource: null,
   }).start()
   daemons.push(daemon)
@@ -94,6 +96,25 @@ afterEach(async () => {
 })
 
 describe("mock runs", () => {
+  it("keeps criterion commands and preview branch through daemon reporting without trusting the agent verify", async () => {
+    const { server, dataDir } = await setup()
+    const fixturesDir = tempDir()
+    const criterionId = "10000000-0000-4000-8000-000000000001"
+    writeFileSync(join(fixturesDir, "details.jsonl"), JSON.stringify({ t: 0, submit: {
+      summary: "Checked criterion", previewDatabaseBranch: "  preview/541  ",
+      verify: { status: "failed", command: "forged" },
+      criteria: [{ criterionId, passed: true, command: "  pnpm check:criterion  ", exitCode: 0, evidence: "passed" }],
+    } }) + "\n")
+    const daemon = await boot(server, dataDir, Number.POSITIVE_INFINITY, undefined, fixturesDir)
+    const runId = queue(server, "details")
+    await runToEnd(daemon, server, runId)
+    expect(server.runs.get(runId)?.completion?.report).toMatchObject({
+      previewDatabaseBranch: "preview/541",
+      criteria: [{ criterionId, command: "pnpm check:criterion", exitCode: 0 }],
+      verify: { status: "passed", command: VERIFY, exitCode: 0 },
+    })
+  })
+
   it("starts from the issue branch only when the trusted push policy permits it", async () => {
     const source = await makeRepo()
     git(source, "checkout", "-b", "mikka/issue-1")

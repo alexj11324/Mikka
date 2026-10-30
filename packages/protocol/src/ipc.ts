@@ -23,6 +23,7 @@ export const IPC = {
   sshChanged: "mikka:ssh:changed",
   sshHosts: "mikka:ssh:hosts",
   sshBegin: "mikka:ssh:begin",
+  sshCancel: "mikka:ssh:cancel",
   sshAccept: "mikka:ssh:accept",
   sshState: "mikka:ssh:state",
   deviceStatus: "mikka:device:status",

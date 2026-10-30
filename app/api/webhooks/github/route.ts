@@ -1,4 +1,5 @@
 import { after } from 'next/server'
+import { refreshPublishedPullRequest } from '@/lib/github/publication-webhook'
 import { verifyGitHubSignature } from '@/lib/suggestions/github-webhook'
 import { githubWebhookNotifications } from '@/lib/suggestions/sources'
 import { ingestNotifications } from '@/lib/suggestions/store'
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
   let payload: Record<string, unknown>
   try { payload = JSON.parse(rawBody) } catch { return new Response('Invalid webhook JSON.', { status: 400, headers: noStore }) }
   after(async () => {
+    try { await refreshPublishedPullRequest(event, payload) }
+    catch { console.error('GitHub delivery refresh failed') }
     try { await ingestNotifications(await githubWebhookNotifications(event, payload)) }
     catch (error) { console.error('GitHub suggestion ingest failed', error instanceof Error ? error.message : error) }
   })

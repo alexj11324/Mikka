@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { auth } from '@/lib/api-auth';
 import { factoryLifecycleEnabled } from '@/lib/factory/runtime';
 import { factoryDispatchRecovery } from '@/lib/factory/dispatch-recovery-server';
 import { handleFactoryDispatchRecovery } from '@/lib/factory/dispatch-recovery-http';

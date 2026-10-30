@@ -940,6 +940,14 @@
     "allStatuses": "全部状态"
   },
   "Errors": {
+    "botNotFound": "找不到这个 Bot。",
+    "executionPlaceInvalid": "请选择可用设备或云端。",
+    "executionHarnessUnavailable": "所选设备上没有这个 Agent。",
+    "executionModelUnknown": "此模型不可用。",
+    "executionRuleNotFound": "找不到这条执行规则。",
+    "executionRuleOrderInvalid": "执行规则顺序已更改，请刷新后重试。",
+    "executionCommandNotFound": "找不到这次检测。",
+    "executionAccountUnavailable": "此账号不可用。",
     "generic": "操作未成功，请稍后重试。",
     "authRequired": "需要先登录",
     "validationGeneric": "请检查填写内容。",
@@ -3433,7 +3441,7 @@
       "codeEmail": "邮件验证码",
       "captchaRequired": "需要你亲自完成网站的人机验证",
       "needsUser": "需要你亲自完成登录",
-      "outcomeUnknown": "没能确认是否已登录",
+      "outcomeUnknown": "无法确认是否已登录",
       "waiting": "已提交，等待网站结果…",
       "submissionInvalid": "提交内容无效，再试一次",
       "denied": "这里不允许登录",

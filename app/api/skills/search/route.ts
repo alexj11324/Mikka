@@ -2,7 +2,7 @@ import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { getVercelOidcToken } from '@vercel/oidc'
 
 import { skillsSearchResponseSchema } from '@/lib/skills-search'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' }
 

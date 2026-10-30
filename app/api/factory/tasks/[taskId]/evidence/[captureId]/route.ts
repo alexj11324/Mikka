@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { auth } from "@/lib/api-auth";
 import { readCapture } from "@/lib/captures/store";
 import { factoryApprovals } from "@/lib/factory/server";
 import { factoryBrowserHuman } from "@/lib/factory/browser-human";
