@@ -2,12 +2,13 @@
 
 import { ActionFailureError } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
+import type { SecretEnvironment } from '@/lib/secrets/format'
 import { getE2BKeyStatus, removeE2BKey, setE2BKey, type E2BKeyStatus } from '@/lib/secrets/e2b'
 import { createWorkspaceSecret, deleteWorkspaceSecret, EgressDomainError, EgressTooManyDomainsError, getNetworkPolicy, listWorkspaceSecrets, replaceWorkspaceSecret, updateNetworkPolicy, type NetworkPolicyView, type WorkspaceSecretView } from '@/lib/secrets/store'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 
-// 设置 › 密钥与环境. All admin only. Secret values are write-only; env values are readable.
+// 设置 › 密钥与环境. Permission tiers: lib/secrets/permissions.ts (members: repo-scoped non-production entries; admins: everything). Secret values are write-only; env values are readable.
 // TODO(audit): pass a recordAudit-backed hook (with actor name + request context) once #432 lands.
 
 const withActor = <T>(fn: (userId: string, workspaceId: string) => Promise<T>) => workspaceAction(async () => {
@@ -18,10 +19,10 @@ const withActor = <T>(fn: (userId: string, workspaceId: string) => Promise<T>) =
 export async function listSecrets(): Promise<ActionResult<{ secrets: WorkspaceSecretView[] }>> {
   return withActor(async (u, w) => ({ secrets: await listWorkspaceSecrets(u, w) }))
 }
-export async function createSecret(input: { name: string; kind: 'secret' | 'env'; value: string; scope?: { type: 'workspace' } | { type: 'repository'; repository: string } }): Promise<ActionResult<WorkspaceSecretView>> {
+export async function createSecret(input: { name: string; kind: 'secret' | 'env'; value: string; scope?: { type: 'workspace' } | { type: 'repository'; repository: string }; environment?: SecretEnvironment }): Promise<ActionResult<WorkspaceSecretView>> {
   return withActor((u, w) => createWorkspaceSecret(u, w, input))
 }
-export async function replaceSecret(input: { id: string; value: string }): Promise<ActionResult<WorkspaceSecretView>> {
+export async function replaceSecret(input: { id: string; value: string; scope?: { type: 'workspace' } | { type: 'repository'; repository: string }; environment?: SecretEnvironment }): Promise<ActionResult<WorkspaceSecretView>> {
   return withActor((u, w) => replaceWorkspaceSecret(u, w, input))
 }
 export async function deleteSecret(input: { id: string }): Promise<ActionResult<{ id: string }>> {

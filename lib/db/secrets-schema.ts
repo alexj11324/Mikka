@@ -3,6 +3,7 @@ import { bigserial, index, integer, pgTable, text, timestamp, uniqueIndex, uuid 
 
 export const WORKSPACE_SECRET_KINDS = ['secret', 'env'] as const
 export const WORKSPACE_SECRET_SCOPES = ['workspace', 'repository'] as const
+export const SECRET_ENVIRONMENTS = ['all', 'production', 'preview', 'development'] as const
 export const EGRESS_MODES = ['open', 'allowlist', 'none'] as const
 export const E2B_KEY_ERROR_CODES = ['invalid', 'rate_limited', 'template_unavailable', 'unavailable'] as const
 
@@ -14,6 +15,7 @@ export const workspaceSecrets = pgTable('workspace_secrets', {
   scopeType: text('scopeType').$type<(typeof WORKSPACE_SECRET_SCOPES)[number]>().notNull(),
   /** '' for workspace scope, owner/repo for repository scope. */
   scopeRef: text('scopeRef').notNull().default(''),
+  environment: text('environment').$type<(typeof SECRET_ENVIRONMENTS)[number]>().notNull().default('all'),
   ciphertext: text('ciphertext').notNull(),
   iv: text('iv').notNull(),
   keyVersion: integer('keyVersion').notNull(),
@@ -21,7 +23,7 @@ export const workspaceSecrets = pgTable('workspace_secrets', {
   updatedBy: text('updatedBy').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [uniqueIndex('workspace_secrets_name_key').on(table.workspaceId, table.scopeType, table.scopeRef, table.name)])
+}, table => [uniqueIndex('workspace_secrets_name_key').on(table.workspaceId, table.scopeType, table.scopeRef, table.environment, table.name)])
 
 export const workspaceNetworkPolicy = pgTable('workspace_network_policy', {
   workspaceId: uuid('workspaceId').primaryKey(),

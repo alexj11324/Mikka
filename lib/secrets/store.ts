@@ -10,6 +10,7 @@ import { workspaceNetworkPolicy, workspaceSecrets } from '@/lib/db/secrets-schem
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { openSecret, sealSecret, secretAad, SecretsKeyMissingError } from './crypto'
+import { secretActionAllowed, type SecretAction, type SecretTarget, type WorkspaceRole } from './permissions'
 import { checkEgressDomains, createSecretInput, deleteSecretInput, replaceSecretInput, scopeColumns, updateEgressInput, EGRESS_DOMAINS_MAX, WORKSPACE_SECRETS_LIMIT } from './format'
 
 export type SecretsTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -35,6 +36,7 @@ export interface WorkspaceSecretView {
   name: string
   kind: 'secret' | 'env'
   scope: { type: 'workspace' } | { type: 'repository'; repository: string }
+  environment: 'all' | 'production' | 'preview' | 'development'
   /** Only for kind='env'. Always null for kind='secret', and null when the row cannot be decrypted. */
   value: string | null
   /** True when the stored ciphertext no longer opens (moved row, wrong key). The rest of the list still works. */
@@ -72,6 +74,7 @@ function unsealForView(row: Row): { value: string | null; unavailable: boolean }
 const view = (row: Row): WorkspaceSecretView => ({
   id: row.id, name: row.name, kind: row.kind,
   scope: row.scopeType === 'workspace' ? { type: 'workspace' } : { type: 'repository', repository: row.scopeRef },
+  environment: row.environment,
   ...(row.kind === 'env' ? unsealForView(row) : { value: null, unavailable: false }),
   createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
 })
@@ -104,13 +107,30 @@ export async function guardSecretsDb<T>(work: () => Promise<T>, onUnique?: () =>
   }
 }
 
-export async function requireAdmin(userId: string, workspaceId: string) {
-  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId, true))
+/** Active member's role, or workspaceAccessDenied (not a member). */
+export async function workspaceRole(userId: string, workspaceId: string): Promise<WorkspaceRole> {
+  const { membership } = await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId))
+  return membership.role === 'admin' ? 'admin' : 'member'
+}
+/** Throws secretPermissionDenied when the matrix (./permissions) says no. */
+export function assertSecretPermission(role: WorkspaceRole, action: SecretAction, targets: readonly SecretTarget[] = [], ownsAll = true) {
+  if (!secretActionAllowed(role, action, targets, ownsAll)) throw new WorkspaceError('secretPermissionDenied')
+}
+/**
+ * Membership + matrix check, before any input validation or DB work. For replace, call again with
+ * the stored row inside the transaction (see replaceWorkspaceSecret). Returns the role.
+ */
+export async function requireSecretPermission(userId: string, workspaceId: string, action: SecretAction, targets: readonly SecretTarget[] = []): Promise<WorkspaceRole> {
+  const role = await workspaceRole(userId, workspaceId)
+  // create/replace targets are only known after parsing (replace: after reading the row); the caller checks them then.
+  const deferred = (action === 'secret.create' || action === 'secret.replace') && !targets.length
+  if (!deferred) assertSecretPermission(role, action, targets)
+  return role
 }
 
-/** Admin only. Secrets come back with value=null; env vars with their value. */
+/** Any member. Secrets come back with value=null; env vars with their value. */
 export async function listWorkspaceSecrets(userId: string, workspaceId: string): Promise<WorkspaceSecretView[]> {
-  await requireAdmin(userId, workspaceId)
+  await requireSecretPermission(userId, workspaceId, 'secret.list')
   const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(eq(workspaceSecrets.workspaceId, workspaceId))
     .orderBy(asc(workspaceSecrets.scopeType), asc(workspaceSecrets.scopeRef), asc(workspaceSecrets.name)))
   return rows.map(view)
@@ -125,40 +145,51 @@ export const isShortSecretValue = (value: string) => Array.from(value).length < 
 const withWarning = (row: WorkspaceSecretView, value: string): SavedSecretView => ({ ...row, warning: isShortSecretValue(value) ? 'shortValueNotMasked' : null })
 
 export async function createWorkspaceSecret(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit): Promise<SavedSecretView> {
-  const { name, kind, value, scope } = createSecretInput.parse(input)
-  await requireAdmin(userId, workspaceId)
+  const role = await requireSecretPermission(userId, workspaceId, 'secret.create')
+  const { name, kind, value, scope, environment } = createSecretInput.parse(input)
+  const columns = { workspaceId, kind, name, ...scopeColumns(scope), environment }
+  assertSecretPermission(role, 'secret.create', [columns])
+  // TODO(audit): member writes are audited through the same hook as admin writes (recordAudit after #432).
   const id = crypto.randomUUID()
-  const columns = { workspaceId, kind, name, ...scopeColumns(scope) }
   const sealed = seal(value, columns)
   const row = await guardSecretsDb(() => db.transaction(async tx => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`secrets:${workspaceId}`}, 0))`)
       const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(workspaceSecrets).where(eq(workspaceSecrets.workspaceId, workspaceId))
       if (n >= WORKSPACE_SECRETS_LIMIT) throw new WorkspaceError('secretLimitReached')
       const [saved] = await tx.insert(workspaceSecrets).values({ id, ...columns, ...sealed, createdBy: userId, updatedBy: userId }).returning()
-      await audit(tx, { workspaceId, actorId: userId, action: kind === 'secret' ? 'secret.created' : 'env.created', target: { type: kind, id, label: name }, metadata: { scope: saved.scopeType, ...(saved.scopeRef ? { repository: saved.scopeRef } : {}) } })
+      await audit(tx, { workspaceId, actorId: userId, action: kind === 'secret' ? 'secret.created' : 'env.created', target: { type: kind, id, label: name }, metadata: { scope: saved.scopeType, environment: saved.environment, role, ...(saved.scopeRef ? { repository: saved.scopeRef } : {}) } })
       return saved
     }), () => new WorkspaceError('secretNameTaken'))
   return withWarning(kind === 'env' ? view(row) : meta(row), value)
 }
 
-/** SEC-15～17 编辑: replaces the value only (kind, name and scope are fixed). Returns metadata (env: with value). */
+/**
+ * SEC-15～17 编辑: new value, optionally a new scope / environment (kind and name are fixed).
+ * The stored row's scope/environment are read under FOR UPDATE inside the transaction and checked
+ * together with the requested ones, so a member can't edit a production/workspace entry or move one there.
+ */
 export async function replaceWorkspaceSecret(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit, now = new Date()): Promise<SavedSecretView> {
-  const { id, value } = replaceSecretInput.parse(input)
-  await requireAdmin(userId, workspaceId)
+  const role = await requireSecretPermission(userId, workspaceId, 'secret.replace')
+  const { id, value, scope, environment } = replaceSecretInput.parse(input)
   const row = await guardSecretsDb(() => db.transaction(async tx => {
     const [current] = await tx.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.id, id), eq(workspaceSecrets.workspaceId, workspaceId))).for('update')
     if (!current) throw new WorkspaceError('secretNotFound')
-    const [saved] = await tx.update(workspaceSecrets).set({ ...seal(value, current), updatedBy: userId, updatedAt: now }).where(eq(workspaceSecrets.id, id)).returning()
-    await audit(tx, { workspaceId, actorId: userId, action: current.kind === 'secret' ? 'secret.replaced' : 'env.updated', target: { type: current.kind, id, label: current.name } })
+    const next = { ...current, ...(scope ? scopeColumns(scope) : {}), environment: environment ?? current.environment }
+    assertSecretPermission(role, 'secret.replace', [current, next], current.createdBy === userId)
+    // TODO(audit): member writes are audited through the same hook as admin writes (recordAudit after #432).
+    const [saved] = await tx.update(workspaceSecrets).set({ scopeType: next.scopeType, scopeRef: next.scopeRef, environment: next.environment, ...seal(value, next), updatedBy: userId, updatedAt: now }).where(eq(workspaceSecrets.id, id)).returning()
+    const moved = current.scopeType !== next.scopeType || current.scopeRef !== next.scopeRef || current.environment !== next.environment
+    await audit(tx, { workspaceId, actorId: userId, action: current.kind === 'secret' ? 'secret.replaced' : 'env.updated', target: { type: current.kind, id, label: current.name },
+      metadata: { role, environment: next.environment, ...(moved ? { from: [current.scopeType, current.scopeRef, current.environment], to: [next.scopeType, next.scopeRef, next.environment] } : {}) } })
     return saved
-  }))
+  }), () => new WorkspaceError('secretNameTaken'))
   return withWarning(row.kind === 'env' ? view(row) : meta(row), value)
 }
 
 /** Delete (no UI frame yet; kept for the API). Audit action secret.deleted / env.deleted. */
 export async function deleteWorkspaceSecret(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit): Promise<{ id: string }> {
+  await requireSecretPermission(userId, workspaceId, 'secret.delete')
   const { id } = deleteSecretInput.parse(input)
-  await requireAdmin(userId, workspaceId)
   return guardSecretsDb(() => db.transaction(async tx => {
     const [gone] = await tx.delete(workspaceSecrets).where(and(eq(workspaceSecrets.id, id), eq(workspaceSecrets.workspaceId, workspaceId))).returning({ id: workspaceSecrets.id, kind: workspaceSecrets.kind, name: workspaceSecrets.name })
     if (!gone) throw new WorkspaceError('secretNotFound')
@@ -169,7 +200,7 @@ export async function deleteWorkspaceSecret(userId: string, workspaceId: string,
 
 /** Outbound network policy. Workspaces without a row are 'open' (today's behaviour). */
 export async function getNetworkPolicy(userId: string, workspaceId: string): Promise<NetworkPolicyView> {
-  await requireAdmin(userId, workspaceId)
+  await requireSecretPermission(userId, workspaceId, 'network.read')
   const [row] = await guardSecretsDb(() => db.select().from(workspaceNetworkPolicy).where(eq(workspaceNetworkPolicy.workspaceId, workspaceId)))
   return row ? { mode: row.mode, allowedDomains: row.allowedDomains, updatedAt: row.updatedAt.toISOString() } : { mode: 'open', allowedDomains: [], updatedAt: null }
 }
@@ -184,13 +215,13 @@ export class EgressTooManyDomainsError extends WorkspaceError {
 }
 
 /**
- * SEC-18/19. Admin check runs first, so non-admins learn nothing about validation.
- * Errors: workspaceAccessDenied, validationGeneric, egressTooManyDomains {count}, egressDomainInvalid {lines, 1-based}.
+ * SEC-18/19. Permission check (admin only) runs first, so non-admins learn nothing about validation.
+ * Errors: workspaceAccessDenied, secretPermissionDenied, validationGeneric, egressTooManyDomains {count}, egressDomainInvalid {lines, 1-based}.
  * open / none deliberately keep the stored allowlist untouched (and ignore allowedDomains), so
  * switching back to allowlist restores the admin's previous list instead of an empty one.
  */
 export async function updateNetworkPolicy(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit, now = new Date()): Promise<NetworkPolicyView> {
-  await requireAdmin(userId, workspaceId)
+  await requireSecretPermission(userId, workspaceId, 'network.write')
   const { mode, allowedDomains } = updateEgressInput.parse(input)
   let domains: string[] | null = null
   if (mode === 'allowlist') {
