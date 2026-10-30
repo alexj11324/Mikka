@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { acceptanceState, acceptanceStateKey } from './acceptance-state'
 
 const now = Date.parse('2026-10-29T12:00:00Z')
-const approval = (patch: Record<string, unknown> = {}) => ({ id: 'a1', candidateId: 'c1', expiresAt: '2026-10-29T13:00:00Z', revokedAt: null, ...patch })
+const approval = (patch: Record<string, unknown> = {}) => ({ id: 'a1', candidateId: 'c1', expiresAt: '2026-10-29T13:00:00Z', revokedAt: null, createdAt: '2026-10-29T10:00:00Z', ...patch })
 const state = (input: Partial<Parameters<typeof acceptanceState>[0]>) => acceptanceState({ stage: 'publish', candidateId: 'c1', approvals: [], publications: [], now, ...input }).state
 
 test('derives every acceptance state from the ledger', () => {
@@ -46,4 +46,20 @@ test('a skill is enabled rather than published', () => {
   assert.equal(acceptanceStateKey('live', true), 'skillState.live')
   assert.equal(acceptanceStateKey('checking', true), 'state.checking')
   assert.equal(acceptanceStateKey('pending', false), 'state.pending')
+})
+
+test('latest is chosen by createdAt, not by array order', () => {
+  const valid = approval({ createdAt: '2026-10-29T11:00:00Z' })
+  const revoked = approval({ id: 'a2', revokedAt: '2026-10-29T10:30:00Z', createdAt: '2026-10-29T10:00:00Z' })
+  assert.equal(state({ approvals: [valid, revoked] }), 'approved')
+  assert.equal(state({ approvals: [revoked, valid] }), 'approved')
+  const newerRevoke = approval({ id: 'a3', revokedAt: '2026-10-29T11:45:00Z', createdAt: '2026-10-29T11:30:00Z' })
+  assert.equal(state({ approvals: [newerRevoke, valid] }), 'revoked')
+})
+
+test('without a current candidate no approval counts', () => {
+  const result = acceptanceState({ stage: 'publish', candidateId: null, approvals: [approval()], publications: [{ approvalId: 'a1', status: 'succeeded' }], now })
+  assert.equal(result.state, 'invalidated')
+  assert.equal(result.active, undefined)
+  assert.equal(acceptanceState({ stage: 'approval', candidateId: null, approvals: [approval()], publications: [], now }).state, 'pending')
 })

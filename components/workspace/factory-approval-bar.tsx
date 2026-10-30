@@ -14,6 +14,8 @@ export type ApprovalBarProps = {
   details: string[]
   busy?: boolean
   canApprove?: boolean
+  /** Publishing needs a complete environment; without one 发布 is hidden, not disabled. */
+  canPublish?: boolean
   reference?: { href: string; label: string }
   onApprove?: () => void
   onPublish?: () => void
@@ -31,7 +33,7 @@ function StateIcon({ state }: { state: AcceptanceState }) {
 }
 
 /** The publication decision for one candidate (Figma 358:6855). Purely presentational. */
-export function ApprovalBar({ state, isSkill, details, busy = false, canApprove = true, reference, onApprove, onPublish, onRevoke, onReconcile }: ApprovalBarProps) {
+export function ApprovalBar({ state, isSkill, details, busy = false, canApprove = true, canPublish = true, reference, onApprove, onPublish, onRevoke, onReconcile }: ApprovalBarProps) {
   const t = useTranslations('FactoryAcceptance')
   const icon = StateIcon({ state })
   return <Item variant="muted" data-state={state}>
@@ -44,7 +46,7 @@ export function ApprovalBar({ state, isSkill, details, busy = false, canApprove 
       {state === 'pending' && canApprove && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onApprove}>{busy && <Spinner data-icon="inline-start" />}{isSkill ? t('enable') : t('approve')}</Button>}
       {state === 'approved' && <>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
-        <Button size="sm" disabled={busy} aria-busy={busy} onClick={onPublish}>{busy && <Spinner data-icon="inline-start" />}{t('publish')}</Button>
+        {canPublish && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onPublish}>{busy && <Spinner data-icon="inline-start" />}{t('publish')}</Button>}
       </>}
       {(state === 'publishing' || state === 'checking' || state === 'failed') && <>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
