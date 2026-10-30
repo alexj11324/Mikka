@@ -42,6 +42,12 @@ export interface FactoryDelivery {
   previewUrl: string | null;
   /** Neon branch of the run. Mikka does not record one anywhere yet, so this is always null. */
   databaseBranch: { name: string; url: string } | null;
+  /**
+   * Vercel's deployment target as recorded in receipt.verifiedTarget.provider.environment (provider
+   * name "vercel") of the newest succeeded publication of the current candidate. Any other value, a
+   * receipt without a Vercel provider, or no receipt gives null. Never inferred from branch names.
+   */
+  deploymentEnvironment: "preview" | "production" | null;
 }
 export interface FactoryTaskDetail { checks: FactoryCheckResult[]; delivery: FactoryDelivery }
 type Task = { id: string; issueId: string; candidateId: string | null; userId: string };
@@ -102,12 +108,17 @@ export async function factoryTaskDetail(
       verify: verifyOf(row.report),
     });
   }
-  const { rows: [d] } = await tx.query<{ sha: string | null; repository: string | null; environment: string | null; pullRequest: FactoryDelivery["pullRequest"]; previewUrl: string | null }>(
+  const { rows: [d] } = await tx.query<{ sha: string | null; repository: string | null; environment: string | null; pullRequest: FactoryDelivery["pullRequest"]; previewUrl: string | null; deploymentEnvironment: string | null }>(
     `SELECT c.sha,c.repository,c.environment,
        (SELECT p."pullRequest" FROM run_publications p WHERE p."runId"=c."runId" AND p."userId"=$3) AS "pullRequest",
        (SELECT f.receipt->'verifiedTarget'->>'reference' FROM factory_publications f
          WHERE f."taskId"=$1 AND f."candidateId"=c.id AND f.status='succeeded' AND f.receipt->'verifiedTarget'->>'environment'='preview'
-         ORDER BY f."finishedAt" DESC NULLS LAST, f.id DESC LIMIT 1) AS "previewUrl"
+         ORDER BY f."finishedAt" DESC NULLS LAST, f.id DESC LIMIT 1) AS "previewUrl",
+       (SELECT CASE WHEN f.receipt->'verifiedTarget'->'provider'->>'name'='vercel'
+                    THEN f.receipt->'verifiedTarget'->'provider'->>'environment' END
+          FROM factory_publications f
+         WHERE f."taskId"=$1 AND f."candidateId"=c.id AND f.status='succeeded'
+         ORDER BY f."finishedAt" DESC NULLS LAST, f.id DESC LIMIT 1) AS "deploymentEnvironment"
      FROM factory_candidates c WHERE c.id=$2 AND c."taskId"=$1`,
     [task.id, task.candidateId, task.userId],
   );
@@ -121,6 +132,7 @@ export async function factoryTaskDetail(
       pullRequest: d?.pullRequest ?? null,
       previewUrl: url,
       databaseBranch: null,
+      deploymentEnvironment: d?.deploymentEnvironment === "preview" || d?.deploymentEnvironment === "production" ? d.deploymentEnvironment : null,
     },
   };
 }

@@ -68,11 +68,12 @@ test('task detail GET exposes criteria, independence and the B11 header without 
     assert.doesNotMatch(review.criteria[1].text!, /xyz/);
     assert.equal(review.criteria[1].criterionId, null);
     assert.deepEqual(review.verify, { status: 'passed', command: 'pnpm test', exitCode: 0 });
-    assert.deepEqual(detail.delivery, { candidateSha: sha, repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, databaseBranch: null });
+    assert.deepEqual(detail.delivery, { candidateSha: sha, repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, databaseBranch: null, deploymentEnvironment: null }, 'no receipt: deploymentEnvironment null');
 
     await pool.query(`INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,'owner','session:s','s',$5,'{}','{}','deploy_preview','preview','d','[]',1,$4,1,now()+interval '1 hour')`, [approvalId, taskId, candidateId, verifyAttempt, randomUUID()]);
-    await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,'deploy_preview','preview',$5,'{}','succeeded',$6,now())`, [randomUUID(), approvalId, taskId, candidateId, randomUUID(), JSON.stringify({ verifiedTarget: { environment: 'preview', reference: 'https://mikka-git-x.vercel.app' } })]);
+    await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,'deploy_preview','preview',$5,'{}','succeeded',$6,now())`, [randomUUID(), approvalId, taskId, candidateId, randomUUID(), JSON.stringify({ verifiedTarget: { environment: 'preview', reference: 'https://mikka-git-x.vercel.app', provider: { name: 'vercel', environment: 'preview' } } })]);
     assert.equal((await store.read('owner', taskId)).delivery?.previewUrl, 'https://mikka-git-x.vercel.app');
+    assert.equal((await store.read('owner', taskId)).delivery?.deploymentEnvironment, 'preview', 'Vercel target preview');
     // A later, unconfirmed publication must not replace the verified preview.
     const approval2 = randomUUID();
     await pool.query(`INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,'owner','session:s','s',$5,'{}','{}','deploy_preview','preview-2','d','[]',1,$4,1,now()+interval '1 hour')`, [approval2, taskId, candidateId, verifyAttempt, randomUUID()]);
@@ -83,6 +84,14 @@ test('task detail GET exposes criteria, independence and the B11 header without 
     await pool.query(`INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,'owner','session:s','s',$5,'{}','{}','deploy_preview','preview-3','d','[]',1,$4,1,now()+interval '1 hour')`, [approval3, taskId, candidateId, verifyAttempt, randomUUID()]);
     await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,'deploy_preview','preview-3',$5,'{}','succeeded',$6,now()+interval '2 minutes')`, [randomUUID(), approval3, taskId, candidateId, randomUUID(), JSON.stringify({ verifiedTarget: { environment: 'preview', reference: 'http://mikka-git-y.vercel.app' } })]);
     assert.equal((await store.read('owner', taskId)).delivery?.previewUrl, null, 'latest preview is http: null, no fallback');
+    assert.equal((await store.read('owner', taskId)).delivery?.deploymentEnvironment, null, 'receipt without Vercel target: null');
+    // deploymentEnvironment comes only from the receipt's Vercel target; unknown values map to null.
+    for (const [i, name, target, status, want] of [[4, 'vercel', 'production', 'succeeded', 'production'], [5, 'vercel', 'staging', 'succeeded', null], [6, 'netlify', 'production', 'succeeded', null], [7, 'vercel', 'production', 'uncertain', null]] as const) {
+      const a = randomUUID();
+      await pool.query(`INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,'owner','session:s','s',$5,'{}','{}','deploy_preview',$6,'d','[]',1,$4,1,now()+interval '1 hour')`, [a, taskId, candidateId, verifyAttempt, randomUUID(), `env-${i}`]);
+      await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,'deploy_preview',$5,$6,'{}',$9,$7,now()+make_interval(mins => $8))`, [randomUUID(), a, taskId, candidateId, `env-${i}`, randomUUID(), JSON.stringify({ verifiedTarget: { environment: 'preview', reference: 'https://main-branch-production.vercel.app', provider: { name, environment: target } } }), i, status]);
+      assert.equal((await store.read('owner', taskId)).delivery?.deploymentEnvironment, want, `${status} ${name} target ${target}`);
+    }
 
     // Closed status unions: a verify.status outside VERIFY_STATUSES drops verify; an attempt status outside
     // FACTORY_STATUSES drops the row (the CHECK constraint is lifted in this throwaway DB to simulate drift).
