@@ -9,6 +9,8 @@ import { reclaimLostRuns, renewRunLeases } from '@/lib/run-leases'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
 import { skillAssignments } from '@/lib/self-improvement/server'
 import { renewCloudDeviceToken } from '@/lib/computer/cloud-device'
+import { factoryLifecycleEnabled } from '@/lib/factory/runtime'
+import { factoryDispatchRecovery } from '@/lib/factory/dispatch-recovery-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +19,8 @@ export const dynamic = 'force-dynamic'
  * device reports right now. The answer carries the renewed lease of each run
  * the device reports that is still claimed by it, and the runs it no longer
  * holds, which the daemon stops.
- * Afterwards, runs the owner lost on another device are queued again.
+ * Afterwards, runs the owner lost on another device are queued again, and
+ * (Factory on) queued Factory runs that failed to dispatch here are marked resumed once.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
@@ -35,6 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const cloudCredential = caller.scopeDeviceId === deviceId && caller.scopeWorkspaceId
     ? await renewCloudDeviceToken(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId, deviceId, tokenId: caller.tokenId }).catch(() => null)
     : null
+  if (factoryLifecycleEnabled()) after(() => factoryDispatchRecovery.deviceOnline(caller.userId, deviceId).catch((error: unknown) => console.error('Could not resume Factory dispatch', error instanceof Error ? error.message : error)))
   after(() => reclaimLostRuns(caller.userId).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error)))
   return NextResponse.json({ ...result, ...(cloudCredential ? { cloudCredential } : {}) }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
