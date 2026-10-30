@@ -89,8 +89,7 @@ test('reject list: every rule, with separator and case mutations', () => {
   for (const key of ALLOWED_KEYS) assert.equal(isSecretBearingKey(key), false, key)
 })
 
-// QA's value samples were not found on the PR or in the review worktree; these
-// use Tech Lead's examples plus one per pattern. Fake, non-working values.
+// One sample per credential pattern (Tech Lead's examples included). Fake, non-working values.
 // '~' keeps push-protection scanners off these fake samples; it is removed before use.
 const SECRET_VALUES = [
   'sk~_live_FAKEFAKEFAKEFAKEFAKE00', 'token=sk~_live_FAKEFAKEFAKEFAKEFAKE00', 'rk~_test_FAKEFAKEFAKEFAKE00',
