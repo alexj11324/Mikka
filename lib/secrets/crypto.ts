@@ -43,7 +43,7 @@ export function openSecret(sealed: Sealed, aad: string, env?: Record<string, str
   return Buffer.concat([decipher.update(body.subarray(0, body.length - 16)), decipher.final()]).toString('utf8')
 }
 
-/** Binds the ciphertext to its row: moving it to another workspace, kind, scope, environment or name breaks decryption. */
-export const secretAad = (row: { workspaceId: string; kind: string; scopeType: string; scopeRef: string; environment: string; name: string }) =>
-  ['workspace_secret', row.workspaceId.toLowerCase(), row.kind, row.scopeType, row.scopeRef, row.environment, row.name].join('\u0000')
+/** Binds the ciphertext to its row: moving it to another workspace, kind, scope or name breaks decryption. */
+export const secretAad = (row: { workspaceId: string; kind: string; scopeType: string; scopeRef: string; name: string }) =>
+  ['workspace_secret', row.workspaceId.toLowerCase(), row.kind, row.scopeType, row.scopeRef, row.name].join('\u0000')
 export const e2bKeyAad = (workspaceId: string) => ['workspace_e2b_key', workspaceId.toLowerCase()].join('\u0000')

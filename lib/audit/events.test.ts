@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AUDIT_ACTIONS, AUDIT_SECRET_KEY_EXEMPT, AUDIT_CATEGORIES, AUDIT_METADATA, AuditEventError, auditCategory, auditRequestContext, isSecretBearingKey, looksLikeSecretValue, toAuditRow, type AuditEvent, type AuditMetadata } from './events'
+import { AUDIT_ACTIONS, AUDIT_CATEGORIES, AuditEventError, auditCategory, auditRequestContext, looksLikeSecretValue, toAuditRow, type AuditEvent, type AuditMetadata } from './events'
 
 const ws = '7b0f3c9e-2d4a-4e1b-9c3d-5f6a7b8c9d0e'
 const base: AuditEvent = { workspaceId: ws, actor: { type: 'user', id: 'u1', name: 'Alex' }, action: 'member.removed', target: { type: 'member', id: 'u2', label: 'Mia' } }
@@ -38,9 +38,10 @@ test('rejects bad workspace, unknown action and bad target', () => {
   assert.deepEqual([toAuditRow({ ...base, target: null }).targetType, toAuditRow({ ...base, target: null }).targetLabel], [null, null])
 })
 
-test('metadata never carries secret-bearing keys, at any depth', () => {
-  for (const key of ['value', 'Token', 'api_key', 'apiKey', 'password', 'client-secret', 'tokenHash'])
-    assert.throws(() => toAuditRow({ ...base, metadata: { nested: [{ [key]: 'x' }] } }), /secret-bearing/, key)
+test('metadata: strict per-action keys only, one size cap', () => {
+  for (const key of ['value', 'Token', 'api_key', 'password', 'nested'])
+    assert.throws(() => toAuditRow({ ...base, metadata: { [key]: 'x' } }), /allowlist for member.removed: unexpected/, key)
+  assert.throws(() => toAuditRow({ ...base, action: 'secret.created', metadata: { scope: 'repo', nested: { value: 'x' } } }), /unexpected nested/)
   assert.doesNotThrow(() => toAuditRow({ ...base, action: 'secret.created', target: { type: 'secret', label: 'VERCEL_TOKEN' }, metadata: { scope: 'repo' } }))
   assert.throws(() => toAuditRow({ ...base, metadata: { blob: 'x'.repeat(5000) } }), /too large/)
   assert.throws(() => toAuditRow({ ...base, metadata: [] as unknown as Record<string, unknown> }), /object/)
@@ -74,55 +75,6 @@ test('billing is prepaid credits: no plan or subscription actions, secret.delete
   assert.equal(AUDIT_ACTIONS['secret.deleted'], 'secret')
 })
 
-// QA's 19 mutated keys (Tech Lead, 2026-10-29) plus separator/case mutations of each rule.
-const MUTATED_SECRET_KEYS = [
-  'githubToken', 'stripeSecretKey', 'webhookSecret', 'secretKey', 'sessionToken', 'bearer', 'credential', 'credentials', 'passwd', 'pwd',
-  'jwt', 'setCookie', 'x-api-key', 'accessKey', 'privateKeyPem', 'signingSecret', 'dsn', 'connectionString', 'otp',
-  'Value', 'plain_text', 'access-token', 'REFRESH_TOKEN', 'clientSecret', 'db_passwd', 'userPwd', 'api.key', 'awsCredentials',
-  'id_jwt', 'Bearer', 'set-cookie', 'SENTRY_DSN', 'connection_string', 'PRIVATE-KEY', 'aws_secret_access_key', 'otp_code',
-  'stripeKey', 'webhook-signing-key', 'Authorization', 'proxy_authorization', 'x-auth', 'authHeader', 'basic_auth', 'auth_code',
-]
-// Tech Lead's false-positive list: describe a secret but cannot hold one.
-const ALLOWED_KEYS = [
-  'idempotencyKey', 'primaryKey', 'otpEnabled', 'footprint', 'oauth', 'pan',
-  'author', 'authorName', 'author_id', 'name', 'kind', 'scope', 'from', 'to', 'monkeys_count', 'keyword', 'keyPrefix',
-]
-// Strong secret words reject even with a safe suffix (Tech Lead, #432 round 3).
-const STRONG_SUFFIXED_KEYS = [
-  'tokenValueName', 'apiKeyPrefix', 'secretKeyId', 'passwordId', 'accessTokenCount', 'sessionTokenChanged', 'token_name',
-  'secretName', 'tokenName', 'tokenId', 'tokenCount', 'passwordChanged', 'secretLabel', 'privateKeyLabel', 'API_KEY_ENABLED',
-]
-
-test('reject list: every rule, with separator and case mutations', () => {
-  for (const key of MUTATED_SECRET_KEYS) assert.throws(() => toAuditRow({ ...base, metadata: { deep: { [key]: 'x' } } }), /secret-bearing key/, key)
-  for (const key of ALLOWED_KEYS) assert.equal(isSecretBearingKey(key), false, key)
-  for (const key of STRONG_SUFFIXED_KEYS) {
-    assert.equal(isSecretBearingKey(key), true, key)
-    assert.throws(() => toAuditRow({ ...base, metadata: { [key]: 'x' } }), /secret-bearing key/, key)
-  }
-})
-
-test('per-action exemption: token.created may carry tokenName, nothing else may', () => {
-  const token = { ...base, action: 'token.created' as const }
-  assert.equal(toAuditRow({ ...token, metadata: { tokenName: 'CI deploy' } }).metadata.tokenName, 'CI deploy')
-  assert.throws(() => toAuditRow({ ...token, metadata: { tokenId: 'x' } }), /secret-bearing key/)
-  assert.throws(() => toAuditRow({ ...token, metadata: { token_name: 'x' } }), /secret-bearing key/)
-  assert.throws(() => toAuditRow({ ...base, action: 'token.revoked', metadata: { tokenName: 'x' } }), /secret-bearing key/)
-  assert.throws(() => toAuditRow({ ...base, action: 'secret.created', metadata: { tokenName: 'x' } }), /secret-bearing key/)
-  // the exemption is exact, top-level and per action
-  assert.throws(() => toAuditRow({ ...token, metadata: { tokenName: { tokenName: 'x' } } as never }), /secret-bearing key metadata\.tokenName\.tokenName/)
-  assert.throws(() => toAuditRow({ ...token, metadata: { TokenName: 'x' } as never }), /secret-bearing key metadata\.TokenName/)
-  assert.throws(() => toAuditRow({ ...base, action: 'member.invited', metadata: { tokenName: 'x' } as never }), /secret-bearing key metadata\.tokenName/)
-  // the exemption covers the key only; its value is still scanned
-  assert.throws(() => toAuditRow({ ...token, metadata: { tokenName: 'gh~p_abcdefghijklmnopqrstuvwxyz0123456789'.replace('~', '') } }), /secret-bearing value/)
-})
-
-test('network_policy host counts are bounded ints', () => {
-  const np = { ...base, action: 'network_policy.updated' as const }
-  assert.doesNotThrow(() => toAuditRow({ ...np, metadata: { addedHosts: 0, removedHosts: 1000 } }))
-  for (const bad of [-1, 1001, 1.5]) assert.throws(() => toAuditRow({ ...np, metadata: { addedHosts: bad } }), /allowlist/, String(bad))
-})
-
 // One sample per credential pattern (Tech Lead's examples included). Fake, non-working values.
 // '~' keeps push-protection scanners off these fake samples; it is removed before use.
 const SECRET_VALUES = [
@@ -143,16 +95,12 @@ test('credential-shaped values are rejected anywhere in a string; look-alikes pa
   assert.doesNotThrow(() => toAuditRow({ ...base, action: 'workspace.slug_changed', metadata: { from: 'Eyjafjallajokull', to: 'xoxo hugs' } }))
 })
 
-test('metadata is a per-action allowlist; every allowlisted key passes the blacklist', () => {
-  for (const [action, schema] of Object.entries(AUDIT_METADATA))
-    for (const key of Object.keys((schema as { shape: Record<string, unknown> }).shape)) {
-      const exempt = AUDIT_SECRET_KEY_EXEMPT[action as keyof typeof AUDIT_ACTIONS]?.includes(key) ?? false
-      assert.equal(isSecretBearingKey(key), exempt, `${action}.${key}`) // exempt keys are exactly the strong-word keys an action opts into
-    }
+test('metadata is a per-action allowlist', () => {
   const ok: Array<[keyof typeof AUDIT_ACTIONS, Record<string, unknown>]> = [
     ['member.role_changed', { oldRole: 'member', newRole: 'admin' }],
     ['integration.permission_changed', { integration: 'Slack', capability: 'write', from: 'allow', to: 'deny' }],
     ['auth.signed_in', { newDevice: true, method: 'password' }],
+    ['token.created', { tokenName: 'CI deploy' }],
   ]
   for (const [action, metadata] of ok) assert.deepEqual(toAuditRow({ ...base, action, metadata }).metadata, metadata, action)
   assert.equal(auditCategory('integration.permission_changed'), 'permission')
@@ -164,23 +112,15 @@ test('metadata is a per-action allowlist; every allowlisted key passes the black
   assert.ok(typed)
 })
 
-test('key suffix: a trailing `key` word is secret, words merely ending in "key" are not', () => {
-  for (const key of ['monkey', 'turkey', 'hockey', 'jockey', 'whiskey', 'Monkey', 'monkeyCount']) assert.equal(isSecretBearingKey(key), false, key)
-  for (const key of ['key', 'KEY', 'Key']) assert.equal(isSecretBearingKey(key), true, `bare ${key}`)
-  // Plural follows the same rule: bare keys/KEYS and a trailing `keys` word are secret; monkeys/hockeys are not.
-  for (const key of ['keys', 'KEYS', 'Keys', 'apiKeys', 'api_keys', 'SIGNING_KEYS']) assert.equal(isSecretBearingKey(key), true, `plural ${key}`)
-  for (const key of ['monkeys', 'hockeys', 'turkeys', 'Monkeys', 'monkeys_count']) assert.equal(isSecretBearingKey(key), false, key)
-  for (const key of ['apiKey', 'api_key', 'API_KEY', 'apikey', 'secretKey', 'secret_key', 'privateKey', 'private-key', 'privatekey', 'accessKey', 'signingKey', 'signing_key', 'SIGNING_KEY', 'encryptionKey', 'masterKey'])
-    assert.equal(isSecretBearingKey(key), true, key)
-  // passes the secret scan; only the per-action allowlist rejects it
-  assert.throws(() => toAuditRow({ ...base, metadata: { deep: { monkey: 'banana' } } }), /allowlist/)
-})
-
 test('Basic credentials are matched case-insensitively', () => {
   const b64 = Buffer.from('alice:hunter2pass').toString('base64')
   for (const prefix of ['Basic', 'BASIC', 'basic', 'bAsIc']) {
     assert.equal(looksLikeSecretValue(`${prefix} ${b64}`), true, prefix)
-    assert.throws(() => toAuditRow({ ...base, metadata: { deep: { note: `Authorization: ${prefix} ${b64}` } } }), /secret-bearing value/, prefix)
+    assert.throws(() => toAuditRow({ ...base, action: 'workspace.slug_changed', metadata: { from: 'a', to: `Authorization: ${prefix} ${b64}` } }), /secret-bearing value/, prefix)
   }
   assert.equal(looksLikeSecretValue(`BASIC ${Buffer.from('no colon here').toString('base64')}`), false)
+})
+
+test('a credential-shaped label value is still rejected (tokenName)', () => {
+  assert.throws(() => toAuditRow({ ...base, action: 'token.created', metadata: { tokenName: 'gh~p_abcdefghijklmnopqrstuvwxyz0123456789'.replace('~', '') } }), /secret-bearing value at metadata.tokenName/)
 })

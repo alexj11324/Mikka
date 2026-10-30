@@ -126,16 +126,13 @@ export function createFactoryDispatchRecovery(pool: Pool, cloudKeyConfigured: Cl
    * The run row stays queued, so the daemon's next claim starts it; nothing is queued twice.
    *
    * Single-dispatch guarantee: `ON CONFLICT ("dedupeKey") DO NOTHING` in insertEvent, and only a
-   * caller whose insert actually wrote a row (rowCount 1) counts the run as resumed. The per-device
-   * advisory lock, `FOR UPDATE OF r` and `SKIP LOCKED` only reduce contention between concurrent
-   * heartbeats; they are not what makes it correct (removing any of them still passes the
-   * concurrency test).
+   * caller whose insert actually wrote a row (rowCount 1) counts the run as resumed. `FOR UPDATE OF r`
+   * and `SKIP LOCKED` only reduce contention between concurrent heartbeats.
    */
   async function deviceOnline(userId: string, deviceId: string, wasUnavailable = false): Promise<string[]> {
     const tx = await pool.connect();
     try {
       await tx.query('BEGIN');
-      await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['factory-redispatch', userId, deviceId])]);
       const { rows: [device] } = await tx.query('SELECT id,name,enabled,"lastSeenAt",harnesses FROM devices WHERE id=$1 AND "ownerId"=$2', [deviceId, userId]);
       if (!device || !factoryDeviceOnline(device, now())) { await tx.query('COMMIT'); return []; }
       const { rows } = await tx.query(`SELECT r.id AS "runId", r."issueId", r."botId", t.id AS "taskId"

@@ -87,7 +87,7 @@ test('dispatch failure, status and exactly-once re-dispatch on a real database',
     assert.equal((await recovery.status('owner', a.taskId))?.cloudDispatchAvailable, false, 'cloud dispatch off until #438');
 
     // QA: two re-dispatches racing on a fresh run, 20 rounds. Exactly one run_redispatched row per run,
-    // one winner, nothing rejected. The dedupeKey unique constraint is the backstop; the advisory lock only cuts conflicts.
+    // one winner, nothing rejected. The dedupeKey unique constraint is what guarantees it.
     for (let round = 0; round < 20; round++) {
       const c = await task();
       const settled = await Promise.allSettled([recovery.deviceOnline('owner', deviceId, true), recovery.deviceOnline('owner', deviceId, true)]);

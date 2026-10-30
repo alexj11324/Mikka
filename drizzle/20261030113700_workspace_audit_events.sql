@@ -3,7 +3,7 @@
 -- Members live in the workspace database (DATABASE_URL), so the actor's display
 -- name and the target's label are snapshotted at write time ("actorName",
 -- "targetLabel") and never joined later. metadata must never hold secret values;
--- lib/audit/record.ts rejects known secret-bearing keys before insert.
+-- lib/audit/events.ts allows only per-action metadata keys (strict schemas).
 -- ip is stored for admins/forensics but never returned by the query API.
 -- Writer: lib/audit/record.ts. Query API (later PR) pages on
 -- ("workspaceId", "createdAt" DESC, id DESC), optionally filtered by category.

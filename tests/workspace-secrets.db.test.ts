@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
-test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
+test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   const previousKey = process.env.WORKSPACE_SECRETS_KEY
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   const { Pool } = await import('pg')
@@ -26,7 +26,7 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
   const secretCrypto = await import('../lib/secrets/crypto')
   /** Test-only read-back of the stored value (no endpoint returns it any more). */
   const stored = async (id: string) => { const { rows: [row] } = await pool.query('select * from workspace_secrets where id=$1', [id]); return secretCrypto.openSecret(row, secretCrypto.secretAad(row)) }
-  const META_KEYS = ['environment', 'id', 'kind', 'name', 'scopeRef', 'scopeType']
+  const META_KEYS = ['id', 'kind', 'name', 'scopeRef', 'scopeType']
 
   await t.test('secret value is never returned; DB holds ciphertext only', async () => {
     const created = await store.createWorkspaceSecret(admin, ws.id, { name: 'STRIPE_KEY', kind: 'secret', value: SECRET })
@@ -34,7 +34,7 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     const replaced = await store.replaceWorkspaceSecret(admin, ws.id, { id: created.id, value: SECRET + 'x' })
     const listed = await store.listWorkspaceSecrets(admin, ws.id)
     assert.ok(!JSON.stringify([created, replaced, listed]).includes(SECRET))
-    for (const row of listed) assert.deepEqual(Object.keys(row).sort(), META_KEYS, 'list: name/kind/scopeType/scopeRef/environment (+id handle) only')
+    for (const row of listed) assert.deepEqual(Object.keys(row).sort(), META_KEYS, 'list: name/kind/scopeType/scopeRef (+id handle) only')
     const { rows } = await pool.query('select * from workspace_secrets where id=$1', [created.id])
     assert.ok(!JSON.stringify(rows).includes(SECRET), 'no plaintext in the row')
     assert.equal(rows[0].keyVersion, 1)
@@ -56,9 +56,8 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
   await t.test('members only (outsiders denied) and workspace scoped', async () => {
     const outsider = await seedUser(pool, 'outsider')
     await rejects(store.listWorkspaceSecrets(outsider, ws.id), 'workspaceAccessDenied')
-    await rejects(store.createWorkspaceSecret(outsider, ws.id, { name: 'X', kind: 'env', value: 'v', scope: { type: 'repository', repository: 'o/r' }, environment: 'preview' }), 'workspaceAccessDenied')
+    await rejects(store.createWorkspaceSecret(outsider, ws.id, { name: 'X', kind: 'env', value: 'v', scope: { type: 'repository', repository: 'o/r' } }), 'workspaceAccessDenied')
     await rejects(e2b.getE2BKeyStatus(outsider, ws.id), 'workspaceAccessDenied')
-    await rejects(store.getNetworkPolicy(outsider, ws.id), 'workspaceAccessDenied')
     const [mine] = await store.listWorkspaceSecrets(admin, ws.id)
     await rejects(store.replaceWorkspaceSecret(admin, other.id, { id: mine.id, value: 'v' }), 'secretNotFound')
     await rejects(store.deleteWorkspaceSecret(admin, other.id, { id: mine.id }), 'secretNotFound')
@@ -98,22 +97,11 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     assert.equal(rows.length, 0)
   })
 
-  await t.test('egress: open by default, three modes only, domains validated per line', async () => {
-    assert.deepEqual(await store.getNetworkPolicy(admin, ws.id), { mode: 'open', allowedDomains: [], updatedAt: null })
-    const saved = await store.updateNetworkPolicy(admin, ws.id, { mode: 'allowlist', allowedDomains: ['github.com', '*.mikka.app', ''] })
-    assert.deepEqual([saved.mode, saved.allowedDomains], ['allowlist', ['github.com', '*.mikka.app']])
-    await assert.rejects(store.updateNetworkPolicy(admin, ws.id, { mode: 'allowlist', allowedDomains: ['ok.com', 'bad domain'] }), (error: unknown) => error instanceof store.EgressDomainError && error.lines.join() === '2')
-    await assert.rejects(store.updateNetworkPolicy(admin, ws.id, { mode: 'deny', allowedDomains: [] }))
-    for (const mode of ['deny', 'all', '', 'OPEN'])
-      await assert.rejects(pool.query(`update workspace_network_policy set mode=$1 where "workspaceId"=$2`, [mode, ws.id]), (error: { code?: string }) => error.code === '23514', mode)
-    assert.equal((await store.updateNetworkPolicy(admin, ws.id, { mode: 'none', allowedDomains: [] })).mode, 'none')
-  })
-
   await t.test('E2B key: verified before save, write-only, audited as secret.* with label "E2B API Key"', async () => {
-    await pool.query('delete from workspace_e2b_verify_attempts')
     const KEY = 'e2b_' + randomBytes(16).toString('hex')
     await rejects(e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: false, code: 'invalid' }) }), 'e2bKeyInvalid')
     await rejects(e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: false, code: 'unavailable' }) }), 'e2bKeyUnverifiable')
+    await rejects(e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: false, code: 'rate_limited' }) }), 'e2bKeyRateLimited') // E2B answered 429
     assert.equal((await e2b.getE2BKeyStatus(admin, ws.id)).configured, false, 'nothing saved on failure')
     const events: string[] = []
     const status = await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }), audit: async (_tx, e) => { events.push(`${e.action}:${e.target.type}:${e.target.label}`) } })
@@ -124,29 +112,10 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     const { rows } = await pool.query('select * from workspace_e2b_keys where "workspaceId"=$1', [ws.id])
     assert.ok(!JSON.stringify(rows).includes(KEY), 'ciphertext only')
     await e2b.setE2BKey(admin, ws.id, { apiKey: KEY + 'z' }, { verify: async () => ({ ok: true }), audit: async (_tx, e) => { events.push(`${e.action}:${e.target.type}:${e.target.label}`) } })
-    await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) }) // 5th attempt in the window
-    await rejects(e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) }), 'e2bKeyRateLimited')
+    await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) }) // no hook
     assert.deepEqual((await e2b.removeE2BKey(admin, ws.id, async (_tx, e) => { events.push(`${e.action}:${e.target.type}:${e.target.label}`) })), { removed: true })
-    assert.deepEqual(events, ['secret.created:e2b_key:E2B API Key', 'secret.replaced:e2b_key:E2B API Key', 'secret.deleted:e2b_key:E2B API Key'] /* 5th set used no hook */)
+    assert.deepEqual(events, ['secret.created:e2b_key:E2B API Key', 'secret.replaced:e2b_key:E2B API Key', 'secret.deleted:e2b_key:E2B API Key'] /* the third set used no hook */)
     assert.deepEqual(await e2b.removeE2BKey(admin, ws.id), { removed: false })
-  })
-
-  await t.test('E2B verify limit is in Postgres: 10 parallel attempts admit exactly 5; window slides; per workspace', async () => {
-    await pool.query('delete from workspace_e2b_verify_attempts')
-    const now = new Date()
-    const results = await Promise.all(Array.from({ length: 10 }, () => e2b.takeVerifyAttempt(ws.id, now)))
-    assert.equal(results.filter(Boolean).length, 5)
-    assert.equal((await pool.query('select count(*)::int n from workspace_e2b_verify_attempts where "workspaceId"=$1', [ws.id])).rows[0].n, 5)
-    assert.equal(await e2b.takeVerifyAttempt(other.id, now), true, 'other workspace unaffected')
-    assert.equal(await e2b.takeVerifyAttempt(ws.id, new Date(now.getTime() + e2b.VERIFY_WINDOW_MS - 1)), false)
-    assert.equal(await e2b.takeVerifyAttempt(ws.id, new Date(now.getTime() + e2b.VERIFY_WINDOW_MS)), true, 'old attempts expire')
-    // through setE2BKey: failed checks count, the 6th is refused before E2B is called
-    await pool.query('delete from workspace_e2b_verify_attempts')
-    let calls = 0
-    const settled = await Promise.allSettled(Array.from({ length: 10 }, () => e2b.setE2BKey(admin, ws.id, { apiKey: 'e2b_' + randomBytes(16).toString('hex') }, { verify: async () => { calls++; return { ok: false, code: 'invalid' } } })))
-    assert.equal(calls, 5)
-    assert.equal(settled.filter(r => r.status === 'rejected' && (r.reason as { code?: string }).code === 'e2bKeyRateLimited').length, 5)
-    await pool.query('delete from workspace_e2b_verify_attempts')
   })
 
   await t.test('saving a value shorter than 8 chars returns shortValueNotMasked', async () => {
@@ -159,7 +128,6 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
   })
 
   await t.test('E2B key delete: admin only; afterwards dispatch sees no key', async () => {
-    await pool.query('delete from workspace_e2b_verify_attempts')
     const KEY = 'e2b_' + randomBytes(16).toString('hex')
     const on = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, E2B_API_KEY: 'platform', MIKKA_BYO_E2B_KEY: '1' }
     await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) })
@@ -169,11 +137,9 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     assert.deepEqual(await e2b.removeE2BKey(admin, ws.id), { removed: true })
     await assert.rejects(e2b.getWorkspaceE2BApiKey(ws.id, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_missing')
     assert.equal(await e2b.getWorkspaceE2BApiKey(ws.id, { ...on, MIKKA_BYO_E2B_KEY: '0' }), 'platform')
-    await pool.query('delete from workspace_e2b_verify_attempts')
   })
 
   await t.test('BYO E2B getter: off = platform key (unchanged); on = workspace key or e2b_key_missing', async () => {
-    await pool.query('delete from workspace_e2b_verify_attempts')
     const PLATFORM = 'platform_' + randomBytes(8).toString('hex'), KEY = 'e2b_' + randomBytes(16).toString('hex')
     const base = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, E2B_API_KEY: PLATFORM }
     assert.equal(await e2b.getWorkspaceE2BApiKey(other.id, base), PLATFORM)
@@ -201,13 +167,8 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     await store.createWorkspaceSecret(admin, third.id, { name: 'SHORT', kind: 'secret', value: 'abc1234' })
     await store.createWorkspaceSecret(admin, third.id, { name: 'REGION', kind: 'env', value: 'us-east-1-long' })
     await store.createWorkspaceSecret(admin, third.id, { name: 'REPO_ONLY', kind: 'secret', value: 'repo-scoped-value', scope: { type: 'repository', repository: 'acme/app' } })
-    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, 'production', off), {}, 'flag off: nothing injected')
-    await store.createWorkspaceSecret(admin, third.id, { name: 'PROD_ONLY', kind: 'env', value: 'prod-value', environment: 'production' })
-    await store.createWorkspaceSecret(admin, third.id, { name: 'PREVIEW_ONLY', kind: 'secret', value: 'preview-secret-value', environment: 'preview' })
-    await store.createWorkspaceSecret(admin, third.id, { name: 'DEV_ONLY', kind: 'secret', value: 'dev-secret-value', environment: 'development' })
-    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, 'production', on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long', PROD_ONLY: 'prod-value' }, 'only environment all + production are injected')
-    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, 'preview', on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long', PREVIEW_ONLY: 'preview-secret-value' }, '4e3: a preview run gets all + preview, never production')
-    assert.equal((await runtime.workspaceSecretMasker(third.id, on))('preview-secret-value dev-secret-value'), '[secret:PREVIEW_ONLY] [secret:DEV_ONLY]', 'every injectable value is masked, whatever its environment (preview and development included)')
+    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, off), {}, 'flag off: nothing injected')
+    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long' }, 'workspace-scoped values are injected; repo-scoped ones only for their repo')
     const chunk = { type: 'text-delta', delta: `push ${TOKEN} b64=${Buffer.from(TOKEN).toString('base64')} short=abc1234 region=us-east-1-long`, nested: [{ url: `https://x/?t=${encodeURIComponent(TOKEN)}` }] }
     const offMask = await runtime.workspaceSecretMasker(third.id, off)
     assert.deepEqual(maskDeep(chunk, offMask), chunk, 'flag off: stored verbatim (today)')
@@ -219,10 +180,10 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     const otherMask = await runtime.workspaceSecretMasker(other.id, on)
     assert.ok(otherMask(TOKEN) === TOKEN, 'another workspace does not mask this one\'s values')
     assert.equal((await runtime.workspaceSecretMasker(null, on))('x'), 'x')
-    await assert.rejects(runtime.taskSecretEnv(third.id, null, 'production', { MIKKA_BYO_E2B_KEY: '1' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
+    await assert.rejects(runtime.taskSecretEnv(third.id, null, { MIKKA_BYO_E2B_KEY: '1' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
   })
 
-  await t.test('4e3 task env: workspace + matching repo only, repo overrides, all/production, lowercase; masker covers repo secrets', async () => {
+  await t.test('4e3 task env: workspace + matching repo only, repo overrides, lowercase; masker covers repo secrets', async () => {
     const runtime = await import('../lib/secrets/runtime')
     const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
     const on = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, MIKKA_BYO_E2B_KEY: '1' }, off = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
@@ -230,13 +191,12 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     await store.createWorkspaceSecret(admin, w.id, { name: 'API_TOKEN', kind: 'secret', value: 'workspace-api-token' })
     await store.createWorkspaceSecret(admin, w.id, { name: 'REGION', kind: 'env', value: 'ws-region' })
     await store.createWorkspaceSecret(admin, w.id, { name: 'API_TOKEN', kind: 'secret', value: REPO_TOKEN, scope: { type: 'repository', repository: 'Acme/App' } })
-    await store.createWorkspaceSecret(admin, w.id, { name: 'REPO_ENV', kind: 'env', value: 'repo-prod', environment: 'production', scope: { type: 'repository', repository: 'acme/app' } })
-    await store.createWorkspaceSecret(admin, w.id, { name: 'REPO_PREVIEW', kind: 'secret', value: 'repo-preview-value', environment: 'preview', scope: { type: 'repository', repository: 'acme/app' } })
+    await store.createWorkspaceSecret(admin, w.id, { name: 'REPO_ENV', kind: 'env', value: 'repo-env', scope: { type: 'repository', repository: 'acme/app' } })
     await store.createWorkspaceSecret(admin, w.id, { name: 'OTHER', kind: 'secret', value: OTHER_TOKEN, scope: { type: 'repository', repository: 'acme/other' } })
-    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'acme/app', 'production', off), {}, 'flag off: nothing')
-    assert.deepEqual(await runtime.taskSecretEnv(w.id, null, 'production', on), { API_TOKEN: 'workspace-api-token', REGION: 'ws-region' }, 'no repo: workspace only')
-    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'ACME/App', 'production', on), { API_TOKEN: REPO_TOKEN, REGION: 'ws-region', REPO_ENV: 'repo-prod' }, 'repo overrides workspace; case-insensitive; no preview; no other repo')
-    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'acme/unknown', 'production', on), { API_TOKEN: 'workspace-api-token', REGION: 'ws-region' })
+    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'acme/app', off), {}, 'flag off: nothing')
+    assert.deepEqual(await runtime.taskSecretEnv(w.id, null, on), { API_TOKEN: 'workspace-api-token', REGION: 'ws-region' }, 'no repo: workspace only')
+    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'ACME/App', on), { API_TOKEN: REPO_TOKEN, REGION: 'ws-region', REPO_ENV: 'repo-env' }, 'repo overrides workspace; case-insensitive; no other repo')
+    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'acme/unknown', on), { API_TOKEN: 'workspace-api-token', REGION: 'ws-region' })
     assert.equal(runtime.remoteRepositoryRef('https://github.com/Acme/App.git'), 'acme/app')
     assert.equal(runtime.remoteRepositoryRef('git@github.com:Acme/App.git'), 'acme/app')
     assert.equal(runtime.remoteRepositoryRef('ssh://git@github.com/acme/app'), 'acme/app')
@@ -245,16 +205,8 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     assert.equal(runtime.remoteRepositoryRef('https://gitlab.com/acme/app.git'), null)
     assert.equal(runtime.remoteRepositoryRef('https://github.com/acme/../app'), null)
     assert.equal(runtime.remoteRepositoryRef(null), null)
-    assert.deepEqual(await runtime.taskSecretEnv(w.id, 'acme/app', 'preview', on), { API_TOKEN: REPO_TOKEN, REGION: 'ws-region', REPO_PREVIEW: 'repo-preview-value' }, 'preview run: repo preview value, no production value')
-    await store.createWorkspaceSecret(admin, w.id, { name: 'REGION', kind: 'env', value: 'ws-region-prod', environment: 'production' })
-    assert.equal((await runtime.taskSecretEnv(w.id, null, 'production', on)).REGION, 'ws-region-prod', 'the specific environment beats all')
-    assert.equal((await runtime.taskSecretEnv(w.id, null, 'preview', on)).REGION, 'ws-region')
     const mask = await runtime.workspaceSecretMasker(w.id, on)
-    assert.equal(mask(`${REPO_TOKEN} ${OTHER_TOKEN} repo-prod`), '[secret:API_TOKEN] [secret:OTHER] repo-prod', 'repo-scoped secrets masked; env not')
-    assert.equal(mask('repo-preview-value'), '[secret:REPO_PREVIEW]')
-    await store.createWorkspaceSecret(admin, w.id, { name: 'REPO_DEV', kind: 'secret', value: 'repo-dev-secret-value', environment: 'development', scope: { type: 'repository', repository: 'acme/app' } })
-    const devMask = await runtime.workspaceSecretMasker(w.id, on)
-    assert.equal(devMask('repo-preview-value repo-dev-secret-value'), '[secret:REPO_PREVIEW] [secret:REPO_DEV]', 'a preview value and a development value are both masked once injectable')
+    assert.equal(mask(`${REPO_TOKEN} ${OTHER_TOKEN} repo-env`), '[secret:API_TOKEN] [secret:OTHER] repo-env', 'repo-scoped secrets masked; env not')
   })
 
   await t.test('#436 defense in depth: a reserved name reaching injection is skipped and audited by name only', async () => {
@@ -324,13 +276,13 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
   }
 
   await t.test('crypto: same plaintext twice gives different iv and ciphertext; AAD binds workspace, scope, kind and name', () => {
-    const aad = crypto.secretAad({ workspaceId: ws.id, kind: 'secret', scopeType: 'workspace', scopeRef: '', environment: 'all', name: 'N' })
+    const aad = crypto.secretAad({ workspaceId: ws.id, kind: 'secret', scopeType: 'workspace', scopeRef: '', name: 'N' })
     const one = crypto.sealSecret(SECRET, aad), two = crypto.sealSecret(SECRET, aad)
     assert.notEqual(one.iv, two.iv); assert.notEqual(one.ciphertext, two.ciphertext)
     assert.equal(Buffer.from(one.iv, 'base64').length, 12)
     assert.equal(crypto.openSecret(one, aad), SECRET); assert.equal(crypto.openSecret(two, aad), SECRET)
-    for (const moved of [{ workspaceId: other.id }, { name: 'M' }, { kind: 'env' as const }, { scopeType: 'repository' as const, scopeRef: 'o/r' }, { environment: 'production' }])
-      assert.throws(() => crypto.openSecret(one, crypto.secretAad({ workspaceId: ws.id, kind: 'secret', scopeType: 'workspace', scopeRef: '', environment: 'all', name: 'N', ...moved })), JSON.stringify(moved))
+    for (const moved of [{ workspaceId: other.id }, { name: 'M' }, { kind: 'env' as const }, { scopeType: 'repository' as const, scopeRef: 'o/r' }])
+      assert.throws(() => crypto.openSecret(one, crypto.secretAad({ workspaceId: ws.id, kind: 'secret', scopeType: 'workspace', scopeRef: '', name: 'N', ...moved })), JSON.stringify(moved))
   })
 
   await t.test('moved ciphertext: list never decrypts (metadata only), so it still works and logs nothing; the moved row fails to open', async () => {
@@ -347,7 +299,6 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
   })
 
   await t.test('moved E2B key fails to decrypt: e2b_unavailable, never the raw crypto Error, one id-only log line', async () => {
-    await pool.query('delete from workspace_e2b_verify_attempts')
     const a = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }]), b = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
     const K = 'e2b_' + randomBytes(16).toString('hex'), on = { MIKKA_BYO_E2B_KEY: '1', WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
     await e2b.setE2BKey(admin, a.id, { apiKey: K }, { verify: async () => ({ ok: true }) })
@@ -358,7 +309,6 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     assert.ok(error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable', 'mapped, not the raw crypto Error')
     assert.deepEqual(lines, [`[secrets] e2b_unavailable id=${b.id}`])
     assert.ok(!JSON.stringify([error, String((error as Error).stack), lines]).includes(K))
-    await pool.query('delete from workspace_e2b_verify_attempts')
   })
 
   await t.test('DB failures become a generic SecretsStoreError: params, ciphertext and iv never reach logs or the caller', async () => {
@@ -399,34 +349,6 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     assert.deepEqual([...new Set(results.flatMap(r => r.status === 'rejected' ? [r.reason instanceof WorkspaceError ? r.reason.code : String(r.reason)] : []))], ['secretLimitReached'])
   })
 
-  await t.test('E2B verify limiter admits exactly 5 of 10 concurrent attempts (advisory lock e2b.ts)', async () => {
-    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
-    let calls = 0
-    const now = new Date()
-    const results = await Promise.allSettled(Array.from({ length: 10 }, () => e2b.setE2BKey(admin, w.id, { apiKey: 'e2b_' + randomBytes(16).toString('hex') }, { now, verify: async () => { calls++; return { ok: false, code: 'invalid' } } })))
-    const codes = results.map(r => r.status === 'rejected' && r.reason instanceof WorkspaceError ? r.reason.code : 'other')
-    assert.equal(codes.filter(c => c === 'e2bKeyInvalid').length, 5); assert.equal(codes.filter(c => c === 'e2bKeyRateLimited').length, 5); assert.equal(calls, 5)
-    await pool.query('delete from workspace_e2b_verify_attempts where "workspaceId"=$1', [w.id])
-  })
-
-  await t.test('egress: admin check before validation, 200-domain limit with real count, 1-based lines, no IPs, open/none keep the allowlist', async () => {
-    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
-    await rejects(store.updateNetworkPolicy(member, w.id, { mode: 'bogus', allowedDomains: ['bad domain'] }), 'secretPermissionDenied')
-    await rejects(store.updateNetworkPolicy(member, w.id, { mode: 'allowlist', allowedDomains: Array.from({ length: 300 }, (_, i) => `d${i}.com`) }), 'secretPermissionDenied')
-    const many = (n: number) => Array.from({ length: n }, (_, i) => `d${i}.com`)
-    assert.equal((await store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: [...many(200), '', 'D0.COM', 'd1.com.'] })).allowedDomains.length, 200)
-    await assert.rejects(store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: [...many(205), '', 'd0.com'] }), (error: unknown) => error instanceof store.EgressTooManyDomainsError && error.code === 'egressTooManyDomains' && error.count === 205)
-    await assert.rejects(store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: ['ok.com', '1.2.3.4', 'x.com', '::1'] }), (error: unknown) => error instanceof store.EgressDomainError && error.lines.join() === '2,4')
-    const list = ['github.com', '*.mikka.app']
-    await store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: list })
-    for (const mode of ['open', 'none'] as const) {
-      const saved = await store.updateNetworkPolicy(admin, w.id, { mode, allowedDomains: ['ignored.com'] })
-      assert.deepEqual([saved.mode, saved.allowedDomains], [mode, list], `${mode} keeps the stored allowlist`)
-    }
-    const fresh = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
-    assert.deepEqual((await store.updateNetworkPolicy(admin, fresh.id, { mode: 'none' })).allowedDomains, [])
-  })
-
   await t.test('repository scope: . and .. rejected; owner/repo stored and compared lowercase', async () => {
     const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
     for (const repository of ['../x', 'o/..', './.', 'o/.']) await assert.rejects(store.createWorkspaceSecret(admin, w.id, { name: 'R', kind: 'env', value: 'repo-value', scope: { type: 'repository', repository } }), repository)
@@ -447,81 +369,75 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     assert.equal(store.isShortSecretValue('密钥密钥密钥密'), true)
   })
 
-  await t.test('permission matrix: member and admin x create/replace/delete x scope x environment x kind', async () => {
+  await t.test('permission matrix: member and admin x create/replace/delete x scope x kind', async () => {
     const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
-    const envs = ['all', 'production', 'preview', 'development'] as const
     const scopes = [{ type: 'workspace' as const }, { type: 'repository' as const, repository: 'acme/app' }]
-    const memberMay = (scope: { type: string }, environment: string) => scope.type === 'repository' && (environment === 'preview' || environment === 'development')
+    const memberMay = (scope: { type: string }) => scope.type === 'repository'
     let n = 0
-    for (const kind of ['secret', 'env'] as const) for (const scope of scopes) for (const environment of envs) {
-      const cell = `${kind}/${scope.type}/${environment}`
+    for (const kind of ['secret', 'env'] as const) for (const scope of scopes) {
+      const cell = `${kind}/${scope.type}`
       // create
-      const memberCreate = store.createWorkspaceSecret(member, w.id, { name: `M${n}`, kind, value: 'membervalue', scope, environment })
-      if (memberMay(scope, environment)) assert.equal((await memberCreate).environment, environment, cell)
+      const memberCreate = store.createWorkspaceSecret(member, w.id, { name: `M${n}`, kind, value: 'membervalue', scope })
+      if (memberMay(scope)) assert.equal((await memberCreate).scopeType, scope.type, cell)
       else await rejects(memberCreate, 'secretPermissionDenied')
-      const byAdmin = await store.createWorkspaceSecret(admin, w.id, { name: `A${n}`, kind, value: 'adminvalue', scope, environment })
-      assert.deepEqual([byAdmin.environment, byAdmin.scopeType], [environment, scope.type], cell)
+      const byAdmin = await store.createWorkspaceSecret(admin, w.id, { name: `A${n}`, kind, value: 'adminvalue', scope })
+      assert.equal(byAdmin.scopeType, scope.type, cell)
       // replace (the admin-created row: also proves "including entries someone else created")
       const memberReplace = store.replaceWorkspaceSecret(member, w.id, { id: byAdmin.id, value: 'membervalue2' })
-      if (memberMay(scope, environment)) await memberReplace; else await rejects(memberReplace, 'secretNotFound')
+      if (memberMay(scope)) await memberReplace; else await rejects(memberReplace, 'secretNotFound')
       await store.replaceWorkspaceSecret(admin, w.id, { id: byAdmin.id, value: 'adminvalue2' })
       // delete: admin only, every cell
       await rejects(store.deleteWorkspaceSecret(member, w.id, { id: byAdmin.id }), 'secretPermissionDenied')
       assert.deepEqual(await store.deleteWorkspaceSecret(admin, w.id, { id: byAdmin.id }), { id: byAdmin.id })
       n++
     }
-    // Same name may exist once per environment (environment is part of the unique key).
-    for (const environment of envs) await store.createWorkspaceSecret(admin, w.id, { name: 'PER_ENV', kind: 'env', value: `v-${environment}`, scope: scopes[1], environment })
-    await rejects(store.createWorkspaceSecret(member, w.id, { name: 'PER_ENV', kind: 'env', value: 'again', scope: scopes[1], environment: 'preview' }), 'secretNameTaken')
+    // Same name may exist once per scope (workspace + each repo).
+    await store.createWorkspaceSecret(admin, w.id, { name: 'PER_SCOPE', kind: 'env', value: 'v-workspace' })
+    await store.createWorkspaceSecret(member, w.id, { name: 'PER_SCOPE', kind: 'env', value: 'v-repo', scope: scopes[1] })
+    await rejects(store.createWorkspaceSecret(member, w.id, { name: 'PER_SCOPE', kind: 'env', value: 'again', scope: scopes[1] }), 'secretNameTaken')
     // Read-side cells.
-    assert.ok((await store.listWorkspaceSecrets(member, w.id)).length >= 4, 'members list')
+    assert.ok((await store.listWorkspaceSecrets(member, w.id)).length >= 2, 'members list')
     assert.ok((await store.listWorkspaceSecrets(member, w.id)).every(r => !('value' in r)), 'no values for anyone (design update)')
     const status = await e2b.getE2BKeyStatus(member, w.id)
     assert.ok(!('apiKey' in status), 'member E2B view is masked')
-    await rejects(store.getNetworkPolicy(member, w.id), 'secretPermissionDenied')
-    await rejects(store.updateNetworkPolicy(member, w.id, { mode: 'none' }), 'secretPermissionDenied')
-    assert.equal((await store.getNetworkPolicy(admin, w.id)).mode, 'open')
     let verifyCalls = 0
     await rejects(e2b.setE2BKey(member, w.id, { apiKey: 'e2b_' + randomBytes(16).toString('hex') }, { verify: async () => { verifyCalls++; return { ok: true } } }), 'secretPermissionDenied')
     await rejects(e2b.removeE2BKey(member, w.id), 'secretPermissionDenied')
     assert.equal(verifyCalls, 0, 'member never reaches the E2B verify call')
   })
 
-  await t.test('members cannot escalate by moving scope or environment; admins can', async () => {
+  await t.test('members cannot escalate by moving scope; admins can', async () => {
     const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
     const repo = { type: 'repository' as const, repository: 'acme/app' }
-    const mine = await store.createWorkspaceSecret(member, w.id, { name: 'MINE', kind: 'secret', value: 'membervalue', scope: repo, environment: 'preview' })
-    for (const move of [{ environment: 'production' }, { environment: 'all' }, { scope: { type: 'workspace' } }, { scope: { type: 'workspace' }, environment: 'development' }]) {
-      await rejects(store.replaceWorkspaceSecret(member, w.id, { id: mine.id, value: 'escalated', ...move }), 'secretPermissionDenied')
-    }
-    const { rows: [still] } = await pool.query('select "scopeType","scopeRef",environment,"updatedBy" from workspace_secrets where id=$1', [mine.id])
-    assert.deepEqual(still, { scopeType: 'repository', scopeRef: 'acme/app', environment: 'preview', updatedBy: member }, 'row untouched after denied moves')
-    // Allowed lateral move inside the member area: other repo, development.
-    const moved = await store.replaceWorkspaceSecret(member, w.id, { id: mine.id, value: 'membervalue', scope: { type: 'repository', repository: 'Acme/Other' }, environment: 'development' })
-    assert.deepEqual([moved.scopeType, moved.scopeRef, moved.environment], ['repository', 'acme/other', 'development'])
-    // Pulling an admin entry down into member territory is also denied (old values are checked).
-    const prod = await store.createWorkspaceSecret(admin, w.id, { name: 'PROD', kind: 'env', value: 'prodvalue', scope: repo, environment: 'production' })
-    await rejects(store.replaceWorkspaceSecret(member, w.id, { id: prod.id, value: 'mine-now', environment: 'preview' }), 'secretNotFound')
-    const ws1 = await store.createWorkspaceSecret(admin, w.id, { name: 'WS', kind: 'env', value: 'wsvalue', environment: 'preview' })
+    const mine = await store.createWorkspaceSecret(member, w.id, { name: 'MINE', kind: 'secret', value: 'membervalue', scope: repo })
+    await rejects(store.replaceWorkspaceSecret(member, w.id, { id: mine.id, value: 'escalated', scope: { type: 'workspace' } }), 'secretPermissionDenied')
+    await assert.rejects(store.replaceWorkspaceSecret(member, w.id, { id: mine.id, value: 'escalated', environment: 'production' }), 'environment is no longer an input')
+    const { rows: [still] } = await pool.query('select "scopeType","scopeRef","updatedBy" from workspace_secrets where id=$1', [mine.id])
+    assert.deepEqual(still, { scopeType: 'repository', scopeRef: 'acme/app', updatedBy: member }, 'row untouched after denied moves')
+    // Allowed lateral move inside the member area: another repo.
+    const moved = await store.replaceWorkspaceSecret(member, w.id, { id: mine.id, value: 'membervalue', scope: { type: 'repository', repository: 'Acme/Other' } })
+    assert.deepEqual([moved.scopeType, moved.scopeRef], ['repository', 'acme/other'])
+    // Pulling an admin workspace entry down into member territory is also denied (old values are checked).
+    const ws1 = await store.createWorkspaceSecret(admin, w.id, { name: 'WS', kind: 'env', value: 'wsvalue' })
     await rejects(store.replaceWorkspaceSecret(member, w.id, { id: ws1.id, value: 'mine-now', scope: repo }), 'secretNotFound')
-    assert.equal(await stored(prod.id), 'prodvalue')
-    // Admin moves work and the value still decrypts at its new place (AAD resealed with the new scope/environment).
-    const promoted = await store.replaceWorkspaceSecret(admin, w.id, { id: ws1.id, value: 'wsvalue2', scope: repo, environment: 'production' })
-    assert.deepEqual([promoted.scopeType, promoted.scopeRef, promoted.environment, await stored(ws1.id)], ['repository', 'acme/app', 'production', 'wsvalue2'])
-    // Member create straight into production / all / workspace denied, and nothing was written.
-    for (const target of [{ environment: 'production' }, { environment: 'all' }, {}, { scope: { type: 'workspace' }, environment: 'preview' }])
-      await rejects(store.createWorkspaceSecret(member, w.id, { name: 'SNEAK', kind: 'secret', value: 'membervalue', ...(target.scope || !('environment' in target) ? {} : { scope: repo }), ...target }), 'secretPermissionDenied')
+    assert.equal(await stored(ws1.id), 'wsvalue')
+    // Admin moves work and the value still decrypts at its new place (AAD resealed with the new scope).
+    const promoted = await store.replaceWorkspaceSecret(admin, w.id, { id: ws1.id, value: 'wsvalue2', scope: repo })
+    assert.deepEqual([promoted.scopeType, promoted.scopeRef, await stored(ws1.id)], ['repository', 'acme/app', 'wsvalue2'])
+    // Member create straight into workspace scope denied, and nothing was written.
+    for (const target of [{}, { scope: { type: 'workspace' } }])
+      await rejects(store.createWorkspaceSecret(member, w.id, { name: 'SNEAK', kind: 'secret', value: 'membervalue', ...target }), 'secretPermissionDenied')
     assert.equal((await pool.query(`select 1 from workspace_secrets where name='SNEAK'`)).rows.length, 0)
     // Name collision on a move maps to secretNameTaken.
-    const a = await store.createWorkspaceSecret(member, w.id, { name: 'DUP', kind: 'env', value: 'aaaaaaaa', scope: repo, environment: 'preview' })
-    await store.createWorkspaceSecret(member, w.id, { name: 'DUP', kind: 'env', value: 'bbbbbbbb', scope: repo, environment: 'development' })
-    await rejects(store.replaceWorkspaceSecret(member, w.id, { id: a.id, value: 'aaaaaaaa', environment: 'development' }), 'secretNameTaken')
+    const a = await store.createWorkspaceSecret(member, w.id, { name: 'DUP', kind: 'env', value: 'aaaaaaaa', scope: repo })
+    await store.createWorkspaceSecret(member, w.id, { name: 'DUP', kind: 'env', value: 'bbbbbbbb', scope: { type: 'repository', repository: 'acme/third' } })
+    await rejects(store.replaceWorkspaceSecret(member, w.id, { id: a.id, value: 'aaaaaaaa', scope: { type: 'repository', repository: 'acme/third' } }), 'secretNameTaken')
   })
 
   await t.test('#436 blocker: for a member, missing / other-workspace / not-permitted ids are indistinguishable; denied audited', async () => {
     const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
     const elsewhere = await store.createWorkspaceSecret(admin, other.id, { name: 'ELSEWHERE', kind: 'env', value: 'elsewhere-value' })
-    const forbidden = await store.createWorkspaceSecret(admin, w.id, { name: 'FORBIDDEN', kind: 'secret', value: 'forbidden-value', environment: 'production' })
+    const forbidden = await store.createWorkspaceSecret(admin, w.id, { name: 'FORBIDDEN', kind: 'secret', value: 'forbidden-value' })
     const events: string[] = []
     const hook: import('../lib/secrets/store').SecretAuditHook = async (_tx, e) => { events.push(`${e.action}:${e.metadata?.reason}`) }
     const codes: string[] = []
@@ -538,20 +454,20 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     assert.equal(await stored(forbidden.id), 'admin-new-value')
   })
 
-  await t.test('#436 race: an uncommitted move to production blocks a concurrent member replace (FOR UPDATE)', async () => {
+  await t.test('#436 race: an uncommitted move to workspace scope blocks a concurrent member replace (FOR UPDATE)', async () => {
     const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
-    const row = await store.createWorkspaceSecret(admin, w.id, { name: 'RACY', kind: 'env', value: 'preview-value', scope: { type: 'repository', repository: 'acme/app' }, environment: 'preview' })
+    const row = await store.createWorkspaceSecret(admin, w.id, { name: 'RACY', kind: 'env', value: 'repo-value', scope: { type: 'repository', repository: 'acme/app' } })
     const holder = await pool.connect()
     try {
       await holder.query('begin')
-      await holder.query(`update workspace_secrets set environment='production' where id=$1`, [row.id])
+      await holder.query(`update workspace_secrets set "scopeType"='workspace', "scopeRef"='' where id=$1`, [row.id])
       const replace = store.replaceWorkspaceSecret(member, w.id, { id: row.id, value: 'member-value' }).then(() => 'ok', (e: unknown) => e instanceof WorkspaceError ? e.code : String(e))
       await new Promise(resolve => setTimeout(resolve, 300))
       await holder.query('commit')
-      assert.equal(await replace, 'secretNotFound', 'member sees the committed production row and is denied')
+      assert.equal(await replace, 'secretNotFound', 'member sees the committed workspace row and is denied')
     } finally { holder.release() }
-    const { rows: [after] } = await pool.query('select environment, "updatedBy" from workspace_secrets where id=$1', [row.id])
-    assert.equal(after.environment, 'production')
+    const { rows: [after] } = await pool.query('select "scopeType", "updatedBy" from workspace_secrets where id=$1', [row.id])
+    assert.equal(after.scopeType, 'workspace')
     assert.notEqual(after.updatedBy, member)
   })
 

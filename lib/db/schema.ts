@@ -324,10 +324,6 @@ export const agentRuns = pgTable('agent_runs', {
   source: text('source').$type<'mcp' | null>(),
   questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true} | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
-  /** 4e3: requested secrets environment (admin-only for 'production'); null = derive from baseBranch. */
-  secretsEnvironmentOverride: text('secretsEnvironmentOverride').$type<'production' | 'preview' | null>(),
-  /** 4e3: the secrets environment this run actually used, written at claim. Null for runs before 4e3. */
-  secretsEnvironment: text('secretsEnvironment').$type<'production' | 'preview' | 'development' | null>(),
   /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */
   attempt: integer('attempt').notNull().default(1),
   /** The run this one retries, when its device went offline. */
