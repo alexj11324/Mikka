@@ -10,10 +10,12 @@ says which source wins when two disagree, and where each kind of rule lives.
    (`R-12`) so reviews can cite it.
 3. [`components.md`](components.md): which component to use for each job, and
    the old components that must not come back.
-4. [`decisions.md`](decisions.md): what Alex decided, when, and what it
+4. [`copy.md`](copy.md): how every visible string is written (C-01…C-08), and
+   which products set the precedent.
+5. [`decisions.md`](decisions.md): what Alex decided, when, and what it
    replaced. Check it before you reopen a question.
-5. The accepted Figma frames for your feature (listed in `decisions.md`).
-6. [`../review-checklist.md`](../review-checklist.md): run it before you show UI
+6. The accepted Figma frames for your feature (listed in `decisions.md`).
+7. [`../review-checklist.md`](../review-checklist.md): run it before you show UI
    to anyone.
 
 New feature? Copy [`spec-template.md`](spec-template.md) first.

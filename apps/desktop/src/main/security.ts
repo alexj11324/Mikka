@@ -61,41 +61,36 @@ export function appExternalUrl(candidate: string, appUrl: string): string | null
   }
 }
 
-const DESKTOP_AUTH_PROTOCOL = 'mikka-desktop'
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,512}$/
 const STATE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/
 
+/** The nonce the renderer stored before asking for a loopback listener. */
+export function desktopAuthState(value: unknown): string | null {
+  return typeof value === 'string' && value.length <= 128 && STATE_PATTERN.test(value) ? value : null
+}
+
 /**
- * Turns a `mikka-desktop://auth` callback from the system browser into the
- * in-app page that exchanges its one-time token for the web session. Only the
- * exact scheme/host, a bounded token/state and an in-app `next` path are
- * accepted; everything else returns null and is ignored.
+ * Builds the in-app page that exchanges a one-time token for the web session.
+ * The token/state/next come from the loopback callback, never from a custom
+ * URL scheme; only a bounded token/state and an in-app `next` path are
+ * accepted.
  */
-export function desktopAuthFinishUrl(candidate: string, appUrl: string): string | null {
-  if (!candidate || candidate.length > 4_096) return null
-  let url: URL
+export function desktopAuthFinishUrl(token: unknown, state: unknown, next: unknown, appUrl: string): string | null {
+  if (typeof token !== 'string' || token.length > 512 || !TOKEN_PATTERN.test(token)) return null
+  if (typeof state !== 'string' || state.length > 128 || !STATE_PATTERN.test(state)) return null
+  const target = typeof next === 'string' ? next : '/'
+  if (target.length > 2_048 || !target.startsWith('/') || target.startsWith('//') || target.includes('\\') || target.includes('#')) return null
   let app: URL
+  let resolved: URL
   try {
-    url = new URL(candidate)
     app = new URL(appUrl)
+    resolved = new URL(target, app)
   } catch {
     return null
   }
-  if (url.protocol !== `${DESKTOP_AUTH_PROTOCOL}:` || url.hostname !== 'auth') return null
-  const token = url.searchParams.get('token')
-  const state = url.searchParams.get('state')
-  const next = url.searchParams.get('next') ?? '/'
-  if (!token || !TOKEN_PATTERN.test(token)) return null
-  if (!state || !STATE_PATTERN.test(state)) return null
-  if (next.length > 2_048 || !next.startsWith('/') || next.startsWith('//') || next.includes('\\') || next.includes('#')) return null
-  let target: URL
-  try {
-    target = new URL(next, app)
-  } catch {
-    return null
-  }
-  if (target.origin !== app.origin) return null
+  if (resolved.origin !== app.origin) return null
   const finish = new URL(`${appUrl.replace(/\/$/, '')}/api/desktop/finish`)
-  finish.hash = new URLSearchParams({ token, state, next }).toString()
+  // The value is the one-time exchange code, not a sign-in token.
+  finish.hash = new URLSearchParams({ code: token, state, next: target }).toString()
   return finish.href
 }

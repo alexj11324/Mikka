@@ -16,6 +16,12 @@ function onNotificationClick(listener: (href: string) => void): () => void {
 }
 
 if (appOrigin && window.location.origin === appOrigin) {
+  // Lets the page reserve room for the macOS traffic lights and draw its own drag region.
+  // The preload runs before <html> exists, so wait for the document.
+  const markPlatform = () => { document.documentElement.dataset.desktopPlatform = process.platform }
+  if (document.documentElement) markPlatform()
+  else window.addEventListener('DOMContentLoaded', markPlatform, { once: true })
+
   const bridge = {
     app: {
       version: __MIKKA_APP_VERSION__,
@@ -24,6 +30,7 @@ if (appOrigin && window.location.origin === appOrigin) {
       serverUrl: __MIKKA_APP_URL__,
       zeroUrl: '',
       openExternal: (url: unknown) => ipcRenderer.invoke(IPC.appOpenExternal, url),
+    prepareAuth: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareAuth, state),
     },
     notifications: {
       show: (notification: unknown) => ipcRenderer.invoke(IPC.notificationsShow, notification),

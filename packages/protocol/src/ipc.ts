@@ -2,6 +2,7 @@
 // Kept free of runtime dependencies so the sandboxed preload stays small.
 export const IPC = {
   appOpenExternal: "mikka:app:open-external",
+  appPrepareAuth: "mikka:app:prepare-auth",
   settingsGetAll: "mikka:settings:get-all",
   settingsSet: "mikka:settings:set",
   quotaGet: "mikka:quota:get",

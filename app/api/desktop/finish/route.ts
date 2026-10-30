@@ -13,10 +13,10 @@ const safeHeaders = {
 }
 
 /**
- * Loaded inside the desktop shell after the `mikka-desktop://auth` callback.
- * The token is in the fragment, so it never reaches this server or a proxy
- * log. The page checks the nonce the renderer stored before opening the
- * browser, exchanges the one-minute token for the Electron session cookie,
+ * Loaded inside the desktop shell after its loopback callback.
+ * The one-time code is in the fragment, so it never reaches a proxy log. The
+ * page checks the nonce the renderer stored before opening the browser,
+ * trades the code and the verifier it kept for a one-minute token, exchanges it for the Electron session cookie,
  * then returns to the requested in-app page.
  */
 export async function GET(request: Request) {
@@ -40,14 +40,17 @@ export async function GET(request: Request) {
     } catch { return '/'; }
   };
   const params = new URLSearchParams(location.hash.slice(1));
-  const token = params.get('token') || '';
+  const code = params.get('code') || '';
   const state = params.get('state') || '';
   const next = params.get('next') || '/';
   history.replaceState(null, '', location.pathname + location.search);
   let saved = null;
   try { saved = JSON.parse(sessionStorage.getItem(key) || 'null'); } catch {}
-  if (!token || !state || !saved || saved.state !== state || typeof saved.expires !== 'number' || saved.expires < Date.now()) { fail(); return; }
-  fetch(base + '/api/auth/one-time-token/verify', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ token }) })
+  if (!code || !state || !saved || saved.state !== state || typeof saved.verifier !== 'string' || typeof saved.expires !== 'number' || saved.expires < Date.now()) { fail(); return; }
+  const post = (path, body) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
+  post('/api/desktop/exchange', { state, code, verifier: saved.verifier })
+    .then(response => response.ok ? response.json() : Promise.reject(new Error('exchange rejected')))
+    .then(result => post('/api/auth/one-time-token/verify', { token: result.token }))
     .then(response => {
       if (!response.ok) throw new Error('token rejected');
       try { sessionStorage.removeItem(key); } catch {}

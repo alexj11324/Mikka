@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { RotateCw } from 'lucide-react'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
@@ -100,7 +103,7 @@ function ViewerIntegrationsSettings({ showWebhookDetails, showConnectedApps, use
             </Button> : <Button type="button" variant="outline" size="sm" disabled={githubLinking} onClick={() => void linkGitHub()}>
               {githubLinking ? t('working') : t('githubLink')}
             </Button>)}
-            <Button type="button" variant="outline" size="sm" disabled={!userId || githubLoading || githubLinking} onClick={() => void refreshGitHub()}>{t('githubRefresh')}</Button>
+            <Button type="button" variant="outline" size="sm" disabled={!userId || githubLoading || githubLinking} onClick={() => { void refreshGitHub().then(() => toast(t('githubRefreshed'))) }}><RotateCw data-icon="inline-start" className={cn(githubLoading && 'animate-spin')} />{t('githubRefresh')}</Button>
           </div>
           {githubState?.configured && githubState.connected && githubState.installed && githubState.repositories.length > 0 && <ScrollArea className="h-32 w-64 max-w-full">
             <ul aria-label={t('githubRepositoryList')} className="flex flex-col gap-1 pr-3 text-xs text-muted-foreground">

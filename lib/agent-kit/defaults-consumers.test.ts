@@ -22,6 +22,7 @@ stub('../auth.ts', {auth: {api: {getSession: async () => ({user: {id: owner}})}}
 stub('./live-eval.ts', {evaluateProposal: forbidden})
 stub('../subscription-runtime.ts', {authorizeSubscriptionWorkspace: forbidden, subscriptionRuntime: forbidden})
 stub('../coordinator/bot-instructions.ts', {botInstructions: async () => 'synthetic host'})
+stub('../coordinator/personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base })
 stub('../coordinator/instructions.ts', {COORDINATOR_INSTRUCTIONS: 'synthetic host'})
 stub('../coordinator/native-prompt.ts', {personalCoordinatorInstructions: () => 'synthetic native host'})
 stub('../../workflows/coordinator/tool-scope.ts', {assertNativeToolScope: forbidden})

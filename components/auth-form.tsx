@@ -8,7 +8,7 @@ import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { SignInCard } from '@/components/blocks/auth-19/components/sign-in-card'
 import { safeAuthReturn } from '@/lib/auth-return'
 import { withBasePath } from '@/lib/base-path'
-import { desktopAuthReturnPath } from '@/lib/desktop-auth'
+import { desktopAuthCallbackURL, desktopAuthReturnPath } from '@/lib/desktop-auth'
 import { bridgeFromWindow } from '@/lib/platform/detect'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
@@ -16,16 +16,27 @@ import { listIssues, saveIssue } from '@/app/actions/issues'
 const DESKTOP_OAUTH_STATE_KEY = 'mikka:desktop-oauth'
 const DESKTOP_OAUTH_TTL_MS = 10 * 60_000
 
-type DesktopFlow = { state: string; next: string }
+type DesktopFlow = { state: string; next: string; callback: string | null }
 
 function newDesktopState(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(24))
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
-function rememberDesktopState(state: string): void {
+function base64url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/** A PKCE-style pair: the verifier stays in this window, the server only sees its S256 challenge. */
+async function newDesktopVerifier(): Promise<{ verifier: string; challenge: string }> {
+  const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)))
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)))
+  return { verifier, challenge: base64url(digest) }
+}
+
+function rememberDesktopState(state: string, verifier: string): void {
   try {
-    sessionStorage.setItem(DESKTOP_OAUTH_STATE_KEY, JSON.stringify({ state, expires: Date.now() + DESKTOP_OAUTH_TTL_MS }))
+    sessionStorage.setItem(DESKTOP_OAUTH_STATE_KEY, JSON.stringify({ state, verifier, expires: Date.now() + DESKTOP_OAUTH_TTL_MS }))
   } catch {
     // Without sessionStorage the finish page refuses the state. Reloading the
     // sign-in page and trying again is the recovery path.
@@ -42,11 +53,26 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     ? `${getPathname({ locale, href: '/' })}${returnPath.slice(1)}`
     : getPathname({ locale, href: returnPath }))
   // A desktop browser handoff must come back to the app, not stay in the browser.
-  const afterSignIn = desktopFlow ? desktopAuthReturnPath(desktopFlow.state, desktopFlow.next) : home
-  function desktopSignInURL(state: string, next: string): string {
+  const afterSignIn = desktopFlow ? desktopAuthReturnPath(desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
+  function desktopSignInURL(state: string, next: string, callback: string): string {
     const target = new URL(withBasePath(getPathname({ locale, href: '/sign-in' })), window.location.origin)
-    target.search = new URLSearchParams({ desktop: '1', desktop_state: state, desktop_next: next }).toString()
+    target.search = new URLSearchParams({ desktop: '1', desktop_state: state, desktop_next: next, desktop_callback: callback }).toString()
     return target.toString()
+  }
+  async function beginDesktopAuth(bridge: NonNullable<ReturnType<typeof bridgeFromWindow>>): Promise<void> {
+    // Works signed out: the server keeps an unbound request that the browser
+    // binds after OAuth, and only this window holds the verifier to claim it.
+    const state = newDesktopState()
+    const { verifier, challenge } = await newDesktopVerifier()
+    rememberDesktopState(state, verifier)
+    const callback = await bridge.app.prepareAuth(state)
+    const response = await fetch(withBasePath('/api/desktop/begin'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state, callback, challenge }),
+    })
+    if (!response.ok) throw new Error('desktop handoff registration failed')
+    await bridge.app.openExternal(desktopSignInURL(state, returnPath, callback))
   }
   const [error, setError] = useState(oauthAccountNotLinked === 'google' ? t('googleAccountNotLinked') : oauthAccountNotLinked === 'github' ? t('githubAccountNotLinked') : oauthFailed ? t('oauthFailed') : '')
   const [notice, setNotice] = useState(desktopFlow || continueGoogle || continueGitHub || continueComposio ? t('continueNotice') : '')
@@ -85,7 +111,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     if (bridge) {
       // An older shell predates the system-browser bridge. Fail closed rather
       // than render Google's OAuth page in the embedded window.
-      if (typeof bridge.app.openExternal !== 'function') {
+      if (typeof bridge.app.prepareAuth !== 'function') {
         setError(t('browserUpdateRequired'))
         return
       }
@@ -93,10 +119,8 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
       try {
         // OAuth state must be created in the browser that completes it, so the
         // desktop opens the web sign-in page in the system browser. The app
-        // keeps the nonce and receives the result through mikka-desktop://.
-        const state = newDesktopState()
-        rememberDesktopState(state)
-        await bridge.app.openExternal(desktopSignInURL(state, returnPath))
+        // keeps the nonce and receives the result through a loopback callback.
+        await beginDesktopAuth(bridge)
         setNotice(t('browserOpened'))
       } catch {
         setError(t('browserFailed'))
@@ -107,7 +131,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
     if (!beginSubmit()) return
     try {
-      const callbackURL = desktopFlow ? desktopAuthReturnPath(desktopFlow.state, desktopFlow.next) : home
+      const callbackURL = desktopFlow ? desktopAuthCallbackURL(window.location.origin, desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
       const result = await authClient.signIn.social({ provider: 'google', callbackURL, errorCallbackURL: oauthErrorCallbackURL('google'), disableRedirect: true })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
@@ -128,15 +152,13 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     if (bridge) {
       // An older shell predates the system-browser bridge. Fail closed rather
       // than render Google's OAuth page in the embedded window.
-      if (typeof bridge.app.openExternal !== 'function') {
+      if (typeof bridge.app.prepareAuth !== 'function') {
         setError(t('browserUpdateRequired'))
         return
       }
       if (!beginSubmit()) return
       try {
-        const state = newDesktopState()
-        rememberDesktopState(state)
-        await bridge.app.openExternal(desktopSignInURL(state, returnPath))
+        await beginDesktopAuth(bridge)
         setNotice(t('browserOpened'))
       } catch {
         setError(t('browserFailed'))
@@ -147,7 +169,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
     if (!beginSubmit()) return
     try {
-      const callbackURL = desktopFlow ? desktopAuthReturnPath(desktopFlow.state, desktopFlow.next) : home
+      const callbackURL = desktopFlow ? desktopAuthCallbackURL(window.location.origin, desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
       const result = await authClient.signIn.social({ provider: 'github', callbackURL, errorCallbackURL: oauthErrorCallbackURL('github'), disableRedirect: true })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
