@@ -25,6 +25,7 @@ import { TeamSettingsDetails } from './team-settings-details'
 type Directory = Awaited<ReturnType<typeof loadTeamDirectory>>
 export function TeamDirectory({ workspaceId }: { workspaceId?: string }) {
   const i18nText = useTranslations();
+  const t = useTranslations('TeamSettings')
   const router = useRouter()
   const params = useSearchParams()
   const initialTeamId = params.get('team') ?? undefined
@@ -79,23 +80,23 @@ export function TeamDirectory({ workspaceId }: { workspaceId?: string }) {
   </div>
   return <div data-settings-state={readError ? 'error' : 'ready'} className="flex w-full flex-col gap-8 px-5 py-10 sm:px-16 sm:py-16">
     {initialTeamId ? <Empty><EmptyHeader><EmptyTitle>{i18nText("FeatureCopy.c_19b23b31")}</EmptyTitle><EmptyDescription>{i18nText("FeatureCopy.c_616748be")}</EmptyDescription></EmptyHeader><Button variant="outline" onClick={() => navigate(directoryHref)}>{i18nText("FeatureCopy.c_30108106")}</Button></Empty> : <section aria-label={i18nText("FeatureCopy.c_efbc2a6b")} className="flex flex-col gap-6">
-      <h1 aria-label={i18nText("Settings.sections.teams.title")} className="text-2xl font-semibold tracking-tight" lang="en">Teams</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{i18nText("Settings.sections.teams.title")}</h1>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex w-full items-center gap-2 sm:w-auto">
-          <div className="min-w-0 flex-1 sm:w-80"><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput aria-label={i18nText("FeatureCopy.c_997ba91d")} placeholder="Filter by name…" value={query} onChange={event => setQuery(event.target.value)} /></InputGroup></div>
-          <Select value={view} items={[{ value: 'all', label: 'Active' }, { value: 'mine', label: 'Joined' }]} onValueChange={value => { if (value) setView(value) }}><SelectTrigger aria-label={i18nText("FeatureCopy.c_ab3ddf8b")}><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">Active</SelectItem><SelectItem value="mine">Joined</SelectItem></SelectGroup></SelectContent></Select>
+          <div className="min-w-0 flex-1 sm:w-80"><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput aria-label={i18nText("FeatureCopy.c_997ba91d")} placeholder={t('filterPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /></InputGroup></div>
+          <Select value={view} items={[{ value: 'all', label: t('active') }, { value: 'mine', label: t('joined') }]} onValueChange={value => { if (value) setView(value) }}><SelectTrigger aria-label={i18nText("FeatureCopy.c_ab3ddf8b")}><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">{t('active')}</SelectItem><SelectItem value="mine">{t('joined')}</SelectItem></SelectGroup></SelectContent></Select>
         </div>
-        <div className="ml-auto flex items-center gap-2"><Button type="button" variant="outline" className="rounded-full" aria-label={i18nText("FeatureCopy.c_3aea5cc4")} onClick={exportTeams}><span lang="en">Export CSV</span></Button><Button type="button" className="rounded-full" aria-label={i18nText("FeatureCopy.c_929d5670")} onClick={createTeam}><span lang="en">Create team</span></Button></div>
+        <div className="ml-auto flex items-center gap-2"><Button type="button" variant="outline" className="rounded-full" aria-label={i18nText("FeatureCopy.c_3aea5cc4")} onClick={exportTeams}>{t('exportCsv')}</Button><Button type="button" className="rounded-full" aria-label={i18nText("FeatureCopy.c_929d5670")} onClick={createTeam}>{t('createTeam')}</Button></div>
       </div>
       {(error || readError) && <Alert variant="destructive"><AlertDescription>{error || i18nText("FeatureCopy.c_1526ac93")}{readError && <Button variant="ghost" size="sm" onClick={() => void mutate()}>{i18nText("Common.retry")}</Button>}</AlertDescription></Alert>}
       {filtered.length ? <Table>
-        <TableHeader><TableRow className="border-0 hover:bg-transparent"><TableHead aria-sort={sortAscending ? 'ascending' : 'descending'} className="w-1/3"><Button type="button" variant="ghost" size="sm" aria-label={i18nText("FeatureCopy.c_74329ce8")} onClick={() => setSortAscending(value => !value)}><span lang="en">Name</span>{sortAscending ? <ArrowDown data-icon="inline-end" /> : <ArrowUp data-icon="inline-end" />}</Button></TableHead><TableHead className="w-1/3" lang="en">Description</TableHead><TableHead lang="en">Visibility</TableHead><TableHead lang="en">Members</TableHead><TableHead className="w-12"><span className="sr-only">{i18nText("Members.table.actions")}</span></TableHead></TableRow></TableHeader>
+        <TableHeader><TableRow className="border-0 hover:bg-transparent"><TableHead aria-sort={sortAscending ? 'ascending' : 'descending'} className="w-1/3"><Button type="button" variant="ghost" size="sm" aria-label={i18nText("FeatureCopy.c_74329ce8")} onClick={() => setSortAscending(value => !value)}>{t('columns.name')}{sortAscending ? <ArrowDown data-icon="inline-end" /> : <ArrowUp data-icon="inline-end" />}</Button></TableHead><TableHead className="w-1/3">{t('columns.description')}</TableHead><TableHead>{t('columns.visibility')}</TableHead><TableHead>{t('columns.members')}</TableHead><TableHead className="w-12"><span className="sr-only">{i18nText("Members.table.actions")}</span></TableHead></TableRow></TableHeader>
         <TableBody>
-          <TableRow className="border-0 bg-muted/60 hover:bg-muted/60"><TableCell colSpan={5} className="rounded-lg px-4 py-2 text-muted-foreground"><span lang="en">{view === 'mine' ? 'Joined' : 'Active'}</span><span className="ml-2 tabular-nums">{filtered.length}</span></TableCell></TableRow>
+          <TableRow className="border-0 bg-muted/60 hover:bg-muted/60"><TableCell colSpan={5} className="rounded-lg px-4 py-2 text-muted-foreground"><span>{view === 'mine' ? t('joined') : t('active')}</span><span className="ml-2 tabular-nums">{filtered.length}</span></TableCell></TableRow>
           {filtered.map(team => <TableRow key={team.id} className="group border-0">
             <TableCell className="min-w-56 py-3"><div className="flex items-center gap-3"><SquareUserRound className="size-4 shrink-0 text-primary" aria-hidden="true" /><Link workspaceId={data.workspace.id} href={teamHref(team.id)} className="rounded-sm font-medium hover:underline focus-visible:outline-2 focus-visible:outline-ring">{team.name}</Link><span className="text-muted-foreground">{team.identifier}</span></div></TableCell>
             <TableCell><p className="max-w-80 truncate text-muted-foreground">{team.description}</p></TableCell>
-            <TableCell className="text-muted-foreground" title={i18nText("FeatureCopy.c_63434fea")} lang="en">Workspace</TableCell>
+            <TableCell className="text-muted-foreground" title={i18nText("FeatureCopy.c_63434fea")}>{t('visibilityWorkspace')}</TableCell>
             <TableCell className="tabular-nums text-muted-foreground">{team.memberCount}</TableCell>
             <TableCell><TeamDirectoryMenu team={team} pending={pending} navigate={navigate} teamHref={teamHref} onMembership={membership} /></TableCell>
           </TableRow>)}
