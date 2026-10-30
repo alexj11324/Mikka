@@ -125,7 +125,7 @@ function CreateTokenDialog({ workspaceId, onDone }: { workspaceId?: string; onDo
           </Label>
           <Label className="flex flex-col items-start gap-1.5">{t('expiryLabel')}
             <Select value={expiry} items={expiryItems} onValueChange={value => { if (value) setExpiry(value as Expiry) }}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label={t('expiryLabel')} className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent><SelectGroup>{expiryItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
             </Select>
           </Label>

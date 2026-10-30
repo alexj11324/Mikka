@@ -2091,6 +2091,36 @@
       "expires": "Expires {date}",
       "noExpiry": "Never expires",
       "expired": "Expired"
+    },
+    "secrets": {
+      "heading": "Secrets",
+      "add": "Add",
+      "addTitle": "Add secret",
+      "loading": "Loading secrets",
+      "empty": "No secrets yet.",
+      "workspaceGroup": "Workspace",
+      "repositoryGroup": "Repository {repository}",
+      "repository": "Repository",
+      "edit": "Edit",
+      "editNamed": "Edit {name}",
+      "kind": "Type",
+      "kinds": {
+        "secret": "Secret",
+        "env": "Environment variable"
+      },
+      "name": "Name",
+      "value": "Value",
+      "newValue": "New value",
+      "scope": "Scope",
+      "environment": "Environment",
+      "environments": {
+        "all": "All environments",
+        "production": "Production",
+        "preview": "Preview",
+        "development": "Development"
+      },
+      "deleting": "Deleting…",
+      "shortValueNotMasked": "{name} is shorter than 8 characters and is not masked in output."
     }
   },
   "TelegramBot": {

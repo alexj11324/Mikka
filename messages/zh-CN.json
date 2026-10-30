@@ -2091,6 +2091,36 @@
       "expires": "{date} 过期",
       "noExpiry": "永不过期",
       "expired": "已过期"
+    },
+    "secrets": {
+      "heading": "密钥",
+      "add": "添加",
+      "addTitle": "添加密钥",
+      "loading": "正在加载密钥",
+      "empty": "还没有密钥。",
+      "workspaceGroup": "工作区",
+      "repositoryGroup": "仓库 {repository}",
+      "repository": "仓库",
+      "edit": "编辑",
+      "editNamed": "编辑 {name}",
+      "kind": "类型",
+      "kinds": {
+        "secret": "密钥",
+        "env": "环境变量"
+      },
+      "name": "名称",
+      "value": "值",
+      "newValue": "新的值",
+      "scope": "范围",
+      "environment": "环境",
+      "environments": {
+        "all": "全部环境",
+        "production": "Production",
+        "preview": "Preview",
+        "development": "Development"
+      },
+      "deleting": "正在删除…",
+      "shortValueNotMasked": "{name} 少于 8 个字符，输出里不会遮住。"
     }
   },
   "TelegramBot": {
