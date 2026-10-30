@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { auth } from "@/lib/api-auth";
 import { factoryApprovals } from "@/lib/factory/server";
 import { handleFactoryApproval } from "@/lib/factory/approval-http";
 import { factoryBrowserHuman } from "@/lib/factory/browser-human";

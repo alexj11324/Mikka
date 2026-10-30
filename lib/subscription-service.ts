@@ -148,6 +148,22 @@ export class SubscriptionService {
       return failedUsage(row.id, 'unavailable', row.accountLabel)
     }
   }
+  /** Account catalogue refresh; no inference, no static model names or binding required. */
+  async models(ownerId: string, id: string, signal?: AbortSignal): Promise<{ id: string; name: string }[]> {
+    const row = await this.repository.connection(ownerId, id)
+    await this.workspace(ownerId, row.workspaceId)
+    if (row.state !== 'connected') throw new SubscriptionRefusal('account_unavailable')
+    const result = await this.worker(this.repository.scope(row)).call<unknown>('models', { revision: Number(row.epoch) }, signal)
+    const current = await this.repository.connection(ownerId, id)
+    if (current.state !== 'connected' || current.epoch !== row.epoch) throw new SubscriptionRefusal('stale_binding')
+    if (!Array.isArray(result) || result.length > 500) throw new SubscriptionRefusal('backend_unavailable')
+    const options = new Map<string, { id: string; name: string }>()
+    for (const item of result) {
+      if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(item.id) || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 200 || Array.from(item.name as string).some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) throw new SubscriptionRefusal('backend_unavailable')
+      if (!options.has(item.id)) options.set(item.id, { id: item.id, name: item.name })
+    }
+    return [...options.values()]
+  }
   async status(ownerId: string, id: string, signal?: AbortSignal) {
     const row = await this.repository.connection(ownerId, id)
     const status = await this.worker(this.repository.scope(row)).call<WorkerMetadata>('status', {}, signal)

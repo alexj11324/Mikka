@@ -1,5 +1,13 @@
 export const ACTION_ERROR_CODES = [
   'generic',
+  'botNotFound',
+  'executionPlaceInvalid',
+  'executionHarnessUnavailable',
+  'executionModelUnknown',
+  'executionRuleNotFound',
+  'executionRuleOrderInvalid',
+  'executionCommandNotFound',
+  'executionAccountUnavailable',
   'authRequired',
   'validationGeneric',
   'issueToolsDisabled',

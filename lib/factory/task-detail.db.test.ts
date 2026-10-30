@@ -6,6 +6,7 @@ import { Pool } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { createFactoryStore } from './store';
 import { factoryCriteria } from './task-detail';
+import { refreshPublishedPullRequest } from '../github/publication-webhook';
 
 const base = process.env.E2E_DATABASE_URL;
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true');
@@ -36,7 +37,7 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
     const sourceEventId = randomUUID();
     await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [sourceEventId, sourceEventId]);
     const report = { criteria: [
-      { criterionId: randomUUID(), text: 'Button renders', passed: true, evidence: 'ran it; token=abc123 seen' },
+      { criterionId: randomUUID(), text: 'Button renders', passed: true, evidence: 'ran it; token=abc123 seen', command: 'pnpm test:button token=abc123', exitCode: 0 },
       { text: 'Mixed case Authorization: Bearer xyz', passed: false },
       { passed: 'yes' },
     ], verify: { status: 'passed', command: 'pnpm test', exitCode: 0, timedOut: false, signal: null } };
@@ -46,7 +47,7 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
     await c.query('BEGIN');
     await c.query(`INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId",route,stage,status,"attemptId",reason) VALUES ($1,'owner',$2,$3,'{}','verify','running',$4,'fixture')`, [taskId, issueId, sourceEventId, verifyAttempt]);
     await c.query(`INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"runId",reason) VALUES ($1,$4,'execute',1,1,'passed',$5,'x'),($2,$4,'review',1,2,'passed',$6,'x'),($3,$4,'verify',1,3,'running',NULL,'x')`, [implAttempt, reviewAttempt, verifyAttempt, taskId, implRun, reviewRun]);
-    await c.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,$3,'o/r','device:x','repo',$4)`, [candidateId, taskId, sha, implRun]);
+    await c.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId","previewDatabaseBranch","machineName") VALUES ($1,$2,$3,'o/r','device:x','repo',$4,'preview/ac-7','Build server')`, [candidateId, taskId, sha, implRun]);
     await c.query(`UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1`, [taskId, candidateId]);
     await c.query(`UPDATE factory_attempts SET "candidateId"=$2 WHERE id=$1`, [reviewAttempt, candidateId]);
     await c.query('COMMIT'); c.release();
@@ -64,11 +65,20 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
     const [review] = detail.checks!;
     assert.equal(review.criteria.length, 2, 'malformed criterion dropped');
     assert.equal(review.criteria[0].passed, true);
+    assert.equal(review.criteria[0].command, 'pnpm test:button token=[REDACTED]');
+    assert.equal(review.criteria[0].exitCode, 0);
+    assert.equal(review.criteria[1].command, 'pnpm test');
+    assert.equal(review.criteria[1].exitCode, 0);
     assert.match(review.criteria[0].evidence!, /token=\[REDACTED\]/);
     assert.doesNotMatch(review.criteria[1].text!, /xyz/);
     assert.equal(review.criteria[1].criterionId, null);
     assert.deepEqual(review.verify, { status: 'passed', command: 'pnpm test', exitCode: 0 });
-    assert.deepEqual(detail.delivery, { candidateSha: sha, repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, deploymentEnvironment: null }, 'no receipt: deploymentEnvironment null');
+    assert.deepEqual(detail.delivery, { candidateSha: sha, previewDatabaseBranch: 'preview/ac-7', machineName: 'Build server', repository: 'o/r', environment: 'device:x', pullRequest: { url: 'https://github.com/o/r/pull/7', state: 'open' }, previewUrl: null, deploymentEnvironment: null }, 'no receipt: deploymentEnvironment null');
+
+    await refreshPublishedPullRequest('pull_request', { repository: { full_name: 'o/r' }, pull_request: { number: 7, html_url: 'https://github.com/o/r/pull/7', title: 'Updated PR title', state: 'open', draft: false, merged_at: null } }, pool);
+    assert.equal((await store.read('owner', taskId)).delivery?.pullRequest?.title, 'Updated PR title');
+    await refreshPublishedPullRequest('pull_request', { repository: { full_name: 'foreign/r' }, pull_request: { number: 7, html_url: 'https://github.com/o/r/pull/7', title: 'Foreign title', state: 'open', draft: false, merged_at: null } }, pool);
+    assert.equal((await store.read('owner', taskId)).delivery?.pullRequest?.title, 'Updated PR title');
 
     await pool.query(`INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,'owner','session:s','s',$5,'{}','{}','deploy_preview','preview','d','[]',1,$4,1,now()+interval '1 hour')`, [approvalId, taskId, candidateId, verifyAttempt, randomUUID()]);
     await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt") VALUES ($1,$2,$3,$4,'deploy_preview','preview',$5,'{}','succeeded',$6,now())`, [randomUUID(), approvalId, taskId, candidateId, randomUUID(), JSON.stringify({ verifiedTarget: { environment: 'preview', reference: 'https://mikka-git-x.vercel.app', provider: { name: 'vercel', environment: 'preview' } } })]);
@@ -104,7 +114,7 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
     }
     // An older candidate's succeeded preview never leaks into the current candidate.
     const newer = randomUUID();
-    await pool.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,$3,'o/r','device:x','repo',$4)`, [newer, taskId, 'c'.repeat(40), implRun]);
+    await pool.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId","previewDatabaseBranch","machineName") VALUES ($1,$2,$3,'o/r','device:x','repo',$4,'preview/ac-7','Build server')`, [newer, taskId, 'c'.repeat(40), implRun]);
     await pool.query(`UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1`, [taskId, newer]);
     { const { delivery } = await store.read('owner', taskId);
       assert.deepEqual([delivery?.previewUrl, delivery?.deploymentEnvironment], [null, null], 'current candidate has no publication'); }
@@ -140,4 +150,13 @@ test('criteria: malformed entries do not take slots; at most 200', () => {
   assert.equal(out[0].text, 'c0');
   assert.equal(out[199].text, 'c199');
   assert.equal(factoryCriteria({ criteria: Array.from({ length: 150 }, (_, i) => ok(i)) }).length, 150);
+});
+
+test('criterion command and exit code stay paired; legacy entries use the run fallback', () => {
+  const out = factoryCriteria({ verify: { status: 'passed', command: 'pnpm test:all', exitCode: 0 }, criteria: [
+    { passed: true, command: 'pnpm test:one', exitCode: 3 },
+    { passed: false, command: 'pnpm test:two' },
+    { passed: true },
+  ] });
+  assert.deepEqual(out.map(c => [c.command, c.exitCode]), [['pnpm test:one', 3], ['pnpm test:two', null], ['pnpm test:all', 0]]);
 });

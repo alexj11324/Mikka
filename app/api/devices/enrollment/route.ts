@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { mintDeviceEnrollment } from '@/lib/device-enrollment'
 
 export async function POST(request: Request) {

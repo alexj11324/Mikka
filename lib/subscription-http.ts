@@ -15,7 +15,7 @@ const input = z.discriminatedUnion('action', [
 ])
 const headers = { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' }
 export interface SubscriptionHTTPDependencies {
-  session(request: Request): Promise<{ userId: string; sessionId: string } | null>
+  session(request: Request): Promise<{ userId: string; sessionId: string; tokenWorkspaceId?: string } | null>
   workspace(userId: string, workspaceId: string): Promise<void>
   service(custodyOnly?: boolean): SubscriptionService
 }
@@ -36,6 +36,7 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
       const body = parsed.data
       const service = deps.service(['status', 'disconnect', 'recover', 'remove'].includes(body.action))
       if (body.action === 'connect') {
+        if (session.tokenWorkspaceId && session.tokenWorkspaceId !== body.workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
         await deps.workspace(session.userId, body.workspaceId)
         if (!service.capabilities.oauth?.[body.provider]) throw new SubscriptionRefusal('backend_unavailable')
         const connectionId = await service.repository.create(session.userId, body.workspaceId, body.provider)
@@ -44,6 +45,7 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
         return Response.json({ connectionId, ...result }, { headers })
       }
       const row = await service.repository.connection(session.userId, body.connectionId)
+      if (session.tokenWorkspaceId && session.tokenWorkspaceId !== row.workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
       await deps.workspace(session.userId, row.workspaceId)
       const worker = service.worker(service.repository.scope(row))
       if (body.action === 'reconnect' && !service.capabilities.oauth?.[row.provider]) throw new SubscriptionRefusal('backend_unavailable')
@@ -74,6 +76,7 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
   try {
     const service = deps.service(true)
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
+    if (session.tokenWorkspaceId && session.tokenWorkspaceId !== workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
     await deps.workspace(session.userId, workspaceId)
     const { rows } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel" from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and "removedAt" is null order by "createdAt" desc limit 50', [session.userId, workspaceId])
     // Which Bots use each connection is a nicety: the list still loads without it.
@@ -96,6 +99,7 @@ export async function subscriptionUsage(request: Request, deps: SubscriptionHTTP
   try {
     const service = deps.service(true)
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
+    if (session.tokenWorkspaceId && session.tokenWorkspaceId !== workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
     await deps.workspace(session.userId, workspaceId)
     const { rows } = await service.repository.pool.query('select id,epoch from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and state=\'connected\' order by "createdAt" desc limit 20', [session.userId, workspaceId])
     const force = new URL(request.url).searchParams.get('refresh') === '1'

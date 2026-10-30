@@ -5,7 +5,7 @@ const input = z.object({ id: z.uuid(), workspaceId: z.uuid(), proof: z.string().
 export function enrollmentBindHTTP(deps: {
   operator(request: Request): Promise<string | null>
   handoff?(request: Request, userId: string, body: z.infer<typeof input>): Promise<string | null>
-  session(request: Request): Promise<{ userId: string } | null>
+  session(request: Request): Promise<{ userId: string; tokenWorkspaceId?: string } | null>
   workspace(userId: string, workspaceId: string): Promise<void>
   client(): Pick<EnrollmentClient, 'bind'>
 }) {
@@ -30,6 +30,7 @@ export function enrollmentBindHTTP(deps: {
       if (!session) return Response.json({ error: 'auth_required' }, { status: 401, headers })
       const principal = directPrincipal ?? await deps.handoff?.(request, session.userId, body)
       if (!principal) return Response.json({ error: 'auth_required' }, { status: 401, headers })
+      if (session.tokenWorkspaceId && session.tokenWorkspaceId !== body.workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
       await deps.workspace(session.userId, body.workspaceId)
       return Response.json(await deps.client().bind(principal, body.id, session.userId, body.workspaceId), { headers })
     } catch { return Response.json({ error: 'subscription_binding_unavailable' }, { status: 409, headers }) }

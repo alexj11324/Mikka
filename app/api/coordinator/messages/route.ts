@@ -1,6 +1,6 @@
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { after, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError, readPersonalSubmissionBody, PersonalSubmissionBodyError } from '@/lib/coordinator-submission'
 import { chatView } from '@/lib/coordinator/store'

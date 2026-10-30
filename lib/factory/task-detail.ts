@@ -9,6 +9,8 @@ export interface FactoryCheckCriterion {
   text: string | null;
   passed: boolean;
   evidence: string | null;
+  command: string | null;
+  exitCode: number | null;
 }
 export interface FactoryCheckResult {
   attemptId: string;
@@ -27,7 +29,9 @@ export interface FactoryCheckResult {
 /** B11 header (the rest of #445's list fields, on the detail). */
 export interface FactoryDelivery {
   candidateSha: string | null;
-  pullRequest: { url: string; state: "open" | "draft" | "merged" | "closed" } | null;
+  previewDatabaseBranch: string | null;
+  machineName: string | null;
+  pullRequest: { url: string; title?: string; state: "open" | "draft" | "merged" | "closed" } | null;
   /** factory_candidates.repository of the current candidate (e.g. "owner/repo"). */
   repository: string | null;
   /** factory_candidates.environment: where the candidate was built (e.g. "device:<id>"), not a deploy target. */
@@ -54,6 +58,7 @@ type Task = { id: string; issueId: string; candidateId: string | null; userId: s
 const text = (v: unknown) => (typeof v === "string" && v.trim() ? redactFactoryCheckText(v) : null);
 
 export function factoryCriteria(report: unknown): FactoryCheckCriterion[] {
+  const fallback = verifyOf(report);
   const list = (report as { criteria?: unknown } | null)?.criteria;
   if (!Array.isArray(list)) return [];
   // Filter first, then cap, so malformed entries never take one of the 200 slots.
@@ -64,6 +69,8 @@ export function factoryCriteria(report: unknown): FactoryCheckCriterion[] {
           text: text((c as { text?: unknown }).text),
           passed: (c as { passed: boolean }).passed,
           evidence: text((c as { evidence?: unknown }).evidence),
+          command: text((c as { command?: unknown }).command) ?? fallback?.command ?? null,
+          exitCode: text((c as { command?: unknown }).command) ? (Number.isSafeInteger((c as { exitCode?: unknown }).exitCode) ? (c as { exitCode: number }).exitCode : null) : fallback?.exitCode ?? null,
         }]
       : [],
   ).slice(0, 200);
@@ -104,8 +111,8 @@ export async function factoryTaskDetail(
       verify: verifyOf(row.report),
     });
   }
-  const { rows: [d] } = await tx.query<{ sha: string | null; repository: string | null; environment: string | null; pullRequest: FactoryDelivery["pullRequest"]; previewUrl: string | null; deploymentEnvironment: string | null }>(
-    `SELECT c.sha,c.repository,c.environment,
+  const { rows: [d] } = await tx.query<{ sha: string | null; repository: string | null; environment: string | null; previewDatabaseBranch: string | null; machineName: string | null; pullRequest: FactoryDelivery["pullRequest"]; previewUrl: string | null; deploymentEnvironment: string | null }>(
+    `SELECT c.sha,c.repository,c.environment,c."previewDatabaseBranch",c."machineName",
        (SELECT p."pullRequest" FROM run_publications p WHERE p."runId"=c."runId" AND p."userId"=$3) AS "pullRequest",
        f.receipt->'verifiedTarget'->>'reference' AS "previewUrl",
        CASE WHEN f.receipt->'verifiedTarget'->'provider'->>'name'='vercel'
@@ -122,6 +129,8 @@ export async function factoryTaskDetail(
     checks,
     delivery: {
       candidateSha: d?.sha ?? null,
+      previewDatabaseBranch: text(d?.previewDatabaseBranch),
+      machineName: text(d?.machineName),
       repository: d?.repository ?? null,
       environment: d?.environment ?? null,
       pullRequest: d?.pullRequest ?? null,
