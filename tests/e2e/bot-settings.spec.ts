@@ -12,6 +12,9 @@ async function shots(page: Page, testInfo: TestInfo, name: string, target: Locat
 
 // docs/design/bot-settings.md: the admin governs 可用模型 in workspace settings; the bot's
 // owner picks its model in the bot's 详情, only from what is allowed. Real app and database.
+// A select trigger's text includes its chevron; compare the shown value only.
+const shown = (combobox: Locator) => combobox.locator('[data-slot="select-value"]')
+
 test('管理员设置可用模型，Bot 创建者只能在允许范围内选择模型', async ({ page }, testInfo) => {
   // A new account is the admin of its own workspace.
   await register(page, '/settings?section=bots')
@@ -27,11 +30,11 @@ test('管理员设置可用模型，Bot 创建者只能在允许范围内选择�
   await expect(page.getByRole('option', { name: 'Claude', exact: true })).toHaveCount(0)
   await shots(page, testInfo, 'starting-model-menu', page.getByRole('listbox'))
   await page.getByRole('option', { name: 'Codex', exact: true }).click()
-  await expect(starting).toHaveText('Codex')
+  await expect(shown(starting)).toHaveText('Codex')
   await expect(starting).toBeEnabled()
   await page.reload()
   await expect(claude).not.toBeChecked()
-  await expect(starting).toHaveText('Codex')
+  await expect(shown(starting)).toHaveText('Codex')
   // The last allowed family cannot be switched off.
   await models.getByRole('switch', { name: 'Mikka 默认', exact: true }).click()
   await expect(models.getByRole('switch', { name: 'Codex', exact: true })).toBeDisabled()
@@ -40,7 +43,7 @@ test('管理员设置可用模型，Bot 创建者只能在允许范围内选择�
   await expect(models.getByRole('switch', { name: 'Codex', exact: true })).toBeEnabled()
   await starting.click()
   await page.getByRole('option', { name: 'Mikka 默认', exact: true }).click()
-  await expect(starting).toHaveText('Mikka 默认')
+  await expect(shown(starting)).toHaveText('Mikka 默认')
 
   // Owner flow: a new bot starts on the starting model and offers only allowed families.
   await page.goto(app('/'))
@@ -53,8 +56,8 @@ test('管理员设置可用模型，Bot 创建者只能在允许范围内选择�
   await panel.getByRole('tab', { name: '详情', exact: true }).click()
   const settings = panel.getByTestId('bot-settings')
   const model = settings.getByRole('combobox', { name: '模型', exact: true })
-  await expect(model).toHaveText('Mikka 默认')
-  await expect(settings.getByRole('combobox', { name: '仓库', exact: true })).toHaveText('无')
+  await expect(shown(model)).toHaveText('Mikka 默认')
+  await expect(shown(settings.getByRole('combobox', { name: '仓库', exact: true }))).toHaveText('无')
   await shots(page, testInfo, 'bot-details-settings', settings)
   await model.click()
   await expect(page.getByRole('option', { name: 'Claude', exact: true })).toHaveCount(0)
@@ -63,7 +66,7 @@ test('管理员设置可用模型，Bot 创建者只能在允许范围内选择�
   await page.keyboard.press('Escape')
   await page.reload()
   await panel.getByRole('tab', { name: '详情', exact: true }).click()
-  await expect(model).toHaveText('Mikka 默认')
+  await expect(shown(model)).toHaveText('Mikka 默认')
 
   // A turn refused for the bot's model shows in the chat with its fix (failTurn's lastError, as the workflow stores it).
   const botId = new URL(page.url()).searchParams.get('bot')!
