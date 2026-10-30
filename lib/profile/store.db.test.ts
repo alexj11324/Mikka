@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
 // R-73: a profile belongs to one person. Teammates in the same workspace never
 // see, delete or correct each other's facts; repeats merge; corrections stick.
@@ -9,10 +10,7 @@ import test from 'node:test'
 let databaseUrl: string | undefined
 try {
   const target = new URL(process.env.E2E_DATABASE_URL ?? '')
-  if (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true'
-    && ['postgres:', 'postgresql:'].includes(target.protocol)
-    && target.hostname === '127.0.0.1' && target.port === '5432' && target.pathname === '/mikka_e2e'
-    && !target.search && !target.hash && process.env.MIKKA_DATABASE_URL === target.href
+  if (isE2eTarget(target.href) && process.env.MIKKA_DATABASE_URL === target.href
     && process.env.DATABASE_URL === target.href) databaseUrl = target.href
 } catch { /* no eligible disposable CI database */ }
 if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')

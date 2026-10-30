@@ -84,7 +84,7 @@
     "test:conversation-reads": "node --import tsx --experimental-test-module-mocks --test lib/conversation-reads-store.test.ts lib/conversation-reads-route.test.ts",
     "test:db": "node scripts/run-db-tests.mjs",
     "test:agent-tool-approval-db": "node scripts/test-agent-tool-approval-db.mjs lib/agent-tool-approval/store.db.test.ts lib/agent-tool-approval/http.db.test.mts",
-    "test:db-runner": "node --test scripts/run-db-tests.test.mjs",
+    "test:db-runner": "node --test scripts/run-db-tests.test.mjs tests/helpers/e2e-target.test.mjs",
     "test:workspace-migration-db": "node --test tests/workspace-migration.test.mjs",
     "test:artifact-migration-db": "node --test tests/artifact-legacy-migration.test.mjs",
     "test:activity-actor-db": "node --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/activity-actor-db.test.ts",

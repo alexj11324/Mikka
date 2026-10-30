@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
+import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { SubagentStore } from './subagents'
 import { startSuggestion } from './suggestions'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
@@ -10,8 +11,21 @@ import { claimCloudRun } from '@/lib/computer/claim'
 import { assertThreadMachineCapacity, openThreadDesktop, recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
+// This suite runs DROP SCHEMA ... CASCADE, so the full target is checked before any
+// connection, not just the hostname. Legacy CI names (computer_test, subagent_test)
+// stay accepted until the workflow follow-up renames them to *_e2e.
+function isolatedTarget(value: string) {
+  if (isE2eTarget(value)) return true
+  if (value !== value.trim() || value.includes('?') || value.includes('#')) return false
+  try {
+    const u = new URL(value)
+    return ['postgres:', 'postgresql:'].includes(u.protocol) && ['localhost', '127.0.0.1'].includes(u.hostname)
+      && ['/computer_test', '/subagent_test'].includes(u.pathname)
+  } catch { return false }
+}
+if (databaseURL && !isolatedTarget(databaseURL)) throw new Error('backend DB test requires a loopback *_e2e (or legacy computer_test/subagent_test) database without URL options')
 test('real DB: additive migration, subagent owner isolation and separate thread claims', { skip: !databaseURL }, async () => {
-  assert.ok(['localhost', '127.0.0.1'].includes(new URL(databaseURL!).hostname))
+  assert.ok(isolatedTarget(databaseURL!))
   const schema = `subagent_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
