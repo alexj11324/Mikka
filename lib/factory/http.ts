@@ -42,6 +42,11 @@ export async function handleFactoryList(
     };
   } catch (error) {
     const status = error instanceof FactoryError ? factoryListStatus(error.code) : 503;
+    // Server-side only, masked: class name and code, never params or messages.
+    if (status === 503) {
+      const code = (error as { code?: unknown } | null)?.code;
+      console.error("factory list unavailable", { error: (error as Error | null)?.constructor?.name ?? "unknown", code: typeof code === "string" ? code : "unknown" });
+    }
     return { status, body: { error: status === 503 ? "factoryUnavailable" : (error as FactoryError).code } };
   }
 }

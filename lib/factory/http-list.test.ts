@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { maskFactoryNote } from "./note-mask";
 import { FactoryError } from "./contract";
 import { factoryListStatus, handleFactoryList, type FactoryStore } from "./http";
 import { redactFactoryCheckText } from "./checks";
@@ -28,8 +29,7 @@ test("list reason uses the factory text masker", () => {
   assert.equal(redactFactoryCheckText("token ghp_abcdefghijklmnop leaked"), "token [REDACTED] leaked");
 });
 
-// TODO(#438): once #438's shared secret masker merges, the list reason must go through it
-// (covers key=value secrets, URLs with credentials, etc. beyond the bearer/token patterns).
-test("list reason masks key=value secrets via #438 masker", { skip: "pending #438 masker" }, () => {
-  assert.doesNotMatch(redactFactoryCheckText("E2B_API_KEY=e2b_live_xxx"), /e2b_live_xxx/);
+test("list reason masks key=value secrets and env secret values", () => {
+  assert.doesNotMatch(maskFactoryNote("E2B_API_KEY=e2b_live_xxx"), /e2b_live_xxx/);
+  assert.doesNotMatch(maskFactoryNote("leaked e2b_synthetic_value_1", [{ name: "E2B_API_KEY", value: "e2b_synthetic_value_1" }]), /e2b_synthetic/);
 });

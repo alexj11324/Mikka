@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { factoryCheckIndependent } from "./check-independence";
-import { redactFactoryCheckText } from "./checks";
+import { maskFactoryNote } from "./note-mask";
 import { factoryScopeAllows, type FactoryIssueScope } from "./scope";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
@@ -346,8 +346,8 @@ export function createFactoryStore(
         for (const row of rows)
           if (factoryScopeAllows(row, issue) && await sourceAllowed(tx, userId, row.sourceEventId, issueId)) {
             const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId, candidateSha, publication } = row;
-            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:redactFactoryCheckText(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication)});
-            // TODO(#438): switch to #438's shared secret masker once merged; see list-mask test (skipped).
+            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication)});
+            // Same minimal masker copy as #444 (lib/factory/note-mask.ts); switch to #438's once merged.
           }
         return { contractVersion: 1 as const, issueId, tasks };
       });
