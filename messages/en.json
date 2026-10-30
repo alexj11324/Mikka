@@ -1596,10 +1596,10 @@
         "title": "Activity"
       },
       "computers": {
-        "title": "My computers"
+        "title": "Devices"
       },
       "developer": {
-        "title": "Developer"
+        "title": "Personal access tokens"
       },
       "general": {
         "title": "General"
@@ -1608,7 +1608,7 @@
         "title": "Bots"
       },
       "permissions": {
-        "title": "Permissions and approvals"
+        "title": "Team permissions"
       },
       "secrets": {
         "title": "Secrets and environment"
@@ -1692,7 +1692,7 @@
       "previewLabel": "Workspace form preview"
     },
     "computerPolicy": {
-      "heading": "Cloud computers",
+      "heading": "Computer use",
       "description": "Control whether Bots may operate computers in this workspace.",
       "label": "Bot computer use",
       "help": "Denying stops computer tasks and revokes their approvals. People can still take control.",
