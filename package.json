@@ -41,7 +41,7 @@
     "test:csv": "node --experimental-strip-types --test tests/invitation-csv.test.mjs",
     "test:analytics": "node --experimental-strip-types --test tests/analytics-policy.test.mjs",
     "test:workspace-settings": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/workspace-settings-actions.test.ts lib/workspace-admin/icon.test.ts",
-    "test:secrets-db": "node --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/workspace-secrets.db.test.ts",
+    "test:secrets-db": "node --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/workspace-secrets.db.test.ts tests/secret-masking-points.test.ts",
     "test:workspace-admin-db": "node --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/workspace-admin.db.test.ts",
     "test:settings": "node --experimental-strip-types --test tests/settings-navigation.test.mjs tests/settings-sidebar-search.test.mjs tests/team-identifier.test.mjs && node --import tsx --test lib/settings/activity-cursor.test.ts && node --import ./tests/support/server-only.mjs --import tsx --test lib/secrets/secrets.test.ts lib/secrets/permissions.test.ts lib/secrets/e2b.test.ts lib/secrets/mask.test.ts lib/secrets/e2b-runtime.test.ts",
     "test:settings-activity-db": "node --test-force-exit --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/settings-activity.db.test.ts",

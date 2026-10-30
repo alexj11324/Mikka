@@ -216,6 +216,38 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     await assert.rejects(runtime.sandboxSecretEnv(third.id, { MIKKA_BYO_E2B_KEY: '1' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
   })
 
+  await t.test('4e2 item 4: run-scoped masking resolves the cloud token workspace; checkpoint patch/files masked', async () => {
+    const runtime = await import('../lib/secrets/runtime')
+    const { maskCheckpoint } = await import('../lib/secrets/checkpoint')
+    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const TOKEN = 'tok_' + randomBytes(12).toString('hex')
+    await store.createWorkspaceSecret(admin, w.id, { name: 'API_TOKEN', kind: 'secret', value: TOKEN })
+    await store.createWorkspaceSecret(admin, w.id, { name: 'PLAIN_ENV', kind: 'env', value: 'plain-env-value' })
+    const on = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, MIKKA_BYO_E2B_KEY: '1' }, off = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
+    const device = (await pool.query(`insert into devices (id,name,"ownerId") values (gen_random_uuid(),'cloud',$1) returning id`, [admin])).rows[0].id
+    const local = (await pool.query(`insert into devices (id,name,"ownerId") values (gen_random_uuid(),'local',$1) returning id`, [admin])).rows[0].id
+    await pool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId") values (gen_random_uuid(),$1,$2,$3,$4)`, [admin, randomBytes(16).toString('hex'), device, w.id])
+    const agent = (await pool.query(`insert into agents (id,"userId",harness,name) values (gen_random_uuid(),$1,'codex','a') returning id`, [admin])).rows[0].id
+    const run = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId") values (gen_random_uuid(),$1,$2,$3) returning id`, [agent, admin, device])).rows[0].id
+    const localRun = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId") values (gen_random_uuid(),$1,$2,$3) returning id`, [agent, admin, local])).rows[0].id
+    assert.equal(await runtime.runWorkspaceId(run), w.id)
+    assert.equal(await runtime.runWorkspaceId(localRun), null, 'local device: no injected secrets, nothing to mask')
+    const out = { title: `report ${TOKEN}`, content: `b64 ${Buffer.from(TOKEN).toString('base64')} env plain-env-value` }
+    assert.deepEqual(await runtime.maskForRun(run, out, off), out, 'flag off: verbatim')
+    assert.deepEqual(await runtime.maskForRun(run, out, on), { title: 'report [secret:API_TOKEN]', content: 'b64 [secret:API_TOKEN] env plain-env-value' }, 'kind=env never masked')
+    assert.deepEqual(await runtime.maskForRun(localRun, out, on), out)
+    assert.equal(await runtime.maskForWorkspace(w.id, `x ${encodeURIComponent(TOKEN)}`, on), 'x [secret:API_TOKEN]')
+    const patch = Buffer.from(`--- a/.env\n+++ b/.env\n@@ -1 +1 @@\n-A=1\n+API_TOKEN=${TOKEN}\n`)
+    const mask = await runtime.workspaceSecretMasker(w.id, on)
+    const cp = maskCheckpoint({ patch, files: [{ path: 'a', preview: TOKEN }] }, mask)
+    assert.ok(!cp.patch.includes(TOKEN) && cp.patch.toString().includes('+API_TOKEN=[secret:API_TOKEN]'))
+    assert.deepEqual(cp.files, [{ path: 'a', preview: '[secret:API_TOKEN]' }])
+    const binary = Buffer.from([0xff, 0xfe, 0x00, ...Buffer.from(TOKEN)])
+    assert.equal(maskCheckpoint({ patch: binary, files: [] }, mask).patch, binary, 'non-UTF-8 patch left as is (documented gap)')
+    const offCp = { patch, files: [] }
+    assert.equal(maskCheckpoint(offCp, await runtime.workspaceSecretMasker(w.id, off)), offCp, 'flag off: same object')
+  })
+
   await t.test('4e2 runtime: E2B errors map to codes and mark the card (flag on only)', async () => {
     const { withE2BErrors } = await import('../lib/secrets/e2b-runtime')
     const { AuthenticationError, NotFoundError } = await import('e2b')

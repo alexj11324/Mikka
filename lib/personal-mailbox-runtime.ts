@@ -15,6 +15,7 @@ import type { PoolClient } from 'pg'
 import { personalMailboxEnabled } from './personal-mailbox-config'
 import { workspacePool } from './workspace-db'
 import { acquireWorkspaceMembership } from './workspace-membership-guard'
+import { maskForRun } from '@/lib/secrets/runtime'
 import type { MailboxTransactionGuard } from './mailbox-transaction-guard'
 export { personalMailboxEnabled } from './personal-mailbox-config'
 
@@ -62,7 +63,10 @@ export async function personalWorkerMailboxAdvertised(userId: string, runId: str
     executionId: run.agentDefinition.parent.executionId, worker: run.agentDefinition }) }
   catch (error) { if (error instanceof MailboxError) return []; throw error }
 }
-export async function personalWorkerMailbox(userId: string, runId: string, input: unknown, verifiedToken: string, signal?: AbortSignal) {
+export async function personalWorkerMailbox(userId: string, runId: string, rawInput: unknown, verifiedToken: string, signal?: AbortSignal) {
+  // 4e2 item 4: a run's outgoing peer message text is stored; mask it with the run's secret set (MCP and HTTP paths).
+  const input = rawInput && typeof rawInput === 'object' && typeof (rawInput as { text?: unknown }).text === 'string'
+    ? { ...rawInput, text: await maskForRun(runId, (rawInput as { text: string }).text) } : rawInput
   if (!personalMailboxEnabled()) return { status: 503, body: { error: 'personal_mailbox_unavailable' } }
   // Resolve the existing private Bot namespace from trusted records, never a
   // body field. Unbound runs retain main's existing device namespace.

@@ -6,6 +6,7 @@ import { ComputerError } from '@/lib/computer/store'
 import { SubagentStore, type Actor } from './subagents'
 import { lockBrowserAuthority } from './browser-authority'
 import { browserEffects, browserMutationSchema, observationMetadata, type BrowserMutation, type VisualObservation } from './visual-contract'
+import { maskForWorkspace } from '@/lib/secrets/runtime'
 import type { judgeVisualBrowserAction } from './visual-model'
 export { browserMutationSchema } from './visual-contract'
 export type { BrowserMutation } from './visual-contract'
@@ -21,8 +22,11 @@ type Judgment=Awaited<ReturnType<typeof judgeVisualBrowserAction>>
 
 /** Only the workflow holding the real visual-model/Decisions response calls
  * this adapter. Neither HTTP input nor model output provides authorization. */
-export async function browserAction(pool:Pool,actor:Actor,botId:string,id:string,mutation:BrowserMutation,summary:string,observation:VisualObservation,judgment:Judgment) {
+export async function browserAction(pool:Pool,actor:Actor,botId:string,id:string,mutation:BrowserMutation,rawSummary:string,observation:VisualObservation,judgment:Judgment) {
   if (judgment.scope!=='within_task' || judgment.execution.vision!=='image-input-submitted' || judgment.execution.imageDigests[0]!==observationMetadata(observation).imageDigest) throw new ComputerError(409,'Browser judgment unavailable')
+  // 4e2 item 4: the summary is persisted (pending_actions, needs, step, subagent_events). The mutation is
+  // the executable action and is NOT masked (masking would type the placeholder); see #438 table.
+  const summary=await maskForWorkspace(actor.workspaceId,rawSummary)
   const client=await pool.connect()
   let input:z.infer<typeof approvedSchema>, permission:'allow'|'ask'|'deny'
   try {

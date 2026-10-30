@@ -2,12 +2,12 @@ import 'server-only'
 // 4e2: workspace secrets at sandbox runtime. Everything here is gated by MIKKA_BYO_E2B_KEY
 // (off by default; turning it on needs Alex). Flag off = no injection, no masking, today's behaviour.
 import { and, eq, inArray } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { workspaceSecrets } from '@/lib/db/secrets-schema'
 import { openSecret, secretAad, SecretsKeyMissingError } from './crypto'
 import { byoE2BKeyEnabled, E2BKeyError } from './e2b'
 import { guardSecretsDb } from './store'
-import { createSecretMasker, identityMasker, type Masker } from './mask'
+import { createSecretMasker, identityMasker, maskDeep, type Masker } from './mask'
 
 type Env = Record<string, string | undefined>
 export interface RuntimeSecret { name: string; kind: 'secret' | 'env'; value: string }
@@ -37,4 +37,26 @@ export async function sandboxSecretEnv(workspaceId: string, env: Env = process.e
 export async function workspaceSecretMasker(workspaceId: string | null | undefined, env: Env = process.env): Promise<Masker> {
   if (!workspaceId || !byoE2BKeyEnabled(env)) return identityMasker
   return createSecretMasker((await loadWorkspaceRuntimeSecrets(workspaceId, env)).filter(s => s.kind === 'secret'))
+}
+
+/** Workspace whose secrets a run's sandbox received: the workspace its cloud device token is bound to. Null for local devices (nothing injected, nothing to mask). */
+export async function runWorkspaceId(runId: string): Promise<string | null> {
+  const { rows } = await guardSecretsDb(() => pool.query<{ workspaceId: string }>(
+    'SELECT t."boundWorkspaceId" AS "workspaceId" FROM agent_runs r JOIN device_tokens t ON t."boundDeviceId"=r."deviceId" WHERE r.id=$1 AND t."boundWorkspaceId" IS NOT NULL ORDER BY t."createdAt" DESC LIMIT 1', [runId]))
+  return rows[0]?.workspaceId ?? null
+}
+
+/** Masker for output persisted on behalf of a run (MCP worker tools). Same secret set as the run's sandbox. */
+export async function runSecretMasker(runId: string, env: Env = process.env): Promise<Masker> {
+  if (!byoE2BKeyEnabled(env)) return identityMasker
+  return workspaceSecretMasker(await runWorkspaceId(runId), env)
+}
+
+/** maskDeep(value) with the workspace's masker; identity (same reference) when the flag is off. */
+export async function maskForWorkspace<T>(workspaceId: string | null | undefined, value: T, env: Env = process.env): Promise<T> {
+  return maskDeep(value, await workspaceSecretMasker(workspaceId, env))
+}
+/** maskDeep(value) with the run's masker. */
+export async function maskForRun<T>(runId: string, value: T, env: Env = process.env): Promise<T> {
+  return maskDeep(value, await runSecretMasker(runId, env))
 }

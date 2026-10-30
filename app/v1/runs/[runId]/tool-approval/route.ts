@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { authenticateDevice } from '@/lib/device-link'
 import { AgentToolApprovalStore } from '@/lib/agent-tool-approval/store'
+import { maskForWorkspace } from '@/lib/secrets/runtime'
 
 export const dynamic = 'force-dynamic'
 const payload = z.discriminatedUnion('operation', [
@@ -19,7 +20,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   const input = parsed.data; const actor = { userId: caller.userId, deviceId: input.deviceId }; const store = new AgentToolApprovalStore(pool)
   try {
     if (input.operation === 'check') return Response.json({ live: await store.check(actor, runId, input.policyRevision) })
-    if (input.operation === 'propose') return Response.json(await store.propose(actor, { runId, requestId: input.requestId, harness: input.harness, method: input.method, input: input.input, policyRevision: input.policyRevision }))
+    if (input.operation === 'propose') return Response.json(await store.propose(actor, { runId, requestId: input.requestId, harness: input.harness, method: input.method, input: await maskForWorkspace(caller.scopeWorkspaceId, input.input), policyRevision: input.policyRevision }))
     if (input.operation === 'take') return Response.json({ decision: await store.take(actor, runId, input.id, input.digest) })
     return Response.json({ cancelled: await store.cancel(actor, runId, input.id, input.digest) })
   } catch { return Response.json({ error: 'approvalUnavailable' }, { status: 409 }) }
