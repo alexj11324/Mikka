@@ -78,3 +78,11 @@ test('no other machine fits: the run waits for its own', () => {
   assert.equal(pickTakeover([candidate('d2', { harnesses: [{ harness: 'claude_code', installed: true }] })], lostRun), null)
   assert.equal(pickTakeover([candidate('d2')], { ...lostRun, remoteUrl: null }), null)
 })
+
+test('a lost CI original-session continuation never falls back to a fresh session', () => {
+  for (const ciContinuation of [{ originRunId: 'origin', originSessionId: 'session' }, {}]) {
+    const outcome = lostRunOutcome({ ...run, ciContinuation })
+    assert.equal(outcome.kind, 'failed')
+    if (outcome.kind === 'failed') assert.match(outcome.error, /original-session.*explicit recovery/)
+  }
+})

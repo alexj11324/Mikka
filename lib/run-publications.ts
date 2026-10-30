@@ -208,6 +208,10 @@ async function settlePublication(claim: Publication, result: { pullRequest?: Pub
       result = { ...result, errorCode: error.code }
       await finishResult(tx, run, { ...result, branch: claim.branch }, false, claim.scopeVersion)
     }
+    if (result.pullRequest && !result.errorCode) {
+      const { registerCiPublication } = await import('@/lib/github/ci/register')
+      await registerCiPublication(tx, { userId: claim.userId, issueId: claim.issueId, remoteKey: claim.remoteKey, runId: claim.runId, scopeVersion: claim.scopeVersion, url: result.pullRequest.url, state: result.pullRequest.state, ciOriginRunId: run.ciContinuation?.originRunId })
+    }
     await tx.update(runPublications).set({ status: result.pullRequest ? 'published' : 'blocked', pullRequest: result.pullRequest ?? null, errorCode: result.errorCode ?? null, leaseToken: null, leaseExpiresAt: null, updatedAt: new Date() }).where(eq(runPublications.runId, claim.runId))
     return true
   })

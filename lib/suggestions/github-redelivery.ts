@@ -11,8 +11,8 @@ const API = 'https://api.github.com'
 export const REDELIVERY_WINDOW_MS = 3 * 60 * 60 * 1000
 /** At most this many redeliveries per run. */
 export const REDELIVERY_LIMIT = 25
-/** The events app/api/webhooks/github turns into suggestions; others are not worth redelivering. */
-const SUGGESTION_EVENTS = new Set(['pull_request', 'issues', 'issue_comment', 'pull_request_review', 'pull_request_review_comment'])
+/** The events app/api/webhooks/github processes; others are not worth redelivering. */
+const HANDLED_EVENTS = new Set(['pull_request', 'issues', 'issue_comment', 'pull_request_review', 'pull_request_review_comment', 'workflow_run'])
 
 /** One row of GET /app/hook/deliveries. */
 export interface GitHubDelivery { id: string; guid: string; delivered_at: string; redelivery: boolean; status_code: number; event: string }
@@ -46,10 +46,24 @@ export function failedDeliveries(deliveries: readonly GitHubDelivery[], since: D
   for (const attempts of byGuid.values()) {
     if (attempts.some(succeeded)) continue
     const latest = attempts.reduce((a, b) => new Date(b.delivered_at) > new Date(a.delivered_at) ? b : a)
-    if (new Date(latest.delivered_at) < since || !SUGGESTION_EVENTS.has(latest.event)) continue
+    if (new Date(latest.delivered_at) < since || !HANDLED_EVENTS.has(latest.event)) continue
     failed.push(latest)
   }
   return failed.sort((a, b) => new Date(a.delivered_at).getTime() - new Date(b.delivered_at).getTime()).slice(0, limit)
+}
+
+/** Keep a failed CI burst from starving business notifications, and vice versa. */
+export function fairRedeliveries(failed: readonly GitHubDelivery[], limit = REDELIVERY_LIMIT): GitHubDelivery[] {
+  const ci = failed.filter(row => row.event === 'workflow_run')
+  const business = failed.filter(row => row.event !== 'workflow_run')
+  const reserved = Math.floor(limit / 2)
+  const selected = [...business.slice(0, reserved), ...ci.slice(0, reserved)]
+  const chosen = new Set(selected.map(row => row.guid))
+  for (const row of failed) {
+    if (selected.length >= limit) break
+    if (!chosen.has(row.guid)) { selected.push(row); chosen.add(row.guid) }
+  }
+  return selected
 }
 
 /** The cursor in GitHub's `Link: <…?cursor=…>; rel="next"` header. */
@@ -94,7 +108,7 @@ export async function redeliverFailedGitHubWebhooks({ now = new Date(), fetcher 
   result.scanned = deliveries.length
   const failed = failedDeliveries(deliveries, since, Infinity)
   result.failed = failed.length
-  for (const delivery of failed.slice(0, REDELIVERY_LIMIT)) {
+  for (const delivery of fairRedeliveries(failed)) {
     const response = await fetcher(`${API}/app/hook/deliveries/${delivery.id}/attempts`, { method: 'POST', headers })
     if (response.ok) result.redelivered++
     else result.errors++
