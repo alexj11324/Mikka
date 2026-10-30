@@ -25,6 +25,7 @@ export const REQUIRED_SUITES = [
   { marker: 'scripts/migration-steps.mjs', file: 'tests/migration-steps.db.test.mjs', script: 'test:migration-steps-db' },
   { marker: 'lib/factory/store.ts', file: 'lib/factory/routing.db.test.ts', script: 'test:factory-routing-db' },
   { marker: 'lib/run-admission-store.ts', file: 'tests/factory-admission.db.test.ts', script: 'test:factory-routing-db' },
+  { marker: 'lib/run-chain.ts', file: 'tests/run-chain.db.test.ts', script: 'test:factory-routing-db' },
   { marker: 'lib/agent-kit/store.ts', file: 'lib/agent-kit/store.db.test.ts', script: 'test:agent-kit-db' },
   { marker: 'lib/computer/store.ts', file: 'lib/computer/store.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/captures/store.ts', file: 'lib/captures/store.db.test.ts', script: 'test:captures-db' },

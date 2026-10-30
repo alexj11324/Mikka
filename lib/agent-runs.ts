@@ -19,6 +19,7 @@ import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { runPrompt } from '@/lib/run-prompt'
 import { dispatchInput, dispatchRequestKey, type DispatchInput, type DispatchResult } from '@/lib/run-dispatch'
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
+import { resolveStopTarget } from '@/lib/run-chain'
 import { runBotName } from '@/lib/run-bot-name'
 
 // Run operations for one person, by user id. The agent actions call these
@@ -247,5 +248,17 @@ export async function addRunMessage(
 export async function requestRunStop(userId: string, runId: string): Promise<void> {
   const parsed = z.uuid().safeParse(runId)
   if (!parsed.success) throw new ActionFailureError('runNotFound')
-  await stopOwnedRun(db, userId, parsed.data)
+  // BE-18: a stop on an ended attempt of a question-continuation chain is forwarded to the
+  // chain's live latest run; if the whole chain has ended it is a 409 (runChainEnded), never
+  // a silent no-op. Only the caller's own chain on one issue is considered (lib/run-chain.ts).
+  const target = await resolveStopTarget(pool, userId, parsed.data)
+  if (target.kind === 'notFound') throw new ActionFailureError('runNotFound')
+  if (target.kind === 'chainEnded') throw new ActionFailureError('runChainEnded', { latestRunId: target.latestRunId })
+  try {
+    await stopOwnedRun(db, userId, target.runId)
+  } catch (error) {
+    // The latest run ended between the read and the stop: the chain has ended now.
+    if (target.forwardedFrom && error instanceof ActionFailureError && error.code === 'runNotFound') throw new ActionFailureError('runChainEnded', { latestRunId: target.runId })
+    throw error
+  }
 }

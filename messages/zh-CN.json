@@ -1052,6 +1052,7 @@
     "runAlreadyActive": "此任务已有正在执行的线程。",
     "runDispatchKeyConflict": "此请求标识已用于不同的运行参数。",
     "runNotActive": "此运行已结束，且没有可回答的问题。",
+    "runChainEnded": "此线程的所有尝试都已结束，没有可停止的运行。",
     "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。"
   },
   "Overview": {

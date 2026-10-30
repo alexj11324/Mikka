@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import {
   agents, agentRuns, deviceRepos, devices, issueMembers, runChunks, runMessages, users,
   type SupportedHarness,
@@ -20,7 +20,8 @@ import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
-import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, type IssueThread } from '@/lib/issue-threads'
+import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, withRunChain, type IssueThread } from '@/lib/issue-threads'
+import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
 async function getUserId(): Promise<string> {
@@ -155,10 +156,15 @@ const threadColumns = {
 export async function listIssueThreads(issueId: string): Promise<IssueThread[]> {
   const { issue, user, memberIds } = await issueThreadAccess(issueId)
   if (!memberIds.has(user.id)) return []
+  // BE-18: fold continuation chains by root first, then take the newest ISSUE_THREAD_LIMIT
+  // roots, so continuations never use up a slot (lib/run-chain.ts). Read-only, no locks.
+  const chains = await listIssueRunChains(pool, issue.id, [...memberIds], ISSUE_THREAD_LIMIT)
+  if (!chains.length) return []
   const rows = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
-    .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds])))
+    .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds]), inArray(agentRuns.id, chains.map(chain => chain.rootRunId))))
     .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
-  return projectIssueThreads(rows, issue.id, user.id, memberIds)
+  const byRoot = new Map(chains.map(chain => [chain.rootRunId, chain]))
+  return projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id)))
 }
 
 async function readableThread(issueId: string, runId: string) {
@@ -185,7 +191,9 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
-  const [thread] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
+  const [projected] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
+  const chain = await readRunChain(pool, row.userId, row.id)
+  const thread = withRunChain(projected, chain)
   return {
     thread: { ...thread, prompt: row.prompt, stopRequestedAt: row.stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,

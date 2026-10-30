@@ -1052,6 +1052,7 @@
     "runAlreadyActive": "This task already has an active run.",
     "runDispatchKeyConflict": "This request key was already used for different run parameters.",
     "runNotActive": "This run has ended and has no answerable question.",
+    "runChainEnded": "Every attempt of this thread has already ended; there is nothing left to stop.",
     "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response."
   },
   "Overview": {
