@@ -1,5 +1,5 @@
-// #438 QA: closing a streamed part in a later batch than its deltas (cross-batch), for every
-// end kind (text-end, reasoning-end, finish, error, abort) and every split point.
+// #438: masking a streamed part inside one event batch, for every end kind (text-end, reasoning-end,
+// finish, error, abort, or just the end of the batch) and every delta size. Nothing is held between batches.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createSecretMasker } from './mask'
@@ -7,51 +7,43 @@ import { maskStreamedChunks } from './stream-mask'
 
 const SECRET = 'sk_live_0123456789abcdef'
 const mask = createSecretMasker([{ name: 'A', value: SECRET }])
-const TEXTS = [`hello ${SECRET} world`, `ends with ${SECRET}`, `ends with sk_live_0`, 'plain text only', `${SECRET}`]
-const ENDS = ['text-end', 'reasoning-end', 'finish', 'error', 'abort'] as const
+const TEXTS = [`hello ${SECRET} world`, `ends with ${SECRET}`, `ends with sk_live_0`, 'plain text only', `${SECRET}`, `b64 ${Buffer.from(SECRET).toString('base64')} done`]
+const ENDS = ['text-end', 'reasoning-end', 'finish', 'error', 'abort', null] as const
 
 type Chunk = Record<string, unknown>
-function run(text: string, end: typeof ENDS[number], cut: number, endAlone: boolean): Chunk[] {
-  const kind = end === 'reasoning-end' ? 'reasoning' : 'text'
-  const deltas: Chunk[] = [...text].map(ch => ({ type: `${kind}-delta`, id: 'p1', delta: ch }))
-  const endChunk: Chunk = end.endsWith('-end') ? { type: end, id: 'p1' } : { type: end }
-  const batches = endAlone ? [deltas.slice(0, cut), deltas.slice(cut), [endChunk]] : [deltas.slice(0, cut), [...deltas.slice(cut), endChunk]]
-  const pending = new Map<string, string>()
-  const out = batches.flatMap(batch => maskStreamedChunks(batch, mask, pending))
-  assert.equal(pending.size, 0, 'nothing held after the part/run ends')
-  return out
-}
 
-test('cross-batch closing: the full masked text comes out for every end kind and split', () => {
+test('a value split over deltas of one batch is masked whole, for every end kind and delta size', () => {
   let combos = 0
-  for (const text of TEXTS) for (const end of ENDS) for (let cut = 0; cut <= text.length; cut++) for (const endAlone of [false, true]) {
-    const out = run(text, end, cut, endAlone)
+  for (const text of TEXTS) for (const end of ENDS) for (const size of [1, 2, 5, text.length]) {
     const kind = end === 'reasoning-end' ? 'reasoning' : 'text'
-    const joined = out.filter(c => c.type === `${kind}-delta`).map(c => c.delta as string).join('')
-    const label = `${JSON.stringify(text)} ${end} cut=${cut} endAlone=${endAlone}`
-    assert.equal(joined, mask(text), label)
-    assert.ok(!JSON.stringify(out).includes(SECRET), label)
-    assert.ok(out.some(c => c.type === end), `${label}: end chunk kept`)
+    const deltas: Chunk[] = []
+    for (let i = 0; i < text.length; i += size) deltas.push({ type: `${kind}-delta`, id: 'p1', delta: text.slice(i, i + size) })
+    const endChunk: Chunk[] = end === null ? [] : [end.endsWith('-end') ? { type: end, id: 'p1' } : { type: end }]
+    const out = maskStreamedChunks([...deltas, ...endChunk], mask)
+    const label = `${JSON.stringify(text)} ${end} size=${size}`
+    assert.equal(out.filter(c => c.type === `${kind}-delta`).map(c => c.delta as string).join(''), mask(text), label)
+    for (const c of out) assert.ok(!String(c.delta ?? '').includes(SECRET.slice(0, 12)), `${label}: no delta carries the secret start`)
+    if (end) assert.deepEqual(out.at(-1), endChunk[0], `${label}: end chunk kept`)
+    assert.equal(out.length, deltas.length + endChunk.length, `${label}: no chunk added`)
     combos++
   }
-  assert.ok(combos > 60)
+  assert.ok(combos > 100)
 })
 
-test('QA repro: "hello [secret] world" closed by finish in a later batch keeps the last char', () => {
-  const pending = new Map<string, string>()
-  const text = `hello ${SECRET} world`
-  const a = maskStreamedChunks([...text].map(ch => ({ type: 'text-delta', id: 't', delta: ch })), mask, pending)
-  const b = maskStreamedChunks([{ type: 'finish' }], mask, pending)
-  assert.equal([...a, ...b].filter(c => c.type === 'text-delta').map(c => c.delta).join(''), 'hello [secret:A] world')
-  assert.deepEqual(b.at(-1), { type: 'finish' })
+test('two parts in one batch are held back independently', () => {
+  const out = maskStreamedChunks([
+    { type: 'text-delta', id: 'a', delta: 'x sk_live_0123' },
+    { type: 'reasoning-delta', id: 'b', delta: 'y sk_live_' },
+    { type: 'text-delta', id: 'a', delta: '456789abcdef z' },
+    { type: 'reasoning-delta', id: 'b', delta: '0123456789abcdef' },
+  ], mask)
+  assert.equal(out.filter(c => c.id === 'a').map(c => c.delta).join(''), 'x [secret:A] z')
+  assert.equal(out.filter(c => c.id === 'b').map(c => c.delta).join(''), 'y [secret:A]')
 })
 
-test('tool input held across batches is flushed as a tool-input-delta on run end', () => {
-  const pending = new Map<string, string>()
-  const a = maskStreamedChunks([{ type: 'tool-input-delta', toolCallId: 'c1', inputTextDelta: '{"k":"sk_live_0' }], mask, pending)
-  const b = maskStreamedChunks([{ type: 'abort' }], mask, pending)
-  assert.equal([...a, ...b].filter(c => c.type === 'tool-input-delta').map(c => c.inputTextDelta).join(''), '{"k":"sk_live_0')
-  assert.equal(pending.size, 0)
+test('tool input held at the end of a batch is released on its last delta', () => {
+  const out = maskStreamedChunks([{ type: 'tool-input-delta', toolCallId: 'c1', inputTextDelta: '{"k":"sk_live_0' }], mask)
+  assert.deepEqual(out, [{ type: 'tool-input-delta', toolCallId: 'c1', inputTextDelta: '{"k":"sk_live_0' }])
 })
 
 test('S7: an end chunk that itself carries a secret is masked (text-end metadata, tool-input-available input, tool-input-error)', () => {
@@ -65,10 +57,9 @@ test('S7: an end chunk that itself carries a secret is masked (text-end metadata
     const kind = type === 'reasoning-end' ? 'reasoning' : type.startsWith('tool') ? 'tool' : 'text'
     const delta: Chunk = kind === 'tool' ? { type: 'tool-input-delta', toolCallId: 'p1', inputTextDelta: 'x' } : { type: `${kind}-delta`, id: 'p1', delta: 'x' }
     for (const batches of [[[delta, endChunk]], [[delta], [endChunk]]]) {
-      const pending = new Map<string, string>()
-      const out = JSON.stringify(batches.flatMap(batch => maskStreamedChunks(batch, mask, pending)))
-      assert.ok(!out.includes(SECRET) && !out.includes(SECRET.slice(0, 10)), `${String(endChunk.type)}: end chunk leaked`)
-      assert.match(out, /\[secret:A\]/, String(endChunk.type))
+      const out = JSON.stringify(batches.flatMap(batch => maskStreamedChunks(batch, mask)))
+      assert.ok(!out.includes(SECRET) && !out.includes(SECRET.slice(0, 10)), `${type}: end chunk leaked`)
+      assert.match(out, /\[secret:A\]/, type)
     }
   }
 })

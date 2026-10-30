@@ -1035,11 +1035,9 @@
     "secretNameTaken": "A secret or variable with this name already exists in this scope.",
     "secretLimitReached": "This workspace has reached the limit of 500 secrets and variables.",
     "secretsUnavailable": "Secret storage isn't available right now. Please try again later.",
-    "egressDomainInvalid": "Some domains are not valid (lines {lines}). IP addresses are not supported. Use example.com or *.example.com, one per line.",
-    "egressTooManyDomains": "Up to 200 domains are allowed; you entered {count}.",
     "e2bKeyInvalid": "This E2B key is invalid or has been revoked.",
     "e2bKeyUnverifiable": "Couldn't verify the key right now. Please try again later.",
-    "e2bKeyRateLimited": "Too many attempts. Wait a few minutes and try again.",
+    "e2bKeyRateLimited": "E2B is rate limiting this key right now. Wait a few minutes and try again.",
     "workspaceAccessDenied": "You do not have permission to manage this workspace, or your membership is suspended.",
     "workspaceNotFound": "No accessible workspace.",
     "workspaceMemberExists": "One of these emails is already a workspace member. Manage or restore them in the member list.",
@@ -2172,9 +2170,6 @@
           "created": "added variable {target}",
           "updated": "updated variable {target}",
           "deleted": "deleted variable {target}"
-        },
-        "network_policy": {
-          "updated": "changed outbound network"
         },
         "token": {
           "created": "created token {target}",

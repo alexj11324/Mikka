@@ -1,7 +1,7 @@
 // Settings › 审计日志 writer. Usage:
 //   await recordAudit(tx, { workspaceId, actor: { type: 'user', id, name }, action: 'token.created', target: { type: 'token', id, label: name }, ...auditRequestContext(headers) })
 // Rules:
-// - Writes that live in the MIKKA database (secret, token, egress/network policy)
+// - Writes that live in the MIKKA database (secret, token)
 //   MUST call recordAudit(tx, …) inside the business transaction, so the audit
 //   row commits or rolls back with the change. Never use recordAuditSafe for them.
 // - Only cross-database member/permission writes (DATABASE_URL, which cannot share

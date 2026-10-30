@@ -3,7 +3,7 @@
 -- (plan 1.3.1). Values are AES-256-GCM ciphertext under WORKSPACE_SECRETS_KEY;
 -- plaintext is never stored. "workspaceId" has no FK: workspaces live in the
 -- workspace database (DATABASE_URL). Mirrors lib/db/secrets-schema.ts.
--- Rollback: drop table workspace_e2b_verify_attempts, workspace_e2b_keys, workspace_network_policy, workspace_secrets;
+-- Rollback: drop table workspace_e2b_keys, workspace_secrets;
 --           delete from schema_migrations where name = '20261030113900_workspace_secrets_env.sql';
 
 create table workspace_secrets (
@@ -14,8 +14,6 @@ create table workspace_secrets (
   "scopeType" text not null check ("scopeType" in ('workspace', 'repository')),
   -- '' for workspace scope (so the unique key works without NULL semantics), owner/repo for repository scope.
   "scopeRef" text not null default '',
-  -- 'all' reaches every environment, production included (so it is admin only, like 'production').
-  environment text not null default 'all' check (environment in ('all', 'production', 'preview', 'development')),
   ciphertext text not null,
   iv text not null,
   "keyVersion" integer not null check ("keyVersion" >= 1),
@@ -29,16 +27,7 @@ create table workspace_secrets (
     or ("scopeType" = 'repository' and "scopeRef" ~ '^[a-z0-9_.-]{1,100}/[a-z0-9_.-]{1,100}$'
         and "scopeRef" !~ '(^|/)\.{1,2}(/|$)'))
 );
-create unique index workspace_secrets_name_key on workspace_secrets ("workspaceId", "scopeType", "scopeRef", environment, name);
-
--- Outbound network (SEC-18/19): exactly one of open | allowlist | none.
-create table workspace_network_policy (
-  "workspaceId" uuid primary key,
-  mode text not null default 'open' check (mode in ('open', 'allowlist', 'none')),
-  "allowedDomains" text[] not null default '{}' check (cardinality("allowedDomains") <= 200),
-  "updatedBy" text not null,
-  "updatedAt" timestamptz not null default now()
-);
+create unique index workspace_secrets_name_key on workspace_secrets ("workspaceId", "scopeType", "scopeRef", name);
 
 -- One E2B API key per workspace. Write-only: only last4 / verifiedAt are ever shown.
 create table workspace_e2b_keys (
@@ -56,11 +45,3 @@ create table workspace_e2b_keys (
   "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now()
 );
-
--- BYO key verify rate limit (5 per workspace per 10 min), strict across instances.
-create table workspace_e2b_verify_attempts (
-  id bigserial primary key,
-  "workspaceId" uuid not null,
-  "attemptedAt" timestamptz not null
-);
-create index workspace_e2b_verify_attempts_ws_idx on workspace_e2b_verify_attempts ("workspaceId", "attemptedAt");

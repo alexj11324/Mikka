@@ -4,8 +4,6 @@ import type { AuditEvent } from '@/lib/audit/events'
 import type { SecretAuditEvent } from './store'
 
 const scope = (value: unknown) => value === 'repository' ? 'repo' as const : value === 'workspace' ? 'workspace' as const : undefined
-const environment = (value: unknown) => typeof value === 'string' && value ? value : undefined
-const egressMode = (value: unknown) => value === 'none' ? 'blocked' as const : value === 'allowlist' ? 'allowlist' as const : value === 'open' ? 'open' as const : undefined
 
 /**
  * The audit event for one store event, or null when the catalogue has no such
@@ -18,11 +16,8 @@ export function secretAuditEvent(event: SecretAuditEvent, actor: { id: string; n
   const compact = <T extends Record<string, unknown>>(value: T) => Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined))
   switch (event.action) {
     case 'secret.created': case 'secret.replaced': case 'secret.deleted':
-      return { ...base, action: event.action, metadata: compact({ scope: scope(meta.scope) }) }
     case 'env.created': case 'env.updated': case 'env.deleted':
-      return { ...base, action: event.action, metadata: compact({ scope: scope(meta.scope), environment: environment(meta.environment) }) }
-    case 'network.updated':
-      return { ...base, action: 'network_policy.updated', metadata: compact({ mode: egressMode(meta.mode) }) }
+      return { ...base, action: event.action, metadata: compact({ scope: scope(meta.scope) }) }
     default:
       return null
   }

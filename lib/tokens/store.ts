@@ -72,7 +72,7 @@ export async function createPersonalAccessToken(userId: string, workspaceId: str
   await requireMember(userId, workspaceId)
   const { token, tokenHash, hint } = generatePersonalAccessToken()
   const row = await guardTokenDb(() => db.transaction(async tx => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`pat:${userId}:${workspaceId}`}, 0))`)
+    // A plain count: concurrent creates can briefly pass the soft cap by a few tokens (no lock).
     const [{ active }] = await tx.select({ active: sql<number>`count(*)::int` }).from(personalAccessTokens)
       .where(and(eq(personalAccessTokens.userId, userId), eq(personalAccessTokens.workspaceId, workspaceId), isNull(personalAccessTokens.revokedAt),
         // Expired tokens no longer hold a slot toward PAT_ACTIVE_LIMIT.

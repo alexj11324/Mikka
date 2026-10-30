@@ -51,11 +51,11 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     assert.equal(mask(`key ${E2B_KEY}`), 'key [secret:E2B_API_KEY]')
   })
 
-  await t.test('A: a secret split over 2 deltas and over single-char deltas never reaches run_chunks or lastReply', async () => {
+  await t.test('A: a secret (and its base64) split over deltas of one batch never reaches run_chunks or lastReply', async () => {
     const events = await import('../app/v1/runs/[runId]/events/route')
     for (const split of ['two', 'chars'] as const) {
       const runId = await newRun()
-      const text = `here is ${SECRET} and Bearer ${Buffer.from(`u:${SECRET}`).toString('base64')} done`
+      const text = `here is ${SECRET} and b64 ${Buffer.from(SECRET).toString('base64')} done`
       const pieces = split === 'two' ? [text.slice(0, text.indexOf(SECRET) + 10), text.slice(text.indexOf(SECRET) + 10)] : [...text]
       let seq = 1
       const post = async (chunks: Record<string, unknown>[]) => {
@@ -63,34 +63,28 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
         assert.equal(response.status, 200, await response.clone().text())
         seq += chunks.length
       }
-      await post([{ type: 'text-start', id: 'p1' }])
-      // One delta per batch: the hold-back has to survive between requests.
-      for (const piece of pieces) await post([{ type: 'text-delta', id: 'p1', delta: piece }])
-      await post([{ type: 'text-end', id: 'p1' }])
+      await post([{ type: 'text-start', id: 'p1' }, ...pieces.map(delta => ({ type: 'text-delta', id: 'p1', delta })), { type: 'text-end', id: 'p1' }])
       const { rows } = await pool.query(`select chunk from run_chunks where "runId"=$1 order by seq`, [runId])
       const stored = JSON.stringify(rows)
       noPlain(`${split} run_chunks`, stored)
       const joined = rows.map(row => row.chunk.type === 'text-delta' ? row.chunk.delta : '').join('')
-      assert.equal(joined, 'here is [secret:API_TOKEN] and Bearer [secret:API_TOKEN] done', split)
+      assert.equal(joined, 'here is [secret:API_TOKEN] and b64 [secret:API_TOKEN] done', split)
       const { rows: [run] } = await pool.query(`select "lastReply" from agent_runs where id=$1`, [runId])
       noPlain(`${split} lastReply`, run.lastReply)
-      assert.equal(run.lastReply, 'here is [secret:API_TOKEN] and Bearer [secret:API_TOKEN] done')
-      const { rows: buffers } = await pool.query(`select * from run_mask_buffers where "runId"=$1`, [runId])
-      assert.equal(buffers.length, 0, 'part ended: no hold-back left')
+      assert.equal(run.lastReply, 'here is [secret:API_TOKEN] and b64 [secret:API_TOKEN] done')
     }
   })
 
-  await t.test('A: held-back text is stored sealed, and a re-sent batch does not append twice', async () => {
+  await t.test('A: the raw value inside one delta is masked, and a re-sent batch does not append twice', async () => {
     const events = await import('../app/v1/runs/[runId]/events/route')
     const runId = await newRun()
     const send = (fromSeq: number, delta: string) => events.POST(call('POST', `/v1/runs/${runId}/events`, { fromSeq, chunks: [{ type: 'text-delta', id: 'p', delta }] }), { params: Promise.resolve({ runId }) })
-    await send(1, `x ${SECRET.slice(0, 15)}`)
-    const { rows: [buffer] } = await pool.query(`select * from run_mask_buffers where "runId"=$1`, [runId])
-    assert.ok(buffer && !JSON.stringify(buffer).includes(SECRET.slice(0, 15)), 'buffer row is ciphertext')
-    await send(1, `x ${SECRET.slice(0, 15)}`)
-    await send(2, `${SECRET.slice(15)} y`)
+    await send(1, `x ${SECRET} y`)
+    await send(1, `x ${SECRET} y`)
     const { rows } = await pool.query(`select chunk->>'delta' as d from run_chunks where "runId"=$1 order by seq`, [runId])
-    assert.deepEqual(rows.map(row => row.d), ['x ', '[secret:API_TOKEN] y'])
+    assert.deepEqual(rows.map(row => row.d), ['x [secret:API_TOKEN] y'])
+    const { rows: [run] } = await pool.query(`select "lastReply" from agent_runs where id=$1`, [runId])
+    assert.equal(run.lastReply, 'x [secret:API_TOKEN] y')
   })
 
   await t.test('F: PATCH error, checkpoint text, report, artifact, read back masked', async () => {
