@@ -43,7 +43,17 @@ export function factoryDispatchClarification(taskId: string, runId: string, reas
   };
 }
 
+/**
+ * Cloud (E2B) dispatch capability. Hardcoded off until #438 wires the BYO E2B key store and cloud
+ * placement; deliberately a code constant, not an env var, so no environment can turn it on.
+ * While false, GET .../dispatch reports cloudDispatchAvailable:false and POST .../dispatch/cloud
+ * refuses with 409 cloudDispatchUnavailable (also when called directly).
+ */
+export const FACTORY_CLOUD_DISPATCH_AVAILABLE: boolean = false;
+
 export interface FactoryDispatchStatus {
+  /** Frontend hides/disables "Switch to cloud computer" when false. */
+  cloudDispatchAvailable: boolean;
   taskId: string; runId: string | null; runStatus: string | null;
   device: { id: string; name: string; online: boolean; lastSeenAt: string | null } | null;
   failure: { reasonCode: FactoryDispatchFailureReason } | null;
@@ -100,6 +110,7 @@ export function createFactoryDispatchRecovery(pool: Pool, cloudKeyConfigured: Cl
     const client = reason ? await pool.connect() : null;
     try {
       return {
+        cloudDispatchAvailable: FACTORY_CLOUD_DISPATCH_AVAILABLE,
         taskId, runId: row.runId ?? null, runStatus: row.runStatus ?? null,
         device: device ? { id: device.id, name: device.name, online: factoryDeviceOnline(device, at), lastSeenAt: device.lastSeenAt?.toISOString() ?? null } : null,
         failure: reason ? { reasonCode: reason } : null,
@@ -138,15 +149,19 @@ export function createFactoryDispatchRecovery(pool: Pool, cloudKeyConfigured: Cl
     } catch (error) { await tx.query('ROLLBACK').catch(() => {}); throw error; } finally { tx.release(); }
   }
 
-  /** "Switch to cloud computer": BYO E2B key path only; without a key the answer is e2bKeyNotConfigured. */
+  /**
+   * "Switch to cloud computer". 404 for a missing/foreign task; 409 cloudDispatchUnavailable while
+   * FACTORY_CLOUD_DISPATCH_AVAILABLE is false (even with a key); then 409 e2bKeyNotConfigured without a BYO key.
+   */
   async function switchToCloud(userId: string, taskId: string): Promise<{ status: number; body: Record<string, unknown> }> {
     const tx = await pool.connect();
     try {
       const { rows: [task] } = await tx.query('SELECT id FROM factory_tasks WHERE id=$1 AND "userId"=$2', [taskId, userId]);
       if (!task) return { status: 404, body: { error: 'factoryNotFound' } };
+      if (!FACTORY_CLOUD_DISPATCH_AVAILABLE) return { status: 409, body: { error: 'cloudDispatchUnavailable' } };
       if (!await cloudKeyConfigured(tx, userId)) return { status: 409, body: { error: 'e2bKeyNotConfigured', action: 'cloudKeySettings', settingsUrl: '/settings?section=integrations' } };
-      // The BYO key store and cloud placement land with #436/#438; until then nothing starts here.
-      return { status: 501, body: { error: 'cloudSwitchUnavailable' } };
+      // The BYO key store and cloud placement land with #436/#438; nothing starts here until then.
+      return { status: 409, body: { error: 'cloudDispatchUnavailable' } };
     } finally { tx.release(); }
   }
 

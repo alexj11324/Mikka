@@ -84,9 +84,21 @@ test('dispatch failure, status and exactly-once re-dispatch on a real database',
     assert.equal(await events('run_redispatched'), 2, 'exactly one run_redispatched per run');
     assert.equal((await pool.query(`SELECT 1 FROM agent_runs WHERE status='queued'`)).rowCount, 2, 'nothing queued twice');
     assert.equal((await recovery.status('owner', a.taskId))?.device?.online, true);
+    assert.equal((await recovery.status('owner', a.taskId))?.cloudDispatchAvailable, false, 'cloud dispatch off until #438');
 
+    // QA: two re-dispatches racing on a fresh run, 20 rounds. Exactly one run_redispatched row per run,
+    // one winner, nothing rejected. The dedupeKey unique constraint is the backstop; the advisory lock only cuts conflicts.
+    for (let round = 0; round < 20; round++) {
+      const c = await task();
+      const settled = await Promise.allSettled([recovery.deviceOnline('owner', deviceId, true), recovery.deviceOnline('owner', deviceId, true)]);
+      assert.deepEqual(settled.filter(r => r.status === 'rejected'), [], 'no error leaks out');
+      const won = settled.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+      assert.deepEqual(won, [c.runId], 'exactly one dispatch');
+      assert.equal((await pool.query(`SELECT 1 FROM coordinator_events WHERE kind='run_redispatched' AND "dedupeKey"=$1`, [`run_redispatched:${c.runId}`])).rowCount, 1);
+      await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`, [c.runId]);
+    }
     const cloud = await recovery.switchToCloud('owner', a.taskId);
-    assert.deepEqual([cloud.status, cloud.body.error], [409, 'e2bKeyNotConfigured']);
+    assert.deepEqual([cloud.status, cloud.body.error], [409, 'cloudDispatchUnavailable']);
     assert.equal((await recovery.switchToCloud('other', a.taskId)).status, 404);
   } finally {
     await pool.end();

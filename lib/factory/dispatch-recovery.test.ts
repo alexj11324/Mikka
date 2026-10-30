@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { factoryDeviceOnline, factoryDispatchClarification, factoryDispatchFailureReason } from './dispatch-recovery';
+import { FACTORY_CLOUD_DISPATCH_AVAILABLE, createFactoryDispatchRecovery, factoryDeviceOnline, factoryDispatchClarification, factoryDispatchFailureReason } from './dispatch-recovery';
 import { handleFactoryDispatchRecovery } from './dispatch-recovery-http';
 
 const now = Date.parse('2026-10-30T07:00:00Z');
@@ -47,4 +47,16 @@ test('http: auth, uuid and e2bKeyNotConfigured', async () => {
   assert.equal(cloud.status, 409);
   assert.equal(cloud.body.error, 'e2bKeyNotConfigured');
   assert.deepEqual(calls, ['aaaaaaaa-1111-4111-8111-111111111111']);
+});
+
+test('cloud dispatch is off until #438: constant false, switchToCloud refuses with 409 even with a key', async () => {
+  assert.equal(FACTORY_CLOUD_DISPATCH_AVAILABLE, false);
+  const queries: string[] = [];
+  const pool = { connect: async () => ({ query: async (sql: string) => { queries.push(sql); return { rows: [{ id: 't' }] }; }, release() {} }) };
+  let keyChecks = 0;
+  const recovery = createFactoryDispatchRecovery(pool as never, async () => { keyChecks++; return true; });
+  assert.deepEqual(await recovery.switchToCloud('u', 't'), { status: 409, body: { error: 'cloudDispatchUnavailable' } });
+  assert.equal(queries.length, 1, 'only the ownership read; nothing written');
+  assert.ok(/^SELECT/i.test(queries[0]));
+  assert.equal(keyChecks, 0);
 });
