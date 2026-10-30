@@ -232,10 +232,11 @@ export function createFactoryQuestions(
     return view(q);
   }
   return {
-    async pending(userId: string) {
+    /** Newest 50 pending questions of this user; `runId` (origin or continuation) is filtered in SQL, before the cap. */
+    async pending(userId: string, runId?: string) {
       const { rows } = await pool.query(
-        "SELECT id FROM factory_questions WHERE \"userId\"=$1 AND status IN ('open','waiting_user','resuming','blocked') ORDER BY \"createdAt\" DESC LIMIT 50",
-        [userId],
+        "SELECT id FROM factory_questions WHERE \"userId\"=$1 AND status IN ('open','waiting_user','resuming','blocked') AND ($2::uuid IS NULL OR \"originRunId\"=$2::uuid OR \"continuationRunId\"=$2::uuid) ORDER BY \"createdAt\" DESC, id DESC LIMIT 50",
+        [userId, runId ?? null],
       );
       const result = [];
       for (const row of rows) {
@@ -266,7 +267,7 @@ export function createFactoryQuestions(
       return transaction(async (tx) => {
         const task = await ownedTask(tx, userId, taskId);
         const { rows } = await tx.query<FactoryQuestion>(
-          'SELECT * FROM factory_questions WHERE "taskId"=$1 AND "userId"=$2 ORDER BY "createdAt" DESC LIMIT 50 FOR UPDATE',
+          'SELECT * FROM factory_questions WHERE "taskId"=$1 AND "userId"=$2 ORDER BY "createdAt" DESC, id DESC LIMIT 50 FOR UPDATE',
           [taskId, userId],
         );
         const result = [];
