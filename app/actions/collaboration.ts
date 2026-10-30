@@ -15,6 +15,7 @@ import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { bindCommentAuthorship, snapshotCommentAuthorship } from '@/lib/linear-sync/comment-authorship'
 import { activityActor } from '@/lib/activity-actor'
 import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
+import { readableIssueContent } from '@/components/workspace/issue-editor-schema'
 
 const encodedState = z.string().max(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/)
 const syncSchema = z.object({ id: z.uuid(), vector: encodedState.optional(), update: encodedState.optional(), seed: encodedState.optional() })
@@ -29,6 +30,9 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>) {
     try {
       if (stored) Y.applyUpdate(doc, Buffer.from(stored.state, 'base64'))
       const commentAuthors = snapshotCommentAuthorship(doc)
+      // The first exchange seeds from issues.content. If that content fails the editor schema, any seed is an
+      // empty/lossy stand-in for it, so refuse instead of overwriting the body (the client stays read-only).
+      if (!stored && !readableIssueContent(locked.content, issue.id)) throw new Error('document content invalid')
       if (!stored && parsed.seed) Y.applyUpdate(doc, Buffer.from(parsed.seed, 'base64'))
       else if (!stored) throw new Error('document not initialized')
       if (parsed.update) Y.applyUpdate(doc, Buffer.from(parsed.update, 'base64'))
