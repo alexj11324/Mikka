@@ -29,6 +29,8 @@ import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { PublicationError } from '@/lib/run-publication-result'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
+import { remoteRepositoryRef, resolveRunSecretsEnvironment, taskSecretEnv, type RunSecretsEnvironment } from '@/lib/secrets/runtime'
+import { byoE2BKeyEnabled } from '@/lib/secrets/flag'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,6 +74,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   // a fresh execution, even when their Factory attempt is no longer present.
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
+  // 4e3: secret-environment overrides are not supported yet (the audited admin path lands with #432).
+  // Any override request, from anyone, fails the queued run with a fixed body that reveals nothing about secrets.
+  if (resolveRunSecretsEnvironment({ deviceKind: device.kind === 'cloud' ? 'cloud' : 'local', runBaseBranch: run.baseBranch, trustedDefaultBranch: null, override: run.secretsEnvironmentOverride }).rejected) {
+    await db.update(agentRuns)
+      .set({ status: 'failed', stopReason: 'error', error: 'Secret environment overrides are not supported.', finishedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'queued')))
+    return NextResponse.json({ error: 'Secret environment overrides are not supported.', code: 'secretEnvironmentOverrideUnsupported' }, { status: 403 })
+  }
   try { await skillAssignments.preflight(caller.userId, runId, supportsSkillArtifacts) } catch (error) {
     if (!(error instanceof ImprovementError)) throw error
     return NextResponse.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 409 })
@@ -109,10 +119,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   let computer: Awaited<ReturnType<typeof claimCloudRun>> = null
   let publication: Awaited<ReturnType<typeof import('@/lib/run-publications')['prepareRunPublication']>> | null = null
   let localComputer: Awaited<ReturnType<typeof localComputerAuthority>> = null
+  let taskEnv: Record<string, string> = {}
+  let secretsEnvironment: RunSecretsEnvironment | null = null
   if (device.kind === 'cloud') {
     if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
+    // 4e3: the task's explicit user variables (workspace + this repo's secrets/env). Resolved before the
+    // claim so a decrypt failure leaves the run queued. Flag off = {}. Only cloud workers get it.
+    // Environment: preview for every cloud run until a trusted default-branch source exists; overrides are refused above.
+    if (byoE2BKeyEnabled(process.env)) {
+      // trustedDefaultBranch: no trusted default-branch source exists yet (repo.baseBranch is written from the
+      // run on the cloud path and defaults to 'main'; GitHub's default_branch is not cached), so every cloud
+      // run is preview. Production waits for a default-branch source.
+      const resolved = resolveRunSecretsEnvironment({ deviceKind: 'cloud', runBaseBranch: run.baseBranch, trustedDefaultBranch: null })
+      secretsEnvironment = resolved.environment
+      try { taskEnv = await taskSecretEnv(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl), resolved.environment) }
+      catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
+    }
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id, beforeClaim, afterClaim)
     if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
+    // 4e3: the run record keeps the environment its secrets came from.
+    if (secretsEnvironment) await db.update(agentRuns).set({ secretsEnvironment })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt))))
   } else {
     const { prepareRunPublication, persistRunCompletion } = await import('@/lib/run-publications')
     try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
@@ -124,6 +151,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     }
     const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim)
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
+    // 4e3: local runs are development; nothing is injected into them.
+    await db.update(agentRuns).set({ secretsEnvironment: 'development' })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt))))
   }
   if (device.kind !== 'cloud' && device.computerUse?.installed) {
     const current = await localComputerAuthority(pool, caller.userId, deviceId, runId)
@@ -195,6 +225,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...(subscription ? { model: subscription.modelId, subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
     ...(localComputer ? { localComputer } : {}),
+    ...(Object.keys(taskEnv).length ? { taskEnv } : {}),
     ...retry,
     ...factoryClaim,
     ...skillAssignment,

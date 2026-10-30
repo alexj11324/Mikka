@@ -12,12 +12,13 @@ import { constrainedAssignmentPolicy } from '../run-assignment-policy'
 // Execute the actual route in memory, with its database/auth boundaries replaced.
 async function routeFixture(unavailable=false,stopped=false) {
   const calls:string[]=[]
+  const secretsWrites:object[]=[]
   const run={id:'run',userId:'owner',issueId:'issue',agentId:'agent',deviceRepoId:'repo',deviceId:'device',status:'queued',kind:'implement',baseBranch:'frozen-sha',prompt:'frozen task',attempt:1}
   const agent={id:'agent',userId:'owner',harness:'codex'},repo={id:'repo',userId:'owner',deviceId:'device',repoPath:'v2/github.com/mikka-ci/benchmark-claim',remoteUrl:'https://github.com/mikka-ci/benchmark-claim.git',verifyCommand:'mutable-repo-command'}
   const selections=[run,agent,repo]
   class ImprovementError extends Error {constructor(public code:string){super(code)}}
   class FactoryError extends Error {}
-  const db={select:()=>({from:()=>({where:()=>({limit:async()=>[selections.shift()]})})}),update:()=>({set:(values:object)=>({where:async()=>{calls.push('block');Object.assign(run,values)}})})}
+  const db={select:()=>({from:()=>({where:()=>({limit:async()=>[selections.shift()]})})}),update:()=>({set:(values:object)=>({where:async()=>{if('secretsEnvironment' in values){secretsWrites.push(values);return}calls.push('block');Object.assign(run,values)}})})}
   const benchmark={harness:'codex',model:'actual-observed-model',verifyCommand:'git diff --exit-code HEAD --',policy:{readOnly:true,networkAllow:[],permissions:{install_dependency:'deny',write_outside_repo:'deny',git_push:'deny',network:'ask'}},benchmark:{caseId:'case',benchmarkDigest:'digest',sourceCommit:'frozen-sha'}}
   const modules:Record<string,unknown>={
     'next/server':{NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
@@ -46,6 +47,8 @@ async function routeFixture(unavailable=false,stopped=false) {
     '@/lib/computer/claim':{claimLocalRun:async(_pool:unknown,_runId:string,_deviceId:string,_lease:Date,_subscription:unknown,guard:(tx:object)=>Promise<boolean>,after:(tx:object)=>Promise<void>)=>{if(!await guard({}))return 'unavailable';calls.push('claim');run.status='preparing';await after({});return 'claimed'}},
     '@/lib/subscription-runtime':{},
     '@/lib/computer/native-run-binding':{},
+    '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
+    '@/lib/secrets/runtime':{resolveRunSecretsEnvironment:({deviceKind,override}:{deviceKind:string;override?:string|null})=>({environment:deviceKind==='cloud'?'preview':'development',rejected:override!=null}),taskSecretEnv:async()=>({}),remoteRepositoryRef:()=>null},
     '@/lib/personal-mailbox-config':{personalMailboxEnabled:()=>false},
     '@/lib/factory/questions/retry':{},'@mikka/protocol/skill':{SKILL_ARTIFACT_HEADER:'x-mikka-skill-artifacts'},
     '@/lib/self-improvement/contract':{ImprovementError},'@/lib/factory/contract':{FactoryError},
@@ -58,17 +61,18 @@ async function routeFixture(unavailable=false,stopped=false) {
   const exports:Record<string,unknown>={}
   runInNewContext(transpileModule(source,{compilerOptions:{module:ModuleKind.CommonJS}}).outputText,
     {exports,require:(name:string)=>{if(!Object.hasOwn(modules,name))throw Error(`Unexpected import ${name}`);return modules[name]},Response,URL,Date,process:{env:{MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA_FACTORY_LIFECYCLE_ENABLED:'1'}}})
-  return {calls,run,benchmark,post:exports.POST as (request:Request,context:{params:Promise<{deviceId:string;runId:string}>})=>Promise<Response>}
+  return {calls,run,benchmark,secretsWrites,post:exports.POST as (request:Request,context:{params:Promise<{deviceId:string;runId:string}>})=>Promise<Response>}
 }
 
 const claimRequest=()=>new Request('https://fixture.invalid/v1/claim',{headers:{[deviceProtocol.REPO_ORIGIN_HEADER]:'1','x-mikka-skill-artifacts':'1'}})
 
 test('actual claim route resolves frozen benchmark exactly once after claim and receipt and overrides mutable config',async()=>{
-  const {post,calls,benchmark}=await routeFixture()
+  const {post,calls,benchmark,secretsWrites}=await routeFixture()
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,200)
   const assignment=await response.json()
   assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark'])
+  assert.equal(JSON.stringify(secretsWrites),JSON.stringify([{secretsEnvironment:'development'}]))
   assert.equal(assignment.verifyCommand,benchmark.verifyCommand)
   assert.equal(assignment.model,benchmark.model)
   assert.equal(assignment.remoteUrl,'https://github.com/mikka-ci/benchmark-claim.git')

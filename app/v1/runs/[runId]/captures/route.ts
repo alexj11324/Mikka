@@ -1,5 +1,6 @@
 import { captureUploadRequest } from '@mikka/protocol/capture'
 import { beginUpload } from '@/lib/captures/store'
+import { maskForWorkspace } from '@/lib/secrets/runtime'
 import { captureFailure, captureJson, deviceRun } from '@/lib/captures/device'
 
 export const dynamic = 'force-dynamic'
@@ -13,6 +14,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   if (found instanceof Response) return found
   const parsed = captureUploadRequest.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return captureJson({ error: 'Invalid capture.' }, 400)
-  const result = await beginUpload(found.owner, parsed.data)
+  const result = await beginUpload(found.owner, { ...parsed.data, title: await maskForWorkspace(found.caller.scopeWorkspaceId, parsed.data.title) })
   return 'error' in result ? captureFailure(result) : captureJson(result, 201)
 }

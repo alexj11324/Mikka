@@ -23,7 +23,7 @@ export async function resolveSubagentBrowserTarget(input: { userId: string; work
   const policy = (await pool.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [input.workspaceId])).rows[0]
   if (policy?.permission === 'deny') throw new Error('Credential target unavailable')
   const observedInputs = observation.inputs.map(item => ({ ...item, loaderId: observation.loaderId, epoch: Number(row.epoch), permissionVersion: Number(policy?.version ?? 0) }))
-  const capability = await grant(await connectComputer(row.sandboxId), row, 'broker')
+  const capability = await grant(await connectComputer(input.workspaceId, row.sandboxId), row, 'broker')
   return { targetId: row.targetId as string, origin: parsed.origin, observedInputs, ...capability }
 }
 
@@ -38,5 +38,5 @@ export async function resolveThreadBrowserTarget(input: { userId: string; worksp
   if (state.guarded || state.targetId !== row.targetId || typeof state.url !== 'string') throw new Error('Thread browser unavailable')
   const url = new URL(state.url)
   if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('Thread browser unavailable')
-  return { targetId: row.targetId as string, origin: url.origin, ...await grant(await connectComputer(row.sandboxId), binding, 'broker') }
+  return { targetId: row.targetId as string, origin: url.origin, ...await grant(await connectComputer(input.workspaceId, row.sandboxId), binding, 'broker') }
 }

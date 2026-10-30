@@ -124,3 +124,66 @@ test('response authorization retries only rolled-back serialization or deadlock 
   await assert.rejects(claim(unexpected),error=>error===unknown)
   assert.equal(unexpected.transactions,1)
 })
+
+test('4e3: every secret-environment override fails the run with a fixed 403, before any claim or credential',async()=>{
+  // No role lookup exists: a member, an admin and a forged value are refused identically.
+  for(const [who,override] of [['member','production'],['admin','production'],['admin','preview'],['forged','PRODUCTION'],['forged',{env:'production'}]] as const){
+    for(const kind of ['local','cloud']){
+      const probe=fixture();probe.device.kind=kind
+      Object.assign(probe.run,{secretsEnvironmentOverride:override,baseBranch:'main'})
+      const response=await claim(probe,[])
+      assert.equal(response.status,403,`${who} ${kind}`)
+      assert.deepEqual(await response.json(),{error:'Secret environment overrides are not supported.',code:'secretEnvironmentOverrideUnsupported'})
+      assert.equal(probe.run.status,'failed',`${who} ${kind} run marked failed`);assert.equal(probe.run.leaseExpiresAt,null)
+      assert.equal((probe.run as {secretsEnvironment?:string}).secretsEnvironment,undefined)
+    }
+  }
+})
+
+test('4e3: a local claim writes development into agent_runs on the claimed run',async()=>{
+  const probe=fixture()
+  const response=await claim(probe)
+  assert.equal(response.status,200)
+  assert.equal((probe.run as {secretsEnvironment?:string}).secretsEnvironment,'development')
+})
+
+test('4e3: a cloud claim reads and records preview, even on the repo default branch, with no trusted default-branch source',async()=>{
+  const saved={...process.env}
+  Object.assign(process.env,{MIKKA_CLOUD_COMPUTER_TASKS:'1',MIKKA_BYOS_ENABLED:'1',MIKKA_BYO_E2B_KEY:'1'})
+  try{
+    for(const baseBranch of ['main','feature/x',null]){
+      const probe=fixture()
+      Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:'ws'},cloud:{subscription:{id:'binding',workspaceId:'ws'}}})
+      Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
+      Object.assign(probe.run,{baseBranch})
+      const response=await claim(probe,['skill-preflight','policy','secrets:preview','claim','skill-claim','benchmark-claim','token'])
+      assert.equal(response.status,200,String(baseBranch))
+      assert.equal((probe.run as {secretsEnvironment?:string}).secretsEnvironment,'preview',String(baseBranch))
+    }
+  } finally { for(const key of ['MIKKA_CLOUD_COMPUTER_TASKS','MIKKA_BYOS_ENABLED','MIKKA_BYO_E2B_KEY'])if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key] }
+})
+
+test('4e3: the override failure write only fails a still-queued run of the caller (concurrent status change or foreign owner)',async()=>{
+  for(const change of ['status','owner'] as const){
+    const probe=fixture()
+    Object.assign(probe.run,{secretsEnvironmentOverride:'production',baseBranch:'main'})
+    ;(probe as {beforeUpdate?:()=>void}).beforeUpdate=()=>{if(change==='status')probe.run.status='cancelled';else probe.run.userId='someone-else'}
+    const response=await claim(probe,[])
+    assert.equal(response.status,403,change)
+    assert.equal(probe.run.status,change==='status'?'cancelled':'queued',`${change}: the write must not touch the run`)
+    assert.equal(probe.run.stopReason,null,change)
+  }
+})
+
+test('4e3: the local development write only lands on the run still claimed under this lease',async()=>{
+  for(const change of ['status','lease'] as const){
+    const probe=fixture()
+    ;(probe as {beforeUpdate?:(table:string,values:Record<string,unknown>)=>void}).beforeUpdate=(_table,values)=>{
+      if(!('secretsEnvironment' in values))return
+      if(change==='status')probe.run.status='cancelled';else probe.run.leaseExpiresAt=new Date(Date.now()+900_000)
+    }
+    const response=await claim(probe)
+    assert.equal((probe.run as {secretsEnvironment?:string}).secretsEnvironment,undefined,`${change}: a changed run keeps no environment`)
+    assert.ok(response.status>=200,change)
+  }
+})

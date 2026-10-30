@@ -37,6 +37,8 @@ export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbo
     await sandbox.files.write(temporary, JSON.stringify({ deviceId: credential.deviceId, workspaceId: actor.workspaceId, credential: credential.token, server: url.toString(), ...(protectionBypass ? { protectionBypass } : {}) }), { user: 'root' })
     if (!await renewWorkerLease(pool, actor, leaseId)) throw new Error('Cloud worker lease expired')
     await sandbox.commands.run(`install -d -o mikka-runner -g mikka-runner -m 0700 /home/mikka-runner/.mikka && install -o mikka-runner -g mikka-runner -m 0600 ${temporary} /home/mikka-runner/.mikka/bootstrap.next && mv /home/mikka-runner/.mikka/bootstrap.next /home/mikka-runner/.mikka/bootstrap.json && unlink ${temporary}`, { user: 'root', timeoutMs: 10_000 })
+    // 4e3: the worker process gets no workspace secrets. Each task receives its explicit user
+    // variable set in the claim response (taskEnv) and the hosted runner passes only that into the task container.
     await sandbox.commands.run('cd /opt/mikka/worker/packages/daemon && HOME=/home/mikka-runner ./node_modules/.bin/tsx bin/cloud-worker.ts > /home/mikka-runner/.mikka/worker-bootstrap.log 2>&1', { user: 'mikka-runner', background: true, timeoutMs: 0 })
     const deadline = Date.now() + 30_000
     do {
