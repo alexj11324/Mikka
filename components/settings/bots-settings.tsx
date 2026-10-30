@@ -10,7 +10,8 @@ import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
-import { Item, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item'
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -21,6 +22,8 @@ import { effectiveModel, type BotDefaultsView, type BotModelId, type BotThreadPa
 
 const CONNECT_REPOSITORY = '__connect-repository__'
 
+type BotDefaultsChange = { defaultModel?: BotModelId | null; defaultRepository?: string | null }
+
 /** 设置 › 工作区 › Bot (V13, WS-05, WS-06, WS-07). Data comes through `api` so the page does not care whether it is mocked. */
 export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; workspaceId?: string }) {
   const t = useTranslations('Settings.botSettings')
@@ -29,7 +32,7 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
   const [defaults, setDefaults] = useState<BotDefaultsView | null>(null)
   const [bots, setBots] = useState<WorkspaceBotRow[] | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
-  const [saveFailed, setSaveFailed] = useState<null | { defaultModel?: BotModelId | null; defaultRepository?: string | null }>(null)
+  const [saveFailed, setSaveFailed] = useState<null | BotDefaultsChange>(null)
 
   const load = useCallback(async () => {
     setLoadFailed(false)
@@ -40,14 +43,38 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
   }, [api])
   useEffect(() => { void load() }, [load])
 
-  async function save(change: { defaultModel?: BotModelId | null; defaultRepository?: string | null }) {
+  const saveSeq = useRef(0)
+  /**
+   * Optimistic save. Saves can overlap, so each one only touches the fields it
+   * changed, and only while they still hold the value it wrote: a slow failure
+   * never undoes a newer choice.
+   */
+  async function save(change: BotDefaultsChange) {
     if (!defaults) return
-    const previous = defaults
+    const id = ++saveSeq.current
+    const keys = Object.keys(change) as (keyof BotDefaultsChange)[]
+    const prior: BotDefaultsChange = {}
+    for (const key of keys) Object.assign(prior, { [key]: defaults[key] })
     setSaveFailed(null)
-    setDefaults({ ...defaults, ...change })
+    setDefaults(current => current && { ...current, ...change })
     const result = await api.updateDefaults(change)
-    if (result.error) { setDefaults(previous); setSaveFailed(change); return }
-    setDefaults(current => current && { ...current, ...result })
+    const stillMine = (current: BotDefaultsView, key: keyof BotDefaultsChange) => current[key] === change[key]
+    if (result.error) {
+      setDefaults(current => {
+        if (!current) return current
+        const next = { ...current }
+        for (const key of keys) if (stillMine(current, key)) Object.assign(next, { [key]: prior[key] })
+        return next
+      })
+      if (id === saveSeq.current) setSaveFailed(change)
+      return
+    }
+    setDefaults(current => {
+      if (!current) return current
+      const next = { ...current }
+      for (const key of keys) if (stillMine(current, key)) Object.assign(next, { [key]: result[key] })
+      return next
+    })
     toast(t('saved'))
   }
 
@@ -58,10 +85,10 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
     {saveFailed && <SettingsSaveError message={errorsT('generic')} retryLabel={commonT('retry')} onRetry={() => void save(saveFailed)} />}
     <SettingsSection id="bot-defaults-heading" title={t('defaultsTitle')}>
       <SettingRow title={t('model')}>
-        <ModelSelect defaults={defaults} disabled={!api.isAdmin} onChange={model => void save({ defaultModel: model })} />
+        <AdminOnly locked={!api.isAdmin} id="bot-default-model-admin-only"><ModelSelect defaults={defaults} disabled={!api.isAdmin} describedBy={api.isAdmin ? undefined : 'bot-default-model-admin-only'} onChange={model => void save({ defaultModel: model })} /></AdminOnly>
       </SettingRow>
       <SettingRow title={t('repository')} description={t('repositorySource')}>
-        <RepositorySelect defaults={defaults} disabled={!api.isAdmin} workspaceId={workspaceId} onChange={repository => void save({ defaultRepository: repository })} />
+        <AdminOnly locked={!api.isAdmin} id="bot-default-repository-admin-only"><RepositorySelect defaults={defaults} disabled={!api.isAdmin} describedBy={api.isAdmin ? undefined : 'bot-default-repository-admin-only'} workspaceId={workspaceId} onChange={repository => void save({ defaultRepository: repository })} /></AdminOnly>
       </SettingRow>
     </SettingsSection>
     <SettingsSection id="bot-list-heading" title={t('allBotsTitle')}>
@@ -72,16 +99,16 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
   </div>
 }
 
-function ModelSelect({ defaults, disabled, onChange }: { defaults: BotDefaultsView; disabled: boolean; onChange: (model: BotModelId) => void }) {
+function ModelSelect({ defaults, disabled, describedBy, onChange }: { defaults: BotDefaultsView; disabled: boolean; describedBy?: string; onChange: (model: BotModelId) => void }) {
   const t = useTranslations()
   const items = defaults.modelGroups.map(group => ({ value: group.id, label: t(group.labelKey) }))
   return <Select items={items} value={effectiveModel(defaults)} disabled={disabled} onValueChange={value => { if (value) onChange(value as BotModelId) }}>
-    <SelectTrigger size="sm" aria-label={t('Settings.botSettings.model')}><SelectValue /></SelectTrigger>
+    <SelectTrigger size="sm" aria-label={t('Settings.botSettings.model')} aria-describedby={describedBy}><SelectValue /></SelectTrigger>
     <SelectContent align="end"><SelectGroup>{items.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
   </Select>
 }
 
-function RepositorySelect({ defaults, disabled, workspaceId, onChange }: { defaults: BotDefaultsView; disabled: boolean; workspaceId?: string; onChange: (repository: string) => void }) {
+function RepositorySelect({ defaults, disabled, describedBy, workspaceId, onChange }: { defaults: BotDefaultsView; disabled: boolean; describedBy?: string; workspaceId?: string; onChange: (repository: string) => void }) {
   const t = useTranslations('Settings.botSettings')
   const router = useRouter()
   const items = [...defaults.repositories.map(value => ({ value, label: value })), { value: CONNECT_REPOSITORY, label: t('connectRepository') }]
@@ -89,13 +116,24 @@ function RepositorySelect({ defaults, disabled, workspaceId, onChange }: { defau
     if (value === CONNECT_REPOSITORY) { router.push(settingsHref('connections', workspaceId)); return }
     if (typeof value === 'string') onChange(value)
   }}>
-    <SelectTrigger size="sm" aria-label={t('repository')}><SelectValue placeholder={t('noRepository')} /></SelectTrigger>
+    <SelectTrigger size="sm" aria-label={t('repository')} aria-describedby={describedBy}><SelectValue placeholder={t('noRepository')} /></SelectTrigger>
     <SelectContent align="end">
       <SelectGroup>{defaults.repositories.map(repository => <SelectItem key={repository} value={repository}>{repository}</SelectItem>)}</SelectGroup>
       <SelectSeparator />
       <SelectGroup><SelectItem value={CONNECT_REPOSITORY}>{t('connectRepository')}</SelectItem></SelectGroup>
     </SelectContent>
   </Select>
+}
+
+
+/** Members see the disabled control; hovering it explains why (team pattern: no extra visible text). */
+function AdminOnly({ locked, id, children }: { locked: boolean; id: string; children: React.ReactNode }) {
+  const t = useTranslations('Settings.botSettings')
+  if (!locked) return children
+  return <Tooltip>
+    <TooltipTrigger render={<span />}>{children}<span id={id} className="sr-only">{t('adminOnly')}</span></TooltipTrigger>
+    <TooltipContent>{t('adminOnly')}</TooltipContent>
+  </Tooltip>
 }
 
 function botStatus(t: ReturnType<typeof useTranslations<'Settings.botSettings'>>, bot: WorkspaceBotRow) {
@@ -106,22 +144,21 @@ function BotRow({ bot, api }: { bot: WorkspaceBotRow; api: BotsSettingsApi }) {
   const t = useTranslations('Settings.botSettings')
   const commonT = useTranslations('Common')
   return <Sheet>
-    <SheetTrigger className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-sm outline-none hover:bg-muted/50 focus-visible:bg-muted/50">
-      <BotAvatar color={bot.color} shape={bot.shape} size="pill" still />
-      <span className="min-w-0 flex-1 truncate">{bot.name}</span>
-      <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
-        <span aria-hidden="true" className={cn('size-1.5 rounded-full', bot.status === 'running' ? 'bg-success' : 'bg-muted-foreground')} />
-        {botStatus(t, bot)}
-      </span>
-      <ChevronRight aria-hidden="true" className="text-muted-foreground" />
+    <SheetTrigger nativeButton={false} render={<Item />}>
+      <ItemMedia><BotAvatar color={bot.color} shape={bot.shape} size="pill" still /></ItemMedia>
+      <ItemContent><ItemTitle>{bot.name}</ItemTitle></ItemContent>
+      <ItemActions>
+        <ItemDescription><span aria-hidden="true" className={cn('mr-1.5 inline-block size-1.5 rounded-full align-middle', bot.status === 'running' ? 'bg-success' : 'bg-muted-foreground')} />{botStatus(t, bot)}</ItemDescription>
+        <ChevronRight aria-hidden="true" className="text-muted-foreground" />
+      </ItemActions>
     </SheetTrigger>
     <SheetContent side="right" showCloseButton={false}>
-      <SheetHeader className="border-b">
+      <SheetHeader>
         <SheetTitle>{t('threadsTitle')}</SheetTitle>
         <SheetDescription>{t('threadsSubtitle', { name: bot.name, status: botStatus(t, bot) })}</SheetDescription>
       </SheetHeader>
       <ThreadList bot={bot} api={api} />
-      <SheetFooter className="items-start">
+      <SheetFooter>
         <SheetClose render={<Button variant="outline" size="sm" />}>{commonT('close')}</SheetClose>
       </SheetFooter>
     </SheetContent>
@@ -137,6 +174,7 @@ function ThreadList({ bot, api }: { bot: WorkspaceBotRow; api: BotsSettingsApi }
   const [failed, setFailed] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const request = useRef(0)
+  const moreInFlight = useRef(false)
 
   const load = useCallback(async (cursor: string | null) => {
     const id = ++request.current
@@ -148,20 +186,31 @@ function ThreadList({ bot, api }: { bot: WorkspaceBotRow; api: BotsSettingsApi }
   }, [api, bot.id])
   useEffect(() => { void load(null) }, [load])
 
+  async function loadMore(cursor: string) {
+    if (moreInFlight.current) return
+    moreInFlight.current = true
+    setLoadingMore(true)
+    try { await load(cursor) } finally { moreInFlight.current = false; setLoadingMore(false) }
+  }
+
   return <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4">
-      {failed && <SettingsSaveError message={errorsT('generic')} retryLabel={commonT('retry')} onRetry={() => void load(page?.nextCursor ?? null)} />}
-      {!page && !failed && <div role="status" aria-label={commonT('loading')} className="flex flex-col gap-3">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-13 w-full rounded-lg" />)}</div>}
+      {!page && !failed && <div role="status" aria-label={commonT('loading')} className="flex flex-col gap-3">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-13 w-full" />)}</div>}
       {page && page.threads.length === 0 && <Empty><EmptyHeader><EmptyTitle>{t('noThreads')}</EmptyTitle></EmptyHeader></Empty>}
       {page?.threads.map(thread => {
-        const meta = <ItemDescription className="flex items-center gap-1.5">
-          <Avatar size="xs" aria-hidden="true">{thread.initiator.avatarUrl && <AvatarImage src={thread.initiator.avatarUrl} alt="" />}<AvatarFallback>{(thread.initiator.name ?? '?').slice(0, 1).toUpperCase()}</AvatarFallback></Avatar>
-          <span>{thread.title === null ? relativeTime(thread.lastActivityAt, locale) : t('threadMeta', { status: thread.status === 'running' ? t('threadRunning') : t('threadDone'), time: relativeTime(thread.lastActivityAt, locale) })}</span>
-        </ItemDescription>
-        const title = <ItemTitle className={cn(thread.title === null && 'text-muted-foreground')}>{thread.title ?? t('privateThread')}</ItemTitle>
+        const time = relativeTime(thread.lastActivityAt, locale)
+        // 私有线程 uses ItemDescription, the component's own muted text, instead of restyling ItemTitle.
+        const body = <>
+          <ItemMedia><Avatar size="xs" aria-hidden="true">{thread.initiator.avatarUrl && <AvatarImage src={thread.initiator.avatarUrl} alt="" />}<AvatarFallback>{(thread.initiator.name ?? '?').slice(0, 1).toUpperCase()}</AvatarFallback></Avatar></ItemMedia>
+          <ItemContent>
+            {thread.title === null ? <ItemDescription>{t('privateThread')}</ItemDescription> : <ItemTitle>{thread.title}</ItemTitle>}
+            <ItemDescription>{thread.title === null ? time : t('threadMeta', { status: thread.status === 'running' ? t('threadRunning') : t('threadDone'), time })}</ItemDescription>
+          </ItemContent>
+        </>
         return thread.canOpen && thread.href
-          ? <Item key={thread.threadId} variant="muted" render={<Link href={thread.href} />}><ItemContent>{title}{meta}</ItemContent></Item>
-          : <Item key={thread.threadId} variant="muted" data-thread-locked=""><ItemContent>{title}{meta}</ItemContent></Item>
+          ? <Item key={thread.threadId} variant="muted" render={<Link href={thread.href} />}>{body}</Item>
+          : <Item key={thread.threadId} variant="muted" data-thread-locked="">{body}</Item>
       })}
-      {page?.nextCursor && <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => { setLoadingMore(true); void load(page.nextCursor).finally(() => setLoadingMore(false)) }}>{t('loadMore')}</Button>}
+      {failed && <SettingsSaveError message={errorsT('generic')} retryLabel={commonT('retry')} onRetry={() => void (page?.nextCursor ? loadMore(page.nextCursor) : load(null))} />}
+      {page?.nextCursor && !failed && <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => void loadMore(page.nextCursor!)}>{t('loadMore')}</Button>}
     </div>
 }

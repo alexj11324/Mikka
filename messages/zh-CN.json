@@ -1710,7 +1710,8 @@
       "threadMeta": "{status} · {time}",
       "privateThread": "私有线程",
       "noThreads": "还没有线程",
-      "loadMore": "加载更多"
+      "loadMore": "加载更多",
+      "adminOnly": "仅管理员可操作"
     },
     "computerPolicy": {
       "heading": "云电脑",

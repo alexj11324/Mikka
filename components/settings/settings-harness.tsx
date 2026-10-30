@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl'
 import { AppShell, AppShellContent } from '@/components/app-shell'
 import { BotsSettings } from '@/components/settings/bots-settings'
 import { SettingsContent } from '@/components/ui/settings-layout'
-import { createMockBotsApi, type BotsMockScenario } from '@/lib/settings/bots-mock'
+import { mockGetBotDefaults, mockListBots, mockListBotThreads, mockUpdateBotDefaults } from '@/lib/settings/bots-mock-actions'
+import type { BotsSettingsApi } from '@/lib/settings/bots-api'
 
 import type { SettingsHarnessSection } from '@/lib/settings/harness-sections'
 
@@ -17,7 +18,7 @@ export function SettingsHarness({ section, state }: { section: SettingsHarnessSe
   const heading = t.has(`sections.${section}.heading`) ? t(`sections.${section}.heading`) : title
   const body = useMemo(() => {
     switch (section) {
-      case 'bots': return <BotsSettings api={createMockBotsApi(state as BotsMockScenario)} />
+      case 'bots': return <BotsSettings api={harnessBotsApi(state)} />
     }
   }, [section, state])
   return <AppShell variant="settings">
@@ -25,4 +26,18 @@ export function SettingsHarness({ section, state }: { section: SettingsHarnessSe
       <SettingsContent className="gap-6"><h1 className="text-2xl font-semibold tracking-tight">{heading}</h1>{body}</SettingsContent>
     </AppShellContent>
   </AppShell>
+}
+
+const never = <T,>() => new Promise<T>(() => {})
+
+/** Mock data lives behind gated server actions; only `loading` (never resolves) is decided here. */
+function harnessBotsApi(scenario: string): BotsSettingsApi {
+  const loading = scenario === 'loading'
+  return {
+    isAdmin: scenario !== 'member',
+    getDefaults: () => loading ? never() : mockGetBotDefaults(scenario),
+    updateDefaults: input => mockUpdateBotDefaults(scenario, input),
+    listBots: () => loading ? never() : mockListBots(scenario),
+    listThreads: input => mockListBotThreads(scenario, input),
+  }
 }

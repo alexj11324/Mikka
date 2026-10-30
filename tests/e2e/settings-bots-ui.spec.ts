@@ -2,9 +2,10 @@ import { expect, test } from '@playwright/test'
 
 /**
  * 设置 › Bot against the dev-only harness (mocked data, see lib/settings/bots-mock.ts).
- * Runs only when the server was started with MIKKA_SETTINGS_HARNESS=1.
+ * Playwright's own webServer enables the harness; against an external E2E_BASE_URL
+ * it runs only when that server was started with MIKKA_SETTINGS_HARNESS=1.
  */
-test.skip(process.env.MIKKA_SETTINGS_HARNESS !== '1', 'settings harness disabled')
+test.skip(!!process.env.E2E_BASE_URL && process.env.MIKKA_SETTINGS_HARNESS !== '1', 'settings harness disabled')
 const open = (page: import('@playwright/test').Page, state = 'default') => page.goto(`/mikka/zh-CN/preview/settings-harness/bots?state=${state}`)
 
 test('admin: defaults, bot list and thread drawer', async ({ page }) => {
@@ -27,7 +28,7 @@ test('admin: defaults, bot list and thread drawer', async ({ page }) => {
   const drawer = page.getByRole('dialog', { name: '线程列表' })
   await expect(drawer).toBeVisible()
   await expect(drawer.getByText('Coordinator · 空闲')).toBeVisible()
-  await expect(drawer.getByRole('link')).toHaveCount(3)
+  await expect(drawer.getByRole('link')).toHaveCount(2)
   const locked = drawer.locator('[data-thread-locked]')
   await expect(locked).toHaveText(/私有线程/)
   await expect(locked).not.toHaveText(/已完成|运行中/)
@@ -41,6 +42,40 @@ test('member: defaults are disabled', async ({ page }) => {
   await open(page, 'member')
   await expect(page.getByRole('combobox', { name: '模型' })).toBeDisabled()
   await expect(page.getByRole('combobox', { name: '代码仓库' })).toBeDisabled()
+  await expect(page.getByRole('combobox', { name: '模型' })).toHaveAccessibleDescription('仅管理员可操作')
+  await page.getByRole('combobox', { name: '模型' }).hover({ force: true })
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('仅管理员可操作')
+})
+
+test('overlapping saves: a slow failure never undoes a newer choice', async ({ page }) => {
+  await open(page, 'saveRace')
+  const model = page.getByRole('combobox', { name: '模型' })
+  await model.click()
+  await page.getByRole('option', { name: 'Codex' }).click() // pending, fails after a delay
+  await model.click()
+  await page.getByRole('option', { name: 'Claude' }).click() // succeeds at once
+  await expect(page.getByText('已保存')).toBeVisible()
+  await page.waitForTimeout(1500)
+  await expect(model).toHaveText(/Claude/)
+  await expect(page.getByRole('alert').filter({ hasText: '操作未成功' })).toHaveCount(0)
+})
+
+test('thread drawer pages with a cursor; a failed next page can be retried', async ({ page }) => {
+  await open(page)
+  await page.getByRole('button', { name: /Frontend/ }).click()
+  const drawer = page.getByRole('dialog', { name: '线程列表' })
+  const rows = drawer.locator('[data-slot="item"]')
+  await expect(rows).toHaveCount(20)
+  await drawer.getByRole('button', { name: '加载更多' }).dblclick()
+  await expect(rows).toHaveCount(25)
+  await expect(drawer.getByRole('button', { name: '加载更多' })).toHaveCount(0)
+
+  await open(page, 'moreError')
+  await page.getByRole('button', { name: /Frontend/ }).click()
+  await expect(rows).toHaveCount(20)
+  await drawer.getByRole('button', { name: '加载更多' }).click()
+  await expect(drawer.getByRole('alert')).toBeVisible()
+  await expect(rows).toHaveCount(20)
 })
 
 test('loading, empty, load error and save error states', async ({ page }) => {

@@ -6,7 +6,7 @@ import type { ActionResult } from '@/lib/action-result'
  * Shapes mirror #434 (listBotThreads, modelGroups) and the #431 base actions
  * (getWorkspaceBotDefaults, updateWorkspaceBotDefaults, listWorkspaceBots).
  * The page only talks to a BotsSettingsApi, so swapping the mock in
- * bots-mock.ts for the real server actions is a one-line change once #434 lands.
+ * bots-mock-actions.ts (harness) for the real server actions is a one-line change once #434 lands.
  */
 export type BotModelId = 'mikka' | 'codex' | 'claude'
 

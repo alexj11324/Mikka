@@ -29,5 +29,7 @@ export default defineConfig({
     url: 'http://localhost:3100/mikka/sign-in',
     reuseExistingServer: false,
     timeout: 60000,
+    // Only adds the dev settings harness route (tests/e2e/settings-bots-ui.spec.ts); no effect on other pages.
+    env: { MIKKA_SETTINGS_HARNESS: '1' },
   },
 })
