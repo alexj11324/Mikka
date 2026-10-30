@@ -20,4 +20,12 @@ test("note masker hides uppercase hex and lowercase %xx spellings", () => {
   assert.notEqual(pct, encodeURIComponent(value));
   assert.equal(maskFactoryNote(`a ${hex} b`, secrets), "a [secret] b");
   assert.equal(maskFactoryNote(`a ${pct} b`, secrets), "a [secret] b");
+  // Mixed case within one string: %2f next to %2B, and alternating-case hex.
+  const mixed = encodeURIComponent(value).replace("%2F", "%2f");
+  assert.match(mixed, /%2f.*%2B/);
+  assert.equal(maskFactoryNote(`a ${mixed} b`, secrets), "a [secret] b");
+  const mixedHex = [...Buffer.from(value).toString("hex")].map((c, i) => (i % 2 ? c.toUpperCase() : c)).join("");
+  assert.equal(maskFactoryNote(`a ${mixedHex} b`, secrets), "a [secret] b");
+  // Regex metacharacters in the value are matched literally.
+  assert.equal(maskFactoryNote("a e2bXsynth+value=123 b", secrets), "a e2bXsynth+value=123 b");
 });
