@@ -82,13 +82,15 @@ export type PanelConversation = { id?: string | null; name: string; color?: stri
  * 详情 / 线程 / PR / 电脑; 全部线程 lists every bot's threads. ⤢ widens just
  * this column. Picking another bot switches its threads, PRs and computer.
  */
-export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSearch, onClose }: {
+export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSearch, onClose, sheet = false }: {
   issues: Issue[]
   threads: Thread[]
   conversation: PanelConversation
   onOpenIssue: (id: string) => void
   onSearch: () => void
   onClose: () => void
+  /** Shown in a Sheet below xl, where the column has no room. */
+  sheet?: boolean
 }) {
   const t = useTranslations('Shell.panel')
   const [view, setView] = useState<PanelView>('overview')
@@ -110,7 +112,7 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
   const shown = tabs.includes(tab) ? tab : 'threads'
 
   const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
-  return <aside aria-label={t('label')} className={cn('hidden min-h-0 shrink-0 flex-col border-l transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90')}>
+  return <aside aria-label={t('label')} className={cn('min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : cn('hidden border-l transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90'))}>
     <Tabs value={view} onValueChange={value => setView(value as PanelView)} className="min-h-0 flex-1 gap-0">
       <div className="flex h-11 shrink-0 items-center gap-1 px-3">
         <TabsList aria-label={t('views')} className="gap-1 bg-transparent p-0">
@@ -119,7 +121,7 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
         </TabsList>
         <div className="ml-auto flex items-center">
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('search')} onClick={onSearch} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('search')}</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={wide ? t('narrow') : t('widen')} aria-pressed={wide} onClick={() => setWide(value => !value)} />}>{wide ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</TooltipTrigger><TooltipContent>{wide ? t('narrow') : t('widen')}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={wide ? t('narrow') : t('widen')} aria-pressed={wide} className={cn(sheet && 'hidden')} onClick={() => setWide(value => !value)} />}>{wide ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</TooltipTrigger><TooltipContent>{wide ? t('narrow') : t('widen')}</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
         </div>
       </div>
