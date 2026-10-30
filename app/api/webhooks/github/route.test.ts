@@ -4,6 +4,7 @@ import { after, before, beforeEach, mock, test } from 'node:test'
 
 const secret = 'synthetic-github-webhook-secret'
 const originalSecret = process.env.GITHUB_WEBHOOK_SECRET
+const originalExternalPolling = process.env.MIKKA_CI_EXTERNAL_POLLING
 const callbacks: Array<() => Promise<void>> = []
 const query = mock.fn(async (_sql: string, _params: unknown[]) => ({ rows: [{ scheduled: true }] }))
 const reconcile = mock.fn(async (_options: unknown) => ({}))
@@ -16,8 +17,8 @@ mock.module(new URL('../../../../lib/suggestions/sources.ts', import.meta.url).h
 mock.module(new URL('../../../../lib/suggestions/store.ts', import.meta.url).href, { namedExports: { ingestNotifications: ingest } })
 let POST: typeof import('./route')['POST']
 before(async () => { ({ POST } = await import('./route')) })
-beforeEach(() => { process.env.GITHUB_WEBHOOK_SECRET = secret; callbacks.length = 0; query.mock.resetCalls(); query.mock.mockImplementation(async () => ({ rows: [{ scheduled: true }] })); reconcile.mock.resetCalls() })
-after(() => { if (originalSecret === undefined) delete process.env.GITHUB_WEBHOOK_SECRET; else process.env.GITHUB_WEBHOOK_SECRET = originalSecret })
+beforeEach(() => { process.env.GITHUB_WEBHOOK_SECRET = secret; delete process.env.MIKKA_CI_EXTERNAL_POLLING; callbacks.length = 0; query.mock.resetCalls(); query.mock.mockImplementation(async () => ({ rows: [{ scheduled: true }] })); reconcile.mock.resetCalls(); notification.mock.resetCalls() })
+after(() => { if (originalSecret === undefined) delete process.env.GITHUB_WEBHOOK_SECRET; else process.env.GITHUB_WEBHOOK_SECRET = originalSecret; if (originalExternalPolling === undefined) delete process.env.MIKKA_CI_EXTERNAL_POLLING; else process.env.MIKKA_CI_EXTERNAL_POLLING = originalExternalPolling })
 function request(signature = true) {
   const body = JSON.stringify({ action: 'completed', repository: { id: 1 }, installation: { id: 2 }, workflow_run: { head_branch: 'mikka/issue-1', id: 42, run_attempt: 2, head_sha: 'a'.repeat(40) } })
   const hash = createHmac('sha256', secret).update(body).digest('hex')
@@ -38,4 +39,17 @@ test('database failure returns 503 and does not start deferred work', async () =
   query.mock.mockImplementation(async () => { throw new Error('fixture outage') })
   assert.equal((await POST(request())).status, 503)
   assert.equal(callbacks.length, 0)
+})
+test('external CI polling leaves PR, issue, comment and review webhook processing active', async () => {
+  process.env.MIKKA_CI_EXTERNAL_POLLING='1'
+  for (const event of ['pull_request','issues','issue_comment','pull_request_review','pull_request_review_comment']) {
+    const body=JSON.stringify({action:'opened',number:1,repository:{id:1},installation:{id:2}})
+    const hash=createHmac('sha256',secret).update(body).digest('hex')
+    const incoming=new Request('https://example.test/api/webhooks/github',{method:'POST',body,headers:{'x-github-event':event,'x-hub-signature-256':`sha256=${hash}`}})
+    assert.equal((await POST(incoming)).status,202)
+    await callbacks.at(-1)!()
+  }
+  assert.equal(query.mock.callCount(),0)
+  assert.equal(notification.mock.callCount(),5)
+  assert.equal(reconcile.mock.callCount(),0)
 })

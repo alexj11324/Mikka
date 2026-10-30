@@ -73,7 +73,7 @@ export async function preflightCiClaim(userId: string, c: CiContinuation): Promi
     const access = await verifyGitHubRepositoryAccess({ remoteKey: c.remoteKey, githubAccountId: await linkedGitHubAccountId(userId), fetcher: (url, init) => fetch(url, { ...init, signal: init?.signal ? AbortSignal.any([signal, init.signal]) : signal }) })
     if (access.installationId !== Number(binding.installationId) || access.repositoryId !== Number(binding.repositoryId)) return { kind: 'unavailable' }
     const result = await readCi({ remoteKey: c.remoteKey, installationId: Number(binding.installationId), repositoryId: Number(binding.repositoryId), prNumber: c.prNumber, branch: binding.branch }, process.env, fetch, { deadline: Date.now() + 20_000 })
-    const attempts = await listCiWorkflowAttempts(pool, { userId, issueId: c.issueId, remoteKey: c.remoteKey, prNumber: c.prNumber, head: c.head })
+    const attempts = process.env.MIKKA_CI_EXTERNAL_POLLING === '1' ? [] : await listCiWorkflowAttempts(pool, { userId, issueId: c.issueId, remoteKey: c.remoteKey, prNumber: c.prNumber, head: c.head })
     const summary = summarize(result.snapshot, attempts)
     if (!result.open || result.head !== c.head) return { kind: 'stale', generation }
     if (summary.kind !== 'complete') return { kind: 'unavailable' }

@@ -46,7 +46,7 @@ export function ciFollowUp(head: string, outcome: 'success' | 'failure', failed:
 
 /** Provider I/O occurs outside locks. A short transaction revalidates the
  * binding and event generation before enqueue; claim re-reads GitHub again. */
-export async function reconcileCi(options: { pool: Pool; deadline: number; limit?: number; read?: typeof readCi; deliver?: Delivery; now?: () => number; lockPolicy?: typeof lockCliAgentPolicy; wake?: (userId: string) => Promise<void>; retire?: Retire; retireRevoked?: RetireRevoked; retireRevokedSkill?: RetireRevoked; acquireMembership?: typeof acquireCiMembership; listAttempts?: typeof listCiWorkflowAttempts; recoverAttempts?: typeof readPendingCiAttempts }): Promise<CiReconcileResult> {
+export async function reconcileCi(options: { pool: Pool; deadline: number; limit?: number; watchId?: string; read?: typeof readCi; deliver?: Delivery; now?: () => number; lockPolicy?: typeof lockCliAgentPolicy; wake?: (userId: string) => Promise<void>; retire?: Retire; retireRevoked?: RetireRevoked; retireRevokedSkill?: RetireRevoked; acquireMembership?: typeof acquireCiMembership; listAttempts?: typeof listCiWorkflowAttempts; recoverAttempts?: typeof readPendingCiAttempts }): Promise<CiReconcileResult> {
   const result: CiReconcileResult = { scanned: 0, queued: 0, pending: 0, closed: 0, failed: 0, escalated: 0 }
   const read = options.read ?? readCi
   const deliver: Delivery = options.deliver ?? (async (tx, userId, input) => (await import('@/lib/ci-continuation')).queueCiContinuation(tx, userId, input))
@@ -54,7 +54,9 @@ export async function reconcileCi(options: { pool: Pool; deadline: number; limit
   const retireRevoked: RetireRevoked = options.retireRevoked ?? (async (tx, userId, input) => (await import('@/lib/ci-continuation')).retireRevokedMailboxCiRuns(tx, userId, input))
   const retireRevokedSkill: RetireRevoked = options.retireRevokedSkill ?? (async (tx, userId, input) => (await import('@/lib/ci-continuation')).retireRevokedCiSkillRuns(tx, userId, input))
   const acquireMembership = options.acquireMembership ?? acquireCiMembership
-  const listAttempts = options.listAttempts ?? listCiWorkflowAttempts
+  // The active poller reads current Actions attempts directly. Historical
+  // webhook attempt rows are no longer a source of truth after cutover.
+  const listAttempts = options.listAttempts ?? (process.env.MIKKA_CI_EXTERNAL_POLLING === '1' ? async () => [] : listCiWorkflowAttempts)
   const limit = Math.min(LIMIT, Math.max(0, options.limit ?? LIMIT))
   const now = options.now ?? Date.now
   const visited: string[] = []
@@ -68,8 +70,9 @@ export async function reconcileCi(options: { pool: Pool; deadline: number; limit
       LEFT JOIN issues i ON i.id=o."issueId"
       LEFT JOIN agent_runs r ON r.id=o."originRunId" AND r."userId"=o."userId"
       WHERE o."nextCheckAt"<=now() AND o."expiresAt">now()
+        AND ($2::uuid IS NULL OR o."watchId"=$2)
         AND NOT (concat_ws(chr(31),o."userId",o."issueId"::text,o."remoteKey",o."prNumber"::text)=ANY($1::text[]))
-      ORDER BY o."nextCheckAt",o."userId",o."issueId" LIMIT 1`, [visited])
+      ORDER BY o."nextCheckAt",o."userId",o."issueId" LIMIT 1`, [visited,options.watchId ?? null])
     if (!hint) break
     visited.push([hint.userId, hint.issueId, hint.remoteKey, String(hint.prNumber)].join('\x1f'))
     result.scanned++
@@ -178,23 +181,18 @@ export async function reconcileCi(options: { pool: Pool; deadline: number; limit
         retired += await retireRevoked(tx, row.userId, binding)
         retired += await retireRevokedSkill(tx, row.userId, binding)
       }
-      const previous: Observation | null = row.head && row.firstSeenAt ? { head: row.head, fingerprint: row.fingerprint, firstSeenAt: row.firstSeenAt.getTime(), deliveredFingerprint: row.deliveredFingerprint } : null
+      // Retirement only affects queued, unclaimed runs. A changed result may
+      // replace one of those; it must not replace a result already started.
+      const claimed = await tx.query(`SELECT "runId" FROM github_ci_commit_claims WHERE "userId"=$1 AND "issueId"=$2 AND "remoteKey"=$3 AND "prNumber"=$4 AND head=$5 LIMIT 1`, [row.userId,row.issueId,row.remoteKey,row.prNumber,current.head.toLowerCase()])
+      if (claimed.rowCount) await tx.query(`UPDATE agent_runs SET status='stopped',"stopReason"='superseded',error='CI result for this commit was already claimed.',"finishedAt"=now(),"updatedAt"=now() WHERE "userId"=$1 AND "issueId"=$2 AND status='queued' AND "stopRequestedAt" IS NULL AND id<>$6 AND "ciContinuation"->>'remoteKey'=$3 AND "ciContinuation"->>'prNumber'=$4 AND lower("ciContinuation"->>'head')=$5`, [row.userId,row.issueId,row.remoteKey,String(row.prNumber),current.head.toLowerCase(),claimed.rows[0].runId])
+      const priorDelivery = claimed.rowCount ? (row.deliveredFingerprint ?? 'claimed') : retired > 0 && row.head === current.head ? null : row.deliveredFingerprint
+      const previous: Observation | null = row.head && row.firstSeenAt ? { head: row.head, fingerprint: row.fingerprint, firstSeenAt: row.firstSeenAt.getTime(), deliveredFingerprint: priorDelivery } : null
       const decision = observe(previous, current.head, summary, now(), QUIET_MS)
-      let delivered = retired > 0 && row.head === current.head && summary.kind === 'complete' && row.deliveredFingerprint === summary.fingerprint
-        ? null : decision.state?.deliveredFingerprint ?? (row.head === current.head ? row.deliveredFingerprint : null)
+      if (claimed.rowCount || retired > 0) decision.deliver = false
+      let delivered = decision.state?.deliveredFingerprint ?? (row.head === current.head ? priorDelivery : null)
       let queued = false, escalated = false, unsupported = false, wakeAfterCommit = false
       const pendingReason = summary.kind === 'pending' ? summary.reason ?? null : null
       const pendingSince = pendingReason ? (row.head === current.head && row.pendingReason === pendingReason && row.pendingReasonSince ? row.pendingReasonSince : new Date(now())) : null
-      if (pendingReason && pendingSince && now() - pendingSince.getTime() >= NEXT_MS) {
-        const payload = { text: lease.held ? 'CI needs attention. Open an authorized task to review its checks.' : pendingReason === 'required_check_missing' ? 'A required CI check has not registered. Please review the pull request checks.' : 'CI workflow ordering could not be verified. Please review the pull request checks.', source: 'github_ci' }
-        await assertCredentialSafeChat(row.userId, payload)
-        const key = createHash('sha256').update(JSON.stringify([row.userId,row.issueId,row.remoteKey,row.prNumber,row.watchId,current.head,pendingReason])).digest('hex')
-        const inserted = await tx.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey","issueId","runId",payload,tier)
-          VALUES ($1,$2,$3,'run_report',$4,$5,$6,$7,'attention') ON CONFLICT ("dedupeKey") DO NOTHING RETURNING id`,
-        [randomUUID(),row.userId,row.botId,`ci_escalation:${key}`,lease.held ? null : row.issueId,lease.held ? null : row.originRunId,JSON.stringify(payload)])
-        escalated = Boolean(inserted.rowCount)
-        wakeAfterCommit = escalated
-      }
       const escalationKey = summary.kind === 'complete' ? `ci_escalation:${createHash('sha256').update(JSON.stringify([row.userId, row.issueId, row.remoteKey, row.prNumber, current.head, summary.fingerprint])).digest('hex')}` : null
       // A queued subscription continuation may wait on an offline device even
       // though the result is already durable. Alert once, without cancelling

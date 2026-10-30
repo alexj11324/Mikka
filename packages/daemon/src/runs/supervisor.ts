@@ -1127,6 +1127,8 @@ export class RunSupervisor {
         repo.path,
         await this.startPoint(runId, repo, assignment),
       ))
+    if (hostedCiResume && await headCommit(repo.path, worktree) !== assignment.ciHead)
+      throw new Error('CI continuation worktree does not match the verified commit')
     if (!entry.worktree) {
       // A continued worktree was bootstrapped by the run that made it.
       // The commit checkpoints diff against: a continued worktree keeps the

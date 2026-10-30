@@ -21,7 +21,9 @@ export async function POST(request: Request) {
   if (!event || event === 'ping') return new Response(null, { status: 204, headers: noStore })
   let payload: Record<string, unknown>
   try { payload = JSON.parse(rawBody) } catch { return new Response('Invalid webhook JSON.', { status: 400, headers: noStore }) }
-  const wakeup = ciWakeup(event, payload)
+  // The same endpoint still handles PR, issue, comment and review business
+  // events. GitHub must separately stop sending workflow_run at cutover.
+  const wakeup = process.env.MIKKA_CI_EXTERNAL_POLLING === '1' ? null : ciWakeup(event, payload)
   let ciScheduled = false
   if (wakeup) {
     try { ciScheduled = await recordCiWakeup(pool, wakeup) }

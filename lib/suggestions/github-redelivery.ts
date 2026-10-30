@@ -106,7 +106,7 @@ export async function redeliverFailedGitHubWebhooks({ now = new Date(), fetcher 
     if (!cursor || !rows.length || rows.some(row => new Date(row.delivered_at) < since)) break
   }
   result.scanned = deliveries.length
-  const failed = failedDeliveries(deliveries, since, Infinity)
+  const failed = failedDeliveries(deliveries, since, Infinity).filter(row => env.MIKKA_CI_EXTERNAL_POLLING !== '1' || row.event !== 'workflow_run')
   result.failed = failed.length
   for (const delivery of fairRedeliveries(failed)) {
     const response = await fetcher(`${API}/app/hook/deliveries/${delivery.id}/attempts`, { method: 'POST', headers })

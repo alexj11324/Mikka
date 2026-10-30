@@ -25,6 +25,7 @@ function harness(rows: typeof base[], notices = new Set<string>(), offline = fal
     if (sql.includes('FOR UPDATE OF o SKIP LOCKED')) { const row = rows.shift(); return { rows: row ? [row] : [], rowCount: row ? 1 : 0 } }
     if (sql.includes('INSERT INTO coordinator_events')) { const provider = sql.includes('SELECT $8'); const key = String(args[provider ? 8 : 3]); events.push(`${provider ? 'read-notice' : 'notice'}:${String(args[provider ? 9 : 6])}`); if (!provider) events.push(`ids:${String(args[4])}:${String(args[5])}`); const fresh = !notices.has(key); notices.add(key); return { rows: fresh ? [{ id: 'notice' }] : [], rowCount: fresh ? 1 : 0 } }
     if (sql.startsWith('SELECT 1 FROM agent_runs')) return { rows: offline ? [{ offline: true }] : [], rowCount: offline ? 1 : 0 }
+    if (sql.startsWith('SELECT "runId" FROM github_ci_commit_claims')) return { rows: [], rowCount: 0 }
     if (sql.includes('UPDATE github_ci_observations')) { events.push(sql.includes("'delivery_unavailable'") ? 'backoff' : `observation:${String(args[7])}`); return { rows: [], rowCount: 1 } }
     throw Error(`unexpected SQL: ${sql}`)
   }, release() {} } } } as unknown as Pool
@@ -114,15 +115,15 @@ test('unverifiable provider state sends one durable notice and never claims a re
 })
 
 
-test('missing required check receives one bounded notice but ordinary pending does not wake', async () => {
+test('missing required check and ordinary pending do not wake', async () => {
   const notices = new Set<string>()
   const data = { ...base, pendingReason: 'required_check_missing', pendingReasonSince: new Date(1) }
   const missing = { ...snapshot, requiredChecks: [{ context: 'not-yet-registered', appId: null }] }
   const first = harness([data], notices)
   const options = { deadline: Date.now() + 30000, limit: 1, lockPolicy: (async () => ({})) as never, listAttempts: async () => [], retire: async () => 0, retireRevoked: async () => 0, retireRevokedSkill: async () => 0, now: () => 1_000_000, read: async () => ({ head: base.head, open: true, snapshot: missing }), wake: async () => {} }
   const result = await reconcileCi({ ...options, pool: first.pool })
-  assert.equal(result.escalated, 1)
-  assert.ok(first.events.some(event => event.startsWith('notice:') && event.includes('required CI check')))
+  assert.equal(result.escalated, 0)
+  assert.equal(first.events.some(event => event.startsWith('notice:')), false)
   const again = harness([data], notices)
   assert.equal((await reconcileCi({ ...options, pool: again.pool })).escalated, 0)
   const normal = harness([{ ...base }], notices)

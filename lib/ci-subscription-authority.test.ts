@@ -10,7 +10,7 @@ test('CI subscription requires current connected binding and fails closed', asyn
     const tx = { query: async (_sql: string, params: unknown[]) => { calls.push(params); return { rows: [{ id: 'binding' }] } } } as never
     const definition = { subscription: { bindingId: 'binding', route: 'codex_cli', modelId: 'model' } } as never
     assert.equal(await currentCiSubscriptionAuthorized(tx, 'owner', 'agent', definition), true)
-    assert.deepEqual(calls[0], ['binding','owner','agent','codex_cli','model'])
+    assert.deepEqual(calls[1], ['binding','owner','agent','codex_cli','model'])
     assert.equal(await currentCiSubscriptionAuthorized({ query: async () => ({ rows: [] }) } as never, 'owner', 'agent', definition), false)
     assert.equal(await currentCiSubscriptionAuthorized(tx, 'owner', null, definition), false)
     process.env.MIKKA_BYOS_ENABLED = '0'

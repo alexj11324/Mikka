@@ -2,6 +2,7 @@ import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { z } from 'zod'
+import { lockSubscriptionBinding } from '../subscription-binding-lock'
 
 const inputSchema = z.object({ botId: z.uuid(), connectionId: z.uuid(), revision: z.number().int().positive(), harness: z.enum(['codex', 'claude_code']), modelId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/), idempotencyKey: z.string().min(1).max(256).optional() }).strict()
 
@@ -18,6 +19,7 @@ export async function bindBotSubscription(pool: Pool, actor: { userId: string; w
     await client.query('BEGIN')
     const runtime = (await client.query('SELECT "agentId" FROM bot_cloud_runtimes WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND harness=$4', [input.botId, actor.userId, actor.workspaceId, input.harness])).rows[0]
     if (!runtime) throw new Error('Bot subscription unavailable')
+    await lockSubscriptionBinding(client, actor.userId, runtime.agentId, route)
     await client.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
       SELECT $1,$2,$3,$4,id,epoch,$7,$8 FROM byos_connections WHERE id=$5 AND "ownerId"=$2 AND "workspaceId"=$3
         AND epoch=$6 AND state='connected' AND provider=$9 ON CONFLICT (id) DO NOTHING`,

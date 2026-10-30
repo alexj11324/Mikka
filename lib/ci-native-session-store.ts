@@ -1,6 +1,9 @@
 import 'server-only'
 import type { Pool } from 'pg'
 import { openCiSession, sealCiSession, type CiSessionScope } from './ci-session-envelope'
+import { acquireCiMembership, ciIssueAuthorized } from './github/ci/authority'
+import { readIssueMetadata } from './issue-metadata'
+import { lockSubscriptionBinding } from './subscription-binding-lock'
 
 type Context = { ownerId: string; deviceId: string; runId: string; accountId: string; revision: number; route: string; modelId: string }
 const unavailable = (): never => { throw new Error('CI session snapshot unavailable') }
@@ -9,9 +12,14 @@ const unavailable = (): never => { throw new Error('CI session snapshot unavaila
  * server-bound CI child. Both paths hold the connection row through commit so
  * disconnect/reconnect cannot race the release of session material. */
 export async function nativeSessionSnapshot(pool: Pool, context: Context, operation: { kind: 'save'; sessionId: string; data: Buffer } | { kind: 'restore' }, secret: string): Promise<Buffer | null> {
-  const tx = await pool.connect()
+  const {rows:[hint]} = await pool.query(`SELECT i.id,i."userId",r."agentId" FROM agent_runs r JOIN issues i ON i.id=r."issueId" WHERE r.id=$1 AND r."userId"=$2`,[context.runId,context.ownerId])
+  if (!hint) unavailable()
+  const membership = await acquireCiMembership(hint.id, context.ownerId, hint.userId)
+  const tx = await pool.connect().catch(async error => { await membership.close(); throw error })
   try {
     await tx.query('BEGIN')
+    const {rows:[issue]} = await tx.query(`SELECT id,"userId",scope,"scopeVersion",content FROM issues WHERE id=$1 FOR UPDATE`,[hint.id])
+    await lockSubscriptionBinding(tx, context.ownerId, hint.agentId, context.route)
     const { rows: [r] } = await tx.query(`SELECT r.id,r."issueId",r."sessionId",r."ciContinuation",r."agentId",r."agentDefinition",b.id AS "bindingId",b."ownerId",b."workspaceId",b."consumerId",b.route,b."modelId",b."connectionRevision",c.epoch,c.state
       FROM agent_runs r JOIN byos_native_runs n ON n."runId"=r.id
       JOIN byos_bindings b ON b.id=n."bindingId" JOIN byos_connections c ON c.id=b."connectionId"
@@ -20,6 +28,8 @@ export async function nativeSessionSnapshot(pool: Pool, context: Context, operat
       AND b.id=(SELECT latest.id FROM byos_bindings latest WHERE latest."ownerId"=b."ownerId" AND latest."consumerId"=b."consumerId" AND latest.route=b.route ORDER BY latest."createdAt" DESC,latest.id DESC LIMIT 1)
       FOR UPDATE OF r FOR SHARE OF b,c`, [context.runId, context.ownerId, context.deviceId])
     if (!r || r.state !== 'connected' || Number(r.epoch) !== context.revision || Number(r.connectionRevision) !== context.revision || r.route !== context.route || r.modelId !== context.modelId) unavailable()
+    const scopeVersion = operation.kind === 'restore' ? r.ciContinuation?.scopeVersion : issue?.scopeVersion
+    if (!ciIssueAuthorized(issue,context.ownerId,scopeVersion,membership.held,value => Boolean(readIssueMetadata(value as never).deletedAt))) unavailable()
     const current = { ownerId: r.ownerId, workspaceId: r.workspaceId, consumerId: r.consumerId, bindingId: r.bindingId, accountId: context.accountId, route: r.route, revision: context.revision, modelId: r.modelId }
     let result: Buffer | null = null
     if (operation.kind === 'save') {
@@ -37,7 +47,9 @@ export async function nativeSessionSnapshot(pool: Pool, context: Context, operat
       if (!origin || origin.sessionId !== c.originSessionId || origin.agentId !== r.agentId || origin.issueId !== r.issueId || origin.deviceId !== context.deviceId || origin.bindingId !== r.bindingId || !r.agentDefinition?.definitionDigest || origin.agentDefinition?.definitionDigest !== r.agentDefinition.definitionDigest) unavailable()
       result = openCiSession({ ...current, runId: c.originRunId, sessionId: c.originSessionId }, origin.ciphertext, secret)
     }
+    await membership.check()
     await tx.query('COMMIT')
+    await membership.check()
     return result
-  } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+  } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release(); await membership.close() }
 }

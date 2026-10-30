@@ -1,7 +1,9 @@
 import { constants, closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
-const maxBytes = 2 * 1024 * 1024
+// The transcript is base64 encoded inside the snapshot and again for JSON
+// transport; this cap keeps the request below the server's 2.8 MB bound.
+const maxBytes = 1_500_000
 const safeId = (id: string) => /^[a-z0-9_-]{1,128}$/i.test(id)
 const fail = (): never => { throw new Error('Original hosted session is unavailable') }
 

@@ -4,7 +4,7 @@ import { observe } from './observation'
 import type { Result } from './snapshot'
 const complete = (fingerprint: string): Result => ({ kind: 'complete', outcome: 'success', failed: [], fingerprint })
 
-test('waits for stability, deduplicates deliveries and detects a rerun or new head', () => {
+test('waits for stability and delivers at most once for the current head', () => {
   const initial = observe(null, 'a', complete('1'), 100, 50)
   assert.equal(initial.deliver, false)
   assert.equal(observe(initial.state, 'a', complete('1'), 149, 50).deliver, false)
@@ -12,6 +12,8 @@ test('waits for stability, deduplicates deliveries and detects a rerun or new he
   const delivered = { ...initial.state!, deliveredFingerprint: '1' }
   assert.equal(observe(delivered, 'a', complete('1'), 200, 50).deliver, false)
   assert.equal(observe(delivered, 'a', complete('2'), 200, 50).deliver, false)
+  const changed = observe(delivered, 'a', complete('2'), 200, 50)
+  assert.equal(observe(changed.state, 'a', complete('2'), 250, 50).deliver, false)
   assert.equal(observe(delivered, 'b', complete('1'), 200, 50).deliver, false)
   const pending = observe(delivered, 'a', { kind: 'pending' }, 200, 50)
   assert.equal(pending.state?.deliveredFingerprint, '1')

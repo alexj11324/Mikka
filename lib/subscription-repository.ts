@@ -20,7 +20,8 @@ export class SubscriptionRepository {
   scope(row: ConnectionRow): CredentialScope { return { ownerId: row.ownerId, workspaceId: row.workspaceId, connectionId: row.id, provider: row.provider } }
   async bind(ownerId: string, workspaceId: string, consumerId: string, connectionId: string, revision: number, route: SubscriptionRoute, modelId: string) {
     const id = randomUUID()
-    const result = await this.pool.query(`insert into byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") select $1,$2,$3,$4,id,epoch,$7,$8 from byos_connections where id=$5 and "ownerId"=$2 and "workspaceId"=$3 and epoch=$6 and state='connected' and provider=$9 returning id`, [id, ownerId, workspaceId, consumerId, connectionId, revision, route, modelId, route.startsWith('codex') ? 'codex' : 'claude'])
+    const lockKey = JSON.stringify(['byos-binding-v1',ownerId,consumerId,route])
+    const result = await this.pool.query(`with binding_lock as materialized (select pg_advisory_xact_lock(hashtextextended($10,0))) insert into byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") select $1,$2,$3,$4,c.id,c.epoch,$7,$8 from binding_lock cross join byos_connections c where c.id=$5 and c."ownerId"=$2 and c."workspaceId"=$3 and c.epoch=$6 and c.state='connected' and c.provider=$9 returning id`, [id, ownerId, workspaceId, consumerId, connectionId, revision, route, modelId, route.startsWith('codex') ? 'codex' : 'claude',lockKey])
     if (!result.rows[0]) throw new SubscriptionRefusal('stale_binding')
     return id
   }

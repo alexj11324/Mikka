@@ -13,6 +13,10 @@ export interface Env {
   LINEAR_CLIENT_SECRET?: string
   LINEAR_TOKEN_ENCRYPTION_KEY?: string
   LINEAR_WEBHOOK_SECRET?: string
+  CI_POLL_ENABLED?: string
+  GITHUB_APP_ID?: string
+  GITHUB_APP_PRIVATE_KEY?: string
+  MIKKA_URL?: string
 }
 
 interface WorkerContext {
@@ -147,9 +151,12 @@ export async function handleRequest(request: Request, env: Env, ctx: WorkerConte
 
 export default {
   fetch: handleRequest,
-  scheduled(_controller: WorkerSchedule, env: Env, ctx: WorkerContext) {
-    ctx.waitUntil(runScheduled(env).catch(() => {
+  scheduled(controller: WorkerSchedule, env: Env, ctx: WorkerContext) {
+    if (controller.cron === '0 4 * * *') ctx.waitUntil(runScheduled(env).catch(() => {
       console.error('Linear sync scheduled batch failed')
+    }))
+    if (controller.cron === '*/15 * * * *') ctx.waitUntil(import('./ci-runtime').then(runtime=>runtime.runCiScheduled(env)).catch(()=>{
+      console.error('CI polling scheduled batch failed')
     }))
   },
 }

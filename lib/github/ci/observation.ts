@@ -11,5 +11,7 @@ export function observe(previous: Observation | null, head: string, result: Resu
   if (!previous || previous.head !== head || previous.fingerprint !== result.fingerprint) {
     return { state: { head, fingerprint: result.fingerprint, firstSeenAt: now, deliveredFingerprint: previous?.head === head ? previous.deliveredFingerprint : null }, deliver: false }
   }
-  return { state: previous, deliver: previous.deliveredFingerprint !== result.fingerprint && now - previous.firstSeenAt >= quietMs }
+  // Once a result for this head was handed off, a later provider snapshot or
+  // rerun must not wake the same agent again for the same commit.
+  return { state: previous, deliver: previous.deliveredFingerprint === null && now - previous.firstSeenAt >= quietMs }
 }

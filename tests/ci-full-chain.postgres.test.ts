@@ -10,7 +10,8 @@ const target = process.env.CI_CHAIN_DATABASE_URL ?? (process.env.CI === 'true' &
 if (!target && process.env.REQUIRE_DB === '1') throw new Error('CI full-chain database fixture is required')
 if (target) {
   const url = new URL(target)
-  if (url.protocol !== 'postgresql:' || url.hostname !== '127.0.0.1' || url.port !== '5432' || url.pathname !== '/mikka_e2e' || url.search || url.hash) throw new Error('CI fixture requires isolated loopback mikka_e2e')
+  const retained = process.env.MIKKA_PRESERVE_CI_FIXTURES === '1' && url.hostname === '127.0.0.1' && url.pathname === '/mikka_ci_native' && /^\d+$/.test(url.port)
+  if (url.protocol !== 'postgresql:' || url.hostname !== '127.0.0.1' || (!retained && (url.port !== '5432' || url.pathname !== '/mikka_e2e')) || url.search || url.hash) throw new Error('CI fixture requires isolated loopback database')
 }
 
 test('isolated PG: signed webhook schedules, snapshot settles, real admission queues and claim binds the original session', { skip: !target, timeout: 90_000 }, async () => {
@@ -186,8 +187,8 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     const reopened = new Request('http://localhost/api/webhooks/github', { method: 'POST', body: reopenedBody, headers: { 'x-github-event': 'pull_request', 'x-hub-signature-256': `sha256=${createHmac('sha256', process.env.GITHUB_WEBHOOK_SECRET!).update(reopenedBody).digest('hex')}` } })
     assert.equal((await POST(reopened)).status, 202)
     assert.equal((await fixture.query('SELECT "expiresAt">now() AS active FROM github_ci_observations')).rows[0].active, true)
-    // Once the automatic continuation budget is exhausted, each changed
-    // complete result is retained for the human rather than spawning a loop.
+    // Once the automatic continuation budget is exhausted, the first
+    // complete result is retained for the human without spawning a loop.
     await fixture.query('UPDATE github_ci_observations SET "chainDepth"=2,"nextCheckAt"=now()')
     providerConclusion = 'failure'
     checkRunId = 103
@@ -206,10 +207,9 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     await fixture.query('UPDATE github_ci_observations SET "nextCheckAt"=now()')
     assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).pending, 1)
     await fixture.query(`UPDATE github_ci_observations SET "firstSeenAt"=now()-interval '5 minutes',"nextCheckAt"=now()`)
-    assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).escalated, 1)
+    assert.equal((await reconcileCi({ pool, deadline: Date.now() + 30_000, limit: 1 })).escalated, 0)
     const { rows: escalations } = await fixture.query(`SELECT payload FROM coordinator_events WHERE "dedupeKey" LIKE 'ci_escalation:%' ORDER BY "createdAt"`)
-    assert.equal(escalations.length, 2)
-    assert.match(escalations[1].payload.text, /"result":"success"/)
+    assert.equal(escalations.length, 1)
   } finally {
     globalThis.fetch = originalFetch
     await scopedPool?.end().catch(() => {})

@@ -7,6 +7,7 @@ import { agentRuns, devices, issues, githubCiObservations } from '@/lib/db/schem
 import { issueTeamAccess } from '@/lib/issue-team-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { acquireCiMembership } from '@/lib/github/ci/authority'
+import { claimCiCommitOnce } from '@/lib/github/ci/claim-once'
 
 type Run = typeof agentRuns.$inferSelect
 
@@ -67,6 +68,7 @@ async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | '
       if (!await currentContinuationMailboxAuthorized(client, userId, run.botId, origin.agentDefinition, run.agentDefinition, process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1')) return null
       try { await (await import('@/lib/self-improvement/server')).skillAssignments.validateCiClaim(client, userId, run.id, leaseExpiresAt) }
       catch (error) { const { ImprovementError } = await import('@/lib/self-improvement/contract'); if (error instanceof ImprovementError) return null; throw error }
+      if (!await claimCiCommitOnce(client, { userId, issueId: issue.id, remoteKey: c.remoteKey, prNumber: c.prNumber, head: c.head, runId: run.id })) return null
     }
     await membership?.check()
     return respond(run)

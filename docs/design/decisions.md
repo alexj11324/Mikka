@@ -215,3 +215,13 @@ Preserve Linear's existing state. Availability follows the existing owner,
 workspace and allow/ask/deny checks; it does not create provider or publication
 authority. Track the concrete rollout prerequisites and verification in
 [the rollout record](../integration/non-linear-rollout-20261029.md).
+
+## 2026-10-30 — CI results
+
+For one task-bound PR commit, report one aggregate success or failure after
+the checks finish; intermediate workflow states do not wake an Agent. CI
+monitoring should also avoid one application ingress request per workflow
+event. Users do not change repository CI to enable this. A new commit is a
+new result; an already reported commit does not trigger another automatic
+Agent wake when it is rerun. See [the pre-ingress plan](../ci-pre-ingress-plan.md)
+for deployment prerequisites and the limit of provider completeness signals.
