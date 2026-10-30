@@ -95,6 +95,38 @@ const output = z
   .object({ approvalId: z.uuid(), publicationId: z.uuid().optional() })
   .strict();
 
+/** Durably reserve one logical publication. A provider-confirmed `failed` row never blocks a
+ * retry (BE-4); any other row may be a performed action and does. The partial unique index
+ * factory_publications_active_key is the backstop when two retries race past the check: the
+ * loser inserts nothing and gets factoryPublicationAlreadyClaimed. */
+export async function reservePublication(
+  tx: PoolClient,
+  p: {
+    approvalId: string;
+    taskId: string;
+    candidateId: string;
+    action: string;
+    target: string;
+    eventId: string;
+    request: unknown;
+  },
+) {
+  const {
+    rows: [prior],
+  } = await tx.query(
+    `SELECT id FROM factory_publications WHERE "taskId"=$1 AND "candidateId"=$2 AND action=$3 AND target=$4 AND status <> 'failed'`,
+    [p.taskId, p.candidateId, p.action, p.target],
+  );
+  if (prior) fail("factoryPublicationAlreadyClaimed");
+  const id = randomUUID();
+  const inserted = await tx.query(
+    `INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'reserved') ON CONFLICT DO NOTHING`,
+    [id, p.approvalId, p.taskId, p.candidateId, p.action, p.target, p.eventId, JSON.stringify(p.request)],
+  );
+  if (inserted.rowCount !== 1) fail("factoryPublicationAlreadyClaimed");
+  return id;
+}
+
 /** Browser transport authentication, not a human-approval requirement. */
 async function browserSession(tx: PoolClient, actor: FactoryActor) {
   if (!actor?.userId) fail("factoryActorRequired");
@@ -163,7 +195,7 @@ async function validApproval(
   const {
     rows: [a],
   } = await tx.query(
-    'SELECT * FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL AND "expiresAt">clock_timestamp() FOR UPDATE',
+    'SELECT * FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL AND "invalidatedAt" IS NULL AND "expiresAt">clock_timestamp() FOR UPDATE',
     [id, task.id, task.userId, task.candidateId],
   );
   if (
@@ -300,6 +332,45 @@ export interface PublicationAdapter {
   ): Promise<PublicationAdapterReceipt>;
 }
 
+/** Records a deferred/failed provider outcome on a live reservation, then rethrows.
+ * failed and succeeded are terminal: the WHERE clause never rewrites them (B2). */
+export async function deferPublication(
+  pool: Pick<Pool, "query">,
+  publicationId: string,
+  error: unknown,
+): Promise<never> {
+  const state =
+    error instanceof PublicationDeferred ? error.state : "uncertain";
+  const checkpoint =
+    error instanceof PublicationDeferred ? error.checkpoint : null;
+  await pool.query(
+    `UPDATE factory_publications SET status=$2,receipt=coalesce($3::jsonb,receipt),"finishedAt"=clock_timestamp() WHERE id=$1 AND status NOT IN ('succeeded','failed')`,
+    [
+      publicationId,
+      state === "pending" ? "reserved" : state,
+      checkpoint == null ? null : JSON.stringify(checkpoint),
+    ],
+  );
+  if (error instanceof PublicationDeferred)
+    throw new PublicationDeferred(publicationId, state, checkpoint);
+  if (error instanceof FactoryError && error.code.startsWith("factoryVercel"))
+    throw new PublicationDeferred(publicationId, "uncertain");
+  throw error;
+}
+
+/** Only a live reservation (reserved/uncertain) can succeed; failed stays failed (B2). */
+export async function markPublicationSucceeded(
+  tx: Pick<PoolClient, "query">,
+  publicationId: string,
+  receipt: PublicationAdapterReceipt,
+) {
+  const { rowCount } = await tx.query(
+    `UPDATE factory_publications SET status='succeeded',receipt=$2,"finishedAt"=clock_timestamp() WHERE id=$1 AND status IN ('reserved','uncertain')`,
+    [publicationId, JSON.stringify(receipt)],
+  );
+  if (rowCount !== 1) fail("factoryPublicationAlreadyClaimed");
+}
+
 export function createFactoryApprovals(
   pool: Pool,
   authorize: FactoryAuthorize,
@@ -339,23 +410,7 @@ export function createFactoryApprovals(
     if (digest(bindingOf(task)) !== digest(binding)) fail("factoryStale");
   }
   async function defer(error: unknown, publicationId: string): Promise<never> {
-    const state =
-      error instanceof PublicationDeferred ? error.state : "uncertain";
-    const checkpoint =
-      error instanceof PublicationDeferred ? error.checkpoint : null;
-    await pool.query(
-      `UPDATE factory_publications SET status=$2,receipt=coalesce($3::jsonb,receipt),"finishedAt"=clock_timestamp() WHERE id=$1 AND status<>'succeeded'`,
-      [
-        publicationId,
-        state === "pending" ? "reserved" : "uncertain",
-        checkpoint == null ? null : JSON.stringify(checkpoint),
-      ],
-    );
-    if (error instanceof PublicationDeferred)
-      throw new PublicationDeferred(publicationId, state, checkpoint);
-    if (error instanceof FactoryError && error.code.startsWith("factoryVercel"))
-      throw new PublicationDeferred(publicationId, "uncertain");
-    throw error;
+    return deferPublication(pool, publicationId, error);
   }
   async function complete(
     tx: PoolClient,
@@ -376,10 +431,7 @@ export function createFactoryApprovals(
       publicationBindingHash(providerInput(task, a, req, publicationId)),
     );
     providerBinding(receipt, providerInput(task, a, req, publicationId));
-    await tx.query(
-      `UPDATE factory_publications SET status='succeeded',receipt=$2,"finishedAt"=clock_timestamp() WHERE id=$1 AND status IN ('reserved','uncertain')`,
-      [publicationId, JSON.stringify(receipt)],
-    );
+    await markPublicationSucceeded(tx, publicationId, receipt);
     const result = await store.apply(
       task.userId,
       req.binding,
@@ -410,7 +462,7 @@ export function createFactoryApprovals(
       return transaction(async (tx) => {
         const task = await owned(tx, actor, taskId, true);
         const { rows: approvals } = await tx.query(
-          'SELECT id,"candidateId","userId",candidate,action,target,request->>\'targetEnvironment\' AS "targetEnvironment","evidenceDigest",evidence,"expiresAt","revokedAt","createdAt" FROM factory_approvals WHERE "taskId"=$1 ORDER BY "createdAt"',
+          'SELECT id,"candidateId","userId",candidate,action,target,request->>\'targetEnvironment\' AS "targetEnvironment","evidenceDigest",evidence,"expiresAt","revokedAt","invalidatedAt","invalidationReason","createdAt" FROM factory_approvals WHERE "taskId"=$1 ORDER BY "createdAt"',
           [task.id],
         );
         const { rows: publications } = await tx.query(
@@ -814,27 +866,15 @@ export function createFactoryApprovals(
           a.request.targetEnvironment !== req.targetEnvironment
         )
           fail("factoryApprovalInvalid");
-        const {
-          rows: [prior],
-        } = await tx.query(
-          'SELECT id FROM factory_publications WHERE "taskId"=$1 AND "candidateId"=$2 AND action=$3 AND target=$4',
-          [task.id, task.candidateId, req.action, req.target],
-        );
-        if (prior) fail("factoryPublicationAlreadyClaimed");
-        const id = randomUUID();
-        await tx.query(
-          `INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'reserved')`,
-          [
-            id,
-            a.id,
-            task.id,
-            task.candidateId,
-            req.action,
-            req.target,
-            req.eventId,
-            JSON.stringify(req),
-          ],
-        );
+        const id = await reservePublication(tx, {
+          approvalId: a.id,
+          taskId: task.id,
+          candidateId: task.candidateId!,
+          action: req.action,
+          target: req.target,
+          eventId: req.eventId,
+          request: req,
+        });
         return { id };
       });
       if ("result" in reservation) return reservation.result;
@@ -894,6 +934,9 @@ export function createFactoryApprovals(
           );
           if (!p) fail("factoryPublicationReceiptRequired");
           if (digest(p.request) !== digest(req)) fail("factoryReplayMismatch");
+          // Terminal: a confirmed provider failure is not asked again (B2).
+          if (p.status === "failed")
+            throw new PublicationDeferred(p.id, "failed", p.receipt);
           if (p.status === "succeeded") {
             if (
               task.stage !== "publish" ||

@@ -170,7 +170,7 @@ export async function readFactoryPublicationReceiptV2(
     rows: [p],
   } = await tx.query(
     `
-    SELECT p.*,a.candidate,a.request AS "approvalRequest",a.action AS "approvalAction",a.target AS "approvalTarget",a."publishAttemptId",a."publishRevision",a."humanSessionId",a."decisionCredentialId",a."decisionScope",a."decisionEvidence",a.evidence AS "approvalEvidence",a."revokedAt",t."issueId",c.sha,c.repository,c.environment,c.scope,
+    SELECT p.*,a.candidate,a.request AS "approvalRequest",a.action AS "approvalAction",a.target AS "approvalTarget",a."publishAttemptId",a."publishRevision",a."humanSessionId",a."decisionCredentialId",a."decisionScope",a."decisionEvidence",a.evidence AS "approvalEvidence",a."revokedAt",a."invalidatedAt",t."issueId",c.sha,c.repository,c.environment,c.scope,
       s.status AS "publishStatus",s.output AS "publishOutput",s."finishedAt" AS "publishFinishedAt"
     FROM factory_publications p
     JOIN factory_approvals a ON a.id=p."approvalId" AND a."taskId"=p."taskId" AND a."candidateId"=p."candidateId" AND a."userId"=$1
@@ -184,6 +184,8 @@ export async function readFactoryPublicationReceiptV2(
   if (
     !p ||
     p.revokedAt ||
+    // An approval invalidated by a superseded candidate no longer vouches for its publication.
+    p.invalidatedAt ||
     p.publishStatus !== "passed" ||
     p.publishOutput?.publicationId !== p.id ||
     p.publishOutput?.approvalId !== p.approvalId ||

@@ -273,3 +273,18 @@ test("authorization hash binds candidate, action, target, environment and public
     assert.throws(f.check, FactoryError);
   }
 });
+
+test("an approval invalidated after publication no longer yields a receipt", async () => {
+  const live = fixture();
+  await live.read();
+  const f = fixture();
+  Object.assign(f.row, { invalidatedAt: new Date("2026-10-26T20:32:00.000Z") });
+  await assert.rejects(
+    f.read(),
+    (e: unknown) =>
+      e instanceof FactoryError && e.code === "factoryPublicationReceiptRequired",
+  );
+  const revoked = fixture();
+  Object.assign(revoked.row, { revokedAt: new Date("2026-10-26T20:32:00.000Z") });
+  await assert.rejects(revoked.read(), FactoryError);
+});

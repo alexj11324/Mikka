@@ -68,7 +68,7 @@ export async function handleFactoryApproval(
           error: error.code,
           publicationId: error.publicationId,
           status: error.state,
-          nextOperation: "reconcile",
+          nextOperation: error.state === "failed" ? null : "reconcile",
         },
       };
     // #192's store may throw its own Error class; consume its public error code,

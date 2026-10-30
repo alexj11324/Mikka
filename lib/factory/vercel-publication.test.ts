@@ -53,7 +53,7 @@ function input(
 }
 const deferred = async (
   fn: () => Promise<unknown>,
-  state: "pending" | "uncertain",
+  state: "pending" | "uncertain" | "failed",
 ) => {
   try {
     await fn();
@@ -224,8 +224,21 @@ test("readback rejects wrong project/team/SHA/environment/repository/meta/URL an
       );
       delete d.customEnvironment;
     }
-    Object.assign(d, base, { readyState: "ERROR" });
-    await deferred(() => a.reconcile!(i, null), "uncertain");
+    // B2: Vercel's terminal states are a confirmed failure; anything unknown stays uncertain.
+    for (const [readyState, state] of [
+      ["ERROR", "failed"],
+      ["CANCELED", "failed"],
+      ["SOMETHING_NEW", "uncertain"],
+    ] as const) {
+      Object.assign(d, base, { readyState });
+      const e = await deferred(() => a.reconcile!(i, null), state);
+      assert.equal(
+        e.code,
+        state === "failed"
+          ? "factoryPublicationFailed"
+          : "factoryPublicationUncertain",
+      );
+    }
     assert.equal(f.posts(), 1);
   } finally {
     await f.close();
