@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronRight, Hash } from 'lucide-react'
+import { ChevronRight, Hash, Laptop, Server } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { issueIdentifier } from '@/components/workspace/issue-properties'
 import { activityLabel, groupThreads, lastActivity, THREAD_GROUPS } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
+import { HarnessMark } from '@/components/labels/entity-labels'
 import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
 import { GroupHeader } from './group-header'
 
@@ -33,6 +34,21 @@ export function ThreadMark({ size = 'profile' }: { size?: 'profile' | 'row' }) {
   </span>
 }
 
+/** The device a queued run waits for while it is offline (#545). Until #545 ships, `listThreads` leaves it out. */
+type ThreadView = Thread & { waitingFor?: { deviceId: string; deviceName: string; deviceType: 'laptop' | 'server'; harness: string } }
+
+/** 等待 <device> 上线 (Figma WS-38): the device type, its offline dot, then the agent's mark (R-74). */
+function WaitingChip({ waiting }: { waiting: NonNullable<ThreadView['waitingFor']> }) {
+  const t = useTranslations('Shell.threads')
+  const Icon = waiting.deviceType === 'server' ? Server : Laptop
+  return <span className="inline-flex max-w-full min-w-0 items-center gap-1.5 self-start rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+    <Icon aria-hidden="true" className="size-3.5 shrink-0" />
+    <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
+    <span className="truncate">{t('waitingFor', { device: waiting.deviceName })}</span>
+    <HarnessMark harness={waiting.harness} />
+  </span>
+}
+
 /**
  * One row: the thread's name, then the opening of its last reply on one line,
  * verbatim. No status word, no bot name. In 全部线程 a 16px avatar in its
@@ -45,13 +61,16 @@ function ThreadRow({ thread, issues, bots, all, now, onOpenIssue }: { thread: Th
   const name = threadName(thread, issues, t('untitled'))
   const at = new Date(lastActivity(thread))
   const when = activityLabel(at, now)
+  const waiting = thread.status === 'queued' ? (thread as ThreadView).waitingFor : undefined
   const body = <>
     <span className="flex w-full min-w-0 items-center gap-2">
       {all && (thread.botId ? <BotAvatar color={bot?.color} shape={bot?.shape} size="row" /> : <CoordinatorAvatar size="row" />)}
       <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
       {all && <span className="shrink-0 text-xs text-muted-foreground">{when === 'relative' ? format.relativeTime(at, now) : t(when)}</span>}
     </span>
-    {thread.lastReply && <span className={cn('block w-full truncate text-xs text-muted-foreground', all && 'pl-6')}>{thread.lastReply}</span>}
+    {waiting
+      ? <span className={cn('flex w-full min-w-0', all && 'pl-6')}><WaitingChip waiting={waiting} /></span>
+      : thread.lastReply && <span className={cn('block w-full truncate text-xs text-muted-foreground', all && 'pl-6')}>{thread.lastReply}</span>}
   </>
   const row = 'flex h-auto w-full flex-col items-stretch justify-start gap-0.5 rounded-lg px-2 py-1.5 text-left font-normal whitespace-normal'
   return <li>

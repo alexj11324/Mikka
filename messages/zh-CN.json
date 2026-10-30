@@ -2901,7 +2901,8 @@
         "running": "进行中（{count}）",
         "idle": "空闲（{count}）",
         "resolved": "已解决（{count}）"
-      }
+      },
+      "waitingFor": "等待 {device} 上线"
     },
     "newBot": {
       "title": "新建 Bot",
