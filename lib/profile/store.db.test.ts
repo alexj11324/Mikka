@@ -104,7 +104,10 @@ dbTest('facts stay with their person, merge on repeat, and keep the person\'s co
     const morning = new Date('2026-10-28T04:30:00Z')
     // Entitlement comes from PostHog (lib/profile/entitlement.ts); here Alex and Dana are entitled, a third person is not.
     await store.recordFacts(outsider, [seen('2026-10-01T01:00:00Z', 'o1')])
-    const entitled = async (userId: string) => userId !== outsider
+    // The DB is shared with other suites (lib/account/store.db.test.ts also writes user_facts), and the
+    // nightly merge reads every user. Only this test's people count; anyone else is treated as not entitled.
+    const mine = new Set([alex, dana, outsider])
+    const entitled = async (userId: string) => mine.has(userId) && userId !== outsider
     const first = await store.consolidateDueFacts({ entitled, now: morning })
     assert.equal(first.written, 1, 'only Alex: Dana has 记忆 off, the outsider is not entitled')
     assert.ok((await store.listFacts(alex)).some(item => item.kind === 'interest' && item.subject === '川菜'), 'scattered purchases become an interest')
@@ -113,7 +116,9 @@ dbTest('facts stay with their person, merge on repeat, and keep the person\'s co
     assert.equal(settings.consolidatedOn, '2026-10-28')
     assert.equal((await db.select().from(schema.userFactConsolidations).where(eq(schema.userFactConsolidations.userId, outsider))).length, 0, 'not entitled: not merged or claimed')
     const again = await store.consolidateDueFacts({ entitled, now: morning })
-    assert.deepEqual([again.written, again.due], [0, 1], 'once per local day; only the outsider stays due, and is skipped')
+    assert.equal(again.written, 0, 'once per local day')
+    assert.equal(again.due - again.skipped, 0, 'whoever is still due is skipped (the outsider and other suites\' users), nobody is merged twice')
+    assert.equal((await db.select().from(schema.userFactConsolidations).where(eq(schema.userFactConsolidations.userId, outsider))).length, 0, 'the outsider stays unclaimed')
     assert.equal(await store.memoryEnabled(dana), false)
     assert.equal(await store.memoryEnabled(alex), true)
   })
