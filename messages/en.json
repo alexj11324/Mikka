@@ -1066,6 +1066,7 @@
     "teamNotFound": "This team does not exist.",
     "teamDeleteNameMismatch": "The name you entered does not match the team name.",
     "botDefaultRepositoryUnavailable": "This repository is not in any workspace member’s GitHub App installation.",
+    "botNotFound": "This bot does not exist in this workspace.",
     "usageLimitReached": "The usage limit has been reached. New tasks are paused; running tasks will finish.",
     "usageCreditsExhausted": "Credits have run out. New tasks are paused; running tasks will finish.",
     "billingNotConfigured": "Billing is not set up.",
@@ -2017,7 +2018,14 @@
         "denied_or_failed": "Refused or failed"
       }
     },
-    "sectionUnavailable": "This section is still being designed and has nothing to act on yet."
+    "sectionUnavailable": "This section is still being designed and has nothing to act on yet.",
+    "bots": {
+      "models": {
+        "mikka": "Mikka (default)",
+        "codex": "Codex",
+        "claude": "Claude"
+      }
+    }
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
