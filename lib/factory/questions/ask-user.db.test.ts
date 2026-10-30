@@ -81,6 +81,21 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.equal((await get("intruder", `?taskId=${a.taskId}`)).status, 404);
     });
 
+    await t.test("BE-16: GETs compute expiry from expiresAt and write nothing", async () => {
+      await pool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 second' WHERE id=$1`, [a.questionId]);
+      const tables = ["factory_questions", "factory_tasks", "factory_attempts", "factory_events", "agent_runs", "run_messages"];
+      const snap = async () => Promise.all(tables.map(async (x) => (await pool.query(`SELECT * FROM ${x} ORDER BY 1`)).rows));
+      const before = await snap();
+      const one = await questions.read("owner", a.questionId);
+      assert.equal(one.status, "expired");
+      assert.equal(one.revision, before[0].find((r: { id: string }) => r.id === a.questionId).revision, "revision not bumped");
+      assert.equal((await questions.list("owner", a.taskId))[0].status, "expired");
+      assert.ok((await questions.pending("owner")).some((q) => q.id === a.questionId && q.status === "expired"));
+      const byTask = (await get("owner", `?taskId=${a.taskId}`)).body as { questions: unknown[] };
+      assert.deepEqual(byTask.questions, [], "expired question is no longer pending");
+      assert.deepEqual(await snap(), before, "GETs wrote nothing");
+    });
+
     await t.test("rejects bad input and anonymous callers", async () => {
       assert.equal((await get("owner", `?taskId=${a.taskId}&runId=${a.runId}`)).status, 422);
       assert.equal((await get("owner", "?runId=nope")).status, 422);

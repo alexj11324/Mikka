@@ -201,10 +201,13 @@ export function createFactoryQuestions(
     reference: questionReference(q),
     thread: { taskId: q.taskId, originRunId: q.originRunId },
   });
+  /** Effective status from the clock and the task. GETs pass persist=false and
+   * write nothing (Tech Lead: GETs are strictly read-only); write paths persist. */
   async function currentView(
     tx: PoolClient,
     task: FactoryTask,
     q: FactoryQuestion,
+    persist = true,
   ) {
     let status: QuestionStatus | null = null;
     if (stopped(task) && !["resolved", "cancelled"].includes(q.status))
@@ -220,7 +223,13 @@ export function createFactoryQuestions(
       !["resolved", "cancelled", "expired"].includes(q.status)
     )
       status = "superseded";
-    if (status) {
+    if (status && !persist)
+      q = {
+        ...q,
+        status,
+        reason: `Question ${status}; continuation is not authorized`,
+      };
+    else if (status) {
       const {
         rows: [updated],
       } = await tx.query<FactoryQuestion>(
@@ -243,7 +252,7 @@ export function createFactoryQuestions(
           result.push(
             await transaction(async (tx) => {
               const { task, q } = await owned(tx, userId, row.id);
-              return currentView(tx, task, q);
+              return currentView(tx, task, q, false);
             }),
           );
         } catch (error) {
@@ -259,18 +268,18 @@ export function createFactoryQuestions(
     async read(userId: string, questionId: string) {
       return transaction(async (tx) => {
         const { task, q } = await owned(tx, userId, questionId);
-        return currentView(tx, task, q);
+        return currentView(tx, task, q, false);
       });
     },
     async list(userId: string, taskId: string) {
       return transaction(async (tx) => {
         const task = await ownedTask(tx, userId, taskId);
         const { rows } = await tx.query<FactoryQuestion>(
-          'SELECT * FROM factory_questions WHERE "taskId"=$1 AND "userId"=$2 ORDER BY "createdAt" DESC LIMIT 50 FOR UPDATE',
+          'SELECT * FROM factory_questions WHERE "taskId"=$1 AND "userId"=$2 ORDER BY "createdAt" DESC LIMIT 50',
           [taskId, userId],
         );
         const result = [];
-        for (const q of rows) result.push(await currentView(tx, task, q));
+        for (const q of rows) result.push(await currentView(tx, task, q, false));
         return result;
       });
     },
