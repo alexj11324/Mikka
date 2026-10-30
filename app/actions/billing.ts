@@ -41,6 +41,6 @@ export async function getHostedUsage(workspaceId?: string) {
     const actor = await currentWorkspaceActor(workspaceId)
     const { hostedUsage, ensureLegacyVerification } = await import('@/lib/abuse/runtime')
     await ensureLegacyVerification(actor.workspaceId)
-    return { ...await hostedUsage.status(actor.workspaceId),recent:await hostedUsage.recent(actor.workspaceId) }
+    return { ...await hostedUsage.status(actor.workspaceId),recent:actor.role === 'admin' ? await hostedUsage.recent(actor.workspaceId) : [] }
   })
 }

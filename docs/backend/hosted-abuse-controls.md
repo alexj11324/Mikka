@@ -13,7 +13,7 @@ verification grants exactly USD 1 once, not a periodically renewed credit.
   can still appear. The existing signature-checked webhook handles
   `setup_intent.succeeded`; the frontend must not grant credit itself.
 - `getHostedUsage(workspaceId?)` returns `state`, `balance`, and up to 50 recent
-  calls. Amounts are integer microdollars (USD 1 = 1,000,000); purchased points
+  calls (recent calls are admin-only; members receive balance/state). Amounts are integer microdollars (USD 1 = 1,000,000); purchased points
   convert at 100 points per dollar. The existing admin `workspaceUsage` read
   also exposes the hosted balance and state. Member usage remains scoped to
   their own bots.
