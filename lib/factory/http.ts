@@ -19,6 +19,15 @@ const controlSchema = z
     reason: z.string().trim().min(1).max(4000),
   })
   .strict();
+/** 404 hides existence (no 403 leak for tasks you cannot see); a switched-off
+ * feature is 503 so the UI can show "not available" instead of "missing". */
+export function factoryListStatus(code: string) {
+  if (code === "factoryNotFound") return 404;
+  if (code === "factoryInvalid") return 422;
+  if (code === "factoryForbidden" || code === "originRejected") return 403;
+  if (code.endsWith("Unavailable")) return 503;
+  return 409;
+}
 /** Read-only discovery; identity is always supplied by the session adapter. */
 export async function handleFactoryList(
   store: FactoryStore,
@@ -34,10 +43,7 @@ export async function handleFactoryList(
     };
   } catch (error) {
     if (!(error instanceof FactoryError)) throw error;
-    return {
-      status: error.code === "factoryNotFound" ? 404 : 422,
-      body: { error: error.code },
-    };
+    return { status: factoryListStatus(error.code), body: { error: error.code } };
   }
 }
 /** Session identity comes from the adapter. No runtime pass, dispatch or approval API. */

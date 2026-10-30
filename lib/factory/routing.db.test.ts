@@ -164,10 +164,11 @@ test(
           const scoped = createFactoryStore(pool, authorize, botId),
             state = await scoped.route("owner", input);
           assert.equal(state.task.botId, botId);
-          assert.equal(
-            (await scoped.listForIssue("owner", input.issueId)).tasks.length,
-            1,
-          );
+          const listed = (await scoped.listForIssue("owner", input.issueId)).tasks;
+          assert.equal(listed.length, 1);
+          // BE-2: list carries candidate sha + latest publication summary.
+          assert.ok("candidateSha" in listed[0] && "publication" in listed[0]);
+          assert.equal(listed[0].publication, null);
           assert.equal(
             (await store.listForIssue("owner", input.issueId)).tasks.length,
             0,

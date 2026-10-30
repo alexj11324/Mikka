@@ -36,7 +36,19 @@ export type FactoryTaskSummary = Pick<FactoryTask, "id" | "issueId" | "stage" | 
   isSkillCandidate: boolean;
   /** The run that produced the candidate, so acceptance can sit beside its thread. */
   candidateRunId: string | null;
+  /** Commit of the current candidate, so a card can tell a stale approval apart without the ledger. */
+  candidateSha: string | null;
+  /** Latest publication for the current candidate, if any. */
+  publication: FactoryPublicationSummary | null;
 };
+export interface FactoryPublicationSummary {
+  id: string;
+  status: string;
+  action: string;
+  target: string;
+  createdAt: string;
+  finishedAt: string | null;
+}
 export interface FactoryAttempt {
   id: string;
   taskId: string;
@@ -316,15 +328,15 @@ export function createFactoryStore(
       return transaction(async (tx) => {
         const issue = await lockedIssue(tx, issueId);
         if (!issue || !(await authorize(userId, issueId, tx))) fail("factoryNotFound");
-        const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null }>(
-          'SELECT t.*, c."runId" AS "candidateRunId", EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
+        const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null; candidateSha: string | null; publication: FactoryPublicationSummary | null }>(
+          'SELECT t.*, c."runId" AS "candidateRunId", c.sha AS "candidateSha", (SELECT json_build_object(\'id\',p.id,\'status\',p.status,\'action\',p.action,\'target\',p.target,\'createdAt\',p."createdAt",\'finishedAt\',p."finishedAt") FROM factory_publications p WHERE p."taskId"=t.id AND p."candidateId"=t."candidateId" ORDER BY p."createdAt" DESC,p.id DESC LIMIT 1) AS publication, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
           [userId, issueId, botId],
         );
         const tasks: FactoryTaskSummary[] = [];
         for (const row of rows)
           if (factoryScopeAllows(row, issue) && await sourceAllowed(tx, userId, row.sourceEventId, issueId)) {
-            const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId } = row;
-            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason,isSkillCandidate,candidateRunId});
+            const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId, candidateSha, publication } = row;
+            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason,isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publication ?? null});
           }
         return { contractVersion: 1 as const, issueId, tasks };
       });
