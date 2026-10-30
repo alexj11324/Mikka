@@ -33,9 +33,9 @@ function fixture(status = 'running', stopped: Date | null = null) {
       assert.equal(predicate(condition), true); events.push('update'); updates.push(value)
     } } } } },
   }
-  const database = { async transaction(fn: (value: typeof tx) => Promise<void>) {
+  const database = { async transaction<T>(fn: (value: typeof tx) => Promise<T>) {
     events.push('begin')
-    try { await fn(tx); events.push('commit') } catch (error) { events.push('rollback'); throw error }
+    try { const result = await fn(tx); events.push('commit'); return result } catch (error) { events.push('rollback'); throw error }
   } } as unknown as RunControlDatabase
   return { database, row, events, messages, updates, onLock(fn: () => Promise<void>) { lockHook = fn } }
 }
@@ -77,15 +77,27 @@ test('completion before the lock is acquired rejects a stale send', async () => 
 })
 
 test('stop is owner scoped and preserves an already requested stop', async () => {
-  const f = fixture('queued')
-  await stopOwnedRun(f.database, 'owner', runId)
+  const f = fixture('running')
+  assert.equal(await stopOwnedRun(f.database, 'owner', runId), false, 'a running run waits for the daemon')
   assert.deepEqual(f.events, ['begin', 'lock', 'update', 'commit'])
   assert.ok(f.updates[0].stopRequestedAt instanceof Date)
+  assert.equal(f.updates[0].status, undefined)
   const stopped = fixture('running', new Date('2026-01-01T00:00:00Z'))
   await stopOwnedRun(stopped.database, 'owner', runId)
   assert.equal(stopped.updates.length, 0)
   await assert.rejects(sendOwnedRunMessage(stopped.database, 'owner', { runId, text: 'after stop' }), /runNotFound/)
   assert.equal(stopped.messages.length, 0)
+})
+
+test('stopping a queued run ends it as stopped in the locked transaction', async () => {
+  for (const prior of [null, new Date('2026-01-01T00:00:00Z')]) {
+    const f = fixture('queued', prior)
+    assert.equal(await stopOwnedRun(f.database, 'owner', runId), true)
+    assert.deepEqual(f.events, ['begin', 'lock', 'update', 'commit'])
+    assert.equal(f.updates[0].status, 'stopped')
+    assert.ok(f.updates[0].finishedAt instanceof Date)
+    assert.equal(f.updates[0].stopRequestedAt, prior ?? f.updates[0].finishedAt, 'an earlier stop request keeps its timestamp')
+  }
 })
 
 test('a database lock error propagates without becoming an authorization success', async () => {

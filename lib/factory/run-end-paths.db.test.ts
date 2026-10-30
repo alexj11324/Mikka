@@ -79,6 +79,18 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
       assert.equal((await pool.query('SELECT revision FROM factory_tasks WHERE id=$1', [c.taskId])).rows[0].revision, before);
     });
 
+    await t.test("stopping a queued run ends it as stopped and finalizes the task (no daemon ack)", async () => {
+      const q = await runningTask();
+      await pool.query(`UPDATE agent_runs SET status='queued',"startedAt"=NULL WHERE id=$1`, [q.runId]);
+      await requestRunStop("owner", q.runId);
+      const row = (await pool.query('SELECT status,"finishedAt","stopRequestedAt" FROM agent_runs WHERE id=$1', [q.runId])).rows[0];
+      assert.equal(row.status, "stopped");
+      assert.ok(row.finishedAt && row.stopRequestedAt);
+      assert.deepEqual(await task(q.taskId), { stage: "execute", status: "cancelled" });
+      // Already terminal: a second stop is rejected and moves nothing.
+      await assert.rejects(requestRunStop("owner", q.runId), /runNotFound/);
+    });
+
     await t.test("ending a thread machine stops a Factory run and finalizes its task", async () => {
       const m = await runningTask();
       await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","snapshotId","operationId",state) VALUES ($1,$2,'owner','fixture-snapshot',$3,'paused')`, [m.runId, workspaceId, randomUUID()]);

@@ -19,6 +19,7 @@ import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { runPrompt } from '@/lib/run-prompt'
 import { dispatchInput, dispatchRequestKey, type DispatchInput, type DispatchResult } from '@/lib/run-dispatch'
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
+import { afterRunEnded } from '@/lib/run-completion-effects'
 import { runBotName } from '@/lib/run-bot-name'
 
 // Run operations for one person, by user id. The agent actions call these
@@ -247,7 +248,8 @@ export async function addRunMessage(
 export async function requestRunStop(userId: string, runId: string): Promise<void> {
   const parsed = z.uuid().safeParse(runId)
   if (!parsed.success) throw new ActionFailureError('runNotFound')
-  // Stop only requests the end. The daemon's acknowledgement goes through
-  // persistRunCompletion, which reconciles Factory after commit.
-  await stopOwnedRun(db, userId, parsed.data)
+  // A running run: stop only requests the end; the daemon's acknowledgement goes
+  // through persistRunCompletion, which reconciles Factory after commit.
+  // A queued run ends right here (no daemon holds it), so finalize Factory now.
+  if (await stopOwnedRun(db, userId, parsed.data)) await afterRunEnded(userId, parsed.data)
 }
