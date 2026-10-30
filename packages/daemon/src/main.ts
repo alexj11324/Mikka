@@ -16,6 +16,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   realpathSync,
 } from "node:fs"
 import { arch, hostname, platform } from "node:os"
@@ -59,7 +60,7 @@ import {
   ServerUnreachableError,
 } from "./errors"
 import { readJson, writeFileAtomic, writeJsonAtomic } from "./fs-util"
-import { restartService } from "./service"
+import { restartService, uninstallService } from "./service"
 import { detectDeviceType } from "./device-type"
 import { detectHarnesses } from "./harnesses"
 import { isSafeId } from "./ids"
@@ -885,7 +886,7 @@ export class Daemon {
       const deviceId = this.device.deviceId as string
       // Heartbeat first: lease renewal must not wait on anything else.
       const quotas = this.quota?.snapshot().quotas
-      const { leases, revoked, cloudCredential, deviceCommands } = await link.heartbeat(deviceId, {
+      const heartbeat = {
         completedDeviceCommands: this.device.completedDeviceCommands,
         failedDeviceCommands: this.device.failedDeviceCommands,
         harnesses: this.harnesses,
@@ -893,7 +894,8 @@ export class Daemon {
         runs: this.supervisor.heartbeatRuns(),
         worktreeDiskBytes: await this.worktrees.diskUsage(),
         ...(quotas ? { quotas } : {}),
-      })
+      }
+      const { leases, revoked, cloudCredential, deviceCommands } = await link.heartbeat(deviceId, heartbeat)
       this.supervisor.renewLeases(leases)
       if (revoked) this.supervisor.revokeLeases(revoked)
       if (this.options.cloudComputer && cloudCredential && this.device.credential === credential) {
@@ -904,6 +906,24 @@ export class Daemon {
         this.registered = false
       }
       const command = deviceCommands?.[0]
+      if (command?.kind === 'uninstall') {
+        this.draining = true
+        if (this.supervisor.heartbeatRuns().length === 0) {
+          this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+          try {
+            await link.heartbeat(deviceId, { ...heartbeat, runs: [], completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+          } catch {
+            // Receipt was persisted locally. The server's fixed expiry covers a lost response.
+            this.log.warn('Could not confirm uninstall receipt')
+          }
+          // Stop outside the current sync: stop() waits for this heartbeat tick.
+          setImmediate(() => { void this.stop().then(() => uninstallService(() => {
+            this.saveDevice({ credential: undefined })
+            rmSync(this.paths.secret, { force: true })
+          })).catch(() => { this.options.onDrained?.() }) })
+        }
+        return
+      }
       if (command && !this.device.completedDeviceCommands?.includes(command.id) && !this.device.failedDeviceCommands?.some(failure => failure.id === command.id)) {
         if (command.kind === 'redetect' || this.supervisor.heartbeatRuns().length === 0) {
           try {

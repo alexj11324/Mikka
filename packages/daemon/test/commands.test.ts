@@ -1,7 +1,10 @@
 // Messages and stops from people reach running agents (ADR 0018): the
 // daemon long-polls the server's commands, hands messages to the session,
 // acks them, and cancels runs a person stopped.
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import * as service from '../src/service'
 
 import type { RunChunk } from "../src/chunks"
 import { Daemon } from "../src/main"
@@ -51,7 +54,54 @@ function text(chunks: RunChunk[]) {
 
 afterEach(async () => {
   for (const daemon of daemons.splice(0)) await daemon.stop()
+  vi.restoreAllMocks()
   cleanupTempDirs()
+})
+
+it('uninstall waits for active threads, persists and sends its receipt, removes the service and credentials, then exits', async () => {
+  const commandId = '10000000-0000-4000-8000-000000000002'
+  const home = tempDir(), unit = join(home, '.config/systemd/user/mikka-daemon.service')
+  mkdirSync(join(home, '.config/systemd/user'), { recursive: true })
+  writeFileSync(unit, 'fixture service')
+  const events: string[] = []
+  let removing = false, current: Daemon | undefined
+  const uninstall = service.uninstallService
+  vi.spyOn(service, 'uninstallService').mockImplementation(clear => uninstall(() => {
+    clear(); events.push('credential')
+  }, { manager: 'systemd', platform: 'linux', home, uid: 1000,
+    run: async (program, args) => { events.push(`${program} ${args.join(' ')}`) },
+    exit: () => { events.push('exit') },
+  }))
+  const { server, daemon } = await setup(link => {
+    const heartbeat = link.heartbeat.bind(link)
+    link.heartbeat = async (id, report) => {
+      const result = await heartbeat(id, report)
+      if (report.completedDeviceCommands?.includes(commandId)) {
+        expect(JSON.parse(readFileSync(current!.paths.device, 'utf8')).completedDeviceCommands).toContain(commandId)
+        events.push('ack')
+        return result
+      }
+      return removing ? { ...result, deviceCommands: [{ id: commandId, kind: 'uninstall' }] } : result
+    }
+  })
+  current = daemon
+  const runId = queueLongRun(server)
+  await daemon.syncWithServer()
+  await waitFor(() => daemon.supervisor.get(runId).state === 'running')
+  removing = true
+  await daemon.syncWithServer()
+  expect(daemon.status().draining).toBe(true)
+  expect(events).toEqual([])
+  expect(daemon.supervisor.get(runId).state).toBe('running')
+  mkdirSync(daemon.paths.repos, { recursive: true }); mkdirSync(daemon.paths.worktrees, { recursive: true })
+  for (const directory of [daemon.paths.repos, daemon.paths.worktrees]) writeFileSync(join(directory, 'keep'), 'retained')
+  server.requestStop(runId)
+  await waitFor(() => events.includes('exit'))
+  expect(events).toEqual(['ack', 'systemctl --user disable mikka-daemon.service', 'systemctl --user daemon-reload', 'credential', 'exit'])
+  expect(existsSync(unit)).toBe(false)
+  expect(JSON.parse(readFileSync(daemon.paths.device, 'utf8')).credential).toBeUndefined()
+  expect(existsSync(daemon.paths.secret)).toBe(false)
+  for (const directory of [daemon.paths.repos, daemon.paths.worktrees]) expect(readFileSync(join(directory, 'keep'), 'utf8')).toBe('retained')
 })
 
 it("redetect refreshes harnesses through the shared device command channel", async()=>{
