@@ -39,7 +39,7 @@ test(
       );
       const migration = await readFile(
         new URL(
-          "../drizzle/20261030194605_execution_rules.sql",
+          "../drizzle/20261030200610_execution_rules.sql",
           import.meta.url,
         ),
         "utf8",
