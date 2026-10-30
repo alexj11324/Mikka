@@ -112,7 +112,7 @@ export function CredentialLoginCard({ prefix, origin, name, onSignedIn }: { pref
   return <Card size="sm" data-testid="credential-login-card">
     <CardHeader>
       <CardTitle><span className="flex items-center gap-2.5"><SiteIcon origin={origin} className="size-5" />{title}</span></CardTitle>
-      <CardAction><Button type="button" variant="secondary" size="icon-sm" aria-label={t('close')} disabled={pending} onClick={close}><XIcon /></Button></CardAction>
+      <CardAction><Button type="button" variant="secondary" size="icon-sm" aria-label={t('close')} disabled={pending} onClick={close}><XIcon data-icon="inline-start" /></Button></CardAction>
     </CardHeader>
     <CardContent>
       {step === 'password' ? <form onSubmit={submitPassword} autoComplete="off">
