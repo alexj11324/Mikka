@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
-import type { ActionFailure, ActionResult } from '@/lib/action-result'
+import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { db } from '@/lib/db'
@@ -12,7 +12,7 @@ import { bots, WORKSPACE_BOT_MODELS } from '@/lib/db/schema'
 import { BOT_COLORS, BOT_SHAPES } from '@/lib/bot-shapes'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
-import { botDefaultOptions, listBotThreadsFor, repositoryAvailable, saveBotDefaults, workspaceBotDefaults, workspaceBots, type BotDefaultOptions, type BotThreadPage, type VersionedBotDefaults, type WorkspaceBotView } from '@/lib/workspace-admin/bots'
+import { botDefaultOptions, listBotThreadsFor, repositoryAvailable, saveBotDefaults, workspaceBotDefaults, workspaceBots, type BotDefaultOptions, type BotDefaults, type BotThreadPage, type WorkspaceBotView } from '@/lib/workspace-admin/bots'
 
 /** A bot in the left column. Its instructions grow inside its chat, so they are not here. */
 export interface BotView {
@@ -68,27 +68,12 @@ export async function getWorkspaceBotDefaults(): Promise<ActionResult<BotDefault
   return workspaceAction(async () => botDefaultOptions((await currentWorkspaceActor()).workspaceId))
 }
 
-/** 409: expectedVersion was stale. `current` is the stored value and version to re-base on. */
-export type BotDefaultsConflict = ActionFailure & { error: 'botDefaultsConflict'; status: 409; current: VersionedBotDefaults }
-
-/**
- * Set or clear (null) the default model and repository for new bots. Admins only.
- * Pass expectedVersion (the `version` from getWorkspaceBotDefaults or the last save) to make the
- * save a compare-and-set; a stale version returns BotDefaultsConflict and writes nothing.
- */
-export async function updateWorkspaceBotDefaults(input: { defaultModel?: string | null; defaultRepository?: string | null; expectedVersion?: number }): Promise<ActionResult<VersionedBotDefaults> | BotDefaultsConflict> {
-  let conflict: VersionedBotDefaults | null = null
-  const result = await workspaceAction(async () => {
+/** Set or clear (null) the default model and repository for new bots. Admins only. */
+export async function updateWorkspaceBotDefaults(input: { defaultModel?: string | null; defaultRepository?: string | null }): Promise<ActionResult<BotDefaults>> {
+  return workspaceAction(async () => {
     const actor = await currentWorkspaceActor()
-    try {
-      return await saveBotDefaults(actor.userId, actor.workspaceId, input as Parameters<typeof saveBotDefaults>[2])
-    } catch (error) {
-      const current = (error as { code?: string; current?: VersionedBotDefaults }).code === 'botDefaultsConflict' ? (error as { current?: VersionedBotDefaults }).current : undefined
-      if (current) conflict = current
-      throw error
-    }
+    return saveBotDefaults(actor.userId, actor.workspaceId, input as Parameters<typeof saveBotDefaults>[2])
   })
-  return conflict ? { error: 'botDefaultsConflict', status: 409, current: conflict } : result
 }
 
 /** Every bot in the current workspace: owner, 空闲 or 运行中 · N 个线程. Any member may read. */

@@ -64,11 +64,14 @@ scheme is registered.
 
 ## Release
 
-Bump `apps/desktop/package.json`, push a tag named `desktop-vX.Y.Z`, and run the
-**Desktop release** workflow (or start it manually with that tag). It builds the
-Apple Silicon macOS installer, signs and notarizes it, and attaches the DMG,
-ZIP and `SHA256SUMS.txt` to a **draft** GitHub Release. Publish the draft only
-after installing it on Apple Silicon.
+Bump `apps/desktop/package.json`, create a tag named `desktop-vX.Y.Z`, then run
+the **Desktop release** workflow **from `main`** with that tag as its input.
+Do not trigger it by pushing the tag: GitHub scopes Actions caches per ref, so
+a tag run starts with an empty pnpm and electron-builder cache every time,
+while a run dispatched from `main` reuses the previous release's. The workflow
+builds the Apple Silicon macOS installer, signs and notarizes it, and attaches
+the DMG, ZIP and `SHA256SUMS.txt` to a **draft** GitHub Release. Publish the
+draft only after installing it on Apple Silicon.
 
 Repository secrets used by the workflow:
 

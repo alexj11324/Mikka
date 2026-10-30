@@ -1026,8 +1026,6 @@ export const workspaceSettings = pgTable('workspace_settings', {
   monthlyCreditLimit: integer('monthlyCreditLimit'),
   botMonthlyCreditLimit: integer('botMonthlyCreditLimit'),
   backgroundDailyCreditLimit: integer('backgroundDailyCreditLimit'),
-  /** Optimistic-lock version of defaultModel/defaultRepository; bumped by every bot-defaults save. */
-  botDefaultsVersion: integer('botDefaultsVersion').notNull().default(0),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 

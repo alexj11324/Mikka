@@ -21,7 +21,8 @@ import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
-import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, withRunChain, type IssueThread } from '@/lib/issue-threads'
+import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, threadQuestionRunId, withRunChain, type IssueThread } from '@/lib/issue-threads'
+import { threadQuestionStates } from '@/lib/issue-thread-questions'
 import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
@@ -179,7 +180,7 @@ export async function listIssueThreads(issueId: string): Promise<IssueThread[]> 
     .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds]), inArray(agentRuns.id, chains.map(chain => chain.rootRunId))))
     .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
   const byRoot = new Map(chains.map(chain => [chain.rootRunId, chain]))
-  return projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id)))
+  return threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)
 }
 
 async function readableThread(issueId: string, runId: string) {
@@ -198,6 +199,23 @@ export interface IssueThreadDetail {
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
 }
 
+/**
+ * Which of the viewer's own threads end on a run that owes them an answer, or whose answer is
+ * resuming them. Only the owner may answer (lib/agent-runs.ts), and only while Factory lifecycle
+ * is on; the answer itself goes through sendIssueThreadMessage to the chain's latestRunId.
+ * A teammate's thread or a live run never carries a question.
+ */
+async function threadQuestions(threads: readonly IssueThread[], viewerId: string): Promise<IssueThread[]> {
+  // Keyed by the chain's live end (threadQuestionRunId), so an earlier attempt's answered question never resurfaces.
+  const asked = new Map(threads.flatMap(thread => {
+    const runId = thread.ownedByCurrentUser ? threadQuestionRunId(thread) : null
+    return runId ? [[thread.id, runId] as const] : []
+  }))
+  if (!asked.size || process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return [...threads]
+  const byRun = await threadQuestionStates(pool, [...new Set(asked.values())], viewerId)
+  return threads.map(thread => ({ ...thread, question: byRun.get(asked.get(thread.id) ?? '') ?? null }))
+}
+
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
 export async function getIssueThread(issueId: string, runId: string): Promise<IssueThreadDetail> {
   const { row, user } = await readableThread(issueId, runId)
@@ -206,11 +224,16 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
+  // The run that resumes this one after an answered question is the same thread: its chain (BE-18).
   const [projected] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
-  const chain = await readRunChain(pool, row.userId, row.id)
-  const thread = withRunChain(projected, chain)
+  const chain = projected ? await readRunChain(pool, row.userId, row.id) : null
+  const [thread] = projected ? await threadQuestions([withRunChain(projected, chain)], user.id) : []
+  if (!thread) throw new ActionFailureError('runNotFound')
+  // A stop request belongs to the live run that send and stop address, not to an earlier attempt.
+  const live = chain?.attempts.find(attempt => attempt.runId === thread.latestRunId)
+  const stopRequestedAt = live && live.runId !== row.id ? live.stopRequestedAt : row.stopRequestedAt
   return {
-    thread: { ...thread, prompt: row.prompt, stopRequestedAt: row.stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, prompt: row.prompt, stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
   }

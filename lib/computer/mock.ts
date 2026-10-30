@@ -6,8 +6,9 @@ import type { ApprovalDecision, ApprovalView, ComputerEvent, ComputerState, Know
  * on when NEXT_PUBLIC_COMPUTER_MOCK=1. It keeps state in the page and plays
  * the same states the real API reports. Like the real one there is one
  * machine per workspace: ?computer-mock=sleep in the page address starts it
- * asleep. The agent id picks the opening state of its desktop: ids containing
- * "approval", "done" or "idle" start there.
+ * asleep and ?computer-mock=waking starts it mid-wake (it stays there, for
+ * review). The agent id picks the opening state of its desktop: ids
+ * containing "approval", "done" or "idle" start there.
  */
 
 export const MOCK_SCREEN_URL = 'mock:desktop'
@@ -32,7 +33,10 @@ function opening(botId: string): ComputerState {
 }
 
 function read(botId: string): ComputerState {
-  machine ??= typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('computer-mock') === 'sleep' ? 'sleeping' : 'running'
+  if (machine === null) {
+    const start = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('computer-mock') : null
+    machine = start === 'sleep' ? 'sleeping' : start === 'waking' ? 'waking' : 'running'
+  }
   let state = states.get(botId)
   if (!state) { state = opening(botId); states.set(botId, state) }
   return { ...state, machine }
