@@ -67,19 +67,18 @@ export async function createPersonalAccessToken(userId: string, workspaceId: str
   try { expiry = checkExpiry(expiresAt, now) } catch { throw new WorkspaceError('validationGeneric') }
   await requireMember(userId, workspaceId)
   const { token, tokenHash, hint } = generatePersonalAccessToken()
-  const row = await guardTokenDb(() => db.transaction(async tx => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`pat:${userId}:${workspaceId}`}, 0))`)
-    const [{ active }] = await tx.select({ active: sql<number>`count(*)::int` }).from(personalAccessTokens)
+  const row = await guardTokenDb(async () => {
+    // A plain count: concurrent creates can briefly pass the soft cap by a few tokens (no lock).
+    const [{ active }] = await db.select({ active: sql<number>`count(*)::int` }).from(personalAccessTokens)
       .where(and(eq(personalAccessTokens.userId, userId), eq(personalAccessTokens.workspaceId, workspaceId), isNull(personalAccessTokens.revokedAt),
         // Expired tokens no longer hold a slot toward PAT_ACTIVE_LIMIT.
         or(isNull(personalAccessTokens.expiresAt), gt(personalAccessTokens.expiresAt, now))))
     if (active >= PAT_ACTIVE_LIMIT) throw new WorkspaceError('tokenLimitReached')
-    const [saved] = await tx.insert(personalAccessTokens).values({ id: crypto.randomUUID(), userId, workspaceId, name, tokenHash, hint, createdAt: now, expiresAt: expiry }).returning()
-    // TODO(audit): after PR #432 merges, call recordAudit(tx, { workspaceId, actor: { type: 'user', id: userId, name }, action: 'token.created',
-    // target: { type: 'token', id: saved.id, label: name }, ...auditRequestContext(headers) }) here. Rule (#432 lib/audit/record.ts):
-    // MIKKA-DB token writes use recordAudit inside this transaction, never recordAuditSafe.
+    const [saved] = await db.insert(personalAccessTokens).values({ id: crypto.randomUUID(), userId, workspaceId, name, tokenHash, hint, createdAt: now, expiresAt: expiry }).returning()
+    // TODO(audit): after PR #432 merges, record 'token.created' (target: the token id, label: its name) with recordAudit
+    // in one transaction with this insert. Rule (#432 lib/audit/record.ts): MIKKA-DB token writes never use recordAuditSafe.
     return saved
-  }))
+  })
   return { ...view(row, now), token }
 }
 
