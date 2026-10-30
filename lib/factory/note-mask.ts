@@ -16,17 +16,28 @@ function forms(value: string): string[] {
   const urlSafe = unpadded.replaceAll("+", "-").replaceAll("/", "_");
   const hex = Buffer.from(value, "utf8").toString("hex");
   const uri = encodeURIComponent(value);
-  // Uppercase hex and lowercase %xx are the same bytes in another spelling.
-  return [value, b64, unpadded, urlSafe, uri, uri.replace(/%[0-9A-F]{2}/g, (m) => m.toLowerCase()), hex, hex.toUpperCase(), JSON.stringify(value).slice(1, -1)];
+  // hex and %xx are matched case-insensitively on their hex digits (see needlePattern).
+  return [value, b64, unpadded, urlSafe, uri, hex, JSON.stringify(value).slice(1, -1)];
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const anyCase = (c: string) => (/[a-f]/i.test(c) ? `[${c.toLowerCase()}${c.toUpperCase()}]` : c);
+/** Hex digits in %xx escapes and in pure-hex forms are case-insensitive bytes
+ * (%2f%2B, aBcD…); every other character stays exact. */
+function needlePattern(form: string): string {
+  if (/^[0-9a-f]+$/i.test(form)) return [...form].map(anyCase).join("");
+  return form.split(/(%[0-9A-Fa-f]{2})/).map((part, i) => (i % 2 ? `%${anyCase(part[1])}${anyCase(part[2])}` : escapeRe(part))).join("");
 }
 
 export function serverNoteSecrets(env: NodeJS.ProcessEnv = process.env): NoteSecret[] {
   return SERVER_SECRET_ENV.flatMap((name) => (env[name] ? [{ name, value: env[name]! }] : []));
 }
 
-// TODO(#438): double URL encoding, nested JSON escaping, offset base64 (value not
-// at a 3-byte boundary), keys split across words, and provider tokens such as
-// xoxb-, AKIA and JWTs are left to #438's shared masker.
+// TODO(#438): left to workspaceSecretMasker once this switches to it:
+// per-character %xx and \uXXXX encoding, double URL encoding, nested JSON
+// escaping, base64 at an offset (value not at a 3-byte boundary) and base64 inside
+// base64, the {"GITHUB_TOKEN":"..."} JSON form, keys split across words, and
+// provider tokens such as AKIA…, JWTs and xoxb-.
 export function maskFactoryNote(text: string, secrets: readonly NoteSecret[] = serverNoteSecrets()): string {
   const needles = new Map<string, string>();
   for (const { value } of secrets) {
@@ -35,7 +46,7 @@ export function maskFactoryNote(text: string, secrets: readonly NoteSecret[] = s
   }
   let out = text;
   for (const [needle, label] of [...needles].sort((a, b) => b[0].length - a[0].length))
-    if (out.includes(needle)) out = out.split(needle).join(label);
+    out = out.replace(new RegExp(needlePattern(needle), "g"), label);
   // NAME_KEY=value / NAME_TOKEN: value forms the word-boundary patterns miss (E2B_API_KEY=…).
   out = out.replace(/\b([A-Za-z0-9]+_)*[A-Za-z0-9]*(KEY|TOKEN|SECRET|PASSWORD|PASSWD)\s*[:=]\s*[^\s,;]+/gi, (m) => `${m.split(/[:=]/)[0].trim()}=[REDACTED]`);
   return redactFactoryCheckText(out);
