@@ -23,16 +23,15 @@ test('管理员添加、编辑和删除密钥，值不回显', async ({ page }, 
   await page.getByRole('option', { name: '环境变量' }).click()
   await dialog.getByRole('textbox', { name: '名称' }).fill('NODE_ENV')
   await dialog.getByLabel('值').fill('production')
+  // No environment selector: an entry is scoped to the workspace or one repository only.
+  await expect(dialog.getByRole('combobox', { name: '环境' })).toHaveCount(0)
   await dialog.getByRole('combobox', { name: '范围' }).click()
   await page.getByRole('option', { name: '仓库' }).click()
   await dialog.getByRole('textbox', { name: '仓库' }).fill('alexj11324/mikka')
-  await dialog.getByRole('combobox', { name: '环境' }).click()
-  await page.getByRole('option', { name: 'Production' }).click()
   await dialog.getByRole('button', { name: '保存', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   const repo = page.getByRole('group', { name: '仓库 alexj11324/mikka' })
   await expect(repo.getByText('NODE_ENV')).toBeVisible()
-  await expect(repo.getByText('Production')).toBeVisible()
   expect(await page.content()).not.toContain(value)
   await attachLightDark(page, testInfo, 'secrets-list')
 
