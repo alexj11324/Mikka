@@ -69,3 +69,56 @@ test('issue numbering: no deadlock with FK KEY SHARE; concurrent numbers unique 
     await pool.end()
   }
 })
+
+test('counter expand backfills once and synchronizes legacy writers', { skip: !enabled, timeout: 120000 }, async () => {
+  const { Pool } = await import('pg')
+  const { readFile } = await import('node:fs/promises')
+  const admin = new Pool({ connectionString: connection, max: 1 })
+  const schema = `counter_${randomUUID().replaceAll('-', '')}`
+  await admin.query(`CREATE SCHEMA "${schema}"`)
+  const pool = new Pool({ connectionString: connection, options: `-c search_path=${schema}`, max: 10 })
+  const content = (number?: number) => JSON.stringify({ type: 'doc', attrs: { mikka: { ...(number ? { number } : {}), preserved: true } }, content: [] })
+  const insert = (owner: string, number?: number) => pool.query('INSERT INTO issues(id,"userId",content) VALUES ($1,$2,$3)', [randomUUID(), owner, content(number)])
+  try {
+    await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY);
+      CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text NOT NULL,content jsonb NOT NULL,"createdAt" timestamptz NOT NULL DEFAULT now());
+      INSERT INTO "user" VALUES ('owner'),('peer')`)
+    await insert('owner', 7)
+    await insert('owner', 12)
+    await insert('owner')
+    await insert('peer', 7)
+    const expand = await readFile(new URL('../drizzle/20261030194000_issue_number_counter_expand.sql', import.meta.url), 'utf8')
+    // A single client keeps the migration transaction and its search path together.
+    const migration = await pool.connect()
+    try { await migration.query(expand) } finally { migration.release() }
+    assert.deepEqual((await pool.query('SELECT number FROM issues WHERE "userId"=$1 ORDER BY number', ['owner'])).rows.map(row => Number(row.number)), [7, 12, 13])
+    assert.equal((await pool.query('SELECT "lastIssueNumber" FROM "user" WHERE id=$1', ['owner'])).rows[0].lastIssueNumber, '13')
+    assert.equal((await pool.query("SELECT bool_and((content #>> '{attrs,mikka,preserved}')::boolean) AS kept FROM issues")).rows[0].kept, true)
+    await insert('owner', 14)
+    assert.equal((await pool.query('SELECT "lastIssueNumber" FROM "user" WHERE id=$1', ['owner'])).rows[0].lastIssueNumber, '14')
+    const numbers = await Promise.all(Array.from({ length: 8 }, async (_, index) => {
+      const tx = await pool.connect()
+      try {
+        await tx.query('BEGIN')
+        let number: number
+        if (index % 2) {
+          await tx.query('SELECT id FROM "user" WHERE id=$1 FOR NO KEY UPDATE', ['owner'])
+          number = Number((await tx.query('SELECT coalesce(max(number),0)+1 AS n FROM issues WHERE "userId"=$1', ['owner'])).rows[0].n)
+        } else {
+          number = Number((await tx.query('UPDATE "user" SET "lastIssueNumber"="lastIssueNumber"+1 WHERE id=$1 RETURNING "lastIssueNumber"', ['owner'])).rows[0].lastIssueNumber)
+        }
+        await tx.query('INSERT INTO issues(id,"userId",content) VALUES ($1,$2,$3)', [randomUUID(), 'owner', content(number)])
+        await tx.query('COMMIT')
+        return number
+      } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+    }))
+    assert.deepEqual(numbers.sort((a, b) => a - b), [15, 16, 17, 18, 19, 20, 21, 22])
+    const retry = await pool.connect()
+    try { await retry.query(expand) } finally { retry.release() }
+    assert.equal((await pool.query('SELECT "lastIssueNumber" FROM "user" WHERE id=$1', ['owner'])).rows[0].lastIssueNumber, '22')
+  } finally {
+    await pool.end()
+    await admin.query(`DROP SCHEMA "${schema}" CASCADE`)
+    await admin.end()
+  }
+})
