@@ -56,9 +56,11 @@ export async function botRunModelSource(ownerId: string, botId: string, definiti
     // later, or reconnected at a new revision) is created from the owner's live connection.
     if (choice.refused === 'binding_required' && (choice.family === 'codex' || choice.family === 'claude')) {
       const { pool } = await import('@/lib/db')
-      const { ensureBotSubscriptionBinding } = await import('@/lib/bot-subscription-binding')
+      const { botSubscriptionModelId, ensureBotSubscriptionBinding } = await import('@/lib/bot-subscription-binding')
       const bindingId = await ensureBotSubscriptionBinding(pool, { ownerId, workspaceId: bot.workspaceId, botId, model: choice.family })
       if (bindingId) return { type: 'subscription', bindingId }
+      // No provider model configured for this deployment: 「… 在此无法运行」, not 「未连接」.
+      if (!botSubscriptionModelId(choice.family)) throw new BotModelRefusal('backend_unavailable', choice.family)
     }
     throw new BotModelRefusal(choice.refused, choice.family)
   }

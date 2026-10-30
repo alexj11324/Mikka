@@ -97,9 +97,11 @@ called from `workflows/coordinator/agent-kit-steps.ts`), which applies
   creating a bot that starts on one, binds it in the same transaction
   (`ensureBotSubscriptionBinding`, through `SubscriptionRepository.bind` and its
   checks), and a run that finds no live binding (connected later, or reconnected at
-  a new revision) binds it then. The provider model comes from
-  `MIKKA_BYOS_CODEX_MODEL` / `MIKKA_BYOS_CLAUDE_MODEL`. With no connected account the
-  turn is refused (`binding_required`). A bot never moves to another provider
+  a new revision) binds it then. A binding names its provider model, which comes from
+  the deployment's `MIKKA_BYOS_CODEX_MODEL` / `MIKKA_BYOS_CLAUDE_MODEL`; there is no
+  built-in model id (one would go stale as providers ship models). Unset, nothing is
+  bound and the turn is refused as unavailable (`backend_unavailable`, 「… 在此无法运行」).
+  With no connected account the turn is refused (`binding_required`). A bot never moves to another provider
   because a subscription is missing.
 - Codex and Claude need the subscription backend and the agent kit
   (`MIKKA_BYOS_ENABLED`, `MIKKA_AGENT_KIT`). Where those are off, the 模型 menu does

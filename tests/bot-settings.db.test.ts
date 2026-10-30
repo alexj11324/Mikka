@@ -9,6 +9,9 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
   // Codex / Claude bots need the subscription backend and the agent kit; the last case turns them off.
   process.env.MIKKA_BYOS_ENABLED = '1'
   process.env.MIKKA_AGENT_KIT = '1'
+  // The deployment names each provider's model; there is no built-in default.
+  process.env.MIKKA_BYOS_CODEX_MODEL = 'fixture-codex-model'
+  process.env.MIKKA_BYOS_CLAUDE_MODEL = 'fixture-claude-model'
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const { WorkspaceError } = await import('../lib/workspace-access')
@@ -185,14 +188,14 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
     const first = await botRunModelSource(rider, bot, undefined)
     const [claudeBinding] = await bindings()
     assert.deepEqual(first, { type: 'subscription', bindingId: claudeBinding.id })
-    assert.deepEqual([claudeBinding.route, claudeBinding.modelId, claudeBinding.connectionId], ['claude_cpa', 'claude-sonnet-4-5', claudeConnection])
+    assert.deepEqual([claudeBinding.route, claudeBinding.modelId, claudeBinding.connectionId], ['claude_cpa', 'fixture-claude-model', claudeConnection])
     assert.deepEqual(await botRunModelSource(rider, bot, undefined), first, 'the live binding is reused')
 
     // Choosing Codex with a connected account binds it in the same save.
     const codexConnection = await connect('codex')
     await botAdmin.saveBotSettings(rider, ws.id, { botId: bot, model: 'codex' })
     const codexBinding = (await bindings()).find(row => row.route === 'codex_cpa')!
-    assert.equal(codexBinding.connectionId, codexConnection)
+    assert.deepEqual([codexBinding.connectionId, codexBinding.modelId], [codexConnection, 'fixture-codex-model'])
     assert.deepEqual(await botRunModelSource(rider, bot, undefined), { type: 'subscription', bindingId: codexBinding.id })
     await botAdmin.saveBotSettings(rider, ws.id, { botId: bot, model: 'codex' })
     assert.equal((await bindings()).length, 2, 'saving again creates no second binding')
@@ -262,6 +265,26 @@ test('bot settings: workspace model allowlist and personal bot settings', { skip
     const error = await botRunModelSource(admin, adminBot, undefined).then(() => null, (reason: unknown) => reason as Error & { code?: string })
     assert.equal(error?.code, 'binding_required')
     assert.deepEqual(parseBotModelRefusal(error?.message), { reason: 'binding_required', family: 'codex' })
+  })
+
+  await t.test('with no provider model configured, nothing is bound and the run is refused as unavailable', async () => {
+    const owner = await seedUser(pool, 'unconfigured')
+    await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [ws.id, owner, `${owner}@example.invalid`])
+    await pool.query(`insert into byos_connections (id,"ownerId","workspaceId",provider,state,"secretName","secretDigest","providerSubject") values ($1,$2,$3,'codex','connected',$4,repeat('f',64),'p')`, [randomUUID(), owner, ws.id, `s-${randomUUID()}`])
+    await botAdmin.saveModelPolicy(admin, ws.id, { allowedModels: ['mikka', 'codex', 'claude'], startingModel: null })
+    const bot = await seedBot(pool, ws.id, owner, 'Unconfigured bot')
+    const count = async () => Number((await pool.query('select count(*)::int as n from byos_bindings where "consumerId"=$1', [bot])).rows[0].n)
+    delete process.env.MIKKA_BYOS_CODEX_MODEL
+    try {
+      await botAdmin.saveBotSettings(owner, ws.id, { botId: bot, model: 'codex' })
+      assert.equal(await count(), 0)
+      const error = await botRunModelSource(owner, bot, undefined).then(() => null, (reason: unknown) => reason as Error & { code?: string })
+      assert.equal(error?.code, 'backend_unavailable')
+    } finally {
+      process.env.MIKKA_BYOS_CODEX_MODEL = 'fixture-codex-model'
+    }
+    assert.ok(await botRunModelSource(owner, bot, undefined))
+    assert.equal(await count(), 1, 'configured again: the next run binds it')
   })
 
   await t.test('createBot binds a Codex / Claude bot in the same transaction as the bot row', async () => {
