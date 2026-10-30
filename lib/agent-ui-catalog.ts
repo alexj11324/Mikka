@@ -62,18 +62,19 @@ export const agentComponentCatalog = {
     props: z.object({ title: z.string().min(1).max(200), description: text, context: z.string().min(1).max(4000) }),
   },
   BeQuestions: {
-    description: 'beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。',
+    description: 'beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。只有一个单选问题时显示为 A/B/C/D 选项行，点击的选项文字即用户回复：Factory 任务派发前澄清（intake 路由到 clarify）或派发失败需用户二选一时用它，问题写清楚、选项 2–4 个；task 可选，为工具返回的真实任务 id，宿主在问题前显示任务引用。派发失败的云端选项是在用户自己的 E2B 密钥上运行云电脑（不是 Mikka 自有云），问题写“派不出去：{设备名} 不在线。等它上线，还是用你的 E2B 在云端运行？”，选项 value 固定为 wait（等它上线）与 cloud（用你的 E2B 运行），宿主按 value 本地化，不加解释段落；用户未配置 E2B 密钥时该选项设 action:"cloudKeySettings"，宿主显示为去设置密钥的入口，不发送回答。',
     props: z.object({
       context: z.string().min(1).max(4000),
       questions: z.array(z.object({
         id: z.string().min(1).max(80),
         title: z.string().min(1).max(200),
-        options: z.array(z.object({ value: z.string().min(1).max(80), label: z.string().min(1).max(200), description: z.string().max(300).optional() })).min(1).max(6).optional(),
+        options: z.array(z.object({ value: z.string().min(1).max(80), label: z.string().min(1).max(200), description: z.string().max(300).optional(), action: z.enum(['cloudKeySettings']).optional() })).min(1).max(6).optional(),
         multiple: z.boolean().optional(),
         allowCustom: z.boolean().optional(),
       }).refine(question => Boolean(question.options?.length || question.allowCustom), '问题必须提供选项或允许自定义回答')
         .refine(question => new Set(question.options?.map(option => option.value)).size === (question.options?.length ?? 0), '选项值不可重复'))
         .min(1).max(10).refine(questions => new Set(questions.map(question => question.id)).size === questions.length, '问题 ID 不可重复'),
+      task: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
     }),
   },
   BeTodoList: {
