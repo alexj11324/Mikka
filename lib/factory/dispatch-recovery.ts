@@ -71,37 +71,50 @@ async function insertEvent(tx: PoolClient, row: { userId: string; botId: string 
   return rowCount === 1;
 }
 
+/**
+ * Write path: called in the transaction that queues a Factory run. When the target device cannot
+ * take it right now, records one `run_dispatch_failed:<runId>:<reasonCode>`. Returns the reason or null.
+ */
+export async function recordFactoryDispatchFailure(tx: PoolClient, userId: string, runId: string, attemptId: string | null = null, at = Date.now()): Promise<FactoryDispatchFailureReason | null> {
+  const { rows: [row] } = await tx.query(`SELECT r.status, r."issueId", r."botId", ag.harness, d.id AS "dId", d.name, d.enabled, d."lastSeenAt", d.harnesses,
+      (SELECT a."taskId" FROM factory_attempts a WHERE a.id=$3) AS "taskId"
+    FROM agent_runs r
+    LEFT JOIN agents ag ON ag.id=r."agentId" AND ag."userId"=r."userId"
+    JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
+    WHERE r.id=$1 AND r."userId"=$2`, [runId, userId, attemptId]);
+  if (!row || row.status !== 'queued') return null;
+  const reason = factoryDispatchFailureReason({ id: row.dId, name: row.name, enabled: row.enabled, lastSeenAt: row.lastSeenAt, harnesses: row.harnesses }, row.harness, at);
+  if (reason) await insertEvent(tx, { userId, botId: row.botId, kind: 'run_dispatch_failed', dedupeKey: `run_dispatch_failed:${runId}:${reason}`, issueId: row.issueId, runId,
+    payload: { taskId: row.taskId ?? null, deviceId: row.dId, reasonCode: reason } });
+  return reason;
+}
+
 export function createFactoryDispatchRecovery(pool: Pool, cloudKeyConfigured: CloudKeyConfigured = noByoCloudKey, now: () => number = Date.now) {
-  /** Reads where the task's current run stands; a queued run that cannot start records one `run_dispatch_failed` per (run, reason). */
+  /** Strictly read-only (BE-16): failure.reasonCode is computed from the device state right now; nothing is written. */
   async function status(userId: string, taskId: string): Promise<FactoryDispatchStatus | null> {
-    const tx = await pool.connect();
+    const { rows: [row] } = await pool.query(taskRunSql, [taskId, userId]);
+    if (!row) return null;
+    const device = row.dId ? { id: row.dId, name: row.name, enabled: row.enabled, lastSeenAt: row.lastSeenAt, harnesses: row.harnesses } as FactoryDispatchDevice : null;
+    const at = now();
+    const reason = device && row.runStatus === 'queued' ? factoryDispatchFailureReason(device, row.harness, at) : null;
+    const client = reason ? await pool.connect() : null;
     try {
-      await tx.query('BEGIN');
-      const { rows: [row] } = await tx.query(taskRunSql, [taskId, userId]);
-      if (!row) { await tx.query('ROLLBACK'); return null; }
-      const device = row.dId ? { id: row.dId, name: row.name, enabled: row.enabled, lastSeenAt: row.lastSeenAt, harnesses: row.harnesses } as FactoryDispatchDevice : null;
-      const reason = device && row.runStatus === 'queued' ? factoryDispatchFailureReason(device, row.harness, now()) : null;
-      let clarification: FactoryClarification | null = null;
-      if (reason && row.runId) {
-        await insertEvent(tx, { userId, botId: row.botId, kind: 'run_dispatch_failed', dedupeKey: `run_dispatch_failed:${row.runId}:${reason}`, issueId: row.issueId, runId: row.runId,
-          payload: { taskId, deviceId: device!.id, reasonCode: reason } });
-        clarification = factoryDispatchClarification(taskId, row.runId, reason, await cloudKeyConfigured(tx, userId));
-      }
-      await tx.query('COMMIT');
       return {
         taskId, runId: row.runId ?? null, runStatus: row.runStatus ?? null,
-        device: device ? { id: device.id, name: device.name, online: factoryDeviceOnline(device, now()), lastSeenAt: device.lastSeenAt?.toISOString() ?? null } : null,
-        failure: reason ? { reasonCode: reason } : null, clarification,
+        device: device ? { id: device.id, name: device.name, online: factoryDeviceOnline(device, at), lastSeenAt: device.lastSeenAt?.toISOString() ?? null } : null,
+        failure: reason ? { reasonCode: reason } : null,
+        clarification: reason && client ? factoryDispatchClarification(taskId, row.runId, reason, await cloudKeyConfigured(client, userId)) : null,
       };
-    } catch (error) { await tx.query('ROLLBACK').catch(() => {}); throw error; } finally { tx.release(); }
+    } finally { client?.release(); }
   }
 
   /**
-   * The device is online again: every still-queued run on it that recorded a dispatch failure
-   * gets exactly one `run_redispatched` event (dedupe key per run) under a per-device lock.
+   * The device is online again: every still-queued Factory run on it that could not be dispatched
+   * just before this heartbeat (`wasUnavailable`) or that recorded `run_dispatch_failed` gets exactly
+   * one `run_redispatched` event (dedupe key per run) under a per-device lock.
    * The run row stays queued, so the daemon's next claim starts it; nothing is queued twice.
    */
-  async function deviceOnline(userId: string, deviceId: string): Promise<string[]> {
+  async function deviceOnline(userId: string, deviceId: string, wasUnavailable = false): Promise<string[]> {
     const tx = await pool.connect();
     try {
       await tx.query('BEGIN');
@@ -113,8 +126,8 @@ export function createFactoryDispatchRecovery(pool: Pool, cloudKeyConfigured: Cl
         JOIN factory_attempts a ON a."runId"=r.id
         JOIN factory_tasks t ON t.id=a."taskId" AND t."attemptId"=a.id AND t."userId"=r."userId"
         WHERE r."userId"=$1 AND r."deviceId"=$2 AND r.status='queued' AND t.status NOT IN ('cancelled','revoked')
-          AND EXISTS (SELECT 1 FROM coordinator_events e WHERE e."runId"=r.id AND e."userId"=r."userId" AND e.kind='run_dispatch_failed')
-        ORDER BY r."createdAt", r.id FOR UPDATE OF r SKIP LOCKED`, [userId, deviceId]);
+          AND ($3::boolean OR EXISTS (SELECT 1 FROM coordinator_events e WHERE e."runId"=r.id AND e."userId"=r."userId" AND e.kind='run_dispatch_failed'))
+        ORDER BY r."createdAt", r.id FOR UPDATE OF r SKIP LOCKED`, [userId, deviceId, wasUnavailable]);
       const resumed: string[] = [];
       for (const run of rows) {
         if (await insertEvent(tx, { userId, botId: run.botId, kind: 'run_redispatched', dedupeKey: `run_redispatched:${run.runId}`, issueId: run.issueId, runId: run.runId, payload: { taskId: run.taskId, deviceId } }))
