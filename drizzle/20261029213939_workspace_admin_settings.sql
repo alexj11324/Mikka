@@ -26,7 +26,9 @@ ALTER TABLE bots ADD COLUMN IF NOT EXISTS "monthlyCreditLimit" integer CHECK ("m
 -- the immutable agent-kit history, whose identity includes the owner) are
 -- removed by the transfer itself.
 ALTER TABLE bot_subagents DROP CONSTRAINT IF EXISTS "bot_subagents_botId_workspaceId_ownerId_fkey";
-ALTER TABLE bot_subagents ADD CONSTRAINT "bot_subagents_botId_workspaceId_ownerId_fkey" FOREIGN KEY ("botId", "workspaceId", "ownerId") REFERENCES bots(id, "workspaceId", "ownerId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE bot_subagents ADD CONSTRAINT "bot_subagents_botId_workspaceId_ownerId_fkey" FOREIGN KEY ("botId", "workspaceId", "ownerId") REFERENCES bots(id, "workspaceId", "ownerId") ON DELETE CASCADE ON UPDATE CASCADE NOT VALID;
+-- NOT VALID: only a brief lock here; existing rows are checked by VALIDATE CONSTRAINT in its own
+-- transaction (20261029213942), which takes SHARE UPDATE EXCLUSIVE and does not block writes.
 
 -- Billing (Stripe). One row per workspace that ever started a checkout.
 CREATE TABLE IF NOT EXISTS workspace_billing (

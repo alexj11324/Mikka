@@ -24,6 +24,6 @@ CREATE TABLE IF NOT EXISTS device_token_devices (
 CREATE INDEX IF NOT EXISTS device_token_devices_device_idx ON device_token_devices ("deviceId");
 
 -- Activity timeline reads: decided proposals and per-login usage.
-CREATE INDEX IF NOT EXISTS pending_actions_user_decided_idx ON pending_actions ("userId", "decidedAt" DESC) WHERE "decidedAt" IS NOT NULL;
+-- pending_actions_user_decided_idx is built CONCURRENTLY in 20261029213941 (large live table).
 CREATE INDEX IF NOT EXISTS credential_access_credential_time ON credential_access_events (credential_id, ts DESC) WHERE credential_id IS NOT NULL;
 COMMIT;

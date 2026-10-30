@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { assertIndexValid, headerLines, planMigration } from './migration-steps.mjs'
+import { assertIndexValid, dropInvalidIndex, headerLines, planMigration } from './migration-steps.mjs'
 
 const NOTX = '-- migrate: no-transaction\n'
 const plan = (sql) => planMigration('x.sql', sql)
@@ -98,4 +98,14 @@ test('all tracked SQL preflights without altering historical migration bytes', a
       assert.throws(() => planMigration(name, sql + '\n'), /no-transaction/, 'compatibility requires exact historical bytes')
     }
   }
+})
+
+test('dropInvalidIndex drops only an INVALID index, concurrently; valid or missing is left alone', async () => {
+  const calls = []
+  const fake = (rows) => async (text, values) => { calls.push(text); return { rows: text.startsWith('select') ? rows : [] } }
+  assert.equal(await dropInvalidIndex(fake([{ indisvalid: true }]), 'i', 'x.sql', () => {}), false)
+  assert.equal(await dropInvalidIndex(fake([]), 'i', 'x.sql', () => {}), false)
+  assert.equal(calls.some(c => /drop/i.test(c)), false)
+  assert.equal(await dropInvalidIndex(fake([{ indisvalid: false }]), 'i', 'x.sql', () => {}), true)
+  assert.equal(calls.at(-1), 'DROP INDEX CONCURRENTLY IF EXISTS "i"')
 })

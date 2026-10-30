@@ -25,7 +25,8 @@ export const LEGACY_CONCURRENT = {
 // BEGIN, COMMIT, END or ROLLBACK. Put each CONCURRENTLY index in its own file.
 // For CREATE INDEX CONCURRENTLY, migrate.mjs then checks pg_index.indisvalid; a failed build
 // leaves an INVALID index (which IF NOT EXISTS would silently skip next time), so an invalid
-// index fails the deploy and the file is not recorded.
+// index fails the deploy and the file is not recorded. On the next run, before executing such a
+// file, an INVALID index of that name is dropped with DROP INDEX CONCURRENTLY and rebuilt.
 
 const DIRECTIVE_TARGET = /^--\s*target:\s*(\w+)\s*$/
 const DIRECTIVE_NO_TX = /^--\s*migrate:\s*no-transaction\s*$/
@@ -90,12 +91,24 @@ export async function assertIndexValid(query, name, file) {
   if (rows.length !== 1 || !rows[0].indisvalid) throw new Error(`migrate: ${file}: index ${name} is INVALID (a concurrent build failed). Run "DROP INDEX CONCURRENTLY IF EXISTS ${name};" and deploy again. The migration was not recorded.`)
 }
 
+/** Drops `name` only when it exists and is INVALID (pg_index.indisvalid = false). A valid index is kept. */
+export async function dropInvalidIndex(query, name, file, log = console.error) {
+  const { rows } = await query('select i.indisvalid from pg_index i join pg_class c on c.oid = i.indexrelid where c.relname = $1 and pg_catalog.pg_table_is_visible(c.oid)', [name])
+  if (rows.length !== 1 || rows[0].indisvalid) return false
+  log(`migrate: ${file}: index ${name} is INVALID from a failed concurrent build; dropping and rebuilding`)
+  await query(`DROP INDEX CONCURRENTLY IF EXISTS "${name.replace(/"/g, '""')}"`)
+  return true
+}
+
 /**
  * Runs one planned file on `client` and records it in schema_migrations. For a concurrent
  * index the result is checked after execution; an INVALID index throws and nothing is recorded.
  */
 export async function applyMigration(client, name, plan, log = console.error) {
   const query = (text, values) => client.query(text, values)
+  // A previous concurrent build of this unrecorded file left an INVALID index: IF NOT EXISTS
+  // would skip it, so drop it (concurrently, outside any transaction) and build again.
+  if (plan.concurrentIndex) await dropInvalidIndex(query, plan.concurrentIndex, name, log)
   try {
     await client.query(plan.sql)
   } catch (error) {
