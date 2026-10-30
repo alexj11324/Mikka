@@ -31,6 +31,7 @@ const userSchema = z.object({ id, login: z.string().regex(/^[a-z0-9-]+$/i) })
 const permissionSchema = z.object({ permission: z.string(), user: userSchema })
 const prSchema = z.object({
   number: id, html_url: z.string(), state: z.enum(['open', 'closed']), draft: z.boolean(),
+  title: z.string().max(256).optional(),
   node_id: z.string().min(1).optional(),
   merged_at: z.string().nullable(), body: z.string().nullable(),
   head: z.object({ ref: z.string(), repo: z.object({ id }).nullable() }),
@@ -149,9 +150,9 @@ export async function openRunPullRequest(options: Options & {
         },
       })))
       if (converted.data.convertPullRequestToDraft.pullRequest.id !== pr.node_id) throw new PublicationError('github_request_failed')
-      return { url: pr.html_url, state: 'draft' }
+      return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: 'draft' }
     }
-    return { url: pr.html_url, state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open' }
+    return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open' }
   }
   const find = async () => {
     const query = new URLSearchParams({ state: 'all', head: `${access.owner}:${options.branch}`, per_page: '100', sort: 'created', direction: 'desc' })

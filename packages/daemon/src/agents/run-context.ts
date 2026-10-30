@@ -123,6 +123,7 @@ interface HandoffFile {
   plan?: unknown
   /** Per acceptance criterion, with the evidence the agent saw. */
   criteria?: unknown
+  previewDatabaseBranch?: unknown
 }
 
 /**
@@ -380,6 +381,7 @@ export class RunContext {
       nextStep: file.nextStep ?? null,
       ...(file.blockedOn ? { blockedOn: file.blockedOn } : {}),
       ...(plan ? { plan } : {}),
+      ...(typeof file.previewDatabaseBranch === "string" ? { previewDatabaseBranch: file.previewDatabaseBranch } : {}),
       ...(Array.isArray(file.criteria) ? { criteria: file.criteria } : {}),
       ...(runQuestion.safeParse(file.question).success
         ? { question: runQuestion.parse(file.question) }

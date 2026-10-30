@@ -1,6 +1,7 @@
 import 'server-only'
 import { NextResponse } from 'next/server'
-import { auth, MOBILE_APP_ORIGIN } from '@/lib/auth'
+import { MOBILE_APP_ORIGIN } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { appOrigin } from '@/lib/mcp/resource'
 
 /**

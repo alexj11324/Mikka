@@ -1,7 +1,7 @@
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { NextResponse } from 'next/server'
 import { getTranslations } from 'next-intl/server'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { loadWorkspaceSettings, WorkspaceError } from '@/lib/workspace-access'
 
 async function handleGET(request: Request) {

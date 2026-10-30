@@ -21,7 +21,7 @@ export async function freezeBotModel(
   const selected = await settings.botModel(settingsScope, scope.botId);
   const available = await settings.botModels(settingsScope);
   const binding = selected
-    ? available.find((row) => row.bindingId === selected)
+    ? await settings.botBinding(settingsScope, selected)
     : available[0];
   if (!binding) throw new SubscriptionRefusal("binding_required");
   return freezeHostedModelSelection(

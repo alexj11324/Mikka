@@ -66,6 +66,8 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 				result, err = w.PrepareRuntime(callCtx, request.Revision)
 			case "quota":
 				result, err = w.Quota(callCtx, request.Revision)
+			case "models":
+				result, err = w.Models(callCtx, request.Revision)
 			case "usage":
 				result, err = w.Usage(callCtx, request.Revision)
 			case "cleanup":

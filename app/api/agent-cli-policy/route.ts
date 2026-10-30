@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { readCliAgentPolicy, readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
 import { setCliAgentPolicy, setCliPolicy } from '@/lib/agent-tool-approval/policy-settings'

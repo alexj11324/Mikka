@@ -1,4 +1,5 @@
-import { auth } from '@/lib/auth'
+import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
+import { AgentKitError } from '@/lib/agent-kit/store'
 import { createAgentDefinitionHandler } from '@/lib/agent-kit/http'
 import { agentKitEnabled,agentKitStore,agentScope,agentKitDefaults } from '@/lib/agent-kit/service'
 import { evaluateProposal } from '@/lib/agent-kit/live-eval'
@@ -13,7 +14,12 @@ export const maxDuration=300
 const handler=createAgentDefinitionHandler({
   enabled:agentKitEnabled,
   authenticate:async request => (await auth.api.getSession({ headers:request.headers,query:{ disableCookieCache:true } }))?.user.id ?? null,
-  scope:agentScope,store:agentKitStore,defaults:agentKitDefaults(),
+  scope:async (ownerId,botId,request) => {
+    const scope = await agentScope(ownerId,botId)
+    const session = await auth.api.getSession({ headers:request.headers,query:{ disableCookieCache:true } })
+    if (!session || session.user.id !== ownerId || (scope.workspaceId && !apiWorkspaceAllowed(session,scope.workspaceId))) throw new AgentKitError('agentScopeNotFound',404)
+    return scope
+  },store:agentKitStore,defaults:agentKitDefaults(),
   writePolicy: { enabled:personalWritesEnabled, settings:createWritePolicySettings(pool, scope => scope.workspaceId ? (_tx, signal) => acquireWorkspaceMembership(workspacePool, { workspaceId:scope.workspaceId!, userId:scope.ownerId }, signal) : undefined) },
   evaluate:(scope,proposalId,requestId,mode) => evaluateProposal(agentKitStore,scope,proposalId,requestId,mode),
 })

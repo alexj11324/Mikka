@@ -25,7 +25,7 @@ test('onboarding backfill, new accounts and session-owned idempotent completion'
     // Only the existing session boundary is synthetic; storage and the action execute for real.
     mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser } } : null } } } })
     const { onboardingDone } = await import('./onboarding')
-    const { completeOnboarding } = await import('../app/actions/onboarding')
+    const { completeOnboarding, resetOnboarding } = await import('../app/actions/onboarding')
 
     await t.test('existing accounts are backfilled; new accounts remain incomplete on migration replay', async () => {
       assert.equal(await onboardingDone('existing'), true)
@@ -47,9 +47,21 @@ test('onboarding backfill, new accounts and session-owned idempotent completion'
       assert.deepEqual((await pool.query(`SELECT * FROM user_onboarding WHERE "userId"='bob'`)).rows, before)
     })
 
+
+    await t.test('reset replays only the signed-in person’s guide and is idempotent', async () => {
+      await Reflect.apply(resetOnboarding, undefined, ['alice'])
+      assert.equal(await onboardingDone('bob'), false)
+      assert.equal(await onboardingDone('alice'), true)
+      await resetOnboarding()
+      assert.equal(await onboardingDone('bob'), false)
+      await completeOnboarding()
+      assert.equal(await onboardingDone('bob'), true)
+    })
+
     await t.test('an absent session cannot complete another account', async () => {
       sessionUser = null
       await assert.rejects(completeOnboarding(), { code: 'authRequired' })
+      await assert.rejects(resetOnboarding(), { code: 'authRequired' })
       assert.equal(await onboardingDone('carol'), false)
     })
   } finally {

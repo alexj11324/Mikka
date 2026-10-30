@@ -1,5 +1,5 @@
 import { GitHubAccessError, listAuthorizedRepositories } from '@/lib/github/user-access'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { withRequestLog } from '@/lib/request-log'
 
 const headers = { 'Cache-Control': 'private, no-store' }

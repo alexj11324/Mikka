@@ -940,6 +940,14 @@
     "allStatuses": "All statuses"
   },
   "Errors": {
+    "botNotFound": "Bot not found.",
+    "executionPlaceInvalid": "Choose an available device or cloud.",
+    "executionHarnessUnavailable": "This harness is unavailable on the selected device.",
+    "executionModelUnknown": "This model is unavailable.",
+    "executionRuleNotFound": "This execution rule was not found.",
+    "executionRuleOrderInvalid": "The execution rule order has changed. Reload and retry.",
+    "executionCommandNotFound": "This detection command was not found.",
+    "executionAccountUnavailable": "This account is unavailable.",
     "generic": "Something went wrong. Please try again.",
     "authRequired": "Sign in required",
     "validationGeneric": "Please check the information you entered.",

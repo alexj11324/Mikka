@@ -1,4 +1,4 @@
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { localComputerDecision } from '@mikka/protocol/computer'
 import { decideLocalComputerReview, pendingLocalComputerReviews } from '@/lib/computer/local-reviews'
