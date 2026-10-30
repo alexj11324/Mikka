@@ -29,3 +29,19 @@ test("only pending statuses are listed and the run filter matches origin or cont
   assert.equal((await handleFactoryQuestionList(service, { actor: { userId: "u" }, authorization: "Bearer x", method: "GET", url: "https://x.test/" })).status, 401);
   assert.equal((await handleFactoryQuestionList(service, { actor: { userId: "u" }, authorization: null, method: "POST", url: "https://x.test/" })).status, 405);
 });
+
+test("POST answer accepts an optional option value but submits only the readable text", async () => {
+  const { handleFactoryQuestion } = await import("./http");
+  const seen: unknown[] = [];
+  const service = { answer: async (_actor: unknown, body: unknown) => { seen.push(body); return { ok: true }; } } as never;
+  const questionId = "00000000-0000-4000-8000-000000000001";
+  const u = (n: number) => `00000000-0000-4000-8000-00000000000${n}`;
+  const reference = { questionId, questionRevision: 1, originRunId: u(3), originSessionId: "s", binding: { taskId: u(4), issueId: u(5), attemptId: u(6), revision: 1, candidateId: null } };
+  const body = { reference, answerId: "00000000-0000-4000-8000-000000000002", text: "REST" };
+  const post = (b: unknown) => handleFactoryQuestion(service, { actor: { userId: "u", sessionId: "s" }, authorization: null, method: "POST", questionId, origin: "https://x.test", url: "https://x.test/api/factory/questions/" + questionId, body: b });
+  assert.equal((await post({ ...body, value: "REST" })).status, 200);
+  assert.equal((await post(body)).status, 200);
+  assert.equal((await post({ ...body, extra: 1 })).status, 422);
+  assert.equal(seen.length, 2);
+  assert.ok(seen.every((b) => !Object.hasOwn(b as object, "value") && (b as { text: string }).text === "REST"));
+});

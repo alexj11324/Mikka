@@ -1,6 +1,10 @@
+import { z } from "zod";
 import { humanQuestionAnswerSchema } from "./contract";
 import { FactoryError } from "../contract";
 import type { createFactoryQuestions } from "./store";
+
+/** The UI may echo the chosen option's `value` (an identifier only); the answer itself is `text`, the readable label. */
+const answerBodySchema = humanQuestionAnswerSchema.extend({ value: z.string().max(500).optional() });
 
 export async function handleFactoryQuestion(
   service: ReturnType<typeof createFactoryQuestions>,
@@ -30,7 +34,7 @@ export async function handleFactoryQuestion(
     } catch {
       return { status: 403, body: { error: "originRejected" } };
     }
-    const parsed = humanQuestionAnswerSchema.safeParse(request.body);
+    const parsed = answerBodySchema.safeParse(request.body);
     if (
       !parsed.success ||
       parsed.data.reference.questionId !== request.questionId
@@ -40,7 +44,7 @@ export async function handleFactoryQuestion(
       status: 200,
       body: await service.answer(
         { source: "human", ...request.actor },
-        parsed.data,
+        withoutValue(parsed.data),
       ),
     };
   } catch (error) {
@@ -55,4 +59,9 @@ export async function handleFactoryQuestion(
       body: { error: error.code },
     };
   }
+}
+
+function withoutValue<T extends { value?: string }>(body: T): Omit<T, "value"> {
+  const { value: _value, ...answer } = body;
+  return answer;
 }

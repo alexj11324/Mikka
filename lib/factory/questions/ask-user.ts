@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { FactoryError } from "../contract";
-import type { createFactoryQuestions } from "./store";
+import { maskFactoryNote } from "../note-mask";
 
 /** Statuses a user can still act on (same set as `pending`). */
 export const PENDING_QUESTION_STATUSES = ["open", "waiting_user", "resuming", "blocked"] as const;
@@ -15,7 +15,7 @@ type QuestionView = {
 };
 
 /** One pending Factory question in AskUserQuestion shape plus Mikka metadata.
- * The question text is kept verbatim (`originalText`); options become
+ * The question text is kept as asked (`originalText`), with secrets masked; options become
  * `{label, description, value}` with an empty description (Factory stores labels only).
  * `value` is the option's stable identifier: it currently equals `label` and
  * switches to a real option id if options get one later. */
@@ -26,8 +26,9 @@ export function toAskUserQuestion(q: QuestionView) {
     runId: q.originRunId,
     status: q.status,
     type: q.kind,
-    originalText: q.question,
-    question: q.question,
+    // Same human/model text as the ledger notes: masked before it leaves the server.
+    originalText: maskFactoryNote(q.question),
+    question: maskFactoryNote(q.question),
     header: HEADERS[q.kind] ?? q.kind.slice(0, 12),
     options: (q.options ?? []).map((label) => ({ label, description: "", value: label })),
     multiSelect: false,
@@ -42,7 +43,7 @@ const query = z.union([
 ]);
 
 export async function handleFactoryQuestionList(
-  service: Pick<ReturnType<typeof createFactoryQuestions>, "pending" | "list">,
+  service: { pending(userId: string, runId?: string): Promise<unknown[]>; list(userId: string, taskId: string): Promise<unknown[]> },
   request: { actor: { userId: string } | null; authorization: string | null; method: string; url: string },
 ) {
   if (!request.actor || request.authorization) return { status: 401, body: { error: "authRequired" } };
@@ -52,7 +53,7 @@ export async function handleFactoryQuestionList(
   if (!parsed.success) return { status: 422, body: { error: "factoryInvalid" } };
   const { taskId, runId } = parsed.data;
   try {
-    const rows = (taskId ? await service.list(request.actor.userId, taskId.toLowerCase()) : await service.pending(request.actor.userId)) as QuestionView[];
+    const rows = (taskId ? await service.list(request.actor.userId, taskId.toLowerCase()) : await service.pending(request.actor.userId, runId?.toLowerCase())) as QuestionView[];
     const run = runId?.toLowerCase();
     const questions = rows
       .filter((q) => (PENDING_QUESTION_STATUSES as readonly string[]).includes(q.status))

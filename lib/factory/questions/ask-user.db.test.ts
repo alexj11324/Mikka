@@ -32,28 +32,32 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       await pool.query(await readFile(new URL(f, dir), "utf8"));
     for (const id of ["owner", "intruder"])
       await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Fixture',$1||'@example.invalid',true,now(),now())`, [id]);
-    const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID();
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Disposable',now(),'[{"harness":"codex","installed":true}]')`, [deviceId]);
-    await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,'owner','Fixture','codex',$2)`, [agentId, deviceId]);
-    await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,'owner','/fixture/repo')`, [repoId, deviceId]);
+    const fixture: Record<string, { deviceId: string; agentId: string; repoId: string }> = {};
+    for (const user of ["owner", "intruder"]) {
+      const f = (fixture[user] = { deviceId: randomUUID(), agentId: randomUUID(), repoId: randomUUID() });
+      await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,$2,'Disposable',now(),'[{"harness":"codex","installed":true}]')`, [f.deviceId, user]);
+      await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,$2,'Fixture','codex',$3)`, [f.agentId, user, f.deviceId]);
+      await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/fixture/repo')`, [f.repoId, f.deviceId, user]);
+    }
     const authorize = async (user: string, issue: string, tx: PoolClient) =>
       (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, user])).rowCount === 1;
     const store = createFactoryStore(pool, authorize, null, { independent: factoryCheckIndependent });
     const dispatch = createFactoryDispatch(pool, store, async (tx, userId, input, botId) => {
       const runId = randomUUID();
-      await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,prompt) VALUES ($1,$2,$3,$4,$5,$6,$7,'queued','Fixture')`, [runId, userId, input.issueId, input.agentId, deviceId, input.deviceRepoId, botId]);
+      await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,prompt) VALUES ($1,$2,$3,$4,$5,$6,$7,'queued','Fixture')`, [runId, userId, input.issueId, input.agentId, fixture[userId].deviceId, input.deviceRepoId, botId]);
       return { runId };
     }, { configure: { execute: async () => {} }, freeze: async (tx, _task, id) => { await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [id, JSON.stringify({ schemaVersion: 1, definitionDigest: "fixture", harness: "codex" })]); } });
     const questions = createFactoryQuestions(pool, authorize, store, dispatch);
-    const asked = async (kind: string, text: string, options: string[]) => {
+    const asked = async (kind: string, text: string, options: string[], user = "owner") => {
+      const { agentId, repoId } = fixture[user];
       const issueId = randomUUID(), src = randomUUID(), questionId = randomUUID();
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId]);
-      await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [src, src]);
-      const r = await store.route("owner", { issueId, sourceEventId: src, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
-      const { runId } = await dispatch("owner", { binding: factoryBinding(r.task), agentId, deviceRepoId: repoId });
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,$2,'Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId, user]);
+      await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$3,'user_message',$2,'{"text":"synthetic"}')`, [src, src, user]);
+      const r = await store.route(user, { issueId, sourceEventId: src, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
+      const { runId } = await dispatch(user, { binding: factoryBinding(r.task), agentId, deviceRepoId: repoId });
       await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"=$2,report=$3,"sessionId"='session:'||id,"startedAt"=now(),"finishedAt"=now() WHERE id=$1`, [runId, kind === "external" ? "blocked" : "asked_human",
         JSON.stringify({ summary: "Synthetic hand-in", openQuestions: [text], question: { questionId, kind, question: text, options } })]);
-      await questions.record("owner", runId);
+      await questions.record(user, runId);
       return { taskId: r.task.id, runId, questionId };
     };
     const get = (userId: string | null, query = "") =>
@@ -81,6 +85,51 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.equal((await get("intruder", `?taskId=${a.taskId}`)).status, 404);
     });
 
+    await t.test("question text is masked like the ledger notes", async () => {
+      const token = "ghp_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8";
+      const m = await asked("decision", `Rotate ${token} now?`, ["Yes"]);
+      const [q] = ((await get("owner", `?taskId=${m.taskId}`)).body as { questions: { question: string; originalText: string }[] }).questions;
+      assert.ok(!q.question.includes(token) && !q.originalText.includes(token), "token leaked");
+      assert.equal(q.originalText, q.question);
+      await pool.query("UPDATE factory_questions SET status='resolved' WHERE id=$1", [m.questionId]);
+    });
+
+    await t.test("another user's runId and task: empty list and the same 404 body as a missing task", async () => {
+      const x = await asked("decision", "Intruder question", ["A"], "intruder");
+      assert.deepEqual((await get("owner", `?runId=${x.runId}`)).body, { questions: [] });
+      assert.deepEqual((await get("intruder", `?runId=${a.runId}`)).body, { questions: [] });
+      const missing = await get("owner", `?taskId=${randomUUID()}`), foreign = await get("owner", `?taskId=${x.taskId}`);
+      assert.equal(missing.status, 404);
+      assert.equal(foreign.status, 404);
+      assert.deepEqual(foreign.body, missing.body);
+    });
+
+    await t.test("list by task filters userId in SQL: a foreign row on the owner's task is not shown", async () => {
+      const x = await asked("decision", "Planted on owner's task", ["A"], "intruder");
+      await pool.query('UPDATE factory_questions f SET "taskId"=o."taskId","attemptId"=o."attemptId","candidateId"=o."candidateId" FROM factory_questions o WHERE f.id=$1 AND o.id=$2', [x.questionId, a.questionId]);
+      const ids = ((await get("owner", `?taskId=${a.taskId}`)).body as { questions: { questionId: string }[] }).questions.map((q) => q.questionId);
+      assert.deepEqual(ids, [a.questionId]);
+      await pool.query("DELETE FROM factory_questions WHERE id=$1", [x.questionId]);
+    });
+
+    await t.test("pending: 50-row cap, userId and runId in SQL, newest first with id tiebreak", async () => {
+      const mine: string[] = [];
+      for (let i = 0; i < 51; i++) mine.push((await asked("decision", `Owner ${i}`, ["A"])).questionId);
+      // Newer than every owner row: without the SQL userId filter they eat the quota.
+      for (let i = 0; i < 50; i++) await asked("decision", `Intruder ${i}`, ["A"], "intruder");
+      // Same createdAt for all owner rows so only `id DESC` orders them.
+      await pool.query(`UPDATE factory_questions SET "createdAt"='2020-01-01T00:00:00Z' WHERE "userId"='owner'`);
+      await pool.query(`UPDATE factory_questions SET "createdAt"='2019-01-01T00:00:00Z' WHERE id=$1`, [b.questionId]);
+      await pool.query(`UPDATE factory_questions SET "createdAt"='2021-01-01T00:00:00Z' WHERE "userId"='intruder'`);
+      const pendingOwner = (await pool.query(`SELECT id FROM factory_questions WHERE "userId"='owner' AND id<>$1 AND status IN ('open','waiting_user','resuming','blocked') ORDER BY id DESC`, [b.questionId])).rows.map((r) => r.id as string);
+      assert.ok(pendingOwner.length > 50);
+      const all = ((await get("owner")).body as { questions: { questionId: string }[] }).questions.map((q) => q.questionId);
+      assert.deepEqual(all, pendingOwner.slice(0, 50));
+      // b's run is outside the newest 50: found only because runId is filtered before LIMIT.
+      assert.ok(!all.includes(b.questionId));
+      assert.deepEqual(((await get("owner", `?runId=${b.runId}`)).body as { questions: { questionId: string }[] }).questions.map((q) => q.questionId), [b.questionId]);
+    });
+
     await t.test("BE-16: GETs compute expiry from expiresAt and write nothing", async () => {
       await pool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 second' WHERE id=$1`, [a.questionId]);
       const tables = ["factory_questions", "factory_tasks", "factory_attempts", "factory_events", "agent_runs", "run_messages"];
@@ -90,7 +139,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.equal(one.status, "expired");
       assert.equal(one.revision, before[0].find((r: { id: string }) => r.id === a.questionId).revision, "revision not bumped");
       assert.equal((await questions.list("owner", a.taskId))[0].status, "expired");
-      assert.ok((await questions.pending("owner")).some((q) => q.id === a.questionId && q.status === "expired"));
+      assert.ok((await questions.pending("owner", a.runId)).some((q) => q.id === a.questionId && q.status === "expired"));
       const byTask = (await get("owner", `?taskId=${a.taskId}`)).body as { questions: unknown[] };
       assert.deepEqual(byTask.questions, [], "expired question is no longer pending");
       assert.deepEqual(await snap(), before, "GETs wrote nothing");
