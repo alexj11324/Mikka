@@ -81,10 +81,20 @@ export async function loadTaskRuntimeSecrets(workspaceId: string, repository: st
   return [...merged.values()]
 }
 
-/** Task env (NAME -> value) for the claim response. {} when the flag is off. Reserved names are skipped and audited by name. */
+/**
+ * Task env (NAME -> value) for the claim response, plus the names in it that are secrets (the daemon
+ * masks those values before upload). Empty when the flag is off. Reserved names are skipped and audited by name.
+ */
+export async function taskSecretInjection(workspaceId: string, repository: string | null, env: Env = process.env, skipped?: { actorId: string; audit: SecretAuditHook }): Promise<{ env: Record<string, string>; secretNames: string[] }> {
+  if (!byoE2BKeyEnabled(env)) return { env: {}, secretNames: [] }
+  const secrets = await loadTaskRuntimeSecrets(workspaceId, repository, env)
+  const injected = await reservedInjectionFilter(workspaceId, secrets, skipped)
+  return { env: injected, secretNames: secrets.filter(s => s.kind === 'secret' && Object.hasOwn(injected, s.name)).map(s => s.name) }
+}
+
+/** Task env (NAME -> value) only; see taskSecretInjection. */
 export async function taskSecretEnv(workspaceId: string, repository: string | null, env: Env = process.env, skipped?: { actorId: string; audit: SecretAuditHook }): Promise<Record<string, string>> {
-  if (!byoE2BKeyEnabled(env)) return {}
-  return reservedInjectionFilter(workspaceId, await loadTaskRuntimeSecrets(workspaceId, repository, env), skipped)
+  return (await taskSecretInjection(workspaceId, repository, env, skipped)).env
 }
 
 /** #438 C: the workspace's own E2B key is masked like a secret. Absent key = nothing to add. */

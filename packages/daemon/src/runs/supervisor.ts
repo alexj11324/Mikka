@@ -32,6 +32,7 @@ import { fixedCheckSnapshot } from "./check"
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
 import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 import { runPaths } from "../agents/run-context"
+import { createRunMasker, type RunMasker } from "../secret-mask"
 import { SKILLS_DIR, SKILL_BODY_FILE, skillSlug } from "@mikka/protocol/skill"
 import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/protocol/run"
 import { runPolicyDigestInput } from "@mikka/protocol/agent-policy"
@@ -80,7 +81,7 @@ import {
 } from "../errors"
 import { isSafeId } from "../ids"
 import type { Logger } from "../log"
-import type { Outbox } from "../outbox"
+import type { Outbox, OutboxItem } from "../outbox"
 import { pushDecision, runPolicy } from "../permissions"
 import {
   DEFAULT_LEASE_MS,
@@ -207,6 +208,8 @@ export class RunSupervisor {
   private openMessages = new Set<string>()
   /** Per run: text / reasoning ids and tool calls still open in that message. */
   private openParts = new Map<string, Set<string>>()
+  /** Runs with injected workspace secrets: their output is masked before the outbox (../secret-mask). */
+  private maskers = new Map<string, RunMasker>()
   /** Runs whose message ends at the next safe point (a person wrote). */
   private cutMessages = new Set<string>()
   /** Aborted by `stop()`: kills a running verify command. */
@@ -294,7 +297,8 @@ export class RunSupervisor {
           baseCommit: entry.baseCommit,
           lastTree: run.lastCheckpointTree,
         })
-        if (taken?.checkpoint) await save(runId, taken.checkpoint)
+        const masker = this.maskers.get(runId)
+        if (taken?.checkpoint) await save(runId, masker ? masker.checkpoint(taken.checkpoint) : taken.checkpoint)
         if (taken) run.lastCheckpointTree = taken.tree
         run.checkpointDue = false
         run.lastCheckpointAt = now
@@ -465,6 +469,12 @@ export class RunSupervisor {
     }
     const existing = this.deps.journal.get(assignment.runId)
     if (existing) return this.summary(existing)
+    // 4e3: mask the task's injected secrets (names from the server, values from taskEnv) before upload.
+    const masker = createRunMasker((assignment.taskSecretNames ?? []).flatMap(name => {
+      const value = assignment.taskEnv?.[name]
+      return typeof value === "string" ? [{ name, value }] : []
+    }))
+    if (masker) this.maskers.set(assignment.runId, masker)
     let repo: DeviceRepo
     try { repo = this.deps.repository(assignment) } catch (error) {
       this.refuse(assignment, new InvalidRepositoryError(error instanceof Error ? error.message : undefined))
@@ -493,14 +503,16 @@ export class RunSupervisor {
 
   /** A claimed run this daemon cannot take: failed, with one completion. */
   private refuse(assignment: RunAssignment, error: DaemonError): never {
-    this.deps.outbox.push(assignment.runId, {
+    this.flushMasker(assignment.runId)
+    this.push(assignment.runId, {
       kind: "run",
       patch: { state: "failed", error: error.message, stopReason: "error" },
     })
-    this.deps.outbox.push(assignment.runId, {
+    this.push(assignment.runId, {
       kind: "complete",
       completion: { stopReason: "error", report: baseReport(error.message) },
     })
+    this.disposeMasker(assignment.runId)
     throw error
   }
 
@@ -708,11 +720,35 @@ export class RunSupervisor {
     if (this.openMessages.delete(runId)) this.append(runId, { type: "finish" })
   }
 
-  /** Outbox first, then the journal: see `resumeAll` for the reconcile. */
+  /** Outbox first, then the journal: see `resumeAll` for the reconcile. Masked first when the run has secrets. */
   private append(runId: string, chunk: RunChunk) {
-    const seq = (this.deps.journal.get(runId)?.lastSeq ?? 0) + 1
-    this.deps.outbox.push(runId, { kind: "chunk", seq, chunk })
-    this.deps.journal.update(runId, { lastSeq: seq })
+    const masker = this.maskers.get(runId)
+    for (const out of masker ? masker.chunk(chunk) : [chunk]) {
+      const seq = (this.deps.journal.get(runId)?.lastSeq ?? 0) + 1
+      this.deps.outbox.push(runId, { kind: "chunk", seq, chunk: out })
+      this.deps.journal.update(runId, { lastSeq: seq })
+    }
+  }
+
+  /** Every run patch and completion goes through here: masked before it is written to the outbox. */
+  private push(runId: string, item: Exclude<OutboxItem, { kind: "chunk" }>) {
+    const masker = this.maskers.get(runId)
+    this.deps.outbox.push(runId, masker ? masker.deep(item) : item)
+  }
+
+  /** Releases any held-back text, masked, as chunks (before the run's terminal items). */
+  private flushMasker(runId: string) {
+    for (const chunk of this.maskers.get(runId)?.flush() ?? []) {
+      const seq = (this.deps.journal.get(runId)?.lastSeq ?? 0) + 1
+      this.deps.outbox.push(runId, { kind: "chunk", seq, chunk })
+      this.deps.journal.update(runId, { lastSeq: seq })
+    }
+  }
+
+  /** Forgets the run's secret values once its last item is in the outbox. */
+  private disposeMasker(runId: string) {
+    this.maskers.get(runId)?.dispose()
+    this.maskers.delete(runId)
   }
 
   /**
@@ -753,6 +789,7 @@ export class RunSupervisor {
     // A planning hand-in leaves its two cards in the conversation (ADR ORV-205).
     this.emitPlanCards(runId, report, planning)
     this.endMessage(runId)
+    this.flushMasker(runId)
     this.openParts.delete(runId)
     if (stopReason === "submitted") this.setState(runId, "finishing")
     // A trusted daemon push can hand unverified work in for a draft PR.
@@ -778,10 +815,11 @@ export class RunSupervisor {
       stopReason,
       ...(error ? { error } : {}),
     })
-    this.deps.outbox.push(runId, {
+    this.push(runId, {
       kind: "complete",
       completion: { stopReason, report },
     })
+    this.disposeMasker(runId)
     const run = this.active.get(runId)
     if (run) void this.closeMailbox(run).catch(() => this.deps.log.warn('Run mailbox shutdown failed'))
     this.leases.delete(runId)
@@ -810,7 +848,7 @@ export class RunSupervisor {
         : {}),
     })
     this.emit(runId, runStateChunk(state, extra.error, extra.stopReason))
-    this.deps.outbox.push(runId, {
+    this.push(runId, {
       kind: "run",
       patch: {
         state,

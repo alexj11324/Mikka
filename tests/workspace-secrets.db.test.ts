@@ -197,6 +197,8 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     assert.deepEqual(await runtime.taskSecretEnv(w.id, null, on), { API_TOKEN: 'workspace-api-token', REGION: 'ws-region' }, 'no repo: workspace only')
     assert.deepEqual(await runtime.taskSecretEnv(w.id, 'ACME/App', on), { API_TOKEN: REPO_TOKEN, REGION: 'ws-region', REPO_ENV: 'repo-env' }, 'repo overrides workspace; case-insensitive; no other repo')
     assert.deepEqual(await runtime.taskSecretEnv(w.id, 'acme/unknown', on), { API_TOKEN: 'workspace-api-token', REGION: 'ws-region' })
+    assert.deepEqual((await runtime.taskSecretInjection(w.id, 'acme/app', on)).secretNames.sort(), ['API_TOKEN'], 'only kind=secret names go to the daemon for masking; env vars are not listed')
+    assert.deepEqual(await runtime.taskSecretInjection(w.id, 'acme/app', off), { env: {}, secretNames: [] })
     assert.equal(runtime.remoteRepositoryRef('https://github.com/Acme/App.git'), 'acme/app')
     assert.equal(runtime.remoteRepositoryRef('git@github.com:Acme/App.git'), 'acme/app')
     assert.equal(runtime.remoteRepositoryRef('ssh://git@github.com/acme/app'), 'acme/app')
