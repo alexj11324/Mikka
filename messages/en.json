@@ -1029,6 +1029,7 @@
     "projectIssueAlreadyLinked": "A task can belong to only one project. Remove it from the original project first.",
     "projectIssuesSaveFailed": "Could not link tasks. Check your access and try again.",
     "secretNotFound": "That secret or variable no longer exists.",
+    "secretNameReserved": "This name is reserved by the runtime (for example PATH, HOME, proxy, TLS, loader, git, E2B or MIKKA variables). Choose another name.",
     "secretPermissionDenied": "Only workspace admins can do this. Members can add and edit repository secrets and variables outside production.",
     "secretNameTaken": "A secret or variable with this name already exists in this scope.",
     "secretLimitReached": "This workspace has reached the limit of 500 secrets and variables.",
