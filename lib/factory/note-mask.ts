@@ -14,13 +14,19 @@ function forms(value: string): string[] {
   const b64 = Buffer.from(value, "utf8").toString("base64");
   const unpadded = b64.replace(/=+$/, "");
   const urlSafe = unpadded.replaceAll("+", "-").replaceAll("/", "_");
-  return [value, b64, unpadded, urlSafe, encodeURIComponent(value), Buffer.from(value, "utf8").toString("hex"), JSON.stringify(value).slice(1, -1)];
+  const hex = Buffer.from(value, "utf8").toString("hex");
+  const uri = encodeURIComponent(value);
+  // Uppercase hex and lowercase %xx are the same bytes in another spelling.
+  return [value, b64, unpadded, urlSafe, uri, uri.replace(/%[0-9A-F]{2}/g, (m) => m.toLowerCase()), hex, hex.toUpperCase(), JSON.stringify(value).slice(1, -1)];
 }
 
 export function serverNoteSecrets(env: NodeJS.ProcessEnv = process.env): NoteSecret[] {
   return SERVER_SECRET_ENV.flatMap((name) => (env[name] ? [{ name, value: env[name]! }] : []));
 }
 
+// TODO(#438): double URL encoding, nested JSON escaping, offset base64 (value not
+// at a 3-byte boundary), keys split across words, and provider tokens such as
+// xoxb-, AKIA and JWTs are left to #438's shared masker.
 export function maskFactoryNote(text: string, secrets: readonly NoteSecret[] = serverNoteSecrets()): string {
   const needles = new Map<string, string>();
   for (const { value } of secrets) {

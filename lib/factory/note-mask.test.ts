@@ -11,3 +11,13 @@ test("note masker hides secret values in their encoded forms and token patterns"
   assert.equal(maskFactoryNote("E2B_API_KEY=e2b_live_xxx and GITHUB_TOKEN: abc", []), "E2B_API_KEY=[REDACTED] and GITHUB_TOKEN=[REDACTED]");
   assert.equal(maskFactoryNote("short ok", [{ name: "S", value: "short" }]), "short ok");
 });
+
+test("note masker hides uppercase hex and lowercase %xx spellings", () => {
+  const value = "e2b/synth+value=123";
+  const secrets = [{ name: "E2B_API_KEY", value }];
+  const hex = Buffer.from(value).toString("hex").toUpperCase();
+  const pct = encodeURIComponent(value).replace(/%[0-9A-F]{2}/g, (m) => m.toLowerCase());
+  assert.notEqual(pct, encodeURIComponent(value));
+  assert.equal(maskFactoryNote(`a ${hex} b`, secrets), "a [secret] b");
+  assert.equal(maskFactoryNote(`a ${pct} b`, secrets), "a [secret] b");
+});
