@@ -259,7 +259,7 @@ jobs:
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
     needs: [changes, ui-policy-full]
-    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -370,7 +370,7 @@ jobs:
     # The required check name. Same docs-only behavior as UI policy above.
     name: Production build and browser interactions
     needs: [changes, browser-tests-full]
-    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

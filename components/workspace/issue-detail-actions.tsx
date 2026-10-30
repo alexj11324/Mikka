@@ -7,7 +7,7 @@ import { ArrowUpRight, Bell, BellOff, Box, Calendar, Check, Circle, Copy, FileTe
 import { toast } from 'sonner'
 import { createLinkedIssue, setIssueDeleted, toggleIssuePreference, updateIssueRelation } from '@/app/actions/issue-operations'
 import { updateIssueMetadata } from '@/app/actions/issue-metadata'
-import type { getIssue } from '@/app/actions/issues'
+import type { IssueView } from '@/app/actions/issues'
 import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -20,7 +20,7 @@ import { IssueRelationPicker, type RelationKind } from './issue-relations'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from './issue-properties'
 import type { MetadataRequest } from './issue-metadata-controls'
 
-type Issue = Awaited<ReturnType<typeof getIssue>>
+type Issue = IssueView
 export type IssueActionRequest = { kind: RelationKind | 'createChild' | 'dueDate' | 'estimate'; sequence: number }
 type OperationResult = { issue?: Issue; error?: string }
 

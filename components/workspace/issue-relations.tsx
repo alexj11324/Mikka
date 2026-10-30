@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronRight, Circle, Flag, GitBranch, Link2, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { listIssueConnections, updateIssueRelation } from '@/app/actions/issue-operations'
-import { moveIssue, type getIssue } from '@/app/actions/issues'
+import { moveIssue, type IssueView } from '@/app/actions/issues'
 import { useActionError } from '@/lib/use-action-error'
 import { useRelationSearch } from '@/lib/hooks/use-relation-search'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,7 @@ import { ISSUE_STATUSES, issueIdentifier } from './issue-properties'
 import { IssuePropertyMenu } from './issue-property-menu'
 import { cn } from '@/lib/utils'
 
-type Issue = Awaited<ReturnType<typeof getIssue>>
+type Issue = IssueView
 export type RelationKind = 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'
 const closed = (status: string) => ['done', 'canceled', 'duplicate'].includes(status)
 

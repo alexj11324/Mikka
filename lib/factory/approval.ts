@@ -173,18 +173,6 @@ function decisionScope(
   };
 }
 
-async function unusedEvent(tx: PoolClient, taskId: string, eventId: string) {
-  const { rows } = await tx.query(
-    `
-    SELECT 1 FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2
-    UNION ALL SELECT 1 FROM factory_approvals WHERE "taskId"=$1 AND "eventId"=$2
-    UNION ALL SELECT 1 FROM factory_approval_controls WHERE "taskId"=$1 AND "eventId"=$2
-    UNION ALL SELECT 1 FROM factory_publications WHERE "taskId"=$1 AND "eventId"=$2`,
-    [taskId, eventId],
-  );
-  if (rows.length) fail("factoryReplayMismatch");
-}
-
 /** The approval as bound to this task's current candidate and attempt. Revocation and a
  * superseded candidate always void it. Expiry and the approver's session do not: they gate
  * only a new reservation (validApproval). Once a publication is reserved, checking or
@@ -587,7 +575,6 @@ export function createFactoryApprovals(
           await validApproval(tx, task, prior.id, true, authority);
           return { approvalId: prior.id, binding: bindingOf(task) };
         }
-        await unusedEvent(tx, task.id, req.eventId);
         fence(task, req.binding);
         if (
           task.stage !== "approval" ||
@@ -730,7 +717,6 @@ export function createFactoryApprovals(
             binding: FactoryBinding;
           };
         }
-        await unusedEvent(tx, task.id, req.eventId);
         fence(task, req.binding);
         if (
           task.stage !== "approval" ||
@@ -819,7 +805,6 @@ export function createFactoryApprovals(
             fail("factoryReplayMismatch");
           return prior.result as { approvalId: string; revoked: boolean };
         }
-        await unusedEvent(tx, task.id, req.eventId);
         const { rowCount } = await tx.query(
           'UPDATE factory_approvals SET "revokedAt"=coalesce("revokedAt",clock_timestamp()) WHERE id=$1 AND "taskId"=$2 AND "userId"=$3',
           [req.approvalId, task.id, actor.userId],
@@ -887,7 +872,13 @@ export function createFactoryApprovals(
             },
           };
         }
-        await unusedEvent(tx, task.id, req.eventId);
+        // complete() records this eventId in factory_events only after the provider effect.
+        // An eventId that row already holds would fail there, after a deployment was made.
+        const { rowCount: used } = await tx.query(
+          'SELECT 1 FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',
+          [task.id, req.eventId],
+        );
+        if (used) fail("factoryReplayMismatch");
         fence(task, req.binding);
         if (task.stage !== "publish" || task.status !== "pending")
           fail("factoryTransition");

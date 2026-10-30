@@ -64,11 +64,11 @@ scheme is registered.
 
 ## Release
 
-Bump `apps/desktop/package.json`, create a tag named `desktop-vX.Y.Z`, then run
-the **Desktop release** workflow **from `main`** with that tag as its input.
-Do not trigger it by pushing the tag: GitHub scopes Actions caches per ref, so
-a tag run starts with an empty pnpm and electron-builder cache every time,
-while a run dispatched from `main` reuses the previous release's. The workflow
+Run the **Desktop release** workflow **from `main`**. There is no version bump
+and no tag to create: the version is the UTC build time, `YYYY.MMDD.HHMM`
+(for example `2026.1030.1834`), stamped into the build, and the release is
+tagged `desktop-<version>` on the built commit. The version in
+`apps/desktop/package.json` is only used for local builds. The workflow
 builds the Apple Silicon macOS installer, signs and notarizes it, and attaches
 the DMG, ZIP and `SHA256SUMS.txt` to a **draft** GitHub Release. Publish the
 draft only after installing it on Apple Silicon.
@@ -104,7 +104,7 @@ Before publishing the draft:
   `ipcRenderer`, `require` or file paths.
 - Main accepts IPC only from the app's main frame and validates every payload
   with the protocol schemas.
-- Navigation: only the app origin stays in the window; every other HTTPS or
+- Navigation: only the app origin stays in the window; every other HTTP(S) or
   mailto link, including Google and GitHub sign-in, opens in the system
   browser; everything else is denied.
 - Permissions are denied except clipboard writes; system notifications come

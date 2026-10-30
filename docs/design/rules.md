@@ -262,6 +262,17 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   page names the product for each. Rail icons: 主页 House, 建议 Lightbulb,
   看板 Columns3, 插件 Blocks. Artifact is the one exception: it uses
   Mikka's own stacked-cards icon (R-56), never lucide Copy or Library.
+- **R-74** A named thing always carries its icon. Wherever the UI shows a
+  device, a coding agent (harness), a model, a connected app or a provider
+  account by name — rows, triggers, menu items, chips, thread headers,
+  status lines — the icon comes first, then the name. Devices use their
+  type (laptop, server = lucide Server, 云端托管 = cloud) plus the online dot;
+  agents use their own brand mark (Claude Code, Codex, Cursor…); models use
+  their provider's mark (Claude, OpenAI…); apps use the R-70 brand tile.
+  Brand marks are the colored logo on its own, never set in a white disc or
+  a bordered circle. 自动 uses one neutral icon so lists line up. Name-only
+  text for these things fails review. Build them with the shared label
+  components, not by hand.
 - **R-72** Two kinds of work. A real task, such as coding, is a thread: a full
   coding agent (Claude Code, Codex) does it, and it is listed in the thread
   list. A web task is the bot's own: the bot runs it as a sub-agent (分身) with
