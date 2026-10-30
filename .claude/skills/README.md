@@ -1,56 +1,38 @@
 # Project skills
 
-These are vendored community Agent Skills, checked into the repository so
-Claude Code (and other compatible agents) see the same operating standards on
-every clone. They are used as review and implementation checklists; they are
-not application runtime code.
+Vendored community Agent Skills, used as review and implementation checklists.
+They are not application runtime code and contain no scripts. `AGENTS.md`,
+`docs/design/` (including R-40 and the one Settings surface) and the release
+and test rules always win over a skill; the example code and copy in a skill
+are illustrations, not Mikka's components or wording.
 
-Vendored on 2026-10-29 from these pinned commits:
+Vendored on 2026-10-29, unmodified, from these pinned commits:
 
-| Source | Commit | License | Vendored skills |
+| Source | Commit | License | Skills |
 | --- | --- | --- | --- |
-| [obra/superpowers](https://github.com/obra/superpowers) | `2ce8aa15d05bd57213e6f746f953aafb7ded7a8b` | MIT | All 15 skills under `skills/` |
-| [AllThingsSmitty/proven-skills](https://github.com/AllThingsSmitty/proven-skills) | `5b74885f7e0568565c04534831cb73eaffd4c0e4` | MIT | `debug`, `incident`, `perf`, `security`, `db-review`, `arch-review`, `node-ops` |
-| [param087/saas-ui-skills](https://github.com/param087/saas-ui-skills) | `4017eaf1e1167a56a5271839053d888faeb1f44a` | MIT | All 15 SaaS UI skills |
-| [mbennell/claude-field-kit](https://github.com/mbennell/claude-field-kit) | `58da5e874ccb5261fd41af75c1d2c12456e36017` | MIT | `saas-design` |
-| [anthropics/skills](https://github.com/anthropics/skills) | `ca45fc496a3436251f191354091d557da31c15b5` | Apache-2.0 | `frontend-design` |
-| [guia-matthieu/clawfu-skills](https://github.com/guia-matthieu/clawfu-skills) | `4108f5c010ccaa8b5707fa05ca1d888ae167e548` | MIT | `yc-pitch-deck` |
-| [alexyc9381/vc-roundtable-skill](https://github.com/alexyc9381/vc-roundtable-skill) | `d338fbbb54baf7b2646279a315d6227a3a404ebe` | MIT | `roundtable` |
+| [AllThingsSmitty/proven-skills](https://github.com/AllThingsSmitty/proven-skills) | `5b74885f7e0568565c04534831cb73eaffd4c0e4` | MIT, (c) 2026 Matt Smith | `debug`, `incident`, `perf`, `node-ops`, `security`, `db-review` |
+| [param087/saas-ui-skills](https://github.com/param087/saas-ui-skills) | `4017eaf1e1167a56a5271839053d888faeb1f44a` | MIT, (c) 2026 Param Bhavsar | `settings-pages` |
 
 Full license texts are in [`../skill-licenses/`](../skill-licenses/).
 
 ## Which skill to use
 
-- **Any bug or failing test**: `systematic-debugging` first (root cause before
-  fixes). Use `debug` as a second framing checklist; do not propose a fix while
-  the root cause is still unknown.
-- **Production incident**: `incident` (triage, blast radius, mitigation,
-  communication, post-mortem), then `systematic-debugging`.
-- **Performance work**: `perf`; use `node-ops` for Next.js/Node production
-  readiness and `db-review` for Postgres queries and indexes.
-- **Architecture / security review**: `arch-review`, `security`.
-- **Settings UI**: `settings-pages` is the primary IA/save-model checklist.
-  `forms-and-validation`, `empty-and-loading-states`, `accessible-components`,
-  `design-tokens-theming` and `navigation-patterns` cover the details.
-- **Broader SaaS UI**: `saas-design` (component patterns) and
-  `frontend-design` (visual direction/craft).
-- **YC / investor roadshow**: `yc-pitch-deck` for the 10–15 slide narrative and
-  a timed 2-minute Demo Day script. Use `roundtable` only for a private
-  rehearsal: it spawns 15–17 sub-agents to role-play VC partners and writes
-  its report under `.roundtable/`; it never contacts real investors.
-- **Writing or reviewing a skill**: `writing-skills`. It is the standard used
-  for the skill audit; run the validator and the trigger/no-trigger checks it
-  describes before accepting a new skill.
+- **Bug or failing test**: `debug` (root cause before a fix).
+- **Production incident**: `incident`, then `debug`.
+- **Performance / production readiness**: `perf`, `node-ops`; `db-review` for
+  Postgres queries, indexes and migrations.
+- **Trust-boundary review**: `security`.
+- **Settings**: `settings-pages` for section structure, save model, unsaved
+  changes and destructive confirmations. It mentions sibling skills
+  (`forms-and-validation`, `data-tables`, `modals-and-dialogs`,
+  `billing-and-pricing`) that were deliberately not vendored.
 
-## Operating rules
+Why the other skills were removed is recorded in
+[`docs/audits/2026-10-29-saas-skill-review.md`](../../docs/audits/2026-10-29-saas-skill-review.md).
 
-1. Read the skill's `SKILL.md` before using it; references are loaded on
-   demand.
-2. Skills may contain scripts. They are not run by the application, CI or
-   install process. Inspect a script before executing it, and never let it
-   read production credentials or customer data.
-3. A skill is guidance, not authority to bypass repository rules: the isolated
-   `_e2e` database, secret handling, one Settings surface, UI policy and
-   release process still apply.
-4. To update a skill, replace the whole directory from the upstream pinned
-   commit, update the table above, and rerun the skill audit.
+## Updating
+
+Replace a whole skill directory from a new pinned upstream commit, update the
+table above, and keep the upstream license in `../skill-licenses/`. Do not add
+a skill that ships executable scripts or tells the agent to invoke skills
+unconditionally.

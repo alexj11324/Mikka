@@ -5,7 +5,8 @@ change. Method: `systematic-debugging` (root cause first),
 `incident`/`perf`/`node-ops` (production readiness), `security` (trust
 boundaries), `db-review` (queries/indexes), `arch-review` (coupling), and the
 `settings-pages` / `forms-and-validation` / `empty-and-loading-states`
-checklists.
+checklists. Several of these were later removed from the repository; see
+[Vendored skills: kept and removed](#vendored-skills-kept-and-removed).
 
 This is a code and design review, not a penetration test or a load test. It did
 not use production data or credentials.
@@ -129,3 +130,42 @@ autosave once the value is valid; do not mix both models on the same row.
 5. Add the polling index migration after `EXPLAIN` confirmation.
 6. Add confirmations for subscription removal and memory deletion; add the
    issue-prefix dirty guard.
+
+## Vendored skills: kept and removed
+
+The first version of this change vendored about 40 skills. Only skills that
+help build and operate Mikka, ship no executable scripts and do not compete
+with `AGENTS.md` were kept. All kept skills are MIT-licensed and unmodified;
+their sources, commits and license texts are in `.claude/skills/README.md` and
+`.claude/skill-licenses/`.
+
+Kept (7):
+
+| Skill | Why |
+| --- | --- |
+| `debug` | Root cause before a fix; one file, no dependencies on other skills. |
+| `incident` | Triage, mitigation and runbook steps for finding 4. |
+| `perf` | Latency and N+1 work, e.g. the desktop polling path (finding 7). |
+| `node-ops` | Next.js/Node readiness, health checks and shutdown (finding 4). |
+| `security` | Trust-boundary review: CSP, rate limits, OAuth (findings 1–3, 5). |
+| `db-review` | Indexes and migrations with `EXPLAIN` evidence (finding 7). |
+| `settings-pages` | Save model, unsaved changes and destructive confirms (findings 8–9). |
+
+Removed:
+
+| Skill(s) | Why |
+| --- | --- |
+| `using-superpowers` | Requires invoking a skill on any 1% chance before every response; conflicts with the `AGENTS.md` workflow. |
+| `brainstorming` | "You MUST use this before any creative work" over-triggers; ships a local server (`start-server.sh`, `server.cjs`). |
+| `yc-pitch-deck`, `roundtable` | Fundraising, not product work; `roundtable` ships `table.py`. |
+| `systematic-debugging` | Duplicates `debug`; ships `find-polluter.sh` and depends on the removed superpowers skills. |
+| `writing-plans`, `executing-plans`, `subagent-driven-development`, `dispatching-parallel-agents`, `using-git-worktrees`, `finishing-a-development-branch`, `test-driven-development`, `verification-before-completion`, `requesting-code-review`, `receiving-code-review` | Generic agent workflow that competes with `AGENTS.md`, `CONTRIBUTING.md` and the review triage rule; `executing-plans` ships scripts. |
+| `writing-skills`, `diagnosing-superpowers` | Tooling for authoring skills or debugging superpowers sessions, not Mikka; `writing-skills` ships `render-graphs.js`. |
+| `arch-review` | Distributed-service design; Mikka's coupling question (finding 6) is a release-order rule, not a service split. |
+| `forms-and-validation` | Prescribes react-hook-form, which Mikka does not use. |
+| `empty-and-loading-states` | Example copy ("Create your first…") contradicts R-40. |
+| `frontend-design`, `saas-design`, `design-tokens-theming`, `accessible-components`, `component-architecture`, `navigation-patterns`, `responsive-layout`, `modals-and-dialogs`, `notifications-and-toasts` | Generic UI direction that competes with `docs/design/`, `ui-policy.json` and the component list, which already decide these. |
+| `auth-screens`, `billing-and-pricing`, `dashboard-layout`, `data-tables`, `onboarding-flows` | Generic SaaS screens Mikka does not build or already specifies in `docs/design/`. |
+
+The `AGENTS.md` line only points to the kept checklists; it does not require
+invoking a skill.

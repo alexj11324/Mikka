@@ -1,6 +1,6 @@
 # Mikka development
 
-- Project skills live in `.claude/skills/`. Use `systematic-debugging` before a fix, `incident`/`perf` for production work, `security` for trust-boundary reviews, and `settings-pages` for Settings IA. The vendored sources, licenses and precedence are in `.claude/skills/README.md`; never run a bundled skill script without reading it first.
+- `.claude/skills/` holds a few vendored checklists (`debug`, `incident`, `perf`, `security`, `settings-pages`, …); use one when it fits the task. They never override these rules or `docs/design/`; see `.claude/skills/README.md`.
 - Before any design, spec or UI work, read `docs/design/README.md`. It sets which source wins and points to the rules, component list, decision log and spec template. Run `docs/review-checklist.md` before showing UI to anyone; new decisions from Alex go into `docs/design/decisions.md` the same day.
 - UI copy has no filler (R-40). Before any string reaches a screen, a Figma frame, a spec or a subagent brief, delete it and look again; if the screen still says the same thing, leave it out. Sheets and dialogs have no subtitle; reassurance is a mark (🔒 Secured by Mikka), not a sentence; status lines name the state only. A reviewer fails a frame or PR that has such a sentence, even when the brief asked for it.
 - Bot, thread and chat mean what `docs/design/glossary.md` says. The left column is the bot list (bots chat with people and dispatch tasks); the right column is the thread list (threads do the work, each with its own name). There is no conversation list.
