@@ -38,6 +38,9 @@ export interface FactoryDelivery {
    * Same row as deploymentEnvironment: the newest succeeded publication of the current candidate.
    * previewUrl is that row's receipt.verifiedTarget.reference (provider-confirmed), kept only when it
    * is https; otherwise null (no fallback to an older row).
+   * Despite the name, this is the URL of the latest successful publication, which may be a preview
+   * or a production deployment; deploymentEnvironment tells them apart. The name is kept because
+   * Frontend already reads it.
    */
   previewUrl: string | null;
   /** Neon branch of the run. Mikka does not record one anywhere yet, so this is always null. */
