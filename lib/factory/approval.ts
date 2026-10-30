@@ -203,14 +203,10 @@ async function boundApproval(
   return a;
 }
 
-/** The task's evidence, which must still be exactly what was approved. */
+/** Evidence is for display; only replacement of the candidate invalidates approval. */
 async function approvedEvidence(tx: PoolClient, task: FactoryTask, a: any) {
   const current = await approvalEvidence(tx, task);
-  if (
-    current.evidenceDigest !== a.evidenceDigest ||
-    digest(current.manifest.candidate) !== digest(a.candidate) ||
-    digest(current.manifest) !== digest(a.evidence)
-  )
+  if (digest(current.manifest.candidate) !== digest(a.candidate))
     fail("factoryApprovalInvalid");
   return current;
 }
@@ -536,20 +532,8 @@ export function createFactoryApprovals(
           !["pending", "waiting"].includes(task.status)
         )
           fail("factoryTransition");
-        const current = await approvalEvidence(tx, task),
-          evidenceReadId = randomUUID();
-        await tx.query(
-          'INSERT INTO factory_evidence_reads (id,"taskId","userId","principalId",binding,"evidenceDigest") VALUES ($1,$2,$3,$4,$5,$6)',
-          [
-            evidenceReadId,
-            task.id,
-            actor.userId,
-            principalId(actor),
-            JSON.stringify(bindingOf(task)),
-            current.evidenceDigest,
-          ],
-        );
-        return { binding: bindingOf(task), ...current, evidenceReadId };
+        const current = await approvalEvidence(tx, task);
+        return { binding: bindingOf(task), ...current };
       });
     },
     async approve(actor: FactoryActor, input: unknown) {
@@ -582,24 +566,7 @@ export function createFactoryApprovals(
         )
           fail("factoryTransition");
         const current = await approvalEvidence(tx, task);
-        const {
-          rows: [read],
-        } = await tx.query(
-          `SELECT id FROM factory_evidence_reads WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "principalId"=$4 AND binding=$5::jsonb AND "evidenceDigest"=$6`,
-          [
-            req.evidenceReadId,
-            task.id,
-            actor.userId,
-            principalId(actor),
-            JSON.stringify(req.binding),
-            current.evidenceDigest,
-          ],
-        );
-        if (
-          !read ||
-          req.evidenceDigest !== current.evidenceDigest ||
-          digest(req.candidate) !== digest(current.manifest.candidate)
-        )
+        if (digest(req.candidate) !== digest(current.manifest.candidate))
           fail("factoryEvidenceMismatch");
         const {
           rows: [expiry],
@@ -641,7 +608,7 @@ export function createFactoryApprovals(
             JSON.stringify(req.candidate),
             req.action,
             req.target,
-            current.evidenceDigest,
+            null,
             JSON.stringify(current.manifest),
             task.revision,
             req.expiresAt,

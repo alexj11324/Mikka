@@ -239,7 +239,6 @@ export async function factoryRunAuthorityCases(
       target: local.target,
       targetEnvironment: local.environment,
       evidenceDigest: evidence.evidenceDigest,
-      evidenceReadId: evidence.evidenceReadId,
     };
     const scope = {
       ownerId: actor.userId,

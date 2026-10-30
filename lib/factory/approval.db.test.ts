@@ -48,7 +48,15 @@ test(
             service = f.service([f.adapter], null),
             before = provider.posts();
           delete human.decisionCredentialId;
+          delete human.evidenceDigest;
+          delete human.evidenceReadId;
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_evidence_reads')).rows[0].n, 0);
+          // GET evidence remains available for display and never writes a receipt.
+          await service.evidence(actor, x.task.id);
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_evidence_reads')).rows[0].n, 0);
           const approved = await service.approve(actor, human);
+          // Display content can change without invalidating the approved commit.
+          await pool.query(`UPDATE agent_runs SET report=jsonb_set(report,'{summary}','"updated display"') WHERE "issueId"=$1`, [x.task.issueId]);
           const published = await service.publish(actor, {
             ...approved,
             eventId: randomUUID(),
@@ -65,6 +73,7 @@ test(
             )
           ).rows[0];
           assert.equal(grant.humanSessionId, actor.sessionId);
+          assert.equal((await pool.query('SELECT "evidenceDigest" FROM factory_approvals WHERE id=$1', [approved.approvalId])).rows[0].evidenceDigest, null);
           assert.equal(grant.decisionCredentialId, null);
           assert.equal(grant.decisionScope, null);
           assert.equal(grant.decisionEvidence, null);
@@ -343,8 +352,6 @@ test(
             { candidate: { ...x.candidate, sha: "b".repeat(40) } },
             { candidate: { ...x.candidate, scope: "expanded" } },
             { candidate: { ...x.candidate, environment: "production" } },
-            { evidenceDigest: "0".repeat(64) },
-            { evidenceReadId: randomUUID() },
           ])
             await rejects(
               () => s.approve(actor, { ...x.approval, ...patch }),
