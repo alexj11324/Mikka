@@ -1,7 +1,7 @@
 import 'server-only'
 // 4e2: workspace secrets at sandbox runtime. Everything here is gated by MIKKA_BYO_E2B_KEY
 // (off by default; turning it on needs Alex). Flag off = no injection, no masking, today's behaviour.
-import { and, eq, inArray, or } from 'drizzle-orm'
+import { and, eq, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaceSecrets } from '@/lib/db/secrets-schema'
 import { openSecret, secretAad, SecretsKeyMissingError } from './crypto'
@@ -16,15 +16,9 @@ const guardSecretsDb: typeof import('./store').guardSecretsDb = async (work, onU
 type Env = Record<string, string | undefined>
 export interface RuntimeSecret { id?: string; name: string; kind: 'secret' | 'env'; value: string }
 
-/** Sandboxes run as production: only environment 'all' and 'production' are injected (preview/development never). */
-export const RUNTIME_ENVIRONMENTS = ['all', 'production'] as const
-/** Masking scope (decided): every injectable value is masked, whatever its environment. Like GitHub
- * Actions, masking depends only on whether a value can be injected, never on production/preview/development. */
-export const MASKED_ENVIRONMENTS = ['all', 'production', 'preview', 'development'] as const
-
-/** Workspace-scoped secrets and env vars for environment all/production, decrypted. Repository-scoped rows are not included yet. */
+/** Workspace-scoped secrets and env vars, decrypted. Repository-scoped rows are not included. */
 export async function loadWorkspaceRuntimeSecrets(workspaceId: string, env: Env = process.env): Promise<RuntimeSecret[]> {
-  const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), eq(workspaceSecrets.scopeType, 'workspace'), inArray(workspaceSecrets.environment, [...RUNTIME_ENVIRONMENTS]))))
+  const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), eq(workspaceSecrets.scopeType, 'workspace'))))
   return rows.map(row => {
     try { return { id: row.id, name: row.name, kind: row.kind, value: openSecret(row, secretAad(row), env) } } catch (error) {
       if (error instanceof SecretsKeyMissingError) throw new E2BKeyError('e2b_unavailable', 'secrets key missing')
@@ -58,9 +52,6 @@ function openRuntime(row: typeof workspaceSecrets.$inferSelect, env: Env): Runti
   }
 }
 
-export { resolveRunSecretsEnvironment, type RunSecretsEnvironment } from './run-environment'
-import type { RunSecretsEnvironment } from './run-environment'
-
 /**
  * owner/repo of a run's GitHub remote, normalized like #436's repositoryRef (lowercase). Null for
  * anything that is not a github.com remote, so a lookalike host can never match a repo-scoped secret.
@@ -75,25 +66,25 @@ export function remoteRepositoryRef(remoteUrl: string | null | undefined): strin
 
 /**
  * 4e3: the explicit user variable set for one task. Workspace-scoped rows plus the repository-scoped rows
- * of exactly the task's linked repo (lowercase compare); on a name clash the repository value wins, and a
- * value for the specific environment beats 'all'. Environment: 'all' + the run's environment.
+ * of exactly the task's linked repo (lowercase compare); on a name clash the repository value wins.
+ * No environment dimension (like Codex cloud environments): every value of the scope reaches the task.
  */
-export async function loadTaskRuntimeSecrets(workspaceId: string, repository: string | null, environment: RunSecretsEnvironment, env: Env = process.env): Promise<RuntimeSecret[]> {
+export async function loadTaskRuntimeSecrets(workspaceId: string, repository: string | null, env: Env = process.env): Promise<RuntimeSecret[]> {
   const repo = repository?.toLowerCase() ?? null
   const scope = repo
     ? or(eq(workspaceSecrets.scopeType, 'workspace'), and(eq(workspaceSecrets.scopeType, 'repository'), eq(workspaceSecrets.scopeRef, repo)))
     : eq(workspaceSecrets.scopeType, 'workspace')
-  const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), scope, inArray(workspaceSecrets.environment, ['all', environment]))))
-  const rank = (row: typeof rows[number]) => (row.scopeType === 'repository' ? 2 : 0) + (row.environment === environment ? 1 : 0)
+  const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), scope)))
+  const rank = (row: typeof rows[number]) => row.scopeType === 'repository' ? 1 : 0
   const merged = new Map<string, RuntimeSecret>()
   for (const row of [...rows].sort((a, b) => rank(a) - rank(b))) merged.set(row.name, openRuntime(row, env))
   return [...merged.values()]
 }
 
 /** Task env (NAME -> value) for the claim response. {} when the flag is off. Reserved names are skipped and audited by name. */
-export async function taskSecretEnv(workspaceId: string, repository: string | null, environment: RunSecretsEnvironment, env: Env = process.env, skipped?: { actorId: string; audit: SecretAuditHook }): Promise<Record<string, string>> {
+export async function taskSecretEnv(workspaceId: string, repository: string | null, env: Env = process.env, skipped?: { actorId: string; audit: SecretAuditHook }): Promise<Record<string, string>> {
   if (!byoE2BKeyEnabled(env)) return {}
-  return reservedInjectionFilter(workspaceId, await loadTaskRuntimeSecrets(workspaceId, repository, environment, env), skipped)
+  return reservedInjectionFilter(workspaceId, await loadTaskRuntimeSecrets(workspaceId, repository, env), skipped)
 }
 
 /** #438 C: the workspace's own E2B key is masked like a secret. Absent key = nothing to add. */
@@ -107,9 +98,8 @@ async function workspaceE2BKeySecret(workspaceId: string, env: Env): Promise<{ n
 /** Masker for persisted output. Identity when the flag is off or the workspace has no maskable secret. Env vars (kind='env') are not masked: they are plain config shown in settings. */
 export async function workspaceSecretMasker(workspaceId: string | null | undefined, env: Env = process.env): Promise<Masker> {
   if (!workspaceId || !byoE2BKeyEnabled(env)) return identityMasker
-  // 4e3: every secret a task of this workspace can receive, including all repository-scoped ones and the
-  // preview environment (preview runs now receive preview values). 'development' never reaches a sandbox.
-  const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), eq(workspaceSecrets.kind, 'secret'), inArray(workspaceSecrets.environment, [...MASKED_ENVIRONMENTS]))))
+  // 4e3: every secret a task of this workspace can receive, including all repository-scoped ones.
+  const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), eq(workspaceSecrets.kind, 'secret'))))
   const e2bKey = await workspaceE2BKeySecret(workspaceId, env)
   return createSecretMasker([...rows.map(row => openRuntime(row, env)), ...e2bKey])
 }

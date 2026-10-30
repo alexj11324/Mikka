@@ -1,6 +1,6 @@
 // Pure input rules for 设置 › 密钥与环境 (no DB, no server-only) so UI and tests share them.
 import { z } from 'zod'
-import { EGRESS_MODES, SECRET_ENVIRONMENTS } from '@/lib/db/secrets-schema'
+import { EGRESS_MODES } from '@/lib/db/secrets-schema'
 
 export const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/
 /**
@@ -26,10 +26,6 @@ export const secretScope = z.discriminatedUnion('type', [
 ])
 export type SecretScope = z.infer<typeof secretScope>
 export type SecretScopeType = SecretScope['type']
-export { SECRET_ENVIRONMENTS }
-export type SecretEnvironment = (typeof SECRET_ENVIRONMENTS)[number]
-/** 'all' = every environment (and therefore production too). */
-export const secretEnvironment = z.enum(SECRET_ENVIRONMENTS)
 
 /** D6 新建: kind is chosen here only; edits (SEC-15～17) cannot change it. */
 export const createSecretInput = z.object({
@@ -37,10 +33,9 @@ export const createSecretInput = z.object({
   kind: z.enum(['secret', 'env']),
   value,
   scope: secretScope.default({ type: 'workspace' }),
-  environment: secretEnvironment.default('all'),
 }).strict()
-/** SEC-15～17 编辑: new value; scope and environment may move too (omitted = unchanged). Kind and name are fixed. */
-export const replaceSecretInput = z.object({ id: z.uuid(), value, scope: secretScope.optional(), environment: secretEnvironment.optional() }).strict()
+/** SEC-15～17 编辑: new value; scope may move too (omitted = unchanged). Kind and name are fixed. */
+export const replaceSecretInput = z.object({ id: z.uuid(), value, scope: secretScope.optional() }).strict()
 export const deleteSecretInput = z.object({ id: z.uuid() }).strict()
 
 export const scopeColumns = (scope: SecretScope) => scope.type === 'workspace'

@@ -6,7 +6,7 @@ import { openSecret, sealSecret, secretAad, secretsKey, SecretsKeyMissingError }
 import { checkEgressDomains, createSecretInput, isReservedEnvName, updateEgressInput } from './format'
 
 const env = { WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') }
-const row = { workspaceId: '00000000-0000-4000-8000-000000000001', kind: 'secret', scopeType: 'workspace', scopeRef: '', environment: 'all', name: 'API_TOKEN' }
+const row = { workspaceId: '00000000-0000-4000-8000-000000000001', kind: 'secret', scopeType: 'workspace', scopeRef: '', name: 'API_TOKEN' }
 
 test('missing or malformed key fails closed', () => {
   for (const bad of [undefined, '', 'short', 'z'.repeat(64), randomBytes(16).toString('hex')])
@@ -24,7 +24,7 @@ test('round trip; ciphertext hides the value and is bound to its row', () => {
   assert.equal(openSecret(sealed, secretAad(row), env), value)
   assert.notEqual(sealSecret(value, secretAad(row), env).iv, sealed.iv)
   assert.throws(() => openSecret(sealed, secretAad({ ...row, name: 'OTHER' }), env))
-  assert.throws(() => openSecret(sealed, secretAad({ ...row, environment: 'development' }), env), 'environment is bound too')
+  assert.throws(() => openSecret(sealed, secretAad({ ...row, scopeType: 'repository', scopeRef: 'o/r' }), env), 'scope is bound too')
   assert.throws(() => openSecret(sealed, secretAad(row), { WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') }))
 })
 
