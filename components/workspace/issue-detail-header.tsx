@@ -27,7 +27,7 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
     <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
       <SidebarTrigger className="-ml-1" aria-label={t('toggleSidebar')} />
       <Separator orientation="vertical" className="mr-1 data-vertical:h-4 data-vertical:self-auto" />
-      <Breadcrumb aria-label={t('breadcrumb')}><BreadcrumbList className="flex-nowrap">
+      <Breadcrumb className="min-w-0" aria-label={t('breadcrumb')}><BreadcrumbList className="min-w-0 flex-nowrap">
         <BreadcrumbItem className="@2xl/header:hidden">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label={tDetail('breadcrumbMore')} />}><BreadcrumbEllipsis /></DropdownMenuTrigger>
