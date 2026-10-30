@@ -12,7 +12,7 @@ import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { NotificationCenter } from './notification-center'
-import { appExternalUrl, desktopAuthFinishUrl, desktopAuthState, externalUrl, navigationDecision } from './security'
+import { appExternalUrl, desktopAuthState, externalUrl, navigationDecision } from './security'
 
 const APP_URL = __MIKKA_APP_URL__
 const APP_VERSION = __MIKKA_APP_VERSION__
