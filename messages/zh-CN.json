@@ -848,9 +848,11 @@
     },
     "remove": {
       "title": "移除「{name}」？",
-      "description": "它的 daemon 凭证会立即失效，不能再接任务。机器上的 daemon 不会被卸载。",
       "cancel": "取消",
-      "confirm": "移除"
+      "confirm": "移除",
+      "uninstall": "也会卸载 {name} 上的 daemon，它的凭证立即失效。",
+      "offline": "{name} 离线，没法卸载上面的 daemon；它的凭证立即失效，不再接任务。",
+      "uninstalling": "正在卸载 {name} 上的 daemon"
     },
     "ssh": {
       "title": "添加设备",
@@ -879,7 +881,8 @@
       },
       "hide": "关闭",
       "retry": "重试",
-      "done": "完成"
+      "done": "完成",
+      "cancelled": "已取消"
     }
   },
   "Workspace": {

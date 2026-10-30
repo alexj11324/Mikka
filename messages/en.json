@@ -848,9 +848,11 @@
     },
     "remove": {
       "title": "Remove “{name}”?",
-      "description": "Its daemon credentials stop working at once and it gets no more work. The daemon is not uninstalled from the machine.",
       "cancel": "Cancel",
-      "confirm": "Remove"
+      "confirm": "Remove",
+      "uninstall": "This also uninstalls the daemon on {name}; its credentials stop working at once.",
+      "offline": "{name} is offline, so its daemon can’t be uninstalled; its credentials stop working at once and it gets no more work.",
+      "uninstalling": "Uninstalling the daemon on {name}"
     },
     "ssh": {
       "title": "Add device",
@@ -879,7 +881,8 @@
       },
       "hide": "Close",
       "retry": "Retry",
-      "done": "Done"
+      "done": "Done",
+      "cancelled": "Cancelled"
     }
   },
   "Workspace": {
