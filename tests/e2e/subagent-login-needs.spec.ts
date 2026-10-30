@@ -20,6 +20,8 @@ async function stream(page: Page, updates: Update[]) {
 test('a sub-agent login need renders the card against its own credential API', async ({ page }) => {
   await stream(page, [
     {},
+    {},
+    { subagentId: '00000000-0000-4000-8000-0000000000a5', state: 'running' },
     { subagentId: OTHER, needs: { kind: 'code', site: 'github.com' } },
     { subagentId: '00000000-0000-4000-8000-0000000000a3', botId: '00000000-0000-4000-8000-0000000000ff' },
     { subagentId: '00000000-0000-4000-8000-0000000000a4', needs: { kind: 'login', site: 'javascript:alert(1)' } },
@@ -34,13 +36,14 @@ test('a sub-agent login need renders the card against its own credential API', a
   await page.goto('/mikka/zh-CN/preview/subagent-login')
   const needs = page.getByTestId('subagent-login-needs')
   await expect(needs.getByRole('button', { name: '登录 dash.cloudflare.com' })).toBeVisible()
-  // Only the one actionable login need: no card for code needs, other bots, or non-http sites.
+  // Only the one actionable login need: no card for a repeated event, a still-running sub-agent, code needs, other bots, or non-http sites.
   await expect(needs.getByRole('button', { name: /^登录 / })).toHaveCount(1)
   await needs.getByRole('button', { name: '登录 dash.cloudflare.com' }).click()
   await page.getByRole('textbox', { name: '邮箱' }).fill('alex@mikka.app')
   await page.getByLabel('密码', { exact: true }).fill(SECRET)
   await page.getByRole('button', { name: '登录', exact: true }).click()
   await expect(page.getByTestId('credential-login-done')).toContainText('已登录 dash.cloudflare.com')
+  await expect(needs).toHaveAttribute('data-signed-in', '1')
   expect(posts.map(post => new URL(post.url).pathname)).toEqual([`${PREFIX}/challenge`, PREFIX])
   expect(JSON.parse(posts[0].body)).toEqual({ site: 'https://dash.cloudflare.com' })
   expect(JSON.parse(posts[1].body)).toMatchObject({ origin: 'https://dash.cloudflare.com', username: 'alex@mikka.app', password: SECRET })

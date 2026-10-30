@@ -25,3 +25,14 @@ test('only the latest needs_you + login update of this bot shows a card', () => 
   state = applySubagentUpdate(state, update({ state: 'running', step: 'Signing in', needs: null }))
   assert.deepEqual(loginNeeds(state, BOT), [], 'a later update clears the card')
 })
+
+test('a login need while the sub-agent is still running is not a card', () => {
+  const state = applySubagentUpdate(new Map(), update({ state: 'running', needs: { kind: 'login', site: 'dash.cloudflare.com' } }))
+  assert.deepEqual(loginNeeds(state, BOT), [])
+})
+
+test('the same update delivered twice (SSE replay) still shows one card', () => {
+  let state = applySubagentUpdate(new Map(), update({}))
+  state = applySubagentUpdate(state, update({}))
+  assert.equal(loginNeeds(state, BOT).length, 1)
+})

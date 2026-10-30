@@ -1,5 +1,6 @@
 import { subagentEventSchema } from '@mikka/protocol/subagent'
 import { withBasePath } from '@/lib/base-path'
+import { listenComputerStream } from '@/lib/computer/event-stream'
 
 export type SubagentUpdate = ReturnType<typeof subagentEventSchema.shape.data.parse>
 export type LoginNeed = { subagentId: string; botId: string; origin: string; name: string; prefix: string }
@@ -31,16 +32,12 @@ export function loginNeeds(state: ReadonlyMap<string, SubagentUpdate>, botId: st
   return needs
 }
 
-/** The SSE stream sends `event: data-subagent` with the event's `data` as the payload. */
+/** Shares the tab's one /api/computer/events stream. It sends `event: data-subagent` with the event's `data` as the payload. */
 export function subscribeSubagentUpdates(listener: (update: SubagentUpdate) => void): () => void {
-  if (typeof EventSource === 'undefined') return () => {}
-  const source = new EventSource(withBasePath('/api/computer/events'), { withCredentials: true })
-  source.addEventListener('data-subagent', message => {
-    const parsed = subagentEventSchema.shape.data.safeParse(safeJson((message as MessageEvent<string>).data))
+  return listenComputerStream('data-subagent', data => {
+    const parsed = subagentEventSchema.shape.data.safeParse(safeJson(data))
     if (parsed.success) listener(parsed.data)
   })
-  source.onerror = () => { if (source.readyState === EventSource.CLOSED) source.close() }
-  return () => source.close()
 }
 
 function safeJson(text: string): unknown {
