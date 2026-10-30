@@ -21,6 +21,7 @@ function params(event: AuditEventView, word: (key: string) => string | null) {
   for (const [key, value] of Object.entries(event.metadata ?? {})) if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') values[key] = String(value)
   if (event.action === 'member.role_changed' && values.newRole) values.newRole = word(`roles.${values.newRole}`) ?? values.newRole
   if (event.action === 'integration.permission_changed' && values.to) values.to = word(`access.${values.to}`) ?? values.to
+  if (event.action === 'integration.permission_changed' && values.integration) values.integration = word(`apps.${values.integration}`) ?? values.integration
   return values
 }
 

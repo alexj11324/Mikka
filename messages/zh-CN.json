@@ -2216,6 +2216,12 @@
         "read": "只读",
         "write": "可写",
         "none": "不可用"
+      },
+      "apps": {
+        "gmail": "Gmail",
+        "googlecalendar": "Google 日历",
+        "slack": "Slack",
+        "notion": "Notion"
       }
     },
     "appPolicy": {
