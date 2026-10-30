@@ -66,3 +66,55 @@ test("POST /api/factory/tasks/route routes once, replays, masks and is owner-onl
     await admin.end();
   }
 });
+
+test("POST /api/factory/tasks/route under concurrency creates one task per source and replays consistently", { skip: !url, timeout: 180000 }, async () => {
+  const admin = new Pool({ connectionString: url, max: 1 });
+  const database = `fac_route_cc_${randomUUID().replaceAll("-", "")}_e2e`;
+  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
+  const target = new URL(url!);
+  target.pathname = `/${database}`;
+  const N = 8;
+  const pool = new Pool({ connectionString: target.toString(), max: N + 2 });
+  try {
+    const dir = new URL("../../drizzle/", import.meta.url);
+    for (const f of orderMigrations((await readdir(dir)).filter((f) => f.endsWith(".sql"))))
+      await pool.query(await readFile(new URL(f, dir), "utf8"));
+    await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','owner@example.invalid',true,now(),now())`);
+    const authorize = async (user: string, issue: string, tx: PoolClient) =>
+      (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, user])).rowCount === 1;
+    const store = createFactoryStore(pool, authorize, null, { independent: factoryCheckIndependent });
+    const route = async () => (userId: string, input: unknown) => store.route(userId, input);
+    const req = (body: unknown) => ({ userId: "owner", origin: "https://app.example", url: "https://app.example/api/factory/tasks/route", body, enabled: true });
+    const fixture = async () => {
+      const issueId = randomUUID(), sourceEventId = randomUUID();
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId]);
+      await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [sourceEventId, `fixture-${sourceEventId}`]);
+      return { issueId, eventId: randomUUID(), sourceEventId, rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false };
+    };
+    const tasks = async (issueId: string) => (await pool.query('SELECT id FROM factory_tasks WHERE "issueId"=$1', [issueId])).rows.map((r) => r.id as string);
+
+    // N identical requests at once: every one answers 200 with the same snapshot, one task exists.
+    const same = await fixture();
+    const identical = await Promise.all(Array.from({ length: N }, () => handleFactoryRoute(route, req(same))));
+    for (const r of identical) assert.deepEqual(r, identical[0], "identical concurrent requests return one consistent snapshot");
+    assert.equal(identical[0].status, 200);
+    assert.deepEqual(await tasks(same.issueId), [(identical[0].body as { taskId: string }).taskId]);
+    assert.deepEqual(await handleFactoryRoute(route, req(same)), identical[0], "a later replay matches the concurrent winner");
+
+    // N different eventIds for one source at once: exactly one 200, the rest factoryRouteExists.
+    const base = await fixture();
+    const different = await Promise.all(Array.from({ length: N }, () => handleFactoryRoute(route, req({ ...base, eventId: randomUUID() }))));
+    const winners = different.filter((r) => r.status === 200);
+    assert.equal(winners.length, 1, "one route wins");
+    for (const r of different.filter((r) => r.status !== 200)) assert.deepEqual(r, { status: 409, body: { error: "factoryRouteExists" } });
+    assert.deepEqual(await tasks(base.issueId), [(winners[0].body as { taskId: string }).taskId]);
+  } finally {
+    await pool.end();
+    // pool.end() resolves before the backends exit; wait for 0 connections before the FORCE drop.
+    for (let i = 0; i < 100 && (await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount; i++)
+      await new Promise((r) => setTimeout(r, 50));
+    assert.equal((await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount, 0, "no connections left before drop");
+    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await admin.end();
+  }
+});
