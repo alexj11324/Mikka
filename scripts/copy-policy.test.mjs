@@ -1,14 +1,36 @@
-// Figma names the cloud machine 「E2B」; the old product name must not come back (FE-7).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { bannedHits, allowedPaths } from './copy-policy.mjs'
 
-const banned = ['Mikka', 'Cloud'].join(' ')
-
-test(`no 「${banned}」 in shipped copy, code or tests`, () => {
-  let hits = ''
+test('no old cloud machine name anywhere in the repo', () => {
+  let files = ''
   try {
-    hits = execFileSync('git', ['grep', '-n', '-F', banned, '--', 'messages', 'components', 'app', 'lib', 'hooks', 'tests', 'scripts', 'docs', ':!docs/design/decisions.md'], { encoding: 'utf8' })
+    files = execFileSync('git', ['grep', '-l', '-i', '-P', 'mikka[\\s_-]*(cloud|云)', '--', '.', ...allowedPaths.map(path => `:!${path}`)], { encoding: 'utf8' })
   } catch (error) { if (error.status !== 1) throw error }
-  assert.equal(hits, '', `use 「E2B」 (through i18n) instead:\n${hits}`)
+  const hits = files.split('\n').filter(Boolean).flatMap(file => bannedHits(readFileSync(file, 'utf8')).map(hit => `${file}:${hit.line}: ${hit.text}`))
+  assert.deepEqual(hits, [], 'use 「E2B」 (through i18n) instead')
+})
+
+test('zh and en messages name the cloud machine 「E2B」', () => {
+  for (const locale of ['zh-CN', 'en']) {
+    const text = readFileSync(`messages/${locale}.json`, 'utf8')
+    assert.deepEqual(bannedHits(text), [], locale)
+    assert.match(text, /"cloud": "E2B"/, locale)
+  }
+})
+
+test('negative examples are caught', () => {
+  for (const sample of ['Mikka Cloud', 'Mikka cloud', 'mikka CLOUD', 'Mikka  Cloud', 'Mikka\tCloud', 'Mikka云', 'Mikka 云端', 'MikkaCloud', 'mikka-cloud', 'mikka_cloud', '"cloud": "Mikka Cloud"', '用 Mikka 云运行'])
+    assert.equal(bannedHits(sample).length, 1, sample)
+  // A root README hit is caught by the same scan (README.md is not on the path allowlist).
+  assert.ok(!allowedPaths.some(path => path.toLowerCase().includes('readme')))
+  assert.equal(bannedHits('# Mikka\n\nRuns on Mikka Cloud.').length, 1)
+})
+
+test('identifiers, env vars and the decision log stay allowed', () => {
+  for (const sample of ['MIKKA_CLOUD_COMPUTER_TASKS=1', 'process.env.MIKKA_CLOUD_WORKER_SHA', "cloudComputer: 'mikka-cloud-computer',", '--name mikka-cloud-desktop-NEW_VERSION'])
+    assert.deepEqual(bannedHits(sample), [], sample)
+  assert.ok(allowedPaths.includes('docs/design/decisions.md'))
 })
