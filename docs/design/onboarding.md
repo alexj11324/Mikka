@@ -1,90 +1,96 @@
-# 首次引导（Onboarding，照 Comma 做）
+# 首次引导（Onboarding）
 
 - **Status:** draft（2026-10-30）
 - **Linear / GitHub:** #129
-- **参考:** Comma（AFK-surf/Comma，`clients/packages/app/src/components/onboarding`，AGPL-3.0：只借鉴流程和交互，不拷代码）
-- **相关规则:** R-20（注意力）、R-40（不写解释性文案）、R-46（Coordinator 的口吻）、R-70（设置要有先例）
+- **Figma:** 「Onboarding · 我们的版本（Claude · 2026-10-25）」页 241:4483，5 个画面 241:4484 / 241:4889 / 241:5265 / 241:5641 / 247:5342（还没有记进 `decisions.md`）
+- **参考:** Comma（AFK-surf/Comma，`clients/packages/app/src/components/onboarding`）。Comma 是 AGPL-3.0，这里只借鉴流程和交互，不拷代码。
+- **相关规则:** R-12（A–D 选择卡）、R-20（注意力）、R-40（不写解释性文案）、R-46（口吻）、R-70（设置要有先例）、R-72（网页分身）
 
 ## 1. 用户要做的事
 
-第一次登录 Mikka 时，一分钟内把 Mikka 用起来：知道 Coordinator 是谁、接上自己的应用和电脑，然后直接开始说第一件事。
+第一次进 Mikka，一分钟内有一个属于自己的 Bot：看着它出生、看着它的电脑开机、把应用交给它，再交给它第一件事，然后亲眼看到它已经开工。
 
-## 2. 为什么照 Comma 做
+## 2. 两个来源各取什么
 
-Comma 的引导**本身就是一段对话**：它的 Router 在聊天里一句句问，用户的每个回答变成一个「自己发出的气泡」飞进对话，Router 再回一句话来承接。背景的蓝光随进度一层层加深，最后让用户真按一遍快捷键。没有表单页，也没有「下一步」按钮。
-
-Mikka 的定位和 Comma 一样，都是一个协调者把工作拆给多个 agent 并行做。现在的 Coordinator 也是先开口（`lib/agent-welcome.ts`），所以由 Coordinator 来带引导最顺。
+- **骨架用 Figma 这 5 步**：孵化 Bot → 电脑开机 → 连应用 → 交第一件事 → 活已经在干了。这是 Mikka 独有的东西：每个 Bot 有自己的样子和自己的电脑。
+- **形式用 Comma 的**：
+  - 引导本身是一段对话。Bot 一句句地说；用户的每个回答变成一个「自己发出的气泡」飞进对话，Bot 再回一句来承接。不再一页页切换，也不要底部的翻页圆点。
+  - 背景光随进度一层层加深。
+  - 有项目被跳过时，最后提醒一句还没开的是什么。
+  - 任何时候都能跳过整个引导，设置里可以重播。
 
 ## 3. 在哪里出现
 
-- 用户第一次进入工作区（建好工作区之后，或者被邀请加入之后）时出现，每人只出现一次。
-- 以**蒙层**的形式盖在应用外壳上面，背后的界面做模糊处理（Comma 的 `overlay` 形态）。结束后直接落到 Coordinator 的对话里，光标停在输入框。
-- 设置 › 通用里有「重新播放引导」（先例：Comma 的 Settings › Onboarding › Replay）。
+- 用户第一次进入工作区时出现（建好工作区之后，或者被邀请加入之后），每人只出现一次。
+- 以蒙层的形式盖在应用外壳上，背后的界面模糊、染成深色（Figma 里背后是虚化的三栏）。结束时蒙层退去，用户落在新 Bot 的对话里，右侧线程栏里已经有它正在做的事。
+- 设置 › 通用里有「重新播放引导」（先例：Comma 的 Settings › Onboarding › Replay）。重播时不再新建 Bot，只把流程演一遍。
 - 手机端第一版不做（见 §8）。
 
 ## 4. 流程
 
-| # | 阶段 | Coordinator 说什么 / 屏幕上有什么 | 用户的回答（气泡） | 跳过时 |
+| # | 阶段 | 屏幕上 / Bot 说什么 | 用户的回答（气泡） | 跳过时 |
 | --- | --- | --- | --- | --- |
-| 0 | 开场 | 屏幕先暗下来，铺一层光；Mikka 标志（56px，`brand.md`）在中间出现并做「思考」动画；下面是「欢迎来到 Mikka」和 **开始**。 | 点「开始」，或者停留几秒后自动开始 | — |
-| 1 | 打招呼（3 句） | 标志移到顶部。① 自我介绍（§6）② 不用建群聊、不用挑 agent ③「先花一分钟弄好三件事。」 | — | — |
-| 2 | 连接应用 | 问一句，下面出现应用卡片：Gmail 与 Google 日历、GitHub、Slack、Notion、Linear（复用现有的 Composio 连接流程） | 「已连接 Gmail、GitHub」 | 「稍后再说」→「没关系，之后随时可以在设置里连接。」 |
-| 3 | 给 Coordinator 起名、选样子 | 输入框加推荐名字，下面一排 bot 形状和颜色（复用 `bots` 表的 name / colour / shape，以及 `bot-shapes.ts`） | 「就叫你 Juno」 | 沿用默认名 Mikka |
-| 4 | 连接你的电脑（可选） | 一张卡片：一条连接命令和「复制」按钮，旁边写「SSH 连接」（复用 Devices.connect） | 「已连接 alex-mbp」 | 「之后可以在设置 › 设备里连接。」 |
-| 5 | 提醒 | 只在有项目被跳过时出现：「还没开的：连接应用、连接电脑。随时都能开。」 | — | — |
-| 6 | 收尾 | 光退下去，出现「Juno 准备好了。」和 **开始对话** | 点「开始对话」 | — |
+| 0 | 开场 | 屏幕暗下来，铺一层光。中间出现一滴颜色（Figma 01） | — | — |
+| 1 | 孵化你的第一个 Bot（Figma 01） | 那滴颜色长成 bloub，眼睛跟着鼠标转。「你好，我是你的第一个 Bot。」下面是 16 种形状（`bot-shapes.ts`）、12 种颜色和一个名字输入框；挑形状和颜色时，bloub 当场变形、变色 | 「就叫这个」→ 气泡「就叫你小满」 | 不能跳过：这一步就是建 Bot。不改的话用默认的形状、颜色和名字 |
+| 2 | 它的电脑亮起来（Figma 02） | bloub 缩成头像，移到对话顶部。「我是小满。等我一下，我去把电脑打开。」下面一块屏幕，Mikka Cloud 真的在开机（「● 正在开机」→ 桌面）；屏幕下方写「小满 的屏幕」 | — | 用户可以不等开机直接往下走；电脑在后台继续开 |
+| 3 | 给它「喂」工具（Figma 03） | 「把常用的应用给我，我帮你盯着。」下面是 Gmail、Google 日历、Google Drive、Notion、Slack 的卡片（Composio 官方彩色图标，复用现有的连接流程），每张有 连接 / 连接中… / 已连接 三种状态 | 「好了」→ 气泡「已连接 Gmail、Google 日历」；承接一句：「好，以后这些我帮你盯着。」 | 「跳过」→「没关系，之后随时可以在设置里连接。」 |
+| 4 | 先交给它一件事（Figma 04） | 「都连好了。先交给我一件事吧。」A–D 选择卡（R-12），标题「你想先让我做哪件事？」，四个选项按已连接的应用出，每项右边带来源应用的图标；下面一个输入框「或者直接说想让它帮你做什么…」 | 选中的那项或者打的字，作为一个气泡发出 | 「先不用」→ 直接进入第 6 步 |
+| 5 | 活已经在干了（Figma 05） | Bot 接一句（「好。这周有 23 封没回，我先把要你回的挑出来。」），这件事作为卡片滑进去，显示实时进度（「小满 在读 Gmail · 已看 9 / 23」） | — | — |
+| 6 | 收尾 | 只在有项目被跳过时，先提醒一句：「还没开的：连接应用。随时都能开。」然后出现 **进入 Mikka** | 点「进入 Mikka」 | — |
 
-- 每完成一项，背景的光就深一层（Comma 的 `depth`）；跳过的项不加深。
-- 用户回答之后，Coordinator 用一两句话承接，**说清楚它接下来会做什么**。例如连上 Gmail 后：「好，以后每天早上我会把要紧的邮件和这周的日程理给你。」这句话把 R-20 的注意力模型和每日简报顺带介绍了。
-- 落到对话以后，Coordinator 发出现在那张欢迎卡片（「想先从哪件事开始？」加 4 个选项）。选项根据刚才连接的应用来出。
-- 推送权限**不在**引导里申请（decisions 2026-10-28：等 Coordinator 第一次主动发消息之后再问）。
-- 右上角一直有「跳过引导」，点了直接进入第 6 步。跳过的项照常出现在第 5 步的提醒里。
+- 每完成一步，背景光就深一层；跳过的步骤不加深。
+- 右上角一直有「跳过引导」：直接用当前的形状、颜色和名字建好 Bot，然后进入 Mikka。
+- 推送权限不在引导里申请（decisions 2026-10-28：等 Coordinator 第一次主动发消息之后再问）。
 
-## 5. 动效与声音
+## 5. 动效
 
-- 光：深蓝色蒙层加底部涌上来的光，两角各有一团慢慢漂移的柔光，只做 opacity 和 transform 动画。有消息正在飞的时候，背景光暂停，减少重绘。
-- 气泡：从（不可见的）输入框位置飞进对话。
+- 光：深色蒙层，底部涌上来一层光，两角各有一团慢慢漂移的柔光，只做 opacity 和 transform 动画。有气泡在飞的时候光暂停，减少重绘。
+- 孵化：一滴颜色长成 bloub，眼睛跟着鼠标转；换形状时 bloub 当场变形（bloub 本身就支持形状之间的过渡）。
+- 气泡从（不可见的）输入框位置飞进对话。
+- 第 5 步的卡片滑进去；退出时蒙层退去，卡片落在右侧线程栏里它该在的位置。
 - 系统开了「减少动态效果」时，全部改成淡入淡出。
-- 声音：第一版不做（见 §8）。
 
 ## 6. 文案（中文为准，英文同步）
 
-只用一种口吻：R-46 说的「温暖、专业、有条理的秘书」。Comma 的六种语气第一版不做。
+只用一种口吻（R-46）。Comma 的六种语气第一版不做。
 
 | 位置 | 中文 | English |
 | --- | --- | --- |
-| 开场标题 | 欢迎来到 Mikka | Welcome to Mikka |
-| 开场按钮 | 开始 | Start |
-| 打招呼 ① | 我是你的 Coordinator。你只管说要做什么，我来拆成任务，交给 bot 和线程同时去做。 | I'm your Coordinator. Tell me what needs doing, and I'll split it up and hand it to bots and threads that work at the same time. |
-| 打招呼 ② | 不用建群聊，也不用挑 agent，有事找我就行。需要你拍板的时候，我再来问你。 | No group chats, no picking agents. Just come to me, and I'll ask when a call is yours. |
-| 打招呼 ③ | 先花一分钟，弄好三件事。 | First, three quick things. One minute. |
-| 问：应用 | 先把你常用的应用接上，我就能帮你处理邮件、日程、代码和文档。 | Let's connect your apps, so I can handle your email, calendar, code and docs. |
-| 答：应用 | 已连接 {apps} | Connected {apps} |
-| 承接：应用 | 好，以后每天我会把 {uses} 理给你。 | Great. Each day I'll round up {uses} for you. |
-| 问：起名 | 再给我起个名字吧。 | Next, give me a name. |
-| 承接：起名 | {name}，好名字。从现在起，有事尽管交给我，我会盯着进度，把结果带回来。 | {name} it is. From now on, hand me anything: I'll keep an eye on it and bring you the results. |
-| 问：电脑 | 最后，要不要把你的电脑接上？这样我能在上面跑 Claude Code 和 Codex。可以跳过。 | Last, connect your computer so I can run Claude Code and Codex on it. Optional. |
-| 跳过 | 稍后再说 | Skip for now |
+| 孵化 | 你好，我是你的第一个 Bot。 | Hi, I'm your first Bot. |
+| 名字输入框占位 | 给它起个名字 | Give it a name |
+| 起名按钮 | 就叫这个 | That's the one |
+| 电脑 | 我是{name}。等我一下，我去把电脑打开。 | I'm {name}. One sec, I'll switch my computer on. |
+| 电脑状态 | 正在开机 | Starting up |
+| 屏幕标签 | {name} 的屏幕 | {name}'s screen |
+| 应用 | 把常用的应用给我，我帮你盯着。 | Hand me the apps you use, and I'll keep an eye on them. |
+| 应用承接 | 好，以后这些我帮你盯着。 | Got it. I'll keep an eye on these from now on. |
+| 应用跳过承接 | 没关系，之后随时可以在设置里连接。 | No problem. Connect them anytime in Settings. |
+| 第一件事 | 都连好了。先交给我一件事吧。 | All set. Give me something to do first. |
+| 选择卡标题 | 你想先让我做哪件事？ | What should I do first? |
+| 输入框占位 | 或者直接说想让它帮你做什么… | Or just say what you'd like it to do… |
 | 提醒 | 还没开的：{missing}。随时都能开。 | Still off: {missing}. Turn them on anytime. |
-| 收尾标题 | {name} 准备好了。 | {name} is ready. |
-| 收尾按钮 | 开始对话 | Start chatting |
+| 收尾按钮 | 进入 Mikka | Enter Mikka |
+| 按钮 | 好了 / 跳过 / 先不用 | Done / Skip / Not now |
 | 跳过引导 | 跳过引导 | Skip setup |
 | 设置行 | 重新播放引导 | Replay onboarding |
 
-## 7. 数据
+## 7. 数据与接线
 
-- 每个用户记一个 `onboarding_completed_at`。点「开始对话」时写入（关掉或刷新不算完成，下次进来从头开始）。
-- 起名和选样子直接写进 Coordinator bot 现有的字段，不另建表。
+- 第 1 步建的就是一个真的 Bot（`bots` 表现有的 name、colour、shape 字段），不另建表。
+- 第 2 步复用每个 Bot 一台的云电脑（`cloud-computer-backend.md`）。账号没开通云电脑时，这一步只播动画，不显示开机状态。
+- 第 4 步发出的那句话，就是发给这个 Bot 的第一条真实消息。第 5 步的进度来自它真实的运行情况；网页上的事按 R-72 由它的分身来做。
+- 每个用户记一个 `onboarding_completed_at`，在点「进入 Mikka」或「跳过引导」时写入。中途关掉或刷新时，从 Bot 已经建好的下一步接着走。
 
 ## 8. 第一版不做
 
-- 多种语气、开场音效、教快捷键这一步（Comma 有，Mikka 网页端没有全局快捷键）。
+- 多种语气、开场音效、教快捷键。
+- 引导里让用户连接自己的电脑（daemon），以后单独做。
 - 手机端引导（手机端的首次体验已经在 `mobile.md` 里定了）。
-- 推送权限、个人画像（`user_facts`）的收集。
+- 引导里申请推送权限，收集个人画像（`user_facts`）。
 
 ## 9. 完成标准
 
 - `docs/review-checklist.md` 的各项检查。
-- 新账号走完全程、全部跳过、只连一个应用、中途刷新，这四条路径各录一段屏。
+- 新账号走完全程、全部跳过、只连一个应用、在第 3 步刷新：这四条路径各录一段屏。
 - 浅色和深色、窄窗口、减少动态效果下都正常。
-- `decisions.md` 加一行，记下 Alex 的确认。
+- `decisions.md` 加一行，记下 Alex 的确认，并把 Figma 那一页标为已接受。
