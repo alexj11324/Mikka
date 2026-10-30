@@ -120,7 +120,7 @@ export function BotAgentsSettings() {
       {view.rules.length > 0 && <div className="overflow-x-auto">
         <Table className="min-w-[40rem] table-fixed">
           <colgroup>
-            <col className="w-28" />
+            <col className="w-36" />
             <col className="w-[27%]" />
             <col className="w-[25%]" />
             <col />
