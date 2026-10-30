@@ -31,3 +31,17 @@ test('isE2eTarget rejects each guard weakening directly', () => {
     for (const value of values) assert.equal(isE2eTarget(value), false, `${kind}: ${String(value)}`)
   assert.throws(() => assertE2eTarget('postgres://db.internal/mikka_e2e'), /_e2e/)
 })
+
+test('e2e target checks run on decoded host and database', () => {
+  assert.equal(e2eTargetParts('postgres://127.0.0.1/mikka%5fe2e')?.database, 'mikka_e2e')
+  // pg decodes the host too, so the guard must judge the decoded loopback host.
+  assert.equal(e2eTargetParts('postgres://127%2e0%2e0%2e1/mikka_e2e')?.host, '127.0.0.1')
+  for (const url of [
+    'postgres://127.0.0.1%2e/mikka_e2e',
+    'postgres://127.0.0.1%2eevil.com/mikka_e2e',
+    'postgres://127.0.0.1/x%2fmikka_e2e',
+    'postgres://127.0.0.1/mikka%2de2e',
+    'postgres://127.0.0.1/mikka_E2E',
+    'postgres://127.0.0.1/MIKKA_e2E',
+  ]) assert.equal(isE2eTarget(url), false, url)
+})
