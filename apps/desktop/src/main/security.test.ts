@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { appExternalUrl, desktopAuthFinishUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision, originOf } from './security'
+import { appExternalUrl, desktopAuthFinishUrl, desktopAuthState, externalUrl, insecureExternalUrl, isTrustedFrame, navigationDecision, originOf } from './security'
 
 const APP = 'https://app.aspectlylabs.com/mikka'
 
@@ -80,4 +80,14 @@ test('the loopback nonce is bounded', () => {
   assert.equal(desktopAuthState('short'), null)
   assert.equal(desktopAuthState('a'.repeat(129)), null)
   assert.equal(desktopAuthState(null), null)
+})
+
+test('plain-HTTP links are recognised for a prompt, never opened directly', () => {
+  assert.equal(externalUrl('http://example.com/docs'), null)
+  assert.equal(insecureExternalUrl('http://example.com/docs'), 'http://example.com/docs')
+  assert.equal(insecureExternalUrl('http://user:pass@example.com'), null)
+  assert.equal(insecureExternalUrl('https://example.com'), null)
+  assert.equal(insecureExternalUrl('file:///etc/passwd'), null)
+  assert.equal(insecureExternalUrl('javascript:alert(1)'), null)
+  assert.equal(insecureExternalUrl(`http://example.com/${'a'.repeat(2_048)}`), null)
 })

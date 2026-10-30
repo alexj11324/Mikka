@@ -50,6 +50,21 @@ export function externalUrl(candidate: string): string | null {
   }
 }
 
+/**
+ * A plain-HTTP link the shell never opens on its own. The caller asks the
+ * user first and only then hands it to the system browser.
+ */
+export function insecureExternalUrl(candidate: string): string | null {
+  if (!candidate || candidate.length > 2_048) return null
+  try {
+    const url = new URL(candidate)
+    if (url.username || url.password) return null
+    return url.protocol === 'http:' ? url.href : null
+  } catch {
+    return null
+  }
+}
+
 /** The app-origin URL handed to `shell.openExternal` for OAuth, or null. */
 export function appExternalUrl(candidate: string, appUrl: string): string | null {
   try {
