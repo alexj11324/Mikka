@@ -36,7 +36,7 @@ before(async () => {
     workspaceDeletionImpact: respond('workspaceDeletionImpact', { bots: 3, tasks: 128, teams: 3, purchasedPoints: 1200 }),
     deleteWorkspaceData: async (...args: unknown[]) => { calls.push(['deleteWorkspaceData', ...args]); if (failure) throw failure; return { deleted: { bots: 0, threads: 0, tasks: 0, projects: 0, teams: 0, invitations: 0, members: 1 }, nextWorkspaceId: args[2] === 'Last' ? null : '22222222-2222-4222-8222-222222222222' } },
   } })
-  mock.module('@/lib/workspace-admin/members', { namedExports: { removeMember: respond('removeMember', { removed: true, transferred: { bots: 2 } }), transferOnSuspend: respond('transferOnSuspend', { bots: 0 }) } })
+  mock.module('@/lib/workspace-admin/members', { namedExports: { removeMember: respond('removeMember', { removed: true, transferred: { bots: 2 }, label: 'Mia' }), transferOnSuspend: respond('transferOnSuspend', { bots: 0 }) } })
   mock.module('@/lib/workspace-admin/teams', { namedExports: {
     teamDeletionImpact: respond('teamDeletionImpact', { teamId: 't', name: 'Platform', tasks: 42, projects: 5 }),
     deleteTeamData: respond('deleteTeamData', { deleted: { tasks: 42, projects: 5 } }),

@@ -68,6 +68,8 @@ export async function deleteWorkspace(id: string, confirmName: string): Promise<
 export async function removeWorkspaceMember(memberId: string, options: { transferTo?: string } = {}): Promise<ActionResult<MemberRemoval>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor()
-    return removeMember(actor.userId, actor.workspaceId, memberId, options.transferTo)
+    const { label, ...removed } = await removeMember(actor.userId, actor.workspaceId, memberId, options.transferTo)
+    await recordAuditSafe({ workspaceId: actor.workspaceId, actor: { type: 'user', id: actor.userId, name: actor.name }, action: 'member.removed', target: { type: 'member', id: memberId, label: label ?? memberId }, ...auditRequestContext(await headers()) })
+    return removed
   })
 }

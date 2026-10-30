@@ -132,7 +132,8 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     assert.equal(await count(pool, 'mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [ws.id, leaving]), 1, 'refusals change nothing')
 
     const removed = await members.removeMember(admin, ws.id, leaving, heir)
-    assert.deepEqual(removed, { removed: true, transferred: { bots: 1 } })
+    assert.deepEqual({ removed: removed.removed, transferred: removed.transferred }, { removed: true, transferred: { bots: 1 } })
+    assert.ok(removed.label)
     assert.equal(await count(pool, 'mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [ws.id, leaving]), 0)
     assert.equal(await count(pool, 'mikka_team_members where "teamId"=$1 and "userId"=$2', [team.id, leaving]), 0)
     assert.equal(await count(pool, 'bots where id=$1 and "ownerId"=$2', [bot, heir]), 1)

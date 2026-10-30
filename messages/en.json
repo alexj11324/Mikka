@@ -2121,6 +2121,94 @@
       },
       "deleting": "Deleting…",
       "shortValueNotMasked": "{name} is shorter than 8 characters and is not masked in output."
+    },
+    "audit": {
+      "loading": "Loading audit log",
+      "filter": "Filter",
+      "filters": {
+        "all": "All",
+        "security": "Security"
+      },
+      "export": "Export",
+      "exportCsv": "Export CSV",
+      "empty": "Nothing in the last 90 days.",
+      "loadMore": "Load more",
+      "actorTypes": {
+        "bot": "Bot",
+        "token": "Token"
+      },
+      "categories": {
+        "security": "Security",
+        "secret": "Secrets",
+        "permission": "Permissions",
+        "member": "Members",
+        "billing": "Billing"
+      },
+      "actions": {
+        "member": {
+          "invited": "invited {target}",
+          "invitation_revoked": "revoked the invitation to {target}",
+          "joined": "joined the workspace",
+          "removed": "removed {target}",
+          "suspended": "suspended {target}",
+          "reactivated": "reactivated {target}",
+          "role_changed": "made {target} {newRole}"
+        },
+        "team": {
+          "access_changed": "changed access for team {target}"
+        },
+        "bot": {
+          "permissions_changed": "changed permissions for {target}"
+        },
+        "integration": {
+          "permission_changed": "set {integration} to {to}"
+        },
+        "secret": {
+          "created": "added secret {target}",
+          "replaced": "updated secret {target}",
+          "deleted": "deleted secret {target}"
+        },
+        "env": {
+          "created": "added variable {target}",
+          "updated": "updated variable {target}",
+          "deleted": "deleted variable {target}"
+        },
+        "network_policy": {
+          "updated": "changed outbound network"
+        },
+        "token": {
+          "created": "created token {target}",
+          "revoked": "revoked token {target}"
+        },
+        "auth": {
+          "signed_in": "signed in",
+          "sign_in_failed": "failed to sign in"
+        },
+        "workspace": {
+          "slug_changed": "changed the address from {from} to {to}",
+          "deleted": "deleted the workspace"
+        },
+        "billing": {
+          "checkout_started": "opened checkout",
+          "credits_purchased": "bought points",
+          "auto_recharge_changed": "changed auto recharge",
+          "limits_changed": "changed usage limits"
+        }
+      },
+      "roles": {
+        "admin": "an admin",
+        "owner": "the owner",
+        "member": "a member",
+        "guest": "a guest"
+      },
+      "access": {
+        "allow": "allowed",
+        "ask": "ask first",
+        "deny": "blocked",
+        "read": "read only",
+        "write": "read and write",
+        "none": "off"
+      }
     }
   },
   "TelegramBot": {

@@ -28,6 +28,7 @@ import { LocaleSetting } from '@/components/settings/locale-setting'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
 import { AccessTokensSettings } from '@/components/settings/access-tokens-settings'
 import { SecretsSettings } from '@/components/settings/secrets-settings'
+import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { SettingsSectionId } from '@/lib/settings-sections'
@@ -93,6 +94,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
     case 'permissions': return workspaceId && !preview ? <ComputerPolicySettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return <p className="py-8 text-sm text-muted-foreground">{t('sectionUnavailable')}</p>
