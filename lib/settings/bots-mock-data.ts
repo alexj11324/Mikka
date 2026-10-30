@@ -6,11 +6,13 @@ import { BOT_MODEL_GROUPS, type BotDefaultsView, type BotThreadPage, type BotThr
  * Server-side only: reached through the gated server actions in bots-mock-actions.ts
  * (and unit tests), so none of this copy ships in public client chunks.
  */
-export const BOTS_MOCK_SCENARIOS = ['default', 'member', 'empty', 'error', 'loading', 'saveError', 'saveRace', 'moreError'] as const
+export const BOTS_MOCK_SCENARIOS = ['default', 'member', 'empty', 'error', 'loading', 'saveError', 'saveRace', 'saveLate', 'moreError'] as const
 export type BotsMockScenario = (typeof BOTS_MOCK_SCENARIOS)[number]
 
 /** saveRace: a Codex save waits this long and then fails; any other save succeeds at once. */
 export const SAVE_RACE_DELAY_MS = 800
+/** saveLate: a Codex save waits this long and then succeeds; a Claude save fails at once. */
+export const SAVE_LATE_DELAY_MS = 1500
 export const THREAD_PAGE_SIZE = 20
 
 const minutesAgo = (now: number, minutes: number) => new Date(now - minutes * 60_000).toISOString()
@@ -59,6 +61,8 @@ export function createMockBotsApi(scenario: BotsMockScenario = 'default', now = 
     async updateDefaults(input) {
       if (scenario === 'saveError') return fail
       if (scenario === 'saveRace' && input.defaultModel === 'codex') { await sleep(SAVE_RACE_DELAY_MS); return fail }
+      if (scenario === 'saveLate' && input.defaultModel === 'claude') return fail
+      if (scenario === 'saveLate' && input.defaultModel === 'codex') await sleep(SAVE_LATE_DELAY_MS)
       if (input.defaultModel !== undefined) defaults.defaultModel = input.defaultModel
       if (input.defaultRepository !== undefined) defaults.defaultRepository = input.defaultRepository
       return { defaultModel: defaults.defaultModel, defaultRepository: defaults.defaultRepository }

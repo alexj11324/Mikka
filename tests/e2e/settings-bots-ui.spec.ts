@@ -61,6 +61,20 @@ test('overlapping saves: a slow failure never undoes a newer choice', async ({ p
   await expect(page.locator('[data-sonner-toast]').filter({ hasText: '已保存' })).toHaveCount(1)
 })
 
+test('latest save fails while an older one is in flight: wait, then show the server value', async ({ page }) => {
+  await open(page, 'saveLate')
+  const model = page.getByRole('combobox', { name: '模型' })
+  await model.click()
+  await page.getByRole('option', { name: 'Codex' }).click() // in flight, succeeds after a delay
+  await model.click()
+  await page.getByRole('option', { name: 'Claude' }).click() // fails at once
+  await page.waitForTimeout(400)
+  // No rollback flicker while Codex is still in flight.
+  await expect(model).toHaveText(/Claude/)
+  await expect(model).toHaveText(/Codex/, { timeout: 5000 })
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '操作未成功' })).toHaveCount(1)
+})
+
 test('thread drawer pages with a cursor; a failed next page can be retried', async ({ page }) => {
   await open(page)
   await page.getByRole('button', { name: /Frontend/ }).click()
