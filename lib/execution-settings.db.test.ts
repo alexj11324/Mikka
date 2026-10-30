@@ -30,7 +30,7 @@ test(
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
       const migration = await readFile(
         new URL(
-          "../drizzle/20261030191000_execution_rules.sql",
+          "../drizzle/20261030194605_execution_rules.sql",
           import.meta.url,
         ),
         "utf8",

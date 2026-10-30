@@ -4,7 +4,7 @@ No page, component, Figma or other frontend change is included.
 
 ## Storage and scope
 
-`20261030191000_execution_rules.sql` is idempotent. `execution_rules` belongs to
+`20261030194605_execution_rules.sql` is idempotent. `execution_rules` belongs to
 an owner and workspace, matching `bots` and the settings workspace boundary.
 Devices remain personal infrastructure: a rule can reference only its owner's
 local device. Positions are serialized per settings scope and use a deferred
