@@ -27,7 +27,7 @@ import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
 import { issueMembers, issues } from '@/lib/db/schema'
-import { COMPOSIO_ACTIONS, type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
+import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
 import { proposeAction, proposeRepositoryPush } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
@@ -210,6 +210,8 @@ async function appBlockedForBot(botId: string | null | undefined, action: Compos
   if (!botId) return false
   const { botMayUseApp } = await import('@/lib/app-policy/store')
   const { isPolicyApp } = await import('@/lib/app-policy/apps')
+  // Loaded here, not at module top: steps.ts is imported by suites that stub 'ai', which composio-actions needs.
+  const { COMPOSIO_ACTIONS } = await import('@/lib/composio-actions')
   const toolkit = COMPOSIO_ACTIONS[action]?.toolkit
   return Boolean(toolkit && isPolicyApp(toolkit) && !(await botMayUseApp(botId, toolkit)))
 }
