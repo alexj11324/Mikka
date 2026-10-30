@@ -1,4 +1,12 @@
 export const ACTION_ERROR_CODES = [
+  'secretNotFound',
+  'secretNameTaken',
+  'secretLimitReached',
+  'secretsUnavailable',
+  'egressDomainInvalid',
+  'e2bKeyInvalid',
+  'e2bKeyUnverifiable',
+  'e2bKeyRateLimited',
   'generic',
   'authRequired',
   'validationGeneric',
