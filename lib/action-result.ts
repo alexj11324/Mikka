@@ -144,6 +144,8 @@ export const ACTION_ERROR_CODES = [
   'botDefaultRepositoryUnavailable',
   'botDefaultsConflict',
   'botNotFound',
+  'tokenNotFound',
+  'tokenLimitReached',
   'usageLimitReached',
   'usageCreditsExhausted',
   'billingNotConfigured',

@@ -1093,7 +1093,9 @@
     "accountEmailMismatch": "输入的邮箱与当前账户不一致。",
     "accountSoleAdmin": "你是工作区「{workspaces}」唯一的管理员。先把管理员身份转给其他成员，再删除账户。",
     "runChainEnded": "此线程的所有尝试都已结束，没有可停止的运行。",
-    "botNotFound": "这个 Bot 不在当前工作区。"
+    "botNotFound": "这个 Bot 不在当前工作区。",
+    "tokenNotFound": "令牌不存在或已被撤销。",
+    "tokenLimitReached": "你在当前工作区的有效令牌已达 50 个上限，请先撤销一个。"
   },
   "Overview": {
     "sections": {
