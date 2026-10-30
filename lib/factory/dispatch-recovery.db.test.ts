@@ -69,6 +69,8 @@ test('dispatch failure, status and exactly-once re-dispatch on a real database',
     assert.equal(first?.device?.online, false);
     assert.equal(first?.clarification?.options[1].action, 'cloudKeySettings');
     assert.equal((await recovery.status('owner', running.taskId))?.failure, null);
+    // a has a run_dispatch_failed event, so a write to coordinator_events keyed on its run would touch rows.
+    assert.equal((await recovery.status('owner', a.taskId))?.failure?.reasonCode, 'deviceOffline');
     assert.deepEqual(await snapshot(), before, 'GET wrote nothing');
 
     assert.deepEqual(await recovery.deviceOnline('owner', deviceId, true), [], 'still offline: nothing resumes');
