@@ -56,6 +56,7 @@ test('all upcoming features fail closed, even if the remote switch is accidental
 
 test('gated features are on only when the remote flag is exactly true', () => {
   assert.equal(gatedFeatures.cloudComputer, 'mikka-cloud-computer')
+  assert.equal(gatedFeatures.computerBilling, 'mikka-computer-billing')
   assert.deepEqual(proactiveFeatures, { profile: 'mikka-proactive-profile', research: 'mikka-proactive-research' })
   for (const remote of [undefined, false, 'control', 'true']) assert.equal(gatedFeatureEnabled(remote), false)
   assert.equal(gatedFeatureEnabled(true), true)
