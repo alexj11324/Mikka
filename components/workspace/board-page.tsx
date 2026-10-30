@@ -174,7 +174,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
         </ToggleGroup>
         <Separator orientation="vertical" className="mx-1 h-5" />
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="text-muted-foreground" />}><ListFilter data-icon="inline-start" />{t('filter')}</DropdownMenuTrigger>
+          <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}><ListFilter data-icon="inline-start" />{t('filter')}</DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52"><DropdownMenuGroup>
             {FILTER_FIELDS.map(({ field, icon: Icon }) => <DropdownMenuSub key={field}>
               <DropdownMenuSubTrigger><Icon />{t(`filterField.${field}`)}</DropdownMenuSubTrigger>
@@ -196,7 +196,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
             <ToggleGroupItem value="list" aria-label={t('viewList')}><List /></ToggleGroupItem>
           </ToggleGroup>
           <Popover>
-            <PopoverTrigger render={<Button variant="ghost" size="sm" />}><Settings2 data-icon="inline-start" />{t('display')}</PopoverTrigger>
+            <PopoverTrigger render={<Button variant="outline" size="sm" />}><Settings2 data-icon="inline-start" />{t('display')}</PopoverTrigger>
             <PopoverContent align="end" className="w-80 gap-3">
               <div className="flex items-center justify-between gap-3"><Label>{t('sort')}</Label>
                 <Select value={display.sort} onValueChange={value => setDisplay({ sort: value as Sort })} items={(['priority', 'updated', 'created'] as const).map(value => ({ value, label: t(`sortBy.${value}`) }))}>

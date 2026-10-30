@@ -170,9 +170,9 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, narrowColumns = []
         {shown.map(column => {
           const tasks = props.value[column.value] ?? []
           if (narrow(column.value)) return <KanbanColumn key={column.value} value={column.value} className="min-h-0 w-10 min-w-10 shrink-0">
-            <Button variant="ghost" className="h-full w-10 flex-col items-center justify-start gap-2 rounded-xl bg-muted/60 px-0 py-2.5 font-medium whitespace-normal hover:bg-muted" aria-label={tBoard('expandColumn', { status: statusLabel(column.value) })} onClick={() => setOpened(current => [...current, column.value])}>
+            <Button variant="ghost" className="h-full w-10 flex-col items-center justify-start gap-2 overflow-hidden rounded-xl bg-muted/60 px-0 py-2.5 font-medium hover:bg-muted" aria-label={tBoard('expandColumn', { status: statusLabel(column.value) })} onClick={() => setOpened(current => [...current, column.value])}>
               <column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />
-              <span className="w-[1em] shrink-0 text-center text-sm leading-tight break-all">{statusLabel(column.value)}</span>
+              <span className="shrink-0 text-sm leading-tight [writing-mode:vertical-rl]">{statusLabel(column.value)}</span>
               <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{tasks.length}</span>
             </Button>
           </KanbanColumn>
