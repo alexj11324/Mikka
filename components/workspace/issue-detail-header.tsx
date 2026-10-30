@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Breadcrumb, BreadcrumbEllipsis, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
-import { SidebarTrigger } from '@/components/ui/sidebar'
+import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { issueIdentifier } from './issue-properties'
 
@@ -21,11 +21,12 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
   const t = useTranslations('Workspace')
   const tDetail = useTranslations('IssueDetail')
   const tWorkspaceDetail = useTranslations('Workspace.detail')
+  const { isMobile, openMobile, open } = useSidebar()
   // The header lays itself out by its own width (the sidebar changes it, the viewport doesn't).
   // Narrowing order: the title truncates, then the workspace name; then both fold into the ellipsis. The ID never truncates.
   return <header className="@container/header sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-rule bg-background px-3 sm:px-4">
     <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-      <SidebarTrigger className="-ml-1" aria-label={t('toggleSidebar')} />
+      <SidebarTrigger className="-ml-1" aria-label={t('toggleSidebar')} aria-expanded={isMobile ? openMobile : open} />
       <Separator orientation="vertical" className="mr-1 data-vertical:h-4 data-vertical:self-auto" />
       <Breadcrumb className="min-w-0" aria-label={t('breadcrumb')}><BreadcrumbList className="min-w-0 flex-nowrap">
         <BreadcrumbItem className="@2xl/header:hidden">

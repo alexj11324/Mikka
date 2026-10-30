@@ -9,8 +9,10 @@ const box = (locator: Locator) => locator.evaluate(element => {
 })
 const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
 
+const rootOf = (page: Page) => page.locator('header').filter({ has: page.getByRole('navigation', { name: '当前位置' }) })
+
 async function header(page: Page) {
-  const root = page.locator('header').filter({ has: page.getByRole('navigation', { name: '当前位置' }) })
+  const root = rootOf(page)
   const crumbs = root.getByRole('navigation', { name: '当前位置' })
   const id = crumbs.locator('[data-slot="breadcrumb-page"]')
   const actions = root.locator(':scope > div').last()
@@ -26,21 +28,26 @@ for (const scheme of ['light', 'dark'] as const) {
     const title = `面包屑重叠检查 一个非常非常长的任务标题用来测试截断顺序 ${randomUUID().slice(0, 8)}`
     await seedTask(page, title)
     await page.reload()
-    await rail(page, '看板').click()
+    // Open the issue over 主页, where the workspace list panel sits beside it. The board is full-page
+    // (no list panel), so there the toggle changes nothing on desktop and "collapsed" would be a no-op.
     await openIssueFromSearch(page, title)
     await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
 
     for (const width of [390, 560, 640, 768, 1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 800 })
       for (const sidebar of width < 768 ? ['mobile'] : ['open', 'collapsed']) {
-        const toggle = page.getByRole('button', { name: '展开或收起侧栏', exact: true }).first()
         if (sidebar !== 'mobile') {
-          // The workspace list panel is a collapsible="none" sidebar, so its state is read from the trigger.
-          // A missing trigger fails the test instead of silently skipping the toggle.
-          await expect(toggle).toHaveAttribute('aria-expanded', /^(true|false)$/)
-          const want = sidebar === 'open' ? 'true' : 'false'
-          if (await toggle.getAttribute('aria-expanded') !== want) await toggle.click()
-          await expect(toggle).toHaveAttribute('aria-expanded', want)
+          // The workspace list panel reports its own state (data-slot="bot-list"); the header trigger mirrors it.
+          // A missing panel fails the test instead of silently skipping the toggle.
+          const panel = page.locator('[data-slot="bot-list"]')
+          const toggle = rootOf(page).getByRole('button', { name: '展开或收起侧栏', exact: true })
+          await expect(panel).toHaveAttribute('data-state', /^(collapsed|expanded)$/)
+          const want = sidebar === 'open' ? 'expanded' : 'collapsed'
+          if (await panel.getAttribute('data-state') !== want) await toggle.click()
+          await expect(panel).toHaveAttribute('data-state', want)
+          await expect(toggle).toHaveAttribute('aria-expanded', sidebar === 'open' ? 'true' : 'false')
+          // The panel animates its width; measure and capture only once it has settled.
+          await expect.poll(() => panel.evaluate(element => element.getBoundingClientRect().width)).toBe(sidebar === 'open' ? 256 : 0)
         }
         const { root, crumbs, id, actions } = await header(page)
         await expect(id).toBeVisible()
