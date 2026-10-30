@@ -58,7 +58,18 @@ function validationCode(error: z.ZodError): ActionErrorCode {
   return 'validationGeneric'
 }
 
-export async function listIssues(workspaceId?: string) {
+// SWR passes its cache key as an argument. Keep this public fetcher zero-argument.
+export async function listIssues() {
+  return readIssues()
+}
+
+/** Explicit API workspace selection, with the same acting-user/membership checks. */
+export async function listWorkspaceIssues(workspaceId: string) {
+  z.uuid().parse(workspaceId)
+  return readIssues(workspaceId)
+}
+
+async function readIssues(workspaceId?: string) {
   const userId = await getUserId()
   const context = await loadWorkspaceContext(workspaceId)
   const teams = await accessibleTeams(userId, context.workspace.id)
@@ -69,7 +80,7 @@ export async function listIssues(workspaceId?: string) {
   const ownersWithoutNumbers = [...new Set(visibleRows.filter(row => row.ownerId === userId && !readIssueMetadata(row.content).number).map(row => row.ownerId))]
   if (ownersWithoutNumbers.length) {
     for (const ownerId of ownersWithoutNumbers) await ensureIssueNumbers(ownerId)
-    return listIssues(workspaceId)
+    return readIssues(workspaceId)
   }
   const liveRows = visibleRows.filter(row => !readIssueMetadata(row.content).deletedAt)
   const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))

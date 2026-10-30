@@ -133,6 +133,12 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
     assert.equal(messages.length, 1)
     assert.equal(messages[0].botId, ownBot)
   })
+  await t.test('the existing browser issue fetcher ignores the SWR cache-key argument', async () => {
+    const { actAs } = await import('../lib/acting-user')
+    const { listIssues } = await import('../app/actions/issues')
+    const listed = await actAs(owner, () => Reflect.apply(listIssues, undefined, [['issues', owner]]))
+    assert.ok(Array.isArray(listed))
+  })
   await t.test('PAT support stays on API adapters, without authorizing general server actions', async () => {
     currentHeaders = new Headers({ authorization: `Bearer ${token.token}` })
     assert.equal(await (await import('../lib/session')).getSession(), null)
