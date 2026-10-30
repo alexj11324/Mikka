@@ -440,9 +440,18 @@ export const coordinatorEvents = pgTable('coordinator_events', {
   lastTriageAttemptAt: timestamp('lastTriageAttemptAt', { withTimezone: true }),
   /** Model response envelope bound to the event and winning attempt, not approval. */
   triageDecision: jsonb('triageDecision').$type<Record<string, unknown>>(),
+  /** Bounded, durable wake delivery; the event itself remains the outbox. */
+  wakeAttempts: integer('wakeAttempts').notNull().default(0),
+  nextWakeAt: timestamp('nextWakeAt', { withTimezone: true }).notNull().defaultNow(),
+  wakeLeaseUntil: timestamp('wakeLeaseUntil', { withTimezone: true }),
+  wakeLastError: text('wakeLastError'),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt)])
+}, table => [
+  index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt),
+  index('coordinator_events_wake_due_idx').on(table.nextWakeAt, table.userId, table.botId)
+    .where(sql`${table.deliveredAt} is null and ${table.wakeAttempts} < 8`),
+])
 
 /**
  * One person's Coordinator, or one of their bots (`botId`), which runs on the

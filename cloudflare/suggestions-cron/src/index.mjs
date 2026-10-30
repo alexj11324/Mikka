@@ -1,5 +1,6 @@
 // Scheduling only: each endpoint handles its own work in Mikka.
 export const SCHEDULES = {
+  '* * * * *': '/api/cron/coordinator-wakes',
   '*/15 * * * *': '/api/cron/briefings',
   '0 * * * *': '/api/cron/suggestions-reconcile',
   '30 * * * *': '/api/cron/user-facts',
