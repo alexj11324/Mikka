@@ -18,8 +18,9 @@ export interface RuntimeSecret { id?: string; name: string; kind: 'secret' | 'en
 
 /** Sandboxes run as production: only environment 'all' and 'production' are injected (preview/development never). */
 export const RUNTIME_ENVIRONMENTS = ['all', 'production'] as const
-/** 4e3: environments whose secrets can reach a sandbox, so persisted output masks them all. */
-export const MASKED_ENVIRONMENTS = ['all', 'production', 'preview'] as const
+/** Masking scope (decided): every injectable value is masked, whatever its environment. Like GitHub
+ * Actions, masking depends only on whether a value can be injected, never on production/preview/development. */
+export const MASKED_ENVIRONMENTS = ['all', 'production', 'preview', 'development'] as const
 
 /** Workspace-scoped secrets and env vars for environment all/production, decrypted. Repository-scoped rows are not included yet. */
 export async function loadWorkspaceRuntimeSecrets(workspaceId: string, env: Env = process.env): Promise<RuntimeSecret[]> {

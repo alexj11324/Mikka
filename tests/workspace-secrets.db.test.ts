@@ -207,7 +207,7 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     await store.createWorkspaceSecret(admin, third.id, { name: 'DEV_ONLY', kind: 'secret', value: 'dev-secret-value', environment: 'development' })
     assert.deepEqual(await runtime.taskSecretEnv(third.id, null, 'production', on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long', PROD_ONLY: 'prod-value' }, 'only environment all + production are injected')
     assert.deepEqual(await runtime.taskSecretEnv(third.id, null, 'preview', on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long', PREVIEW_ONLY: 'preview-secret-value' }, '4e3: a preview run gets all + preview, never production')
-    assert.equal((await runtime.workspaceSecretMasker(third.id, on))('preview-secret-value dev-secret-value'), '[secret:PREVIEW_ONLY] dev-secret-value', '4e3: preview values reach sandboxes so they are masked; development never does')
+    assert.equal((await runtime.workspaceSecretMasker(third.id, on))('preview-secret-value dev-secret-value'), '[secret:PREVIEW_ONLY] [secret:DEV_ONLY]', 'every injectable value is masked, whatever its environment (preview and development included)')
     const chunk = { type: 'text-delta', delta: `push ${TOKEN} b64=${Buffer.from(TOKEN).toString('base64')} short=abc1234 region=us-east-1-long`, nested: [{ url: `https://x/?t=${encodeURIComponent(TOKEN)}` }] }
     const offMask = await runtime.workspaceSecretMasker(third.id, off)
     assert.deepEqual(maskDeep(chunk, offMask), chunk, 'flag off: stored verbatim (today)')
@@ -252,6 +252,9 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     const mask = await runtime.workspaceSecretMasker(w.id, on)
     assert.equal(mask(`${REPO_TOKEN} ${OTHER_TOKEN} repo-prod`), '[secret:API_TOKEN] [secret:OTHER] repo-prod', 'repo-scoped secrets masked; env not')
     assert.equal(mask('repo-preview-value'), '[secret:REPO_PREVIEW]')
+    await store.createWorkspaceSecret(admin, w.id, { name: 'REPO_DEV', kind: 'secret', value: 'repo-dev-secret-value', environment: 'development', scope: { type: 'repository', repository: 'acme/app' } })
+    const devMask = await runtime.workspaceSecretMasker(w.id, on)
+    assert.equal(devMask('repo-preview-value repo-dev-secret-value'), '[secret:REPO_PREVIEW] [secret:REPO_DEV]', 'a preview value and a development value are both masked once injectable')
   })
 
   await t.test('#436 defense in depth: a reserved name reaching injection is skipped and audited by name only', async () => {
