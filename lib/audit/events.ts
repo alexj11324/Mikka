@@ -37,6 +37,7 @@ export const AUDIT_ACTIONS = {
   'auth.sign_in_failed': 'security',
   'workspace.slug_changed': 'security',
   'workspace.deleted': 'security',
+  'workspace.ownership_transferred': 'security',
   // 计费
   'billing.checkout_started': 'billing',
   'billing.credits_purchased': 'billing',
@@ -79,6 +80,7 @@ export const AUDIT_METADATA = {
   'auth.sign_in_failed': z.object({ method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']), reason: z.enum(['invalid', 'locked', 'expired', 'denied']) }).partial().strict(),
   'workspace.slug_changed': z.object({ from: label, to: label }).strict(),
   'workspace.deleted': none,
+  'workspace.ownership_transferred': none,
   'billing.checkout_started': z.object({ amountCents: cents, currency }).partial().strict(),
   'billing.credits_purchased': z.object({ amountCents: cents, currency, credits: z.number().int().min(0) }).partial().strict(),
   'billing.auto_recharge_changed': z.object({ enabled: z.boolean(), thresholdCents: cents.nullable(), amountCents: cents.nullable() }).partial().strict(),

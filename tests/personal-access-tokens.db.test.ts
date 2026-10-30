@@ -30,6 +30,19 @@ test('personal access tokens', { skip: !dbUrl }, async t => {
     assert.ok(!JSON.stringify(listed).includes(rows[0].tokenHash), 'list never returns the hash')
   })
 
+  await t.test('create and revoke write audit rows in the same transaction (name only, never the token)', async () => {
+    const auditWs = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+    const created = await store.createPersonalAccessToken(owner, auditWs.id, { name: 'CLI · MacBook' }, new Date(), { actorName: 'Owner', ip: '203.0.113.4' })
+    await store.revokePersonalAccessToken(owner, auditWs.id, { id: created.id }, new Date(), { actorName: 'Owner' })
+    const { rows } = await pool.query('select action, category, "actorName", "targetId", "targetLabel", metadata, host(ip) as ip from workspace_audit_events where "workspaceId"=$1 order by "createdAt", id', [auditWs.id])
+    assert.deepEqual(rows.map(row => [row.action, row.category, row.actorName, row.targetId, row.targetLabel]), [['token.created', 'security', 'Owner', created.id, 'CLI · MacBook'], ['token.revoked', 'security', 'Owner', created.id, 'CLI · MacBook']])
+    assert.equal(rows[0].ip, '203.0.113.4')
+    assert.ok(!JSON.stringify(rows).includes(created.token), 'the plaintext never reaches the audit log')
+    // A bad audit event rolls the token back with it.
+    await assert.rejects(store.createPersonalAccessToken(owner, auditWs.id, { name: 'Broken' }, new Date(), { actorName: '' }))
+    assert.equal((await store.listPersonalAccessTokens(owner, auditWs.id)).some(token => token.name === 'Broken'), false)
+  })
+
   await t.test('optional expiry: future accepted, past/too far rejected, expired flagged and unusable', async () => {
     const now = new Date()
     const later = await store.createPersonalAccessToken(owner, ws.id, { name: 'Week', expiresAt: new Date(now.getTime() + 7 * 86_400_000).toISOString() })

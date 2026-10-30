@@ -28,6 +28,18 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   const stored = async (id: string) => { const { rows: [row] } = await pool.query('select * from workspace_secrets where id=$1', [id]); return secretCrypto.openSecret(row, secretCrypto.secretAad(row)) }
   const META_KEYS = ['id', 'kind', 'name', 'scopeRef', 'scopeType']
 
+  await t.test('the recordAudit hook writes name-only rows inside the write transaction', async () => {
+    const { secretAuditHook } = await import('../lib/secrets/audit')
+    const auditWs = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const hook = secretAuditHook({ id: admin, name: 'Admin' }, { ip: '198.51.100.7' })
+    const saved = await store.createWorkspaceSecret(admin, auditWs.id, { name: 'VERCEL_TOKEN', kind: 'secret', value: SECRET }, hook)
+    await store.replaceWorkspaceSecret(admin, auditWs.id, { id: saved.id, value: SECRET + 'x' }, hook)
+    await store.deleteWorkspaceSecret(admin, auditWs.id, { id: saved.id }, hook)
+    const { rows } = await pool.query('select action, category, "targetLabel", metadata from workspace_audit_events where "workspaceId"=$1 order by "createdAt", id', [auditWs.id])
+    assert.deepEqual(rows.map(row => [row.action, row.category, row.targetLabel]), [['secret.created', 'secret', 'VERCEL_TOKEN'], ['secret.replaced', 'secret', 'VERCEL_TOKEN'], ['secret.deleted', 'secret', 'VERCEL_TOKEN']])
+    assert.ok(!JSON.stringify(rows).includes(SECRET), 'the value never reaches the audit log')
+  })
+
   await t.test('secret value is never returned; DB holds ciphertext only', async () => {
     const created = await store.createWorkspaceSecret(admin, ws.id, { name: 'STRIPE_KEY', kind: 'secret', value: SECRET })
     assert.deepEqual(Object.keys(created).filter(k => k !== 'warning').sort(), META_KEYS, 'metadata only')
