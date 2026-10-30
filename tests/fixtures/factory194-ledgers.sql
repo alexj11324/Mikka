@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS factory_approval_controls (
 );
 COMMIT;
 
--- #528 merges (same DDL as drizzle/20261030230000_factory_merges.sql).
+-- #528 merges (same DDL as drizzle/20261030233000_factory_merges.sql).
 CREATE TABLE IF NOT EXISTS factory_merges (
   id uuid PRIMARY KEY,
   "taskId" uuid NOT NULL REFERENCES factory_tasks(id) ON DELETE CASCADE,

@@ -339,6 +339,8 @@ export function createFactoryApprovals(
   authorize: FactoryAuthorize,
   store: FactoryApprovalStore,
   adapters: PublicationAdapter[] = [],
+  /** codeCandidatesMerge (#528): only a skill is approved here; a code candidate is accepted by merging its PR. */
+  options: { codeCandidatesMerge?: boolean } = {},
 ) {
   async function transaction<T>(fn: (tx: PoolClient) => Promise<T>) {
     const tx = await pool.connect();
@@ -530,17 +532,9 @@ export function createFactoryApprovals(
           !["pending", "waiting"].includes(task.status)
         )
           fail("factoryTransition");
-        // #528: approval never leaves an approved-but-unpublished candidate. Without a
-        // registered publication for this exact action (production registers only skill
-        // activation), a code candidate is accepted by merging its PR instead.
-        if (
-          !adapters.some(
-            (adapter) =>
-              adapter.action === req.action &&
-              adapter.target === req.target &&
-              adapter.environment === req.targetEnvironment,
-          )
-        )
+        // #528: where code candidates are accepted by merging their PR (production),
+        // approving one is refused rather than leaving it approved but unpublished.
+        if (options.codeCandidatesMerge && req.action !== "activate_skill")
           fail("factoryAcceptanceIsMerge");
         const current = await approvalEvidence(tx, task);
         if (digest(req.candidate) !== digest(current.manifest.candidate))

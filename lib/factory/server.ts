@@ -52,6 +52,7 @@ export const factoryApprovals = createFactoryApprovals(
         ).skillEvaluations.passingEvaluation(...args),
     }),
   ],
+  { codeCandidatesMerge: true },
 );
 export const factoryMerges = createFactoryMerges(pool, authorize, factoryStore, githubMergeApi());
 export const claimFactoryCheckRun = createFactoryCheckClaim(pool, authorize);

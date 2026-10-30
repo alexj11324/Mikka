@@ -97,8 +97,8 @@ PR as the accepting person:
   webhook, which also completes a merge made directly on GitHub.
 - Preview deployments come from the repository's own integration (Vercel on the
   PR) and are evidence only. The local and Vercel publication adapters are not
-  registered for acceptance; `approve` refuses an action with no registered
-  publication (`factoryAcceptanceIsMerge`).
+  registered for acceptance, and the production composition refuses `approve` for
+  a code candidate (`codeCandidatesMerge`, error `factoryAcceptanceIsMerge`).
 
 A skill candidate has no PR. It is still approved and enabled through
 `factory_approvals` / `factory_publications` with the skill activation adapter.

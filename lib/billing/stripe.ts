@@ -52,3 +52,10 @@ export function verifyStripeSignature(body: string, header: string | null, secre
     return timingSafeEqual(Buffer.from(value, 'hex'), expected)
   })
 }
+
+/** Retrieves a Stripe-owned resource; paths are constructed by the server. */
+export async function stripeGet<T>(config: StripeConfig,path: string,fetchImpl: typeof fetch = fetch): Promise<T> {
+  const response = await fetchImpl(`https://api.stripe.com/v1/${path}`, { headers:{ authorization:`Bearer ${config.secretKey}` }, signal:AbortSignal.timeout(15_000) })
+  if (!response.ok) throw new StripeRequestError(response.status)
+  return response.json() as Promise<T>
+}

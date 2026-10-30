@@ -5,6 +5,7 @@ import test from "node:test";
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { factory194Target } from "../../tests/helpers/factory194-target";
 import { FactoryError } from "./approval-contract";
+import { createFactoryApprovals } from "./approval";
 import { handleFactoryApproval } from "./approval-http";
 import { createFactoryMerges, FactoryMergeRefused, type GitHubMergePort, type GitHubPullRequestView } from "./merge";
 
@@ -53,7 +54,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       CREATE TABLE run_publications ("runId" uuid PRIMARY KEY,"userId" text NOT NULL,"pullRequest" jsonb);
       CREATE TABLE improvement_skill_candidates ("factoryTaskId" uuid,"candidateId" uuid,"userId" text);
     `);
-    await pool.query(await readFile(new URL("../../drizzle/20261030230000_factory_merges.sql", import.meta.url), "utf8"));
+    await pool.query(await readFile(new URL("../../drizzle/20261030233000_factory_merges.sql", import.meta.url), "utf8"));
 
     let nextPull = 418;
     async function prepared(pr = `https://github.com/alexj11324/Mikka/pull/${nextPull++}`) {
@@ -176,7 +177,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
 
     await t.test("a code candidate cannot be approved into an unpublished state; HTTP refusals carry the PR", async () => {
       const x = await prepared();
-      await assert.rejects(() => f.service([]).approve(actor, x.approval), (e) => e instanceof FactoryError && e.code === "factoryAcceptanceIsMerge");
+      await assert.rejects(() => createFactoryApprovals(pool, f.authorize, f.store, [], { codeCandidatesMerge: true }).approve(actor, x.approval), (e) => e instanceof FactoryError && e.code === "factoryAcceptanceIsMerge");
       x.github.state.merge = async () => ({ merged: false, status: 403 });
       const request = { actor, authorization: null, method: "POST", taskId: x.task.id, origin: "https://mikka.test", url: `https://mikka.test/api/factory/tasks/${x.task.id}/approval` };
       const http = await handleFactoryApproval(f.service([]), { ...request, body: { operation: "accept", input: { binding: x.approval.binding, eventId: randomUUID() } }, githubToken: async () => TOKEN }, x.merges);
