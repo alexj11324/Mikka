@@ -137,7 +137,7 @@
     "test:run-dispatch": "node --import tsx --test tests/run-dispatch.test.ts",
     "test:factory-http": "node scripts/run-factory-http-tests.mjs",
     "test:skill-semantic-db": "TSX_DISABLE_CACHE=1 node --import ./scripts/server-test.mjs --import tsx --test lib/self-improvement/evaluation-comparison-postgres.test.ts lib/self-improvement/claim-composition-postgres.test.ts",
-    "test:factory-routing": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/intake.test.ts lib/factory/tools.test.ts lib/factory/dispatch-http.test.ts lib/factory/route-http.test.ts lib/factory/questions/route.test.ts",
+    "test:factory-routing": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/intake.test.ts lib/factory/tools.test.ts lib/factory/dispatch-http.test.ts lib/factory/route-http.test.ts lib/factory/questions/route.test.ts && pnpm test:factory-acceptance-ui",
     "test:factory-routing-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/factory/routing.db.test.ts tests/factory-admission.db.test.ts lib/factory/list.db.test.ts lib/factory/completion-reconcile.db.test.ts lib/factory/run-end-paths.db.test.ts lib/factory/dispatch-http.db.test.ts lib/factory/route-http.db.test.ts lib/cloud-computer/thread-machine-stop.db.test.ts tests/run-chain.db.test.ts lib/factory/publication-failed.db.test.ts lib/factory/dispatch-recovery.db.test.ts lib/factory/task-detail.db.test.ts lib/factory/questions/ask-user.db.test.ts lib/factory/monitor-sweep.db.test.ts",
     "test:factory-checks-db": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/checks.db.test.ts",
     "test:factory-check-recovery": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/check-recovery-tools.test.ts",
@@ -149,7 +149,8 @@
     "test:unattended": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/visual-contract.test.ts lib/cloud-computer/visual-model.test.ts && pnpm --filter @mikka/daemon exec vitest run src/agents/public-egress.test.ts src/agents/run-network.test.ts src/agents/tool-approval-policy.test.ts src/permissions.test.ts && pnpm --filter @mikka/protocol exec vitest run src/agent-policy.test.ts src/network-bounds.test.ts",
     "test:account": "node --import tsx --test lib/account/account.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/account/mail.test.ts tests/account-actions.test.ts",
     "test:account-db": "node --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test lib/account/store.db.test.ts",
-    "test:issue-readonly-dom": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/issue-readonly-dom.test.tsx"
+    "test:issue-readonly-dom": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/issue-readonly-dom.test.tsx",
+    "test:factory-acceptance-ui": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/factory/acceptance-state.test.ts lib/factory/reject-flow.test.ts components/workspace/factory-acceptance.test.tsx scripts/factory-acceptance-ui.test.tsx"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

@@ -3271,7 +3271,9 @@
       "live": "Live",
       "revoked": "Revoked",
       "expired": "Expired",
-      "unavailable": "Cannot approve"
+      "unavailable": "Cannot approve",
+      "failed": "Publish failed",
+      "invalidated": "Invalidated"
     },
     "stage": {
       "execute": "Execute",
@@ -3292,7 +3294,26 @@
     "publicationUnavailable": "Publication is unavailable: no publication target is configured.",
     "attestationRequired": "Production needs a signed attestation.",
     "artifactError": "The evidence did not open.",
-    "closeEvidence": "Close evidence"
+    "closeEvidence": "Close evidence",
+    "superseded": "{sha} · Invalidated",
+    "copySha": "Copy full sha {sha}",
+    "shaCopied": "Full sha copied",
+    "shaCopyFailed": "Copy failed. Allow clipboard access in your browser.",
+    "loadError": "Could not load the acceptance",
+    "skillState": {
+      "pending": "Ready to enable",
+      "live": "Enabled"
+    },
+    "listError": "Couldn't load acceptance",
+    "retry": "Retry",
+    "reject": "Request changes",
+    "rejectNote": "Note for changes",
+    "rejectSubmit": "Send back",
+    "rejecting": "Submitting…",
+    "rejectFailed": "Couldn't submit. Try again.",
+    "resubmit": "Resubmit",
+    "cancel": "Cancel",
+    "publishFailed": "Publish failed. The approval is kept."
   },
   "AccountEmail": {
     "exportSubject": "Your Mikka data export",
