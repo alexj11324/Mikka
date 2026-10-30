@@ -143,11 +143,12 @@ export function createFactoryQuestions(
       tx.release();
     }
   }
-  async function ownedTask(tx: PoolClient, userId: string, taskId: string) {
-    return store.lockTask(tx, userId, taskId);
+  async function ownedTask(tx: PoolClient, userId: string, taskId: string, lock = true) {
+    return lock ? store.lockTask(tx, userId, taskId) : store.readTask(tx, userId, taskId);
   }
 
-  async function owned(tx: PoolClient, userId: string, questionId: string) {
+  /** lock=false for GETs (pending/read/list): no FOR UPDATE on the task or question. */
+  async function owned(tx: PoolClient, userId: string, questionId: string, lock = true) {
     if (!z.uuid().safeParse(questionId).success) fail("factoryInvalid");
     const {
       rows: [identity],
@@ -156,11 +157,13 @@ export function createFactoryQuestions(
       [questionId, userId],
     );
     if (!identity) fail("factoryNotFound");
-    const task = await ownedTask(tx, userId, identity.taskId);
+    const task = await ownedTask(tx, userId, identity.taskId, lock);
     const {
       rows: [q],
     } = await tx.query<FactoryQuestion>(
-      'SELECT * FROM factory_questions WHERE id=$1 AND "userId"=$2 FOR UPDATE',
+      lock
+        ? 'SELECT * FROM factory_questions WHERE id=$1 AND "userId"=$2 FOR UPDATE'
+        : 'SELECT * FROM factory_questions WHERE id=$1 AND "userId"=$2',
       [questionId, userId],
     );
     if (!q || q.issueId !== task.issueId) fail("factoryNotFound");
@@ -252,7 +255,7 @@ export function createFactoryQuestions(
         try {
           result.push(
             await transaction(async (tx) => {
-              const { task, q } = await owned(tx, userId, row.id);
+              const { task, q } = await owned(tx, userId, row.id, false);
               return currentView(tx, task, q, false);
             }),
           );
@@ -268,13 +271,13 @@ export function createFactoryQuestions(
     },
     async read(userId: string, questionId: string) {
       return transaction(async (tx) => {
-        const { task, q } = await owned(tx, userId, questionId);
+        const { task, q } = await owned(tx, userId, questionId, false);
         return currentView(tx, task, q, false);
       });
     },
     async list(userId: string, taskId: string) {
       return transaction(async (tx) => {
-        const task = await ownedTask(tx, userId, taskId);
+        const task = await ownedTask(tx, userId, taskId, false);
         const { rows } = await tx.query<FactoryQuestion>(
           'SELECT * FROM factory_questions WHERE "taskId"=$1 AND "userId"=$2 ORDER BY "createdAt" DESC, id DESC LIMIT 50',
           [taskId, userId],

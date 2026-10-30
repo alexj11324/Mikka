@@ -135,15 +135,18 @@ export function createFactoryStore(
     );
     return rows.length === 1;
   }
-  async function owned(tx: PoolClient, userId: string, taskId: string) {
+  /** lock=false is the read-only variant for GETs: same ownership/scope checks, no row locks. */
+  async function owned(tx: PoolClient, userId: string, taskId: string, lock = true) {
     uuid(taskId);
     const {
       rows: [task],
     } = await tx.query<FactoryTask>(
-      'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
+      lock
+        ? 'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE'
+        : 'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2',
       [taskId, userId],
     );
-    const issue = task ? await lockedIssue(tx, task.issueId) : undefined;
+    const issue = task ? await lockedIssue(tx, task.issueId, lock) : undefined;
     if (
       !task ||
       task.botId !== botId ||
@@ -154,8 +157,8 @@ export function createFactoryStore(
       fail("factoryNotFound");
     return task;
   }
-  async function lockedIssue(tx: PoolClient, issueId: string) {
-    const { rows: [issue] } = await tx.query<FactoryIssueScope>('SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1 FOR SHARE', [issueId]);
+  async function lockedIssue(tx: PoolClient, issueId: string, lock = true) {
+    const { rows: [issue] } = await tx.query<FactoryIssueScope>(lock ? 'SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1 FOR SHARE' : 'SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1', [issueId]);
     return issue;
   }
   async function snapshot(
@@ -230,7 +233,9 @@ export function createFactoryStore(
     task.status = "pending";
   }
   return {
-    lockTask: owned,
+    lockTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId),
+    /** Read-only GET paths: ownership/scope checked, nothing locked. */
+    readTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId, false),
     async route(userId: string, input: unknown) {
       const parsed = routeSchema.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");

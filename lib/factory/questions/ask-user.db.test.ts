@@ -145,6 +145,27 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.deepEqual(await snap(), before, "GETs wrote nothing");
     });
 
+    await t.test("GETs do not block while another transaction holds FOR UPDATE on the task, question and issue", async () => {
+      const holder = await pool.connect();
+      try {
+        await holder.query("BEGIN");
+        await holder.query("SELECT 1 FROM factory_tasks WHERE id=$1 FOR UPDATE", [b.taskId]);
+        await holder.query("SELECT 1 FROM factory_questions WHERE id=$1 FOR UPDATE", [b.questionId]);
+        await holder.query('SELECT 1 FROM issues WHERE id=(SELECT "issueId" FROM factory_tasks WHERE id=$1) FOR UPDATE', [b.taskId]);
+        const within = <T,>(p: Promise<T>, what: string) => Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${what} blocked on a row lock`)), 3000))]);
+        assert.equal((await within(questions.read("owner", b.questionId), "read")).id, b.questionId);
+        assert.ok((await within(questions.list("owner", b.taskId), "list")).some((q) => q.id === b.questionId));
+        assert.ok((await within(questions.pending("owner", b.runId), "pending")).some((q) => q.id === b.questionId));
+        assert.equal((await within(get("owner", `?taskId=${b.taskId}`), "GET route")).status, 200);
+        // Control: a write path on the same task does wait for the lock.
+        const blocked = await Promise.race([store.read("owner", b.taskId).then(() => "done"), new Promise((r) => setTimeout(() => r("blocked"), 500))]);
+        assert.equal(blocked, "blocked", "control: locking path waits");
+      } finally {
+        await holder.query("ROLLBACK");
+        holder.release();
+      }
+    });
+
     await t.test("rejects bad input and anonymous callers", async () => {
       assert.equal((await get("owner", `?taskId=${a.taskId}&runId=${a.runId}`)).status, 422);
       assert.equal((await get("owner", "?runId=nope")).status, 422);
