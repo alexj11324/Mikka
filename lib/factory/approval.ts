@@ -187,7 +187,7 @@ async function boundApproval(
   const {
     rows: [a],
   } = await tx.query(
-    'SELECT *,"expiresAt">clock_timestamp() AS unexpired FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL AND "invalidatedAt" IS NULL FOR UPDATE',
+    'SELECT *,"expiresAt">clock_timestamp() AS unexpired FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL FOR UPDATE',
     [id, task.id, task.userId, task.candidateId],
   );
   if (
@@ -481,9 +481,14 @@ export function createFactoryApprovals(
       if (!z.uuid().safeParse(taskId).success) fail("factoryInvalid");
       return transaction(async (tx) => {
         const task = await owned(tx, actor, taskId, true);
+        // B4: an approval stops counting once its candidate is no longer current. That is
+        // derived here, not stored: every authorization query already requires the task's
+        // current candidateId.
         const { rows: approvals } = await tx.query(
-          'SELECT id,"candidateId","userId",candidate,action,target,request->>\'targetEnvironment\' AS "targetEnvironment","evidenceDigest",evidence,"expiresAt","revokedAt","invalidatedAt","invalidationReason","createdAt" FROM factory_approvals WHERE "taskId"=$1 ORDER BY "createdAt"',
-          [task.id],
+          `SELECT id,"candidateId","userId",candidate,action,target,request->>'targetEnvironment' AS "targetEnvironment","evidenceDigest",evidence,"expiresAt","revokedAt",
+                  CASE WHEN "candidateId" IS DISTINCT FROM $2::uuid AND "revokedAt" IS NULL THEN 'candidateSuperseded' END AS "invalidationReason","createdAt"
+             FROM factory_approvals WHERE "taskId"=$1 ORDER BY "createdAt"`,
+          [task.id, task.candidateId],
         );
         const { rows: publications } = await tx.query(
           'SELECT id,"approvalId","candidateId",action,target,request,request->>\'targetEnvironment\' AS "targetEnvironment",status,receipt,"createdAt","finishedAt" FROM factory_publications WHERE "taskId"=$1 ORDER BY "createdAt"',

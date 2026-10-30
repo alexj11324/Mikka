@@ -20,7 +20,7 @@ function guarded(url: string) {
   return u;
 }
 
-test('B2/B4 migrations: failed publications are terminal and a superseded candidate invalidates its approvals', { skip: !base, timeout: 120_000 }, async () => {
+test('B2/B4: failed publications are terminal and a superseded candidate invalidates its approvals', { skip: !base, timeout: 120_000 }, async () => {
   const admin = guarded(base!);
   const name = `fac_x_${randomUUID().replaceAll('-', '')}_e2e`;
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 });
@@ -30,8 +30,10 @@ test('B2/B4 migrations: failed publications are terminal and a superseded candid
   try {
     const dir = new URL('../../drizzle/', import.meta.url);
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'));
-    const { rows: cons } = await pool.query(`SELECT conname, convalidated FROM pg_constraint WHERE conname IN ('factory_publications_status_v2_check','factory_publications_status_check','factory_approvals_invalidation_check') ORDER BY 1`);
-    assert.deepEqual(cons, [{ conname: 'factory_approvals_invalidation_check', convalidated: true }, { conname: 'factory_publications_status_v2_check', convalidated: true }]);
+    const { rows: cons } = await pool.query(`SELECT conname, convalidated FROM pg_constraint WHERE conname IN ('factory_publications_status_v2_check','factory_publications_status_check') ORDER BY 1`);
+    assert.deepEqual(cons, [{ conname: 'factory_publications_status_v2_check', convalidated: true }]);
+    // B4 is derived from candidateId, not stored.
+    assert.equal((await pool.query(`SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name='factory_approvals' AND column_name IN ('invalidatedAt','invalidationReason')`)).rows[0].n, 0);
     const [deviceId, agentId, issueId, taskId, implAttempt, reviewAttempt, verifyAttempt, implRun, reviewRun, candidateId, approvalId] = Array.from({ length: 11 }, () => randomUUID());
     const sha = 'b'.repeat(40);
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','O','o@example.invalid',true,now(),now()),('other','X','x@example.invalid',true,now(),now())`);
@@ -60,25 +62,29 @@ test('B2/B4 migrations: failed publications are terminal and a superseded candid
     const pub = randomUUID();
     await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status) VALUES ($1,$2,$3,$4,'deploy_preview','preview',$5,'{}','failed')`, [pub, approvalId, taskId, candidateId, randomUUID()]);
     await assert.rejects(pool.query(`UPDATE factory_publications SET status='bogus' WHERE id=$1`, [pub]), /factory_publications_status_v2_check/);
-    await assert.rejects(pool.query(`UPDATE factory_approvals SET "invalidatedAt"=now() WHERE id=$1`, [approvalId]), /factory_approvals_invalidation_check/, 'timestamp and reason travel together');
-    await assert.rejects(pool.query(`UPDATE factory_approvals SET "invalidatedAt"=now(),"invalidationReason"='whatever' WHERE id=$1`, [approvalId]), /factory_approvals_invalidation_check/);
 
     const store = createFactoryStore(pool, async () => true, null, { independent: async () => true });
-    const state = async () => (await pool.query(`SELECT "invalidatedAt" IS NOT NULL AS gone,"invalidationReason" FROM factory_approvals WHERE id=$1`, [approvalId])).rows[0];
+    const ledgerService = createFactoryApprovals(pool, async () => true, store, []);
+    const state = async () => {
+      const approval = (await ledgerService.ledger({ userId: 'owner' }, taskId)).approvals.find((a: { id: string }) => a.id === approvalId);
+      return { gone: approval.invalidationReason !== null, invalidationReason: approval.invalidationReason };
+    };
     const binding = async () => { const { rows: [t] } = await pool.query(`SELECT id AS "taskId","issueId","attemptId",revision,"candidateId" FROM factory_tasks WHERE id=$1`, [taskId]); return t; };
     // retry keeps the same candidate: the approval still counts.
     await store.apply('owner', await binding(), randomUUID(), { action: 'retry', reason: 'flake' });
     assert.deepEqual(await state(), { gone: false, invalidationReason: null });
     await pool.query(`UPDATE factory_tasks SET status='failed' WHERE id=$1`, [taskId]);
     await pool.query(`UPDATE factory_attempts SET status='failed' WHERE id=(SELECT "attemptId" FROM factory_tasks WHERE id=$1)`, [taskId]);
-    // repair drops the candidate: every approval of the old one is invalidated, once.
+    // repair drops the candidate: every approval of the old one reads as superseded.
     await store.apply('owner', await binding(), randomUUID(), { action: 'repair', reason: 'fix it' });
-    const first = (await pool.query(`SELECT "invalidatedAt" FROM factory_approvals WHERE id=$1`, [approvalId])).rows[0].invalidatedAt;
     assert.deepEqual(await state(), { gone: true, invalidationReason: 'candidateSuperseded' });
     await pool.query(`UPDATE factory_tasks SET status='failed' WHERE id=$1`, [taskId]);
     await pool.query(`UPDATE factory_attempts SET status='failed' WHERE id=(SELECT "attemptId" FROM factory_tasks WHERE id=$1)`, [taskId]);
     await store.apply('owner', await binding(), randomUUID(), { action: 'retry', reason: 'again' });
-    assert.deepEqual((await pool.query(`SELECT "invalidatedAt" FROM factory_approvals WHERE id=$1`, [approvalId])).rows[0].invalidatedAt, first, 'first invalidation time kept');
+    assert.deepEqual(await state(), { gone: true, invalidationReason: 'candidateSuperseded' }, 'still superseded after a later retry');
+    // A revoked approval reads as revoked, not superseded.
+    await pool.query(`UPDATE factory_approvals SET "revokedAt"=now() WHERE id=$1`, [approvalId]);
+    assert.deepEqual(await state(), { gone: false, invalidationReason: null });
 
     // BE-4 retry: the old logical UNIQUE is gone; the partial key ignores failed rows.
     const { rows: keys } = await pool.query(`SELECT c.relname, i.indisvalid, pg_get_expr(i.indpred, i.indrelid) AS pred FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='factory_publications_active_key'`);
@@ -161,7 +167,7 @@ test('B2/B4 migrations: failed publications are terminal and a superseded candid
     await markPublicationSucceeded(pool, g1, { operationId: 'dpl_ok' } as any);
     assert.equal((await snap(g1)).status, 'succeeded');
 
-    // ---- validApproval ignores an invalidated approval ----
+    // ---- an approval of a superseded candidate is never selected ----
     await pool.query(`UPDATE factory_tasks SET stage='publish',status='passed',"candidateId"=$2 WHERE id=$1`, [taskId, candidateId]);
     const sBinding = await binding();
     const a5 = randomUUID();
@@ -184,9 +190,15 @@ test('B2/B4 migrations: failed publications are terminal and a superseded candid
     await spied.reconcile({ userId: 'owner' }, { ...sReq, publicationId: spub }).catch(() => {});
     assert.ok(approvalRows.length > 0 && approvalRows.every((n) => n === 1), 'control: the live approval is found');
     approvalRows.length = 0;
-    await pool.query(`UPDATE factory_approvals SET "invalidatedAt"=now(),"invalidationReason"='candidateSuperseded' WHERE id=$1`, [a5]);
-    await assert.rejects(spied.reconcile({ userId: 'owner' }, { ...sReq, publicationId: spub }), (e: unknown) => e instanceof FactoryError && e.code === 'factoryApprovalInvalid');
-    assert.ok(approvalRows.length > 0 && (approvalRows as number[]).every((n) => n === 0), `an invalidated approval is not selected: ${approvalRows}`);
+    // A newer candidate replaces this one: the old approval reads as superseded and its
+    // publication no longer reconciles.
+    const newer = randomUUID();
+    await pool.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,$3,'o/r','device:x','repo',$4)`, [newer, taskId, 'c'.repeat(40), implRun]);
+    await pool.query(`UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1`, [taskId, newer]);
+    await assert.rejects(spied.reconcile({ userId: 'owner' }, { ...sReq, publicationId: spub }), (e: unknown) => e instanceof FactoryError && e.code === 'factoryStale');
+    const a5Row = (await ledgerService.ledger({ userId: 'owner' }, taskId)).approvals.find((a: { id: string }) => a.id === a5);
+    assert.equal(a5Row.invalidationReason, 'candidateSuperseded');
+    assert.equal(provider, 0);
     assert.equal(provider, 0);
   } finally {
     await pool.end();
