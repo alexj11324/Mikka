@@ -266,13 +266,13 @@ dbTest('Telegram source receipts survive failed turns and reject stale or revoke
   })
 })
 
-dbTest('a workspace Bot Telegram reply locks members before the issue, so team promotion cannot deadlock it (BE-14)', async t => {
+dbTest('a workspace Telegram reply reads authorization once without cross-database locks', async t => {
   const [{ createRequestDatabaseScope, db, pool }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { createTelegramReplies }, { sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('./telegram-replies'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const userId = `test-telegram-lock-order-${randomUUID()}`
-  const workspaceId = randomUUID(), botId = randomUUID(), issueId = randomUUID()
+  const workspaceId = randomUUID(), botId = randomUUID(), issueId = randomUUID(), peerId = `telegram-peer-${randomUUID()}`
   const telegramUserId = `synthetic-${randomUUID()}`
   const threadId = `telegram:synthetic-${randomUUID()}`
   // Remove this test's synthetic rows (children first); report them only if any are left behind.
@@ -285,7 +285,9 @@ dbTest('a workspace Bot Telegram reply locks members before the issue, so team p
             ['delete from coordinator_messages where "userId"=$1', userId],
             ['delete from coordinator_sessions where "userId"=$1', userId],
             ['delete from coordinator_events where "userId"=$1', userId],
+            ['delete from mikka_team_issues where "issueId"=$1', issueId],
             ['delete from issues where id=$1', issueId],
+            ['delete from "user" where id=$1', peerId],
             ['delete from bots where id=$1', botId],
             ['delete from mikka_workspace_members where "workspaceId"=$1', workspaceId],
             ['delete from mikka_workspaces where id=$1', workspaceId],
@@ -305,7 +307,7 @@ dbTest('a workspace Bot Telegram reply locks members before the issue, so team p
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${userId}, 'Synthetic lock-order owner', ${`${userId}@example.invalid`}, false, now(), now())`)
     await pool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,\'Synthetic lock order\')', [workspaceId, userId])
     await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'owner\',\'active\')', [workspaceId, userId, `${userId}@example.invalid`])
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Synthetic promotion\',$3,\'todo\',\'normal\',\'personal\')', [issueId, userId, JSON.stringify({ type: 'doc', content: [] })])
+    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Synthetic promotion\',$3,\'todo\',\'normal\',\'workspace\')', [issueId, userId, JSON.stringify({ type: 'doc', content: [] })])
     await db.insert(schema.bots).values({ id: botId, ownerId: userId, workspaceId, name: 'Synthetic workspace Bot' })
     await db.insert(schema.telegramLinks).values({ userId, telegramUserId })
     await recordCoordinatorEvent(db, userMessageEvent(userId, 'Synthetic issue Telegram message', { botId, issueId, telegram: { threadId, telegramUserId, messageId: 1 } }))
@@ -313,40 +315,33 @@ dbTest('a workspace Bot Telegram reply locks members before the issue, so team p
     assert.equal(taken.telegramTargets.length, 1)
     const target = taken.telegramTargets[0]
 
-    // Mirrors team-issue-create: the workspace tx holds the member row FOR
-    // UPDATE (lockAllowedTeam), then the app tx promotes the issue FOR UPDATE.
-    const team = await pool.connect(), promotion = await pool.connect()
-    const pending: Promise<unknown>[] = []
-    let sent = 0
-    try {
-      await team.query('BEGIN')
-      await team.query("SELECT set_config('lock_timeout','5s',true)")
-      await team.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE', [workspaceId, userId])
-      const replies = createTelegramReplies(pool, pool)
-      pending.push(replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ }))
-      for (let attempt = 0; !(await pool.query("SELECT 1 FROM pg_locks l JOIN pg_stat_activity a USING (pid) WHERE NOT l.granted AND a.datname=current_database() AND a.query LIKE '%mikka_workspace_members%'")).rowCount; attempt++) {
-        if (attempt > 400) throw Error('the reply never waited on the workspace member row')
-        await new Promise(resolve => setTimeout(resolve, 25))
-      }
-      pending.push((async () => {
-        await promotion.query('BEGIN')
-        await promotion.query("SELECT set_config('lock_timeout','5s',true)")
-        await promotion.query('SELECT 1 FROM issues WHERE id=$1 FOR UPDATE', [issueId])
-        await promotion.query('COMMIT')
-        await team.query('COMMIT')
-      })())
-      const results = await Promise.allSettled(pending)
-      const codes = results.flatMap(result => result.status === 'rejected' ? [(result.reason as { code?: string }).code ?? String(result.reason)] : [])
-      assert.ok(!codes.includes('40P01'), `deadlock between Telegram reply and team promotion: ${codes}`)
-      assert.ok(!codes.includes('55P03'), `lock_timeout between Telegram reply and team promotion: ${codes}`)
-      assert.deepEqual(codes, [])
-      assert.equal(sent, 1, 'the reply is delivered once after the promotion commits')
-    } finally {
-      await Promise.allSettled(pending)
-      await promotion.query('ROLLBACK').catch(() => undefined)
-      await team.query('ROLLBACK').catch(() => undefined)
-      promotion.release()
-      team.release()
-    }
+    let appReads = 0, workspaceReads = 0, sent = 0
+    const counted = (kind: 'app' | 'workspace') => ({ connect: async () => {
+      const client = await pool.connect()
+      return { query: (...args: Parameters<typeof client.query>) => {
+        if (typeof args[0] === 'string' && /^\s*SELECT/i.test(args[0])) {
+          if (kind === 'app') appReads++; else workspaceReads++
+        }
+        return client.query(...args)
+      }, release: () => client.release() } as typeof client
+    } })
+    const replies = createTelegramReplies(counted('app'), counted('workspace'))
+    await replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ })
+    assert.equal(sent, 1)
+    assert.equal(appReads, 2, 'one timeout configuration read and one authorization read')
+    assert.equal(workspaceReads, 1, 'one membership read without a workspace transaction')
+    await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [peerId, `${peerId}@example.invalid`])
+    await pool.query('UPDATE issues SET "userId"=$2 WHERE id=$1', [issueId, peerId])
+    await assert.rejects(replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ }), /telegramReplySourceUnavailable/, 'a foreign issue without a workspace link stays private')
+    await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [issueId, randomUUID(), workspaceId, peerId])
+    await replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ })
+    assert.equal(sent, 2, 'a current workspace membership grants source access')
+    await pool.query("UPDATE issues SET scope='personal' WHERE id=$1", [issueId])
+    await assert.rejects(replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ }), /telegramReplySourceUnavailable/, 'another person’s personal issue stays private')
+    await pool.query('UPDATE issues SET "userId"=$2 WHERE id=$1', [issueId, userId])
+    await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [issueId])
+    await pool.query(`UPDATE mikka_workspace_members SET status='removed' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspaceId, userId])
+    await assert.rejects(replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ }), /telegramReplySourceUnavailable/)
+    assert.equal(sent, 2)
   })
 })
