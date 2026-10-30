@@ -21,10 +21,11 @@ export function harnessLabel(harness: string) {
   return harness === 'claude_code' ? 'Claude Code' : harness === 'codex' ? 'Codex' : harness
 }
 
-export function ThreadStatus({ status, stopping = false }: { status: string; stopping?: boolean }) {
+export function ThreadStatus({ status, stopping = false, waiting = false }: { status: string; stopping?: boolean; waiting?: boolean }) {
   const statusLabel = useTranslations('Coordinator.citation.runStatus')
   const t = useTranslations('IssueThreads')
   const key = runStatusKey(status)
+  if (waiting) return <Badge variant="warning-light" size="sm">{t('waiting')}</Badge>
   if (stopping) return <Badge variant="secondary" size="sm">{t('stopping')}</Badge>
   return <Badge variant={RUN_BADGES[status] ?? 'secondary'} size="sm">{key ? statusLabel(key) : status}</Badge>
 }

@@ -2515,7 +2515,8 @@
     "pullRequest": "PR #{number}",
     "moreOutputs": "+{count}",
     "moreOutputsAria": "还有 {count} 个输出",
-    "send": "发送"
+    "send": "发送",
+    "waiting": "等你回复"
   },
   "Computer": {
     "status": {

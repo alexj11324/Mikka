@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import {
   agents, agentRuns, deviceRepos, devices, issueMembers, runChunks, runMessages, users,
   type SupportedHarness,
@@ -172,9 +172,28 @@ async function readableThread(issueId: string, runId: string) {
 
 export interface IssueThreadDetail {
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
-  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean }
+  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean
+    /** 等你回复 (Figma 382:6469): this ended run asked its owner a Factory question; `resuming` once answered. */
+    question: 'waiting' | 'resuming' | null }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
+}
+
+/**
+ * Whether the run's owner owes it an answer. Only the owner may answer (lib/agent-runs.ts),
+ * and only while Factory lifecycle is on; the answer itself goes through sendIssueThreadMessage.
+ */
+async function threadQuestion(runId: string, ownerId: string, viewerId: string): Promise<'waiting' | 'resuming' | null> {
+  if (ownerId !== viewerId || process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return null
+  const { rows: [q] } = await pool.query<{ status: string }>(
+    `SELECT q.status FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId"
+      WHERE q."originRunId"=$1 AND q."userId"=$2 AND t."userId"=$2 AND t.status NOT IN ('cancelled','revoked')
+        AND t."candidateId" IS NOT DISTINCT FROM q."candidateId"
+        AND (q.status='resuming' OR (q.status IN ('open','waiting_user') AND (q."expiresAt" IS NULL OR q."expiresAt">now())))
+      ORDER BY q."createdAt" DESC LIMIT 1`,
+    [runId, viewerId],
+  )
+  return !q ? null : q.status === 'resuming' ? 'resuming' : 'waiting'
 }
 
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
@@ -187,7 +206,7 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
   const [thread] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
   return {
-    thread: { ...thread, prompt: row.prompt, stopRequestedAt: row.stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, question: await threadQuestion(row.id, row.userId, user.id), prompt: row.prompt, stopRequestedAt: row.stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
   }
