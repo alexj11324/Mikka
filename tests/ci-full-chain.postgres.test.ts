@@ -30,7 +30,7 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
   delete process.env.MIKKA_CI_RESUME_ENABLED
   let scopedPool: Pool | undefined, workspacePool: Pool | undefined
   try {
-    assert.ok(Number((await fixture.query('SHOW server_version_num')).rows[0].server_version_num) >= 160000)
+    assert.equal((await fixture.query('SHOW server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
     const migrations = new URL('../drizzle/', import.meta.url)
     // This fixture skips only the unrelated global pg_trgm search index migration:
     // CREATE EXTENSION is database-global and outside its private schema.

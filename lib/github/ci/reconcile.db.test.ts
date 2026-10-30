@@ -18,14 +18,14 @@ const snapshot = { checks: [{ id: '1', name: 'build', status: 'completed', concl
 const summary = summarize(snapshot)
 if (summary.kind !== 'complete') throw Error('fixture')
 
-test('PG16+: concurrent workers lock one observation; failure and capped escalation are durable', { skip: !target }, async () => {
+test('PG17: concurrent workers lock one observation; failure and capped escalation are durable', { skip: !target }, async () => {
   const schema = `ci_obs_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: target })
   await admin.query(`CREATE SCHEMA "${schema}"`)
   const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}` })
   const issue = randomUUID(), run = randomUUID(), agent = randomUUID()
   try {
-    assert.ok(Number((await pool.query('show server_version_num')).rows[0].server_version_num) >= 160000)
+    assert.equal((await pool.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
     await pool.query(`CREATE TABLE "user" (id text primary key);
       CREATE TABLE issues (id uuid primary key, content jsonb, "scopeVersion" int);
       CREATE TABLE agent_runs (id uuid primary key, "userId" text, "agentId" uuid, "botId" uuid, "createdAt" timestamptz default now());
@@ -132,7 +132,7 @@ test('PG16+: concurrent workers lock one observation; failure and capped escalat
   } finally { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() }
 })
 
-test('PG16+: resume budget dedupes per (task, PR, head, result) and caps resumes per task per rolling day', { skip: !target }, async () => {
+test('real PG: resume budget dedupes per (task, PR, head, result) and caps resumes per task per rolling day', { skip: !target }, async () => {
   const schema = `ci_budget_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: target })
   await admin.query(`CREATE SCHEMA "${schema}"`)
@@ -168,7 +168,7 @@ test('PG16+: resume budget dedupes per (task, PR, head, result) and caps resumes
   } finally { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() }
 })
 
-test('PG16+: reconcile does not resume once the per-task cap is reached; the result is not retried', { skip: !target }, async () => {
+test('real PG: reconcile does not resume once the per-task cap is reached; the result is not retried', { skip: !target }, async () => {
   const schema = `ci_cap_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: target })
   await admin.query(`CREATE SCHEMA "${schema}"`)
