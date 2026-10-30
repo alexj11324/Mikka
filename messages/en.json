@@ -1697,7 +1697,9 @@
       "adminOnly": "Only workspace admins can change this setting.",
       "ask": "Ask for approval",
       "deny": "Deny",
-      "error": "Could not update or load the computer setting."
+      "error": "Could not update or load the computer setting.",
+      "loading": "Loading approval settings…",
+      "unavailable": "Cloud computer tasks aren't turned on for this deployment, so there's nothing to approve yet."
     },
     "issuePrefix": {
       "title": "Personal task ids",
@@ -1782,7 +1784,9 @@
       "extraUsageOn": "Extra usage is on, so Bots won’t use this subscription",
       "extraUsageClaudeFix": "Turn it off in claude.ai Settings › Usage",
       "extraUsageUnverified": "Couldn’t confirm extra usage is off, so Bots won’t use this subscription for now",
-      "removeFailed": "The connection could not be removed."
+      "removeFailed": "The connection could not be removed.",
+      "loading": "Loading model subscriptions…",
+      "serviceOff": "Model subscriptions aren't turned on for this deployment. Bots use the workspace's default model quota."
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
@@ -2018,7 +2022,9 @@
         "denied_or_failed": "Refused or failed"
       }
     },
-    "sectionUnavailable": "This section is still being designed and has nothing to act on yet."
+    "sectionUnavailable": "This section is still being designed and has nothing to act on yet.",
+    "workspaceLoading": "Loading the workspace…",
+    "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again."
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",

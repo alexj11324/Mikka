@@ -1697,7 +1697,9 @@
       "adminOnly": "只有工作区管理员可以修改此设置。",
       "ask": "操作前审批",
       "deny": "禁止",
-      "error": "无法读取或更新电脑设置。"
+      "error": "无法读取或更新电脑设置。",
+      "loading": "正在读取审批设置…",
+      "unavailable": "这个部署还没有开启云电脑任务，暂时没有需要审批的操作。"
     },
     "issuePrefix": {
       "title": "个人任务编号",
@@ -1782,7 +1784,9 @@
       "extraUsageOn": "开启了额外用量，Bot 不会使用这个订阅",
       "extraUsageClaudeFix": "在 claude.ai 的 设置 › 用量 关闭",
       "extraUsageUnverified": "没确认额外用量已关闭，Bot 暂不会使用这个订阅",
-      "removeFailed": "无法移除这个连接。"
+      "removeFailed": "无法移除这个连接。",
+      "loading": "正在读取模型订阅…",
+      "serviceOff": "这个部署还没有开启模型订阅，Bot 会使用工作区默认的模型额度。"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",
@@ -2018,7 +2022,9 @@
         "denied_or_failed": "被拒绝或失败"
       }
     },
-    "sectionUnavailable": "这个分区还在设计中，暂时没有可用的操作。"
+    "sectionUnavailable": "这个分区还在设计中，暂时没有可用的操作。",
+    "workspaceLoading": "正在读取工作区…",
+    "workspaceUnavailable": "无法读取工作区，请刷新后重试。"
   },
   "TelegramBot": {
     "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",

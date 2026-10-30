@@ -34,7 +34,8 @@ export function ComputerPolicySettings({ workspaceId }: { workspaceId: string })
       await refresh()
     } catch { setError(true); await refresh().catch(() => undefined) } finally { setPending(false) }
   }
-  if (!state?.enabled) return error ? <p role="alert" className="text-sm text-destructive">{t('error')}</p> : null
+  if (!state) return error ? <p role="alert" className="text-sm text-destructive">{t('error')}</p> : <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>
+  if (!state.enabled) return <p role="status" className="text-sm text-muted-foreground">{t('unavailable')}</p>
   return <div className="flex flex-col gap-2">
     <SettingsSection id="computer-policy-heading" title={t('heading')} description={t('description')}>
       <SettingRow title={t('label')} description={state.canEdit ? t('help') : t('adminOnly')}>

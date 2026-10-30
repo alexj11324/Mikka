@@ -54,8 +54,10 @@ export function SettingsView({ user, userKey, googleEnabled = false, onBack, onS
   const t = useTranslations('Settings')
   const [localSection, setSection] = useState<SettingsSectionId>(activeSection ?? initialSection ?? 'preferences')
   const section = activeSection ?? localSection
-  const { data: workspace } = useWorkspace(userKey ?? user.email, workspaceId)
+  const { data: workspace, error: workspaceError } = useWorkspace(userKey ?? user.email, workspaceId)
   const admin = workspace?.role === 'admin'
+  // Settings opened without ?workspace= still has one: the default the API resolved.
+  const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id
   const title = t(`sections.${section}.title`)
   const routedBody = section === 'members' || section === 'teams'
 
@@ -65,13 +67,17 @@ export function SettingsView({ user, userKey, googleEnabled = false, onBack, onS
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {routedBody ? children ?? (section === 'members' ? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} /> : null) : <SettingsContent className="gap-6">
         {section === 'computers' ? <DevicesSettings /> : <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
-        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={workspaceId} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} />
+        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceError={Boolean(workspaceError)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} />
       </SettingsContent>}
     </AppShellContent>
   </>
 }
 
-function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, linearNotice, preview, onSignOut, signingOut }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean }) {
+function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, workspaceError = false, linearNotice, preview, onSignOut, signingOut }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; workspaceError?: boolean }) {
+  // Workspace sections wait for the workspace instead of rendering nothing.
+  const waiting = !workspaceId && !preview
+    ? workspaceError ? <p role="alert" className="text-sm text-destructive">{t('workspaceUnavailable')}</p> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
+    : null
   switch (section) {
     case 'account': return <AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />
     case 'security': return <><SecuritySettings /><GoogleSignInSettings googleEnabled={googleEnabled} /></>
@@ -82,9 +88,9 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, li
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <><IntegrationsSettings /><LinearSettings notice={linearNotice ?? null} /><TelegramSettings preview={preview} /></>
-    case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : null
+    case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
-    case 'permissions': return workspaceId && !preview ? <ComputerPolicySettings key={workspaceId} workspaceId={workspaceId} /> : null
+    case 'permissions': return workspaceId && !preview ? <ComputerPolicySettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return <p className="py-8 text-sm text-muted-foreground">{t('sectionUnavailable')}</p>
   }
 }
