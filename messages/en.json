@@ -3033,7 +3033,9 @@
       "live": "Live",
       "revoked": "Revoked",
       "expired": "Expired",
-      "unavailable": "Cannot approve"
+      "unavailable": "Cannot approve",
+      "failed": "Publish failed",
+      "invalidated": "Invalidated"
     },
     "stage": {
       "execute": "Execute",
@@ -3054,6 +3056,12 @@
     "publicationUnavailable": "Publication is unavailable: no publication target is configured.",
     "attestationRequired": "Production needs a signed attestation.",
     "artifactError": "The evidence did not open.",
-    "closeEvidence": "Close evidence"
+    "closeEvidence": "Close evidence",
+    "skillState": {
+      "pending": "Ready to enable",
+      "live": "Enabled"
+    },
+    "listError": "Couldn't load acceptance",
+    "retry": "Retry"
   }
 }

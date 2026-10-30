@@ -3,12 +3,17 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ChevronRight, ClipboardCheck, ExternalLink, FileText, Image as ImageIcon, LoaderCircle, Play, X } from 'lucide-react'
+import { ChevronRight, ClipboardCheck, FileText, Image as ImageIcon, LoaderCircle, Play, X } from 'lucide-react'
+import { Alert, AlertAction, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Item, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item'
+import { Skeleton } from '@/components/ui/skeleton'
 import { withBasePath } from '@/lib/base-path'
 import { MIKKA_VERCEL, publicationActionFor, vercelTarget, type PublicationEnvironment } from '@/lib/factory/vercel-target'
+import { acceptanceState, acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
+import { ApprovalBar } from './factory-approval-bar'
 import { IssueThreadPanel } from './issue-thread-panel'
 
 type Candidate = { sha: string; repository: string; environment: string; scope: string }
@@ -16,7 +21,7 @@ type Artifact = { artifact: string; kind: 'log' | 'report' | 'screenshot' | 'vid
 type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean }
 type Evidence = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; evidenceDigest: string; evidenceReadId: string; manifest: { candidate: Candidate; artifacts: Artifact[] } }
 type Approval = { id: string; candidateId: string; candidate: Candidate; action: string; target: string; targetEnvironment: string; expiresAt: string; revokedAt: string | null }
-type Publication = { id: string; approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded'; request: Record<string, unknown>; receipt?: { verifiedTarget?: { reference?: string } } }
+type Publication = { id: string; approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed'; request: Record<string, unknown>; receipt?: { verifiedTarget?: { reference?: string } } }
 type Ledger = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; approvals: Approval[]; publications: Publication[] }
 
 class RequestError extends Error {
@@ -36,7 +41,6 @@ async function request(path: string, body?: unknown) {
 const environmentOf = (candidate: Candidate | undefined): PublicationEnvironment | null =>
   candidate?.environment === 'production' ? 'production' : candidate?.environment === 'preview' ? 'preview' : null
 
-type AcceptanceState = 'pending' | 'approved' | 'publishing' | 'checking' | 'live' | 'revoked' | 'expired' | 'unavailable'
 type ErrorKey = 'error' | 'decisionUnavailable' | 'publicationUnavailable' | 'attestationRequired'
 const ERROR_KEYS: Record<string, ErrorKey> = {
   factoryPolicyDecisionUnavailable: 'decisionUnavailable',
@@ -48,16 +52,27 @@ const taskState = (task: FactoryTask): AcceptanceState => task.stage === 'approv
   ? 'pending'
   : task.status === 'failed' ? 'checking' : task.status === 'passed' ? 'live' : task.status === 'running' || task.status === 'waiting' ? 'publishing' : 'approved'
 
-const tone = (state: AcceptanceState) => state === 'live' ? 'success' : state === 'pending' ? 'warning' : state === 'revoked' || state === 'expired' ? 'neutral' : 'info'
+const tone = (state: AcceptanceState) => state === 'live' ? 'success' : state === 'pending' ? 'warning' : state === 'failed' ? 'destructive' : state === 'revoked' || state === 'expired' || state === 'invalidated' ? 'neutral' : 'info'
 
 /** Acceptance for a Factory task (R-56): evidence on the left, the thread that
  * produced the candidate on the right, and the publication decision on top. */
 export function FactoryAcceptance({ issueId, identifier }: { issueId: string; identifier?: string | null }) {
   const t = useTranslations('FactoryAcceptance')
-  const { data, error } = useSWR<{ tasks: FactoryTask[] }>(`/api/factory/tasks?issueId=${encodeURIComponent(issueId)}`, request, { refreshInterval: 15000 })
+  const { data, error, isLoading, mutate } = useSWR<{ tasks: FactoryTask[] }>(`/api/factory/tasks?issueId=${encodeURIComponent(issueId)}`, request, { refreshInterval: 15000 })
   const [open, setOpen] = useState<FactoryTask | null>(null)
   const tasks = data?.tasks.filter(task => (task.stage === 'approval' && ['pending', 'waiting'].includes(task.status)) || task.stage === 'publish') ?? []
-  if (error || !tasks.length) return null
+  if (error && !data) return <section className="flex flex-col gap-2">
+    <h3 className="text-sm font-medium">{t('title')}</h3>
+    <Alert className="max-w-[26.25rem]">
+      <AlertTitle>{t('listError')}</AlertTitle>
+      <AlertAction><Button size="sm" variant="outline" onClick={() => { void mutate() }}>{t('retry')}</Button></AlertAction>
+    </Alert>
+  </section>
+  if (isLoading) return <section aria-busy="true" className="flex flex-col gap-2">
+    <h3 className="text-sm font-medium">{t('title')}</h3>
+    <Skeleton data-testid="factory-acceptance-loading" className="h-16 w-full max-w-[26.25rem]" />
+  </section>
+  if (!tasks.length) return null
   return <section className="flex flex-col gap-2">
     <h3 className="text-sm font-medium">{t('title')}</h3>
     {tasks.map(task => {
@@ -69,7 +84,7 @@ export function FactoryAcceptance({ issueId, identifier }: { issueId: string; id
           <span className="truncate text-sm font-medium text-foreground">{task.isSkillCandidate ? t('skillTitle') : t('title')}</span>
           <span className="truncate text-xs text-muted-foreground">{task.reason}</span>
         </span>
-        <Badge variant="outline" tone={tone(state)}>{t(`state.${state}`)}</Badge>
+        <Badge variant="outline" tone={tone(state)}>{t(acceptanceStateKey(state, task.isSkillCandidate))}</Badge>
         <ChevronRight aria-hidden="true" data-icon="inline-end" className="text-muted-foreground" />
       </Button>
     })}
@@ -89,18 +104,12 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
 
   const approvals = ledger?.approvals ?? []
   const latest = approvals[approvals.length - 1]
-  const now = Date.now()
-  const active = [...approvals].reverse().find(item => !item.revokedAt && Date.parse(item.expiresAt) > now)
-  const publication = active ? [...(ledger?.publications ?? [])].reverse().find(item => item.approvalId === active.id) : undefined
+  const derived = acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals, publications: ledger?.publications ?? [], now: Date.now() })
+  const state = derived.state
+  const active = derived.active as Approval | undefined
+  const publication = derived.publication as Publication | undefined
   const candidate = evidence?.manifest.candidate ?? active?.candidate ?? latest?.candidate
   const environment = environmentOf(candidate)
-  const state: AcceptanceState = publication?.status === 'succeeded' ? 'live'
-    : publication?.status === 'uncertain' ? 'checking'
-      : publication ? 'publishing'
-        : active ? 'approved'
-          : latest?.revokedAt ? 'revoked'
-            : latest ? 'expired'
-              : task.stage === 'approval' ? 'pending' : 'unavailable'
   const reference = publication?.receipt?.verifiedTarget?.reference
 
   async function run(operation: 'approve' | 'publish' | 'reconcile' | 'revoke', input: Record<string, unknown>) {
@@ -156,19 +165,9 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
         <ClipboardCheck aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
         <DialogTitle className="truncate text-sm leading-5 font-medium">{t(task.isSkillCandidate ? 'skillTitle' : 'title')}</DialogTitle>
         {identifier && <span className="font-mono text-xs text-muted-foreground">{identifier}</span>}
-        <Badge variant="outline" tone={tone(state)}>{t(`state.${state}`)}</Badge>
+        <Badge variant="outline" tone={tone(state)}>{t(acceptanceStateKey(state, task.isSkillCandidate))}</Badge>
         {candidate?.sha && <span className="font-mono text-xs text-muted-foreground">{candidate.sha.slice(0, 7)}</span>}
         <span className="flex-1" />
-        {state === 'pending' && <Button size="sm" disabled={busy || !evidence || !environment} onClick={() => { void approve() }}>{task.isSkillCandidate ? t('enable') : t('approve')}</Button>}
-        {state === 'approved' && <>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => { void revoke() }}>{t('revoke')}</Button>
-          <Button size="sm" disabled={busy} onClick={() => { const approval = active; if (!approval) return; const action = approval.action; void run('publish', { binding: ledger!.binding, eventId: crypto.randomUUID(), approvalId: approval.id, action, target: approval.target, targetEnvironment: approval.targetEnvironment }) }}>{t('publish')}</Button>
-        </>}
-        {(state === 'publishing' || state === 'checking') && <>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => { void revoke() }}>{t('revoke')}</Button>
-          <Button size="sm" disabled={busy} onClick={() => { void reconcile() }}>{t('reconcile')}</Button>
-        </>}
-        {state === 'live' && reference && <Button size="sm" variant="outline" render={<a href={reference} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-end" />{publication?.request.targetEnvironment === 'production' ? t('production') : t('preview')}</Button>}
         <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
       </header>
       <div className="flex min-h-0 flex-1">
@@ -178,15 +177,17 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
               : <div className="mx-auto flex w-full max-w-[40rem] flex-col gap-8 px-8 py-6">
                 <section className="flex flex-col gap-2">
                   <h4 className="text-xs font-medium text-muted-foreground">{t('candidate')}</h4>
-                  <div className="flex flex-col gap-1.5 rounded-[14px] bg-control p-4">
-                    <span className="truncate font-mono text-sm">{candidate?.sha}</span>
-                    <span className="truncate text-xs text-muted-foreground">{candidate?.repository}</span>
-                    <span className="text-xs text-muted-foreground">{task.isSkillCandidate ? t('internalSkill') : environment ? t(environment) : t('state.unavailable')}</span>
-                  </div>
+                  <Item variant="muted">
+                    <ItemContent>
+                      <ItemTitle className="font-mono">{candidate?.sha}</ItemTitle>
+                      <ItemDescription>{candidate?.repository}</ItemDescription>
+                      <ItemDescription>{task.isSkillCandidate ? t('internalSkill') : environment ? t(environment) : t('state.unavailable')}</ItemDescription>
+                    </ItemContent>
+                  </Item>
                 </section>
                 {task.isSkillCandidate && <section className="flex flex-col gap-2">
                   <h4 className="text-xs font-medium text-muted-foreground">{t('target')}</h4>
-                  <p className="rounded-[14px] bg-control px-4 py-3 font-mono text-xs">mikka-builtin:run-report</p>
+                  <Item variant="muted"><ItemContent><ItemTitle className="font-mono">mikka-builtin:run-report</ItemTitle></ItemContent></Item>
                 </section>}
                 {evidence && <section className="flex flex-col gap-2">
                   <h4 className="text-xs font-medium text-muted-foreground">{t('evidence')}</h4>
@@ -203,17 +204,17 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                   </div>
                   {artifactError && <p role="alert" className="text-xs text-destructive">{t('artifactError')}</p>}
                 </section>}
-                {(publication || active) && <section className="flex flex-col gap-2">
-                  <h4 className="text-xs font-medium text-muted-foreground">{t('publication')}</h4>
-                  <div className="flex flex-col gap-1.5 rounded-[14px] bg-control p-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" tone={tone(state)}>{t(`state.${state}`)}</Badge>
-                      {active && <span className="text-xs text-muted-foreground">{t('expires', { time: format.dateTime(new Date(active.expiresAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })}</span>}
-                    </div>
-                    {publication && <span className="truncate font-mono text-xs text-muted-foreground">{publication.id}</span>}
-                    {reference && <a className="truncate text-xs underline underline-offset-2" href={reference} target="_blank" rel="noopener noreferrer">{reference}</a>}
-                  </div>
-                </section>}
+                {state !== 'unavailable' && <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={Boolean(evidence && environment)}
+                  details={[
+                    ...(task.isSkillCandidate ? [t('internalSkill')] : environment ? [t(environment)] : []),
+                    ...(candidate?.sha ? [candidate.sha.slice(0, 7)] : []),
+                    ...(active ? [t('expires', { time: format.dateTime(new Date(active.expiresAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })] : []),
+                  ]}
+                  reference={reference ? { href: reference, label: publication?.request.targetEnvironment === 'production' ? t('production') : t('preview') } : undefined}
+                  onApprove={() => { void approve() }}
+                  onPublish={() => { const approval = active; if (!approval || !ledger) return; void run('publish', { binding: ledger.binding, eventId: crypto.randomUUID(), approvalId: approval.id, action: approval.action, target: approval.target, targetEnvironment: approval.targetEnvironment }) }}
+                  onRevoke={() => { void revoke() }}
+                  onReconcile={() => { void reconcile() }} />}
                 {error && <p role="alert" className="text-xs text-destructive">{t(ERROR_KEYS[error] ?? 'error')}</p>}
               </div>}
         </main>

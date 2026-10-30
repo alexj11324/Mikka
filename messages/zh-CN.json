@@ -3033,7 +3033,9 @@
       "live": "已上线",
       "revoked": "已撤销",
       "expired": "已失效",
-      "unavailable": "不可批准"
+      "unavailable": "不可批准",
+      "failed": "发布失败",
+      "invalidated": "已失效"
     },
     "stage": {
       "execute": "执行",
@@ -3054,6 +3056,12 @@
     "publicationUnavailable": "发布暂不可用：尚未配置发布目标。",
     "attestationRequired": "生产发布需要签名证明。",
     "artifactError": "证据打开失败。",
-    "closeEvidence": "关闭证据"
+    "closeEvidence": "关闭证据",
+    "skillState": {
+      "pending": "待启用",
+      "live": "已启用"
+    },
+    "listError": "无法加载验收",
+    "retry": "重试"
   }
 }
