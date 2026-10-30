@@ -311,15 +311,16 @@ export function createFactoryStore(
         return save(tx, task, route.eventId, route);
       });
     },
+    /** Task-detail GET: read-only, no row locks (BE-16). */
     async read(userId: string, taskId: string) {
       return transaction(async (tx) =>
-        snapshot(tx, await owned(tx, userId, taskId)),
+        snapshot(tx, await owned(tx, userId, taskId, false)),
       );
     },
     async listForIssue(userId: string, issueId: string) {
       uuid(issueId);
       return transaction(async (tx) => {
-        const issue = await lockedIssue(tx, issueId);
+        const issue = await lockedIssue(tx, issueId, false);
         if (!issue || !(await authorize(userId, issueId, tx))) fail("factoryNotFound");
         const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null }>(
           'SELECT t.*, c."runId" AS "candidateRunId", EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',

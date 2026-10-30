@@ -63,6 +63,23 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     const get = (userId: string | null, query = "") =>
       handleFactoryQuestionList(questions, { actor: userId ? { userId } : null, authorization: null, method: "GET", url: `https://mikka.test/api/factory/questions${query}` });
 
+    // Whole-database fingerprint: every public table's rows plus the sequences, so a GET that writes anywhere is caught.
+    const dbHash = async () => {
+      const { rows: tables } = await pool.query<{ t: string }>("SELECT quote_ident(tablename) AS t FROM pg_tables WHERE schemaname='public' ORDER BY 1");
+      const parts: string[] = [];
+      for (const { t } of tables)
+        parts.push(t + ":" + (await pool.query(`SELECT count(*)::text||':'||coalesce(md5(string_agg(x::text, '|' ORDER BY x::text)),'') AS h FROM ${t} x`)).rows[0].h);
+      const { rows: seqs } = await pool.query<{ s: string }>("SELECT quote_ident(sequencename) AS s FROM pg_sequences WHERE schemaname='public' ORDER BY 1");
+      for (const { s: q } of seqs) parts.push(q + ":" + (await pool.query(`SELECT last_value::text||is_called::text AS v FROM ${q}`)).rows[0].v);
+      return parts.join("\n");
+    };
+    const allGets = async (q: { taskId: string; runId: string; questionId: string }) => {
+      const one = await questions.read("owner", q.questionId);
+      const listed = (await questions.list("owner", q.taskId)).find((x) => x.id === q.questionId);
+      const http = [await get("owner", `?taskId=${q.taskId}`), await get("owner", `?runId=${q.runId}`), await get("owner")];
+      return { one, listed, http };
+    };
+
     const a = await asked("decision", "Which API should we keep?", ["REST", "GraphQL"]);
     const b = await asked("context", "Where is the staging config?", []);
 
@@ -139,13 +156,76 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.equal(one.status, "expired");
       assert.equal(one.revision, before[0].find((r: { id: string }) => r.id === a.questionId).revision, "revision not bumped");
       assert.equal((await questions.list("owner", a.taskId))[0].status, "expired");
-      assert.ok((await questions.pending("owner", a.runId)).some((q) => q.id === a.questionId && q.status === "expired"));
+      // Expired rows are filtered in SQL (before LIMIT 50), so pending never returns them.
+      assert.ok(!(await questions.pending("owner", a.runId)).some((q) => q.id === a.questionId));
       const byTask = (await get("owner", `?taskId=${a.taskId}`)).body as { questions: unknown[] };
       assert.deepEqual(byTask.questions, [], "expired question is no longer pending");
       assert.deepEqual(await snap(), before, "GETs wrote nothing");
     });
 
+    await t.test("pending: expiry is filtered in SQL before LIMIT 50", async () => {
+      const live = (await pool.query(`SELECT id FROM factory_questions WHERE "userId"='owner' AND status IN ('open','waiting_user','resuming','blocked') AND ("expiresAt" IS NULL OR "expiresAt">now()) ORDER BY "createdAt" DESC, id DESC`)).rows.map((r) => r.id as string);
+      assert.ok(live.length > 50, "fixture: more than 50 live pending rows");
+      const newest = live.slice(0, 50), survivor = live[50];
+      const saved = (await pool.query(`SELECT id,"expiresAt" FROM factory_questions WHERE id=ANY($1::uuid[])`, [newest])).rows;
+      try {
+        await pool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 second' WHERE id=ANY($1::uuid[])`, [newest]);
+        const ids = ((await get("owner")).body as { questions: { questionId: string }[] }).questions.map((q) => q.questionId);
+        assert.ok(ids.includes(survivor), "the 51st row is reachable once the 50 newer ones expire");
+        assert.ok(!ids.some((id) => newest.includes(id)), "expired rows are not listed");
+        assert.ok((await questions.pending("owner")).length > 0);
+      } finally {
+        for (const r of saved) await pool.query(`UPDATE factory_questions SET "expiresAt"=$2 WHERE id=$1`, [r.id, r.expiresAt]);
+      }
+    });
+
+    await t.test("BE-16: superseded candidate is derived at read time; whole database unchanged", async () => {
+      const s = await asked("decision", "Superseded?", ["A"]);
+      const { rows: [row] } = await pool.query(`SELECT q."candidateId" AS q, t."candidateId" AS t FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" WHERE q.id=$1`, [s.questionId]);
+      assert.equal(row.q, row.t, "fixture: question starts on the task's candidate");
+      // A new candidate lands on the task; the question still points at the old (here: none).
+      const cand = randomUUID();
+      await pool.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,repeat('a',40),'fixture/repo','preview','fixture',$3)`, [cand, s.taskId, s.runId]);
+      await pool.query(`UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1`, [s.taskId, cand]);
+      const before = await dbHash();
+      const { one, listed, http } = await allGets(s);
+      assert.equal(one.status, "superseded");
+      assert.equal(listed?.status, "superseded");
+      for (const res of http) {
+        assert.equal(res.status, 200);
+        assert.ok(!(res.body as { questions: { questionId: string }[] }).questions.some((q) => q.questionId === s.questionId), "superseded is not pending");
+      }
+      assert.equal(await dbHash(), before, "GETs wrote nothing anywhere");
+      assert.equal((await pool.query("SELECT status FROM factory_questions WHERE id=$1", [s.questionId])).rows[0].status, "open", "stored status untouched");
+    });
+
+    await t.test("BE-16: cancelled task is derived at read time; whole database unchanged", async () => {
+      const c = await asked("decision", "Cancelled?", ["A"]);
+      await pool.query(`UPDATE factory_tasks SET status='cancelled' WHERE id=$1`, [c.taskId]);
+      const before = await dbHash();
+      const { one, listed, http } = await allGets(c);
+      assert.equal(one.status, "cancelled");
+      assert.equal(listed?.status, "cancelled");
+      for (const res of http) {
+        assert.equal(res.status, 200);
+        assert.ok(!(res.body as { questions: { questionId: string }[] }).questions.some((q) => q.questionId === c.questionId), "cancelled is not pending");
+      }
+      assert.equal(await dbHash(), before, "GETs wrote nothing anywhere");
+      assert.equal((await pool.query("SELECT status FROM factory_questions WHERE id=$1", [c.questionId])).rows[0].status, "open", "stored status untouched");
+    });
+
+    await t.test("BE-16: expired GETs leave the whole database unchanged", async () => {
+      const e = await asked("decision", "Expired?", ["A"]);
+      await pool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 second' WHERE id=$1`, [e.questionId]);
+      const before = await dbHash();
+      const { one, listed } = await allGets(e);
+      assert.equal(one.status, "expired");
+      assert.equal(listed?.status, "expired");
+      assert.equal(await dbHash(), before, "GETs wrote nothing anywhere");
+    });
+
     await t.test("GETs do not block while another transaction holds FOR UPDATE on the task, question and issue", async () => {
+      const writes: Promise<unknown>[] = [];
       const holder = await pool.connect();
       try {
         await holder.query("BEGIN");
@@ -157,13 +237,47 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
         assert.ok((await within(questions.list("owner", b.taskId), "list")).some((q) => q.id === b.questionId));
         assert.ok((await within(questions.pending("owner", b.runId), "pending")).some((q) => q.id === b.questionId));
         assert.equal((await within(get("owner", `?taskId=${b.taskId}`), "GET route")).status, 200);
-        // Control: a write path on the same task does wait for the lock.
-        const blocked = await Promise.race([store.read("owner", b.taskId).then(() => "done"), new Promise((r) => setTimeout(() => r("blocked"), 500))]);
-        assert.equal(blocked, "blocked", "control: locking path waits");
+        // Task-detail GET (store.read) is a no-lock read too.
+        assert.equal((await within(store.read("owner", b.taskId), "task-detail read")).task.id, b.taskId);
+        // Control: a real write path (dispatch -> lockForDispatch, FOR UPDATE on the task) does wait.
+        const snap = await store.read("owner", b.taskId);
+        const write = dispatch("owner", { binding: factoryBinding(snap.task), agentId: fixture.owner.agentId, deviceRepoId: fixture.owner.repoId }).then(() => "done", () => "done");
+        writes.push(write);
+        const blocked = await Promise.race([write, new Promise((r) => setTimeout(() => r("blocked"), 500))]);
+        assert.equal(blocked, "blocked", "control: write path waits for the task lock");
       } finally {
         await holder.query("ROLLBACK");
         holder.release();
+        await Promise.all(writes);
       }
+    });
+
+    await t.test("botId scope: a store bound to another bot sees nothing, on read and write paths", async () => {
+      const other = createFactoryStore(pool, authorize, randomUUID(), { independent: factoryCheckIndependent });
+      const otherQuestions = createFactoryQuestions(pool, authorize, other, dispatch);
+      const notFound = { code: "factoryNotFound" };
+      await assert.rejects(other.read("owner", b.taskId), notFound);
+      await assert.rejects(otherQuestions.read("owner", b.questionId), notFound);
+      await assert.rejects(otherQuestions.list("owner", b.taskId), notFound);
+      assert.ok(!(await otherQuestions.pending("owner", b.runId)).some((q) => q.id === b.questionId));
+      const c = await pool.connect();
+      try {
+        await c.query("BEGIN");
+        await assert.rejects(other.lockTask(c, "owner", b.taskId), notFound, "write path (lockTask) checks botId");
+        await assert.rejects(other.readTask(c, "owner", b.taskId), notFound, "read path (readTask) checks botId");
+      } finally { await c.query("ROLLBACK"); c.release(); }
+      assert.equal((await store.read("owner", b.taskId)).task.id, b.taskId, "control: own bot scope reads it");
+      // Task re-bound to another bot while its source event stays bot-less: only the task.botId check stops it.
+      const rebound = await asked("decision", "Rebound", ["A"]), botId = randomUUID();
+      await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,'owner','Fixture bot')`, [botId, randomUUID()]);
+      await pool.query('UPDATE factory_tasks SET "botId"=$2 WHERE id=$1', [rebound.taskId, botId]);
+      await assert.rejects(store.read("owner", rebound.taskId), notFound, "read path checks task.botId");
+      await assert.rejects(questions.read("owner", rebound.questionId), notFound);
+      const d = await pool.connect();
+      try {
+        await d.query("BEGIN");
+        await assert.rejects(store.lockTask(d, "owner", rebound.taskId), notFound, "write path checks task.botId");
+      } finally { await d.query("ROLLBACK"); d.release(); }
     });
 
     await t.test("list by task: newest first with id tiebreak", async () => {

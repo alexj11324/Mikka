@@ -247,7 +247,7 @@ export function createFactoryQuestions(
     /** Newest 50 pending questions of this user; `runId` (origin or continuation) is filtered in SQL, before the cap. */
     async pending(userId: string, runId?: string) {
       const { rows } = await pool.query(
-        "SELECT id FROM factory_questions WHERE \"userId\"=$1 AND status IN ('open','waiting_user','resuming','blocked') AND ($2::uuid IS NULL OR \"originRunId\"=$2::uuid OR \"continuationRunId\"=$2::uuid) ORDER BY \"createdAt\" DESC, id DESC LIMIT 50",
+        "SELECT id FROM factory_questions WHERE \"userId\"=$1 AND status IN ('open','waiting_user','resuming','blocked') AND NOT (status IN ('open','waiting_user') AND \"expiresAt\" IS NOT NULL AND \"expiresAt\"<=clock_timestamp()) AND ($2::uuid IS NULL OR \"originRunId\"=$2::uuid OR \"continuationRunId\"=$2::uuid) ORDER BY \"createdAt\" DESC, id DESC LIMIT 50",
         [userId, runId ?? null],
       );
       const result = [];
