@@ -83,7 +83,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     const card = page.getByRole('region', { name: 'Coordinator', exact: true }).getByRole('group', { name: /派不出去/ })
     const setup = card.getByRole('link', { name: /去设置 E2B 密钥/ })
     await expect(setup).toHaveAttribute('href', /\/settings\?section=integrations$/)
-    await expect(card.getByText('用你的 E2B 密钥在云电脑上运行')).toHaveCount(0)
+    await expect(card.getByText('用你的 E2B 密钥在云电脑上运行', { exact: true })).toHaveCount(0)
     await expect(card.getByRole('button', { name: /等它上线/ })).toBeEnabled()
     await shoot(page, testInfo, `choice-${viewport.name}-nokey`)
     await setup.click()
