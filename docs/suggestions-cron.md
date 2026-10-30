@@ -5,7 +5,7 @@ Three schedules keep the 建议 page and each person's profile current (R-21, R-
 | Cron (UTC) | Endpoint | What it does |
 | --- | --- | --- |
 | `*/15 * * * *` | `GET /mikka/api/cron/briefings` | Writes the daily briefing for everyone whose local time is past 08:00 and who has none for today yet, and has the Coordinator push it |
-| `0 * * * *` | `GET /mikka/api/cron/suggestions-reconcile` | Backfills events a webhook may have missed in the last 26 hours |
+| `0 * * * *` | `GET /mikka/api/cron/suggestions-reconcile` | Backfills events a webhook may have missed in the last 26 hours, then sweeps Factory monitor completions (see below) |
 | `30 * * * *` | `GET /mikka/api/cron/user-facts` | Merges the profile facts of everyone whose local time is past 04:00 and who has not been merged today |
 
 All three endpoints answer 503 without `CRON_SECRET`, 401 for a wrong bearer, and otherwise a JSON summary of counts (no personal data). Reconciliation also returns 503 when GitHub is unconfigured, or 502 when a source fails. Each stops starting new people after about 40–45 seconds; the next run picks up whoever is left.
@@ -39,6 +39,22 @@ Proactive work is behind four switches (`docs/design/proactive.md` § 3), and an
 Set the environment values in Infisical, never in source.
 
 Facts the person corrected in 记忆 are never faded or overwritten. A person is due from 04:00 their time (the zone in `user_time_zones`, UTC without one); `user_fact_consolidations.consolidatedOn` holds the local date of the last merge and is claimed before merging, so overlapping runs merge a person once a day. A person with 记忆 off is not merged and nothing is extracted for them. The run starts no new people after about 40 seconds; the next hourly run picks up whoever is left.
+
+## Cron GET exception and the Factory monitor sweep
+
+Mikka's rule is that GET is strictly read-only. Cron endpoints are the one documented exception
+(the Vercel Cron pattern, which only issues GET): `/api/cron/*` handlers may write, provided that
+they accept nothing but the exact `CRON_SECRET` bearer (503 when unset, 401 otherwise, checked
+before any read or write) and every write is idempotent, so a repeated or overlapping run converges.
+
+The hourly `suggestions-reconcile` run also sweeps the Factory monitor stage when
+`MIKKA_FACTORY_ROUTING_ENABLED=1` and `MIKKA_FACTORY_LIFECYCLE_ENABLED=1` (otherwise it reports
+`factoryMonitor.enabled: false` and does nothing). It finds `run_finished` events of monitor
+attempts that no `factory_monitor_observations` row records, and hands each (user, Bot) scope to that
+Bot's `monitor.reconcile`, until 50 seconds after the request started. Observed events are skipped
+and replays create no new transition. The response carries
+`factoryMonitor: { enabled, scopes, observed, failed, deferred }`; any failed scope answers 502.
+No Worker change, redeploy or new secret is needed: the Worker already calls this fixed path.
 
 ## Backfill
 
