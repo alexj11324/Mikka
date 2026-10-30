@@ -81,8 +81,9 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await expect(dialog).not.toBeVisible()
   const title = `按钮回归 ${randomUUID()}`
   await seedTask(page, title, { status: 'doing' })
+  // The board is in the URL, so a reload reopens it instead of the chat.
+  await expect(page).toHaveURL(url => url.searchParams.get('section') === 'all-issues')
   await page.reload()
-  await rail(page, '看板').click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
   await openIssueFromSearch(page, title)
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
