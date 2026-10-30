@@ -3062,6 +3062,14 @@
       "live": "Enabled"
     },
     "listError": "Couldn't load acceptance",
-    "retry": "Retry"
+    "retry": "Retry",
+    "reject": "Request changes",
+    "rejectNote": "Note for changes",
+    "rejectSubmit": "Send back",
+    "rejecting": "Submitting…",
+    "rejectFailed": "Couldn't submit. Try again.",
+    "resubmit": "Resubmit",
+    "cancel": "Cancel",
+    "publishFailed": "Publish failed. The approval is kept."
   }
 }

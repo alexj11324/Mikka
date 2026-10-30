@@ -89,7 +89,7 @@ test('approval bar uses component defaults and the Figma copy for each state', (
   }
   assert.match(bar('pending', true), />待启用<.*>启用</)
   assert.match(bar('live', true), />已启用</)
-  assert.match(bar('failed'), />发布失败<.*>撤销批准<.*>核对发布</)
+  assert.match(bar('failed'), />发布失败<.*>撤销批准<.*>发布</)
   assert.match(bar('invalidated'), />已失效</)
   assert.doesNotMatch(bar('invalidated'), /<button/)
   assert.match(bar('checking'), />发布待核对</)
@@ -103,4 +103,17 @@ test('pending without a decision source hides 批准; busy actions show a spinne
   const busy = renderToStaticMarkup(<ApprovalBar state="approved" isSkill={false} details={[]} busy />)
   assert.match(busy, /aria-busy="true"[^>]*>[^<]*<svg[^>]*role="status"|aria-busy="true"/)
   assert.match(busy, /data-icon="inline-start"/)
+})
+
+test('pending shows 退回修改 only when a reject handler is passed', () => {
+  const without = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} details={[]} canApprove />)
+  assert.doesNotMatch(without, /退回修改/)
+  const withReject = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} details={[]} canApprove onReject={() => {}} />)
+  assert.match(withReject, /variant="secondary"[^<]*<?[^<]*退回修改|退回修改/)
+})
+
+test('publish failed keeps revoke and offers publish again', () => {
+  const html = renderToStaticMarkup(<ApprovalBar state="failed" isSkill={false} details={[]} />)
+  assert.match(html, /撤销/)
+  assert.match(html, />发布</)
 })

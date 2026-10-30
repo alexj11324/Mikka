@@ -19,6 +19,8 @@ export type ApprovalBarProps = {
   onPublish?: () => void
   onRevoke?: () => void
   onReconcile?: () => void
+  /** Only passed when the server can take a send-back; otherwise the action is hidden. */
+  onReject?: () => void
 }
 
 function StateIcon({ state }: { state: AcceptanceState }) {
@@ -31,7 +33,7 @@ function StateIcon({ state }: { state: AcceptanceState }) {
 }
 
 /** The publication decision for one candidate (Figma 358:6855). Purely presentational. */
-export function ApprovalBar({ state, isSkill, details, busy = false, canApprove = true, reference, onApprove, onPublish, onRevoke, onReconcile }: ApprovalBarProps) {
+export function ApprovalBar({ state, isSkill, details, busy = false, canApprove = true, reference, onApprove, onPublish, onRevoke, onReconcile, onReject }: ApprovalBarProps) {
   const t = useTranslations('FactoryAcceptance')
   const icon = StateIcon({ state })
   return <Item variant="muted" data-state={state}>
@@ -41,12 +43,17 @@ export function ApprovalBar({ state, isSkill, details, busy = false, canApprove 
       {details.length > 0 && <div className="flex flex-wrap gap-1">{details.map(detail => <Badge key={detail} variant="outline">{detail}</Badge>)}</div>}
     </ItemContent>
     <ItemActions>
+      {state === 'pending' && onReject && <Button size="sm" variant="secondary" disabled={busy} onClick={onReject}>{t('reject')}</Button>}
       {state === 'pending' && canApprove && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onApprove}>{busy && <Spinner data-icon="inline-start" />}{isSkill ? t('enable') : t('approve')}</Button>}
       {state === 'approved' && <>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
         <Button size="sm" disabled={busy} aria-busy={busy} onClick={onPublish}>{busy && <Spinner data-icon="inline-start" />}{t('publish')}</Button>
       </>}
-      {(state === 'publishing' || state === 'checking' || state === 'failed') && <>
+      {state === 'failed' && <>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
+        <Button size="sm" disabled={busy} aria-busy={busy} onClick={onPublish}>{busy && <Spinner data-icon="inline-start" />}{t('publish')}</Button>
+      </>}
+      {(state === 'publishing' || state === 'checking') && <>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
         <Button size="sm" disabled={busy} aria-busy={busy} onClick={onReconcile}>{busy && <Spinner data-icon="inline-start" />}{t('reconcile')}</Button>
       </>}

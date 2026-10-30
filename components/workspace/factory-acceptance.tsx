@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ChevronRight, ClipboardCheck, FileText, Image as ImageIcon, LoaderCircle, Play, X } from 'lucide-react'
@@ -14,7 +14,9 @@ import { Spinner } from '@/components/ui/spinner'
 import { withBasePath } from '@/lib/base-path'
 import { MIKKA_VERCEL, publicationActionFor, vercelTarget, type PublicationEnvironment } from '@/lib/factory/vercel-target'
 import { acceptanceState, acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
+import { canReject, closedReject, rejectFlow } from '@/lib/factory/reject-flow'
 import { ApprovalBar } from './factory-approval-bar'
+import { RejectNote } from './factory-reject-note'
 import { IssueThreadPanel } from './issue-thread-panel'
 
 type Candidate = { sha: string; repository: string; environment: string; scope: string }
@@ -23,7 +25,7 @@ type FactoryTask = { id: string; issueId: string; stage: string; status: string;
 type Evidence = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; evidenceDigest: string; evidenceReadId: string; manifest: { candidate: Candidate; artifacts: Artifact[] } }
 type Approval = { id: string; candidateId: string; candidate: Candidate; action: string; target: string; targetEnvironment: string; expiresAt: string; revokedAt: string | null }
 type Publication = { id: string; approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed'; request: Record<string, unknown>; receipt?: { verifiedTarget?: { reference?: string } } }
-type Ledger = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; approvals: Approval[]; publications: Publication[] }
+type Ledger = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; approvals: Approval[]; publications: Publication[]; capabilities?: { reject?: boolean } }
 
 class RequestError extends Error {
   constructor(readonly code: string, readonly status: number, readonly body: Record<string, unknown>) { super(code) }
@@ -131,6 +133,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
   const [error, setError] = useState<string | null>(null)
   const [artifact, setArtifact] = useState<{ name: string; content: string } | null>(null)
   const [artifactError, setArtifactError] = useState(false)
+  const [reject, dispatchReject] = useReducer(rejectFlow, closedReject)
 
   const approvals = ledger?.approvals ?? []
   const latest = approvals[approvals.length - 1]
@@ -178,6 +181,16 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
   async function revoke() {
     if (!active || !ledger) return
     await run('revoke', { binding: ledger.binding, approvalId: active.id, eventId: crypto.randomUUID() })
+  }
+
+  async function sendBack() {
+    if (!ledger || reject.phase === 'submitting') return
+    dispatchReject({ type: 'submit' })
+    try {
+      await request(`/api/factory/tasks/${task.id}/approval`, { operation: 'reject', input: { binding: ledger.binding, eventId: crypto.randomUUID(), note: reject.note.trim() } })
+      dispatchReject({ type: 'succeed' })
+      await reload()
+    } catch { dispatchReject({ type: 'fail' }) }
   }
 
   async function view(name: string) {
@@ -234,6 +247,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                   </div>
                   {artifactError && <p role="alert" className="text-xs text-destructive">{t('artifactError')}</p>}
                 </section>}
+                {state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
                 {state !== 'unavailable' && <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={Boolean(evidence && environment)}
                   details={[
                     ...(task.isSkillCandidate ? [t('internalSkill')] : environment ? [t(environment)] : []),
@@ -244,6 +258,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                   onApprove={() => { void approve() }}
                   onPublish={() => { const approval = active; if (!approval || !ledger) return; void run('publish', { binding: ledger.binding, eventId: crypto.randomUUID(), approvalId: approval.id, action: approval.action, target: approval.target, targetEnvironment: approval.targetEnvironment }) }}
                   onRevoke={() => { void revoke() }}
+                  onReject={canReject(state, ledger?.capabilities?.reject === true) ? () => dispatchReject({ type: 'open' }) : undefined}
                   onReconcile={() => { void reconcile() }} />}
                 {error && <p role="alert" className="text-xs text-destructive">{t(ERROR_KEYS[error] ?? 'error')}</p>}
               </div>}
@@ -252,6 +267,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
           <IssueThreadPanel issueId={task.issueId} runId={task.candidateRunId} onClose={onClose} bare />
         </aside>}
       </div>
+      <RejectNote flow={reject} onEdit={note => dispatchReject({ type: 'edit', note })} onSubmit={() => { void sendBack() }} onCancel={() => dispatchReject({ type: 'cancel' })} />
       {artifact && <ArtifactPreview name={artifact.name} content={artifact.content} onClose={() => setArtifact(null)} />}
     </DialogContent>
   </Dialog>

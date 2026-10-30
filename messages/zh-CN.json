@@ -3062,6 +3062,14 @@
       "live": "已启用"
     },
     "listError": "无法加载验收",
-    "retry": "重试"
+    "retry": "重试",
+    "reject": "退回修改",
+    "rejectNote": "退回备注",
+    "rejectSubmit": "退回",
+    "rejecting": "提交中…",
+    "rejectFailed": "提交失败，请重试",
+    "resubmit": "重新提交",
+    "cancel": "取消",
+    "publishFailed": "发布失败，批准仍保留"
   }
 }
