@@ -19,14 +19,13 @@ const controlSchema = z
     reason: z.string().trim().min(1).max(4000),
   })
   .strict();
-/** 404 hides existence (no 403 leak for tasks you cannot see); a switched-off
- * feature is 503 so the UI can show "not available" instead of "missing". */
+/** List contract: 401 authRequired, 422 factoryInvalid (bad issueId), 404 factoryNotFound
+ * (missing or not visible, never 403 to avoid an existence leak), 503 factoryUnavailable
+ * (database or other unexpected failure, no detail in the body). Nothing else is reachable. */
 export function factoryListStatus(code: string) {
   if (code === "factoryNotFound") return 404;
   if (code === "factoryInvalid") return 422;
-  if (code === "factoryForbidden" || code === "originRejected") return 403;
-  if (code.endsWith("Unavailable")) return 503;
-  return 409;
+  return 503;
 }
 /** Read-only discovery; identity is always supplied by the session adapter. */
 export async function handleFactoryList(
@@ -42,8 +41,8 @@ export async function handleFactoryList(
       body: await store.listForIssue(req.userId, req.issueId!),
     };
   } catch (error) {
-    if (!(error instanceof FactoryError)) throw error;
-    return { status: factoryListStatus(error.code), body: { error: error.code } };
+    const status = error instanceof FactoryError ? factoryListStatus(error.code) : 503;
+    return { status, body: { error: status === 503 ? "factoryUnavailable" : (error as FactoryError).code } };
   }
 }
 /** Session identity comes from the adapter. No runtime pass, dispatch or approval API. */

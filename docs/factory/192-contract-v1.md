@@ -33,6 +33,8 @@ Historical candidate/attempt run IDs deliberately survive the existing Agent-to-
 
 `listForIssue(userId, issueId)` and session-authenticated `GET /api/factory/tasks?issueId=...` return up to 50 same-owner task summaries, newest first. Existing `get_issue` also returns these task IDs, bindings, stages, statuses and reasons, so a restarted/compacted Coordinator can discover the existing task from its issue instead of remembering taskId. An owned accessible issue with no tasks returns an empty list; nonexistent, foreign or deleted issues return 404. Cancelled/revoked records remain visible to their authorized owner, but cannot be reopened through this read endpoint or bypass the existing stopped-task checks. The query writes no Factory events.
 
+Each summary also carries `candidateSha: string | null` (the current candidate's commit) and `publication: { id, approvalId, status: 'reserved' | 'uncertain' | 'succeeded' | 'failed', action, target, createdAt, finishedAt } | null` — the newest publication (createdAt DESC, id DESC) of the current candidate only; timestamps are ISO 8601 UTC (`...Z`). `reason` is passed through the factory text masker. Status codes are exactly: 401 `authRequired`, 422 `factoryInvalid` (malformed issueId), 404 `factoryNotFound`, 503 `factoryUnavailable` (database or other unexpected failure; no detail in the body).
+
 This is an additive read path. Stage/candidate schema, contractVersion, FactoryBinding/FactoryEvidence, validators, gate callbacks, dispatch and migration files are unchanged.
 
 ## Repeated monitor observations (additive v1 compatibility)
