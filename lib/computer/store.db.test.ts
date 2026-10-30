@@ -46,7 +46,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, "botId" uuid REFERENCES bots(id), status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "finishedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
     const bindingMigration = await readFile(new URL('../../drizzle/20261027164502_computer_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
-    await pool.query(await readFile(new URL('../../drizzle/20261030233000_run_human_control_pause.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261030234636_run_human_control_pause.sql', import.meta.url), 'utf8'))
     await pool.query('ALTER TABLE agent_runs ADD COLUMN "sessionId" text')
     await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', enabled boolean NOT NULL DEFAULT true, harnesses jsonb NOT NULL DEFAULT \'[]\', "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz, "createdAt" timestamptz NOT NULL DEFAULT now())')
     const scopeMigration = await readFile(new URL('../../drizzle/20261027164511_cloud_device_scope.sql', import.meta.url), 'utf8')
