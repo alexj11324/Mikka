@@ -247,5 +247,7 @@ export async function addRunMessage(
 export async function requestRunStop(userId: string, runId: string): Promise<void> {
   const parsed = z.uuid().safeParse(runId)
   if (!parsed.success) throw new ActionFailureError('runNotFound')
+  // Stop only requests the end. The daemon's acknowledgement goes through
+  // persistRunCompletion, which reconciles Factory after commit.
   await stopOwnedRun(db, userId, parsed.data)
 }

@@ -137,6 +137,8 @@ export async function pushToPhones(userId: string, botId: string | null, text: s
  */
 export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
+  // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
+  // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
   if (process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1') {
     const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     await factoryRuntimeForBot(botId).reconcile(userId)
