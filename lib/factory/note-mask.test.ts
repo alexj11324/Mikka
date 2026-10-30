@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { maskFactoryNote } from "./note-mask";
+
+test("note masker hides secret values in their encoded forms and token patterns", () => {
+  const value = "e2b_synthetic_value_123";
+  const secrets = [{ name: "E2B_API_KEY", value }];
+  for (const form of [value, Buffer.from(value).toString("base64"), Buffer.from(value).toString("hex"), encodeURIComponent(value + "/")])
+    assert.doesNotMatch(maskFactoryNote(`x ${form} y`, secrets), /e2b_synthetic|ZTJiX3N5bnRoZXRpY|6532625f/);
+  assert.equal(maskFactoryNote("Bearer abc.def", []), "[REDACTED]");
+  assert.equal(maskFactoryNote("short ok", [{ name: "S", value: "short" }]), "short ok");
+});
