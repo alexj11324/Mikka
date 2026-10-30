@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ChevronRight, ClipboardCheck, FileText, Image as ImageIcon, Play, RefreshCw, X } from 'lucide-react'
+import { ChevronRight, ClipboardCheck, RefreshCw, X } from 'lucide-react'
 import { Alert, AlertAction, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
@@ -15,15 +15,16 @@ import { withBasePath } from '@/lib/base-path'
 import { MIKKA_VERCEL, publicationActionFor, vercelTarget, type PublicationEnvironment } from '@/lib/factory/vercel-target'
 import { acceptanceState, acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
 import { canReject, closedReject, rejectFlow } from '@/lib/factory/reject-flow'
+import { evidenceEntries, orderEvidence, type EvidenceEntry } from '@/lib/factory/evidence-view'
+import { EvidenceList, EvidenceViewer } from './factory-evidence'
 import { ApprovalBar } from './factory-approval-bar'
 import { RejectNote } from './factory-reject-note'
 import { ShortSha } from './short-sha'
 import { IssueThreadPanel } from './issue-thread-panel'
 
 type Candidate = { sha: string; repository: string; environment: string; scope: string }
-type Artifact = { artifact: string; kind: 'log' | 'report' | 'screenshot' | 'video' | 'request'; stage: 'execute' | 'review' | 'verify'; runId: string }
 type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean }
-type Evidence = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; evidenceDigest: string; evidenceReadId: string; manifest: { candidate: Candidate; artifacts: Artifact[] } }
+type Evidence = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; evidenceDigest: string; evidenceReadId: string; manifest: { candidate: Candidate; artifacts: EvidenceEntry[] } }
 type Approval = { id: string; candidateId: string; candidate: Candidate; action: string; target: string; targetEnvironment: string; expiresAt: string; revokedAt: string | null; createdAt: string }
 type Publication = { id: string; approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed'; request: Record<string, unknown>; receipt?: { verifiedTarget?: { reference?: string } } }
 type Ledger = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; approvals: Approval[]; publications: Publication[]; capabilities?: { reject?: boolean } }
@@ -140,8 +141,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
   const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded ? `/api/factory/tasks/${task.id}/approval` : null, request)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [artifact, setArtifact] = useState<{ name: string; content: string } | null>(null)
-  const [artifactError, setArtifactError] = useState(false)
+  const [viewing, setViewing] = useState<number | null>(null)
   const [reject, dispatchReject] = useReducer(rejectFlow, closedReject)
 
   const approvals = ledger && Array.isArray(ledger.approvals) ? ledger.approvals : []
@@ -206,13 +206,11 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
     } catch { dispatchReject({ type: 'fail' }) }
   }
 
-  async function view(name: string) {
-    setArtifactError(false)
-    try {
-      const value = await request(`/api/factory/tasks/${task.id}/approval?artifact=${encodeURIComponent(name)}`)
-      setArtifact({ name, content: typeof value.raw === 'string' ? value.raw : JSON.stringify(value.raw, null, 2) })
-    } catch { setArtifactError(true) }
-  }
+  const readText = useCallback(async (name: string) => {
+    const value = await request(`/api/factory/tasks/${task.id}/approval?artifact=${encodeURIComponent(name)}`)
+    return typeof value.raw === 'string' ? value.raw : JSON.stringify(value.raw, null, 2)
+  }, [task.id])
+  const entries = orderEvidence(evidenceEntries(evidence?.manifest))
 
   return <Dialog open onOpenChange={value => { if (!value) onClose() }}>
     <DialogContent showCloseButton={false} aria-describedby={undefined}
@@ -247,17 +245,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                 </section>}
                 {evidence && <section className="flex flex-col gap-2">
                   <h4 className="text-xs font-medium text-muted-foreground">{t('evidence')}</h4>
-                  <div className="flex flex-col gap-1">
-                    {(Array.isArray(evidence.manifest?.artifacts) ? evidence.manifest.artifacts : []).map(item => <Item key={item.artifact} variant="muted" size="sm">
-                      <ItemMedia variant="icon">{item.kind === 'screenshot' ? <ImageIcon aria-hidden="true" /> : item.kind === 'video' ? <Play aria-hidden="true" /> : <FileText aria-hidden="true" />}</ItemMedia>
-                      <ItemContent><ItemDescription><code>{item.artifact}</code></ItemDescription></ItemContent>
-                      <ItemActions>
-                        <Badge variant="outline" tone="neutral">{t(`stage.${item.stage}`)}</Badge>
-                        <Button variant="ghost" size="icon-sm" aria-label={item.artifact} onClick={() => { void view(item.artifact) }}><ChevronRight data-icon="inline-start" /></Button>
-                      </ItemActions>
-                    </Item>)}
-                  </div>
-                  {artifactError && <p role="alert" className="text-xs text-destructive">{t('artifactError')}</p>}
+                  <EvidenceList taskId={task.id} entries={entries} onOpen={setViewing} />
                 </section>}
                 {state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
                 {state !== 'unavailable' && <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={Boolean(evidence && environment)} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
@@ -280,19 +268,8 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
         </aside>}
       </div>
       <RejectNote flow={reject} onEdit={note => dispatchReject({ type: 'edit', note })} onSubmit={() => { void sendBack() }} onCancel={() => dispatchReject({ type: 'cancel' })} />
-      {artifact && <ArtifactPreview name={artifact.name} content={artifact.content} onClose={() => setArtifact(null)} />}
-    </DialogContent>
-  </Dialog>
-}
-
-function ArtifactPreview({ name, content, onClose }: { name: string; content: string; onClose: () => void }) {
-  const t = useTranslations('FactoryAcceptance')
-  return <Dialog open onOpenChange={value => { if (!value) onClose() }}>
-    <DialogContent aria-describedby={undefined} closeLabel={t('closeEvidence')} className="flex max-h-[85svh] flex-col sm:max-w-5xl">
-      <DialogHeader>
-        <DialogTitle><code>{name}</code></DialogTitle>
-      </DialogHeader>
-      <pre className="min-h-0 flex-1 overflow-auto px-4 py-3 font-mono text-xs whitespace-pre-wrap break-words">{content}</pre>
+      {viewing !== null && entries[viewing] && <EvidenceViewer taskId={task.id} entries={entries} index={viewing} onIndex={setViewing} onClose={() => setViewing(null)}
+        readText={readText} sha={candidate?.sha} environment={task.isSkillCandidate ? t('internalSkill') : environment ? t(environment) : null} />}
     </DialogContent>
   </Dialog>
 }

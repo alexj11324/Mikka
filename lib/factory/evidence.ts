@@ -7,6 +7,15 @@ import {
 } from "./approval-contract";
 import type { FactoryCandidate, FactoryTask } from "./approval-dependencies";
 
+/** What a screenshot or recording entry of the manifest carries besides its hash. */
+export interface FactoryCaptureEvidence {
+  captureId: string;
+  contentType: string;
+  title: string;
+  size: number;
+  durationMs: number | null;
+}
+
 export function digest(value: unknown): string {
   // JSONB canonical key ordering must survive DB round trips.
   function canonical(v: unknown): unknown {
@@ -82,6 +91,8 @@ export async function readFactoryArtifact(
     throw new FactoryError("factoryEvidenceMismatch");
   let raw: unknown;
   let sourceTime: Date = run.finishedAt;
+  let capture: FactoryCaptureEvidence | undefined;
+  let fileSha256: string | undefined;
   if (
     ref.kind === "report" &&
     ref.artifact === `run-report:${run.id}` &&
@@ -101,19 +112,83 @@ export async function readFactoryArtifact(
     if (!chunk) throw new FactoryError("factoryArtifactMissing");
     raw = chunk.chunk;
     sourceTime = chunk.createdAt;
+  } else if (
+    (ref.kind === "screenshot" || ref.kind === "video") &&
+    CAPTURE_ARTIFACT.test(ref.artifact)
+  ) {
+    // Screenshots and recordings are the run's own captures (run_captures),
+    // never a second copy and never a URL. The file's sha256 is the hash.
+    const {
+      rows: [row],
+    } = await tx.query(
+      `SELECT id,kind,"contentType",title,size,sha256,"durationMs","updatedAt" FROM run_captures
+        WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND status='ready' FOR SHARE`,
+      [ref.artifact.slice(CAPTURE_PREFIX.length), run.id, task.userId],
+    );
+    if (!row || !row.sha256 || typeof row.size !== "number")
+      throw new FactoryError("factoryArtifactMissing");
+    if (row.kind !== (ref.kind === "screenshot" ? "image" : "video"))
+      throw new FactoryError("factoryEvidenceMismatch");
+    capture = {
+      captureId: row.id as string,
+      contentType: row.contentType as string,
+      title: row.title as string,
+      size: row.size as number,
+      durationMs: (row.durationMs as number | null) ?? null,
+    };
+    raw = { ...capture, sha256: row.sha256 };
+    fileSha256 = row.sha256 as string;
+    sourceTime = row.updatedAt;
   } else {
-    // No screenshot/video store exists in the frozen baseline. Do not accept
-    // arbitrary URLs as real artifacts; #193 can add a trusted reader later.
+    // Only existing, access controlled artifacts. Arbitrary URLs never count.
     throw new FactoryError("factoryArtifactMissing");
   }
   if (new Date(ref.recordedAt).getTime() < sourceTime.getTime())
     throw new FactoryError("factoryEvidenceMismatch");
   return {
     raw,
+    /** The file's own sha256 for a capture; the canonical digest otherwise. */
+    sha256: fileSha256 ?? digest(raw),
+    capture,
     sourceTime: sourceTime.toISOString(),
     startedAt: run.startedAt.toISOString(),
     finishedAt: run.finishedAt.toISOString(),
   };
+}
+
+const CAPTURE_PREFIX = "run-capture:";
+const CAPTURE_ARTIFACT = /^run-capture:[a-f0-9-]{36}$/;
+export const captureArtifact = (id: string) => `${CAPTURE_PREFIX}${id}`;
+export const captureIdOf = (artifact: string) =>
+  CAPTURE_ARTIFACT.test(artifact) ? artifact.slice(CAPTURE_PREFIX.length) : null;
+
+/** Evidence entries are capped per finish (contract.ts). */
+const MAX_EVIDENCE = 100;
+
+/**
+ * The run's ready screenshots and recordings as evidence references next to
+ * `base` (its report), oldest first. Trusted reconcilers call this; an agent
+ * cannot name a capture of another run.
+ */
+export async function runCaptureEvidence(
+  tx: PoolClient,
+  run: { id: string; userId: string },
+  base: FactoryEvidence,
+  room = MAX_EVIDENCE - 1,
+): Promise<FactoryEvidence[]> {
+  if (room <= 0) return [];
+  const { rows } = await tx.query(
+    `SELECT id,kind,"updatedAt" FROM run_captures WHERE "runId"=$1 AND "userId"=$2 AND status='ready' AND sha256 IS NOT NULL ORDER BY "createdAt",id LIMIT $3`,
+    [run.id, run.userId, room],
+  );
+  return rows.map((row) => ({
+    ...base,
+    artifact: captureArtifact(row.id),
+    kind: row.kind === "video" ? "video" : "screenshot",
+    recordedAt: new Date(
+      Math.max(new Date(base.recordedAt).getTime(), row.updatedAt.getTime()),
+    ).toISOString(),
+  }));
 }
 
 export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
@@ -170,13 +245,18 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
         )
           throw new FactoryError("factoryEvidenceMismatch");
       }
-      const { raw, ...timestamps } = source;
+      // Text entries keep their historical shape so earlier approvals still
+      // match; a capture entry adds its id and file facts, and its sha256 is
+      // the file's, so swapping the file changes the evidence digest.
       artifacts.push({
         stage: attempt.stage,
         attemptId: attempt.id,
         ...ref,
-        ...timestamps,
-        sha256: digest(raw),
+        sourceTime: source.sourceTime,
+        startedAt: source.startedAt,
+        finishedAt: source.finishedAt,
+        ...source.capture,
+        sha256: source.sha256,
       });
     }
   }

@@ -498,8 +498,26 @@ export function createFactoryApprovals(
           ...ref,
           ...source,
           raw: redactArtifact(source.raw),
-          sourceSha256: digest(source.raw),
+          sourceSha256: source.sha256,
         };
+      });
+    },
+    /**
+     * Which run capture the reviewer may open as this task's evidence, and the
+     * sha256 the evidence digest binds. The caller serves the file only if its
+     * bytes still have that hash. Same authorization as every acceptance read.
+     */
+    async capture(actor: FactoryActor, taskId: string, captureId: string) {
+      if (!z.uuid().safeParse(taskId).success || !z.uuid().safeParse(captureId).success)
+        fail("factoryNotFound");
+      return transaction(async (tx) => {
+        const task = await owned(tx, actor, taskId, true);
+        const current = await approvalEvidence(tx, task);
+        const entry = current.manifest.artifacts.find(
+          (a) => "captureId" in a && a.captureId === captureId,
+        );
+        if (!entry) fail("factoryArtifactMissing");
+        return { ownerId: task.userId, captureId, sha256: entry.sha256 };
       });
     },
     async evidence(actor: FactoryActor, taskId: string) {

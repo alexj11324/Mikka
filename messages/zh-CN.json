@@ -3313,7 +3313,21 @@
     "rejectFailed": "提交失败，请重试",
     "resubmit": "重新提交",
     "cancel": "取消",
-    "publishFailed": "发布失败，批准仍保留"
+    "publishFailed": "发布失败，批准仍保留",
+    "evidenceEmpty": "没有证据",
+    "captureLabel": "{kind} · {title}",
+    "kind": {
+      "screenshot": "截图",
+      "video": "录屏",
+      "log": "日志",
+      "report": "报告",
+      "request": "请求"
+    },
+    "counter": "{index} / {total}",
+    "previous": "上一条证据",
+    "next": "下一条证据",
+    "download": "下载",
+    "allEvidence": "全部证据"
   },
   "AccountEmail": {
     "exportSubject": "你的 Mikka 数据导出",

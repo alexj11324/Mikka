@@ -67,6 +67,7 @@ export async function factory194Fixture(connectionString: string) {
     CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean);
     CREATE TABLE run_tokens (id uuid PRIMARY KEY,"runId" uuid,"userId" text,"tokenHash" text,"revokedAt" timestamptz,"expiresAt" timestamptz);
     CREATE TABLE run_chunks (id uuid PRIMARY KEY,"runId" uuid,chunk jsonb,"createdAt" timestamptz,seq integer NOT NULL DEFAULT 1);
+    CREATE TABLE run_captures (id uuid PRIMARY KEY,"userId" text NOT NULL,"runId" uuid NOT NULL,kind text NOT NULL,"contentType" text NOT NULL,status text NOT NULL,title text NOT NULL,size integer,sha256 text,"durationMs" integer,"createdAt" timestamptz NOT NULL DEFAULT now(),"updatedAt" timestamptz NOT NULL DEFAULT now());
   `);
   await pool.query(
     await readFile(
@@ -265,7 +266,9 @@ export async function factory194Fixture(connectionString: string) {
       adapters,
       configuredAuthority ?? undefined,
     );
-  async function prepare(executionActor: FactoryActor = actor) {
+  /** `capture`: the verify run also took a screenshot, referenced as run capture evidence (A3). */
+  async function prepare(executionActor: FactoryActor = actor, options: { capture?: boolean } = {}) {
+    let captureId: string | null = null;
     const task: FactoryTask = {
       id: randomUUID(),
       userId: actor.userId,
@@ -335,6 +338,7 @@ export async function factory194Fixture(connectionString: string) {
       const runId = randomUUID(),
         sessionId = `synthetic-${stage}-${randomUUID()}`,
         recordedAt = new Date().toISOString();
+      const capturedAt = new Date(Date.now() - 1000).toISOString();
       const evidence = {
         artifact: `run-report:${runId}`,
         kind: "report",
@@ -360,6 +364,15 @@ export async function factory194Fixture(connectionString: string) {
           recordedAt,
         ],
       );
+      const evidenceList: Record<string, unknown>[] = [evidence];
+      if (options.capture && stage === "verify") {
+        captureId = randomUUID();
+        await pool.query(
+          `INSERT INTO run_captures (id,"userId","runId",kind,"contentType",status,title,size,sha256,"durationMs","createdAt","updatedAt") VALUES ($1,$2,$3,'image','image/png','ready','Home',3,$4,NULL,$5,$5)`,
+          [captureId, task.userId, runId, "e".repeat(64), capturedAt],
+        );
+        evidenceList.push({ ...evidence, artifact: `run-capture:${captureId}`, kind: "screenshot" });
+      }
       await pool.query(
         `INSERT INTO factory_attempts VALUES ($1,$2,$3,$4,$5,$6,$7,'passed',$8,'{}',$9)`,
         [
@@ -370,7 +383,7 @@ export async function factory194Fixture(connectionString: string) {
           position,
           runId,
           sessionId,
-          JSON.stringify([evidence]),
+          JSON.stringify(evidenceList),
           recordedAt,
         ],
       );
@@ -401,7 +414,7 @@ export async function factory194Fixture(connectionString: string) {
       target: approval.target,
       targetEnvironment: approval.targetEnvironment,
     });
-    return { task, candidate, approval, approve, publication };
+    return { task, candidate, approval, approve, publication, captureId };
   }
   return {
     permission,

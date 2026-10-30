@@ -89,6 +89,68 @@ test(
         },
       );
       await t.test(
+        "A3: a run capture is evidence by reference; the digest binds its file sha256",
+        async () => {
+          const x = await f.prepare(actor, { capture: true }),
+            service = f.service([f.adapter], null),
+            captureId = x.captureId!;
+          const read = await service.evidence(actor, x.task.id);
+          const entry = read.manifest.artifacts.find(
+            (a) => "captureId" in a && a.captureId === captureId,
+          ) as Record<string, unknown> | undefined;
+          assert.ok(entry, "the manifest names the capture");
+          assert.equal(entry.artifact, `run-capture:${captureId}`);
+          assert.equal(entry.kind, "screenshot");
+          assert.equal(entry.stage, "verify");
+          assert.equal(entry.sha256, "e".repeat(64), "the file's own sha256, not a digest of metadata");
+          assert.equal(entry.contentType, "image/png");
+          // Text entries keep their historical shape (existing approvals keep matching).
+          const report = read.manifest.artifacts.find((a) => a.kind === "report")!;
+          assert.equal("captureId" in report, false);
+          assert.deepEqual(await service.capture(actor, x.task.id, captureId), {
+            ownerId: actor.userId,
+            captureId,
+            sha256: "e".repeat(64),
+          });
+          await rejects(() => service.capture(actor, x.task.id, randomUUID()), "factoryArtifactMissing");
+          await rejects(
+            () => service.capture({ userId: "someone-else", sessionId: actor.sessionId }, x.task.id, captureId),
+            "factoryNotFound",
+          );
+          const human = { ...x.approval } as Record<string, unknown>;
+          delete human.decisionCredentialId;
+          // Swapping the file after the read invalidates the read.
+          await pool.query("UPDATE run_captures SET sha256=$2 WHERE id=$1", [captureId, "f".repeat(64)]);
+          await rejects(() => service.approve(actor, human), "factoryEvidenceMismatch");
+          const swapped = await service.evidence(actor, x.task.id);
+          assert.notEqual(swapped.evidenceDigest, read.evidenceDigest);
+          // An approval binds the evidence the reviewer saw; a later swap voids it at publish.
+          const approved = await service.approve(actor, {
+            ...human,
+            eventId: randomUUID(),
+            evidenceDigest: swapped.evidenceDigest,
+            evidenceReadId: swapped.evidenceReadId,
+          });
+          await pool.query("UPDATE run_captures SET sha256=$2 WHERE id=$1", [captureId, "e".repeat(64)]);
+          await rejects(
+            () =>
+              service.publish(actor, {
+                ...approved,
+                eventId: randomUUID(),
+                action: x.approval.action,
+                target: x.approval.target,
+                targetEnvironment: x.approval.targetEnvironment,
+              }),
+            "factoryApprovalInvalid",
+          );
+          // A capture of another run, or one no longer ready, is not evidence.
+          await pool.query(`UPDATE run_captures SET status='failed' WHERE id=$1`, [captureId]);
+          await rejects(() => service.capture(actor, x.task.id, captureId), "factoryArtifactMissing");
+          await pool.query(`UPDATE run_captures SET status='ready',"runId"=$2 WHERE id=$1`, [captureId, randomUUID()]);
+          await rejects(() => service.capture(actor, x.task.id, captureId), "factoryArtifactMissing");
+        },
+      );
+      await t.test(
         "policy allow publishes for authenticated backend owner without any human session prerequisite",
         async () => {
           const backendActor = { userId: actor.userId },

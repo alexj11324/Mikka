@@ -150,7 +150,7 @@ export function createFactoryRunReviewIssuer(
         const manifest = current.manifest.artifacts.find(
           (a) => a.artifact === ref.artifact && a.runId === ref.runId,
         );
-        if (!manifest || manifest.sha256 !== digest(source.raw))
+        if (!manifest || manifest.sha256 !== source.sha256)
           fail("factoryEvidenceMismatch");
         artifacts.push({
           reference: ref,
