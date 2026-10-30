@@ -23,6 +23,7 @@ import { ChatComposer } from './chat-composer'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { ThreadCard } from './thread-card'
 import { PendingActions } from './pending-actions'
+import { SubagentLoginNeeds } from './subagent-login-needs'
 import { UnreadDivider } from '@/components/chat/unread-divider'
 import { UnreadPill } from '@/components/chat/unread-pill'
 import { MESSAGE_POSITION_ATTR, useUnreadIndicators } from '@/lib/hooks/use-unread-indicators'
@@ -192,6 +193,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
       {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
+      {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={setDraft} sending={sending} onSubmit={() => { void send() }}
         quote={embedded?.quote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">

@@ -88,7 +88,7 @@
     "test:byos": "node --import ./scripts/server-test.mjs --import tsx --test lib/infisical-workload.test.ts lib/subscription-access-snapshot.test.ts lib/subscription-model.test.ts lib/subscription-enrollment.test.ts lib/subscription-enrollment-bind.test.ts lib/subscription-enrollment-binding-proof.test.ts lib/subscription-enrollment-handoff.test.ts lib/subscription-enrollment-policy.test.ts lib/subscription-ui.test.ts lib/subscription-usage.test.ts",
     "test:byos-worker": "node scripts/test-subscription-worker.mjs",
     "test:slack": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/slack/webhook.test.ts lib/slack/owner.test.ts tests/slack-bot.test.mjs",
-    "test:credentials": "node --import tsx --test lib/credentials/credentials.test.ts lib/credentials/login-flow.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/cloud-computer/credential-reviews.test.ts",
+    "test:credentials": "node --import tsx --test lib/credentials/credentials.test.ts lib/credentials/login-flow.test.ts lib/subagents/login-needs.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/cloud-computer/credential-reviews.test.ts",
     "test:credentials-db": "node --import tsx --test lib/credentials/store.db.test.ts",
     "test:cloud-limits": "node --import tsx --test lib/cloud-computer/thread-machine-limits.test.ts",
     "test:cloud-backend-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/backend.db.test.ts lib/cloud-computer/unattended.db.test.ts",
