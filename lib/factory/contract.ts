@@ -132,6 +132,7 @@ export const changeSchema = z.discriminatedUnion("action", [
     })
     .strict(),
   z.object({ action: z.literal("retry"), reason }).strict(),
+  z.object({ action: z.literal("retry_publication"), publicationId: canonicalUuid, reason }).strict(),
   z.object({ action: z.literal("repair"), reason }).strict(),
   z.object({ action: z.literal("cancel"), reason }).strict(),
   z.object({ action: z.literal("revoke"), reason }).strict(),

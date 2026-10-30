@@ -709,6 +709,14 @@ export function createFactoryStore(
             fail("factoryTransition");
           task.reason = change.reason;
           await freshAttempt(tx, task, change.stage, change.reason);
+        } else if (change.action === "retry_publication") {
+          if (task.stage !== 'publish' || task.status !== 'pending' || !task.candidateId)
+            fail('factoryTransition');
+          const { rowCount } = await tx.query(`SELECT id FROM factory_publications WHERE id=$1 AND "taskId"=$2 AND "candidateId"=$3 AND status='failed' AND request->'binding'->>'revision'=$4 FOR UPDATE`, [change.publicationId, task.id, task.candidateId, String(task.revision)]);
+          if (rowCount !== 1) fail('factoryPublicationReceiptRequired');
+          await tx.query(`UPDATE factory_attempts SET status='failed',reason=$2,"finishedAt"=clock_timestamp() WHERE id=$1`, [attempt.id, change.reason]);
+          task.reason = change.reason;
+          await freshAttempt(tx, task, 'approval', change.reason);
         } else if (change.action === "retry" || change.action === "repair") {
           if (task.stage === "clarify") fail("factoryTransition");
           const pendingQuestion = await tx.query(

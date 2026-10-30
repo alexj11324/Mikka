@@ -53,7 +53,8 @@ export interface FactoryApprovalStore {
           output: Record<string, unknown>;
         }
       | { action: "advance"; stage: "publish"; reason: string }
-      | { action: "repair"; reason: string },
+      | { action: "repair"; reason: string }
+      | { action: "retry_publication"; publicationId: string; reason: string },
     tx: PoolClient,
   ): Promise<{ task: FactoryTask }>;
 }

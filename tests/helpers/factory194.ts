@@ -126,6 +126,12 @@ export async function factory194Fixture(connectionString: string) {
           'INSERT INTO factory_events ("taskId","eventId") VALUES ($1,$2)',
           [task.id, eventId],
         );
+        if (change.action === 'retry_publication') {
+          const attemptId = randomUUID();
+          await tx.query(`UPDATE factory_attempts SET status='failed',"finishedAt"=clock_timestamp() WHERE id=$1`, [task.attemptId]);
+          await tx.query(`INSERT INTO factory_attempts(id,"taskId","candidateId",stage,position,status,evidence,output) VALUES($1,$2,$3,'approval',99,'pending','[]','{}')`, [attemptId,task.id,task.candidateId]);
+          return { task: (await tx.query<FactoryTask>(`UPDATE factory_tasks SET stage='approval',status='pending',"attemptId"=$2,revision=revision+1 WHERE id=$1 RETURNING *`, [task.id,attemptId])).rows[0] };
+        }
         if (change.action === "finish" && change.status === "failed") {
           // Contract substitute for #192: failing never needs a consumer gate.
           await tx.query(

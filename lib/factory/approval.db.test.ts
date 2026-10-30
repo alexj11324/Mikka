@@ -38,16 +38,33 @@ test(
     const f = await factory194Fixture(db!);
     try {
       const { actor, pool, provider } = f;
+      await t.test('one approve HTTP request starts publication and returns pending reconciliation without a second publish', async () => {
+        const x = await f.prepare(), service = f.service(), before = provider.posts();
+        provider.state.readyState = 'BUILDING';
+        try {
+          const response = await handleFactoryApproval(service, { actor, authorization: null, method: 'POST', taskId: x.task.id, origin: 'https://mikka.example', url: `https://mikka.example/api/factory/tasks/${x.task.id}/approval`, body: { operation: 'approve', input: x.approval } });
+          assert.equal(response.status, 202);
+          assert.equal(provider.posts(), before + 1);
+          const publication = (await service.ledger(actor, x.task.id)).publications[0];
+          assert.equal((response.body as { publicationId?: string }).publicationId, publication.id);
+          assert.equal(publication.status, 'reserved');
+          for (const deployment of provider.deployments.values()) deployment.readyState = 'READY';
+          assert.equal((await service.reconcile(actor, { ...publication.request, publicationId: publication.id })).publicationId, publication.id);
+          assert.equal(provider.posts(), before + 1);
+        } finally { provider.state.readyState = 'READY'; }
+      });
       await t.test('approval accepts taskId and revision without redundant client context', async () => {
         const x = await f.prepare();
         const service = f.service([f.adapter]);
         const minimal = { taskId: x.approval.binding.taskId, revision: x.approval.binding.revision };
-        const approval = await service.approve(actor, { ...x.approval, binding: minimal });
+        const request: Record<string, unknown> = { ...x.approval, binding: minimal };
+        delete request.expiresAt;
+        const approval = await service.approve(actor, request);
         await pool.query('UPDATE factory_approvals SET request=jsonb_set(request,\'{binding}\',$2::jsonb) WHERE id=$1', [approval.approvalId, JSON.stringify({ ...minimal, issueId: randomUUID(), attemptId: randomUUID(), candidateId: randomUUID() })]);
         const replay = await service.approve(actor, { ...x.approval, binding: { ...minimal, issueId: randomUUID(), attemptId: randomUUID(), candidateId: randomUUID() } });
         assert.equal(replay.approvalId, approval.approvalId);
-        const request = { binding: { taskId: approval.binding.taskId, revision: approval.binding.revision }, eventId: randomUUID(), approvalId: approval.approvalId, action: x.approval.action, target: x.approval.target, targetEnvironment: x.approval.targetEnvironment };
-        const published = await service.publish(actor, request);
+        const publication = { binding: { taskId: approval.binding.taskId, revision: approval.binding.revision }, eventId: randomUUID(), approvalId: approval.approvalId, action: x.approval.action, target: x.approval.target, targetEnvironment: x.approval.targetEnvironment };
+        const published = await service.publish(actor, publication);
         assert.ok(published?.publicationId);
       });
       await t.test(
@@ -178,7 +195,7 @@ test(
                   [x.task.id],
                 )
               ).rows[0].n,
-              0,
+              1,
             );
           } finally {
             f.source.allowed = true;
@@ -211,14 +228,9 @@ test(
             () => s.approve({ ...actor, userId: "foreign" }, x.approval),
             "factoryNotFound",
           );
-          await rejects(
-            () =>
-              s.approve(actor, {
-                ...x.approval,
-                expiresAt: new Date(Date.now() - 1000).toISOString(),
-              }),
-            "factoryApprovalExpiry",
-          );
+          const historicalExpiry = await f.prepare();
+          const alreadyExpiredInput = await s.approve(actor, { ...historicalExpiry.approval, expiresAt: new Date(Date.now() - 1000).toISOString() });
+          assert.ok(alreadyExpiredInput.approvalId, 'approval is an action, not a renewable grant');
           const approvals = await Promise.all(
             Array.from({ length: 10 }, () => s.approve(actor, x.approval)),
           );
@@ -457,6 +469,7 @@ test(
               [request.approvalId],
             );
             await rejects(read, "factoryPublicationReceiptRequired");
+            await rejects(() => service.publish(actor, request), 'factoryApprovalInvalid');
           } finally {
             tx.release();
           }
@@ -495,7 +508,7 @@ test(
             );
             await rejects(
               () => f.service().publish(actor, p),
-              "factoryPublicationAlreadyClaimed",
+              window === 'queued' ? 'factoryPublicationPending' : 'factoryPublicationUncertain',
             );
             for (const d of provider.deployments.values())
               d.readyState = "READY";
@@ -510,7 +523,7 @@ test(
           },
         );
       await t.test(
-        "expiry/revocation/session sign-out/new candidate/failing verify/wrong destination make zero POST",
+        "reserved approval ignores grant expiry; task STOP, sign-out, candidate and destination changes block effects",
         async () => {
           for (const scenario of [
             "expired",
@@ -531,12 +544,14 @@ test(
                 "UPDATE factory_approvals SET \"expiresAt\"=now()-interval '1 minute' WHERE id=$1",
                 [p.approvalId],
               );
-            if (scenario === "revoked")
-              await s.revoke(actor, {
+            if (scenario === "revoked") {
+              await rejects(() => s.revoke(actor, {
                 binding: p.binding,
                 approvalId: p.approvalId,
                 eventId: randomUUID(),
-              });
+              }), 'factoryPublicationAlreadyClaimed');
+              await pool.query("UPDATE factory_tasks SET status='cancelled' WHERE id=$1", [x.task.id]);
+            }
             if (scenario === "session")
               await pool.query(
                 'UPDATE "session" SET "expiresAt"=now()-interval \'1 minute\' WHERE id=$1',
@@ -560,8 +575,13 @@ test(
                   : scenario === "action"
                     ? { action: "deploy_production" }
                     : {};
-            await assert.rejects(() => s.publish(actor, { ...p, ...patch }));
-            assert.equal(provider.posts(), before);
+            if (scenario === 'expired') {
+              assert.ok(await s.publish(actor, p));
+              assert.equal(provider.posts(), before + 1);
+            } else {
+              await assert.rejects(() => s.publish(actor, { ...p, ...patch }));
+              assert.equal(provider.posts(), before);
+            }
             await pool.query(
               'UPDATE "session" SET "expiresAt"=now()+interval \'1 hour\' WHERE id=$1',
               [actor.sessionId],
@@ -596,12 +616,12 @@ test(
         },
       );
       await t.test(
-        "grant/session expiration during project preflight prevents POST",
+        "grant expiry no longer interrupts an approved reservation; current session expiry still prevents POST",
         async () => {
-          const before = provider.posts();
           provider.state.projectDelayMs = 2500;
           try {
             for (const field of ["approval", "session"]) {
+              const before = provider.posts();
               const x = await f.prepare();
               if (field === "approval")
                 x.approval.expiresAt = new Date(
@@ -615,13 +635,13 @@ test(
                   [actor.sessionId],
                 );
               try {
-                await rejects(
-                  () => f.service().publish(actor, p),
-                  field === "approval"
-                    ? "factoryApprovalInvalid"
-                    : "factoryHumanRequired",
-                );
-                assert.equal(provider.posts(), before);
+                if (field === 'approval') {
+                  assert.ok(await f.service().publish(actor, p));
+                  assert.equal(provider.posts(), before + 1);
+                } else {
+                  await rejects(() => f.service().publish(actor, p), 'factoryHumanRequired');
+                  assert.equal(provider.posts(), before);
+                }
               } finally {
                 await pool.query(
                   'UPDATE "session" SET "expiresAt"=now()+interval \'1 hour\' WHERE id=$1',
@@ -668,16 +688,17 @@ test(
               ).publicationId,
               r.publicationId,
             );
-            await s.revoke(actor, {
+            await rejects(() => s.revoke(actor, {
               binding: r.binding,
               approvalId: p.approvalId,
               eventId: randomUUID(),
-            });
-            await rejects(() => s.publish(actor, p), "factoryApprovalInvalid");
+            }), 'factoryPublicationAlreadyClaimed');
+            await pool.query("UPDATE factory_tasks SET status='revoked' WHERE id=$1", [x.task.id]);
+            await rejects(() => s.publish(actor, p), "factoryStopped");
             await rejects(
               () =>
                 s.reconcile(actor, { ...p, publicationId: r.publicationId }),
-              "factoryApprovalInvalid",
+              "factoryStopped",
             );
             await rejects(
               () =>
@@ -754,11 +775,10 @@ test(
               [x.task.id],
             );
             assert.deepEqual(task, { stage: "publish", status: "passed" });
-            // The finished publish stage cannot be reserved again.
-            await rejects(
-              () => s.publish(other, { ...p, eventId: randomUUID() }),
-              "factoryStale",
-            );
+            // A legacy second publish reads the approved operation; it cannot
+            // reserve or execute another deployment.
+            assert.equal((await s.publish(other, { ...p, eventId: randomUUID() }))?.publicationId, op.id);
+            assert.equal(provider.posts(), posts);
           } finally {
             provider.state.readyState = "READY";
             await pool.query(
@@ -769,7 +789,7 @@ test(
         },
       );
       await t.test(
-        "pending publication: a revoked grant blocks reconcile and every new publish",
+        "pending publication: grant revoke is obsolete and task STOP blocks reconcile and every new publish",
         async () => {
           const x = await f.prepare(),
             p = await x.publication(),
@@ -781,18 +801,19 @@ test(
               (e: unknown) => e instanceof PublicationDeferred,
             );
             const op = (await s.ledger(actor, x.task.id)).publications[0];
-            await s.revoke(actor, {
+            await rejects(() => s.revoke(actor, {
               binding: p.binding,
               approvalId: p.approvalId,
               eventId: randomUUID(),
-            });
+            }), 'factoryPublicationAlreadyClaimed');
+            await pool.query("UPDATE factory_tasks SET status='cancelled' WHERE id=$1", [x.task.id]);
             for (const d of provider.deployments.values())
               d.readyState = "READY";
             const before = provider.posts(),
               requests = provider.requests.length;
             await rejects(
               () => s.reconcile(actor, { ...p, publicationId: op.id }),
-              "factoryApprovalInvalid",
+              "factoryStopped",
             );
             assert.equal(
               provider.requests.length,
@@ -805,7 +826,7 @@ test(
             );
             await rejects(
               () => s.publish(actor, { ...p, eventId: randomUUID() }),
-              "factoryApprovalInvalid",
+              "factoryStopped",
             );
             assert.equal(provider.posts(), before);
           } finally {

@@ -24,7 +24,8 @@ export const approvalRequest = z
     action: publicationAction,
     target: z.string().trim().min(1).max(2000),
     targetEnvironment: z.string().trim().min(1).max(4000),
-    expiresAt: z.iso.datetime(),
+    // Accepted for old clients; approval now starts publication immediately.
+    expiresAt: z.iso.datetime().optional(),
     // Compatibility with older clients only; human approval does not require a read receipt.
     evidenceDigest: z
       .string()
