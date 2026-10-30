@@ -98,15 +98,10 @@ export async function recordE2BKeyError(workspaceId: string, code: (typeof E2B_K
 
 /**
  * The E2B API key to use for this workspace's sandboxes.
- * Flag off (default): process E2B_API_KEY, as today. Flag on: the workspace's own key, or
+ * Always the workspace's own key, or
  * E2BKeyError('e2b_key_missing'); never falls back to the platform key.
- * Callers are not wired yet (follow-up PR 4e2).
  */
 export async function getWorkspaceE2BApiKey(workspaceId: string, env: Record<string, string | undefined> = process.env): Promise<string> {
-  if (!byoE2BKeyEnabled(env)) {
-    if (!env.E2B_API_KEY) throw new Error('Cloud computer is not configured')
-    return env.E2B_API_KEY
-  }
   const [row] = await guardSecretsDb(() => db.select().from(workspaceE2bKeys).where(eq(workspaceE2bKeys.workspaceId, workspaceId)))
   if (!row) throw new E2BKeyError('e2b_key_missing')
   try { return openSecret(row, e2bKeyAad(workspaceId), env) } catch (error) {

@@ -160,20 +160,20 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     assert.equal(await e2b.getWorkspaceE2BApiKey(ws.id, on), KEY, 'non-admin delete changed nothing')
     assert.deepEqual(await e2b.removeE2BKey(admin, ws.id), { removed: true })
     await assert.rejects(e2b.getWorkspaceE2BApiKey(ws.id, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_missing')
-    assert.equal(await e2b.getWorkspaceE2BApiKey(ws.id, { ...on, MIKKA_BYO_E2B_KEY: '0' }), 'platform')
+    await assert.rejects(e2b.getWorkspaceE2BApiKey(ws.id, { ...on, MIKKA_BYO_E2B_KEY: '0' }), /e2b_key_missing/)
   })
 
-  await t.test('BYO E2B getter: off = platform key (unchanged); on = workspace key or e2b_key_missing', async () => {
+  await t.test('BYO E2B getter never falls back to a platform key', async () => {
     const PLATFORM = 'platform_' + randomBytes(8).toString('hex'), KEY = 'e2b_' + randomBytes(16).toString('hex')
     const base = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, E2B_API_KEY: PLATFORM }
-    assert.equal(await e2b.getWorkspaceE2BApiKey(other.id, base), PLATFORM)
-    assert.equal(await e2b.getWorkspaceE2BApiKey(other.id, { ...base, MIKKA_BYO_E2B_KEY: '0' }), PLATFORM)
-    await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, { MIKKA_BYO_E2B_KEY: '' }), /not configured/)
+    await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, base), /e2b_key_missing/)
+    await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, { ...base, MIKKA_BYO_E2B_KEY: '0' }), /e2b_key_missing/)
+    await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, { MIKKA_BYO_E2B_KEY: '' }), /e2b_key_missing/)
     const on = { ...base, MIKKA_BYO_E2B_KEY: '1' }
     await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_missing')
     await e2b.setE2BKey(admin, other.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) })
     assert.equal(await e2b.getWorkspaceE2BApiKey(other.id, on), KEY)
-    assert.equal(await e2b.getWorkspaceE2BApiKey(other.id, base), PLATFORM, 'flag off ignores the stored key')
+    assert.equal(await e2b.getWorkspaceE2BApiKey(other.id, base), KEY, 'stored BYO key is used regardless of legacy flag')
     await assert.rejects(e2b.getWorkspaceE2BApiKey(ws.id, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_missing')
     await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, { MIKKA_BYO_E2B_KEY: '1' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
     await e2b.recordE2BKeyError(other.id, 'invalid')
@@ -286,7 +286,7 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const { withE2BErrors } = await import('../lib/secrets/e2b-runtime')
     const { AuthenticationError, NotFoundError } = await import('e2b')
     const on = { MIKKA_BYO_E2B_KEY: '1' }
-    await assert.rejects(withE2BErrors(other.id, false, async () => { throw new AuthenticationError('nope') }, {}), AuthenticationError, 'flag off: unchanged')
+    await assert.rejects(withE2BErrors(other.id, false, async () => { throw new AuthenticationError('nope') }, {}), (error:unknown)=>error instanceof e2b.E2BKeyError && error.code==='e2b_key_invalid', 'platform fallback is gone')
     await assert.rejects(withE2BErrors(other.id, true, async () => { throw new NotFoundError('template x not found') }, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_template_unavailable')
     assert.equal((await e2b.getE2BKeyStatus(admin, other.id)).lastErrorCode, 'template_unavailable')
     await assert.rejects(withE2BErrors(other.id, false, async () => { throw new AuthenticationError('nope') }, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_invalid')

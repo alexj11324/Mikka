@@ -1,14 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { AuthenticationError, NotFoundError, RateLimitError, SandboxNotFoundError } from 'e2b'
-import { classifyE2BError, computerTemplate, e2bApiKey } from './e2b-runtime'
+import { classifyE2BError, computerTemplate } from './e2b-runtime'
 import { E2BKeyError } from './e2b'
 
-test('flag off: platform key and template exactly as before', async () => {
-  assert.equal(await e2bApiKey('ws', 'Cloud computer is not configured', { E2B_API_KEY: 'platform' }), 'platform')
-  await assert.rejects(e2bApiKey('ws', 'Cloud runtime unavailable', {}), /^Error: Cloud runtime unavailable$/)
-  assert.equal(computerTemplate({ E2B_COMPUTER_TEMPLATE: 'private-tpl', E2B_BYO_COMPUTER_TEMPLATE: 'public-tpl' }), 'private-tpl')
-  assert.throws(() => computerTemplate({}), /Cloud desktop template is not configured/)
+test('platform template never overrides the public BYO template', () => {
+  assert.equal(computerTemplate({ E2B_COMPUTER_TEMPLATE: 'private-tpl', E2B_BYO_COMPUTER_TEMPLATE: 'public-tpl' }), 'public-tpl')
+  assert.throws(() => computerTemplate({}), /e2b_template_unavailable/)
 })
 test('flag on: only the public BYO template; unset is e2b_template_unavailable', () => {
   assert.equal(computerTemplate({ MIKKA_BYO_E2B_KEY: '1', E2B_COMPUTER_TEMPLATE: 'private-tpl', E2B_BYO_COMPUTER_TEMPLATE: 'public-tpl' }), 'public-tpl')

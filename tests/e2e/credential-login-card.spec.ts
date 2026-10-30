@@ -127,7 +127,7 @@ test('unknown outcome offers a single re-check via GET attempts', async ({ page 
   await open(page)
   await signIn(page)
   const recheck = page.getByRole('button', { name: '再查一次' })
-  await expect(page.getByText('无法确认是否已登录')).toBeVisible()
+  await expect(page.getByText('登录状态未确认')).toBeVisible()
   await recheck.click()
   await expect(recheck).toBeDisabled()
   await expect(recheck.getByRole('status')).toBeVisible()

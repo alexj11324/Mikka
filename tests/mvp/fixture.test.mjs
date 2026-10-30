@@ -135,6 +135,7 @@ test('scripted Decisions accepts only the runtime triage contract and identifies
     const result = await response.json()
     assert.equal(result.model, request.model)
     assert.match(result.provider_metadata.gateway.generationId, /^mvp-synthetic-/)
+    assert.equal(result.provider_metadata.gateway.cost,'0.001','scripted hosted triage includes its billing receipt')
     assert.deepEqual(result.answers, [{ type: 'choice', name: 'tier', choice: 'result' }])
     for (const invalid of [{ ...request, model: 'unconfigured-model' }, { ...request, questions: [{ type: 'predicate', name: 'approved' }] }, { ...request, input: 'unexpected judgment request' }]) {
       assert.equal((await post(invalid)).status, 500)

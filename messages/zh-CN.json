@@ -3441,7 +3441,7 @@
       "codeEmail": "邮件验证码",
       "captchaRequired": "需要你亲自完成网站的人机验证",
       "needsUser": "需要你亲自完成登录",
-      "outcomeUnknown": "无法确认是否已登录",
+      "outcomeUnknown": "登录状态未确认",
       "waiting": "已提交，等待网站结果…",
       "submissionInvalid": "提交内容无效，再试一次",
       "denied": "这里不允许登录",
