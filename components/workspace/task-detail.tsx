@@ -81,7 +81,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
   const saveMessages = useRef({ t, actionError })
   saveMessages.current = { t, actionError }
   const [saved, setSaved] = useState(initial)
-  const [sync] = useState(() => new DocumentSync(initial.id, createDocumentSeed(initial.content)))
+  const [sync] = useState(() => new DocumentSync(initial.id, createDocumentSeed(initial.content, initial.id)))
   const syncState = useSyncExternalStore(sync.subscribe, sync.getSnapshot, sync.getSnapshot)
   const { mutate: retrySync } = useSWR(['document-sync', saved.id, sync.doc.clientID], () => sync.exchange(saved.id), { refreshInterval: 1500, revalidateOnFocus: true, shouldRetryOnError: true, errorRetryInterval: 3000 })
   useEffect(() => {

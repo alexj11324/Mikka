@@ -10,6 +10,7 @@ import { Collaboration } from "@tiptap/extension-collaboration"
 import { ySyncPluginKey } from "@tiptap/y-tiptap"
 import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap"
 import * as Y from "yjs"
+import { seedableContent } from "@/lib/issue-document-seed"
 import { Check, FileText, MessageSquare, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -46,9 +47,9 @@ export function createEditorExtensions(isOpen: (id: string) => boolean, author: 
     CommentMark, CommentPaint.configure({ isOpen }),
   ]
 }
-export function createDocumentSeed(content: JSONContent) {
+export function createDocumentSeed(content: unknown, issueId: string) {
   const schema = getSchema(createEditorExtensions(() => false, 'seed', true))
-  const doc = prosemirrorJSONToYDoc(schema, content, 'default')
+  const doc = prosemirrorJSONToYDoc(schema, seedableContent(schema, content, issueId), 'default')
   const update = Y.encodeStateAsUpdate(doc)
   doc.destroy()
   return update
