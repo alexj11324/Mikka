@@ -49,7 +49,7 @@ export async function handleFactoryApproval(
     }
     const parsed = z
       .object({
-        operation: z.enum(["approve", "revoke", "publish", "reconcile"]),
+        operation: z.enum(["approve", "reject", "revoke", "publish", "reconcile"]),
         input: z
           .object({ binding: z.object({ taskId: z.uuid() }).passthrough() })
           .passthrough(),
