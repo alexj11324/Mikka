@@ -39,7 +39,11 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
   const author = authorProp ?? t('draftAuthor')
   const syncLabel = syncLabelProp ?? t('unsavedDraft')
   const label = labelProp ?? t('descriptionLabel')
-  const placeholder = compact ? t('placeholderCompact') : t('placeholderFull')
+  // Without a shared doc the editor renders `content` directly; content the schema rejects stays read-only and is never echoed back.
+  const [initialContent] = useState(() => content === undefined ? EMPTY_DOCUMENT : readableIssueContent(content))
+  const unreadable = !sharedDoc && initialContent === null
+  // Read-only shows no typing hint, including on the empty document that stands in for unreadable content.
+  const placeholder = disabled || unreadable ? null : compact ? t('placeholderCompact') : t('placeholderFull')
   const [localDoc] = useState(() => new Y.Doc())
   const threadDoc = sharedDoc ?? localDoc
   const threadStore = useMemo(() => createThreadStore(threadDoc), [threadDoc])
@@ -78,9 +82,6 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
       return true
     },
   }), [label])
-  // Without a shared doc the editor renders `content` directly; content the schema rejects stays read-only and is never echoed back.
-  const [initialContent] = useState(() => content === undefined ? EMPTY_DOCUMENT : readableIssueContent(content))
-  const unreadable = !sharedDoc && initialContent === null
   const editor = useEditor({
     extensions,
     content: sharedDoc ? undefined : initialContent ?? EMPTY_DOCUMENT,
@@ -185,7 +186,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
 
   return <TooltipProvider delay={300}><section aria-label={t('editorAria', { label: t('descriptionLabel') })} className="overflow-hidden rounded-lg border bg-background">
     <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/20 px-3 py-2">
-      <span className="flex items-center gap-2 text-xs font-medium"><FileText className="size-3.5 text-muted-foreground" />{t('document')}<Badge variant="outline">{syncLabel}</Badge></span>
+      <span className="flex items-center gap-2 text-xs font-medium"><FileText className="size-3.5 text-muted-foreground" />{t('document')}{syncLabel && <Badge variant="outline">{syncLabel}</Badge>}</span>
       <div className="flex items-center gap-2"><NativeSelect aria-label={t('editMode')} size="sm" value={mode} onChange={e => setMode(e.target.value)}><NativeSelectOption value="editing">{t('mode.editing')}</NativeSelectOption><NativeSelectOption value="suggesting">{t('mode.suggesting')}</NativeSelectOption><NativeSelectOption value="viewing">{t('mode.viewing')}</NativeSelectOption></NativeSelect><NativeSelect aria-label={t('markupView')} size="sm" value={markup} onChange={e => setMarkup(e.target.value as RichTextMarkupView)}><NativeSelectOption value="all">{t('markup.all')}</NativeSelectOption><NativeSelectOption value="final">{t('markup.final')}</NativeSelectOption><NativeSelectOption value="original">{t('markup.original')}</NativeSelectOption></NativeSelect></div>
     </div>
     {editable && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}

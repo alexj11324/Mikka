@@ -10,9 +10,11 @@ import { RichTextChanges } from '@/components/blocks/rich-text-editor-3/componen
 import { CommentMark, CommentPaint } from '@/components/blocks/rich-text-editor-4/components/rich-text-comments'
 import { issueDocumentSeed, readIssueContent } from '@/lib/issue-document-seed'
 
-export function createEditorExtensions(isOpen: (id: string) => boolean, author: string, collaborative: boolean, compact = false, placeholder = '') {
+export function createEditorExtensions(isOpen: (id: string) => boolean, author: string, collaborative: boolean, compact = false, placeholder: string | null = '') {
+  // null: a read-only document has no typing hint, so the Placeholder extension is left out entirely.
+  const base = createRichTextExtensions({ placeholder: placeholder ?? '', collaborative })
   return [
-    ...createRichTextExtensions({ placeholder, collaborative }),
+    ...(placeholder === null ? base.filter(extension => extension.name !== 'placeholder') : base),
     RichTextBlockActions, RichTextTable, RichTextOutlineBlock, createRichTextMention([]),
     RichTextSlashCommand.configure({ items: [...RICH_TEXT_BASIC_SLASH_ITEMS, RICH_TEXT_TABLE_SLASH_ITEM, RICH_TEXT_OUTLINE_SLASH_ITEM] }),
     RichTextChanges.configure({ author, tracking: false, now: () => new Date().toISOString() }),
