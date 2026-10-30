@@ -45,7 +45,7 @@ export async function pendingLocalComputerReviews(pool: Pool, userId: string) {
     LEFT JOIN workspace_computer_policies p ON p."workspaceId"=bot."workspaceId"
     WHERE v."userId"=$1 AND d.kind='local' AND d.enabled=true AND v.display IS NULL
       AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id)
-      AND coalesce(p.permission,'ask') IN ('allow','ask')
+      AND p.permission IS DISTINCT FROM 'deny'
       AND v.decision IS NULL AND v."expiresAt">now() AND v."seenAt">now()-interval '10 seconds'
       AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now()
       AND r.status=ANY($2::text[]) ORDER BY v."seenAt" LIMIT 20`,
@@ -65,7 +65,7 @@ export async function decideLocalComputerReview(pool: Pool, userId: string, id: 
       LEFT JOIN workspace_computer_policies p ON p."workspaceId"=bot."workspaceId"
       WHERE v.id=$1 AND v.digest=$2 AND v."userId"=$3 AND d.kind='local' AND d.enabled=true
         AND v.display IS NULL AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id)
-        AND coalesce(p.permission,'ask') IN ('allow','ask')
+        AND p.permission IS DISTINCT FROM 'deny'
         AND v.decision IS NULL AND v."expiresAt">now() AND v."seenAt">now()-interval '10 seconds'
         AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now() AND r.status=ANY($4::text[])
       FOR UPDATE OF r,d,v`, [id, digest, userId, ['running', 'preparing', 'waiting_input', 'finishing']])

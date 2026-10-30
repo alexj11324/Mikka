@@ -20,25 +20,24 @@ const approvedSchema=z.object({
 type Judgment=Awaited<ReturnType<typeof judgeVisualBrowserAction>>
 
 /** Only the workflow holding the real visual-model/Decisions response calls
- * this adapter. Neither HTTP input nor model output provides authorization. */
+ * this adapter. Neither HTTP input nor model output provides authorization.
+ * The Decisions judgment (within_task) is the only gate before the action;
+ * there is no human approval step (Alex, 2026-10-30). Deny still blocks. */
 export async function browserAction(pool:Pool,actor:Actor,botId:string,id:string,mutation:BrowserMutation,summary:string,observation:VisualObservation,judgment:Judgment) {
   if (judgment.scope!=='within_task' || judgment.execution.vision!=='image-input-submitted' || judgment.execution.imageDigests[0]!==observationMetadata(observation).imageDigest) throw new ComputerError(409,'Browser judgment unavailable')
   const client=await pool.connect()
-  let input:z.infer<typeof approvedSchema>, permission:'allow'|'ask'|'deny'
+  let input:z.infer<typeof approvedSchema>
   try {
     await client.query('BEGIN')
     const current=await lockBrowserAuthority(client,actor,botId,id,judgment.effect)
     if (current.row.status!=='running' || current.row.activeActionId) throw new ComputerError(409,'Browser task waiting')
-    permission=current.permission
-    if(permission==='deny') throw new ComputerError(403,'Browser action denied')
+    if(current.permission==='deny') throw new ComputerError(403,'Browser action denied')
     const body={version:2 as const,actionId:randomUUID(),workspaceId:actor.workspaceId,botId,subagentId:id,epoch:current.row.epoch,loaderId:observation.loaderId,origin:observation.origin,observationId:observation.observationId,observedAt:observation.observedAt,mutation:browserMutationSchema.parse(mutation),summary:summary.slice(0,500),effect:judgment.effect,policyRevision:current.revision,judgment:{executionId:judgment.execution.executionId,requestDigest:judgment.execution.requestDigest,imageDigest:observationMetadata(observation).imageDigest}}
     input=approvedSchema.parse({...body,digest:hash([actor.userId,body])})
-    await client.query(`INSERT INTO pending_actions(id,"userId",action,input,status) VALUES($1,$2,'browser_operation',$3,$4)`,[input.actionId,actor.userId,input,permission==='allow'?'running':'pending'])
-    const needs={kind:'approval',actionId:input.actionId,summary:input.summary}
-    await client.query(`WITH changed AS (UPDATE bot_subagents SET status=$4,needs=$2,step=$3,"activeActionId"=$5 WHERE id=$1 RETURNING *) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event) SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`,[id,permission==='ask'?needs:null,permission==='allow'?'Executing authorized action':'Approval requested',permission==='allow'?'running':'needs_you',input.actionId])
+    await client.query(`INSERT INTO pending_actions(id,"userId",action,input,status) VALUES($1,$2,'browser_operation',$3,'running')`,[input.actionId,actor.userId,input])
+    await client.query(`WITH changed AS (UPDATE bot_subagents SET status='running',needs=NULL,step='Executing authorized action',"activeActionId"=$2 WHERE id=$1 RETURNING *) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event) SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`,[id,input.actionId])
     await client.query('COMMIT')
   } catch(error) {await client.query('ROLLBACK');throw error} finally {client.release()}
-  if(permission==='ask') return {state:'needs_you' as const,actionId:input.actionId,summary:input.summary}
   const result=await executeApprovedBrowserAction(pool,actor.userId,input,true)
   if ('error' in result) throw new ComputerError(409,result.error)
   return {state:'running' as const,actionId:input.actionId}
@@ -75,7 +74,6 @@ export async function executeApprovedBrowserAction(pool:Pool,userId:string,raw:u
       await client.query(`UPDATE bot_subagents SET status='running',needs=NULL,"activeActionId"=NULL,step='Operation declined; choosing another approach' WHERE id=$1`,[input.subagentId])
       await client.query('COMMIT');return {data:{declined:true}}
     }
-    if(current.permission==='ask' && !action.decidedAt) throw new Error('browserApprovalRequired')
     const machine=(await client.query(`SELECT "sandboxId" FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2 AND state='running'`,[input.workspaceId,userId])).rows[0]
     if(!machine?.sandboxId) throw new Error('browserUnavailable')
     // Persist invocation before external I/O; do not manufacture an uninvoked

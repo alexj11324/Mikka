@@ -33,7 +33,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
   // Materialize empty defaults under the same locks, so legacy runs have a
   // stable generation. No existing computer or external-write choice changes.
   await tx.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id) VALUES ($1,$2,$3,$4) ON CONFLICT (owner_id,bot_key) DO NOTHING`, [userId,key,scope.botId,scope.workspaceId])
-  if (scope.workspaceId) await tx.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission) VALUES ($1,'ask') ON CONFLICT ("workspaceId") DO NOTHING`, [scope.workspaceId])
+  if (scope.workspaceId) await tx.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission) VALUES ($1,'allow') ON CONFLICT ("workspaceId") DO NOTHING`, [scope.workspaceId])
   const agentRow = await tx.query<{ policy: unknown; version: string; generation: string; workspace: string | null }>(`SELECT cli_run_policy AS policy,cli_run_policy_version AS version,cli_run_policy_generation AS generation,workspace_id AS workspace FROM agent_kit_heads WHERE owner_id=$1 AND bot_key=$2 FOR SHARE`, [userId,key])
   if (!agentRow.rows[0] || agentRow.rows[0].workspace !== scope.workspaceId) throw new Error('agentPolicyUnavailable')
   const agent = cliPolicyLayerSchema.parse(agentRow.rows[0]?.policy ?? {})

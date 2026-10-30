@@ -1,9 +1,10 @@
 import 'server-only'
 import type { Pool, PoolClient } from 'pg'
+import { computerPermission } from './permission'
 
 /** The existing local daemon cannot operate a Bot's cloud desktop. Keep its
  * claim serialized with Bot binding and fail closed until a cloud worker with
- * the computer tool and approval gate can claim the run. */
+ * the computer tool can claim the run. */
 export async function claimLocalRun(pool: Pool, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId?: string, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>): Promise<'claimed' | 'unavailable' | 'cloud-required'> {
   const client = await pool.connect()
   try {
@@ -24,7 +25,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
 
 /** The scoped cloud device may claim only a run bound to its owner's Bot
  * and its workspace's machine. Binding and claim use the same run row lock. */
-export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: 'allow' | 'ask' } | null> {
+export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: 'allow' } | null> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -33,8 +34,8 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return null }
     const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
-    const permission = policy?.permission ?? 'ask'
-    if (permission !== 'ask' && permission !== 'allow') { await client.query('COMMIT'); return null }
+    const permission = computerPermission(policy?.permission)
+    if (permission !== 'allow') { await client.query('COMMIT'); return null }
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return null }
     const run = (await client.query('SELECT id,"agentId" FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND "userId"=$3 AND status=$4 AND "stopRequestedAt" IS NULL FOR UPDATE', [runId, deviceId, actor.userId, 'queued'])).rows[0]
     if (!run) { await client.query('COMMIT'); return null }

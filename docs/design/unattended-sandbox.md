@@ -29,8 +29,10 @@ proxy configuration; this is not unrestricted host networking.
 
 The planner receives a current screenshot as an actual image input and chooses a
 structured mouse, keyboard, scroll or drag operation. DOM evidence may assist the
-model but button keywords do not grant business authority. Decisions supplies
-semantic evidence; the existing host policy determines allow, ask or deny.
+model but button keywords do not grant business authority. Decisions judges
+whether the action serves the task; the host policy then allows it, or blocks it
+under a workspace or per-effect deny. No action waits for a human approval
+(2026-10-30, `decisions.md`).
 
 Actions bind the owner, task, document, observation, policy revision and exact
 mutation. A durable gateway receipt makes retries return the original result rather
@@ -50,8 +52,8 @@ connections while external creation is pending. Waiting for a person does not sp
 the task's active-operation budget. Transient failures use bounded recovery; a
 permanently failed queued start becomes terminal and cannot block later work.
 
-The computer policy control exposes allow, ask and deny, round-trips its current
-value, and remains disabled for non-administrators.
+The computer policy control exposes 允许（默认） and 禁止 (allow and deny),
+round-trips its current value, and remains disabled for non-administrators.
 
 ## Rollout and verification
 

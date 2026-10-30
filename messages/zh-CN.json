@@ -1693,16 +1693,15 @@
       "previewLabel": "工作区表单预览"
     },
     "computerPolicy": {
-      "heading": "云电脑",
-      "description": "控制工作区内的 Bot 是否可以操作电脑。",
+      "heading": "电脑操作",
       "label": "Bot 操作电脑",
-      "help": "禁止后，电脑任务会停止，已有授权也会失效。你仍然可以接管电脑。",
+      "help": "Bot 直接操作，不逐步确认。你接管电脑时 Bot 暂停。禁止后电脑任务停止。",
       "adminOnly": "只有工作区管理员可以修改此设置。",
-      "ask": "操作前审批",
+      "allow": "允许（默认）",
       "deny": "禁止",
       "error": "无法读取或更新电脑设置。",
-      "loading": "正在读取审批设置…",
-      "unavailable": "这个部署还没有开启云电脑任务，暂时没有需要审批的操作。"
+      "loading": "正在读取电脑设置…",
+      "unavailable": "这个部署没有开启云电脑。"
     },
     "issuePrefix": {
       "title": "个人任务编号",
