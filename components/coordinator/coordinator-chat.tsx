@@ -180,7 +180,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   }
 
   if (openThread) return <section aria-label={name} data-slot="thread-view" className="flex min-h-0 flex-1 flex-col">
-    <IssueThreadPanel issueId={openThread.issueId} runId={openThread.runId} back={name} onClose={() => setOpenThread(null)} />
+    <IssueThreadPanel key={openThread.runId} issueId={openThread.issueId} runId={openThread.runId} back={name} onOpenThread={runId => setOpenThread({ issueId: openThread.issueId, runId })} onClose={() => setOpenThread(null)} />
   </section>
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>

@@ -92,13 +92,15 @@ test('skill rows read 待启用 and ordinary rows keep 待你确认', () => {
 
 test('approval bar uses component defaults and the Figma copy for each state', () => {
   const bar = (state: Parameters<typeof ApprovalBar>[0]['state'], isSkill = false) =>
-    renderToStaticMarkup(<ApprovalBar state={state} isSkill={isSkill} details={['Preview', 'abcdef1']} />)
+    renderToStaticMarkup(<ApprovalBar state={state} isSkill={isSkill} />)
   for (const state of ['pending', 'approved', 'publishing', 'checking', 'failed', 'live', 'revoked', 'expired', 'invalidated'] as const) {
     const html = bar(state)
     assert.match(html, /data-slot="item"/)
     assert.doesNotMatch(html, /bg-control|rounded-\[14px\]|line-through|bg-blue|bg-destructive/)
   }
-  assert.match(bar('pending', true), />待启用<.*>启用</)
+  // While it waits for you the header's chip names the state; the bar carries only the scope and the action.
+  assert.doesNotMatch(bar('pending', true), />待启用</)
+  assert.match(bar('pending', true), />启用</)
   assert.match(bar('live', true), />已启用</)
   assert.match(bar('failed'), />发布失败<.*>撤销批准<.*>发布</)
   assert.match(bar('invalidated'), />已失效</)
@@ -108,44 +110,44 @@ test('approval bar uses component defaults and the Figma copy for each state', (
 })
 
 test('pending without a decision source hides 批准; busy actions show a spinner and stay disabled', () => {
-  const hidden = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} details={[]} canApprove={false} />)
+  const hidden = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} canApprove={false} />)
   assert.doesNotMatch(hidden, /批准/)
   assert.doesNotMatch(hidden, /<button/)
-  const busy = renderToStaticMarkup(<ApprovalBar state="approved" isSkill={false} details={[]} busy />)
+  const busy = renderToStaticMarkup(<ApprovalBar state="approved" isSkill={false} busy />)
   assert.match(busy, /aria-busy="true"[^>]*>[^<]*<svg[^>]*role="status"|aria-busy="true"/)
   assert.match(busy, /data-icon="inline-start"/)
 })
 
 test('pending shows 退回修改 only when a reject handler is passed', () => {
-  const without = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} details={[]} canApprove />)
+  const without = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} canApprove />)
   assert.doesNotMatch(without, /退回修改/)
-  const withReject = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} details={[]} canApprove onReject={() => {}} />)
+  const withReject = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} canApprove onReject={() => {}} />)
   assert.match(withReject, /variant="secondary"[^<]*<?[^<]*退回修改|退回修改/)
 })
 
 test('publish failed keeps revoke and offers publish again', () => {
-  const html = renderToStaticMarkup(<ApprovalBar state="failed" isSkill={false} details={[]} />)
+  const html = renderToStaticMarkup(<ApprovalBar state="failed" isSkill={false} />)
   assert.match(html, /撤销/)
   assert.match(html, />发布</)
 })
 
 test('revoke is secondary and busy actions swap the icon for the spinner (fixed width)', () => {
   for (const state of ['approved', 'failed'] as const) {
-    const idle = renderToStaticMarkup(<ApprovalBar state={state} isSkill={false} details={[]} />)
+    const idle = renderToStaticMarkup(<ApprovalBar state={state} isSkill={false} />)
     assert.match(idle, /<button[^>]*class="[^"]*bg-secondary [^"]*"[^>]*>撤销批准</)
-    const busy = renderToStaticMarkup(<ApprovalBar state={state} isSkill={false} details={[]} busy />)
+    const busy = renderToStaticMarkup(<ApprovalBar state={state} isSkill={false} busy />)
     // Each action has exactly one inline-start icon whether idle or busy, so its width does not change.
     assert.equal((idle.match(/data-icon="inline-start"/g) ?? []).length, (busy.match(/data-icon="inline-start"/g) ?? []).length)
     assert.ok((idle.match(/data-icon="inline-start"/g) ?? []).length >= 1)
   }
-  const pendingIdle = renderToStaticMarkup(<ApprovalBar state="pending" isSkill details={[]} />)
-  const pendingBusy = renderToStaticMarkup(<ApprovalBar state="pending" isSkill details={[]} busy />)
+  const pendingIdle = renderToStaticMarkup(<ApprovalBar state="pending" isSkill />)
+  const pendingBusy = renderToStaticMarkup(<ApprovalBar state="pending" isSkill busy />)
   assert.equal((pendingIdle.match(/data-icon="inline-start"/g) ?? []).length, 1)
   assert.equal((pendingBusy.match(/data-icon="inline-start"/g) ?? []).length, 1)
 })
 
 test('a voided approval shows only the 「<sha> · 已失效」 badge next to the enable action', () => {
-  const html = renderToStaticMarkup(<ApprovalBar state="pending" isSkill details={[]} superseded={'c'.repeat(40)} />)
+  const html = renderToStaticMarkup(<ApprovalBar state="pending" isSkill superseded={'c'.repeat(40)} />)
   assert.match(html, />ccccccc · 已失效</)
   assert.doesNotMatch(html, />c{8,}/)
   assert.match(html, />启用</)
@@ -154,7 +156,7 @@ test('a voided approval shows only the 「<sha> · 已失效」 badge next to th
 
 test('every sha shows 7 characters; the full sha is the copy target and the hover label', () => {
   const full = '3f9c2ab' + 'e'.repeat(33)
-  const html = renderToStaticMarkup(<ApprovalBar state="approved" isSkill={false} details={['Preview']} sha={full} superseded={'d'.repeat(40)} />)
+  const html = renderToStaticMarkup(<ApprovalBar state="approved" isSkill={false} sha={full} superseded={'d'.repeat(40)} />)
   assert.match(html, />3f9c2ab</)
   assert.doesNotMatch(html, />3f9c2abe/)
   assert.match(html, new RegExp(`<button[^>]*data-sha="${full}"`))
