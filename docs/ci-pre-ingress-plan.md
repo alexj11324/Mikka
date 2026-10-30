@@ -48,17 +48,22 @@ scoped authority and must recheck the task, head, account and membership before
 committing an idempotent claim. No credentials, bindings, subscriptions or
 external configuration are changed by this proposal.
 
-With a cached token, an ordinary complete poll currently needs nine GitHub
-requests: three to recheck the person's access and six for PR, checks, statuses,
-branch protection, rules and Actions. Issuance adds about six GitHub requests
-and one Vercel authentication request, approximately once per hour per active
-watch. Pagination, retries and interrupted leases add more. At a 15-minute
-interval, one watch running for two hours is roughly 72 polling calls plus 12
-issuance calls, two authentication requests and one final result request. This
-is a cost estimate, not a reduction of GitHub traffic. The batch limit is two
-watches per invocation, with backoff and jitter; backlog delays later watches.
-Branch-rule caching and a global rate budget remain to be implemented and
-measured before deployment.
+With a cached token, a full poll needs nine GitHub requests: three to recheck
+the person's access and six for PR, checks, statuses, branch protection, rules
+and Actions. Branch protection and rules are cached for 30 minutes, reducing
+an ordinary cache-hit poll to seven. The Worker bypasses the cache and reads a
+fresh complete snapshot before queuing a result; the application also rechecks
+fresh before claim. After a commit result has been accepted, same-head monitoring uses only
+the three access checks and one PR-head read. Issuance adds about six GitHub
+requests and one Vercel authentication request, approximately once per hour
+per active watch. Pagination, retries and interrupted leases add more. At a
+15-minute interval, one watch running for two hours without completion is about
+64 polling calls plus up to nine for the final fresh read, 12 issuance calls,
+two authentication requests and one final result request. This is an estimate,
+not a reduction of GitHub traffic.
+The batch limit is two watches per invocation, with backoff and jitter;
+backlog delays later watches. A global rate budget remains to be implemented
+and latency and cost must be measured before deployment.
 
 The parent reports that CI event subscriptions have already been disabled;
 the active poller is not deployed, leaving a temporary CI detection gap.

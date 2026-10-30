@@ -8,6 +8,16 @@ const env = { GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey }
 const binding = { remoteKey: 'v2/github.com/owner/repo', installationId: 5, repositoryId: 7, prNumber: 9, branch: 'mikka/issue-9' }
 const sha = 'a'.repeat(40)
 
+test('scoped token cache reuses bounded branch rules without requesting an App token',async()=>{
+  const calls:string[]=[];let saved:{branch:unknown;rules:unknown[][]}|null=null
+  const cache={async get(){return saved},async put(_key:string,value:{branch:unknown;rules:unknown[][]}){saved=value}}
+  const fetcher:typeof fetch=async url=>{const path=String(url);calls.push(path);if(path.includes('/pulls/'))return Response.json({state:'open',head:{sha,ref:binding.branch,repo:{id:7}},base:{ref:'main',repo:{id:7}}});if(path.includes('check-runs'))return Response.json({total_count:1,check_runs:[{id:4,name:'build',status:'completed',conclusion:'success'}]});if(path.includes('/rules/branches/'))return Response.json([]);if(path.includes('/branches/'))return Response.json({protected:false,protection:{enabled:false}});if(path.includes('/actions/runs?'))return Response.json({total_count:0,workflow_runs:[]});return Response.json({total_count:0,statuses:[]})}
+  await readCi(binding,{},fetcher,{scopedToken:'synthetic-token',staticCache:cache})
+  await readCi(binding,{},fetcher,{scopedToken:'synthetic-token',staticCache:cache})
+  assert.equal(calls.filter(x=>x.includes('/branches/main')).length,2) // branch + rules once each
+  assert.equal(calls.some(x=>x.includes('/access_tokens')),false)
+})
+
 test('reads scoped PR head and all checks; never follows arbitrary URLs', async () => {
   const calls: { url: string; init?: RequestInit }[] = []
   const fetcher: typeof fetch = async (url, init) => {

@@ -5,7 +5,7 @@ import type { CiPollAdapter, CiPollLease, CiPollResult, CiPollState } from './ci
 
 /** Durable polling queue. The caller supplies a repository-scoped provider
  * reader; this layer never receives a long-lived GitHub App private key. */
-export function postgresCiPollAdapter(pool: Pool, read: (lease:CiPollLease,signal:AbortSignal)=>Promise<CiPollState>, authorize: CiPollAdapter['authorize']): CiPollAdapter {
+export function postgresCiPollAdapter(pool: Pool, read: (lease:CiPollLease,signal:AbortSignal)=>Promise<CiPollState>, authorize: CiPollAdapter['authorize'], readFresh:CiPollAdapter['readFresh']=read): CiPollAdapter {
   async function transaction<T>(work:(tx:PoolClient)=>Promise<T>):Promise<T> {
     const tx=await pool.connect()
     try { await tx.query('BEGIN'); const result=await work(tx); await tx.query('COMMIT'); return result }
@@ -21,7 +21,7 @@ export function postgresCiPollAdapter(pool: Pool, read: (lease:CiPollLease,signa
     if (result.rowCount !== 1) throw new Error('CI lease lost')
   }
   return {
-    read, authorize,
+    read, readFresh, authorize,
     async lease(limit, now) {
       return transaction(async tx => {
         const rows=await tx.query(`SELECT o.*,gi."installationId",gi."repositoryId",gi."githubAccountId",p.branch,i."userId" AS "issueOwner",i.scope AS "issueScope" FROM github_ci_observations o

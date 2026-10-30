@@ -7,6 +7,7 @@ alter table github_ci_observations add column if not exists "pollAttempt" intege
 alter table github_ci_observations add column if not exists "pollObservation" jsonb;
 alter table github_ci_observations add column if not exists "pollTokenEnvelope" bytea;
 alter table github_ci_observations add column if not exists "pollTokenExpiresAt" timestamptz;
+alter table github_ci_observations add column if not exists "pollRules" jsonb;
 create table if not exists github_ci_poll_outbox (
   "userId" text not null,
   "issueId" uuid not null,

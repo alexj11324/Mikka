@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { constants, closeSync, mkdtempSync, mkdirSync, openSync, readFileSync, renameSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { captureNativeSession, restoreNativeSession } from '../src/native-session-files'
+import { captureNativeSession, captureNativeSessionAt, restoreNativeSession } from '../src/native-session-files'
 
 describe('retained hosted transcript snapshot', () => {
   for (const kind of ['codex','claude_code'] as const) it(`round trips only the named ${kind} transcript`, () => {
@@ -28,6 +28,20 @@ describe('retained hosted transcript snapshot', () => {
     mkdirSync(join(root,'source'))
     symlinkSync(join(root,'outside'),join(root,'source','id.jsonl'))
     expect(() => captureNativeSession(join(root,'source'),'claude_code','id')).toThrow()
+  })
+  it('anchors capture to the original directory even if its path is replaced',()=>{
+    const root=mkdtempSync(join(tmpdir(),'mikka-native-anchor-retained-'))
+    const original=join(root,'original'),moved=join(root,'moved'),outside=join(root,'outside')
+    mkdirSync(original);mkdirSync(outside);mkdirSync(join(original,'sessions'));mkdirSync(join(outside,'sessions'))
+    writeFileSync(join(original,'sessions','rollout-id.jsonl'),'original')
+    writeFileSync(join(outside,'sessions','rollout-id.jsonl'),'outside')
+    const fd=openSync(original,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW)
+    try {
+      renameSync(original,moved);symlinkSync(outside,original)
+      const snapshot=captureNativeSessionAt(fd,['sessions'],'codex','id')
+      const target=join(root,'restored');restoreNativeSession(target,'codex','id',snapshot)
+      expect(readFileSync(join(target,'rollout-id.jsonl'),'utf8')).toBe('original')
+    } finally {closeSync(fd)}
   })
   it('retains a large complete transcript and rejects a larger one without truncation', () => {
     const root=mkdtempSync(join(tmpdir(),'mikka-native-size-retained-'))

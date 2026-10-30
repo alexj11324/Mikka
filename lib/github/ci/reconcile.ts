@@ -240,7 +240,10 @@ export async function reconcileCi(options: { pool: Pool; deadline: number; limit
             await tx.query('RELEASE SAVEPOINT ci_delivery')
             if (!(error instanceof CiContinuationUnsupported)) throw error
             unsupported = true
-            const payload = { text: lease.held ? 'CI needs attention. Open an authorized task to review its checks.' : `Automatic CI follow-up cannot resume this session. Please review the latest result.\n${followUp}`, source: 'github_ci' }
+            const message = error.reason === 'session_missing'
+              ? 'Automatic CI follow-up cannot resume because the original session snapshot is unavailable or exceeds the supported size. The result is preserved for review.'
+              : 'Automatic CI follow-up cannot resume this session. Please review the latest result.'
+            const payload = { text: lease.held ? 'CI needs attention. Open an authorized task to review its checks.' : `${message}\n${followUp}`, source: 'github_ci' }
             await assertCredentialSafeChat(row.userId, payload)
             const inserted = await tx.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey","issueId","runId",payload,tier)
               VALUES ($1,$2,$3,'run_report',$4,$5,$6,$7,'attention') ON CONFLICT ("dedupeKey") DO NOTHING RETURNING id`,

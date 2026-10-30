@@ -10,6 +10,8 @@ export interface CiPollAdapter {
   lease(limit: number, now: number): Promise<CiPollLease[]>
   authorize(lease:CiPollLease):Promise<{check():Promise<void>;close():Promise<void>}>
   read(lease: CiPollLease, signal: AbortSignal): Promise<CiPollState>
+  /** Bypass branch-rule caches immediately before final delivery. */
+  readFresh(lease: CiPollLease, signal: AbortSignal): Promise<CiPollState>
   /** Persist state and next due time only if the lease/generation is current. */
   pending(lease: CiPollLease, state: Observation | null, nextAt: number): Promise<void>
   close(lease: CiPollLease): Promise<void>
@@ -52,6 +54,16 @@ export async function pollActiveCi(adapter: CiPollAdapter, options: { now?: () =
       const head = current.head.toLowerCase(), summary = summarize(current.snapshot)
       const decision = observe(lease.observation,head,summary,now(),QUIET_MS)
       if (decision.deliver && summary.kind === 'complete' && decision.state) {
+        await authority.check()
+        const left=options.deadline-now();if(left<=0)throw new Error('CI poll deadline exceeded')
+        const fresh=await adapter.readFresh(lease,AbortSignal.timeout(Math.min(left,30_000)))
+        if(!fresh.open){await adapter.close(lease);continue}
+        if(!/^[a-f0-9]{40}$/i.test(fresh.head))throw new Error('Invalid CI head')
+        const freshHead=fresh.head.toLowerCase(), freshSummary=summarize(fresh.snapshot)
+        if(freshHead!==head||freshSummary.kind!=='complete'||freshSummary.fingerprint!==summary.fingerprint){
+          await adapter.pending(lease,observe(decision.state,freshHead,freshSummary,now(),QUIET_MS).state,now()+BASE_MS)
+          counts.pending++;continue
+        }
         await authority.check()
         await adapter.complete(lease,decision.state,{head,fingerprint:summary.fingerprint,outcome:summary.outcome,failed:summary.failed})
         await authority.check()

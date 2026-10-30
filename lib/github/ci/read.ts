@@ -19,7 +19,7 @@ export async function readCiHead(binding: Binding,token:string,fetcher:typeof fe
 }
 
 /** Read only, fixed origin, installation- and repository-scoped. No token is retained. */
-export async function readCi(binding: Binding, env: Record<string, string | undefined>, fetcher: typeof fetch = fetch, options: { deadline?: number; scopedToken?:string } = {}): Promise<{ head: string; open: boolean; snapshot: Snapshot }> {
+export async function readCi(binding: Binding, env: Record<string, string | undefined>, fetcher: typeof fetch = fetch, options: { deadline?: number; scopedToken?:string; staticCache?:{get(key:string):Promise<{branch:unknown;rules:unknown[][]}|null>;put(key:string,value:{branch:unknown;rules:unknown[][]}):Promise<void>} } = {}): Promise<{ head: string; open: boolean; snapshot: Snapshot }> {
   if ((!options.scopedToken && (!env.GITHUB_APP_ID || !env.GITHUB_APP_PRIVATE_KEY)) || !Number.isSafeInteger(binding.installationId) || binding.installationId <= 0 || !Number.isSafeInteger(binding.repositoryId) || binding.repositoryId <= 0 || !Number.isSafeInteger(binding.prNumber) || binding.prNumber <= 0 || !binding.branch || binding.branch.length > 255) throw new CiReadError('configuration')
   const { path } = githubRepository(binding.remoteKey)
   async function request(pathname: string, token: string, body?: unknown): Promise<unknown> {
@@ -70,7 +70,9 @@ export async function readCi(binding: Binding, env: Record<string, string | unde
   // that have already registered on the head. The branch endpoint exposes
   // legacy protection with Contents read; missing details are not an empty set.
   const base = encodeURIComponent(pr.base.ref)
-  const branch = await request(`${path}/branches/${base}`, token) as { protected?: unknown; protection?: { enabled?: unknown; required_status_checks?: { contexts?: unknown; checks?: unknown } } }
+  const cacheKey=JSON.stringify([binding.repositoryId,pr.base.ref])
+  const cached=await options.staticCache?.get(cacheKey) ?? null
+  const branch = (cached?.branch ?? await request(`${path}/branches/${base}`, token)) as { protected?: unknown; protection?: { enabled?: unknown; required_status_checks?: { contexts?: unknown; checks?: unknown } } }
   if (typeof branch?.protected !== 'boolean' || !branch.protection || typeof branch.protection.enabled !== 'boolean') throw new CiReadError('invalid_response')
   const requiredChecks: RequiredCheck[] = []
   const add = (context: unknown, appId: unknown) => {
@@ -86,9 +88,11 @@ export async function readCi(binding: Binding, env: Record<string, string | unde
       if (!requiredChecks.some(check => check.context === context)) add(context, null)
     }
   }
+  const pages:unknown[][]=[]
   for (let page = 1; page <= 5; page++) {
-    const rules = await request(`${path}/rules/branches/${base}?per_page=100&page=${page}`, token)
+    const rules = cached ? cached.rules[page-1] : await request(`${path}/rules/branches/${base}?per_page=100&page=${page}`, token)
     if (!Array.isArray(rules)) throw new CiReadError('invalid_response')
+    pages.push(rules)
     for (const rule of rules) {
       if (!rule || typeof rule.type !== 'string') throw new CiReadError('invalid_response')
       if (rule.type === 'required_status_checks') {
@@ -102,6 +106,7 @@ export async function readCi(binding: Binding, env: Record<string, string | unde
     if (rules.length < 100) break
     if (page === 5) throw new CiReadError('invalid_response')
   }
+  if(!cached && options.staticCache)await options.staticCache.put(cacheKey,{branch,rules:pages})
   // GitHub Actions knows runs that have not yet registered any check run.
   const workflows: WorkflowRun[] = []
   let workflowTotal: number | undefined

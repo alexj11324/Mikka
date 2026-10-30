@@ -12,6 +12,7 @@ test('multiple workflows and missing required checks create one final callback, 
     async lease() { return [{id:'fixture',generation:'1',attempt:0,observation}] },
     async authorize(){return {async check(){},async close(){}}},
     async read() { return {head,open:true,snapshot} },
+    async readFresh() {return {head,open:true,snapshot}},
     async pending(_lease,state) { observation=state },
     async close() { throw Error('not closed') },
     async complete(_lease,state,result) { completed++; outputs.push(result); observation={...state,deliveredFingerprint:result.fingerprint} },
@@ -33,7 +34,17 @@ test('multiple workflows and missing required checks create one final callback, 
 test('failed provider reads back off and do not emit a final result', async () => {
   let due=0
   const lease:CiPollLease={id:'fixture',generation:'1',attempt:2,observation:null}
-  const adapter:CiPollAdapter={async lease(){return [lease]},async authorize(){return {async check(){},async close(){}}},async read(){throw Error('offline')},async pending(){throw Error('unexpected')},async close(){throw Error('unexpected')},async complete(){throw Error('unexpected')},async retry(_lease,next){due=next}}
+  const adapter:CiPollAdapter={async lease(){return [lease]},async authorize(){return {async check(){},async close(){}}},async read(){throw Error('offline')},async readFresh(){throw Error('unexpected')},async pending(){throw Error('unexpected')},async close(){throw Error('unexpected')},async complete(){throw Error('unexpected')},async retry(_lease,next){due=next}}
   const result=await pollActiveCi(adapter,{now:()=>1000,random:()=>0,deadline:31000})
   assert.equal(result.failed,1); assert.equal(result.completed,0); assert.ok(due>1000)
+})
+
+test('fresh branch rules can block a result that appeared complete from cache',async()=>{
+  const head='a'.repeat(40),snapshot:Snapshot={checks:[{id:'1',name:'build',status:'completed',conclusion:'success'}],statuses:[]}
+  const {summarize}=await import('../../../lib/github/ci/snapshot')
+  const result=summarize(snapshot);if(result.kind!=='complete')throw Error('fixture')
+  let completed=0,pending=0
+  const adapter:CiPollAdapter={async lease(){return [{id:'x',generation:'1',attempt:0,observation:{head,fingerprint:result.fingerprint,firstSeenAt:1,deliveredFingerprint:null}}]},async authorize(){return {async check(){},async close(){}}},async read(){return {head,open:true,snapshot}},async readFresh(){return {head,open:true,snapshot:{...snapshot,requiredChecks:[{context:'new-required',appId:null}]}}},async pending(){pending++},async close(){throw Error('unexpected')},async complete(){completed++},async retry(){throw Error('unexpected')}}
+  await pollActiveCi(adapter,{now:()=>200000,deadline:230000,random:()=>0})
+  assert.equal(completed,0);assert.equal(pending,1)
 })
