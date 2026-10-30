@@ -4,7 +4,7 @@ import 'server-only'
 // Flag on: the workspace's own key (getWorkspaceE2BApiKey, e2b_key_missing when absent, no fallback)
 // and only the public template named by E2B_BYO_COMPUTER_TEMPLATE. We never modify or publish templates.
 import { AuthenticationError, NotFoundError, RateLimitError, SandboxNotFoundError } from 'e2b'
-import { byoE2BKeyEnabled, E2BKeyError, getWorkspaceE2BApiKey, recordE2BKeyError, type E2BKeyErrorCode } from './e2b'
+import { byoE2BKeyEnabled, E2BKeyError, type E2BKeyErrorCode } from './flag'
 
 type Env = Record<string, string | undefined>
 
@@ -14,7 +14,7 @@ export async function e2bApiKey(workspaceId: string, platformMissing: string, en
     if (!env.E2B_API_KEY) throw new Error(platformMissing)
     return env.E2B_API_KEY
   }
-  return getWorkspaceE2BApiKey(workspaceId, env)
+  return (await import('./e2b')).getWorkspaceE2BApiKey(workspaceId, env)
 }
 
 /** Base desktop template. Flag on: E2B_BYO_COMPUTER_TEMPLATE (must be a public template); unset → e2b_template_unavailable. */
@@ -54,7 +54,7 @@ export async function withE2BErrors<T>(workspaceId: string, creating: boolean, r
     if (!byoE2BKeyEnabled(env) || error instanceof E2BKeyError) throw error
     const code = classifyE2BError(error, creating)
     if (!code) throw error
-    if (code in CARD_CODE) await recordE2BKeyError(workspaceId, CARD_CODE[code as keyof typeof CARD_CODE]).catch(() => undefined)
+    if (code in CARD_CODE) await (await import('./e2b')).recordE2BKeyError(workspaceId, CARD_CODE[code as keyof typeof CARD_CODE]).catch(() => undefined)
     throw new E2BKeyError(code)
   }
 }

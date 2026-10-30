@@ -2,13 +2,16 @@ import 'server-only'
 // 4e2: workspace secrets at sandbox runtime. Everything here is gated by MIKKA_BYO_E2B_KEY
 // (off by default; turning it on needs Alex). Flag off = no injection, no masking, today's behaviour.
 import { and, eq, inArray } from 'drizzle-orm'
-import { db, pool } from '@/lib/db'
+import { db } from '@/lib/db'
 import { workspaceSecrets } from '@/lib/db/secrets-schema'
 import { openSecret, secretAad, SecretsKeyMissingError } from './crypto'
-import { byoE2BKeyEnabled, E2BKeyError, getWorkspaceE2BApiKey } from './e2b'
+import { byoE2BKeyEnabled, E2BKeyError } from './flag'
 import { isReservedEnvName } from './format'
-import { guardSecretsDb, type SecretAuditHook } from './store'
+import type { SecretAuditHook } from './store'
 import { createSecretMasker, identityMasker, maskDeep, type Masker } from './mask'
+
+// The settings store (and its workspace-access chain) loads only when the flag is on and a query runs.
+const guardSecretsDb: typeof import('./store').guardSecretsDb = async (work, onUnique) => (await import('./store')).guardSecretsDb(work, onUnique)
 
 type Env = Record<string, string | undefined>
 export interface RuntimeSecret { id?: string; name: string; kind: 'secret' | 'env'; value: string }
@@ -53,7 +56,7 @@ export async function reservedInjectionFilter(workspaceId: string, secrets: Runt
 
 /** #438 C: the workspace's own E2B key is masked like a secret. Absent key = nothing to add. */
 async function workspaceE2BKeySecret(workspaceId: string, env: Env): Promise<{ name: string; value: string }[]> {
-  try { return [{ name: 'E2B_API_KEY', value: await getWorkspaceE2BApiKey(workspaceId, env) }] } catch (error) {
+  try { return [{ name: 'E2B_API_KEY', value: await (await import('./e2b')).getWorkspaceE2BApiKey(workspaceId, env) }] } catch (error) {
     if (error instanceof E2BKeyError && error.code === 'e2b_key_missing') return []
     throw error
   }
@@ -68,7 +71,7 @@ export async function workspaceSecretMasker(workspaceId: string | null | undefin
 
 /** Workspace whose secrets a run's sandbox received: the workspace its cloud device token is bound to. Null for local devices (nothing injected, nothing to mask). */
 export async function runWorkspaceId(runId: string): Promise<string | null> {
-  const { rows } = await guardSecretsDb(() => pool.query<{ workspaceId: string }>(
+  const { rows } = await guardSecretsDb(async () => (await import('@/lib/db')).pool.query<{ workspaceId: string }>(
     'SELECT t."boundWorkspaceId" AS "workspaceId" FROM agent_runs r JOIN device_tokens t ON t."boundDeviceId"=r."deviceId" WHERE r.id=$1 AND t."boundWorkspaceId" IS NOT NULL ORDER BY t."createdAt" DESC LIMIT 1', [runId]))
   return rows[0]?.workspaceId ?? null
 }
