@@ -67,3 +67,24 @@ test('billing is prepaid credits: no plan or subscription actions, secret.delete
   assert.equal(AUDIT_ACTIONS['billing.credits_purchased'], 'billing')
   assert.equal(AUDIT_ACTIONS['secret.deleted'], 'secret')
 })
+
+// No QA list of 19 mutated keys was found on the PR or in the review worktree,
+// so this set covers each rule (exact, substring, `key` suffix, auth-style),
+// with separator/case mutations of each.
+const MUTATED_SECRET_KEYS = [
+  'Value', 'plain_text', 'access-token', 'REFRESH_TOKEN', 'clientSecret', 'db_passwd', 'userPwd', 'api.key', 'awsCredentials',
+  'id_jwt', 'Bearer', 'set-cookie', 'SENTRY_DSN', 'connection_string', 'PRIVATE-KEY', 'aws_access_key_id', 'totpSeed', 'otp_code',
+  'stripeKey', 'webhook-signing-key', 'Authorization', 'proxy_authorization', 'x-auth', 'authHeader', 'basic_auth', 'auth_code',
+]
+const ALLOWED_KEYS = ['author', 'authorName', 'author_id', 'name', 'kind', 'scope', 'from', 'to', 'monkeys_count', 'keyword']
+
+test('reject list: every rule, with separator and case mutations', () => {
+  for (const key of MUTATED_SECRET_KEYS) assert.throws(() => toAuditRow({ ...base, metadata: { deep: { [key]: 'x' } } }), /secret-bearing key/, key)
+  for (const key of ALLOWED_KEYS) assert.doesNotThrow(() => toAuditRow({ ...base, metadata: { [key]: 'x' } }), key)
+})
+
+test('values with credential prefixes are rejected anywhere in metadata', () => {
+  for (const value of ['sk_live_abc', 'rk_test_1', 'ghp_x', 'gho_x', 'github_pat_11', 'xoxb-1', 'eyJhbGciOi', '-----BEGIN PRIVATE KEY-----', 'whsec_1', '  SK_live_upper'])
+    assert.throws(() => toAuditRow({ ...base, metadata: { list: ['ok', value] } }), /secret-bearing value/, value)
+  assert.doesNotThrow(() => toAuditRow({ ...base, metadata: { name: 'VERCEL_TOKEN_NAME_ONLY', note: 'skip', pr: 'ghost' } }))
+})

@@ -81,7 +81,34 @@ export class AuditEventError extends Error {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 // Lower-cased, separator-free key names that must never carry a value into the audit log.
-const FORBIDDEN_KEYS = new Set(['value', 'secret', 'secretvalue', 'token', 'accesstoken', 'refreshtoken', 'password', 'plaintext', 'apikey', 'authorization', 'cookie', 'privatekey', 'clientsecret', 'tokenhash', 'cardnumber'])
+// Key names are normalised (separators stripped, lowercased) and then matched:
+// exact words, substrings, a `key` suffix, and auth-style names. `author` and
+// similar stay allowed. Values are also scanned for well-known credential prefixes.
+const FORBIDDEN_KEY_EXACT = new Set(['value', 'plaintext', 'cardnumber', 'pan', 'cvc', 'cvv'])
+const FORBIDDEN_KEY_PARTS = ['token', 'secret', 'passw', 'pwd', 'apikey', 'credential', 'jwt', 'bearer', 'cookie', 'dsn', 'connectionstring', 'privatekey', 'accesskey', 'otp']
+// 'auth' only as authorization / auth header-token style names, never 'author…'.
+const FORBIDDEN_AUTH = /authoriz|auth(?:header|code|z)?$/
+const SECRET_VALUE_PREFIXES = ['sk_', 'rk_', 'ghp_', 'gho_', 'github_pat_', 'xox', 'eyj', '-----begin', 'whsec_']
+
+export const normaliseAuditKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+/** True when a metadata key name could carry a secret. */
+export function isSecretBearingKey(key: string): boolean {
+  const k = normaliseAuditKey(key)
+  if (!k) return false
+  if (FORBIDDEN_KEY_EXACT.has(k) || k.endsWith('key')) return true
+  if (FORBIDDEN_KEY_PARTS.some(part => k.includes(part))) return true
+  return FORBIDDEN_AUTH.test(k)
+}
+
+/** True when a string value looks like a credential (case-insensitive prefix, after trimming). */
+export function looksLikeSecretValue(value: string): boolean {
+  const v = value.trimStart().toLowerCase()
+  return SECRET_VALUE_PREFIXES.some(prefix => v.startsWith(prefix))
+}
+
+// Intentionally below the DB CHECK (8 KB): the JS cap fails fast with a clear
+// error, and the DB limit is a backstop for any writer that bypasses toAuditRow.
 const MAX_METADATA_BYTES = 4096
 
 export const auditCategory = (action: AuditAction): AuditCategory => AUDIT_ACTIONS[action]
@@ -92,10 +119,11 @@ const clip = (value: string | null | undefined, max: number) => {
 }
 
 function assertNoSecrets(value: unknown, path: string) {
+  if (typeof value === 'string') { if (looksLikeSecretValue(value)) throw new AuditEventError(`audit metadata must not contain a secret-bearing value at ${path}`); return }
   if (Array.isArray(value)) { value.forEach((item, i) => assertNoSecrets(item, `${path}[${i}]`)); return }
   if (value && typeof value === 'object') {
     for (const [key, inner] of Object.entries(value)) {
-      if (FORBIDDEN_KEYS.has(key.toLowerCase().replace(/[^a-z]/g, ''))) throw new AuditEventError(`audit metadata must not contain secret-bearing key ${path}.${key}`)
+      if (isSecretBearingKey(key)) throw new AuditEventError(`audit metadata must not contain secret-bearing key ${path}.${key}`)
       assertNoSecrets(inner, `${path}.${key}`)
     }
   }
@@ -128,6 +156,8 @@ export function toAuditRow(event: AuditEvent): AuditRow {
     category: auditCategory(event.action),
     targetType,
     targetId: target ? clip(target.id, 200) : null,
+    // actorName/targetLabel are display snapshots and are NOT scanned: callers
+    // must never put a secret value in targetLabel (use the secret's name).
     targetLabel: target ? clip(target.label, 200) : null,
     metadata,
     ip: ip && isIP(ip) ? ip : null,
