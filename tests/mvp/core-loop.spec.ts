@@ -171,7 +171,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     expect(repo).toEqual({ repoPath: REPOSITORY_KEY, remoteUrl: REPOSITORY, baseBranch: null })
     checkpoint('run-dispatched', 'Coordinator created exactly one task and dispatched to the selected device')
     const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
-    const threadTitle = `# ${title}`
+    const threadTitle = title
     const card = chat.getByRole('button', { name: `打开线程 ${threadTitle}`, exact: true })
     await expect(card).toBeVisible()
     await card.click()
