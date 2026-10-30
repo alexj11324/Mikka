@@ -238,3 +238,46 @@ test('actor constraint validation runs separately while a writer holds its table
     await pool.end()
   }
 })
+
+test('actor validations preserve schema variants and reject invalid legacy rows without deleting data', { skip: !enabled }, async () => {
+  const pool = new Pool({ connectionString: connection, max: 1 })
+  const client = await pool.connect()
+  const actorMigration = readFileSync('drizzle/20261025200000_activity_version_actor.sql', 'utf8')
+  const validations = ['20261030180500_validate_activity_actor_type.sql', '20261030180501_validate_activity_actor_id.sql']
+    .map(file => readFileSync(`drizzle/${file}`, 'utf8'))
+  try {
+    for (const variant of ['preexisting-columns', 'prevalidated-checks', 'invalid-type', 'id-without-type']) {
+      const schema = `actor_variant_${randomUUID().replaceAll('-', '')}`
+      await client.query(`create schema "${schema}"`)
+      console.log(`Retained actor variant schema: ${schema} (${variant})`)
+      await client.query(`set search_path to "${schema}"`)
+      await client.query('create table issue_versions(id text primary key, actor_type text, actor_id text)')
+      if (variant === 'invalid-type') await client.query("insert into issue_versions values ('legacy','invalid','id')")
+      else if (variant === 'id-without-type') await client.query("insert into issue_versions values ('legacy',null,'id')")
+      else await client.query("insert into issue_versions values ('legacy',null,null)")
+      await client.query('begin')
+      await client.query(actorMigration)
+      await client.query('commit')
+      const validate = async (sql: string) => client.query(sql)
+      if (variant === 'prevalidated-checks') for (const sql of validations) await validate(sql)
+      for (let i = 0; i < validations.length; i++) {
+        const invalid = (variant === 'invalid-type' && i === 0) || (variant === 'id-without-type' && i === 1)
+        if (invalid) await assert.rejects(validate(validations[i]), { code: '23514' })
+        else await validate(validations[i])
+      }
+      const legacy = (await client.query("select actor_type,actor_id from issue_versions where id='legacy'")).rows[0]
+      if (variant === 'invalid-type') assert.deepEqual(legacy, { actor_type: 'invalid', actor_id: 'id' })
+      else if (variant === 'id-without-type') assert.deepEqual(legacy, { actor_type: null, actor_id: 'id' })
+      else assert.deepEqual(legacy, { actor_type: null, actor_id: null })
+      const checks = (await client.query("select conname,convalidated from pg_constraint where conrelid='issue_versions'::regclass and conname in ('issue_versions_actor_type_check','issue_versions_actor_id_needs_type_check') order by conname")).rows
+      assert.equal(checks.length, 2)
+      for (const check of checks) {
+        const shouldFail = (variant === 'invalid-type' && check.conname === 'issue_versions_actor_type_check') || (variant === 'id-without-type' && check.conname === 'issue_versions_actor_id_needs_type_check')
+        assert.equal(check.convalidated, !shouldFail, `${variant}: ${check.conname}`)
+      }
+    }
+  } finally {
+    client.release()
+    await pool.end()
+  }
+})
