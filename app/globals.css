@@ -327,3 +327,18 @@ body {
 }
 }
 
+
+/* Desktop shell: macOS hides the native title bar, so the page provides the drag region. */
+html[data-desktop-platform="darwin"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2.75rem;
+  -webkit-app-region: drag;
+}
+html[data-desktop-platform="darwin"] :is(button, a, input, textarea, select, [role="button"], [role="combobox"], [contenteditable="true"]) {
+  -webkit-app-region: no-drag;
+}
+html[data-desktop-platform="darwin"] [data-slot="window-bar"] {
+  padding-left: 5rem;
+}

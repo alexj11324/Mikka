@@ -16,6 +16,9 @@ function onNotificationClick(listener: (href: string) => void): () => void {
 }
 
 if (appOrigin && window.location.origin === appOrigin) {
+  // Lets the page reserve room for the macOS traffic lights and draw its own drag region.
+  document.documentElement.dataset.desktopPlatform = process.platform
+
   const bridge = {
     app: {
       version: __MIKKA_APP_VERSION__,
