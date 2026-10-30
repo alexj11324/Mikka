@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AUDIT_ACTIONS, AUDIT_CATEGORIES, AUDIT_METADATA, AuditEventError, auditCategory, auditRequestContext, isSecretBearingKey, looksLikeSecretValue, toAuditRow, type AuditEvent, type AuditMetadata } from './events'
+import { AUDIT_ACTIONS, AUDIT_SECRET_KEY_EXEMPT, AUDIT_CATEGORIES, AUDIT_METADATA, AuditEventError, auditCategory, auditRequestContext, isSecretBearingKey, looksLikeSecretValue, toAuditRow, type AuditEvent, type AuditMetadata } from './events'
 
 const ws = '7b0f3c9e-2d4a-4e1b-9c3d-5f6a7b8c9d0e'
 const base: AuditEvent = { workspaceId: ws, actor: { type: 'user', id: 'u1', name: 'Alex' }, action: 'member.removed', target: { type: 'member', id: 'u2', label: 'Mia' } }
@@ -53,12 +53,16 @@ test('labels are trimmed and clipped; invalid ip dropped', () => {
   assert.equal(row.ip, null)
 })
 
-test('auditRequestContext reads first forwarded ip and decoded Vercel city', () => {
+test('auditRequestContext reads first forwarded ip and decoded Vercel city (on Vercel only)', () => {
+  const vercel = { VERCEL: '1' }
   const h = new Headers({ 'x-forwarded-for': '203.0.113.4, 10.0.0.1', 'x-vercel-ip-city': 'San%20Francisco' })
   h.set('x-vercel-ip-country', 'US'); h.set('x-vercel-ip-country-region', 'CA')
-  assert.deepEqual(auditRequestContext(h), { ip: '203.0.113.4', geoCity: 'San Francisco', geoCountry: 'US', geoRegion: 'CA' })
-  assert.deepEqual(auditRequestContext(new Headers({ 'x-real-ip': '2001:db8::1' })), { ip: '2001:db8::1', geoCity: null, geoCountry: null, geoRegion: null })
-  assert.deepEqual(auditRequestContext(new Headers({ 'x-forwarded-for': 'garbage', 'x-vercel-ip-city': '%E0', 'x-vercel-ip-country': 'USA', 'x-vercel-ip-country-region': 'C-A' })), { ip: null, geoCity: '%E0', geoCountry: null, geoRegion: null })
+  assert.deepEqual(auditRequestContext(h, vercel), { ip: '203.0.113.4', geoCity: 'San Francisco', geoCountry: 'US', geoRegion: 'CA' })
+  assert.deepEqual(auditRequestContext(new Headers({ 'x-real-ip': '2001:db8::1' }), vercel), { ip: null, geoCity: null, geoCountry: null, geoRegion: null })
+  assert.deepEqual(auditRequestContext(new Headers({ 'x-forwarded-for': '2001:db8::1', 'x-vercel-ip-country': 'US' }), vercel), { ip: '2001:db8::1', geoCity: null, geoCountry: 'US', geoRegion: null })
+  assert.deepEqual(auditRequestContext(new Headers({ 'x-forwarded-for': 'garbage', 'x-vercel-ip-city': '%E0', 'x-vercel-ip-country': 'USA', 'x-vercel-ip-country-region': 'C-A' }), vercel), { ip: null, geoCity: '%E0', geoCountry: null, geoRegion: null })
+  // Off Vercel the headers are client-forgeable: no ip, no geo.
+  for (const env of [{}, { VERCEL: '0' }, { VERCEL: 'true' }]) assert.deepEqual(auditRequestContext(h, env), { ip: null, geoCity: null, geoCountry: null, geoRegion: null })
 })
 
 test('billing is prepaid credits: no plan or subscription actions, secret.deleted kept', () => {
@@ -80,13 +84,39 @@ const MUTATED_SECRET_KEYS = [
 ]
 // Tech Lead's false-positive list: describe a secret but cannot hold one.
 const ALLOWED_KEYS = [
-  'secretName', 'tokenName', 'tokenId', 'tokenCount', 'idempotencyKey', 'primaryKey', 'otpEnabled', 'footprint', 'oauth', 'pan',
-  'author', 'authorName', 'author_id', 'name', 'kind', 'scope', 'from', 'to', 'monkeys_count', 'keyword', 'keyPrefix', 'passwordChanged', 'secretLabel',
+  'idempotencyKey', 'primaryKey', 'otpEnabled', 'footprint', 'oauth', 'pan',
+  'author', 'authorName', 'author_id', 'name', 'kind', 'scope', 'from', 'to', 'monkeys_count', 'keyword', 'keyPrefix',
+]
+// Strong secret words reject even with a safe suffix (Tech Lead, #432 round 3).
+const STRONG_SUFFIXED_KEYS = [
+  'tokenValueName', 'apiKeyPrefix', 'secretKeyId', 'passwordId', 'accessTokenCount', 'sessionTokenChanged', 'token_name',
+  'secretName', 'tokenName', 'tokenId', 'tokenCount', 'passwordChanged', 'secretLabel', 'privateKeyLabel', 'API_KEY_ENABLED',
 ]
 
 test('reject list: every rule, with separator and case mutations', () => {
   for (const key of MUTATED_SECRET_KEYS) assert.throws(() => toAuditRow({ ...base, metadata: { deep: { [key]: 'x' } } }), /secret-bearing key/, key)
   for (const key of ALLOWED_KEYS) assert.equal(isSecretBearingKey(key), false, key)
+  for (const key of STRONG_SUFFIXED_KEYS) {
+    assert.equal(isSecretBearingKey(key), true, key)
+    assert.throws(() => toAuditRow({ ...base, metadata: { [key]: 'x' } }), /secret-bearing key/, key)
+  }
+})
+
+test('per-action exemption: token.created may carry tokenName, nothing else may', () => {
+  const token = { ...base, action: 'token.created' as const }
+  assert.equal(toAuditRow({ ...token, metadata: { tokenName: 'CI deploy' } }).metadata.tokenName, 'CI deploy')
+  assert.throws(() => toAuditRow({ ...token, metadata: { tokenId: 'x' } }), /secret-bearing key/)
+  assert.throws(() => toAuditRow({ ...token, metadata: { token_name: 'x' } }), /secret-bearing key/)
+  assert.throws(() => toAuditRow({ ...base, action: 'token.revoked', metadata: { tokenName: 'x' } }), /secret-bearing key/)
+  assert.throws(() => toAuditRow({ ...base, action: 'secret.created', metadata: { tokenName: 'x' } }), /secret-bearing key/)
+  // the exemption covers the key only; its value is still scanned
+  assert.throws(() => toAuditRow({ ...token, metadata: { tokenName: 'gh~p_abcdefghijklmnopqrstuvwxyz0123456789'.replace('~', '') } }), /secret-bearing value/)
+})
+
+test('network_policy host counts are bounded ints', () => {
+  const np = { ...base, action: 'network_policy.updated' as const }
+  assert.doesNotThrow(() => toAuditRow({ ...np, metadata: { addedHosts: 0, removedHosts: 1000 } }))
+  for (const bad of [-1, 1001, 1.5]) assert.throws(() => toAuditRow({ ...np, metadata: { addedHosts: bad } }), /allowlist/, String(bad))
 })
 
 // One sample per credential pattern (Tech Lead's examples included). Fake, non-working values.
@@ -99,8 +129,9 @@ const SECRET_VALUES = [
   'wh~sec_abcdefghijklmnop1234', 'AK~IAIOSFODNN7EXAMPLE', 'AI~zaSyA1234567890abcdefghijklmnopqrstuv', 'np~m_abcdefghijklmnopqrstuvwxyz0123456789',
   'ey~JhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U',
   '--~---BEGIN PRIVATE KEY-----', 'Au~thorization: Bearer abcdefghijklmnop1234', 'po~stgres://app:hunter2@db.example.com/mikka', 'ht~tps://user:pass@example.com',
+  '--~---BEGIN PGP PRIVATE KEY BLOCK-----', 'Au~thorization: Basic dXNlcjpodW50ZXIy', 'ba~sic YWRtaW46c2VjcmV0cGFzcw==', 'id~_Bearer abcdefghijklmnop1234',
 ].map(sample => sample.replaceAll('~', ''))
-const SAFE_VALUES = ['Eyjafjallajokull', 'xoxo hugs', 'sk_', 'skip', 'ghost', 'task-runner', 'Bearer of good news', 'https://example.com/a@b', 'VERCEL_TOKEN', 'AKIA', 'mailto:me@example.com']
+const SAFE_VALUES = ['Eyjafjallajokull', 'xoxo hugs', 'sk_', 'skip', 'ghost', 'task-runner', 'Bearer of good news', 'https://example.com/a@b', 'VERCEL_TOKEN', 'AKIA', 'mailto:me@example.com', 'Basic plan', 'basic setup guide', 'Basic SGVsbG9Xb3JsZA==', '-----BEGIN PGP PUBLIC KEY BLOCK-----']
 
 test('credential-shaped values are rejected anywhere in a string; look-alikes pass', () => {
   for (const value of SECRET_VALUES) assert.throws(() => toAuditRow({ ...base, action: 'workspace.slug_changed', metadata: { from: 'a', to: `x ${value}` } }), /secret-bearing value/, value)
@@ -110,7 +141,10 @@ test('credential-shaped values are rejected anywhere in a string; look-alikes pa
 
 test('metadata is a per-action allowlist; every allowlisted key passes the blacklist', () => {
   for (const [action, schema] of Object.entries(AUDIT_METADATA))
-    for (const key of Object.keys((schema as { shape: Record<string, unknown> }).shape)) assert.equal(isSecretBearingKey(key), false, `${action}.${key}`)
+    for (const key of Object.keys((schema as { shape: Record<string, unknown> }).shape)) {
+      const exempt = AUDIT_SECRET_KEY_EXEMPT[action as keyof typeof AUDIT_ACTIONS]?.includes(key) ?? false
+      assert.equal(isSecretBearingKey(key), exempt, `${action}.${key}`) // exempt keys are exactly the strong-word keys an action opts into
+    }
   const ok: Array<[keyof typeof AUDIT_ACTIONS, Record<string, unknown>]> = [
     ['member.role_changed', { oldRole: 'member', newRole: 'admin' }],
     ['integration.permission_changed', { integration: 'Slack', capability: 'write', from: 'allow', to: 'deny' }],

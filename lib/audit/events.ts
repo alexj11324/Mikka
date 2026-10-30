@@ -75,8 +75,8 @@ export const AUDIT_METADATA = {
   'env.created': z.object({ scope, environment: label }).partial().strict(),
   'env.updated': z.object({ scope, environment: label }).partial().strict(),
   'env.deleted': z.object({ scope, environment: label }).partial().strict(),
-  'network_policy.updated': z.object({ mode: z.enum(['open', 'allowlist', 'blocked']), addedHosts: z.number().int().min(0), removedHosts: z.number().int().min(0) }).partial().strict(),
-  'token.created': z.object({ expiresAt: z.string().datetime({ offset: true }).nullable() }).partial().strict(),
+  'network_policy.updated': z.object({ mode: z.enum(['open', 'allowlist', 'blocked']), addedHosts: z.number().int().min(0).max(1000), removedHosts: z.number().int().min(0).max(1000) }).partial().strict(),
+  'token.created': z.object({ tokenName: label, expiresAt: z.string().datetime({ offset: true }).nullable() }).partial().strict(),
   'token.revoked': none,
   'auth.signed_in': z.object({ newDevice: z.boolean(), method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']) }).strict(),
   'auth.sign_in_failed': z.object({ method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']), reason: z.enum(['invalid', 'locked', 'expired', 'denied']) }).partial().strict(),
@@ -87,6 +87,16 @@ export const AUDIT_METADATA = {
   'billing.auto_recharge_changed': z.object({ enabled: z.boolean(), thresholdCents: cents.nullable(), amountCents: cents.nullable() }).partial().strict(),
   'billing.limits_changed': z.object({ fromCents: cents.nullable(), toCents: cents.nullable() }).partial().strict(),
 } as const satisfies Record<AuditAction, z.ZodType>
+
+/**
+ * Keys that contain a strong secret word (see STRONG_KEY_PARTS) are rejected
+ * everywhere, whatever their suffix. An action that genuinely needs such a key
+ * names it here AND in its zod schema above; the exemption applies only to that
+ * action's top-level metadata keys.
+ */
+export const AUDIT_SECRET_KEY_EXEMPT: Partial<Record<AuditAction, readonly string[]>> = {
+  'token.created': ['tokenName'],
+}
 
 /** Allowlisted metadata for one action (named params for that action's ICU template). */
 export type AuditMetadata<A extends AuditAction> = z.infer<(typeof AUDIT_METADATA)[A]>
@@ -149,6 +159,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SAFE_KEY_SUFFIXES = ['name', 'id', 'label', 'count', 'prefix', 'changed', 'enabled']
 const FORBIDDEN_KEY_EXACT = new Set(['value', 'plaintext', 'cardnumber', 'cvc', 'cvv'])
 const FORBIDDEN_KEY_PARTS = ['token', 'secret', 'passw', 'pwd', 'apikey', 'credential', 'jwt', 'bearer', 'cookie', 'connectionstring', 'privatekey', 'accesskey']
+const STRONG_KEY_PARTS = ['token', 'secret', 'passw', 'privatekey', 'apikey']
 const FORBIDDEN_KEY_WORDS = new Set(['otp', 'dsn'])
 const BENIGN_KEY_SUFFIXED = new Set(['idempotencykey', 'primarykey', 'foreignkey', 'sortkey', 'cachekey', 'partitionkey', 'lookupkey', 'groupkey'])
 const FORBIDDEN_AUTH = /authoriz|^(?:x|basic|proxy|http)?auth(?:header|code|z)?$/
@@ -161,6 +172,8 @@ export function isSecretBearingKey(key: string): boolean {
   const k = normaliseAuditKey(key)
   if (!k) return false
   const words = keyWords(key)
+  // Strong words win over any safe suffix: tokenValueName, apiKeyPrefix, secretKeyId…
+  if (STRONG_KEY_PARTS.some(part => k.includes(part))) return true
   if (words.length > 1 && SAFE_KEY_SUFFIXES.includes(words.at(-1)!)) return false
   if (FORBIDDEN_KEY_EXACT.has(k)) return true
   if (FORBIDDEN_KEY_PARTS.some(part => k.includes(part))) return true
@@ -184,14 +197,24 @@ const SECRET_VALUE_PATTERNS: RegExp[] = [
   new RegExp(`${NOT_WORD}(?:AKIA|ASIA)[0-9A-Z]{16}(?![A-Za-z0-9])`), // AWS access key id
   new RegExp(`${NOT_WORD}AIza[0-9A-Za-z_-]{35}`), // Google API key
   new RegExp(`${NOT_WORD}npm_[A-Za-z0-9]{36}`),
-  /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)-----/,
-  /\bbearer\s+[A-Za-z0-9._~+/-]{16,}=*/i,
+  /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)/, // PEM and PGP ("PRIVATE KEY BLOCK")
+  /(?<![A-Za-z0-9])bearer\s+[A-Za-z0-9._~+/-]{16,}=*/i, // '_' counts as a boundary (id_Bearer …)
   /[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:[^\s/@]+@/i, // URL with user:password@
 ]
 
 /** True when a string value contains something shaped like a credential. */
 export function looksLikeSecretValue(value: string): boolean {
-  return SECRET_VALUE_PATTERNS.some(pattern => pattern.test(value))
+  return SECRET_VALUE_PATTERNS.some(pattern => pattern.test(value)) || hasBasicCredentials(value)
+}
+
+// "Basic <base64(user:pass)>": only flagged when the token decodes to text with a ':'.
+const BASIC_AUTH = /(?<![A-Za-z0-9])basic\s+([A-Za-z0-9+/]{6,}={0,2})(?![A-Za-z0-9+/=])/gi
+function hasBasicCredentials(value: string): boolean {
+  for (const match of value.matchAll(BASIC_AUTH)) {
+    const decoded = Buffer.from(match[1], 'base64').toString('utf8')
+    if (/^[\x20-\x7e]+:[\x20-\x7e]*$/.test(decoded)) return true
+  }
+  return false
 }
 
 // Intentionally below the DB CHECK (8 KB): the JS cap fails fast with a clear
@@ -205,12 +228,12 @@ const clip = (value: string | null | undefined, max: number) => {
   return text ? [...text].slice(0, max).join('') : null
 }
 
-function assertNoSecrets(value: unknown, path: string) {
+function assertNoSecrets(value: unknown, path: string, exempt: readonly string[] = []) {
   if (typeof value === 'string') { if (looksLikeSecretValue(value)) throw new AuditEventError(`audit metadata must not contain a secret-bearing value at ${path}`); return }
   if (Array.isArray(value)) { value.forEach((item, i) => assertNoSecrets(item, `${path}[${i}]`)); return }
   if (value && typeof value === 'object') {
     for (const [key, inner] of Object.entries(value)) {
-      if (isSecretBearingKey(key)) throw new AuditEventError(`audit metadata must not contain secret-bearing key ${path}.${key}`)
+      if (!exempt.includes(key) && isSecretBearingKey(key)) throw new AuditEventError(`audit metadata must not contain secret-bearing key ${path}.${key}`)
       assertNoSecrets(inner, `${path}.${key}`)
     }
   }
@@ -231,7 +254,7 @@ export function toAuditRow(event: AuditEvent): AuditRow {
   if (target && !targetType) throw new AuditEventError('audit target type is required')
   const metadata = event.metadata ?? {}
   if (typeof metadata !== 'object' || Array.isArray(metadata)) throw new AuditEventError('audit metadata must be an object')
-  assertNoSecrets(metadata, 'metadata')
+  assertNoSecrets(metadata, 'metadata', AUDIT_SECRET_KEY_EXEMPT[event.action])
   if (Buffer.byteLength(JSON.stringify(metadata)) > MAX_METADATA_BYTES) throw new AuditEventError('audit metadata is too large')
   const allowed = AUDIT_METADATA[event.action].safeParse(metadata)
   if (!allowed.success) throw new AuditEventError(`audit metadata does not match the allowlist for ${event.action}: ${allowed.error.issues.map(issue => issue.code === 'unrecognized_keys' ? `unexpected ${issue.keys.join(',')}` : `${issue.path.join('.')} ${issue.code}`).join('; ')}`)
@@ -259,9 +282,16 @@ export function toAuditRow(event: AuditEvent): AuditRow {
 const countryCode = (value: string | null | undefined) => { const v = value?.trim().toUpperCase(); return v && /^[A-Z]{2}$/.test(v) ? v : null }
 const regionCode = (value: string | null | undefined) => { const v = value?.trim().toUpperCase(); return v && /^[A-Z0-9]{1,3}$/.test(v) ? v : null }
 
-/** Client IP and Vercel geo (city in English as sent; ISO country; ISO 3166-2 region suffix). */
-export function auditRequestContext(headers: Pick<Headers, 'get'>): { ip: string | null; geoCity: string | null; geoCountry: string | null; geoRegion: string | null } {
-  const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim() || headers.get('x-real-ip')?.trim() || null
+/**
+ * Client IP and Vercel geo (city in English as sent; ISO country; ISO 3166-2 region suffix).
+ * Only trustworthy behind Vercel: its edge overwrites client-sent x-forwarded-for and
+ * x-vercel-ip-* headers. Off Vercel (process.env.VERCEL !== '1') any client can forge
+ * them, so ip AND geo are both null there rather than recording attacker-chosen values.
+ * x-real-ip is deliberately not read.
+ */
+export function auditRequestContext(headers: Pick<Headers, 'get'>, env: Readonly<Record<string, string | undefined>> = process.env as Readonly<Record<string, string | undefined>>): { ip: string | null; geoCity: string | null; geoCountry: string | null; geoRegion: string | null } {
+  if (env.VERCEL !== '1') return { ip: null, geoCity: null, geoCountry: null, geoRegion: null }
+  const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
   let city = headers.get('x-vercel-ip-city')
   if (city) { try { city = decodeURIComponent(city) } catch { /* keep raw */ } }
   return { ip: forwarded && isIP(forwarded) ? forwarded : null, geoCity: clip(city, 120), geoCountry: countryCode(headers.get('x-vercel-ip-country')), geoRegion: regionCode(headers.get('x-vercel-ip-country-region')) }
