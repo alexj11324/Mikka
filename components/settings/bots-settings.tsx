@@ -48,7 +48,7 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
     update: change => api.updateDefaults(change),
     apply: patch => setDefaults(current => current && { ...current, ...patch }),
     onSaved: () => toast(t('saved')),
-    onFailed: change => { setSaveFailed(change); toast.error(errorsT('generic')) },
+    onFailed: change => setSaveFailed(change),
   })
   function save(change: BotDefaultsChange) {
     setSaveFailed(null)
@@ -59,7 +59,7 @@ export function BotsSettings({ api, workspaceId }: { api: BotsSettingsApi; works
   if (!defaults || !bots) return <div className="flex flex-col gap-6"><SettingsLoading label={t('defaultsTitle')} rows={2} /><SettingsLoading label={t('allBotsTitle')} rows={3} /></div>
 
   return <div className="flex flex-col gap-6">
-    {saveFailed && <SettingsSaveError message={errorsT('generic')} retryLabel={commonT('retry')} onRetry={() => void save(saveFailed)} />}
+    {saveFailed && <div className="animate-in fade-in duration-200"><SettingsSaveError message={errorsT('generic')} retryLabel={commonT('retry')} onRetry={() => void save(saveFailed)} /></div>}
     <SettingsSection id="bot-defaults-heading" title={t('defaultsTitle')}>
       <SettingRow title={t('model')}>
         {api.isAdmin ? <ModelSelect defaults={defaults} onChange={model => void save({ defaultModel: model })} /> : <ModelLabel defaults={defaults} />}
@@ -87,7 +87,7 @@ function ModelSelect({ defaults, onChange }: { defaults: BotDefaultsView; onChan
   const t = useTranslations()
   const items = defaults.modelGroups.map(group => ({ value: group.id, label: t(group.labelKey) }))
   return <Select items={items} value={effectiveModel(defaults)} onValueChange={value => { if (value) onChange(value as BotModelId) }}>
-    <SelectTrigger size="sm" aria-label={t('Settings.botSettings.model')}><SelectValue /></SelectTrigger>
+    <SelectTrigger size="sm" className="w-32" aria-label={t('Settings.botSettings.model')}><SelectValue /></SelectTrigger>
     <SelectContent align="end"><SelectGroup>{items.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
   </Select>
 }

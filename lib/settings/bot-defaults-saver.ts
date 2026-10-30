@@ -38,8 +38,9 @@ export function createBotDefaultsSaver(options: {
       const keys = Object.keys(change) as Field[]
       for (const key of keys) { latest[key] = id; inflight[key] = (inflight[key] ?? 0) + 1; delete failedLatest[key] }
       options.apply(change)
-      const result = await options.update(change)
-      for (const key of keys) inflight[key]! -= 1
+      // A rejected request is a failed one; inflight must drop either way or a later rollback never fires.
+      let result: Awaited<ReturnType<typeof options.update>>
+      try { result = await options.update(change) } catch { result = { error: 'generic' } } finally { for (const key of keys) inflight[key]! -= 1 }
       if (!result.error) {
         // Any success is server truth for its fields unless a later request already confirmed them.
         for (const key of keys) if ((confirmedSeq[key] ?? -1) < id) { Object.assign(confirmed, { [key]: result[key] }); confirmedSeq[key] = id }

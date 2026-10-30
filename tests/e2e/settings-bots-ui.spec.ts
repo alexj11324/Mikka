@@ -65,14 +65,20 @@ test('latest save fails while an older one is in flight: wait, then show the ser
   await open(page, 'saveLate')
   const model = page.getByRole('combobox', { name: '模型' })
   await model.click()
+  const width = (await model.boundingBox())!.width
   await page.getByRole('option', { name: 'Codex' }).click() // in flight, succeeds after a delay
+  // Fixed width: the right-aligned trigger keeps its left edge whatever is selected.
+  expect((await model.boundingBox())!.width).toBe(width)
   await model.click()
   await page.getByRole('option', { name: 'Claude' }).click() // fails at once
   await page.waitForTimeout(400)
   // No rollback flicker while Codex is still in flight.
   await expect(model).toHaveText(/Claude/)
   await expect(model).toHaveText(/Codex/, { timeout: 5000 })
-  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '操作未成功' })).toHaveCount(1)
+  // Shown once: the inline error with retry, no duplicate toast.
+  await expect(page.getByText('操作未成功')).toHaveCount(1)
+  await expect(page.getByRole('alert').filter({ hasText: '操作未成功' })).toHaveCount(1)
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '操作未成功' })).toHaveCount(0)
 })
 
 test('thread drawer pages with a cursor; a failed next page can be retried', async ({ page }) => {
@@ -104,6 +110,6 @@ test('loading, empty, load error and save error states', async ({ page }) => {
   await page.getByRole('combobox', { name: '模型' }).click()
   await page.getByRole('option', { name: 'Claude' }).click()
   await expect(page.getByRole('alert').filter({ hasText: '操作未成功' })).toBeVisible()
-  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '操作未成功' })).toBeVisible()
+  await expect(page.getByText('操作未成功')).toHaveCount(1)
   await expect(page.getByRole('combobox', { name: '模型' })).toHaveText(/Mikka 默认/)
 })

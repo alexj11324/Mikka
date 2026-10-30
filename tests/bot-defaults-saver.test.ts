@@ -6,11 +6,11 @@ import type { BotModelId } from '../lib/settings/bots-api'
 /** Drives the saver with promises the test resolves by hand, in any order. */
 function setup() {
   const state = { defaultModel: null as BotModelId | null, defaultRepository: 'r1' as string | null }
-  const pending: { change: BotDefaultsChange; resolve: (ok: boolean) => void }[] = []
+  const pending: { change: BotDefaultsChange; resolve: (ok: boolean | 'reject') => void }[] = []
   const events = { saved: 0, failed: [] as BotDefaultsChange[] }
   const history: (BotModelId | null)[] = []
   const saver = createBotDefaultsSaver({
-    update: change => new Promise(resolve => pending.push({ change, resolve: ok => resolve(ok ? { defaultModel: state.defaultModel, defaultRepository: state.defaultRepository, ...change } as never : { error: 'generic' } as never) })),
+    update: change => new Promise((resolve, reject) => pending.push({ change, resolve: ok => ok === 'reject' ? reject(new Error('network')) : resolve(ok ? { defaultModel: state.defaultModel, defaultRepository: state.defaultRepository, ...change } as never : { error: 'generic' } as never) })),
     apply: patch => { Object.assign(state, patch); history.push(state.defaultModel) },
     onSaved: () => { events.saved++ },
     onFailed: change => { events.failed.push(change) },
@@ -19,7 +19,7 @@ function setup() {
   const runs: Promise<void>[] = []
   const save = (model: BotModelId | null) => { runs.push(saver.save({ defaultModel: model })) }
   const saveRepository = (repository: string) => { runs.push(saver.save({ defaultRepository: repository })) }
-  const answer = async (index: number, ok: boolean) => { pending[index]!.resolve(ok); await new Promise(resolve => setImmediate(resolve)) }
+  const answer = async (index: number, ok: boolean | 'reject') => { pending[index]!.resolve(ok); await new Promise(resolve => setImmediate(resolve)) }
   return { saver, history, state, events, save, saveRepository, answer, done: () => Promise.all(runs) }
 }
 
@@ -100,4 +100,18 @@ test('a fresh load confirms at the current seq: an older in-flight success canno
   await s.answer(0, true)
   s.save('mikka'); await s.answer(1, false); await s.done()
   assert.equal(s.state.defaultModel, 'claude'); assert.deepEqual(s.events.failed, [{ defaultModel: 'mikka' }])
+})
+
+test('reject: latest fails while an older save is in flight, then the older one rejects → rolls back once', async () => {
+  const s = setup(); s.save('codex'); s.save('claude')
+  await s.answer(1, false); await s.answer(0, 'reject'); await s.done()
+  assert.equal(s.state.defaultModel, null); assert.deepEqual(s.events.failed, [{ defaultModel: 'claude' }]); assert.equal(s.events.saved, 0)
+})
+
+test('reject: the only save rejects → rolls back and reports, later saves still roll back', async () => {
+  const s = setup(); s.save('codex')
+  await s.answer(0, 'reject'); await s.done()
+  assert.equal(s.state.defaultModel, null); assert.deepEqual(s.events.failed, [{ defaultModel: 'codex' }])
+  s.save('claude'); await s.answer(1, false); await s.done()
+  assert.equal(s.state.defaultModel, null); assert.equal(s.events.failed.length, 2)
 })
