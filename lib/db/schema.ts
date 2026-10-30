@@ -252,6 +252,7 @@ export const deviceTokens = pgTable('device_tokens', {
   expiresAt: timestamp('expiresAt', { withTimezone: true }),
   lastUsedAt: timestamp('lastUsedAt', { withTimezone: true }),
   revokedAt: timestamp('revokedAt', { withTimezone: true }),
+  revokedBy: text('revokedBy'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('device_tokens_hash_key').on(table.tokenHash), index('device_tokens_user_idx').on(table.userId)])
 
@@ -305,6 +306,8 @@ export const agentRuns = pgTable('agent_runs', {
   botId: uuid('botId').references(() => bots.id, { onDelete: 'set null' }),
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
+  /** Authenticated daemon token that claimed this run; unknown for old runs. */
+  deviceTokenId: uuid('deviceTokenId'),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),

@@ -58,10 +58,12 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
     if (!device.rowCount) throw new ActionFailureError('deviceNotFound')
     const live = await client.query(`SELECT 1 FROM agent_runs WHERE "deviceId"=$1 AND status = ANY($2::text[]) LIMIT 1`, [target, [...LIVE_RUN_STATUSES]])
     if (live.rowCount) throw new ActionFailureError('deviceHasActiveRuns')
-    const revoked = await client.query(`UPDATE device_tokens SET "revokedAt"=now()
+    const revoked = await client.query(`WITH revoked AS (UPDATE device_tokens SET "revokedAt"=now(),"revokedBy"=$2
       WHERE "userId"=$2 AND "revokedAt" IS NULL
         AND (id IN (SELECT "tokenId" FROM device_token_devices WHERE "deviceId"=$1) OR "boundDeviceId"=$1)
-      RETURNING id`, [target, userId])
+      RETURNING id,"revokedAt")
+      INSERT INTO device_credential_revocations ("tokenId","ownerId","actorId","revokedAt")
+      SELECT id,$2,$2,"revokedAt" FROM revoked RETURNING "tokenId" AS id`, [target, userId])
     await client.query(`UPDATE agents SET "deviceId"=NULL,"updatedAt"=now() WHERE "deviceId"=$1 AND "userId"=$2`, [target, userId])
     await client.query(`UPDATE devices SET "removedAt"=now(),enabled=false,"updatedAt"=now() WHERE id=$1`, [target])
     await client.query('COMMIT')

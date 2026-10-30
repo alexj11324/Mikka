@@ -6,19 +6,21 @@ import { afterEach, describe, expect, it } from "vitest"
 import type { RunChunk } from "../src/chunks"
 import { Daemon } from "../src/main"
 import { MemoryServer } from "../src/server-link"
+import { SessionRejectedError } from '../src/server-link-http'
 import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
 
 const DEVICE = "device-1"
 const daemons: Daemon[] = []
 
-async function setup() {
+async function setup(rejection?: { value: boolean }) {
   const repo = await makeRepo()
   const server = new MemoryServer(DEVICE)
+  const link = server.link()
   server.addRepo(DEVICE, { repoId: "repo-1", name: "sandbox", path: repo })
   const daemon = await new Daemon({
     dataDir: tempDir(),
     flavor: "dev",
-    link: server.link(),
+    link: { ...link, heartbeat: (...args) => rejection?.value ? Promise.reject(new SessionRejectedError()) : link.heartbeat(...args) },
     credential: "cred-1",
     harnesses: [{ harness: "mock", installed: true, version: "test" }],
     mockSpeed: 2,
@@ -53,6 +55,18 @@ afterEach(async () => {
 })
 
 describe("run commands", () => {
+  it('cancels active work when the application rejects the device credential', async () => {
+    const rejected = { value: false }
+    const { server, daemon } = await setup(rejected)
+    const runId = queueLongRun(server)
+    await daemon.syncWithServer()
+    await waitFor(() => daemon.supervisor.get(runId).state === 'running')
+    rejected.value = true
+    await daemon.syncWithServer()
+    await waitFor(() => daemon.supervisor.get(runId).state === 'cancelled')
+    expect(daemon.status().signedIn).toBe(false)
+    expect(daemon.status().server).toBe('unregistered')
+  })
   it("hands a person's message to the running agent and acks it once", async () => {
     const { server, daemon } = await setup()
     const runId = queueLongRun(server)

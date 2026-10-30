@@ -1,9 +1,10 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { authenticateDevice } from '@/lib/device-link'
 import { pool } from '@/lib/db'
 import { localComputerAuthority } from '@/lib/computer/local-authority'
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
-export async function GET(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }) {
+async function handleGET(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }) {
   const actor = await authenticateDevice(request)
   if (!actor) return Response.json({ error: 'Unauthorized' }, { status: 401, headers })
   const { deviceId, runId } = await params
@@ -12,3 +13,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
   if (!authority || (actor.scopeWorkspaceId && actor.scopeWorkspaceId !== authority.workspaceId)) return Response.json({ error: 'Unavailable' }, { status: 409, headers })
   return Response.json(authority, { headers })
 }
+
+export const GET = withDeviceRoute(handleGET)

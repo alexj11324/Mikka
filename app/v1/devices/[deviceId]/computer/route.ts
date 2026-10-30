@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { computerSyncBody } from '@mikka/protocol/computer'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 import { pool } from '@/lib/db'
@@ -5,7 +6,7 @@ import { syncComputerReviews } from '@/lib/computer/reviews'
 import { syncLocalComputerReviews } from '@/lib/computer/local-reviews'
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
-export async function POST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return Response.json({ error: 'Unauthorized' }, { status: 401, headers })
   const { deviceId } = await params
@@ -19,3 +20,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   try { return Response.json({ decisions: await (device.kind === 'local' ? syncLocalComputerReviews : syncComputerReviews)(pool, deviceId, caller.userId, parsed.data.requests) }, { headers }) }
   catch { return Response.json({ error: 'Review or run unavailable' }, { status: 409, headers }) }
 }
+
+export const POST = withDeviceRoute(handlePOST)

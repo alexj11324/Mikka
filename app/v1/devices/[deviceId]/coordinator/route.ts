@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { nativeCoordinatorCommandSchema } from '@mikka/protocol/coordinator'
@@ -12,7 +13,7 @@ const bodySchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('result'), turnId: z.uuid(), callId: z.string().min(1).max(200) }).strict(),
 ])
 /** The device token never receives a database credential or another person's tools/context. */
-export async function POST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   if (!nativeCoordinatorEnabled()) return NextResponse.json({ error: 'notEnabled' }, { status: 404 })
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -35,3 +36,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     throw error
   }
 }
+
+export const POST = withDeviceRoute(handlePOST)

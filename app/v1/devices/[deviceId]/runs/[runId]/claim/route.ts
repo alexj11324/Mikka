@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
 import { and, eq, isNull } from 'drizzle-orm'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
@@ -37,7 +38,7 @@ export const dynamic = 'force-dynamic'
  * it needs to run. 409 means the run is not queued for this device — the
  * daemon's `RunNotPinnedHereError`, and it stops asking.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId, runId } = await params
@@ -101,6 +102,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     catch (error) { if (error instanceof FactoryError) return false; throw error }
   }
   const afterClaim = async (tx: import('pg').PoolClient) => {
+    await tx.query('UPDATE agent_runs SET "deviceTokenId"=$2 WHERE id=$1 AND "userId"=$3', [runId, caller.tokenId, caller.userId])
     if (factoryClaim.preserveQuestionWorktree === true) {
       const { withDatabaseClient } = await import('@/lib/db')
       factoryToken = await withDatabaseClient(tx, () => issueRunToken(run))
@@ -203,3 +205,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   }))
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
 }
+
+export const POST = withDeviceRoute(handlePOST)
