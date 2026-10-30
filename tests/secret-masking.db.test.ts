@@ -166,6 +166,20 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     assert.match(JSON.stringify(events), /\[secret:API_TOKEN\]/)
   })
 
+  await t.test('subagent: a secret in the task itself is masked in every published subagent_event (D1)', async () => {
+    const { SubagentStore } = await import('../lib/cloud-computer/subagents')
+    const subagents = new SubagentStore(pool)
+    const actor = { userId: admin, workspaceId: ws.id }
+    const bot = await seedBot(pool, ws.id, admin)
+    const created = await subagents.create(actor, bot, `deploy with ${SECRET} please`)
+    await pool.query(`update bot_subagents set status='running' where id=$1`, [created.id])
+    await subagents.update(actor, bot, created.id, 'needs_you', 'waiting on the form', { kind: 'approval', actionId: randomUUID(), summary: 'confirm the deploy' })
+    const { rows: events } = await pool.query(`select event from subagent_events where "subagentId"=$1`, [created.id])
+    assert.ok(events.length > 0, 'an event was published')
+    noPlain('subagent_events (task)', JSON.stringify(events))
+    for (const { event } of events) assert.match(String(event.data.task), /\[secret:API_TOKEN\]/)
+  })
+
   await t.test('mailbox: a run\'s peer message is masked in run_messages and coordinator_events', async () => {
     // The mailbox schema is still review-only (docs/backend/personal-mailbox-schema.review.sql), so the
     // write goes to a throwaway local _e2e database with that SQL applied, never to the shared test DB.
