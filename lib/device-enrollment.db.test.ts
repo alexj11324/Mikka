@@ -29,7 +29,7 @@ before(async () => {
     CREATE TABLE agents (id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,"updatedAt" timestamptz);
     CREATE TABLE agent_runs (id uuid PRIMARY KEY,"deviceId" uuid,status text);`)
     await pool.query(await readFile(new URL('../drizzle/20261030193000_device_enrollment_management.sql', import.meta.url), 'utf8'))
-    await pool.query(await readFile(new URL('../drizzle/20261030224011_device_uninstall_command.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../drizzle/20261030231122_device_uninstall_command.sql', import.meta.url), 'utf8'))
   })
 })
 after(async () => { mock.restoreAll(); await scope.close(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
