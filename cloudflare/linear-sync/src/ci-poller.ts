@@ -1,3 +1,4 @@
+import { CiReadError } from '../../../lib/github/ci/read'
 import { summarize, type Snapshot } from '../../../lib/github/ci/snapshot'
 import { observe, type Observation } from '../../../lib/github/ci/observation'
 
@@ -18,7 +19,7 @@ export interface CiPollAdapter {
   /** Atomically fence current head and generation and enqueue an idempotent
    * final result; never call this for intermediate workflow events. */
   complete(lease: CiPollLease, state: Observation, result: CiPollResult): Promise<void>
-  retry(lease: CiPollLease, nextAt: number): Promise<void>
+  retry(lease: CiPollLease, nextAt: number, code: CiReadError['code']): Promise<void>
 }
 
 const BASE_MS = 15 * 60_000
@@ -75,13 +76,14 @@ export async function pollActiveCi(adapter: CiPollAdapter, options: { now?: () =
         await adapter.pending(lease,decision.state,now()+delay)
         counts.pending++
       }
-    } catch {
+    } catch (error) {
+      const code = error instanceof CiReadError ? error.code : 'unavailable'
       const attempt = Math.max(0, Math.min(8, lease.attempt))
       const cap = Math.min(MAX_BACKOFF_MS,BASE_MS * 2 ** attempt)
       const delay = Math.floor(cap * (0.8 + Math.max(0,Math.min(1,random())) * 0.2))
       // A concurrently superseded or expired lease needs no update; the
       // current owner or the next scheduler pass will recover it.
-      await adapter.retry(lease,now()+delay).catch(() => undefined)
+      await adapter.retry(lease,now()+delay,code).catch(() => undefined)
       counts.failed++
     } finally { await authority?.close() }
   }

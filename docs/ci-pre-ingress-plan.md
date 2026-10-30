@@ -1,9 +1,10 @@
 # CI aggregation before the application ingress (proposal)
 
-This is a deployment plan, not an enabled service. The current GitHub App sends
-`workflow_run` webhooks directly to Vercel and the 15-minute suggestions Worker
-calls the briefing endpoint. Filtering those webhooks in the app does not reduce
-incoming requests. No repository CI changes are needed for the plan below.
+This is a deployment plan, not an enabled service. CI webhook subscriptions
+have been disabled, and the polling replacement is not deployed; this leaves a
+CI detection gap. The 15-minute suggestions Worker still calls the briefing
+endpoint for unrelated work. No repository CI changes are needed for the plan
+below.
 
 The existing `mikka-linear-sync` Worker already has the application database
 Hyperdrive binding; it is the candidate execution location. Add a separate,
@@ -43,7 +44,9 @@ webhook endpoint and the App remain active.
 
 The Hyperdrive connection also needs a least-privilege review: its existing
 database role must be checked before reuse, rather than assuming that a broad
-app role is appropriate. The final callback needs authenticated, narrowly
+app role is appropriate. The workspace role must also support the row locks
+used on team, issue-link, and membership tables; ordinary SELECT alone is not
+sufficient. The final callback needs authenticated, narrowly
 scoped authority and must recheck the task, head, account and membership before
 committing an idempotent claim. No credentials, bindings, subscriptions or
 external configuration are changed by this proposal.
@@ -74,3 +77,5 @@ Polling cannot prove that an unknown third-party check will never register in
 the future. Missing required contexts remain pending, and a quiet window bounds
 but does not eliminate that uncertainty. Same-commit reruns after a claimed
 result intentionally do not generate another automatic wake.
+
+Poll read errors are stored as bounded categories and retried. Token, access and workspace errors currently collapse to unavailable; delivery errors retain only retry counts. Durable user-facing notification for persistent or unrecoverable errors remains required before cutover.

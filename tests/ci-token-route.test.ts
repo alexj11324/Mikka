@@ -11,11 +11,11 @@ mock.module(new URL('../lib/db/index.ts',import.meta.url).href,{namedExports:{po
 mock.module(new URL('../lib/github/ci/authority.ts',import.meta.url).href,{namedExports:{acquireCiMembership:async()=>{if(blocked)throw Error('revoked');return {held:false,async check(){if(blocked)throw Error('revoked')},async close(){}}},ciIssueAuthorized:()=>true}})
 mock.module(new URL('../lib/github/run-pull-request.ts',import.meta.url).href,{namedExports:{verifyGitHubRepositoryAccess:async()=>({installationId:55,repositoryId:77})}})
 mock.module(new URL('../lib/suggestions/github-redelivery.ts',import.meta.url).href,{namedExports:{githubAppJwt:()=> 'synthetic-app-jwt'}})
-const {POST}=await import('../app/api/cron/ci-token/route')
 const body=JSON.stringify({watchId,leaseId,generation:'1'})
 const request=(token:string)=>new Request('http://localhost/api/cron/ci-token',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body})
 
 test('short token issuance requires live authority and grants only one repository read access',async()=>{
+  const {POST}=await import('../app/api/cron/ci-token/route')
   const previous={secret:process.env.CRON_SECRET,id:process.env.GITHUB_APP_ID,key:process.env.GITHUB_APP_PRIVATE_KEY,fetch:globalThis.fetch}
   process.env.CRON_SECRET='synthetic-ci-token-secret';process.env.GITHUB_APP_ID='55';process.env.GITHUB_APP_PRIVATE_KEY='synthetic'
   globalThis.fetch=async(input,init)=>{providerCalls++;assert.equal(String(input),'https://api.github.com/app/installations/55/access_tokens');metadata=JSON.parse(String(init?.body));return Response.json({token:'synthetic-short-token',expires_at:new Date(Date.now()+3600000).toISOString()})}

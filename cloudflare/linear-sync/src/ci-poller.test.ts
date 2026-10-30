@@ -32,11 +32,11 @@ test('multiple workflows and missing required checks create one final callback, 
 })
 
 test('failed provider reads back off and do not emit a final result', async () => {
-  let due=0
+  let due=0, code=''
   const lease:CiPollLease={id:'fixture',generation:'1',attempt:2,observation:null}
-  const adapter:CiPollAdapter={async lease(){return [lease]},async authorize(){return {async check(){},async close(){}}},async read(){throw Error('offline')},async readFresh(){throw Error('unexpected')},async pending(){throw Error('unexpected')},async close(){throw Error('unexpected')},async complete(){throw Error('unexpected')},async retry(_lease,next){due=next}}
+  const adapter:CiPollAdapter={async lease(){return [lease]},async authorize(){return {async check(){},async close(){}}},async read(){throw Error('offline')},async readFresh(){throw Error('unexpected')},async pending(){throw Error('unexpected')},async close(){throw Error('unexpected')},async complete(){throw Error('unexpected')},async retry(_lease,next,reason){due=next;code=reason}}
   const result=await pollActiveCi(adapter,{now:()=>1000,random:()=>0,deadline:31000})
-  assert.equal(result.failed,1); assert.equal(result.completed,0); assert.ok(due>1000)
+  assert.equal(result.failed,1); assert.equal(result.completed,0); assert.ok(due>1000); assert.equal(code,'unavailable')
 })
 
 test('fresh branch rules can block a result that appeared complete from cache',async()=>{

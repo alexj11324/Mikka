@@ -11,16 +11,16 @@ export type CiNoticeIdentity = { userId: string; issueId: string; remoteKey: str
  * intentionally generic even after delivery, because membership may later be
  * revoked before the Coordinator consumes an already-committed event. */
 export async function recordCiAttention(pool: Pool, identity: CiNoticeIdentity, dedupeKey: string, text: string): Promise<boolean> {
-  const { rows: [owner] } = await pool.query<{ userId: string }>('SELECT "userId" FROM issues WHERE id=$1', [identity.issueId])
-  if (!owner) return false
-  const lease = await acquireCiMembership(identity.issueId, identity.userId, owner.userId)
+  const { rows: [ownerHint] } = await pool.query<{ userId: string; scope: string }>('SELECT "userId",scope FROM issues WHERE id=$1', [identity.issueId])
+  if (!ownerHint) return false
+  const lease = await acquireCiMembership(identity.issueId, identity.userId, ownerHint.userId, undefined, ownerHint.scope === 'workspace')
   try {
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
       await client.query("SET LOCAL lock_timeout = '1s'")
       const { rows: [issue] } = await client.query('SELECT "userId",scope,"scopeVersion",content FROM issues WHERE id=$1 FOR UPDATE', [identity.issueId])
-      if (!ciIssueAuthorized(issue, identity.userId, identity.scopeVersion, lease.held, value => Boolean(readIssueMetadata(value as Parameters<typeof readIssueMetadata>[0]).deletedAt))) { await client.query('ROLLBACK'); return false }
+      if (!issue || issue.userId !== ownerHint.userId || issue.scope !== ownerHint.scope || !ciIssueAuthorized(issue, identity.userId, identity.scopeVersion, lease.held, value => Boolean(readIssueMetadata(value as Parameters<typeof readIssueMetadata>[0]).deletedAt))) { await client.query('ROLLBACK'); return false }
       const owner = issue.userId === identity.userId
       const payload = { text: owner ? text : 'CI needs attention. Open an authorized task to review its checks.', source: 'github_ci' }
       await assertCredentialSafeChat(identity.userId, payload)

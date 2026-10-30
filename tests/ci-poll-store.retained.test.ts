@@ -16,7 +16,7 @@ test('durable CI polling leases, fencing and outbox survive overlapping workers'
   await admin.query(`CREATE SCHEMA "${schema}"`)
   const scopedURL=new URL(url); scopedURL.searchParams.set('options',`-c search_path=${schema}`)
   const db=new Pool({connectionString:scopedURL.toString()})
-  await db.query(`CREATE TABLE github_ci_observations ("userId" text,"issueId" uuid,"remoteKey" text,"prNumber" integer,"originRunId" uuid,"watchId" uuid,generation bigint,"nextCheckAt" timestamptz,"expiresAt" timestamptz,"scopeVersion" integer,primary key("userId","issueId","remoteKey","prNumber"));
+  await db.query(`CREATE TABLE github_ci_observations ("userId" text,"issueId" uuid,"remoteKey" text,"prNumber" integer,"originRunId" uuid,"watchId" uuid,generation bigint,"nextCheckAt" timestamptz,"expiresAt" timestamptz,"scopeVersion" integer,"lastError" text,"pendingReason" text,"pendingReasonSince" timestamptz,primary key("userId","issueId","remoteKey","prNumber"));
     CREATE TABLE issues (id uuid,"userId" text,"scopeVersion" integer,content jsonb,scope text);
     CREATE TABLE github_repository_installations ("userId" text,"remoteKey" text,"installationId" bigint,"repositoryId" bigint,"githubAccountId" text);
     CREATE TABLE account ("userId" text,"providerId" text,"accountId" text,"createdAt" timestamptz);
@@ -33,7 +33,11 @@ test('durable CI polling leases, fencing and outbox survive overlapping workers'
   const one=postgresCiPollAdapter(db,read,authority),two=postgresCiPollAdapter(db,read,authority)
   const batches=await Promise.all([one.lease(1,Date.now()),two.lease(1,Date.now())])
   assert.equal(batches[0].length+batches[1].length,1)
-  const lease=batches.flat()[0]
+  let lease=batches.flat()[0]
+  await one.retry(lease,Date.now()-1000,'permission')
+  const failure=(await db.query('SELECT "lastError","pendingReason","pendingReasonSince" FROM github_ci_observations WHERE "watchId"=$1',[watch])).rows[0]
+  assert.equal(failure.lastError,'permission'); assert.equal(failure.pendingReason,'permission'); assert.ok(failure.pendingReasonSince)
+  lease=(await one.lease(1,Date.now()))[0]
   let issuance=0
   const token=async()=>{issuance++;return {token:'synthetic-repository-token',expiresAt:new Date(Date.now()+3600000).toISOString()}}
   const cacheSecret='synthetic-ci-cache-secret-at-least-32-bytes'

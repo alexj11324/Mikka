@@ -13,7 +13,7 @@ const base = { userId: 'owner', issueId: 'issue', remoteKey: 'v2/github.com/acme
 function harness(rows: typeof base[], notices = new Set<string>(), offline = false) {
   const events: string[] = []
   const pool = { async query(sql: string, args: unknown[] = []) {
-    if (sql.startsWith('SELECT "userId" FROM issues')) { const row = rows[0]; return { rows: row ? [{ userId: row.issueOwner }] : [], rowCount: row ? 1 : 0 } }
+    if (sql.startsWith('SELECT "userId",scope FROM issues')) { const row = rows[0]; return { rows: row ? [{ userId: row.issueOwner, scope: row.issueScope }] : [], rowCount: row ? 1 : 0 } }
     if (sql.includes('SELECT o.*,gi.')) { const row = rows[0]; return { rows: row ? [row] : [], rowCount: row ? 1 : 0 } }
     if (sql.includes('INSERT INTO coordinator_events')) { const key = String(args[8]); events.push(`read-notice:${String(args[9])}`); const fresh = !notices.has(key); notices.add(key); return { rows: fresh ? [{ id: 'notice' }] : [], rowCount: fresh ? 1 : 0 } }
     if (sql.includes('UPDATE github_ci_observations')) { events.push(args[4] === 'delivery_unavailable' ? 'backoff' : 'postpone'); return { rows: [], rowCount: 1 } }

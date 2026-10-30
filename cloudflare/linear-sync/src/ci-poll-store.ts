@@ -44,13 +44,13 @@ export function postgresCiPollAdapter(pool: Pool, read: (lease:CiPollLease,signa
       })
     },
     async pending(lease,state,nextAt) {
-      await update(lease,`UPDATE github_ci_observations SET "pollObservation"=$8::jsonb,"nextCheckAt"=to_timestamp($9/1000.0),"pollAttempt"=0,"pollLeaseId"=NULL,"pollLeaseUntil"=NULL`,[JSON.stringify(state),nextAt])
+      await update(lease,`UPDATE github_ci_observations SET "pollObservation"=$8::jsonb,"nextCheckAt"=to_timestamp($9/1000.0),"pollAttempt"=0,"lastError"=NULL,"pendingReason"=NULL,"pendingReasonSince"=NULL,"pollLeaseId"=NULL,"pollLeaseUntil"=NULL`,[JSON.stringify(state),nextAt])
     },
     async close(lease) {
       await update(lease,`UPDATE github_ci_observations SET "expiresAt"=now(),"pollLeaseId"=NULL,"pollLeaseUntil"=NULL`)
     },
-    async retry(lease,nextAt) {
-      await update(lease,`UPDATE github_ci_observations SET "nextCheckAt"=to_timestamp($8/1000.0),"pollAttempt"=least("pollAttempt"+1,8),"pollLeaseId"=NULL,"pollLeaseUntil"=NULL`,[nextAt])
+    async retry(lease,nextAt,code) {
+      await update(lease,`UPDATE github_ci_observations SET "nextCheckAt"=to_timestamp($8/1000.0),"pollAttempt"=least("pollAttempt"+1,8),"lastError"=$9,"pendingReasonSince"=CASE WHEN "pendingReason"=$9 THEN coalesce("pendingReasonSince",now()) ELSE now() END,"pendingReason"=$9,"pollLeaseId"=NULL,"pollLeaseUntil"=NULL`,[nextAt,code])
     },
     async complete(lease,state,result:CiPollResult) {
       await transaction(async tx => {

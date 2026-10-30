@@ -10,12 +10,12 @@ const pool={async query(sql:string) {
 }}
 mock.module(new URL('../lib/db/index.ts',import.meta.url).href,{namedExports:{pool}})
 mock.module(new URL('../lib/github/ci/reconcile.ts',import.meta.url).href,{namedExports:{reconcileCi:async()=>{calls++;return {queued:mode==='fresh'?1:0,escalated:0,closed:0,failed:0}}}})
-const {POST}=await import('../app/api/cron/ci-final/route')
 const secret='synthetic-ci-final-test-secret'
 const body=JSON.stringify({watchId:'00000000-0000-4000-8000-000000000001',head:'a'.repeat(40),fingerprint:'b'.repeat(64)})
 const request=(token:string,value=body)=>new Request('http://localhost/api/cron/ci-final',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:value})
 
 test('final callback authenticates, rejects stale results and accepts a lost-response retry',async()=>{
+  const {POST}=await import('../app/api/cron/ci-final/route')
   const prior=process.env.CRON_SECRET; process.env.CRON_SECRET=secret
   try {
     assert.equal((await POST(request('wrong'))).status,401); assert.equal(calls,0)
