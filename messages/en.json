@@ -1066,6 +1066,7 @@
     "teamNotFound": "This team does not exist.",
     "teamDeleteNameMismatch": "The name you entered does not match the team name.",
     "botDefaultRepositoryUnavailable": "This repository is not in any workspace member’s GitHub App installation.",
+    "botNotFound": "This bot does not exist in this workspace.",
     "usageLimitReached": "The usage limit has been reached. New tasks are paused; running tasks will finish.",
     "usageCreditsExhausted": "Credits have run out. New tasks are paused; running tasks will finish.",
     "billingNotConfigured": "Billing is not set up.",
@@ -1689,6 +1690,27 @@
       "previewNote": "Form preview: workspace storage is not connected, so changes are not saved.",
       "previewLabel": "Workspace form preview"
     },
+    "botSettings": {
+      "defaultsTitle": "New bot defaults",
+      "model": "Model",
+      "repository": "Repository",
+      "repositorySource": "From your GitHub connection",
+      "noRepository": "Choose a repository",
+      "connectRepository": "Connect another repository…",
+      "allBotsTitle": "All bots",
+      "noBots": "No bots yet",
+      "idle": "Idle",
+      "running": "Running · {count, plural, one {# thread} other {# threads}}",
+      "saved": "Saved",
+      "threadsTitle": "Threads",
+      "threadsSubtitle": "{name} · {status}",
+      "threadRunning": "Running",
+      "threadDone": "Done",
+      "threadMeta": "{status} · {time}",
+      "privateThread": "Private thread",
+      "noThreads": "No threads yet",
+      "loadMore": "Load more"
+    },
     "computerPolicy": {
       "heading": "Cloud computers",
       "description": "Control whether Bots may operate computers in this workspace.",
@@ -2031,7 +2053,14 @@
     },
     "sectionUnavailable": "This section is still being designed and has nothing to act on yet.",
     "workspaceLoading": "Loading the workspace…",
-    "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again."
+    "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again.",
+    "bots": {
+      "models": {
+        "mikka": "Mikka (default)",
+        "codex": "Codex",
+        "claude": "Claude"
+      }
+    }
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
