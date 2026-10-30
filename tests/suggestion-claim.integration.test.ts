@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import type { Pool } from 'pg'
 import { before, after as afterTests, mock, test } from 'node:test'
 import { eq } from 'drizzle-orm'
@@ -38,6 +39,7 @@ before(async () => {
   scope = (await import('../lib/db/request-scope')).createRequestDatabaseScope(scopedUrl.href)
   console.info(`Retained CI fixture schema: ${fixtureSchema}`)
   await scope.run(() => pool.query(`CREATE TABLE suggestions (id uuid primary key, "userId" text not null, source text not null, "externalId" text not null, action text not null, title text not null, url text, actor text, shown boolean not null, "decidedBy" text not null, probability real, level text, "matterKey" text, "actionTitle" text, required boolean not null default false, "occurredAt" timestamptz not null, "dismissedAt" timestamptz, "createdAt" timestamptz not null default now()); CREATE TABLE coordinator_events (id uuid primary key, "userId" text not null, "botId" uuid, kind text not null, "dedupeKey" text not null unique, "issueId" uuid, "runId" uuid, payload jsonb not null CHECK (position('fail-fixture' in payload::text) = 0), tier text, "lastTriageAttemptAt" timestamptz, "triageDecision" jsonb, "deliveredAt" timestamptz, "createdAt" timestamptz not null default now())`))
+  await scope.run(async () => pool.query(await readFile(new URL('../drizzle/20261030203541_coordinator_wake_recovery.sql', import.meta.url), 'utf8')))
   await scope.run(() => pool.query(`CREATE TABLE artifacts (id uuid primary key, "userId" text not null, kind text not null, title varchar(200) not null, "runId" uuid, "issueId" uuid, "latestVersion" int not null default 1, "createdAt" timestamptz not null default now(), "updatedAt" timestamptz not null default now()); CREATE TABLE artifact_versions (id uuid primary key, "artifactId" uuid not null, version int not null, "storageKey" text not null, "inlineContent" text, sha256 text not null, size int not null, "authorName" text not null, "createdAt" timestamptz not null default now(), unique("artifactId",version))`))
 })
 afterTests(async () => { await scope?.close(); await pool?.end() })
