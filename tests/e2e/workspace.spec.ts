@@ -114,3 +114,14 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await rail(page, '看板').click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
 })
+
+test('打开不存在或无权访问的任务链接显示任务不可用，不返回 500', async ({ page }) => {
+  await register(page)
+  const serverErrors: string[] = []
+  page.on('response', response => { if (response.status() >= 500) serverErrors.push(`${response.status()} ${response.request().method()}`) })
+  await page.goto(app(`/?issue=${randomUUID()}`))
+  await expect(page.getByRole('heading', { name: '任务不可用', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '重新读取', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '任务不可用', exact: true })).toBeVisible()
+  expect(serverErrors).toEqual([])
+})
