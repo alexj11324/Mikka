@@ -88,7 +88,7 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
       assert.ok(row.finishedAt && row.stopRequestedAt);
       assert.deepEqual(await task(q.taskId), { stage: "execute", status: "cancelled" });
       // Already terminal: a second stop is rejected and moves nothing.
-      await assert.rejects(requestRunStop("owner", q.runId), /runNotFound/);
+      await assert.rejects(requestRunStop("owner", q.runId), /runChainEnded/); // BE-18: an ended chain is a 409, not a 404
     });
 
     await t.test("a queued cloud run with a thread machine binding only records the stop request", async () => {
@@ -102,6 +102,18 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
       assert.ok(row.stopRequestedAt);
       assert.deepEqual(await task(b.taskId), { stage: "execute", status: "running" });
       assert.equal((await pool.query('SELECT state FROM thread_machines WHERE "runId"=$1', [b.runId])).rows[0].state, "starting");
+    });
+
+    await t.test("stop on an ended earlier attempt reaches the queued latest: stopped, and afterRunEnded runs under the latest's own runId (BE-18)", async () => {
+      const q = await runningTask();
+      await pool.query(`UPDATE agent_runs SET status='queued',"startedAt"=NULL,"createdAt"=now() WHERE id=$1`, [q.runId]);
+      const origin = randomUUID();
+      await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId",status,prompt,"createdAt","finishedAt") SELECT $1,'owner',"issueId","agentId","deviceId",'succeeded','Origin',now()-interval '1 hour',now() FROM agent_runs WHERE id=$2`, [origin, q.runId]);
+      await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [q.runId, JSON.stringify({ originRunId: origin })]);
+      assert.deepEqual(await requestRunStop("owner", origin), { stoppedRunIds: [q.runId] });
+      assert.equal(await runStatus(q.runId), "stopped");
+      assert.equal(await runStatus(origin), "succeeded");
+      assert.deepEqual(await task(q.taskId), { stage: "execute", status: "cancelled" });
     });
 
     await t.test("ending a thread machine stops a Factory run and finalizes its task", async () => {

@@ -34,6 +34,7 @@ export const ACTION_ERROR_CODES = [
   'runDispatchKeyConflict',
   'runNotFound',
   'runNotActive',
+  'runChainEnded',
   'factoryQuestionNeedsAnswerTool',
   'artifactNotFound',
   'suggestionNotFound',

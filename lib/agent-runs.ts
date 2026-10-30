@@ -19,6 +19,7 @@ import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { runPrompt } from '@/lib/run-prompt'
 import { dispatchInput, dispatchRequestKey, type DispatchInput, type DispatchResult } from '@/lib/run-dispatch'
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
+import { resolveStopTargets } from '@/lib/run-chain'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { runBotName } from '@/lib/run-bot-name'
 
@@ -245,11 +246,28 @@ export async function addRunMessage(
   await sendOwnedRunMessage(db,userId,parsed.data,typeof source==='string'?source:source.source==='human'?'user':'peer')
 }
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
-export async function requestRunStop(userId: string, runId: string): Promise<void> {
+export async function requestRunStop(userId: string, runId: string): Promise<{ stoppedRunIds: string[] }> {
   const parsed = z.uuid().safeParse(runId)
   if (!parsed.success) throw new ActionFailureError('runNotFound')
-  // A running run: stop only requests the end; the daemon's acknowledgement goes
-  // through persistRunCompletion, which reconciles Factory after commit.
-  // A queued run ends right here (no daemon holds it), so finalize Factory now.
-  if (await stopOwnedRun(db, userId, parsed.data)) await afterRunEnded(userId, parsed.data)
+  // BE-18 (Tech Lead): stop acts on the requested run and every later attempt of its chain
+  // (question continuations and retryOf reruns, same owner + issue only; lib/run-chain.ts).
+  // Each still-unfinished one is stopped; a queued one ends here, so it is finalized with
+  // afterRunEnded under its own runId (#467). If nothing from the requested run onward is
+  // unfinished, it is a 409 runChainEnded with latestRunId — never a silent no-op. A run that
+  // ends between the read and its stop is skipped; if that leaves nothing stopped it is also
+  // runChainEnded. A continuation created after the chain was read is not stopped: accepted window.
+  const target = await resolveStopTargets(pool, userId, parsed.data)
+  if (target.kind === 'notFound') throw new ActionFailureError('runNotFound')
+  if (target.kind === 'chainEnded') throw new ActionFailureError('runChainEnded', { latestRunId: target.latestRunId })
+  const stoppedRunIds: string[] = []
+  for (const runId of target.runIds) {
+    try {
+      if (await stopOwnedRun(db, userId, runId)) await afterRunEnded(userId, runId)
+      stoppedRunIds.push(runId)
+    } catch (error) {
+      if (!(error instanceof ActionFailureError && error.code === 'runNotFound')) throw error
+    }
+  }
+  if (!stoppedRunIds.length) throw new ActionFailureError('runChainEnded', { latestRunId: target.latestRunId })
+  return { stoppedRunIds }
 }

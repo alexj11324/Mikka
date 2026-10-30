@@ -1,4 +1,5 @@
 import { runIsActive, runSummaryText } from './issue-run-conversation'
+import type { RunChain } from './run-chain'
 
 /**
  * A thread is one agent run on an issue, and its content is its owner's alone (R-62):
@@ -16,6 +17,34 @@ export interface IssueThread {
   /** Whose thread it is, shown on a teammate's thread instead of its content. */
   ownerName: string | null
   detail: { name: string; agentName: string; harness: string; summary: string | null } | null
+  /**
+   * BE-18 run chain (GitHub Actions run_id + run_attempt): a question continuation is a new
+   * run in the same thread. `id` is the root run (attempt 1); stop, status and send act on
+   * `latestRunId`. `attempts` is the whole chain in order, root first.
+   */
+  rootRunId: string
+  latestRunId: string
+  attempts: IssueThreadAttempt[]
+}
+
+export interface IssueThreadAttempt {
+  runId: string
+  /** 1-based; the root run is attempt 1. */
+  attempt: number
+  status: string
+  stopping: boolean
+  createdAt: Date
+  finishedAt: Date | null
+}
+
+/** Attach the run's resolved chain; without one the thread is a one-attempt chain. */
+export function withRunChain(thread: IssueThread, chain: RunChain | null | undefined): IssueThread {
+  if (!chain) return thread
+  return {
+    ...thread, rootRunId: chain.rootRunId, latestRunId: chain.latestRunId,
+    attempts: chain.attempts.map(attempt => ({ runId: attempt.runId, attempt: attempt.attempt, status: attempt.status,
+      stopping: runIsActive(attempt.status) && !!attempt.stopRequestedAt, createdAt: attempt.createdAt, finishedAt: attempt.finishedAt })),
+  }
 }
 
 export const ISSUE_THREAD_LIMIT = 20
@@ -51,5 +80,7 @@ export function projectIssueThreads(rows: readonly IssueThreadRow[], issueId: st
       detail: canReadThread(row.userId, viewerId, memberIds)
         ? { name: threadName(row.prompt, row.agentName), agentName: row.agentName, harness: row.harness, summary: runSummaryText({ report: row.report, error: row.error }) }
         : null,
+      rootRunId: row.id, latestRunId: row.id,
+      attempts: [{ runId: row.id, attempt: 1, status: row.status, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],
     }))
 }
