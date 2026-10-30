@@ -38,6 +38,8 @@ dbTest('devices, shared links, export links and avatars belong to one person', a
   const scope = createRequestDatabaseScope(databaseUrl!)
   const alice = `test-account-alice-${randomUUID()}`, bob = `test-account-bob-${randomUUID()}`
   t.after(async () => {
+    // user_facts has no foreign key to "user": remove them explicitly so later suites see none.
+    await scope.run(() => pool.query('delete from user_facts where "userId" = any($1::text[])', [[alice, bob]]))
     await scope.run(() => pool.query('delete from "user" where id = any($1::text[])', [[alice, bob]]))
     await scope.run(() => pool.query('delete from artifacts where "userId" = any($1::text[])', [[alice, bob]]))
     await scope.close()
@@ -138,6 +140,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
       await pool.query('delete from conversations where id = any($1::uuid[])', [[group, dm]])
       await pool.query('delete from issue_documents where "issueId" = any($1::uuid[])', [[personalIssue, teamIssue, bobIssue]])
       await pool.query('delete from issues where id = any($1::uuid[])', [[personalIssue, teamIssue, bobIssue]])
+      await pool.query('delete from user_facts where "userId" = any($1::text[])', [[alice, bob, carol, dave]])
       await pool.query('delete from "user" where id = any($1::text[])', [[alice, bob, carol, dave]])
     })
     await scope.close()
