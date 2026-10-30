@@ -23,7 +23,11 @@ test('parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or fai
 })
 test('only matching ephemeral Actions URLs are permitted; missing DB fails before subprocess', () => {
   assert.doesNotThrow(() => validateTarget(env))
-  for (const changes of [{ CI: '' }, { GITHUB_ACTIONS: '' }, { E2E_DATABASE_URL: '' }, { E2E_DATABASE_URL: 'postgres://business/db' }, { DATABASE_URL: 'postgres://business/db' }, { ORVILO_DATABASE_URL: 'postgres://business/db' }, { E2E_DATABASE_URL: target + '?options=x' }]) assert.throws(() => validateTarget({ ...env, ...changes }))
+  // CI is no longer required; any loopback *_e2e database on any port is allowed.
+  assert.doesNotThrow(() => validateTarget({ ...env, CI: '', GITHUB_ACTIONS: '' }))
+  const local = 'postgresql://e2e:local@127.0.0.1:55594/fac_overnight_e2e'
+  assert.doesNotThrow(() => validateTarget({ E2E_DATABASE_URL: local, MIKKA_DATABASE_URL: local, DATABASE_URL: local }))
+  for (const changes of [{ E2E_DATABASE_URL: '' }, { E2E_DATABASE_URL: target.replace('mikka_e2e', 'mikka') }, { E2E_DATABASE_URL: target.replace('127.0.0.1', 'db.internal') }, { E2E_DATABASE_URL: 'postgres://business/db' }, { DATABASE_URL: 'postgres://business/db' }, { ORVILO_DATABASE_URL: 'postgres://business/db' }, { E2E_DATABASE_URL: target + '?options=x' }]) assert.throws(() => validateTarget({ ...env, ...changes }))
   let called = false
   assert.equal(main({ env: {}, run() { called = true } }), 1)
   assert.equal(called, false)

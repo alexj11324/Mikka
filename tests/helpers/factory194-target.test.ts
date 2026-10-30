@@ -11,6 +11,8 @@ test("isolated target validation cannot be overridden by URL search_path/options
     local.replace("postgresql:", "https:"),
     local.replace("127.0.0.1", "localhost"),
     local.replace("55594", "5432"),
+    "postgresql://synthetic:synthetic@127.0.0.1:5432/mikka_prod",
+    "postgresql://synthetic:synthetic@10.0.0.5:5432/mikka_e2e",
     local.replace("factory194_test", "postgres"),
   ])
     assert.throws(
@@ -31,4 +33,10 @@ test("isolated target validation cannot be overridden by URL search_path/options
     "mikka_e2e",
   );
   assert.throws(() => factory194Target(local, true), /exact isolated loopback/);
+  // Any *_e2e database on any loopback port is accepted, CI or not.
+  for (const ci of [true, false])
+    assert.equal(
+      factory194Target("postgresql://s:s@127.0.0.1:55600/fac_overnight_e2e", ci).port,
+      55600,
+    );
 });

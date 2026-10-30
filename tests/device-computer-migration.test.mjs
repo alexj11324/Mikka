@@ -3,13 +3,13 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { Pool } from "pg";
+import { isE2eTarget, E2E_DB_RULE } from "./helpers/e2e-target.mjs";
 test("local computer metadata migration preserves devices and reruns safely", async () => {
-  assert.equal(process.env.CI, "true", "Database tests run only in CI");
   const target = new URL(process.env.E2E_DATABASE_URL ?? process.env.COMPUTER_TEST_DATABASE_URL);
   assert.ok(
     ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname) &&
-      ["/mikka_e2e", "/computer_test"].includes(target.pathname),
-    "Requires CI ephemeral Postgres 17",
+      (target.pathname === "/computer_test" || isE2eTarget(target.href)),
+    E2E_DB_RULE,
   );
   const pool = new Pool({ connectionString: target.toString(), max: 1 });
   const client = await pool.connect();
