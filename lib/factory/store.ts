@@ -158,15 +158,18 @@ export function createFactoryStore(
     );
     return rows.length === 1;
   }
-  async function owned(tx: PoolClient, userId: string, taskId: string) {
+  /** lock=false is the read-only variant for GETs: same ownership/scope checks, no row locks. */
+  async function owned(tx: PoolClient, userId: string, taskId: string, lock = true) {
     uuid(taskId);
     const {
       rows: [task],
     } = await tx.query<FactoryTask>(
-      'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE',
+      lock
+        ? 'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE'
+        : 'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2',
       [taskId, userId],
     );
-    const issue = task ? await lockedIssue(tx, task.issueId) : undefined;
+    const issue = task ? await lockedIssue(tx, task.issueId, lock) : undefined;
     if (
       !task ||
       task.botId !== botId ||
@@ -177,8 +180,8 @@ export function createFactoryStore(
       fail("factoryNotFound");
     return task;
   }
-  async function lockedIssue(tx: PoolClient, issueId: string) {
-    const { rows: [issue] } = await tx.query<FactoryIssueScope>('SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1 FOR SHARE', [issueId]);
+  async function lockedIssue(tx: PoolClient, issueId: string, lock = true) {
+    const { rows: [issue] } = await tx.query<FactoryIssueScope>(lock ? 'SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1 FOR SHARE' : 'SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1', [issueId]);
     return issue;
   }
   async function snapshot(
@@ -253,7 +256,9 @@ export function createFactoryStore(
     task.status = "pending";
   }
   return {
-    lockTask: owned,
+    lockTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId),
+    /** Read-only GET paths: ownership/scope checked, nothing locked. */
+    readTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId, false),
     async route(userId: string, input: unknown) {
       const parsed = routeSchema.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
@@ -329,10 +334,10 @@ export function createFactoryStore(
         return save(tx, task, route.eventId, route);
       });
     },
+    /** Task-detail GET: read-only, no row locks (BE-16). B8/B9 checks and the B11 header are computed, never stored. */
     async read(userId: string, taskId: string): Promise<FactorySnapshot & Partial<FactoryTaskDetail>> {
-      // Read-only: B8/B9 checks and the B11 header are computed, never stored.
       return transaction(async (tx) => {
-        const task = await owned(tx, userId, taskId);
+        const task = await owned(tx, userId, taskId, false);
         return {
           ...(await snapshot(tx, task)),
           ...(await factoryTaskDetail(tx, task, lifecycle?.independent as never)),
@@ -342,7 +347,7 @@ export function createFactoryStore(
     async listForIssue(userId: string, issueId: string) {
       uuid(issueId);
       return transaction(async (tx) => {
-        const issue = await lockedIssue(tx, issueId);
+        const issue = await lockedIssue(tx, issueId, false);
         if (!issue || !(await authorize(userId, issueId, tx))) fail("factoryNotFound");
         const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null; candidateSha: string | null; publication: PublicationRow | null }>(
           'SELECT t.*, c."runId" AS "candidateRunId", c.sha AS "candidateSha", (SELECT json_build_object(\'id\',p.id,\'approvalId\',p."approvalId",\'status\',p.status,\'action\',p.action,\'target\',p.target,\'createdAt\',p."createdAt",\'finishedAt\',p."finishedAt") FROM factory_publications p WHERE p."taskId"=t.id AND p."candidateId"=t."candidateId" ORDER BY p."createdAt" DESC,p.id DESC LIMIT 1) AS publication, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
