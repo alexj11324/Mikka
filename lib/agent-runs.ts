@@ -99,6 +99,9 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
     const result = await queueAdmittedRun(userId, { ...parsed.data, repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, undefined, requestEventId, null, undefined, { executor, repo, client: tx, sourceRunId })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
+    // BE-13: the target device cannot take the run right now -> one reason-coded event, same transaction.
+    const { recordFactoryDispatchFailure } = await import('./factory/dispatch-recovery')
+    await recordFactoryDispatchFailure(tx, userId, result.runId, context?.attemptId ?? null)
     return { runId: result.runId, status: run.status, replayed: result.replayed ?? false }
   })
 }

@@ -126,6 +126,15 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         'Nothing to do; follow the new run.',
         note,
       ].filter(Boolean).join('\n')
+    case 'run_dispatch_failed':
+      return [
+        `[Event] Factory run ${event.runId} for task ${payload.taskId} cannot start on device ${payload.deviceId}: ${payload.reasonCode}.`,
+        event.issueId ? `Issue: ${event.issueId}.` : null,
+        'It stays queued and starts by itself when the device is back. Tell the person only if they are waiting on it; a cloud computer needs their own E2B key.',
+        note,
+      ].filter(Boolean).join('\n')
+    case 'run_redispatched':
+      return [`[Event] Device ${payload.deviceId} is back online; queued Factory run ${event.runId} for task ${payload.taskId} will start there.`, note].filter(Boolean).join('\n')
     case 'issue_done':
       return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to done.`, note].filter(Boolean).join('\n')
     case 'run_report':
