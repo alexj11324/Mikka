@@ -47,7 +47,7 @@ async function routeFixture(unavailable=false,stopped=false) {
     '@/lib/subscription-runtime':{},
     '@/lib/computer/native-run-binding':{},
     '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
-    '@/lib/secrets/runtime':{taskSecretEnv:async()=>({}),remoteRepositoryRef:()=>null},
+    '@/lib/secrets/runtime':{taskSecretInjection:async()=>({env:{},secretNames:[]}),remoteRepositoryRef:()=>null},
     '@/lib/personal-mailbox-config':{personalMailboxEnabled:()=>false},
     '@/lib/factory/questions/retry':{},'@mikka/protocol/skill':{SKILL_ARTIFACT_HEADER:'x-mikka-skill-artifacts'},
     '@/lib/self-improvement/contract':{ImprovementError},'@/lib/factory/contract':{FactoryError},

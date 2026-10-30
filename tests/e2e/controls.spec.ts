@@ -12,7 +12,6 @@ const surfaces: { name: string; scope?: 'dialog' | 'menu'; prepare: (page: Page)
     await page.goto(app('/settings/members'))
     await expect(page.getByRole('button', { name: '邀请成员', exact: true })).toBeEnabled()
     // Admin-only sections join the sidebar once the role is known (S-P); freeze the list after that.
-    // 团队权限 is an admin-only section; waiting for it waits for the role.
     await expect(page.locator('[data-slot="sidebar-container"]').getByRole('link', { name: '团队权限', exact: true })).toBeVisible()
   } },
   { name: '邀请弹窗', scope: 'dialog', prepare: async page => {
