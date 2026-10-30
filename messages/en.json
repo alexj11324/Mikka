@@ -3441,5 +3441,44 @@
       "unavailable": "Sign-in is unavailable right now",
       "failed": "Couldn’t sign in. Try again."
     }
+  },
+  "Onboarding": {
+    "title": "Create your first Bot",
+    "start": "Start",
+    "skip": "Skip setup",
+    "botLabel": "Your Bot",
+    "hello": "Hi. Give me a name and pick a look.",
+    "nameLabel": "Name",
+    "confirm": "Done",
+    "nameReply": "Call it {name}",
+    "named": "Got it. I'm {name} from now on.",
+    "computerAsk": "I can use a cloud computer to browse the web and run code. Turn it on now?",
+    "computerYes": "Turn on",
+    "computerNo": "Not now",
+    "computerLater": "OK. You can add an E2B API key in Settings later.",
+    "computerMember": "Once a workspace admin adds an E2B API key in Settings, I can use a cloud computer.",
+    "keyLabel": "E2B API key",
+    "keyLink": "Get a key from E2B",
+    "keyConnect": "Connect",
+    "keyInvalid": "This key doesn't work. Check it and try again.",
+    "keyUnavailable": "Can't reach E2B right now. Try again later.",
+    "keyReply": "E2B API key added",
+    "computerReady": "Your cloud computer is on.",
+    "appsAsk": "Connect the apps you use, and I can work in them for you.",
+    "apps": {
+      "gmail": "Email",
+      "googlecalendar": "Calendar",
+      "notion": "Notes and docs",
+      "slack": "Messages"
+    },
+    "connect": "Connect",
+    "connected": "Connected",
+    "appsContinue": "Continue",
+    "appsNo": "Not now",
+    "appsReplyDone": "All set",
+    "appsDone": "Connected {apps}. I'll start with today's briefing.",
+    "appsLater": "OK. You can connect them in Settings later.",
+    "welcome": "Your first Bot",
+    "enter": "Open Mikka"
   }
 }

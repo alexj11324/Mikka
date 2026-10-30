@@ -9,9 +9,18 @@ export { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotC
 /**
  * What the bot is doing, as bloub states (Figma 196:3571): 空闲 idle (its eyes
  * follow the cursor), 工作中 thinking, 等你处理 notify, 完成 wink, 出错
- * exclaim, 离线 sleep.
+ * exclaim, 离线 sleep. The rest are one-off moves (wide eyes, play, the
+ * hexagon pose, and the burst, orbit and comet effects) for moments like the
+ * first-run guide; they play at bloub's own length and the caller sets the
+ * mood back to idle afterwards.
  */
-export type BotMood = 'idle' | 'thinking' | 'notify' | 'wink' | 'exclaim' | 'sleep'
+export type BotMood = 'idle' | 'thinking' | 'notify' | 'wink' | 'exclaim' | 'sleep' | BotMove
+
+export type BotMove = 'wide' | 'play' | 'hexagon' | 'burst' | 'orbit' | 'comet'
+
+/** How long each mood lasts at bloub's own pace, in seconds. */
+export const BOT_MOOD_SECONDS: Record<BotMood, number> = { idle: 2.4, thinking: 2.6, notify: 2.2, wink: 1.6, exclaim: 2, sleep: 2.4, wide: 1.8, play: 2, hexagon: 1.6, burst: 2.6, orbit: 3.4, comet: 2.4 }
+const BOT_MOVES = new Set<BotMood>(['wide', 'play', 'hexagon', 'burst', 'orbit', 'comet'])
 
 /** A steady colour for something that has a name but no colour of its own, such as an agent assignee. */
 export function colorFor(name: string): BotColor {
@@ -49,9 +58,11 @@ if (typeof window !== 'undefined') void loadRuntime()
 
 /**
  * Idle plays a montage instead of one long idle block: rest (bloub blinks on
- * its own), a wink, rest, a wide-eyed glance. Other moods hold their state.
+ * its own), a wink, rest, a wide-eyed glance. Status moods hold their state;
+ * moves, and every other mood when `brisk`, play at bloub's own pace.
  */
-function cycleFor(bloub: Runtime[0], mood: BotMood) {
+function cycleFor(bloub: Runtime[0], mood: BotMood, brisk: boolean) {
+  if (BOT_MOVES.has(mood) || brisk && mood !== 'idle') return [{ state: mood, duration: bloub.clampDuration(mood, BOT_MOOD_SECONDS[mood]) }]
   if (mood !== 'idle') return [{ state: mood, duration: 12 }]
   return ([['idle', 6], ['wink', 1.6], ['idle', 5], ['wide', 2.2]] as const).map(([state, seconds]) => ({ state, duration: bloub.clampDuration(state, seconds) }))
 }
@@ -82,8 +93,8 @@ type Live = { set: (next: { color: string; shape: string; mood: BotMood }) => vo
  * of remounting it. Small rows and anything `still` hold one pose; the rest
  * animate at 30fps and pause off screen.
  */
-export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, still = size === 'row' }: {
-  color?: string | null; shape?: string | null; size?: keyof typeof SIZES; mood?: BotMood; label?: string; still?: boolean
+export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, still = size === 'row', brisk = false }: {
+  color?: string | null; shape?: string | null; size?: keyof typeof SIZES; mood?: BotMood; label?: string; still?: boolean; brisk?: boolean
 }) {
   const host = useRef<HTMLSpanElement>(null)
   const live = useRef<Live | null>(null)
@@ -108,14 +119,14 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
       if (!alive) return
       const first = latest.current()
       const [state, setState] = createSignal(first)
-      const cycle = cycleFor(bloub, first.mood)
+      const cycle = cycleFor(bloub, first.mood, brisk)
       const length = cycle.reduce((sum, block) => sum + block.duration, 0)
       const dispose = render(() => createComponent(bloub.BloubBot, {
         size: Math.round(px * SVG_SCALE), paper: 'transparent', ariaLabel: label ?? '', fps: 30,
         ...(frozen ? { frozenAt: 0 } : { initialPhase: phaseFor(latestSeed.current, length) }),
         get color() { return state().color },
         get shape() { return state().shape },
-        get cycle() { return cycleFor(bloub, state().mood) },
+        get cycle() { return cycleFor(bloub, state().mood, brisk) },
         get follow() { return !frozen && state().mood === 'idle' },
       }), node)
       live.current = { set: next => setState(() => next), dispose }
@@ -126,7 +137,7 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
     const watch = new MutationObserver(() => live.current?.set(latest.current()))
     watch.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => { alive = false; watch.disconnect(); live.current?.dispose(); live.current = null; node.replaceChildren() }
-  }, [px, still, label])
+  }, [px, still, label, brisk])
 
   useEffect(() => { live.current?.set(latest.current()) }, [tone, form, mood])
 

@@ -13,6 +13,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IconRail, type RailDestination } from '@/components/nav/icon-rail'
 import { BotList, type ChatTarget } from '@/components/nav/bot-list'
 import { NewBotDialog } from '@/components/nav/new-bot-dialog'
+import { Onboarding, type E2BKeyResult, type OnboardingComputer } from '@/components/onboarding/onboarding'
 import type { LegacyChatRequest } from './legacy-chat-archive'
 import { TeamHome } from '@/components/teams/team-home'
 import { AppFrame, AppShell, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'
@@ -42,6 +43,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { listProjects } from '@/app/actions/projects'
+import { saveE2BKey } from '@/app/actions/workspace-secrets'
 import { listTeams } from '@/app/actions/teams'
 import { listProjectTeams } from '@/app/actions/team-relations'
 import { WorkspaceOverview } from './workspace-overview'
@@ -66,6 +68,12 @@ if (typeof window !== 'undefined') {
   void import('./create-issue-dialog').catch(() => {})
 }
 
+/** The guide's E2B step saves the workspace key; only a rejected key reads as invalid. */
+async function saveOnboardingKey(apiKey: string): Promise<E2BKeyResult> {
+  const result = await saveE2BKey({ apiKey })
+  return !result.error ? 'ok' : result.error === 'e2bKeyInvalid' ? 'invalid' : 'unavailable'
+}
+
 function DetailLoading() {
   const t = useTranslations('Workspace')
   return <div role="status" aria-label={t('loadingEditor')} className="flex flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>
@@ -77,7 +85,7 @@ const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module
 const SettingsShell = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsShell), { loading: WorkspaceLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
-export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {
+export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false, onboarding }: { onboarding?: { computer: OnboardingComputer }; initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {
   const i18nText = useTranslations()
   const { data: workspaceData } = useWorkspace(user.email)
   const { data: agentHistory } = useAgentHistory(user.id, initialAgentHistory)
@@ -135,6 +143,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const { data: teams = [] } = useSWR('teams', listTeams)
   const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams)
   const { data: bots = [] } = useSWR('bots', listBots, { revalidateOnFocus: false })
+  const [onboardingOpen, setOnboardingOpen] = useState(Boolean(onboarding))
   const { data: threads = [] } = useSWR('threads', () => listThreads(), { refreshInterval: boardBusy ? 0 : 15000, revalidateOnFocus: false })
   const [creatingBot, setCreatingBot] = useState(false)
   const [createdBot, setCreatedBot] = useState<BotView>()
@@ -379,6 +388,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const lastCoordinatorItem = coordinatorChat?.items.findLast(item => item.from !== 'event')
   const dialogs = <>
     <NewTaskDialog open={creating} project={creationProject ? scopedProjects.find(project => project.id === creationProject)?.name : null} initialText={typedAhead} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />
+    {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot) }} />}
     <NewBotDialog open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />
     {searchOpen && <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} bots={bots} sessions={conversationSessions} coordinatorLine={lastCoordinatorItem ? sessionPreview(lastCoordinatorItem.text.replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, ''), null) : undefined} issues={tasks} projects={projects} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
       onChat={openChat} onNewBot={() => setCreatingBot(true)} onIssue={open} onCreateIssue={() => create()}
