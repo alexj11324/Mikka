@@ -1606,7 +1606,8 @@
         "title": "常规"
       },
       "bots": {
-        "title": "Bot 管理"
+        "title": "Bot 与 Agents",
+        "keywords": "Bot Agents 模型 运行位置 Harness 规则 标签"
       },
       "permissions": {
         "title": "团队权限"
@@ -2034,7 +2035,39 @@
     },
     "sectionUnavailable": "这个分区还在设计中，暂时没有可用的操作。",
     "workspaceLoading": "正在读取工作区…",
-    "workspaceUnavailable": "无法读取工作区，请刷新后重试。"
+    "workspaceUnavailable": "无法读取工作区，请刷新后重试。",
+    "botAgents": {
+      "bots": "Bot",
+      "agents": "Agents",
+      "addRule": "添加规则",
+      "default": "默认",
+      "auto": "自动",
+      "autoBotHint": "额度用完或登录失效时换一个",
+      "cloud": "云端托管",
+      "online": "在线",
+      "offline": "离线",
+      "removedDevice": "已移除的设备",
+      "redetect": "重新检测",
+      "searchModels": "搜索模型",
+      "claudeAccount": "Claude",
+      "openaiAccount": "ChatGPT",
+      "add": "添加",
+      "save": "保存",
+      "delete": "删除",
+      "rowMenu": "{label} 的更多操作",
+      "cell": "{row} {column}：{value}",
+      "loading": "正在读取 Bot 与 Agents",
+      "loadFailed": "无法读取 Bot 与 Agents",
+      "notSaved": "未保存",
+      "retry": "重试",
+      "columns": {
+        "label": "标签",
+        "place": "运行位置",
+        "harness": "Harness",
+        "model": "模型",
+        "actions": "操作"
+      }
+    }
   },
   "TelegramBot": {
     "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",

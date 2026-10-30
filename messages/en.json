@@ -1606,7 +1606,8 @@
         "title": "General"
       },
       "bots": {
-        "title": "Bots"
+        "title": "Bots & Agents",
+        "keywords": "bots agents model location harness rules labels"
       },
       "permissions": {
         "title": "Team permissions"
@@ -2034,7 +2035,39 @@
     },
     "sectionUnavailable": "This section is still being designed and has nothing to act on yet.",
     "workspaceLoading": "Loading the workspace…",
-    "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again."
+    "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again.",
+    "botAgents": {
+      "bots": "Bots",
+      "agents": "Agents",
+      "addRule": "Add rule",
+      "default": "Default",
+      "auto": "Auto",
+      "autoBotHint": "Switches when quota runs out or sign-in expires",
+      "cloud": "Cloud",
+      "online": "Online",
+      "offline": "Offline",
+      "removedDevice": "Removed device",
+      "redetect": "Detect again",
+      "searchModels": "Search models",
+      "claudeAccount": "Claude",
+      "openaiAccount": "ChatGPT",
+      "add": "Add",
+      "save": "Save",
+      "delete": "Delete",
+      "rowMenu": "More for {label}",
+      "cell": "{row} {column}: {value}",
+      "loading": "Loading bots and agents",
+      "loadFailed": "Couldn't load bots and agents",
+      "notSaved": "Not saved",
+      "retry": "Retry",
+      "columns": {
+        "label": "Label",
+        "place": "Runs on",
+        "harness": "Harness",
+        "model": "Model",
+        "actions": "Actions"
+      }
+    }
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",

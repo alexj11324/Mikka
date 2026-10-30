@@ -40,7 +40,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'general', group: 'workspace', title: 'General' },
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
-  { id: 'bots', group: 'workspace', title: 'Bots', unbuilt: true },
+  { id: 'bots', group: 'workspace', title: 'Bots and agents' },
   { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },
   { id: 'secrets', group: 'workspace', title: 'Secrets and environment', adminOnly: true, unbuilt: true },
   { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true, unbuilt: true },
