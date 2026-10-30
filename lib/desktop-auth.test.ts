@@ -39,3 +39,21 @@ test('the desktop state must be URL-safe and bounded', () => {
   assert.equal(desktopAuthState(`${'a'.repeat(16)}!`), null)
   assert.equal(desktopAuthState('a'.repeat(129)), null)
 })
+
+test('the OAuth callback URL is absolute and keeps the base path', async () => {
+  const { BASE_PATH } = await import('@/lib/base-path')
+  const { desktopAuthCallbackURL } = await import('./desktop-auth')
+  const url = new URL(desktopAuthCallbackURL('https://app.example', state, '/'))
+  assert.equal(url.origin, 'https://app.example')
+  assert.equal(url.pathname, `${BASE_PATH}/api/desktop/return`)
+})
+
+test('challenge, verifier and code shapes are bounded', async () => {
+  const { desktopAuthChallenge, desktopAuthCode, desktopAuthVerifier } = await import('./desktop-auth')
+  assert.equal(desktopAuthChallenge('a'.repeat(43)), 'a'.repeat(43))
+  assert.equal(desktopAuthChallenge('a'.repeat(42)), null)
+  assert.equal(desktopAuthVerifier('a'.repeat(42)), null)
+  assert.equal(desktopAuthVerifier('a'.repeat(129)), null)
+  assert.equal(desktopAuthCode('a'.repeat(31)), null)
+  assert.equal(desktopAuthCode('a'.repeat(43)), 'a'.repeat(43))
+})

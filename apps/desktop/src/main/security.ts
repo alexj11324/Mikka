@@ -90,6 +90,7 @@ export function desktopAuthFinishUrl(token: unknown, state: unknown, next: unkno
   }
   if (resolved.origin !== app.origin) return null
   const finish = new URL(`${appUrl.replace(/\/$/, '')}/api/desktop/finish`)
-  finish.hash = new URLSearchParams({ token, state, next: target }).toString()
+  // The value is the one-time exchange code, not a sign-in token.
+  finish.hash = new URLSearchParams({ code: token, state, next: target }).toString()
   return finish.href
 }

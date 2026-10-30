@@ -53,9 +53,14 @@ export const teamIssuePromotions = pgTable('team_issue_promotions', {
 /** A desktop browser handoff, bound to the signed-in person before the browser opens. */
 export const desktopAuthRequests = pgTable('desktop_auth_requests', {
   stateHash: text('stateHash').primaryKey(),
-  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // Null until the browser that finished OAuth binds the request to its person.
+  userId: text('userId').references(() => users.id, { onDelete: 'cascade' }),
   callback: text('callback').notNull(),
+  codeChallenge: text('codeChallenge').notNull(),
+  codeHash: text('codeHash'),
+  token: text('token'),
   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  boundAt: timestamp('boundAt', { withTimezone: true }),
   usedAt: timestamp('usedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('desktop_auth_requests_user_idx').on(table.userId, table.expiresAt)])

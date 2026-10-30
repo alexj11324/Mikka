@@ -27,10 +27,10 @@ export async function startLoopbackAuth(options: {
       response.end()
       return
     }
-    const token = requestUrl.searchParams.get('token')
+    const code = requestUrl.searchParams.get('code')
     const returnedState = requestUrl.searchParams.get('state')
     const next = requestUrl.searchParams.get('next') ?? '/'
-    const finish = returnedState === state ? desktopAuthFinishUrl(token, returnedState, next, options.appUrl) : null
+    const finish = returnedState === state ? desktopAuthFinishUrl(code, returnedState, next, options.appUrl) : null
     if (!finish) {
       response.writeHead(400, { 'Cache-Control': 'no-store', 'Content-Type': 'text/plain; charset=utf-8' })
       response.end('This sign-in link is invalid or expired. Return to Mikka and try again.')

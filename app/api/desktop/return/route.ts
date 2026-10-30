@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { and, eq, gt, isNull } from 'drizzle-orm'
@@ -8,7 +7,8 @@ import { db } from '@/lib/db'
 import { desktopAuthRequests } from '@/lib/db/schema'
 import { safeAuthReturn } from '@/lib/auth-return'
 import { withBasePath } from '@/lib/base-path'
-import { desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
+import { DESKTOP_AUTH_EXCHANGE_TTL_MS, desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
+import { newExchangeCode, sha256Hex } from '@/lib/desktop-auth-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,11 +21,10 @@ const safeHeaders = {
 
 /**
  * OAuth lands here in the system browser after the provider callback. The
- * browser holds the web session; the desktop app does not. Mint a one-minute,
- * single-use token and hand it to the Electron loopback listener, together
- * with the nonce the app stored before opening the browser. The app exchanges
- * the token for its own session cookie; the token never becomes an app
- * credential and never travels through a custom URL scheme.
+ * browser holds the web session; the desktop app does not. Bind the pending
+ * request to this person, park a one-minute sign-in token on it and send the
+ * Electron loopback listener a one-time code. The desktop trades the code and
+ * its verifier for the token, then the token for its own session cookie.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -49,22 +48,29 @@ export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: requestHeaders })
   if (!session) return fail()
 
-  const stateHash = createHash('sha256').update(state).digest('hex')
-  const [authRequest] = await db.select({ callback: desktopAuthRequests.callback })
-    .from(desktopAuthRequests)
-    .where(and(eq(desktopAuthRequests.stateHash, stateHash), eq(desktopAuthRequests.userId, session.user.id), isNull(desktopAuthRequests.usedAt), gt(desktopAuthRequests.expiresAt, new Date())))
-    .limit(1)
-  if (!authRequest || authRequest.callback !== callback) return fail()
-
+  const stateHash = sha256Hex(state)
   try {
-    const claimed = await db.update(desktopAuthRequests).set({ usedAt: new Date() })
-      .where(and(eq(desktopAuthRequests.stateHash, stateHash), eq(desktopAuthRequests.userId, session.user.id), isNull(desktopAuthRequests.usedAt), gt(desktopAuthRequests.expiresAt, new Date())))
-      .returning({ stateHash: desktopAuthRequests.stateHash })
-    if (!claimed.length) return fail()
+    // Mint the sign-in token with this browser's session, then bind the
+    // pending row to this person exactly once. A row someone else already
+    // bound, a used or expired row, or a different callback all fail.
     const { token } = await auth.api.generateOneTimeToken({ headers: requestHeaders })
     if (!token) return fail()
+    const code = newExchangeCode()
+    const now = new Date()
+    const bound = await db.update(desktopAuthRequests).set({
+      userId: session.user.id,
+      boundAt: now,
+      codeHash: sha256Hex(code),
+      token,
+      expiresAt: new Date(now.getTime() + DESKTOP_AUTH_EXCHANGE_TTL_MS),
+    })
+      .where(and(eq(desktopAuthRequests.stateHash, stateHash), eq(desktopAuthRequests.callback, callback), isNull(desktopAuthRequests.boundAt), isNull(desktopAuthRequests.usedAt), gt(desktopAuthRequests.expiresAt, now)))
+      .returning({ stateHash: desktopAuthRequests.stateHash })
+    if (!bound.length) return fail()
+    // The loopback gets a code, never the token: only the desktop that holds
+    // the verifier can trade it (/api/desktop/exchange).
     const target = new URL(callback)
-    target.searchParams.set('token', token)
+    target.searchParams.set('code', code)
     target.searchParams.set('state', state)
     target.searchParams.set('next', next)
     return NextResponse.redirect(target, { status: 303, headers: safeHeaders })

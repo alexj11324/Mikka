@@ -1,25 +1,23 @@
-import { createHash } from 'node:crypto'
-import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { desktopAuthRequests } from '@/lib/db/schema'
-import { desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
+import { DESKTOP_AUTH_PENDING_TTL_MS, desktopAuthChallenge, desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
+import { sha256Hex } from '@/lib/desktop-auth-server'
 import { withRequestLog } from '@/lib/request-log'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Records the loopback callback before the browser starts. The return route
- * accepts a callback only when it matches the row for this signed-in person;
- * a crafted page cannot point another person's token at a local listener.
+ * Registers a desktop sign-in before the system browser opens. The desktop is
+ * usually signed out, so the row is not bound to anyone yet: it holds the
+ * nonce hash, the loopback callback and a challenge for a verifier only the
+ * desktop knows. The browser that finishes OAuth binds it once (/return), and
+ * only the holder of the verifier can trade the result for a token (/exchange).
  */
 async function handlePOST(request: Request) {
   const origin = request.headers.get('origin')
   if (origin && origin !== new URL(request.url).origin) return new NextResponse(null, { status: 403 })
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return new NextResponse(null, { status: 401 })
 
   let body: unknown
   try {
@@ -30,14 +28,14 @@ async function handlePOST(request: Request) {
   const value = body && typeof body === 'object' ? body as Record<string, unknown> : {}
   const state = desktopAuthState(value.state)
   const callback = desktopLoopbackCallback(value.callback)
-  if (!state || !callback) return NextResponse.json({ error: 'invalidRequest' }, { status: 400 })
+  const challenge = desktopAuthChallenge(value.challenge)
+  if (!state || !callback || !challenge) return NextResponse.json({ error: 'invalidRequest' }, { status: 400 })
 
-  const now = new Date()
   const result = await db.insert(desktopAuthRequests).values({
-    stateHash: createHash('sha256').update(state).digest('hex'),
-    userId: session.user.id,
+    stateHash: sha256Hex(state),
     callback,
-    expiresAt: new Date(now.getTime() + 10 * 60_000),
+    codeChallenge: challenge,
+    expiresAt: new Date(Date.now() + DESKTOP_AUTH_PENDING_TTL_MS),
   }).onConflictDoNothing()
   if (!result.rowCount) return NextResponse.json({ error: 'stateUnavailable' }, { status: 409 })
   return new NextResponse(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })
