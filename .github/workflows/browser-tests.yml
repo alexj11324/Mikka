@@ -581,7 +581,7 @@ jobs:
     # selected test job fail; documentation is the only test-free tier.
     name: Browser tests (before merge)
     needs: [changes, browser-build, browser-runtime, browser-selection, browser-e2e-full]
-    if: always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
